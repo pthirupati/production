@@ -1,0 +1,42 @@
+# Scenario definition — loaded by admin or seed script
+title: "Fix Broken User Creation"
+slug: "broken-useradd"
+technology: "Linux"
+category: "User Management"
+difficulty: "medium"
+time_limit: 900  # 15 minutes
+max_score: 100
+infrastructure_type: "aws_ec2"
+
+description: |
+  The system administrator received an urgent ticket: new employees
+  cannot be added to the server. The `useradd` command fails with
+  errors, and existing user management appears corrupted. You need
+  to diagnose the issue, repair the user management system, and
+  successfully create the required user accounts.
+
+objectives:
+  - Investigate why useradd is failing
+  - Fix the corrupted /etc/passwd and /etc/group files
+  - Restore correct permissions on user management files
+  - Create the user 'devops' with a home directory and bash shell
+  - Verify the user can log in with 'su - devops'
+
+initial_state: |
+  You have SSH access to an Ubuntu 22.04 EC2 instance.
+  The useradd command is broken due to corrupted system files.
+  Someone has tampered with critical user management configurations.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "Try running 'useradd testuser' and read the exact error message carefully."
+  - order: 2
+    cost: 15
+    content: "Check permissions on /etc/passwd, /etc/shadow, /etc/group with 'ls -la /etc/passwd /etc/shadow /etc/group'. They should be 644, 640, 644 respectively."
+  - order: 3
+    cost: 20
+    content: "Look for a duplicate entry or corrupted line in /etc/passwd — use 'pwck' to verify."
+  - order: 4
+    cost: 25
+    content: "Fix: chmod 644 /etc/passwd /etc/group && chmod 640 /etc/shadow. Remove the corrupted line from /etc/passwd. Then run: useradd -m -s /bin/bash devops"

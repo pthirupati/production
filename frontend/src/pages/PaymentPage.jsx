@@ -1,0 +1,876 @@
+/**
+ * PaymentPage — Modern 3D Payment Flow with Method Selection
+ *
+ * Features:
+ * - Selectable payment methods (UPI, Credit/Debit Card, Net Banking, Wallets)
+ * - 3D card transforms, glassmorphism, animated backgrounds
+ * - Smooth step transitions with animations
+ * - Live currency display (INR/USD)
+ * - Razorpay integration (or demo mode fallback)
+ */
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams, useNavigate, Link } from 'react-router-dom'
+import { useAuthStore } from '../store/authStore'
+import { useThemeStore } from '../store/themeStore'
+import { subscriptionApi } from '../api/subscriptions'
+import {
+  ArrowLeft, ShieldCheck, Lock, CheckCircle2, Loader2, AlertTriangle,
+  Sun, Moon, Terminal, CreditCard, Smartphone, Building2, BadgeCheck,
+  IndianRupee, Globe, Clock, Wallet, Fingerprint, Sparkles,
+  Star, Award, ChevronRight, ArrowRight, Zap, Shield
+} from 'lucide-react'
+import toast from 'react-hot-toast'
+
+/* ──────── PAYMENT METHODS ──────── */
+const paymentMethods = [
+  {
+    id: 'upi',
+    label: 'UPI',
+    desc: 'Google Pay, PhonePe, Paytm',
+    icon: Smartphone,
+    gradient: 'from-violet-500 to-purple-600',
+    bgGlow: 'bg-violet-500/10',
+    borderActive: 'border-violet-500/50',
+    shadowActive: 'shadow-violet-500/20',
+    popular: true,
+  },
+  {
+    id: 'card',
+    label: 'Credit / Debit Card',
+    desc: 'Visa, Mastercard, RuPay, Amex',
+    icon: CreditCard,
+    gradient: 'from-blue-500 to-cyan-500',
+    bgGlow: 'bg-blue-500/10',
+    borderActive: 'border-blue-500/50',
+    shadowActive: 'shadow-blue-500/20',
+    popular: false,
+  },
+  {
+    id: 'netbanking',
+    label: 'Net Banking',
+    desc: '50+ banks supported',
+    icon: Building2,
+    gradient: 'from-emerald-500 to-teal-500',
+    bgGlow: 'bg-emerald-500/10',
+    borderActive: 'border-emerald-500/50',
+    shadowActive: 'shadow-emerald-500/20',
+    popular: false,
+  },
+  {
+    id: 'wallet',
+    label: 'Wallets',
+    desc: 'Paytm, Amazon Pay, Mobikwik',
+    icon: Wallet,
+    gradient: 'from-amber-500 to-orange-500',
+    bgGlow: 'bg-amber-500/10',
+    borderActive: 'border-amber-500/50',
+    shadowActive: 'shadow-amber-500/20',
+    popular: false,
+  },
+]
+
+/* ──────── ANIMATED PARTICLES ──────── */
+function FloatingParticles() {
+  return (
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+      {/* Large gradient orbs */}
+      <div className="absolute top-[-10%] left-[-5%] w-[600px] h-[600px] bg-accent-cyan/[0.04] rounded-full blur-[150px] animate-float" />
+      <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-accent-purple/[0.05] rounded-full blur-[130px] animate-float-delayed" />
+      <div className="absolute top-1/2 left-1/3 w-[400px] h-[400px] bg-blue-500/[0.03] rounded-full blur-[120px] animate-morph" />
+      <div className="absolute top-1/4 right-1/4 w-[300px] h-[300px] bg-violet-500/[0.03] rounded-full blur-[100px] animate-float" />
+
+      {/* Grid pattern overlay */}
+      <div className="absolute inset-0 opacity-[0.015]"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(6,182,212,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(6,182,212,0.3) 1px, transparent 1px)',
+          backgroundSize: '80px 80px',
+        }}
+      />
+
+      {/* Floating dots */}
+      {[...Array(6)].map((_, i) => (
+        <div
+          key={i}
+          className="absolute w-1 h-1 rounded-full bg-accent-cyan/20 animate-float"
+          style={{
+            left: `${15 + i * 15}%`,
+            top: `${20 + (i % 3) * 25}%`,
+            animationDelay: `${i * 0.8}s`,
+            animationDuration: `${4 + i}s`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+/* ──────── MAIN COMPONENT ──────── */
+export default function PaymentPage() {
+  const { user } = useAuthStore()
+  const { theme, toggleTheme } = useThemeStore()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  const paymentToken = searchParams.get('token')
+  const techName = searchParams.get('tech')
+  const amountINR = searchParams.get('amount')
+  const techId = searchParams.get('tech_id')
+  const existingOrderId = searchParams.get('order_id')
+  const existingRazorpayKey = searchParams.get('razorpay_key')
+  const displayCurrency = searchParams.get('display_currency') || 'INR'
+  const displayAmountUSD = searchParams.get('display_amount')
+  const paramExchangeRate = searchParams.get('exchange_rate')
+
+  const [step, setStep] = useState('summary') // summary -> processing -> success -> failed
+  const [selectedMethod, setSelectedMethod] = useState('upi')
+  const [razorpayReady, setRazorpayReady] = useState(false)
+  const [razorpayFailed, setRazorpayFailed] = useState(false)
+  const [paymentResult, setPaymentResult] = useState(null)
+  const [error, setError] = useState('')
+  const [hoveredMethod, setHoveredMethod] = useState(null)
+  const [upiId, setUpiId] = useState('')
+  const cardRef = useRef(null)
+
+  // Display amounts
+  const amountNum = parseInt(amountINR) || 0
+  const displayAmount = displayCurrency === 'USD' && displayAmountUSD
+    ? `$${displayAmountUSD}`
+    : `\u20B9${amountINR}`
+  const secondaryAmount = displayCurrency === 'USD' && displayAmountUSD
+    ? `(\u20B9${amountINR} INR)`
+    : ''
+
+  // Load Razorpay SDK
+  useEffect(() => {
+    if (window.Razorpay) { setRazorpayReady(true); return }
+    if (document.getElementById('razorpay-sdk')) {
+      const existing = document.getElementById('razorpay-sdk')
+      existing.addEventListener('load', () => setRazorpayReady(true))
+      existing.addEventListener('error', () => setRazorpayFailed(true))
+      return
+    }
+    const script = document.createElement('script')
+    script.id = 'razorpay-sdk'
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.async = true
+    script.onload = () => setRazorpayReady(true)
+    script.onerror = () => {
+      console.error('Razorpay SDK failed to load')
+      setRazorpayFailed(true)
+    }
+    document.body.appendChild(script)
+  }, [])
+
+  // Redirect if no token
+  useEffect(() => {
+    if (!paymentToken || !techName || !amountINR) {
+      navigate('/pricing', { replace: true })
+    }
+  }, [paymentToken, techName, amountINR, navigate])
+
+  // 3D tilt effect on card
+  useEffect(() => {
+    const card = cardRef.current
+    if (!card) return
+
+    const handleMouseMove = (e) => {
+      const rect = card.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      const centerX = rect.width / 2
+      const centerY = rect.height / 2
+      const rotateX = ((y - centerY) / centerY) * -5
+      const rotateY = ((x - centerX) / centerX) * 5
+      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`
+    }
+
+    const handleMouseLeave = () => {
+      card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1)'
+    }
+
+    card.addEventListener('mousemove', handleMouseMove)
+    card.addEventListener('mouseleave', handleMouseLeave)
+    return () => {
+      card.removeEventListener('mousemove', handleMouseMove)
+      card.removeEventListener('mouseleave', handleMouseLeave)
+    }
+  }, [step])
+
+  const openRazorpayCheckout = async () => {
+    setError('')
+
+    // Validate payment method inputs
+    if (selectedMethod === 'upi' && upiId && !/^[\w.\-]+@[\w]+$/.test(upiId.trim())) {
+      setError('Please enter a valid UPI ID (e.g., yourname@upi)')
+      return
+    }
+
+    // DEMO MODE: If we have a paymentToken from URL and no Razorpay order_id,
+    // this means Razorpay is NOT configured on backend → use confirm-payment flow
+    const isDemoMode = paymentToken && !existingOrderId
+
+    if (isDemoMode) {
+      setStep('processing')
+      try {
+        const result = await subscriptionApi.confirmPayment(paymentToken, selectedMethod)
+        setPaymentResult(result)
+        setStep('success')
+        toast.success('Payment successful!')
+      } catch (err) {
+        const msg = err?.response?.data?.error || 'Payment failed. Please try again.'
+        setError(msg)
+        setStep('failed')
+      }
+      return
+    }
+
+    // RAZORPAY MODE: Real payment with Razorpay Checkout
+    if (!razorpayReady || !window.Razorpay) {
+      setError('Payment system is loading. Please wait a moment and try again.')
+      return
+    }
+
+    try {
+      setStep('processing')
+
+      let orderId = existingOrderId
+      let razorpayKey = existingRazorpayKey
+      let amountPaise = amountNum * 100
+
+      if (!orderId) {
+        // Create a new Razorpay order
+        const orderData = await subscriptionApi.createRazorpayOrder(parseInt(techId))
+
+        if (orderData.payment_token && !orderData.order_id) {
+          // Backend returned demo token (Razorpay not configured)
+          const result = await subscriptionApi.confirmPayment(orderData.payment_token, selectedMethod)
+          setPaymentResult(result)
+          setStep('success')
+          return
+        }
+
+        orderId = orderData.order_id
+        razorpayKey = orderData.razorpay_key_id
+        amountPaise = orderData.amount_paise || amountPaise
+      }
+
+      if (!orderId) {
+        setError('Failed to create payment order. Please try again.')
+        setStep('summary')
+        return
+      }
+
+      setStep('summary')
+
+      const methodMap = { upi: 'upi', card: 'card', netbanking: 'netbanking', wallet: 'wallet' }
+
+      const options = {
+        key: razorpayKey,
+        amount: amountPaise,
+        currency: 'INR',
+        name: 'FixitLab',
+        description: `${techName} \u2014 Lifetime Access`,
+        order_id: orderId,
+        prefill: {
+          name: user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : user?.username,
+          email: user?.email || '',
+          method: methodMap[selectedMethod] || 'upi',
+        },
+        notes: {
+          technology: techName,
+          technology_id: techId,
+        },
+        theme: {
+          color: '#06b6d4',
+          backdrop_color: 'rgba(0,0,0,0.85)',
+        },
+        modal: {
+          ondismiss: () => {
+            setStep('summary')
+            toast('Payment cancelled.', { icon: '\u26A0\uFE0F' })
+          },
+          confirm_close: true,
+          escape: false,
+        },
+        handler: async (response) => {
+          setStep('processing')
+          try {
+            const verifyResult = await subscriptionApi.verifyRazorpayPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              technology_id: parseInt(techId),
+            })
+            setPaymentResult(verifyResult)
+            setStep('success')
+            toast.success('Payment verified successfully!')
+          } catch (err) {
+            setError(err?.response?.data?.error || 'Payment verification failed. Contact support.')
+            setStep('failed')
+          }
+        },
+      }
+
+      const rzp = new window.Razorpay(options)
+      rzp.on('payment.failed', (response) => {
+        setError(response.error?.description || 'Payment failed. Please try again.')
+        setStep('failed')
+      })
+      rzp.open()
+
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Failed to initiate payment. Please try again.')
+      setStep('summary')
+    }
+  }
+
+  if (!paymentToken) return null
+
+  return (
+    <div className="min-h-screen bg-surface-950 relative overflow-hidden">
+      <FloatingParticles />
+
+      {/* Header */}
+      <nav className="border-b border-surface-700/20 backdrop-blur-2xl sticky top-0 z-50 bg-surface-950/70">
+        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link to="/pricing" className="p-2 text-surface-400 hover:text-white transition-colors rounded-lg hover:bg-surface-800/50">
+              <ArrowLeft size={18} />
+            </Link>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center shadow-lg shadow-accent-cyan/20">
+                <Terminal size={16} className="text-white" />
+              </div>
+              <span className="font-bold text-white">FixitLab</span>
+              <span className="text-surface-500 text-sm">/ Checkout</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-surface-400 bg-surface-800/40 px-3 py-1.5 rounded-full border border-surface-700/20 backdrop-blur-xl">
+              <Lock size={12} className="text-accent-green" />
+              <span>256-bit SSL</span>
+            </div>
+            <button onClick={toggleTheme} className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800/50 transition-all">
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <div className="max-w-5xl mx-auto px-6 py-10 relative z-10">
+
+        {/* ════════════════ STEP: SUMMARY ════════════════ */}
+        {step === 'summary' && (
+          <div className="grid lg:grid-cols-5 gap-8 animate-slide-up">
+
+            {/* ── LEFT: Payment Method Selection ── */}
+            <div className="lg:col-span-3 space-y-6">
+              <div>
+                <h1 className="text-3xl font-extrabold text-white mb-2 bg-gradient-to-r from-white to-surface-300 bg-clip-text text-transparent">
+                  Choose Payment Method
+                </h1>
+                <p className="text-surface-400">Select how you&apos;d like to pay for {techName}</p>
+              </div>
+
+              {/* Payment Method Cards — 3D hover */}
+              <div className="grid grid-cols-2 gap-4">
+                {paymentMethods.map(method => {
+                  const Icon = method.icon
+                  const isSelected = selectedMethod === method.id
+                  const isHovered = hoveredMethod === method.id
+                  return (
+                    <button
+                      key={method.id}
+                      onClick={() => setSelectedMethod(method.id)}
+                      onMouseEnter={() => setHoveredMethod(method.id)}
+                      onMouseLeave={() => setHoveredMethod(null)}
+                      className={`relative p-5 rounded-2xl border-2 text-left transition-all duration-500
+                        ${isSelected
+                          ? `${method.borderActive} ${method.bgGlow} shadow-xl ${method.shadowActive}`
+                          : 'border-surface-700/30 hover:border-surface-600/50 bg-surface-800/20 hover:bg-surface-800/40'
+                        }
+                      `}
+                      style={{
+                        transform: isHovered
+                          ? 'perspective(800px) rotateY(3deg) rotateX(-2deg) scale(1.03)'
+                          : 'perspective(800px) rotateY(0) rotateX(0) scale(1)',
+                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                      }}
+                    >
+                      {/* Popular badge */}
+                      {method.popular && (
+                        <div className="absolute -top-2.5 right-3 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 text-[9px] font-bold text-white uppercase tracking-widest shadow-lg">
+                          Popular
+                        </div>
+                      )}
+
+                      {/* Selection indicator */}
+                      <div className={`absolute top-4 right-4 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+                        isSelected
+                          ? `bg-gradient-to-br ${method.gradient} border-transparent`
+                          : 'border-surface-600'
+                      }`}>
+                        {isSelected && <CheckCircle2 size={12} className="text-white" />}
+                      </div>
+
+                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${method.gradient} flex items-center justify-center mb-3 shadow-lg transition-transform duration-300 ${isSelected ? 'scale-110' : ''}`}>
+                        <Icon size={22} className="text-white" />
+                      </div>
+
+                      <h3 className={`font-bold mb-0.5 transition-colors ${isSelected ? 'text-white' : 'text-surface-300'}`}>
+                        {method.label}
+                      </h3>
+                      <p className="text-xs text-surface-500">{method.desc}</p>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Payment Method Details Form */}
+              <div className="glass-card p-5 animate-fade-in">
+                {selectedMethod === 'upi' && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <Smartphone size={16} className="text-violet-400" /> Enter UPI Details
+                    </h4>
+                    <div>
+                      <label className="text-xs text-surface-400 block mb-1.5">UPI ID</label>
+                      <input
+                        type="text"
+                        value={upiId}
+                        onChange={(e) => setUpiId(e.target.value)}
+                        placeholder="yourname@upi, yourname@paytm, etc."
+                        className="input-field w-full text-sm"
+                      />
+                      <p className="text-[10px] text-surface-500 mt-1.5">
+                        Enter your UPI ID linked to Google Pay, PhonePe, Paytm, or any bank UPI app.
+                        A payment request will be sent to your UPI app for approval.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-surface-800/40 rounded-lg border border-surface-700/20">
+                      <div className="flex gap-2">
+                        {['GPay', 'PhonePe', 'Paytm', 'BHIM'].map(app => (
+                          <div key={app} className="px-2 py-1 bg-surface-700/40 rounded text-[10px] text-surface-400 font-medium">{app}</div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedMethod === 'card' && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <CreditCard size={16} className="text-blue-400" /> Card Payment
+                    </h4>
+                    <div className="p-4 bg-surface-800/30 rounded-xl border border-surface-700/20 space-y-3">
+                      <div>
+                        <label className="text-xs text-surface-400 block mb-1.5">Card Number</label>
+                        <div className="input-field w-full text-sm text-surface-500 cursor-not-allowed flex items-center gap-2">
+                          <CreditCard size={14} className="text-surface-500" />
+                          <span>**** **** **** ****</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-surface-400 block mb-1.5">Expiry</label>
+                          <div className="input-field w-full text-sm text-surface-500 cursor-not-allowed">MM / YY</div>
+                        </div>
+                        <div>
+                          <label className="text-xs text-surface-400 block mb-1.5">CVV</label>
+                          <div className="input-field w-full text-sm text-surface-500 cursor-not-allowed">***</div>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-surface-500 flex items-center gap-1.5">
+                        <Lock size={10} className="text-accent-green" />
+                        Card details will be entered securely on Razorpay&apos;s PCI-certified checkout
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {['Visa', 'Mastercard', 'RuPay', 'Amex'].map(card => (
+                        <div key={card} className="px-2.5 py-1 bg-surface-700/40 rounded text-[10px] text-surface-400 font-medium border border-surface-700/30">{card}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedMethod === 'netbanking' && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <Building2 size={16} className="text-emerald-400" /> Net Banking
+                    </h4>
+                    <p className="text-xs text-surface-400">
+                      You will be redirected to your bank&apos;s secure login page to authorize the payment.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak', 'PNB', 'BOB', 'Union'].map(bank => (
+                        <div key={bank} className="flex items-center gap-2 p-2.5 bg-surface-800/40 rounded-lg border border-surface-700/20 text-xs text-surface-300">
+                          <Building2 size={12} className="text-emerald-400/60" />
+                          {bank} Bank
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-surface-500">50+ banks supported via Razorpay</p>
+                  </div>
+                )}
+
+                {selectedMethod === 'wallet' && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <Wallet size={16} className="text-amber-400" /> Wallet Payment
+                    </h4>
+                    <p className="text-xs text-surface-400">
+                      Select your wallet and you&apos;ll be redirected to authorize the payment.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { name: 'Paytm', color: 'text-blue-400' },
+                        { name: 'Amazon Pay', color: 'text-yellow-400' },
+                        { name: 'Mobikwik', color: 'text-cyan-400' },
+                        { name: 'Freecharge', color: 'text-green-400' },
+                      ].map(w => (
+                        <div key={w.name} className="flex items-center gap-2 p-2.5 bg-surface-800/40 rounded-lg border border-surface-700/20 text-xs text-surface-300">
+                          <Wallet size={12} className={w.color} />
+                          {w.name}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Security badges */}
+              <div className="glass-card p-5 space-y-3 bg-surface-800/10">
+                <h3 className="font-semibold text-white flex items-center gap-2 text-sm">
+                  <Shield size={16} className="text-accent-green" /> Payment Security
+                </h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { icon: Lock, label: 'PCI DSS Level 1', color: 'text-accent-green' },
+                    { icon: Fingerprint, label: '3D Secure / OTP', color: 'text-accent-cyan' },
+                    { icon: ShieldCheck, label: 'RBI Compliant', color: 'text-accent-purple' },
+                  ].map(({ icon: SIcon, label, color }) => (
+                    <div key={label} className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-surface-800/30 border border-surface-700/20">
+                      <SIcon size={16} className={color} />
+                      <p className="text-[10px] text-surface-400 text-center">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-surface-500 leading-relaxed">
+                  Razorpay handles all card validation and bank OTP. Your payment details are entered directly on Razorpay&apos;s certified checkout — <strong className="text-surface-400">we never see or store your card/UPI data.</strong>
+                </p>
+              </div>
+
+              {razorpayFailed && (
+                <div className="glass-card p-4 border-accent-amber/30 bg-accent-amber/5 animate-fade-in">
+                  <div className="flex items-center gap-2 text-accent-amber mb-1.5">
+                    <AlertTriangle size={16} />
+                    <p className="font-medium text-sm">Razorpay SDK could not load</p>
+                  </div>
+                  <p className="text-xs text-surface-400">
+                    This may be due to an ad blocker or network issue. Please disable ad blockers and refresh.
+                  </p>
+                </div>
+              )}
+
+              {error && (
+                <div className="glass-card p-4 border-accent-red/30 bg-accent-red/5 flex items-center gap-3 animate-shake">
+                  <AlertTriangle size={16} className="text-accent-red shrink-0" />
+                  <p className="text-sm text-accent-red">{error}</p>
+                </div>
+              )}
+
+              {/* Pay Now Button */}
+              <button
+                onClick={openRazorpayCheckout}
+                disabled={razorpayFailed && !paymentToken}
+                className="w-full py-4 rounded-2xl text-lg font-bold flex items-center justify-center gap-3 disabled:opacity-40
+                  bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple text-white
+                  shadow-2xl shadow-accent-cyan/20 hover:shadow-accent-cyan/40
+                  hover:scale-[1.02] active:scale-[0.98] transition-all duration-300
+                  relative overflow-hidden group"
+              >
+                {/* Shimmer effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                <Lock size={18} className="relative z-10" />
+                <span className="relative z-10">Pay {displayAmount} Securely</span>
+                <ArrowRight size={18} className="relative z-10 group-hover:translate-x-1 transition-transform" />
+              </button>
+
+              <div className="flex items-center justify-center gap-6 text-xs text-surface-500">
+                <span className="flex items-center gap-1"><ShieldCheck size={12} className="text-accent-green" /> PCI DSS Level 1</span>
+                <span className="flex items-center gap-1"><Lock size={12} /> 256-bit encryption</span>
+                <span className="flex items-center gap-1"><BadgeCheck size={12} /> RBI compliant</span>
+              </div>
+            </div>
+
+            {/* ── RIGHT: Order Summary Card (3D tilt) ── */}
+            <div className="lg:col-span-2">
+              <div
+                ref={cardRef}
+                className="glass-card p-6 sticky top-24 border-surface-700/30 will-change-transform"
+                style={{ transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles size={14} className="text-accent-cyan animate-pulse" />
+                  <h3 className="text-sm font-bold text-surface-400 uppercase tracking-wider">Order Summary</h3>
+                </div>
+
+                {/* Tech card */}
+                <div className="relative rounded-2xl overflow-hidden mb-5">
+                  <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/20 via-accent-blue/10 to-accent-purple/20" />
+                  <div className="relative p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-14 h-14 rounded-xl bg-white/10 backdrop-blur-xl flex items-center justify-center border border-white/10 shadow-xl">
+                        <Terminal size={24} className="text-white" />
+                      </div>
+                      <div>
+                        <p className="font-extrabold text-white text-xl">{techName}</p>
+                        <p className="text-xs text-surface-300 flex items-center gap-1">
+                          <Star size={10} className="text-accent-amber" /> Lifetime Access
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {[
+                        { icon: CheckCircle2, label: `All ${techName} scenarios` },
+                        { icon: Zap, label: 'Full hints & solutions' },
+                        { icon: Award, label: 'Completion certificate' },
+                        { icon: ShieldCheck, label: 'Priority support' },
+                      ].map(({ icon: FIcon, label }) => (
+                        <div key={label} className="flex items-center gap-1.5 text-surface-200">
+                          <FIcon size={11} className="text-accent-green shrink-0" />
+                          <span>{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Price breakdown */}
+                <div className="space-y-2.5 text-sm mb-5">
+                  <div className="flex justify-between text-surface-400">
+                    <span>{techName} Subscription</span>
+                    <span>{'\u20B9'}{amountINR}</span>
+                  </div>
+                  {displayCurrency === 'USD' && displayAmountUSD && (
+                    <div className="flex justify-between text-surface-500 text-xs">
+                      <span>Converted to USD</span>
+                      <span>${displayAmountUSD}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-surface-500">
+                    <span>GST (included)</span>
+                    <span>{'\u20B9'}0</span>
+                  </div>
+                  <div className="border-t border-surface-700/30 pt-3 flex justify-between text-white font-bold">
+                    <span>Total</span>
+                    <div className="text-right">
+                      <span className="text-2xl bg-gradient-to-r from-white to-accent-cyan bg-clip-text text-transparent">
+                        {displayAmount}
+                      </span>
+                      {secondaryAmount && (
+                        <p className="text-[10px] text-surface-500 font-normal mt-0.5">{secondaryAmount}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selected payment method indicator */}
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-surface-800/30 border border-surface-700/20 mb-4">
+                  {(() => {
+                    const method = paymentMethods.find(m => m.id === selectedMethod)
+                    const MIcon = method?.icon || CreditCard
+                    return (
+                      <>
+                        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${method?.gradient || 'from-gray-500 to-gray-600'} flex items-center justify-center`}>
+                          <MIcon size={14} className="text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-surface-300">Paying via</p>
+                          <p className="text-xs text-surface-500">{method?.label || 'UPI'}</p>
+                        </div>
+                        <ChevronRight size={14} className="text-surface-500" />
+                      </>
+                    )
+                  })()}
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-surface-500 pt-3 border-t border-surface-700/20">
+                  <Lock size={12} className="text-accent-green shrink-0" />
+                  <span>Your payment info is processed by Razorpay. We never store card details.</span>
+                </div>
+
+                <div className="mt-3 p-2.5 bg-surface-800/20 border border-surface-700/15 rounded-lg">
+                  <p className="text-[10px] text-surface-500 flex items-center gap-1.5">
+                    <Clock size={10} /> Session expires in 30 minutes
+                  </p>
+                </div>
+
+                {paramExchangeRate && displayCurrency === 'USD' && (
+                  <div className="mt-3 text-center">
+                    <p className="text-[10px] text-surface-500">
+                      Exchange rate: 1 USD = {'\u20B9'}{paramExchangeRate} (live)
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════ STEP: PROCESSING ════════════════ */}
+        {step === 'processing' && (
+          <div className="flex flex-col items-center justify-center py-24 animate-fade-in">
+            {/* Animated concentric rings */}
+            <div className="relative mb-10">
+              <div className="w-32 h-32 rounded-full border-[3px] border-accent-cyan/10 animate-spin-slow" />
+              <div className="absolute inset-2 rounded-full border-[3px] border-accent-purple/15 animate-spin" style={{ animationDirection: 'reverse' }} />
+              <div className="absolute inset-4 rounded-full border-[3px] border-accent-blue/20 animate-spin-slow" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent-cyan to-accent-purple flex items-center justify-center shadow-2xl shadow-accent-cyan/30">
+                  <IndianRupee size={28} className="text-white" />
+                </div>
+              </div>
+            </div>
+            <h2 className="text-2xl font-extrabold text-white mb-3 bg-gradient-to-r from-white to-surface-300 bg-clip-text text-transparent">
+              Processing Payment
+            </h2>
+            <p className="text-surface-400 text-sm mb-6 text-center max-w-sm">
+              Verifying your payment with the bank. This may take a few moments...
+            </p>
+            <div className="flex items-center gap-2 px-4 py-2 bg-surface-800/30 rounded-full border border-surface-700/20">
+              <Lock size={12} className="text-accent-green" />
+              <span className="text-xs text-surface-500">Do not close this page</span>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════ STEP: SUCCESS ════════════════ */}
+        {step === 'success' && (
+          <div className="max-w-lg mx-auto flex flex-col items-center py-16 animate-scale-in">
+            {/* Animated success icon */}
+            <div className="relative mb-8">
+              <div className="w-24 h-24 rounded-full bg-accent-green/20 border-2 border-accent-green/30 flex items-center justify-center animate-bounce-subtle">
+                <CheckCircle2 size={48} className="text-accent-green" />
+              </div>
+              <div className="absolute -inset-4 rounded-full bg-accent-green/5 blur-xl animate-pulse" />
+              {/* Confetti dots */}
+              {[...Array(8)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-2 h-2 rounded-full animate-float"
+                  style={{
+                    background: ['#06b6d4', '#a855f7', '#eab308', '#22c55e', '#f43f5e'][i % 5],
+                    left: `${50 + 40 * Math.cos(i * Math.PI / 4)}%`,
+                    top: `${50 + 40 * Math.sin(i * Math.PI / 4)}%`,
+                    animationDelay: `${i * 0.2}s`,
+                    animationDuration: '3s',
+                  }}
+                />
+              ))}
+            </div>
+
+            <h2 className="text-3xl font-extrabold text-white mb-3 bg-gradient-to-r from-accent-green to-accent-cyan bg-clip-text text-transparent">
+              Payment Successful!
+            </h2>
+            <p className="text-surface-400 text-sm mb-8 text-center max-w-md">
+              Your {techName} subscription is now active. You have lifetime access to all {techName} scenarios, hints, and certificates.
+            </p>
+
+            <div className="glass-card p-6 w-full mb-8 border-accent-green/20 bg-accent-green/[0.02]">
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-surface-400">Technology</span>
+                  <span className="text-white font-semibold">{techName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-surface-400">Amount Paid</span>
+                  <span className="text-accent-green font-bold">{'\u20B9'}{amountINR}</span>
+                </div>
+                {paymentResult?.subscription_id && (
+                  <div className="flex justify-between">
+                    <span className="text-surface-400">Subscription ID</span>
+                    <span className="text-surface-300 font-mono text-xs">{paymentResult.subscription_id}</span>
+                  </div>
+                )}
+                {paymentResult?.razorpay_payment_id && (
+                  <div className="flex justify-between">
+                    <span className="text-surface-400">Payment ID</span>
+                    <span className="text-surface-300 font-mono text-xs">{paymentResult.razorpay_payment_id}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-surface-400">Access</span>
+                  <span className="text-surface-300">Lifetime</span>
+                </div>
+                <div className="border-t border-surface-700/30 pt-2 flex justify-between">
+                  <span className="text-surface-400">Status</span>
+                  <span className="text-accent-green font-semibold flex items-center gap-1"><BadgeCheck size={14} /> Verified & Active</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 w-full">
+              <Link to="/dashboard" className="btn-primary flex-1 text-center py-3.5 flex items-center justify-center gap-2 text-base font-bold">
+                Go to Dashboard
+              </Link>
+              <Link to="/pricing" className="btn-secondary flex-1 text-center py-3.5 font-semibold">
+                Subscribe More
+              </Link>
+            </div>
+
+            <p className="text-xs text-surface-500 mt-6 text-center">
+              A confirmation email and invoice have been sent to {user?.email}
+            </p>
+          </div>
+        )}
+
+        {/* ════════════════ STEP: FAILED ════════════════ */}
+        {step === 'failed' && (
+          <div className="max-w-lg mx-auto flex flex-col items-center py-16 animate-slide-up">
+            <div className="relative mb-8">
+              <div className="w-24 h-24 rounded-full bg-accent-red/20 border-2 border-accent-red/30 flex items-center justify-center">
+                <AlertTriangle size={44} className="text-accent-red animate-pulse" />
+              </div>
+              <div className="absolute -inset-4 rounded-full bg-accent-red/5 blur-xl" />
+            </div>
+
+            <h2 className="text-3xl font-extrabold text-white mb-3">Payment Failed</h2>
+            <p className="text-surface-400 text-sm mb-6 text-center max-w-md">{error || 'Your payment could not be processed. No amount has been deducted from your account.'}</p>
+
+            <div className="glass-card p-5 w-full mb-6 border-accent-red/20 bg-accent-red/[0.02]">
+              <h3 className="text-sm font-semibold text-white mb-3">Common reasons:</h3>
+              <ul className="text-xs text-surface-400 space-y-2">
+                {[
+                  'Insufficient funds in your account',
+                  'Incorrect OTP entered',
+                  'Bank declined the transaction',
+                  'Payment session timed out',
+                ].map(reason => (
+                  <li key={reason} className="flex items-center gap-2">
+                    <div className="w-1 h-1 rounded-full bg-accent-red/50" />
+                    {reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex gap-3 w-full">
+              <button onClick={() => { setStep('summary'); setError('') }} className="btn-primary flex-1 py-3.5 flex items-center justify-center gap-2 font-bold">
+                <CreditCard size={16} /> Try Again
+              </button>
+              <Link to="/pricing" className="btn-secondary flex-1 text-center py-3.5 font-semibold">
+                Back to Pricing
+              </Link>
+            </div>
+
+            <p className="text-xs text-surface-500 mt-6 text-center">
+              If amount was deducted, it will be refunded within 5-7 business days. Contact{' '}
+              <a href="mailto:fixitlab.techsupport@gmail.com" className="text-accent-cyan hover:underline">support</a> for help.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

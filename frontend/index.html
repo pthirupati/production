@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FixitLab — Master DevOps by Breaking & Fixing Real Systems</title>
+    <meta name="description" content="Practice real-world DevOps, Linux, Docker, Kubernetes, and cloud skills on live environments. Timed challenges, auto-validation, leaderboards, and achievements." />
+    <meta name="keywords" content="DevOps, Linux, Docker, Kubernetes, hands-on labs, troubleshooting, SRE, cloud, practice, learning platform" />
+    <meta name="author" content="FixitLab" />
+    <link rel="canonical" href="https://fixitlab.com/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="FixitLab — Master DevOps by Breaking & Fixing Real Systems" />
+    <meta property="og:description" content="Practice real-world DevOps skills on live environments. Linux, Docker, Kubernetes, cloud — timed challenges with auto-validation." />
+    <meta property="og:url" content="https://fixitlab.com/" />
+    <meta property="og:site_name" content="FixitLab" />
+    <meta property="og:image" content="https://fixitlab.com/og-image.png" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="FixitLab — Master DevOps by Breaking & Fixing Real Systems" />
+    <meta name="twitter:description" content="Practice real-world DevOps skills on live environments with timed challenges and auto-validation." />
+    <meta name="twitter:image" content="https://fixitlab.com/og-image.png" />
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#04081a" />
+    <meta name="msapplication-TileColor" content="#04081a" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%2306b6d4'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Ctext x='50' y='68' font-family='system-ui' font-size='60' font-weight='800' fill='white' text-anchor='middle'%3EF%3C/text%3E%3C/svg%3E" />
+
+    <script>
+      // Apply saved theme before first paint to avoid flash
+      try {
+        const stored = JSON.parse(localStorage.getItem('fixitlab-theme'));
+        if (stored?.state?.theme) document.documentElement.setAttribute('data-theme', stored.state.theme);
+      } catch(e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+

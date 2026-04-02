@@ -1,0 +1,150 @@
+import uuid
+from django.db import models
+from django.conf import settings
+from django.utils import timezone
+from apps.question_bank.models import Scenario
+
+
+class CommandHistory(models.Model):
+    """Records every command a user types during a lab session (like SadServers)."""
+    session = models.ForeignKey(
+        "LabSession",
+        on_delete=models.CASCADE,
+        related_name="command_history",
+    )
+    command = models.TextField()
+    output = models.TextField(blank=True, default="")
+    timestamp = models.DateTimeField(auto_now_add=True)
+    exit_code = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["timestamp"]
+        indexes = [
+            models.Index(fields=["session", "timestamp"]),
+        ]
+
+    def __str__(self):
+        return f"{self.session_id}: {self.command[:60]}"
+
+
+class SessionRecording(models.Model):
+    """Stores terminal I/O recording for session replay (asciinema-style)."""
+    session = models.OneToOneField(
+        "LabSession",
+        on_delete=models.CASCADE,
+        related_name="recording",
+    )
+    events = models.JSONField(
+        default=list,
+        help_text="List of [timestamp, type, data] events for replay",
+    )
+    total_duration = models.FloatField(default=0, help_text="Total duration in seconds")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Recording for {self.session_id}"
+
+
+class LabSession(models.Model):
+    STATUS_CHOICES = [
+        ("PROVISIONING", "Provisioning"),
+        ("RUNNING", "Running"),
+        ("COMPLETED", "Completed"),
+        ("FAILED", "Failed"),
+        ("TERMINATED", "Terminated"),
+        ("EXPIRED", "Expired"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="lab_sessions",
+    )
+
+    scenario = models.ForeignKey(
+        Scenario,
+        on_delete=models.CASCADE,
+        related_name="lab_sessions",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="PROVISIONING",
+    )
+
+    provider = models.CharField(
+        max_length=50,
+        help_text="docker | aws_ec2 | digitalocean",
+        default="docker",
+    )
+
+    # Docker container info
+    container_id = models.CharField(max_length=255, blank=True, null=True)
+    container_name = models.CharField(max_length=255, blank=True, null=True)
+
+    # AWS instance info
+    instance_id = models.CharField(max_length=255, blank=True, null=True)
+    ssh_host = models.CharField(max_length=255, blank=True)
+    ssh_user = models.CharField(max_length=50, blank=True, default="root")
+    ssh_key_path = models.CharField(max_length=255, blank=True)
+
+    # Timing
+    duration_limit = models.PositiveIntegerField(
+        default=3600, help_text="Max duration in seconds"
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+
+    # Scoring
+    score = models.PositiveIntegerField(default=0)
+    hints_used = models.PositiveIntegerField(default=0)
+    validation_passed = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-started_at"]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["status", "started_at"]),
+            models.Index(fields=["user", "started_at"]),  # daily count queries
+            models.Index(fields=["instance_id"]),  # cleanup lookups
+            models.Index(fields=["container_id"]),  # cleanup lookups
+        ]
+
+    def __str__(self):
+        return f"{self.user} - {self.scenario.slug} ({self.status})"
+
+    @property
+    def is_expired(self):
+        if self.status != "RUNNING":
+            return False
+        elapsed = (timezone.now() - self.started_at).total_seconds()
+        return elapsed > self.duration_limit
+
+    @property
+    def time_remaining(self):
+        if self.status != "RUNNING":
+            return 0
+        elapsed = (timezone.now() - self.started_at).total_seconds()
+        remaining = self.duration_limit - elapsed
+        return max(0, int(remaining))
+
+    def mark_completed(self, score=100):
+        self.status = "COMPLETED"
+        self.score = score
+        self.validation_passed = True
+        self.ended_at = timezone.now()
+        self.save()
+
+    def mark_failed(self):
+        self.status = "FAILED"
+        self.ended_at = timezone.now()
+        self.save()
+
+    def mark_terminated(self):
+        self.status = "TERMINATED"
+        self.ended_at = timezone.now()
+        self.save()
+

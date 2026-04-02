@@ -1,0 +1,463 @@
+from pathlib import Path
+import environ
+import os
+from datetime import timedelta
+
+# --------------------------------------------------
+# Base paths & env
+# --------------------------------------------------
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+env = environ.Env(
+    DJANGO_DEBUG=(bool, False),
+)
+environ.Env.read_env(os.path.join(BASE_DIR.parent, ".env"))
+
+SECRET_KEY = env("DJANGO_SECRET_KEY")
+DEBUG = env.bool("DJANGO_DEBUG", default=False)
+
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
+
+# --------------------------------------------------
+# Applications
+# --------------------------------------------------
+INSTALLED_APPS = [
+    # Django core
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+
+    # Third-party
+    "rest_framework",
+    "rest_framework.authtoken",
+    "rest_framework_simplejwt.token_blacklist",
+    "corsheaders",
+    "channels",
+    "django_celery_results",
+    "django_celery_beat",
+    "django_filters",
+
+    # Local Django apps
+    "apps.accounts",
+    "apps.question_bank",
+    "apps.scenario_versions",
+    "apps.hints",
+    "apps.labs",
+    "apps.terminal",
+    "apps.progress",
+    "apps.leaderboard",
+    "apps.billing",
+    "apps.adminpanel",
+    "apps.audit",
+    "apps.notifications",
+    "apps.community",
+    "apps.ratings",
+]
+
+# --------------------------------------------------
+# Middleware
+# --------------------------------------------------
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.middleware.gzip.GZipMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+
+    # Security: restrict Django admin to superusers only
+    "common.middleware.AdminAccessMiddleware",
+
+    # Audit (LAST)
+    "apps.audit.middleware.AuditMiddleware",
+]
+
+ROOT_URLCONF = "config.urls"
+
+# --------------------------------------------------
+# CORS
+# --------------------------------------------------
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[
+    "http://localhost:5173",
+    "http://localhost:8080",
+    "http://localhost:80",
+    "http://localhost",
+])
+CORS_ALLOW_CREDENTIALS = True
+
+# CSRF
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[
+    "http://localhost:8080",
+    "http://localhost",
+    "http://localhost:5173",
+])
+
+# --------------------------------------------------
+# Templates
+# --------------------------------------------------
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [
+            BASE_DIR / "templates",
+        ],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+# --------------------------------------------------
+# WSGI / ASGI
+# --------------------------------------------------
+WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
+
+# --------------------------------------------------
+# Database (PostgreSQL – persistent)
+# --------------------------------------------------
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("POSTGRES_DB"),
+        "USER": env("POSTGRES_USER"),
+        "PASSWORD": env("POSTGRES_PASSWORD"),
+        "HOST": env("POSTGRES_HOST"),
+        "PORT": env("POSTGRES_PORT"),
+        "CONN_MAX_AGE": 600,  # 10 min persistent connections (reduces connect overhead)
+        "CONN_HEALTH_CHECKS": True,  # Verify connections before reuse
+        "OPTIONS": {
+            "connect_timeout": 5,
+        },
+    }
+}
+
+# --------------------------------------------------
+# Password validation
+# --------------------------------------------------
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+     "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+# --------------------------------------------------
+# Static & Media files
+# --------------------------------------------------
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# --------------------------------------------------
+# Django REST Framework + JWT
+# --------------------------------------------------
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",
+        "user": "1000/hour",
+        "auth": "10/minute",  # Strict limit on auth endpoints
+        "lab_start": "5/minute",  # Limit lab provisioning
+    },
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=2),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+# --------------------------------------------------
+# Channels (Redis)
+# --------------------------------------------------
+_channels_redis_host = env("REDIS_HOST", default="redis")
+_channels_redis_port = int(env("REDIS_PORT", default="6379"))
+_channels_redis_password = env("REDIS_PASSWORD", default="")
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                {
+                    "address": (_channels_redis_host, _channels_redis_port),
+                    **({"password": _channels_redis_password} if _channels_redis_password else {}),
+                }
+            ] if _channels_redis_password else [(_channels_redis_host, _channels_redis_port)],
+            "capacity": 1500,  # Max messages per channel before oldest dropped
+            "expiry": 60,  # Message expiry in seconds
+        },
+    }
+}
+
+# --------------------------------------------------
+# Celery (RabbitMQ)
+# --------------------------------------------------
+_celery_redis_host = env("REDIS_HOST", default="redis")
+_celery_redis_port = env("REDIS_PORT", default="6379")
+_celery_redis_password = env("REDIS_PASSWORD", default="")
+_celery_redis_auth = f":{_celery_redis_password}@" if _celery_redis_password else ""
+
+CELERY_BROKER_URL = env("CELERY_BROKER_URL")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_BACKEND = f"redis://{_celery_redis_auth}{_celery_redis_host}:{_celery_redis_port}/2"  # Redis (fast) instead of django-db
+CELERY_RESULT_EXPIRES = 3600  # Expire results after 1 hour
+CELERY_TIMEZONE = "UTC"
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 200  # Prevent memory leaks in long-lived workers
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Fair scheduling for long-running tasks
+CELERY_TASK_ACKS_LATE = True  # Re-deliver tasks if worker crashes mid-execution
+
+# Task routing: separate queues for long vs short tasks
+CELERY_TASK_ROUTES = {
+    "celery_app.tasks.provision_cloud_lab": {"queue": "provisioning"},
+    "celery_app.tasks.cleanup_expired_labs": {"queue": "maintenance"},
+    "celery_app.tasks.cleanup_orphaned_containers": {"queue": "maintenance"},
+    "celery_app.tasks.recalculate_leaderboard": {"queue": "maintenance"},
+    "apps.notifications.tasks.*": {"queue": "notifications"},
+}
+
+# Celery Beat
+from celery_app.beat_schedule import CELERY_BEAT_SCHEDULE  # noqa
+
+# --------------------------------------------------
+# Email (for notifications)
+# --------------------------------------------------
+# Priority: SMTP credentials → MailHog (local dev) → Console fallback
+_email_user = env("EMAIL_HOST_USER", default="")
+_email_host = env("EMAIL_HOST", default="mailhog")
+
+if _email_user:
+    # Production: use real SMTP (Mailgun, SES, SendGrid, etc.)
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = _email_host
+    EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+    EMAIL_USE_TLS = True
+else:
+    # Development: use MailHog (SMTP on port 1025, web UI on port 8025)
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = "mailhog"
+    EMAIL_PORT = 1025
+    EMAIL_USE_TLS = False
+
+EMAIL_HOST_USER = _email_user
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = "FixitLab <no-reply@fixitlab.com>"
+
+# Frontend URL for email links
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:8080")
+
+# --------------------------------------------------
+# Configurable Contact Emails
+# --------------------------------------------------
+PRIMARY_EMAIL = env("PRIMARY_EMAIL", default="fixitlab@gmail.com")
+PAYMENT_EMAIL = env("PAYMENT_EMAIL", default="kubelearn464@gmail.com")
+SUPPORT_EMAIL = env("SUPPORT_EMAIL", default="fixitlab.techsupport@gmail.com")
+
+# --------------------------------------------------
+# Maintenance Mode
+# --------------------------------------------------
+MAINTENANCE_MODE = env.bool("MAINTENANCE_MODE", default=False)
+MAINTENANCE_MESSAGE = env(
+    "MAINTENANCE_MESSAGE",
+    default="We are currently performing scheduled maintenance. Please check back soon."
+)
+
+# --------------------------------------------------
+# Internationalization
+# --------------------------------------------------
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
+USE_I18N = True
+USE_TZ = True
+
+# --------------------------------------------------
+# Business Details (invoices, receipts)
+# --------------------------------------------------
+BUSINESS_NAME = env("BUSINESS_NAME", default="FixitLab")
+BUSINESS_ADDRESS = env("BUSINESS_ADDRESS", default="")
+BUSINESS_GSTIN = env("BUSINESS_GSTIN", default="")
+BUSINESS_PAN = env("BUSINESS_PAN", default="")
+
+# --------------------------------------------------
+# Default PK
+# --------------------------------------------------
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --------------------------------------------------
+# Lab / Docker provisioning
+# --------------------------------------------------
+LAB_PROVIDER = env("LAB_PROVIDER", default="docker")  # docker | aws
+LAB_MAX_DURATION_MINUTES = env.int("LAB_MAX_DURATION_MINUTES", default=60)
+LAB_CLEANUP_INTERVAL_MINUTES = env.int("LAB_CLEANUP_INTERVAL_MINUTES", default=5)
+DOCKER_SOCKET = env("DOCKER_SOCKET", default="unix:///var/run/docker.sock")
+DOCKER_NETWORK = env("DOCKER_NETWORK", default="fixitlab_labs")
+DOCKER_SCENARIO_IMAGE_PREFIX = env("DOCKER_SCENARIO_IMAGE_PREFIX", default="fixitlab/scenario-")
+DOCKER_CONTAINER_MEMORY_LIMIT = env("DOCKER_CONTAINER_MEMORY_LIMIT", default="512m")
+DOCKER_CONTAINER_CPU_LIMIT = env.float("DOCKER_CONTAINER_CPU_LIMIT", default=1.0)
+
+# AWS provisioning (for later)
+AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
+AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
+AWS_REGION = env("AWS_REGION", default="us-east-1")
+AWS_LAB_BASE_AMI = env("AWS_LAB_BASE_AMI", default="ami-0c7217cdde317cfec")
+AWS_LAB_AMI_PREFIX = env("AWS_LAB_AMI_PREFIX", default="fixitlab-scenario-")
+AWS_LAB_INSTANCE_TYPE = env("AWS_LAB_INSTANCE_TYPE", default="t3.micro")
+AWS_LAB_SUBNET_ID = env("AWS_LAB_SUBNET_ID", default="")
+AWS_LAB_SECURITY_GROUP_ID = env("AWS_LAB_SECURITY_GROUP_ID", default="")
+AWS_LAB_KEY_PAIR = env("AWS_LAB_KEY_PAIR", default="fixitlab-labs")
+AWS_LAB_KEY_PEM = env("AWS_LAB_KEY_PEM", default="")
+AWS_LAB_KEY_PATH = env("AWS_LAB_KEY_PATH", default="")
+
+# DigitalOcean provisioning
+DO_API_TOKEN = env("DO_API_TOKEN", default="")
+DO_SSH_KEY_ID = env("DO_SSH_KEY_ID", default="")
+DO_SSH_KEY_PEM = env("DO_SSH_KEY_PEM", default="")
+DO_SSH_KEY_PATH = env("DO_SSH_KEY_PATH", default="")
+DO_REGION = env("DO_REGION", default="nyc1")
+DO_SIZE = env("DO_SIZE", default="s-1vcpu-1gb")
+
+# --------------------------------------------------
+# Social OAuth (GitHub + Google)
+# --------------------------------------------------
+GITHUB_CLIENT_ID = env("GITHUB_CLIENT_ID", default="")
+GITHUB_CLIENT_SECRET = env("GITHUB_CLIENT_SECRET", default="")
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
+GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")
+
+# --------------------------------------------------
+# Stripe billing
+# --------------------------------------------------
+STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
+STRIPE_PUBLISHABLE_KEY = env("STRIPE_PUBLISHABLE_KEY", default="")
+STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
+STRIPE_PRO_PRICE_ID = env("STRIPE_PRO_PRICE_ID", default="")
+STRIPE_TEAM_PRICE_ID = env("STRIPE_TEAM_PRICE_ID", default="")
+SITE_URL = env("SITE_URL", default="http://localhost:8080")
+
+# --------------------------------------------------
+# Razorpay (technology subscriptions)
+# --------------------------------------------------
+RAZORPAY_KEY_ID = env("RAZORPAY_KEY_ID", default="")
+RAZORPAY_KEY_SECRET = env("RAZORPAY_KEY_SECRET", default="")
+
+# --------------------------------------------------
+# Currency Settings
+# --------------------------------------------------
+DEFAULT_CURRENCY = env("DEFAULT_CURRENCY", default="INR")
+ENABLE_CURRENCY_CONVERSION = env.bool("ENABLE_CURRENCY_CONVERSION", default=True)
+
+# --------------------------------------------------
+# Redis caching
+# --------------------------------------------------
+_redis_password = env("REDIS_PASSWORD", default="")
+_redis_auth = f":{_redis_password}@" if _redis_password else ""
+_redis_host = env("REDIS_HOST", default="redis")
+_redis_port = env("REDIS_PORT", default="6379")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{_redis_auth}{_redis_host}:{_redis_port}/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+    }
+}
+
+# --------------------------------------------------
+# Security (all environments)
+# --------------------------------------------------
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_AGE = 3600 * 8  # 8 hours
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+# Password hashing — Argon2 preferred (install via requirements.txt)
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+]
+
+# --------------------------------------------------
+# Security (production only)
+# --------------------------------------------------
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# --------------------------------------------------
+# Logging (structured)
+# --------------------------------------------------
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] {levelname} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "apps": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
+

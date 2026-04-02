@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#0a0e17;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0e17;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#111827;border-radius:16px;border:1px solid #1f2937;overflow:hidden;">
+        <!-- Header -->
+        <tr><td style="background:linear-gradient(135deg,#0e7490 0%,#6366f1 100%);padding:32px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Subscription Cancelled</h1>
+        </td></tr>
+        <!-- Body -->
+        <tr><td style="padding:32px;">
+          <p style="color:#e5e7eb;font-size:16px;margin:0 0 16px;">Hi {{ username }},</p>
+          <p style="color:#9ca3af;font-size:14px;line-height:1.6;margin:0 0 24px;">
+            Your subscription for <strong style="color:#06b6d4;">{{ technology }}</strong> has been cancelled.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#1f2937;border-radius:12px;padding:0;margin:0 0 24px;">
+            <tr><td style="padding:20px;">
+              <p style="color:#9ca3af;font-size:13px;margin:0 0 8px;">Subscription ID</p>
+              <p style="color:#06b6d4;font-size:15px;font-weight:600;margin:0;font-family:monospace;">{{ subscription_id }}</p>
+            </td></tr>
+          </table>
+          <p style="color:#9ca3af;font-size:14px;line-height:1.6;margin:0 0 24px;">
+            You can resubscribe anytime from the Pricing page. Your previous progress is preserved.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+            <tr><td style="background:linear-gradient(135deg,#0e7490,#6366f1);border-radius:8px;padding:12px 32px;">
+              <a href="{{ frontend_url }}/pricing" style="color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;">Resubscribe</a>
+            </td></tr>
+          </table>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="padding:24px 32px;border-top:1px solid #1f2937;text-align:center;">
+          <p style="color:#4b5563;font-size:12px;margin:0;">&copy; 2026 FixitLab. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

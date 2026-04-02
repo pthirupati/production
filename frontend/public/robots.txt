@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://fixitlab.com/sitemap.xml
+
+# Disallow admin and API
+Disallow: /admin/
+Disallow: /api/
+Disallow: /lab/
+Disallow: /session-replay/
+
+# Allow crawlers to see public pages
+Allow: /scenarios
+Allow: /leaderboard
+Allow: /pricing
+Allow: /faq
+Allow: /contact
+Allow: /blog
+Allow: /about

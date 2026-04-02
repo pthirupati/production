@@ -1,0 +1,343 @@
+import logging
+from celery import shared_task
+from django.utils import timezone
+from datetime import timedelta
+
+logger = logging.getLogger(__name__)
+
+
+@shared_task(bind=True)
+def debug_task(self):
+    """Simple test task to verify Celery is working."""
+    import time
+    time.sleep(2)
+    return {"task_id": self.request.id, "status": "completed"}
+
+
+@shared_task
+def cleanup_expired_labs():
+    """
+    Terminate lab sessions that have exceeded their time limit.
+    Also cleans up sessions stuck in PROVISIONING for more than 10 minutes.
+    Handles Docker containers, AWS EC2 instances, and DigitalOcean droplets.
+    Runs every 5 minutes via Celery Beat.
+    """
+    from apps.labs.models import LabSession
+    from apps.labs.provisioner import get_provisioner
+
+    terminated = 0
+
+    # ── 1. Clean up expired RUNNING sessions (iterate in chunks to avoid OOM) ──
+    expired_sessions = LabSession.objects.filter(status="RUNNING").select_related("scenario", "user").iterator(chunk_size=200)
+    for session in expired_sessions:
+        if session.is_expired:
+            logger.info(f"Terminating expired session {session.id} (provider: {session.provider})")
+            resource_id = session.container_id or session.instance_id
+            if resource_id:
+                try:
+                    provisioner = get_provisioner(session.provider or "docker")
+                    provisioner.terminate(resource_id, session_id=str(session.id))
+                except Exception as e:
+                    logger.error(f"Error terminating resource: {e}")
+
+            session.status = "EXPIRED"
+            session.ended_at = timezone.now()
+            session.save()
+            terminated += 1
+
+            # Notify user that their lab expired
+            try:
+                from apps.notifications.tasks import create_in_app_notification, send_notification_email
+                from django.conf import settings
+
+                create_in_app_notification.delay(
+                    user_id=session.user_id,
+                    notification_type="lab_expired",
+                    title=f"Lab Expired: {session.scenario.title}",
+                    message=f"Your lab session expired after {session.duration_limit // 60} minutes. You can try again anytime!",
+                    metadata={"scenario_slug": session.scenario.slug},
+                )
+                send_notification_email.delay(
+                    subject=f"FixitLab: Lab session expired — {session.scenario.title}",
+                    to_email=session.user.email,
+                    template="emails/lab_expired.html",
+                    context={
+                        "username": session.user.username,
+                        "scenario_title": session.scenario.title,
+                        "duration_minutes": session.duration_limit // 60,
+                        "scenario_url": f"{settings.FRONTEND_URL}/scenarios/{session.scenario.slug}",
+                    },
+                )
+            except Exception as e:
+                logger.warning(f"Failed to notify user about expired lab: {e}")
+
+    # ── 2. Clean up stuck PROVISIONING sessions (>10 minutes) ──
+    stuck_cutoff = timezone.now() - timedelta(minutes=10)
+    stuck_sessions = LabSession.objects.filter(
+        status="PROVISIONING",
+        started_at__lt=stuck_cutoff,
+    ).iterator(chunk_size=100)
+    stuck_cleaned = 0
+    for session in stuck_sessions:
+        logger.warning(
+            f"Cleaning up stuck PROVISIONING session {session.id} "
+            f"(started {session.started_at}, provider: {session.provider})"
+        )
+        # Terminate any associated cloud resource
+        resource_id = session.container_id or session.instance_id
+        if resource_id:
+            try:
+                provisioner = get_provisioner(session.provider or "docker")
+                provisioner.terminate(resource_id, session_id=str(session.id))
+                logger.info(f"Terminated stuck resource {resource_id}")
+            except Exception as e:
+                logger.error(f"Error terminating stuck resource {resource_id}: {e}")
+
+        session.status = "FAILED"
+        session.ended_at = timezone.now()
+        session.instance_id = None
+        session.ssh_host = ""
+        session.save()
+        stuck_cleaned += 1
+
+    logger.info(f"Cleanup: terminated {terminated} expired, {stuck_cleaned} stuck sessions")
+    return {"terminated": terminated, "stuck_cleaned": stuck_cleaned}
+
+
+@shared_task
+def cleanup_orphaned_containers():
+    """
+    Remove Docker containers and cloud instances that don't have a matching active lab session.
+    Safety net for resources that weren't cleaned up properly.
+    """
+    from apps.labs.models import LabSession
+    from apps.labs.provisioner import get_provisioner
+
+    results = {}
+
+    # Clean up Docker containers
+    try:
+        docker_provisioner = get_provisioner("docker")
+        docker_cleaned = docker_provisioner.cleanup_expired(max_age_seconds=7200)
+        results["docker"] = docker_cleaned
+    except Exception as e:
+        logger.error(f"Docker cleanup failed: {e}")
+        results["docker_error"] = str(e)
+
+    # Clean up AWS EC2 instances (if configured)
+    try:
+        from django.conf import settings
+        if getattr(settings, "AWS_ACCESS_KEY_ID", ""):
+            ec2_provisioner = get_provisioner("aws_ec2")
+            ec2_cleaned = ec2_provisioner.cleanup_expired(max_age_seconds=7200)
+            results["aws_ec2"] = ec2_cleaned
+    except Exception as e:
+        logger.error(f"EC2 cleanup failed: {e}")
+        results["aws_ec2_error"] = str(e)
+
+    # Clean up DigitalOcean droplets (if configured)
+    try:
+        from django.conf import settings
+        if getattr(settings, "DO_API_TOKEN", ""):
+            do_provisioner = get_provisioner("digitalocean")
+            do_cleaned = do_provisioner.cleanup_expired(max_age_seconds=7200)
+            results["digitalocean"] = do_cleaned
+    except Exception as e:
+        logger.error(f"DO cleanup failed: {e}")
+        results["digitalocean_error"] = str(e)
+
+    return results
+
+
+@shared_task
+def recalculate_leaderboard():
+    """
+    Recalculate global leaderboard from progress data.
+    Runs hourly via Celery Beat.
+    """
+    from apps.progress.models import UserScenarioProgress
+    from apps.leaderboard.models import LeaderboardEntry
+    from django.db.models import Sum, Count
+    from django.db import transaction
+
+    # Compute from progress
+    rankings = (
+        UserScenarioProgress.objects.filter(completed=True)
+        .values("user_id")
+        .annotate(
+            total_score=Sum("best_score"),
+            completed_count=Count("id"),
+        )
+        .order_by("-total_score")
+    )
+
+    entries = []
+    for rank, data in enumerate(rankings, 1):
+        entries.append(LeaderboardEntry(
+            user_id=data["user_id"],
+            scenario=None,  # Global leaderboard
+            score=data["total_score"],
+            rank=rank,
+        ))
+
+    # Batch upsert: delete old and create new in batches to reduce lock time
+    with transaction.atomic():
+        LeaderboardEntry.objects.filter(scenario__isnull=True).delete()
+        batch_size = 500
+        for i in range(0, len(entries), batch_size):
+            LeaderboardEntry.objects.bulk_create(entries[i:i + batch_size])
+    logger.info(f"Leaderboard recalculated: {len(entries)} entries")
+    return {"entries": len(entries)}
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=30)
+def provision_cloud_lab(self, session_id):
+    """
+    Asynchronously provision an AWS EC2 or DigitalOcean instance for a lab session.
+    Called by StartLabView for cloud-based scenarios so the HTTP response returns
+    immediately while the instance boots in the background.
+    The frontend polls session status, transitioning from PROVISIONING → RUNNING.
+
+    Idempotent: provision() checks for existing instance_id and resumes
+    instead of launching a second instance on retry.
+    """
+    from apps.labs.models import LabSession
+    from apps.labs.provisioner import get_provisioner
+
+    try:
+        session = LabSession.objects.select_related("scenario", "user").get(
+            pk=session_id, status="PROVISIONING"
+        )
+    except LabSession.DoesNotExist:
+        logger.warning(f"provision_cloud_lab: session {session_id} not found or not PROVISIONING")
+        return {"status": "skipped", "reason": "session not found or wrong status"}
+
+    infra_type = session.provider or "docker"
+    attempt = self.request.retries + 1
+    logger.info(
+        f"Provisioning cloud lab {session_id} ({infra_type}) for "
+        f"{session.user.username} [attempt {attempt}/{self.max_retries + 1}]"
+    )
+
+    try:
+        provisioner = get_provisioner(infra_type)
+
+        # provision() is idempotent: if session already has instance_id,
+        # it resumes that instance instead of launching a new one.
+        resource_id, resource_name = provisioner.provision(session)
+
+        # Refresh session from DB — provision() may have saved instance_id already
+        session.refresh_from_db()
+
+        if infra_type == "docker":
+            session.container_id = resource_id
+            session.container_name = resource_name
+        else:
+            session.instance_id = resource_id
+
+        session.status = "RUNNING"
+        session.save()
+
+        # NOTE: attempt counting is done in StartLabView (not here)
+        # to avoid double-counting on retries.
+
+        logger.info(f"Cloud lab {session_id} provisioned successfully: {resource_id}")
+        return {"status": "running", "resource_id": resource_id}
+
+    except Exception as e:
+        logger.error(f"Cloud lab provisioning failed for {session_id}: {e}")
+
+        # Refresh session — provision() may have saved partial state
+        session.refresh_from_db()
+
+        if self.request.retries < self.max_retries:
+            logger.info(
+                f"Retrying provision for {session_id} in {self.default_retry_delay}s "
+                f"(attempt {attempt}/{self.max_retries + 1})"
+            )
+            raise self.retry(exc=e)
+
+        # Final failure: clean up any orphaned instance
+        if session.instance_id:
+            try:
+                provisioner = get_provisioner(infra_type)
+                provisioner.terminate(session.instance_id, session_id=str(session.id))
+                logger.info(f"Cleaned up orphaned instance {session.instance_id}")
+            except Exception as te:
+                logger.error(f"Failed to clean up instance {session.instance_id}: {te}")
+
+        session.status = "FAILED"
+        session.instance_id = None
+        session.ssh_host = ""
+        session.save()
+
+        # Notify user of failure
+        try:
+            from apps.notifications.tasks import create_in_app_notification
+            create_in_app_notification.delay(
+                user_id=session.user_id,
+                notification_type="lab_failed",
+                title=f"Lab Failed: {session.scenario.title}",
+                message="Failed to launch cloud server. Please try again.",
+                metadata={"scenario_slug": session.scenario.slug},
+            )
+        except Exception:
+            pass
+
+        return {"status": "failed", "error": str(e)}
+
+
+@shared_task
+def cleanup_expired_otps():
+    """
+    Remove expired OTP records older than 24 hours.
+    Prevents unbounded table growth.
+    """
+    from apps.accounts.models import EmailVerificationOTP
+    cutoff = timezone.now() - timedelta(hours=24)
+    deleted, _ = EmailVerificationOTP.objects.filter(created_at__lt=cutoff).delete()
+    logger.info(f"Cleaned up {deleted} expired OTPs")
+    return {"deleted_otps": deleted}
+
+
+@shared_task
+def cleanup_expired_tokens():
+    """
+    Remove used/expired password reset tokens older than 7 days.
+    """
+    from apps.accounts.models import PasswordResetToken
+    cutoff = timezone.now() - timedelta(days=7)
+    deleted, _ = PasswordResetToken.objects.filter(
+        created_at__lt=cutoff
+    ).delete()
+    logger.info(f"Cleaned up {deleted} expired password reset tokens")
+    return {"deleted_tokens": deleted}
+
+
+@shared_task
+def cleanup_old_audit_logs():
+    """
+    Remove audit log entries older than 90 days.
+    Keep recent history while preventing unbounded growth.
+    """
+    from apps.audit.models import AuditLog
+    cutoff = timezone.now() - timedelta(days=90)
+    deleted, _ = AuditLog.objects.filter(created_at__lt=cutoff).delete()
+    logger.info(f"Cleaned up {deleted} old audit log entries")
+    return {"deleted_audit_logs": deleted}
+
+
+@shared_task
+def cleanup_old_notifications():
+    """
+    Remove read notifications older than 60 days.
+    Keep unread notifications indefinitely.
+    """
+    from apps.notifications.models import Notification
+    cutoff = timezone.now() - timedelta(days=60)
+    deleted, _ = Notification.objects.filter(
+        is_read=True, created_at__lt=cutoff
+    ).delete()
+    logger.info(f"Cleaned up {deleted} old read notifications")
+    return {"deleted_notifications": deleted}
+

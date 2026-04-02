@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>FixitLab Invoice</title></head>
+<body style="margin:0;padding:0;background-color:#0a0e1a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0e1a;padding:32px 16px;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+  <!-- Logo -->
+  <tr><td style="text-align:center;padding:24px 0 20px;">
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr>
+      <td style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#06b6d4,#8b5cf6);text-align:center;line-height:44px;"><span style="color:#fff;font-weight:800;font-size:20px;">F</span></td>
+      <td style="padding-left:12px;"><span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">FixitLab</span></td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Main Card -->
+  <tr><td>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#141b2d 0%,#1a2235 100%);border-radius:16px;border:1px solid #1e293b;overflow:hidden;">
+
+      <!-- Accent bar -->
+      <tr><td style="height:6px;background:linear-gradient(90deg,#06b6d4,#8b5cf6,#ec4899);"></td></tr>
+
+      <!-- Invoice Header -->
+      <tr><td style="padding:32px 40px 8px;">
+        <table width="100%"><tr>
+          <td>
+            <h1 style="color:#ffffff;font-size:24px;font-weight:700;margin:0;">Invoice</h1>
+            <p style="color:#94a3b8;font-size:13px;margin:4px 0 0;">{{ invoice_number }}</p>
+          </td>
+          <td style="text-align:right;">
+            <div style="display:inline-block;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(6,182,212,0.15));border:1px solid rgba(16,185,129,0.3);border-radius:8px;padding:8px 16px;">
+              <span style="color:#10b981;font-size:13px;font-weight:600;">&#10004; PAID</span>
+            </div>
+          </td>
+        </tr></table>
+      </td></tr>
+
+      <!-- Divider -->
+      <tr><td style="padding:16px 40px;"><div style="height:1px;background:#1e293b;"></div></td></tr>
+
+      <!-- Bill To / Invoice Date -->
+      <tr><td style="padding:0 40px 20px;">
+        <table width="100%"><tr>
+          <td style="vertical-align:top;width:50%;">
+            <p style="color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px;">Bill To</p>
+            <p style="color:#ffffff;font-size:14px;font-weight:600;margin:0;">{{ username }}</p>
+            <p style="color:#94a3b8;font-size:13px;margin:4px 0 0;">{{ email }}</p>
+          </td>
+          <td style="vertical-align:top;width:50%;text-align:right;">
+            <p style="color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px;">Invoice Date</p>
+            <p style="color:#ffffff;font-size:14px;font-weight:600;margin:0;">{{ invoice_date }}</p>
+            <p style="color:#94a3b8;font-size:13px;margin:4px 0 0;">{{ payment_method }}</p>
+          </td>
+        </tr></table>
+      </td></tr>
+
+      <!-- Line Items Table -->
+      <tr><td style="padding:0 40px 24px;">
+        <table width="100%" style="background:#0f172a;border-radius:12px;border:1px solid #1e293b;overflow:hidden;border-collapse:collapse;">
+          <!-- Table Header -->
+          <tr style="background:#0f172a;">
+            <td style="padding:14px 20px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;border-bottom:1px solid #1e293b;">Description</td>
+            <td style="padding:14px 20px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;text-align:center;border-bottom:1px solid #1e293b;">Period</td>
+            <td style="padding:14px 20px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;text-align:right;border-bottom:1px solid #1e293b;">Amount</td>
+          </tr>
+          <!-- Item Row -->
+          <tr>
+            <td style="padding:16px 20px;border-bottom:1px solid #1e293b;">
+              <p style="color:#ffffff;font-size:14px;font-weight:600;margin:0;">{{ technology }}</p>
+              <p style="color:#94a3b8;font-size:12px;margin:4px 0 0;">{{ plan_name }}</p>
+            </td>
+            <td style="padding:16px 20px;color:#8b5cf6;font-size:13px;font-weight:600;text-align:center;border-bottom:1px solid #1e293b;">{{ billing_period }}</td>
+            <td style="padding:16px 20px;color:#ffffff;font-size:14px;font-weight:700;text-align:right;border-bottom:1px solid #1e293b;">{{ amount }}</td>
+          </tr>
+          <!-- Subtotal -->
+          <tr>
+            <td colspan="2" style="padding:14px 20px;color:#94a3b8;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">Subtotal</td>
+            <td style="padding:14px 20px;color:#ffffff;font-size:14px;font-weight:600;text-align:right;border-bottom:1px solid #1e293b;">{{ amount }}</td>
+          </tr>
+          <!-- Tax -->
+          <tr>
+            <td colspan="2" style="padding:14px 20px;color:#94a3b8;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">Tax (included)</td>
+            <td style="padding:14px 20px;color:#94a3b8;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">&#8212;</td>
+          </tr>
+          <!-- Total -->
+          <tr style="background:rgba(6,182,212,0.05);">
+            <td colspan="2" style="padding:16px 20px;color:#06b6d4;font-size:14px;font-weight:700;text-align:right;">Total Paid</td>
+            <td style="padding:16px 20px;color:#10b981;font-size:18px;font-weight:800;text-align:right;">{{ amount }}</td>
+          </tr>
+        </table>
+      </td></tr>
+
+      <!-- Subscription Details -->
+      <tr><td style="padding:0 40px 24px;">
+        <table width="100%" style="background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.2);border-radius:12px;overflow:hidden;">
+          <tr><td style="padding:16px 20px;">
+            <p style="color:#8b5cf6;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px;">Subscription Details</p>
+            <table width="100%">
+              <tr>
+                <td style="color:#94a3b8;font-size:13px;padding:4px 0;">Subscription ID</td>
+                <td style="color:#ffffff;font-size:13px;font-weight:600;text-align:right;padding:4px 0;">{{ subscription_id }}</td>
+              </tr>
+              <tr>
+                <td style="color:#94a3b8;font-size:13px;padding:4px 0;">Technology</td>
+                <td style="color:#06b6d4;font-size:13px;font-weight:600;text-align:right;padding:4px 0;">{{ technology }}</td>
+              </tr>
+              <tr>
+                <td style="color:#94a3b8;font-size:13px;padding:4px 0;">Access</td>
+                <td style="color:#10b981;font-size:13px;font-weight:600;text-align:right;padding:4px 0;">All Scenarios + Hints + Certificate</td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <!-- CTA Button -->
+      <tr><td style="text-align:center;padding:0 40px 32px;">
+        <a href="{{ scenarios_url }}" style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:12px;font-weight:700;font-size:15px;box-shadow:0 4px 20px rgba(6,182,212,0.3);">Start Learning &#8594;</a>
+      </td></tr>
+
+      <!-- Footer note -->
+      <tr><td style="padding:0 40px 24px;">
+        <p style="color:#475569;font-size:12px;line-height:1.6;margin:0;text-align:center;">
+          This is a computer-generated invoice and does not require a physical signature. For questions or refunds within 7 days, contact <a href="mailto:kubelearn464@gmail.com" style="color:#06b6d4;text-decoration:none;">kubelearn464@gmail.com</a>.
+        </p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+
+  <!-- Separator -->
+  <tr><td style="padding:0 40px;"><div style="height:1px;background:linear-gradient(90deg,transparent,#1e293b,transparent);"></div></td></tr>
+
+  <!-- Footer -->
+  <tr><td style="text-align:center;padding:24px 0 8px;">
+    <p style="color:#64748b;font-size:11px;margin:0;">&#169; 2026 FixitLab &#8212; Learn by Doing.</p>
+    <p style="color:#475569;font-size:11px;margin:8px 0 0;">
+      <a href="https://fixitlab.com/privacy" style="color:#94a3b8;text-decoration:none;">Privacy</a> &#183;
+      <a href="https://fixitlab.com/terms" style="color:#94a3b8;text-decoration:none;">Terms</a> &#183;
+      <a href="mailto:kubelearn464@gmail.com" style="color:#94a3b8;text-decoration:none;">Support</a>
+    </p>
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body></html>

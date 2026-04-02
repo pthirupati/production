@@ -1,0 +1,1466 @@
+"""
+Complete Admin Panel API - Full CRUD for scenarios, technologies, users,
+lab sessions, system monitoring, platform settings, and data exports.
+"""
+import csv
+import logging
+from io import StringIO
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db.models import Count, Q, Avg, Sum
+from django.http import HttpResponse
+from django.utils import timezone
+from datetime import timedelta
+
+from apps.question_bank.models import Scenario, Technology, Tag
+from apps.question_bank.serializers import ScenarioAdminSerializer, TechnologySerializer
+from apps.labs.models import LabSession
+from apps.labs.provisioner import get_provisioner, DockerProvisioner
+from apps.leaderboard.models import LeaderboardEntry
+from apps.progress.models import UserScenarioProgress
+from apps.billing.models import Plan, Subscription, TechnologySubscription
+from apps.hints.models import Hint
+from apps.community.models import Thread, Reply
+from .permissions import IsPlatformAdmin
+
+User = get_user_model()
+logger = logging.getLogger(__name__)
+
+
+class AdminOverviewView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        now = timezone.now()
+        last_24h = now - timedelta(hours=24)
+        last_7d = now - timedelta(days=7)
+        last_30d = now - timedelta(days=30)
+        inactive_threshold = now - timedelta(days=90)
+
+        # Revenue from technology subscriptions
+        total_revenue = TechnologySubscription.objects.filter(
+            is_active=True
+        ).aggregate(total=Sum("amount"))["total"] or 0
+
+        # Paid subscribers count
+        paid_subscribers = TechnologySubscription.objects.filter(
+            is_active=True
+        ).values("user").distinct().count()
+
+        # Inactive users (90+ days)
+        inactive_users = User.objects.filter(
+            Q(last_login__lt=inactive_threshold) | Q(last_login__isnull=True)
+        ).count()
+
+        return Response({
+            "users": {
+                "total": User.objects.count(),
+                "active_24h": User.objects.filter(last_login__gte=last_24h).count(),
+                "new_7d": User.objects.filter(date_joined__gte=last_7d).count(),
+                "new_30d": User.objects.filter(date_joined__gte=last_30d).count(),
+                "inactive_90d": inactive_users,
+                "paid_subscribers": paid_subscribers,
+            },
+            "revenue": {
+                "total": float(total_revenue),
+                "subscriptions_count": TechnologySubscription.objects.filter(is_active=True).count(),
+            },
+            "scenarios": {
+                "total": Scenario.objects.count(),
+                "active": Scenario.objects.filter(is_active=True).count(),
+                "draft": Scenario.objects.filter(is_active=False).count(),
+            },
+            "technologies": {
+                "total": Technology.objects.count(),
+                "active": Technology.objects.filter(is_active=True).count(),
+            },
+            "labs": {
+                "running": LabSession.objects.filter(status="RUNNING").count(),
+                "completed_24h": LabSession.objects.filter(
+                    status="COMPLETED", ended_at__gte=last_24h
+                ).count(),
+                "total": LabSession.objects.count(),
+                "avg_score": LabSession.objects.filter(
+                    status="COMPLETED"
+                ).aggregate(avg=Avg("score"))["avg"] or 0,
+            },
+            "community": {
+                "threads": Thread.objects.filter(is_deleted=False).count(),
+                "replies": Reply.objects.filter(is_deleted=False).count(),
+            },
+            "completion_rate": self._get_completion_rate(),
+            "maintenance_mode": settings.MAINTENANCE_MODE,
+        })
+
+    def _get_completion_rate(self):
+        total = LabSession.objects.filter(
+            status__in=["COMPLETED", "TERMINATED", "FAILED"]
+        ).count()
+        completed = LabSession.objects.filter(status="COMPLETED").count()
+        return round(completed / total * 100, 1) if total else 0
+
+
+# ─── Technology Management ───────────────────────────────────────────
+
+class AdminTechnologiesView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        techs = Technology.objects.annotate(
+            scenario_count=Count("scenarios"),
+            active_scenarios=Count("scenarios", filter=Q(scenarios__is_active=True)),
+        ).order_by("name")
+        data = []
+        for t in techs:
+            data.append({
+                "id": t.id,
+                "name": t.name,
+                "slug": t.slug,
+                "icon": t.icon,
+                "color": t.color,
+                "description": t.description,
+                "price": str(t.price),
+                "order": t.order,
+                "is_active": t.is_active,
+                "scenario_count": t.scenario_count,
+                "active_scenarios": t.active_scenarios,
+                "created_at": t.created_at.isoformat(),
+            })
+        return Response(data)
+
+    def post(self, request):
+        """Create a new technology."""
+        serializer = TechnologySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminTechnologyDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def put(self, request, pk):
+        try:
+            tech = Technology.objects.get(pk=pk)
+        except Technology.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        serializer = TechnologySerializer(tech, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    def delete(self, request, pk):
+        try:
+            tech = Technology.objects.get(pk=pk)
+        except Technology.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        if tech.scenarios.exists():
+            return Response(
+                {"error": "Cannot delete technology with existing scenarios. Deactivate it instead."},
+                status=400,
+            )
+        tech.delete()
+        return Response({"message": "Technology deleted"})
+
+
+# ─── Tag Management ──────────────────────────────────────────────────
+
+class AdminTagsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        tags = Tag.objects.annotate(
+            scenario_count=Count("scenarios"),
+        ).order_by("name")
+        data = [
+            {"id": t.id, "name": t.name, "slug": t.slug, "scenario_count": t.scenario_count}
+            for t in tags
+        ]
+        return Response(data)
+
+    def post(self, request):
+        name = request.data.get("name")
+        if not name:
+            return Response({"error": "Name is required"}, status=400)
+        if Tag.objects.filter(name__iexact=name).exists():
+            return Response({"name": ["Tag with this name already exists."]}, status=400)
+        tag = Tag.objects.create(name=name)
+        return Response({"id": tag.id, "name": tag.name, "slug": tag.slug}, status=201)
+
+
+class AdminTagDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def put(self, request, pk):
+        try:
+            tag = Tag.objects.get(pk=pk)
+        except Tag.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+        name = request.data.get("name", tag.name)
+        tag.name = name
+        tag.save()
+        return Response({"id": tag.id, "name": tag.name, "slug": tag.slug})
+
+    def delete(self, request, pk):
+        try:
+            tag = Tag.objects.get(pk=pk)
+        except Tag.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+        tag.delete()
+        return Response({"message": "Tag deleted"})
+
+
+# ─── Scenario Management ────────────────────────────────────────────
+
+class AdminScenariosView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        qs = Scenario.objects.select_related("technology").prefetch_related("tags").annotate(
+            total_attempts=Count("lab_sessions"),
+            completions=Count("lab_sessions", filter=Q(lab_sessions__status="COMPLETED")),
+        ).order_by("-created_at")
+
+        # Filters
+        tech_id = request.query_params.get("technology")
+        difficulty = request.query_params.get("difficulty")
+        is_active = request.query_params.get("is_active")
+        search = request.query_params.get("search")
+
+        if tech_id:
+            qs = qs.filter(technology_id=tech_id)
+        if difficulty:
+            qs = qs.filter(difficulty=difficulty)
+        if is_active is not None:
+            qs = qs.filter(is_active=is_active.lower() == "true")
+        if search:
+            qs = qs.filter(Q(title__icontains=search) | Q(slug__icontains=search))
+
+        data = []
+        for s in qs:
+            data.append({
+                "id": s.id,
+                "title": s.title,
+                "slug": s.slug,
+                "subtitle": s.subtitle,
+                "scenario_type": s.scenario_type,
+                "technology": {"id": s.technology.id, "name": s.technology.name},
+                "category": s.category,
+                "difficulty": s.difficulty,
+                "description": s.description,
+                "objectives": s.objectives,
+                "validation_script": s.validation_script,
+                "solution_explanation": s.solution_explanation,
+                "definition_path": s.definition_path,
+                "infrastructure_type": s.infrastructure_type,
+                "is_active": s.is_active,
+                "is_free": s.is_free,
+                "time_limit": s.time_limit,
+                "max_score": s.max_score,
+                "tags": [{"id": t.id, "name": t.name} for t in s.tags.all()],
+                "total_attempts": s.total_attempts,
+                "completions": s.completions,
+                "created_at": s.created_at.isoformat(),
+            })
+        return Response(data)
+
+    def post(self, request):
+        """Create a new scenario."""
+        serializer = ScenarioAdminSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminScenarioDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request, pk):
+        try:
+            scenario = Scenario.objects.select_related("technology").prefetch_related("tags").get(pk=pk)
+        except Scenario.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        hints = Hint.objects.filter(scenario=scenario).order_by("order").values(
+            "id", "order", "content", "penalty", "is_active"
+        )
+
+        serializer = ScenarioAdminSerializer(scenario)
+        data = serializer.data
+        data["hints"] = list(hints)
+        return Response(data)
+
+    def put(self, request, pk):
+        try:
+            scenario = Scenario.objects.get(pk=pk)
+        except Scenario.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        serializer = ScenarioAdminSerializer(scenario, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    def delete(self, request, pk):
+        try:
+            scenario = Scenario.objects.get(pk=pk)
+        except Scenario.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        # Soft delete - deactivate instead
+        scenario.is_active = False
+        scenario.save()
+        return Response({"message": "Scenario deactivated"})
+
+
+# ─── Hint Management ────────────────────────────────────────────────
+
+class AdminHintsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request, scenario_id):
+        """Add a hint to a scenario."""
+        try:
+            scenario = Scenario.objects.get(pk=scenario_id)
+        except Scenario.DoesNotExist:
+            return Response({"error": "Scenario not found"}, status=404)
+
+        content = request.data.get("content")
+        penalty = request.data.get("penalty", 10)
+        if not content:
+            return Response({"error": "Content is required"}, status=400)
+
+        # Auto-assign order
+        max_order = Hint.objects.filter(scenario=scenario).count()
+        hint = Hint.objects.create(
+            scenario=scenario,
+            order=max_order + 1,
+            content=content,
+            penalty=penalty,
+        )
+        return Response({
+            "id": hint.id, "order": hint.order,
+            "content": hint.content, "penalty": hint.penalty,
+        }, status=201)
+
+
+class AdminHintDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def put(self, request, pk):
+        try:
+            hint = Hint.objects.get(pk=pk)
+        except Hint.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        hint.content = request.data.get("content", hint.content)
+        hint.penalty = request.data.get("penalty", hint.penalty)
+        hint.is_active = request.data.get("is_active", hint.is_active)
+        hint.save()
+        return Response({"id": hint.id, "content": hint.content, "penalty": hint.penalty})
+
+    def delete(self, request, pk):
+        try:
+            hint = Hint.objects.get(pk=pk)
+        except Hint.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+        hint.delete()
+        return Response({"message": "Hint deleted"})
+
+
+# ─── User Management ────────────────────────────────────────────────
+
+class AdminUsersView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        qs = User.objects.all().order_by("-date_joined")
+
+        search = request.query_params.get("search")
+        is_active = request.query_params.get("is_active")
+        is_staff = request.query_params.get("is_staff")
+
+        if search:
+            qs = qs.filter(
+                Q(username__icontains=search) |
+                Q(email__icontains=search)
+            )
+        if is_active is not None:
+            qs = qs.filter(is_active=is_active.lower() == "true")
+        if is_staff is not None:
+            qs = qs.filter(is_staff=is_staff.lower() == "true")
+
+        # Annotate with stats
+        qs = qs.annotate(
+            labs_completed=Count(
+                "lab_sessions", filter=Q(lab_sessions__status="COMPLETED")
+            ),
+            total_labs=Count("lab_sessions"),
+        )
+
+        data = []
+        for u in qs[:100]:
+            # Get phone number and country from profile
+            phone_number = None
+            country = ""
+            try:
+                phone_number = u.profile.phone_number
+                country = u.profile.country or ""
+            except Exception:
+                pass
+
+            # Check if user has active tech subscriptions
+            from apps.billing.models import TechnologySubscription
+            active_subs = TechnologySubscription.objects.filter(
+                user=u, is_active=True
+            ).count()
+
+            # Check 90-day inactive
+            is_inactive_90d = False
+            if u.last_login:
+                from django.utils import timezone as tz
+                is_inactive_90d = (tz.now() - u.last_login).days >= 90
+
+            data.append({
+                "id": u.id,
+                "username": u.username,
+                "email": u.email,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "phone_number": phone_number,
+                "country": country,
+                "is_active": u.is_active,
+                "is_staff": u.is_staff,
+                "is_superuser": u.is_superuser,
+                "is_paid": active_subs > 0,
+                "active_subscriptions": active_subs,
+                "is_inactive_90d": is_inactive_90d,
+                "date_joined": u.date_joined.isoformat(),
+                "last_login": u.last_login.isoformat() if u.last_login else None,
+                "labs_completed": u.labs_completed,
+                "total_labs": u.total_labs,
+            })
+        return Response(data)
+
+    def post(self, request):
+        """Create a new user (admin-created)."""
+        email = request.data.get("email")
+        password = request.data.get("password")
+        is_staff = request.data.get("is_staff", False)
+        phone_number = request.data.get("phone_number")
+
+        if not email or not password:
+            return Response({"error": "Email and password are required"}, status=400)
+
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Email already exists"}, status=400)
+
+        user = User.objects.create_user(
+            username=email, email=email, password=password, is_staff=is_staff
+        )
+
+        # Create profile with phone number
+        from apps.accounts.models import Profile
+        Profile.objects.update_or_create(
+            user=user,
+            defaults={"phone_number": phone_number or None},
+        )
+
+        return Response({"id": user.id, "email": user.email}, status=201)
+
+
+class AdminUserDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request, pk):
+        """Get detailed user info including progress and activity."""
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        # Profile info
+        phone_number = None
+        try:
+            phone_number = user.profile.phone_number
+        except Exception:
+            pass
+
+        # Lab stats
+        labs = LabSession.objects.filter(user=user)
+        completed_labs = labs.filter(status="COMPLETED")
+        total_score = completed_labs.aggregate(total=Sum("score"))["total"] or 0
+
+        # Progress stats
+        progress = UserScenarioProgress.objects.filter(user=user)
+        completed_scenarios = progress.filter(completed=True).count()
+        total_attempts = sum(p.attempts for p in progress)
+
+        # Recent labs
+        recent_labs = labs.select_related("scenario").order_by("-started_at")[:10]
+
+        return Response({
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "phone_number": phone_number,
+            "is_active": user.is_active,
+            "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
+            "date_joined": user.date_joined.isoformat(),
+            "last_login": user.last_login.isoformat() if user.last_login else None,
+            "stats": {
+                "total_labs": labs.count(),
+                "labs_completed": completed_labs.count(),
+                "total_score": total_score,
+                "scenarios_completed": completed_scenarios,
+                "total_attempts": total_attempts,
+                "avg_score": round(
+                    completed_labs.aggregate(avg=Avg("score"))["avg"] or 0, 1
+                ),
+            },
+            "recent_labs": [
+                {
+                    "id": str(lab.id),
+                    "scenario": lab.scenario.title,
+                    "status": lab.status,
+                    "score": lab.score,
+                    "started_at": lab.started_at.isoformat(),
+                }
+                for lab in recent_labs
+            ],
+        })
+
+    def put(self, request, pk):
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        if "is_active" in request.data:
+            user.is_active = request.data["is_active"]
+        if "is_staff" in request.data:
+            user.is_staff = request.data["is_staff"]
+
+        # Admin can reset user password
+        new_password = request.data.get("new_password")
+        if new_password:
+            if len(new_password) < 8:
+                return Response({"error": "Password must be at least 8 characters"}, status=400)
+            user.set_password(new_password)
+
+        user.save()
+
+        # Update phone number if provided
+        phone_number = request.data.get("phone_number")
+        if phone_number is not None:
+            from apps.accounts.models import Profile
+            profile, _ = Profile.objects.get_or_create(user=user)
+            profile.phone_number = phone_number or None
+            profile.save()
+
+        return Response({
+            "id": user.id,
+            "is_active": user.is_active,
+            "is_staff": user.is_staff,
+            "message": "User updated successfully",
+        })
+
+    def delete(self, request, pk):
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        if user.is_superuser:
+            return Response({"error": "Cannot delete superuser"}, status=403)
+
+        try:
+            user.delete()
+            return Response({"message": "User deleted"})
+        except Exception as e:
+            logger.error(f"Failed to delete user {pk}: {e}")
+            return Response(
+                {"error": "Failed to delete user. They may have related data that cannot be removed."},
+                status=500,
+            )
+
+
+# ─── Bulk User Operations ───────────────────────────────────────────
+
+class AdminBulkUsersView(APIView):
+    """Bulk delete or update users."""
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        action = request.data.get("action")
+        user_ids = request.data.get("user_ids", [])
+
+        if not user_ids or not isinstance(user_ids, list):
+            return Response({"error": "user_ids must be a non-empty list"}, status=400)
+
+        if not action:
+            return Response({"error": "action is required"}, status=400)
+
+        users = User.objects.filter(id__in=user_ids).exclude(is_superuser=True)
+        count = users.count()
+
+        if count == 0:
+            return Response({"error": "No eligible users found (superusers are protected)"}, status=400)
+
+        if action == "delete":
+            try:
+                users.delete()
+                return Response({"message": f"{count} user(s) deleted", "count": count})
+            except Exception as e:
+                logger.error(f"Bulk delete failed: {e}")
+                return Response({"error": "Bulk delete failed"}, status=500)
+
+        elif action == "activate":
+            updated = users.update(is_active=True)
+            return Response({"message": f"{updated} user(s) activated", "count": updated})
+
+        elif action == "deactivate":
+            updated = users.update(is_active=False)
+            return Response({"message": f"{updated} user(s) deactivated", "count": updated})
+
+        elif action == "make_staff":
+            updated = users.update(is_staff=True)
+            return Response({"message": f"{updated} user(s) granted admin", "count": updated})
+
+        elif action == "remove_staff":
+            updated = users.update(is_staff=False)
+            return Response({"message": f"{updated} user(s) had admin removed", "count": updated})
+
+        else:
+            return Response(
+                {"error": f"Unknown action: {action}. Valid: delete, activate, deactivate, make_staff, remove_staff"},
+                status=400,
+            )
+
+
+# ─── Active Labs Management ─────────────────────────────────────────
+
+class AdminActiveLabsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        labs = (
+            LabSession.objects.filter(status="RUNNING")
+            .select_related("user", "scenario")
+            .order_by("-started_at")
+        )
+        data = []
+        for lab in labs:
+            resource_id = lab.container_id or lab.instance_id or ""
+            data.append({
+                "id": str(lab.id),
+                "user": lab.user.username,
+                "scenario": lab.scenario.title,
+                "provider": lab.provider,
+                "infrastructure_type": lab.provider,
+                "resource_id": resource_id[:12] if resource_id else None,
+                "container_id": lab.container_id[:12] if lab.container_id else None,
+                "instance_id": lab.instance_id[:12] if lab.instance_id else None,
+                "ssh_host": lab.ssh_host or None,
+                "time_remaining": lab.time_remaining,
+                "started_at": lab.started_at.isoformat(),
+            })
+        return Response(data)
+
+
+class AdminTerminateLabView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request, session_id):
+        try:
+            session = LabSession.objects.get(pk=session_id)
+        except LabSession.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        resource_id = session.container_id or session.instance_id
+        if resource_id:
+            try:
+                provisioner = get_provisioner(session.provider or "docker")
+                provisioner.terminate(resource_id, session_id=str(session.id))
+            except Exception as e:
+                logger.error(f"Admin terminate error: {e}")
+
+        session.mark_terminated()
+        return Response({"message": "Lab terminated"})
+
+
+class AdminTerminateAllIdleLabsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        """Terminate all labs that have exceeded their time limit."""
+        expired = LabSession.objects.filter(status="RUNNING")
+        terminated = 0
+        for lab in expired:
+            if lab.is_expired:
+                resource_id = lab.container_id or lab.instance_id
+                if resource_id:
+                    try:
+                        provisioner = get_provisioner(lab.provider or "docker")
+                        provisioner.terminate(resource_id, session_id=str(lab.id))
+                    except Exception:
+                        pass
+                lab.status = "EXPIRED"
+                lab.ended_at = timezone.now()
+                lab.save()
+                terminated += 1
+
+        return Response({"terminated": terminated})
+
+
+# ─── Analytics ───────────────────────────────────────────────────────
+
+class AdminAnalyticsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        now = timezone.now()
+        days = int(request.query_params.get("days", 30))
+        start_date = now - timedelta(days=days)
+
+        # Daily lab starts
+        daily_labs = []
+        for i in range(days):
+            day = start_date + timedelta(days=i)
+            next_day = day + timedelta(days=1)
+            count = LabSession.objects.filter(
+                started_at__gte=day, started_at__lt=next_day
+            ).count()
+            daily_labs.append({"date": day.strftime("%Y-%m-%d"), "count": count})
+
+        # Top scenarios
+        top_scenarios = (
+            Scenario.objects.annotate(
+                attempt_count=Count("lab_sessions"),
+                completion_count=Count("lab_sessions", filter=Q(lab_sessions__status="COMPLETED")),
+            )
+            .order_by("-attempt_count")[:10]
+            .values("title", "attempt_count", "completion_count")
+        )
+
+        # Difficulty distribution
+        difficulty_stats = (
+            Scenario.objects.filter(is_active=True)
+            .values("difficulty")
+            .annotate(count=Count("id"))
+        )
+
+        return Response({
+            "daily_labs": daily_labs,
+            "top_scenarios": list(top_scenarios),
+            "difficulty_distribution": list(difficulty_stats),
+        })
+
+
+# ─── System Health ───────────────────────────────────────────────────
+
+class AdminSystemHealthView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        health = {
+            "database": self._check_db(),
+            "redis": self._check_redis(),
+            "docker": self._check_docker(),
+            "email": self._check_email(),
+            "rabbitmq": self._check_rabbitmq(),
+            "celery": self._check_celery(),
+        }
+
+        # Cloud provider health
+        health["cloud_providers"] = self._check_cloud_providers()
+
+        # Container-level health
+        health["containers"] = self._check_containers()
+
+        # Email statistics
+        health["email_stats"] = self._get_email_stats()
+
+        # Cloud lab usage
+        health["cloud_labs"] = self._get_cloud_lab_stats()
+
+        # Overall health — healthy only if all core services are up
+        core_services = ["database", "redis", "docker", "email", "rabbitmq", "celery"]
+        health["overall"] = all(
+            health.get(svc, {}).get("status") == "healthy" for svc in core_services
+        )
+        return Response(health)
+
+    def _check_db(self):
+        try:
+            from django.db import connection
+            connection.ensure_connection()
+            user_count = User.objects.count()
+            return {"status": "healthy", "details": f"{user_count} users"}
+        except Exception as e:
+            return {"status": "unhealthy", "error": str(e)}
+
+    def _check_redis(self):
+        try:
+            from django.core.cache import cache
+            cache.set("health_check", "ok", 10)
+            if cache.get("health_check") == "ok":
+                return {"status": "healthy"}
+            return {"status": "unhealthy", "error": "Cache read/write failed"}
+        except Exception as e:
+            return {"status": "unhealthy", "error": str(e)}
+
+    def _check_docker(self):
+        try:
+            provisioner = DockerProvisioner()
+            provisioner.client.ping()
+            info = provisioner.client.info()
+            return {
+                "status": "healthy",
+                "details": f"{info.get('Containers', 0)} containers, {info.get('Images', 0)} images",
+            }
+        except Exception as e:
+            return {"status": "unhealthy", "error": str(e)}
+
+    def _check_email(self):
+        """Check SMTP connectivity."""
+        try:
+            import smtplib
+            from django.conf import settings
+            host = settings.EMAIL_HOST
+            port = settings.EMAIL_PORT
+            use_tls = getattr(settings, "EMAIL_USE_TLS", False)
+
+            if use_tls:
+                server = smtplib.SMTP(host, port, timeout=5)
+                server.starttls()
+            else:
+                server = smtplib.SMTP(host, port, timeout=5)
+
+            user = getattr(settings, "EMAIL_HOST_USER", "")
+            password = getattr(settings, "EMAIL_HOST_PASSWORD", "")
+            if user and password:
+                server.login(user, password)
+            server.quit()
+            return {"status": "healthy", "details": f"{host}:{port}"}
+        except Exception as e:
+            return {"status": "unhealthy", "error": str(e)}
+
+    def _check_rabbitmq(self):
+        """Check RabbitMQ connectivity via Celery's broker."""
+        try:
+            from celery_app.celery import app
+            conn = app.connection()
+            conn.ensure_connection(max_retries=1, timeout=3)
+            conn.close()
+            return {"status": "healthy"}
+        except Exception as e:
+            return {"status": "unhealthy", "error": str(e)}
+
+    def _check_celery(self):
+        """Check if Celery workers are responding."""
+        try:
+            from celery_app.celery import app
+            inspector = app.control.inspect(timeout=3)
+            active = inspector.active()
+            if active:
+                worker_count = len(active)
+                task_count = sum(len(tasks) for tasks in active.values())
+                return {
+                    "status": "healthy",
+                    "details": f"{worker_count} worker(s), {task_count} active task(s)",
+                }
+            return {"status": "unhealthy", "error": "No workers responding"}
+        except Exception as e:
+            return {"status": "unhealthy", "error": str(e)}
+
+    def _check_containers(self):
+        """Get health status of all fixitlab Docker containers."""
+        try:
+            import docker
+            client = docker.from_env()
+            containers = client.containers.list(all=True, filters={"name": "fixitlab"})
+            result = []
+            for c in containers:
+                health = c.attrs.get("State", {}).get("Health", {})
+                health_status = health.get("Status", "none")
+                result.append({
+                    "name": c.name,
+                    "status": c.status,
+                    "health": health_status,
+                    "image": c.image.tags[0] if c.image.tags else str(c.image.id)[:20],
+                    "up_since": c.attrs.get("State", {}).get("StartedAt", ""),
+                })
+            # Also check for non-fixitlab project containers (compose services)
+            all_containers = client.containers.list(all=True)
+            fixitlab_names = {c.name for c in containers}
+            for c in all_containers:
+                labels = c.labels or {}
+                project = labels.get("com.docker.compose.project", "")
+                if project == "fixitlab-main" and c.name not in fixitlab_names:
+                    health = c.attrs.get("State", {}).get("Health", {})
+                    result.append({
+                        "name": c.name,
+                        "status": c.status,
+                        "health": health.get("Status", "none"),
+                        "image": c.image.tags[0] if c.image.tags else str(c.image.id)[:20],
+                        "up_since": c.attrs.get("State", {}).get("StartedAt", ""),
+                    })
+            return sorted(result, key=lambda x: x["name"])
+        except Exception as e:
+            return [{"name": "error", "status": "unknown", "error": str(e)}]
+
+    def _get_email_stats(self):
+        """Get email sending statistics."""
+        try:
+            from apps.notifications.models import EmailLog
+            now = timezone.now()
+            last_24h = now - timedelta(hours=24)
+            last_7d = now - timedelta(days=7)
+
+            total = EmailLog.objects.count()
+            sent_24h = EmailLog.objects.filter(status="sent", created_at__gte=last_24h).count()
+            failed_24h = EmailLog.objects.filter(status="failed", created_at__gte=last_24h).count()
+            sent_7d = EmailLog.objects.filter(status="sent", created_at__gte=last_7d).count()
+            failed_7d = EmailLog.objects.filter(status="failed", created_at__gte=last_7d).count()
+
+            last_email = EmailLog.objects.first()  # ordered by -created_at
+            last_sent_at = last_email.created_at.isoformat() if last_email else None
+
+            recent = list(
+                EmailLog.objects.values("subject", "to_email", "status", "created_at")[:10]
+            )
+            # Convert datetimes to iso strings
+            for r in recent:
+                r["created_at"] = r["created_at"].isoformat() if r["created_at"] else None
+
+            return {
+                "total": total,
+                "sent_24h": sent_24h,
+                "failed_24h": failed_24h,
+                "sent_7d": sent_7d,
+                "failed_7d": failed_7d,
+                "last_sent_at": last_sent_at,
+                "recent": recent,
+            }
+        except Exception:
+            return {
+                "total": 0, "sent_24h": 0, "failed_24h": 0,
+                "sent_7d": 0, "failed_7d": 0,
+                "last_sent_at": None, "recent": [],
+            }
+
+    def _check_cloud_providers(self):
+        """Check which cloud providers are configured and their status."""
+        providers = {}
+
+        # AWS EC2
+        aws_key = getattr(settings, "AWS_ACCESS_KEY_ID", "")
+        if aws_key:
+            try:
+                from apps.labs.provisioner.aws_provisioner import EC2Provisioner
+                prov = EC2Provisioner()
+                prov.ec2_client.describe_regions(RegionNames=[settings.AWS_REGION])
+                providers["aws_ec2"] = {
+                    "configured": True,
+                    "status": "healthy",
+                    "region": settings.AWS_REGION,
+                    "instance_type": getattr(settings, "AWS_LAB_INSTANCE_TYPE", "t3.micro"),
+                }
+            except Exception as e:
+                providers["aws_ec2"] = {
+                    "configured": True,
+                    "status": "unhealthy",
+                    "error": str(e),
+                }
+        else:
+            providers["aws_ec2"] = {"configured": False, "status": "not_configured"}
+
+        # DigitalOcean
+        do_token = getattr(settings, "DO_API_TOKEN", "")
+        if do_token:
+            try:
+                import requests as req
+                resp = req.get(
+                    "https://api.digitalocean.com/v2/account",
+                    headers={"Authorization": f"Bearer {do_token}"},
+                    timeout=5,
+                )
+                if resp.status_code == 200:
+                    providers["digitalocean"] = {
+                        "configured": True,
+                        "status": "healthy",
+                        "region": getattr(settings, "DO_REGION", "nyc1"),
+                        "size": getattr(settings, "DO_SIZE", "s-1vcpu-1gb"),
+                    }
+                else:
+                    providers["digitalocean"] = {
+                        "configured": True,
+                        "status": "unhealthy",
+                        "error": f"API returned {resp.status_code}",
+                    }
+            except Exception as e:
+                providers["digitalocean"] = {
+                    "configured": True,
+                    "status": "unhealthy",
+                    "error": str(e),
+                }
+        else:
+            providers["digitalocean"] = {"configured": False, "status": "not_configured"}
+
+        return providers
+
+    def _get_cloud_lab_stats(self):
+        """Get statistics about cloud-based lab sessions."""
+        try:
+            now = timezone.now()
+            last_24h = now - timedelta(hours=24)
+
+            stats = {
+                "active_docker": LabSession.objects.filter(status="RUNNING", provider="docker").count(),
+                "active_aws": LabSession.objects.filter(status="RUNNING", provider="aws_ec2").count(),
+                "active_do": LabSession.objects.filter(status="RUNNING", provider="digitalocean").count(),
+                "total_cloud_24h": LabSession.objects.filter(
+                    provider__in=["aws_ec2", "digitalocean"],
+                    started_at__gte=last_24h,
+                ).count(),
+                "cloud_scenarios": Scenario.objects.filter(
+                    infrastructure_type__in=["aws_ec2", "digitalocean"],
+                    is_active=True,
+                ).count(),
+            }
+            return stats
+        except Exception:
+            return {
+                "active_docker": 0, "active_aws": 0, "active_do": 0,
+                "total_cloud_24h": 0, "cloud_scenarios": 0,
+            }
+
+
+# ─── Audit Log Viewer ───────────────────────────────────────────────
+
+class AdminAuditLogView(APIView):
+    """View audit logs with filtering."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.audit.models import AuditLog
+        qs = AuditLog.objects.select_related("user").order_by("-created_at")
+
+        # Filters
+        action = request.query_params.get("action")
+        user_id = request.query_params.get("user_id")
+        days = int(request.query_params.get("days", 7))
+
+        if action:
+            qs = qs.filter(action=action)
+        if user_id:
+            qs = qs.filter(user_id=user_id)
+
+        since = timezone.now() - timedelta(days=days)
+        qs = qs.filter(created_at__gte=since)
+
+        logs = []
+        for log in qs[:200]:
+            logs.append({
+                "id": log.id,
+                "action": log.action,
+                "resource": log.resource,
+                "user": log.user.username if log.user else None,
+                "user_id": log.user_id,
+                "ip_address": log.ip_address,
+                "metadata": log.metadata,
+                "created_at": log.created_at.isoformat(),
+            })
+
+        # Summary stats
+        all_actions = AuditLog.objects.filter(created_at__gte=since)
+        stats = list(all_actions.values("action").annotate(count=Count("id")).order_by("-count"))
+
+        return Response({
+            "logs": logs,
+            "stats": stats,
+            "total": qs.count(),
+        })
+
+
+# ─── Recent Activity Feed ───────────────────────────────────────────
+
+class AdminActivityFeedView(APIView):
+    """Get recent platform activity for the admin dashboard."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        now = timezone.now()
+        last_24h = now - timedelta(hours=24)
+        activities = []
+
+        # Recent registrations
+        new_users = User.objects.filter(
+            date_joined__gte=last_24h
+        ).order_by("-date_joined")[:10]
+        for u in new_users:
+            activities.append({
+                "type": "registration",
+                "icon": "user-plus",
+                "message": f"New user registered: {u.username}",
+                "email": u.email,
+                "timestamp": u.date_joined.isoformat(),
+            })
+
+        # Recent lab starts
+        recent_labs = LabSession.objects.filter(
+            started_at__gte=last_24h
+        ).select_related("user", "scenario").order_by("-started_at")[:10]
+        for lab in recent_labs:
+            activities.append({
+                "type": "lab_start",
+                "icon": "play",
+                "message": f"{lab.user.username if lab.user else 'Unknown'} started {lab.scenario.title if lab.scenario else 'a lab'}",
+                "timestamp": lab.started_at.isoformat(),
+            })
+
+        # Recent completions
+        completed_labs = LabSession.objects.filter(
+            status="COMPLETED", ended_at__gte=last_24h
+        ).select_related("user", "scenario").order_by("-ended_at")[:10]
+        for lab in completed_labs:
+            activities.append({
+                "type": "lab_completed",
+                "icon": "check-circle",
+                "message": f"{lab.user.username if lab.user else 'Unknown'} completed {lab.scenario.title if lab.scenario else 'a lab'} (Score: {lab.score or 0})",
+                "timestamp": lab.ended_at.isoformat(),
+            })
+
+        # Recent failed labs
+        failed_labs = LabSession.objects.filter(
+            status="FAILED", ended_at__gte=last_24h
+        ).select_related("user", "scenario").order_by("-ended_at")[:5]
+        for lab in failed_labs:
+            activities.append({
+                "type": "lab_failed",
+                "icon": "x-circle",
+                "message": f"{lab.user.username if lab.user else 'Unknown'}'s lab expired: {lab.scenario.title if lab.scenario else 'a lab'}",
+                "timestamp": lab.ended_at.isoformat(),
+            })
+
+        # Sort all activities by timestamp descending
+        activities.sort(key=lambda x: x["timestamp"], reverse=True)
+
+        return Response(activities[:30])
+
+
+# ─── CSV Exports ─────────────────────────────────────────────────────
+
+class AdminExportUsersView(APIView):
+    """Export all users as CSV."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        users = User.objects.annotate(
+            total_labs=Count("lab_sessions"),
+            completed_labs=Count("lab_sessions", filter=Q(lab_sessions__status="COMPLETED")),
+        ).order_by("-date_joined")
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="users_{timezone.now().strftime("%Y%m%d")}.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(["ID", "Username", "Email", "Active", "Staff", "Total Labs", "Completed", "Joined", "Last Login"])
+        for u in users:
+            writer.writerow([
+                u.id, u.username, u.email, u.is_active, u.is_staff,
+                u.total_labs, u.completed_labs,
+                u.date_joined.strftime("%Y-%m-%d %H:%M"),
+                u.last_login.strftime("%Y-%m-%d %H:%M") if u.last_login else "Never",
+            ])
+        return response
+
+
+class AdminExportLabsView(APIView):
+    """Export lab sessions as CSV."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        days = int(request.query_params.get("days", 30))
+        since = timezone.now() - timedelta(days=days)
+        labs = LabSession.objects.filter(
+            started_at__gte=since
+        ).select_related("user", "scenario").order_by("-started_at")
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="labs_{timezone.now().strftime("%Y%m%d")}.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(["Session ID", "User", "Scenario", "Status", "Score", "Started", "Ended", "Duration (min)"])
+        for lab in labs:
+            duration = ""
+            if lab.started_at and lab.ended_at:
+                duration = round((lab.ended_at - lab.started_at).total_seconds() / 60, 1)
+            writer.writerow([
+                str(lab.id), lab.user.username if lab.user else "—",
+                lab.scenario.title if lab.scenario else "—",
+                lab.status, lab.score or 0,
+                lab.started_at.strftime("%Y-%m-%d %H:%M"),
+                lab.ended_at.strftime("%Y-%m-%d %H:%M") if lab.ended_at else "—",
+                duration,
+            ])
+        return response
+
+
+class AdminExportProgressView(APIView):
+    """Export user progress as CSV."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        progress = UserScenarioProgress.objects.select_related(
+            "user", "scenario"
+        ).order_by("user__username", "scenario__title")
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="progress_{timezone.now().strftime("%Y%m%d")}.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(["User", "Scenario", "Best Score", "Attempts", "Completed", "Last Attempt"])
+        for p in progress:
+            writer.writerow([
+                p.user.username, p.scenario.title if p.scenario else "—",
+                p.best_score or 0, p.attempts or 0,
+                "Yes" if p.completed else "No",
+                p.last_attempt_at.strftime("%Y-%m-%d %H:%M") if hasattr(p, "last_attempt_at") and p.last_attempt_at else "—",
+            ])
+        return response
+
+
+# ─── New Admin Features ──────────────────────────────────────────────
+
+class AdminMaintenanceModeView(APIView):
+    """Toggle maintenance mode and message."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        return Response({
+            "maintenance_mode": settings.MAINTENANCE_MODE,
+            "maintenance_message": settings.MAINTENANCE_MESSAGE,
+        })
+
+    def post(self, request):
+        # Update in-memory settings (persists until restart)
+        # For permanent change, admin should update .env
+        enabled = request.data.get("enabled", False)
+        message = request.data.get("message", settings.MAINTENANCE_MESSAGE)
+        settings.MAINTENANCE_MODE = enabled
+        settings.MAINTENANCE_MESSAGE = message
+        logger.info(f"Maintenance mode {'enabled' if enabled else 'disabled'} by {request.user.username}")
+        return Response({
+            "maintenance_mode": settings.MAINTENANCE_MODE,
+            "maintenance_message": settings.MAINTENANCE_MESSAGE,
+        })
+
+
+class AdminInactiveUsersView(APIView):
+    """List users inactive for 90+ days (excludes never-logged-in users registered recently)."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        days = int(request.query_params.get("days", 90))
+        threshold = timezone.now() - timedelta(days=days)
+        join_threshold = timezone.now() - timedelta(days=days)
+
+        # Inactive = last_login older than threshold
+        # OR never logged in AND joined more than 'days' ago
+        users = User.objects.filter(
+            Q(last_login__lt=threshold) |
+            Q(last_login__isnull=True, date_joined__lt=join_threshold)
+        ).exclude(
+            is_staff=True  # Exclude admin/staff users
+        ).order_by("last_login")[:100]
+
+        data = [{
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "is_active": u.is_active,
+            "date_joined": u.date_joined.isoformat(),
+            "last_login": u.last_login.isoformat() if u.last_login else None,
+            "days_inactive": (timezone.now() - u.last_login).days if u.last_login else "Never logged in",
+        } for u in users]
+
+        return Response({"inactive_users": data, "count": len(data)})
+
+
+class AdminSubscriptionLogsView(APIView):
+    """View subscription logs with filters, currency conversion, and revenue details."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from django.db.models import Q
+        from common.currency import get_usd_to_inr_rate
+
+        # Filters
+        tech_filter = request.query_params.get("technology", "").strip()
+        status_filter = request.query_params.get("status", "").strip()
+        user_filter = request.query_params.get("user", "").strip()
+        date_from = request.query_params.get("date_from", "").strip()
+        date_to = request.query_params.get("date_to", "").strip()
+        display_currency = request.query_params.get("currency", "INR").upper()
+
+        subs = TechnologySubscription.objects.all().select_related(
+            "user", "technology"
+        ).order_by("-created_at")
+
+        if tech_filter:
+            subs = subs.filter(technology__name__icontains=tech_filter)
+        if status_filter == "active":
+            subs = subs.filter(is_active=True)
+        elif status_filter == "expired":
+            subs = subs.filter(is_active=False)
+        if user_filter:
+            subs = subs.filter(
+                Q(user__username__icontains=user_filter) |
+                Q(user__email__icontains=user_filter)
+            )
+        if date_from:
+            try:
+                from datetime import datetime as dt
+                subs = subs.filter(created_at__date__gte=dt.strptime(date_from, "%Y-%m-%d").date())
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                from datetime import datetime as dt
+                subs = subs.filter(created_at__date__lte=dt.strptime(date_to, "%Y-%m-%d").date())
+            except ValueError:
+                pass
+
+        subs = subs[:500]
+
+        # Exchange rate
+        exchange_rate = None
+        if display_currency == "USD":
+            try:
+                exchange_rate = float(get_usd_to_inr_rate())
+            except Exception:
+                exchange_rate = 83.50
+
+        # Build response
+        total_inr = 0
+        active_count = 0
+        data = []
+        for sub in subs:
+            amount_inr = float(sub.amount)
+            if sub.is_active:
+                total_inr += amount_inr
+                active_count += 1
+
+            if display_currency == "USD" and exchange_rate:
+                amt_converted = round(amount_inr / exchange_rate, 2)
+                amount_str = f"${amt_converted}"
+            else:
+                amount_str = f"₹{int(amount_inr)}"
+
+            data.append({
+                "id": str(sub.id),
+                "subscription_id": sub.subscription_id,
+                "user": {
+                    "id": sub.user.id,
+                    "username": sub.user.username,
+                    "email": sub.user.email,
+                    "full_name": sub.user.get_full_name(),
+                },
+                "technology": sub.technology.name,
+                "amount": str(sub.amount),
+                "amount_display": amount_str,
+                "is_active": sub.is_active,
+                "payment_verified": sub.payment_verified,
+                "created_at": sub.created_at.isoformat(),
+            })
+
+        total_display = total_inr
+        if display_currency == "USD" and exchange_rate:
+            total_display = round(total_inr / exchange_rate, 2)
+
+        return Response({
+            "logs": data,
+            "total_revenue": total_display,
+            "total_revenue_inr": total_inr,
+            "display_currency": display_currency,
+            "exchange_rate": exchange_rate,
+            "total_count": len(data),
+            "active_count": active_count,
+        })
+
+
+class AdminThreadModerationView(APIView):
+    """Moderate community threads — delete inappropriate content."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        threads = Thread.objects.filter(
+            is_deleted=False
+        ).select_related("author", "technology").order_by("-created_at")[:100]
+
+        data = [{
+            "id": str(t.id),
+            "title": t.title,
+            "body": t.body[:200],
+            "author": t.author.username,
+            "technology": t.technology.name if t.technology else None,
+            "is_pinned": t.is_pinned,
+            "is_locked": t.is_locked,
+            "reply_count": t.reply_count,
+            "upvotes": t.upvotes,
+            "created_at": t.created_at.isoformat(),
+        } for t in threads]
+
+        return Response({"threads": data})
+
+    def delete(self, request, thread_id):
+        """Soft-delete a thread."""
+        try:
+            thread = Thread.objects.get(id=thread_id)
+            thread.is_deleted = True
+            thread.save(update_fields=["is_deleted"])
+            logger.info(f"Thread {thread_id} deleted by admin {request.user.username}")
+            return Response({"status": "deleted"})
+        except Thread.DoesNotExist:
+            return Response({"error": "Thread not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    def patch(self, request, thread_id):
+        """Pin/lock a thread."""
+        try:
+            thread = Thread.objects.get(id=thread_id)
+            if "is_pinned" in request.data:
+                thread.is_pinned = request.data["is_pinned"]
+            if "is_locked" in request.data:
+                thread.is_locked = request.data["is_locked"]
+            thread.save()
+            return Response({"status": "updated"})
+        except Thread.DoesNotExist:
+            return Response({"error": "Thread not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class AdminConfigView(APIView):
+    """Get platform configuration for admin."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        return Response({
+            "primary_email": settings.PRIMARY_EMAIL,
+            "payment_email": settings.PAYMENT_EMAIL,
+            "support_email": settings.SUPPORT_EMAIL,
+            "maintenance_mode": settings.MAINTENANCE_MODE,
+            "maintenance_message": settings.MAINTENANCE_MESSAGE,
+            "lab_provider": settings.LAB_PROVIDER,
+            "max_lab_duration": settings.LAB_MAX_DURATION_MINUTES,
+        })

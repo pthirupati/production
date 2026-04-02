@@ -1,0 +1,227 @@
+# FixitLab — Production Docker Compose
+# Deploy on a single VPS with SSL via Let's Encrypt
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+services:
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile.prod
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      frontend-prod:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    volumes:
+      - static_volume:/static
+      - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    networks:
+      - fixitlab_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    # Auto-renew every 12 hours
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 43200 & wait $${!}; done'"
+    restart: unless-stopped
+
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    networks:
+      - fixitlab_net
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    env_file:
+      - .env.production
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - static_volume:/app/staticfiles
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./scripts:/scripts
+    networks:
+      - fixitlab_net
+      - fixitlab_labs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  celery_worker:
+    build: ./backend
+    command: celery -A config worker -l info --concurrency=8 -Q default,notifications -n default@%h
+    env_file:
+      - .env.production
+    depends_on:
+      backend:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - static_volume:/app/staticfiles
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./scripts:/scripts
+    networks:
+      - fixitlab_net
+      - fixitlab_labs
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    restart: unless-stopped
+
+  celery_provisioning:
+    build: ./backend
+    command: celery -A config worker -l info --concurrency=10 -Q provisioning -n provisioning@%h
+    env_file:
+      - .env.production
+    depends_on:
+      backend:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - static_volume:/app/staticfiles
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./scripts:/scripts
+    networks:
+      - fixitlab_net
+      - fixitlab_labs
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    restart: unless-stopped
+
+  celery_maintenance:
+    build: ./backend
+    command: celery -A config worker -l info --concurrency=2 -Q maintenance -n maintenance@%h
+    env_file:
+      - .env.production
+    depends_on:
+      backend:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - static_volume:/app/staticfiles
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./scripts:/scripts
+    networks:
+      - fixitlab_net
+      - fixitlab_labs
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+
+  celery_beat:
+    build: ./backend
+    command: celery -A config beat -l info
+    env_file:
+      - .env.production
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - static_volume:/app/staticfiles
+    networks:
+      - fixitlab_net
+    restart: unless-stopped
+
+  database:
+    build: ./database
+    container_name: fixitlab_db
+    volumes:
+      - fixitlab_db_data:/var/lib/postgresql/data
+    env_file:
+      - .env.production
+    networks:
+      - fixitlab_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: fixitlab_redis
+    command: redis-server --maxmemory 1gb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-fixitlab_redis_secret} --tcp-backlog 511 --timeout 300
+    networks:
+      - fixitlab_net
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-fixitlab_redis_secret}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: fixitlab_rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-fixitlab}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-fixitlab_rabbit_secret}
+    networks:
+      - fixitlab_net
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  fixitlab_db_data:
+  static_volume:
+  certbot_www:
+  certbot_certs:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  fixitlab_net:
+    driver: bridge
+  fixitlab_labs:
+    driver: bridge
+    name: fixitlab_labs

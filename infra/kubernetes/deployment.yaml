@@ -1,0 +1,345 @@
+# FixitLab — Complete Production Kubernetes Manifests
+# Architecture: HPA-enabled, WebSocket-ready, Docker-in-Docker for lab sandboxing
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fixitlab
+---
+# === ConfigMap ===
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fixitlab-config
+  namespace: fixitlab
+data:
+  DJANGO_DEBUG: "false"
+  DJANGO_ALLOWED_HOSTS: "*"
+  POSTGRES_HOST: "postgres-service"
+  POSTGRES_PORT: "5432"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  CELERY_BROKER_URL: "amqp://guest:guest@rabbitmq-service:5672//"
+  LAB_PROVIDER: "docker"
+  DOCKER_NETWORK: "fixitlab_labs"  # Legacy — per-session networks used at runtime
+  DOCKER_CONTAINER_MEMORY_LIMIT: "512m"
+  DOCKER_CONTAINER_CPU_LIMIT: "1.0"
+  DOCKER_SCENARIO_IMAGE_PREFIX: "fixitlab/scenario-"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fixitlab-secrets
+  namespace: fixitlab
+type: Opaque
+stringData:
+  DJANGO_SECRET_KEY: "CHANGE-ME-IN-PRODUCTION-USE-SEALED-SECRETS"
+  POSTGRES_DB: "fixitlab"
+  POSTGRES_USER: "fixitlab"
+  POSTGRES_PASSWORD: "CHANGE-ME"
+  STRIPE_SECRET_KEY: ""
+  STRIPE_PUBLISHABLE_KEY: ""
+  STRIPE_WEBHOOK_SECRET: ""
+---
+# === PostgreSQL StatefulSet ===
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: fixitlab
+spec:
+  serviceName: postgres-service
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports: [{ containerPort: 5432 }]
+          envFrom: [{ secretRef: { name: fixitlab-secrets } }]
+          env: [{ name: PGDATA, value: /var/lib/postgresql/data/pgdata }]
+          volumeMounts: [{ name: pg-data, mountPath: /var/lib/postgresql/data }]
+          resources:
+            requests: { memory: "512Mi", cpu: "250m" }
+            limits: { memory: "2Gi", cpu: "1" }
+  volumeClaimTemplates:
+    - metadata: { name: pg-data }
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources: { requests: { storage: 20Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgres-service, namespace: fixitlab }
+spec:
+  selector: { app: postgres }
+  ports: [{ port: 5432 }]
+  clusterIP: None
+---
+# === Redis ===
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: redis, namespace: fixitlab }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: redis } }
+  template:
+    metadata: { labels: { app: redis } }
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command: [redis-server, --maxmemory, 512mb, --maxmemory-policy, allkeys-lru]
+          ports: [{ containerPort: 6379 }]
+          resources:
+            requests: { memory: 128Mi, cpu: 100m }
+            limits: { memory: 512Mi, cpu: 500m }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis-service, namespace: fixitlab }
+spec:
+  selector: { app: redis }
+  ports: [{ port: 6379 }]
+---
+# === RabbitMQ ===
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: rabbitmq, namespace: fixitlab }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: rabbitmq } }
+  template:
+    metadata: { labels: { app: rabbitmq } }
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management-alpine
+          ports: [{ containerPort: 5672 }, { containerPort: 15672 }]
+          resources:
+            requests: { memory: 256Mi, cpu: 200m }
+            limits: { memory: 1Gi, cpu: 500m }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: rabbitmq-service, namespace: fixitlab }
+spec:
+  selector: { app: rabbitmq }
+  ports:
+    - { name: amqp, port: 5672 }
+    - { name: mgmt, port: 15672 }
+---
+# === Backend (Daphne ASGI) ===
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: backend, namespace: fixitlab }
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: backend } }
+  template:
+    metadata: { labels: { app: backend } }
+    spec:
+      containers:
+        - name: backend
+          image: fixitlab/backend:latest
+          ports: [{ containerPort: 8000 }]
+          envFrom:
+            - { configMapRef: { name: fixitlab-config } }
+            - { secretRef: { name: fixitlab-secrets } }
+          volumeMounts:
+            - { name: docker-sock, mountPath: /var/run/docker.sock }
+          resources:
+            requests: { memory: 256Mi, cpu: 200m }
+            limits: { memory: 1Gi, cpu: "1" }
+          readinessProbe:
+            httpGet: { path: /api/technologies/, port: 8000 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/technologies/, port: 8000 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: docker-sock
+          hostPath: { path: /var/run/docker.sock }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: backend-service, namespace: fixitlab }
+spec:
+  selector: { app: backend }
+  ports: [{ port: 8000 }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: backend-hpa, namespace: fixitlab }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: backend }
+  minReplicas: 5
+  maxReplicas: 200
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 60 } }
+    - type: Resource
+      resource: { name: memory, target: { type: Utilization, averageUtilization: 75 } }
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Pods
+          value: 10
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+---
+# === Celery Worker ===
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: celery-worker, namespace: fixitlab }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: celery-worker } }
+  template:
+    metadata: { labels: { app: celery-worker } }
+    spec:
+      containers:
+        - name: worker
+          image: fixitlab/backend:latest
+          command: [celery, -A, config, worker, -l, info, --concurrency=4]
+          envFrom:
+            - { configMapRef: { name: fixitlab-config } }
+            - { secretRef: { name: fixitlab-secrets } }
+          volumeMounts:
+            - { name: docker-sock, mountPath: /var/run/docker.sock }
+          resources:
+            requests: { memory: 256Mi, cpu: 200m }
+            limits: { memory: 1Gi, cpu: "1" }
+      volumes:
+        - name: docker-sock
+          hostPath: { path: /var/run/docker.sock }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: celery-hpa, namespace: fixitlab }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: celery-worker }
+  minReplicas: 3
+  maxReplicas: 100
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 60 } }
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Pods
+          value: 5
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+---
+# === Celery Beat ===
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: celery-beat, namespace: fixitlab }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: celery-beat } }
+  template:
+    metadata: { labels: { app: celery-beat } }
+    spec:
+      containers:
+        - name: beat
+          image: fixitlab/backend:latest
+          command: [celery, -A, config, beat, -l, info, --scheduler, django_celery_beat.schedulers:DatabaseScheduler]
+          envFrom:
+            - { configMapRef: { name: fixitlab-config } }
+            - { secretRef: { name: fixitlab-secrets } }
+          resources:
+            requests: { memory: 128Mi, cpu: 100m }
+            limits: { memory: 256Mi, cpu: 200m }
+---
+# === Frontend (Nginx serving built React) ===
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: frontend, namespace: fixitlab }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: frontend } }
+  template:
+    metadata: { labels: { app: frontend } }
+    spec:
+      containers:
+        - name: frontend
+          image: fixitlab/frontend:latest
+          ports: [{ containerPort: 80 }]
+          resources:
+            requests: { memory: 64Mi, cpu: 50m }
+            limits: { memory: 256Mi, cpu: 200m }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: frontend-service, namespace: fixitlab }
+spec:
+  selector: { app: frontend }
+  ports: [{ port: 80 }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: frontend-hpa, namespace: fixitlab }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: frontend }
+  minReplicas: 3
+  maxReplicas: 30
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+---
+# === Ingress with TLS ===
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fixitlab-ingress
+  namespace: fixitlab
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/websocket-services: "backend-service"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "fixitlab-affinity"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [fixitlab.com]
+      secretName: fixitlab-tls
+  rules:
+    - host: fixitlab.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend: { service: { name: backend-service, port: { number: 8000 } } }
+          - path: /ws
+            pathType: Prefix
+            backend: { service: { name: backend-service, port: { number: 8000 } } }
+          - path: /admin
+            pathType: Prefix
+            backend: { service: { name: backend-service, port: { number: 8000 } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: frontend-service, port: { number: 80 } } }
+
