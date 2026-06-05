@@ -24,4 +24,5 @@ initial_state: |
 hints:
   - order: 1
     cost: 20
-    content: "Set `Defaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"`"
+    content: |
+      Set Defaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" in visudo.

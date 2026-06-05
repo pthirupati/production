@@ -30,7 +30,7 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
 echo "Waiting for backend..."
 for i in $(seq 1 60); do
   if docker compose -f "$COMPOSE_FILE" exec -T backend python -c \
-    "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/')" 2>/dev/null; then
+    "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/'); assert r.status==200" 2>/dev/null; then
     break
   fi
   sleep 3
