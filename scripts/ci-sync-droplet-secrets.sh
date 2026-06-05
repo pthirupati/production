@@ -23,11 +23,6 @@ trap 'rm -f "$TMP_ENV"' EXIT
 echo "$PRODUCTION_ENV_B64" | base64 -d > "$TMP_ENV"
 chmod 600 "$TMP_ENV"
 
-export ENV_FILE="$TMP_ENV"
-"$ROOT/scripts/update-production-host.sh" "$PUBLIC_IP" "$DROPLET_ID" || true
-
-# update-production-host wrote to deploy/production.env path — re-read TMP after python update
-# Re-run python inline on TMP_ENV since update-production-host uses deploy/production.env
 python3 - "$TMP_ENV" "$PUBLIC_IP" "$DROPLET_ID" "$SSH_KEY_ID" <<'PY'
 import re, sys
 from pathlib import Path
