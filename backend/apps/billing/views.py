@@ -259,20 +259,20 @@ class PaymentGatewayStatusView(APIView):
 
     def get(self, request):
         razorpay_configured = bool(settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET)
-        razorpay_ready = "ready" if razorpay_configured else "not_configured"
+        razorpay_ready = "ready" if razorpay_configured else "down"
         
         banner_message = None
         if not razorpay_configured:
             banner_message = (
-                "Payment gateway is not configured yet. "
-                "Free scenarios are available, but paid technologies are temporarily unavailable. "
-                "Contact support for access."
+                "Payment gateway is currently unavailable. "
+                "Free scenarios still work. Paid subscriptions will open once Razorpay is configured."
             )
         
         return Response({
             "razorpay_configured": razorpay_configured,
             "razorpay_key_id": settings.RAZORPAY_KEY_ID if razorpay_configured else None,
             "status": razorpay_ready,
+            "available": razorpay_configured,
             "banner_message": banner_message,
             "banner_type": "warning" if banner_message else None,
         })
@@ -323,10 +323,16 @@ class CreateRazorpayOrderView(APIView):
         # Amount in paise (INR smallest unit)
         amount_paise = amount * 100
 
-        # Check Razorpay configuration
+        # Payment gateway must be configured — no fake/demo checkout in production
         if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
-            # Fallback: create subscription directly (demo mode)
-            return self._create_direct_subscription(request, technology, amount)
+            return Response(
+                {
+                    "error": "Payment gateway is temporarily unavailable. Please try again later or contact support.",
+                    "code": "GATEWAY_UNAVAILABLE",
+                    "support_email": settings.SUPPORT_EMAIL,
+                },
+                status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         try:
             import razorpay
@@ -985,7 +991,19 @@ class ConfirmPaymentView(APIView):
         from apps.question_bank.models import Technology
         from apps.notifications.tasks import send_notification_email, create_in_app_notification
 
-        if not getattr(settings, "DEMO_PAYMENT_ENABLED", True):
+        razorpay_configured = bool(settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET)
+        demo_enabled = getattr(settings, "DEMO_PAYMENT_ENABLED", False) and not razorpay_configured
+
+        if not razorpay_configured and not demo_enabled:
+            return Response(
+                {
+                    "error": "Payment gateway is not configured. Subscriptions are unavailable until payments are enabled.",
+                    "code": "GATEWAY_UNAVAILABLE",
+                },
+                status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not getattr(settings, "DEMO_PAYMENT_ENABLED", False):
             return Response(
                 {"error": "Demo payment is disabled. Use Razorpay checkout."},
                 status=http_status.HTTP_403_FORBIDDEN,

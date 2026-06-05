@@ -39,12 +39,11 @@ class UserJiraTicketsView(APIView):
         return Response({"tickets": data, "count": len(data)})
 
 
-def _scenario_ticket_payload(ticket):
+def _scenario_ticket_payload(ticket, include_details=False):
     comments = JiraCommentLog.objects.filter(issue_key=ticket.issue_key).order_by("-created_at")[:10]
-    return {
+    payload = {
         "ticket": {
             "issue_key": ticket.issue_key,
-            "issue_url": ticket.issue_url,
             "jira_status": ticket.jira_status,
             "run_count": ticket.run_count,
         },
@@ -53,6 +52,18 @@ def _scenario_ticket_payload(ticket):
             for c in comments
         ],
     }
+    if include_details and ticket.issue_key:
+        from .client import JiraClient, JiraClientError
+        client = JiraClient()
+        if client.enabled:
+            try:
+                details = client.get_issue_details(ticket.issue_key)
+                payload["ticket"]["summary"] = details.get("summary", "")
+                payload["ticket"]["description"] = details.get("description", "")
+                payload["ticket"]["jira_status"] = details.get("status") or ticket.jira_status
+            except JiraClientError:
+                pass
+    return payload
 
 
 class ScenarioJiraTicketView(APIView):
@@ -66,7 +77,7 @@ class ScenarioJiraTicketView(APIView):
         ).first()
         if not ticket or not ticket.issue_key:
             return Response({"ticket": None, "recent_comments": []})
-        return Response(_scenario_ticket_payload(ticket))
+        return Response(_scenario_ticket_payload(ticket, include_details=True))
 
     def post(self, request, scenario_id):
         """Ensure a Jira ticket exists for this user+scenario (create if missing)."""
@@ -82,6 +93,6 @@ class ScenarioJiraTicketView(APIView):
                 status=200,
             )
         ticket = UserScenarioJiraTicket.objects.get(user=request.user, scenario=scenario)
-        payload = _scenario_ticket_payload(ticket)
+        payload = _scenario_ticket_payload(ticket, include_details=True)
         payload["jira_created"] = result.get("jira_created", False)
         return Response(payload, status=201 if result.get("jira_created") else 200)

@@ -4,7 +4,7 @@ import {
   Check, ArrowRight, Zap, Crown, Loader2, Sun, Moon, Server, Globe,
   Monitor, Database, Cpu, Shield, Lock, Sparkles, ShoppingCart, X,
   IndianRupee, DollarSign, BadgeCheck, ChevronRight,
-  RefreshCw, ShieldCheck
+  RefreshCw, ShieldCheck, AlertTriangle
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
@@ -60,7 +60,8 @@ export default function Pricing() {
   // Cart state for multi-tech subscribe
   const [cart, setCart] = useState([])
   const [showCart, setShowCart] = useState(false)
-  const [batchProcessing, setBatchProcessing] = useState(false)
+  const [gatewayDown, setGatewayDown] = useState(false)
+  const [gatewayMessage, setGatewayMessage] = useState('')
 
   // Fetch live exchange rate on mount
   useEffect(() => {
@@ -110,6 +111,15 @@ export default function Pricing() {
   }, [isAuthenticated])
 
   useEffect(() => {
+    subscriptionApi.getGatewayStatus()
+      .then((data) => {
+        setGatewayDown(!data?.razorpay_configured)
+        setGatewayMessage(data?.banner_message || '')
+      })
+      .catch(() => setGatewayDown(true))
+  }, [])
+
+  useEffect(() => {
     if (searchParams.get('success') === 'true') {
       toast.success('Subscription activated! You now have full access.', { duration: 5000 })
     }
@@ -148,6 +158,10 @@ export default function Pricing() {
   const handleSubscribe = async (tech) => {
     if (!isAuthenticated) {
       toast('Please sign in first to subscribe.', { icon: '\uD83D\uDD12' })
+      return
+    }
+    if (gatewayDown) {
+      toast.error(gatewayMessage || 'Payment gateway is unavailable. Try again later.')
       return
     }
 
@@ -198,35 +212,24 @@ export default function Pricing() {
 
     setBatchProcessing(true)
     try {
-      for (const tech of cart) {
-        const orderData = await subscriptionApi.createRazorpayOrder(tech.id)
-
-        if (orderData.payment_token && !orderData.order_id) {
-          await subscriptionApi.confirmPayment(orderData.payment_token, 'demo')
-          toast.success(`Subscribed to ${tech.name}!`)
-        } else {
-          const params = new URLSearchParams({
-            token: orderData.payment_token || orderData.order_id || '',
-            tech: tech.name,
-            amount: String(orderData.amount || tech.price || 499),
-            tech_id: String(tech.id),
-            currency: 'INR',
-          })
-          if (orderData.order_id) {
-            params.set('order_id', orderData.order_id)
-            params.set('razorpay_key', orderData.razorpay_key_id || '')
-          }
-          setBatchProcessing(false)
-          navigateTo(`/payment?${params.toString()}`)
-          return
-        }
+      const tech = cart[0]
+      const orderData = await subscriptionApi.createRazorpayOrder(tech.id)
+      if (!orderData.order_id) {
+        toast.error(orderData.error || 'Payment gateway unavailable')
+        return
       }
-
-      const data = await subscriptionApi.getMySubscriptions()
-      setMySubscriptions(data.subscriptions || [])
-      setCart([])
-      setShowCart(false)
-      toast.success(`All ${cart.length} technologies subscribed!`, { duration: 5000 })
+      const params = new URLSearchParams({
+        token: orderData.payment_token || orderData.order_id || '',
+        tech: tech.name,
+        amount: String(orderData.amount || tech.price || 499),
+        tech_id: String(tech.id),
+        currency: 'INR',
+      })
+      if (orderData.order_id) {
+        params.set('order_id', orderData.order_id)
+        params.set('razorpay_key', orderData.razorpay_key_id || '')
+      }
+      navigateTo(`/payment?${params.toString()}`)
     } catch (err) {
       const msg = err.response?.data?.error || 'Batch subscription failed. Please try individually.'
       toast.error(msg)
@@ -318,6 +321,12 @@ export default function Pricing() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
+        {gatewayDown && (
+          <div className="mb-8 rounded-lg border border-accent-amber/30 bg-accent-amber/10 px-4 py-3 text-sm text-accent-amber flex items-start gap-2">
+            <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+            <span>{gatewayMessage || 'Payment gateway is unavailable. Free scenarios still work.'}</span>
+          </div>
+        )}
         {/* Hero */}
         <div className="text-center mb-14 relative">
           <div className="relative">

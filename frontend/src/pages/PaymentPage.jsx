@@ -127,7 +127,8 @@ export default function PaymentPage() {
   const [razorpayFailed, setRazorpayFailed] = useState(false)
   const [paymentResult, setPaymentResult] = useState(null)
   const [error, setError] = useState('')
-  const [hoveredMethod, setHoveredMethod] = useState(null)
+  const [gatewayDown, setGatewayDown] = useState(false)
+  const [gatewayChecked, setGatewayChecked] = useState(false)
   const [upiId, setUpiId] = useState('')
   const cardRef = useRef(null)
 
@@ -160,6 +161,18 @@ export default function PaymentPage() {
     }
     document.body.appendChild(script)
   }, [])
+
+  // Block checkout when payment gateway is not configured
+  useEffect(() => {
+    subscriptionApi.getGatewayStatus()
+      .then((data) => {
+        const down = !data?.razorpay_configured && !existingOrderId
+        setGatewayDown(down)
+        if (down) setStep('gateway_down')
+      })
+      .catch(() => setGatewayDown(true))
+      .finally(() => setGatewayChecked(true))
+  }, [existingOrderId])
 
   // Redirect if no token
   useEffect(() => {
@@ -205,22 +218,10 @@ export default function PaymentPage() {
       return
     }
 
-    // DEMO MODE: If we have a paymentToken from URL and no Razorpay order_id,
-    // this means Razorpay is NOT configured on backend → use confirm-payment flow
-    const isDemoMode = paymentToken && !existingOrderId
-
-    if (isDemoMode) {
-      setStep('processing')
-      try {
-        const result = await subscriptionApi.confirmPayment(paymentToken, selectedMethod)
-        setPaymentResult(result)
-        setStep('success')
-        toast.success('Payment successful!')
-      } catch (err) {
-        const msg = err?.response?.data?.error || 'Payment failed. Please try again.'
-        setError(msg)
-        setStep('failed')
-      }
+    // Require real Razorpay order — no demo/fake payments
+    if (!existingOrderId) {
+      setError('Payment gateway is unavailable. Please try again later.')
+      setStep('gateway_down')
       return
     }
 
@@ -241,11 +242,9 @@ export default function PaymentPage() {
         // Create a new Razorpay order
         const orderData = await subscriptionApi.createRazorpayOrder(parseInt(techId))
 
-        if (orderData.payment_token && !orderData.order_id) {
-          // Backend returned demo token (Razorpay not configured)
-          const result = await subscriptionApi.confirmPayment(orderData.payment_token, selectedMethod)
-          setPaymentResult(result)
-          setStep('success')
+        if (!orderData.order_id) {
+          setError(orderData.error || 'Payment gateway is unavailable.')
+          setStep('gateway_down')
           return
         }
 
@@ -324,7 +323,25 @@ export default function PaymentPage() {
     }
   }
 
-  if (!paymentToken) return null
+  if (!paymentToken || !gatewayChecked) return null
+
+  if (step === 'gateway_down' || gatewayDown) {
+    return (
+      <div className="min-h-screen bg-surface-950 flex items-center justify-center p-6">
+        <div className="max-w-md text-center glass-card p-8">
+          <AlertTriangle size={48} className="text-accent-amber mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-white mb-2">Payment gateway unavailable</h1>
+          <p className="text-surface-400 text-sm mb-6">
+            Online payments are not configured yet. No charge has been made.
+            Free scenarios are still available.
+          </p>
+          <Link to="/pricing" className="btn-primary inline-flex items-center gap-2">
+            <ArrowLeft size={16} /> Back to Pricing
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-surface-950 relative overflow-hidden">

@@ -143,3 +143,26 @@ class JiraClient:
     def get_issue_status(self, issue_key: str) -> str:
         data = self._request("GET", f"/issue/{issue_key}", params={"fields": "status"})
         return data.get("fields", {}).get("status", {}).get("name", "")
+
+    def get_issue_details(self, issue_key: str) -> dict:
+        """Fetch summary + description for in-app display (no user Jira login needed)."""
+        data = self._request(
+            "GET",
+            f"/issue/{issue_key}",
+            params={"fields": "summary,description,status,comment"},
+        )
+        fields = data.get("fields", {})
+        description = ""
+        desc_doc = fields.get("description")
+        if isinstance(desc_doc, dict):
+            for block in desc_doc.get("content", []):
+                for item in block.get("content", []):
+                    if item.get("type") == "text":
+                        description += item.get("text", "")
+        elif isinstance(desc_doc, str):
+            description = desc_doc
+        return {
+            "summary": fields.get("summary", ""),
+            "description": description[:8000],
+            "status": fields.get("status", {}).get("name", ""),
+        }

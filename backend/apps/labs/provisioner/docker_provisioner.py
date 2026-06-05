@@ -134,6 +134,12 @@ class DockerProvisioner:
             return container.id, container_name
 
         except DockerException as e:
+            err = str(e)
+            if "pull access denied" in err or "not found" in err.lower():
+                raise DockerException(
+                    f"Lab image not built on server: {image_name}. "
+                    f"Ask admin to run ./scripts/build-scenario-images.sh"
+                ) from e
             logger.error(f"Failed to provision container: {e}")
             raise
 

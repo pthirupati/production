@@ -53,6 +53,11 @@ export const subscriptionApi = {
     return data
   },
 
+  async getGatewayStatus() {
+    const { data } = await api.get('/billing/gateway-status/')
+    return data
+  },
+
   async createBatchOrders(technologyIds) {
     const results = []
     for (const techId of technologyIds) {

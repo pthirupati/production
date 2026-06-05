@@ -470,11 +470,8 @@ SITE_URL = env("SITE_URL", default="http://localhost:8080")
 RAZORPAY_KEY_ID = env("RAZORPAY_KEY_ID", default="")
 RAZORPAY_KEY_SECRET = env("RAZORPAY_KEY_SECRET", default="")
 RAZORPAY_WEBHOOK_SECRET = env("RAZORPAY_WEBHOOK_SECRET", default="")
-# Demo payments when Razorpay keys are absent; respect explicit env override
-DEMO_PAYMENT_ENABLED = env.bool(
-    "DEMO_PAYMENT_ENABLED",
-    default=not bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET),
-)
+# Demo payments only when explicitly enabled (local dev); never default on in production
+DEMO_PAYMENT_ENABLED = env.bool("DEMO_PAYMENT_ENABLED", default=False)
 
 SENTRY_DSN = env("SENTRY_DSN", default="")
 if SENTRY_DSN:

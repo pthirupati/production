@@ -500,8 +500,16 @@ class StartLabView(APIView):
             session.status = "FAILED"
             session.save()
             logger.error(f"Lab provisioning failed: {e}")
+            err_msg = str(e)
+            if "Lab image not built" in err_msg or "pull access denied" in err_msg:
+                user_msg = (
+                    "This lab scenario is not deployed on the server yet. "
+                    "Please try another scenario or contact support."
+                )
+            else:
+                user_msg = "Failed to provision lab. Please try again."
             return Response(
-                {"error": "Failed to provision lab. Please try again."},
+                {"error": user_msg, "code": "PROVISION_FAILED", "detail": err_msg[:200]},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
