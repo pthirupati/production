@@ -18,10 +18,19 @@ On every **Platform Start** or **CI/CD deploy**, `scripts/sync-production-env.sh
 
 | Checkbox / input | What it does |
 |------------------|--------------|
-| **Create server** | Creates `fixitlab-prod` on DO, runs bootstrap, updates `PROD_HOST` + `PRODUCTION_ENV_B64` secrets, commits `infra/digitalocean/production.json` |
-| **Run tests** | Backend + frontend tests before deploy |
-| **Build scenarios** | Rebuild lab Docker images on server |
-| **Git ref** | Branch to deploy (default `main`) |
+| **Create server** | Creates `fixitlab-prod` on DO, bootstrap, **auto-updates GitHub secrets** (`PROD_HOST`, `PRODUCTION_ENV_B64`), **GoDaddy A record** (if keys set), commits `production.json`, then tests + deploy |
+
+### What updates automatically when **Create server** is checked
+
+| Target | Updated? | How |
+|--------|----------|-----|
+| GitHub `PROD_HOST` | Yes | `ci-sync-droplet-secrets.sh` via `gh secret set` |
+| GitHub `PRODUCTION_ENV_B64` | Yes | Re-encoded env with new IP + `DJANGO_ALLOWED_HOSTS` |
+| GoDaddy DNS A `@` | Yes* | `update-godaddy-dns.sh` — needs `GODADDY_API_KEY` + `GODADDY_API_SECRET` inside `PRODUCTION_ENV_B64` |
+| GoDaddy CNAME `www` | Yes* | Points `www` → `fixitlab.in` |
+| Git commit | Yes | `infra/digitalocean/production.json` only (no secrets) |
+
+\*GoDaddy skipped with a log message if API keys are not configured.
 
 Required **production** environment secrets:
 
@@ -32,6 +41,22 @@ Required **production** environment secrets:
 | `PROD_USER` | Always (usually `root`) |
 | `PROD_HOST` | Deploy only (auto-set when **Create server** is checked) |
 | `DO_API_TOKEN` | Optional if `DO_API_TOKEN` is inside `PRODUCTION_ENV_B64` |
+
+**GoDaddy DNS** (store inside `deploy/production.env` → upload via `PRODUCTION_ENV_B64`):
+
+```env
+GODADDY_API_KEY=your_production_key
+GODADDY_API_SECRET=your_production_secret
+GODADDY_DOMAIN=fixitlab.in
+```
+
+Get keys at [developer.godaddy.com/keys](https://developer.godaddy.com/keys) (Production). After adding, run `./scripts/upload-secrets-to-github.sh`.
+
+| Input | What it does |
+|-------|--------------|
+| **Run tests** | Backend + frontend tests before deploy |
+| **Build scenarios** | Rebuild lab Docker images on server |
+| **Git ref** | Branch to deploy (default `main`) |
 
 Push to `main` still runs **CI/CD Production** (tests + deploy, no droplet create).
 

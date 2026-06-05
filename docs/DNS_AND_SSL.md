@@ -1,5 +1,19 @@
 # DNS and HTTPS for fixitlab.in
 
+## Automatic DNS (GoDaddy)
+
+When the production IP changes, run:
+
+```bash
+./scripts/update-godaddy-dns.sh 64.227.175.89
+```
+
+Or it runs automatically from **Production Deploy** (Create server) and `update-production-host.sh` if `GODADDY_API_KEY` + `GODADDY_API_SECRET` are in your env.
+
+Updates:
+- **A** `@` → server IP
+- **CNAME** `www` → `fixitlab.in`
+
 ## Your GoDaddy DNS is correct
 
 | Type  | Name | Value           | Notes                          |

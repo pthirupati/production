@@ -120,3 +120,10 @@ echo "ci_prod_host=$PUBLIC_IP"
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   echo "prod_host=$PUBLIC_IP" >> "$GITHUB_OUTPUT"
 fi
+
+# GoDaddy DNS (optional — keys in PRODUCTION_ENV_B64 or GODADDY_* env)
+if [ -x "$ROOT/scripts/update-godaddy-dns.sh" ]; then
+  export PRODUCTION_ENV_B64="$NEW_B64"
+  export ENV_FILE="$TMP_ENV"
+  "$ROOT/scripts/update-godaddy-dns.sh" "$PUBLIC_IP" || echo "WARN: GoDaddy DNS update failed or skipped"
+fi

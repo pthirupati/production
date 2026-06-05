@@ -216,6 +216,6 @@ jobs:
         run: |
           echo "## Production deploy complete" >> "$GITHUB_STEP_SUMMARY"
           echo "- Host: ${{ steps.host.outputs.host }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- GitHub secrets PROD_HOST + PRODUCTION_ENV_B64: updated (if Create server)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- GoDaddy DNS: updated if GODADDY_* keys in PRODUCTION_ENV_B64" >> "$GITHUB_STEP_SUMMARY"
           echo "- Ref: ${{ inputs.git_ref }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Create server: ${{ inputs.create_server }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Tests: ${{ inputs.run_tests }}" >> "$GITHUB_STEP_SUMMARY"

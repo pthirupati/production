@@ -233,6 +233,11 @@ EOF
   fi
 fi
 
+if [ -x "$ROOT/scripts/update-godaddy-dns.sh" ]; then
+  echo ""
+  "$ROOT/scripts/update-godaddy-dns.sh" "$PUBLIC_IP" || echo "  (GoDaddy DNS skipped — add GODADDY_API_KEY/SECRET to deploy/production.env)"
+fi
+
 echo ""
 echo "Done. deploy/production.env updated (gitignored — not committed)."
 echo "  ssh root@${PUBLIC_IP}"
