@@ -8,6 +8,8 @@ services:
     build:
       context: ./gateway
       dockerfile: Dockerfile.prod
+    environment:
+      - SSL_DOMAIN=${SSL_DOMAIN:-fixitlab.in}
     ports:
       - "80:80"
       - "443:443"

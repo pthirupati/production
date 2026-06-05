@@ -52,7 +52,15 @@ class Command(BaseCommand):
                     continue
 
                 with open(yaml_path) as f:
-                    data = yaml.safe_load(f)
+                    try:
+                        data = yaml.safe_load(f)
+                    except yaml.YAMLError as exc:
+                        self.stderr.write(self.style.ERROR(f"Invalid YAML in {yaml_path}: {exc}"))
+                        continue
+
+                if not data:
+                    self.stderr.write(self.style.WARNING(f"Skipping empty scenario: {yaml_path}"))
+                    continue
 
                 check_path = os.path.join(tech_path, scenario_dir, "check.sh")
                 validation_script = ""

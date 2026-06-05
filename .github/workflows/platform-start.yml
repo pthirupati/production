@@ -26,11 +26,12 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          envs: GITHUB_TOKEN
+          envs: GITHUB_TOKEN,PRODUCTION_ENV_B64
           command_timeout: 90m
           script: |
             set -e
@@ -44,10 +45,7 @@ jobs:
             git fetch origin
             git checkout ${{ inputs.git_ref }}
             git reset --hard "origin/${{ inputs.git_ref }}"
-            chmod +x scripts/platform-start.sh scripts/platform-stop.sh scripts/build-scenario-images.sh scripts/startup.sh
-            test -f deploy/production.env || { echo "ERROR: deploy/production.env missing in repo"; exit 1; }
-            cp deploy/production.env .env.production
-            chmod 600 .env.production
+            chmod +x scripts/platform-start.sh scripts/platform-stop.sh scripts/build-scenario-images.sh scripts/startup.sh scripts/ensure-ssl-certs.sh scripts/sync-production-env.sh
             export BUILD_SCENARIOS=${{ inputs.build_scenarios }}
             export COMPOSE_FILE=docker-compose.prod.yml
             export ENV_FILE=.env.production

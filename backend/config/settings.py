@@ -81,6 +81,7 @@ MIDDLEWARE = [
 
     # Security: request metadata extraction and JWT session validation
     "common.middleware_security.RequestMetadataMiddleware",
+    "common.middleware_security.AdminIPRestrictionMiddleware",
     "common.middleware_security.JWTSessionValidationMiddleware",
     "common.middleware_security.SecurityHeadersMiddleware",
 
@@ -202,7 +203,7 @@ REST_FRAMEWORK = {
         "anon": "100/hour",
         "user": "1000/hour",
         "auth": "10/minute",  # Strict limit on auth endpoints
-        "lab_start": "5/minute",  # Limit lab provisioning
+        "lab_start": "5/hour",  # Limit lab provisioning (DoS protection)
     },
 }
 
@@ -431,6 +432,10 @@ JIRA_TRANSITION_IN_PROGRESS = env("JIRA_TRANSITION_IN_PROGRESS", default="In Pro
 JIRA_TRANSITION_TODO = env("JIRA_TRANSITION_TODO", default="To Do")
 JIRA_TRANSITION_DONE = env("JIRA_TRANSITION_DONE", default="Done")
 JIRA_WEBHOOK_SECRET = env("JIRA_WEBHOOK_SECRET", default="")
+
+# Comma-separated IPs allowed to access /django-admin/ and /api/admin/
+# Empty = allow all (set in production to your office/VPN IP)
+ADMIN_ALLOWED_IPS = [ip.strip() for ip in env("ADMIN_ALLOWED_IPS", default="").split(",") if ip.strip()]
 
 # --------------------------------------------------
 # Social OAuth (GitHub + Google)

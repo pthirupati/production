@@ -11,6 +11,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   test-backend:
     runs-on: ubuntu-latest
@@ -48,6 +51,16 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
+      - name: Validate scenario YAML files
+        run: |
+          python3 -c "
+          import glob, yaml, sys
+          for p in glob.glob('scenarios/**/scenario.yaml', recursive=True):
+              with open(p) as f:
+                  yaml.safe_load(f)
+          print('All scenario YAML files valid')
+          "
+
       - name: Run migrations check
         working-directory: backend
         env:
@@ -66,13 +79,11 @@ jobs:
 
   test-frontend:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
@@ -110,11 +121,12 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          envs: GITHUB_TOKEN
+          envs: GITHUB_TOKEN,PRODUCTION_ENV_B64
           command_timeout: 90m
           script: |
             set -e
@@ -128,11 +140,8 @@ jobs:
             git fetch origin
             git checkout main
             git reset --hard origin/main
-            chmod +x scripts/platform-start.sh scripts/platform-stop.sh scripts/build-scenario-images.sh scripts/startup.sh
-            test -f deploy/production.env || { echo "ERROR: deploy/production.env missing in repo"; exit 1; }
-            cp deploy/production.env .env.production
-            chmod 600 .env.production
-            export BUILD_SCENARIOS=true
+            chmod +x scripts/platform-start.sh scripts/platform-stop.sh scripts/build-scenario-images.sh scripts/startup.sh scripts/ensure-ssl-certs.sh scripts/sync-production-env.sh
             export COMPOSE_FILE=docker-compose.prod.yml
             export ENV_FILE=.env.production
+            export BUILD_SCENARIOS=true
             ./scripts/platform-start.sh

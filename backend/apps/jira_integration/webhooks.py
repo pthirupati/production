@@ -2,6 +2,8 @@
 Jira Cloud webhook receiver — bidirectional sync (Jira → FixitLab).
 """
 
+import hmac
+import hashlib
 import json
 import logging
 
@@ -18,9 +20,24 @@ logger = logging.getLogger(__name__)
 
 
 def _verify_webhook_secret(request) -> bool:
+    """Verify Jira webhook via HMAC-SHA256 signature or shared secret."""
     secret = getattr(settings, "JIRA_WEBHOOK_SECRET", "") or ""
     if not secret:
         return settings.DEBUG
+
+    body = request.body or b""
+    sig_header = (
+        request.headers.get("X-FixitLab-Signature")
+        or request.headers.get("X-Hub-Signature")
+        or ""
+    )
+    if sig_header:
+        if sig_header.startswith("sha256="):
+            sig_header = sig_header[7:]
+        expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        if hmac.compare_digest(expected, sig_header):
+            return True
+
     provided = request.GET.get("secret") or request.headers.get("X-FixitLab-Webhook-Secret", "")
     return provided == secret
 

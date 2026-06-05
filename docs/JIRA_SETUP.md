@@ -10,7 +10,9 @@
 
 1. Go to [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 2. Create token → copy value
-3. Set in `.env.production`:
+3. Set in `.env.production` (or `deploy/production.env` → upload via `./scripts/upload-secrets-to-github.sh`):
+
+See [GITHUB_SECRETS.md](GITHUB_SECRETS.md) for how env reaches the server.
 
 ```env
 JIRA_ENABLED=true

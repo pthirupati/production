@@ -131,6 +131,41 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
         return response
 
 
+class AdminIPRestrictionMiddleware(MiddlewareMixin):
+    """
+    Restrict Django admin and admin API to configured IP addresses.
+    When ADMIN_ALLOWED_IPS is empty, all IPs are allowed (development default).
+    """
+
+    ADMIN_PREFIXES = ("/django-admin/", "/api/admin/")
+
+    def process_request(self, request):
+        allowed_ips = getattr(settings, "ADMIN_ALLOWED_IPS", None) or []
+        if not allowed_ips:
+            return None
+
+        path = request.path
+        if not any(path.startswith(prefix) for prefix in self.ADMIN_PREFIXES):
+            return None
+
+        client_ip = getattr(request, "client_ip", None)
+        if not client_ip:
+            x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+            if x_forwarded_for:
+                client_ip = x_forwarded_for.split(",")[0].strip()
+            else:
+                client_ip = request.META.get("REMOTE_ADDR", "")
+
+        if client_ip in allowed_ips:
+            return None
+
+        logger.warning("Admin access denied for IP %s on %s", client_ip, path)
+        return JsonResponse(
+            {"detail": "Admin access is restricted to authorized IP addresses."},
+            status=403,
+        )
+
+
 def require_session_valid(view_func):
     """
     Decorator to check if JWT session is still active.

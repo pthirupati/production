@@ -1,19 +1,22 @@
 #!/bin/sh
 set -e
 
-# Prepare directories used by certbot and cert mounts
-mkdir -p /var/www/certbot
-mkdir -p /etc/letsencrypt/live
+DOMAIN="${SSL_DOMAIN:-fixitlab.in}"
+CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
+CERT_FILE="${CERT_DIR}/fullchain.pem"
+KEY_FILE="${CERT_DIR}/privkey.pem"
 
-# Ensure nginx user owns writable dirs where applicable
-if id nginx >/dev/null 2>&1; then
-  chown -R nginx:nginx /var/www/certbot || true
+# /etc/letsencrypt is a read-only volume mount — never mkdir there
+if [ -w /var/www/certbot ] 2>/dev/null; then
+  mkdir -p /var/www/certbot
 fi
 
-# Warn if certificates are missing; continue to start nginx so container healthchecks can fail fast
-if [ ! -f "/etc/letsencrypt/live/fixitlab.in/fullchain.pem" ] || [ ! -f "/etc/letsencrypt/live/fixitlab.in/privkey.pem" ]; then
-  echo "[WARNING] TLS certificates not found at /etc/letsencrypt/live/fixitlab.in/. Ensure certs are mounted." >&2
+if [ -f "$CERT_FILE" ] && [ -f "$KEY_FILE" ]; then
+  echo "[gateway] TLS certificates found — enabling HTTPS"
+  cp /etc/nginx/templates/nginx.prod.conf /etc/nginx/conf.d/default.conf
+else
+  echo "[gateway] No TLS certificates yet — HTTP bootstrap mode (ACME + site on :80)"
+  cp /etc/nginx/templates/nginx.http.conf /etc/nginx/conf.d/default.conf
 fi
 
-# Start nginx in foreground
 exec nginx -g 'daemon off;'
