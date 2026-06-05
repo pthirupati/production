@@ -45,7 +45,7 @@ This sets **Environment secrets** on the `production` environment:
 | Secret | Purpose |
 |--------|---------|
 | `PRODUCTION_ENV_B64` | Base64 of entire `deploy/production.env` |
-| `PROD_HOST` | Server IP (`139.59.58.8`) |
+| `PROD_HOST` | Server IP (`64.227.175.89`) |
 | `PROD_USER` | SSH user (`root`) |
 | `PROD_SSH_KEY` | SSH private key (full PEM) |
 
@@ -77,8 +77,8 @@ Re-run **Platform Start** to apply on the server.
 On the server only:
 
 ```bash
-scp deploy/production.env root@139.59.58.8:/opt/fixitlab/.env.production
-ssh root@139.59.58.8 'chmod 600 /opt/fixitlab/.env.production && cd /opt/fixitlab && ./scripts/platform-start.sh'
+scp deploy/production.env root@64.227.175.89:/opt/fixitlab/.env.production
+ssh root@64.227.175.89 'chmod 600 /opt/fixitlab/.env.production && cd /opt/fixitlab && ./scripts/platform-start.sh'
 ```
 
 ## Verify Jira on server

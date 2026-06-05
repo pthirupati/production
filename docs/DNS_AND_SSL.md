@@ -4,7 +4,7 @@
 
 | Type  | Name | Value           | Notes                          |
 |-------|------|-----------------|--------------------------------|
-| A     | @    | 139.59.58.8     | Root domain → server IP        |
+| A     | @    | 64.227.175.89     | Root domain → server IP        |
 | CNAME | www  | fixitlab.in.    | www resolves via root A record |
 
 Verify from your machine:
@@ -12,12 +12,12 @@ Verify from your machine:
 ```bash
 dig +short fixitlab.in
 dig +short www.fixitlab.in
-# Both should return 139.59.58.8
+# Both should return 64.227.175.89
 ```
 
 ## Why the site “works on IP” but not on the domain
 
-1. **HTTP works** — `http://fixitlab.in` and `http://139.59.58.8` both hit nginx on port 80.
+1. **HTTP works** — `http://fixitlab.in` and `http://64.227.175.89` both hit nginx on port 80.
 2. **HTTPS was broken** — Browsers often upgrade to `https://fixitlab.in`. Port 443 was closed because the gateway ran HTTP-only bootstrap mode (no TLS listener) until Let's Encrypt certificates existed.
 
 ## Fix on the production server
@@ -25,7 +25,7 @@ dig +short www.fixitlab.in
 After deploying the latest gateway changes:
 
 ```bash
-ssh root@139.59.58.8
+ssh root@64.227.175.89
 cd /opt/fixitlab
 git pull   # or deploy via GitHub Actions Platform Start
 

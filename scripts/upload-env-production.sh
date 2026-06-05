@@ -2,7 +2,7 @@
 # Copy .env.production to your production server (run from laptop)
 set -euo pipefail
 
-PROD_HOST="${PROD_HOST:-139.59.58.8}"
+PROD_HOST="${PROD_HOST:-64.227.175.89}"
 PROD_USER="${PROD_USER:-root}"
 ENV_FILE="${1:-.env.production}"
 

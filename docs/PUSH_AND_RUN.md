@@ -19,7 +19,7 @@ This creates these **Environment secrets** (Settings → Environments → produc
 | Secret | Purpose |
 |--------|---------|
 | `PRODUCTION_ENV_B64` | Full `.env` (Jira, OAuth, DB, email, everything) |
-| `PROD_HOST` | `139.59.58.8` |
+| `PROD_HOST` | `64.227.175.89` |
 | `PROD_USER` | `root` |
 | `PROD_SSH_KEY` | SSH private key to droplet |
 
@@ -27,7 +27,7 @@ This creates these **Environment secrets** (Settings → Environments → produc
 
 ## DNS (required)
 
-Point `fixitlab.in` and `www.fixitlab.in` → **`139.59.58.8`** only (remove parking IPs).
+Point `fixitlab.in` and `www.fixitlab.in` → **`64.227.175.89`** only (remove parking IPs).
 
 ## Every deploy
 
