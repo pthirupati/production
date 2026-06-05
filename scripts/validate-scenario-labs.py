@@ -30,7 +30,7 @@ from apps.question_bank.models import Scenario
 from apps.public_api.views import StartLabView
 from apps.labs.models import LabSession
 from apps.labs.provisioner.docker_provisioner import DockerProvisioner
-from apps.billing.models import TechnologySubscription
+from apps.billing.models import TechnologySubscription, Plan, Subscription
 
 User = get_user_model()
 SKIP_LAB = os.environ.get("E2E_SKIP_LAB", "0") == "1"
@@ -57,6 +57,20 @@ def ensure_user(suffix: str):
     if created:
         user.set_password("LabValPass123!")
         user.save()
+    # Unlimited labs for validation runs
+    val_plan, _ = Plan.objects.get_or_create(
+        code="lab-validation",
+        defaults={
+            "name": "Lab Validation",
+            "price": 0,
+            "max_labs_per_day": 9999,
+            "max_lab_duration_minutes": 60,
+        },
+    )
+    Subscription.objects.update_or_create(
+        user=user,
+        defaults={"plan": val_plan, "is_active": True},
+    )
     return user
 
 
