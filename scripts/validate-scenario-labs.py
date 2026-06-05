@@ -65,10 +65,16 @@ def grant_subscriptions(user, scenarios):
     cache.clear()
     tech_ids = {sc.technology_id for sc in scenarios}
     for tech_id in tech_ids:
+        sub_id = f"TECH-{user.username[:20]}-{tech_id}-LABVAL"
         TechnologySubscription.objects.get_or_create(
             user=user,
             technology_id=tech_id,
-            defaults={"is_active": True, "amount": 0},
+            defaults={
+                "subscription_id": sub_id,
+                "is_active": True,
+                "amount": 0,
+                "payment_verified": True,
+            },
         )
 
 
