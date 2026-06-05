@@ -456,6 +456,32 @@ def run_concurrent_login(s: Suite, n_users: int = 8):
     s.record(f"Concurrent logins {ok_count}/{n_users}", ok_count == n_users)
 
 
+def run_cleanup():
+    """Remove all users/data created during this test run."""
+    print("\n=== Test data cleanup ===")
+    try:
+        script = os.path.join(os.path.dirname(__file__), "cleanup-test-data.py")
+        if not os.path.isfile(script):
+            script = "/scripts/cleanup-test-data.py"
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, script],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if result.stdout:
+            print(result.stdout.rstrip())
+        if result.returncode != 0:
+            print(f"  WARN cleanup exit {result.returncode}")
+            if result.stderr:
+                print(result.stderr[:500])
+        else:
+            print("  ✓ Test data removed")
+    except Exception as exc:
+        print(f"  WARN cleanup failed: {exc}")
+
+
 def run_email_logs(s: Suite):
     print("\n=== Email delivery logs ===")
     try:
@@ -486,38 +512,45 @@ def main():
     print(f"FixitLab E2E — BASE_URL={BASE_URL}")
     s = Suite()
     t0 = time.time()
+    exit_code = 0
 
-    run_public_tests(s)
-    token, test_email = run_auth_registration(s)
-    if token:
-        run_user_flow(s, token, "new_user")
-        run_auth_extras(s, token, test_email, "E2eTestPass123!")
-        run_billing_flow(s, token)
-        run_community_flow(s, token)
-        run_lab_flow(s, token)
-        run_technology_scenario_flow(s, token)
-    else:
-        s.record("User registration flow", False, detail="no token")
+    try:
+        run_public_tests(s)
+        token, test_email = run_auth_registration(s)
+        if token:
+            run_user_flow(s, token, "new_user")
+            run_auth_extras(s, token, test_email, "E2eTestPass123!")
+            run_billing_flow(s, token)
+            run_community_flow(s, token)
+            run_lab_flow(s, token)
+            run_technology_scenario_flow(s, token)
+        else:
+            s.record("User registration flow", False, detail="no token")
 
-    run_admin_flow(s)
-    run_contact(s)
-    run_jira_webhook(s)
-    run_concurrent_users(s, 3)
-    run_concurrent_login(s, 8)
-    run_email_logs(s)
+        run_admin_flow(s)
+        run_contact(s)
+        run_jira_webhook(s)
+        run_concurrent_users(s, 3)
+        run_concurrent_login(s, 8)
+        run_email_logs(s)
 
-    elapsed = time.time() - t0
-    passed = sum(1 for r in s.results if r.ok)
-    total = len(s.results)
-    print(f"\n{'='*60}")
-    print(f"RESULT: {passed}/{total} passed in {elapsed:.1f}s")
-    if s.failed:
-        print("\nFailures:")
-        for r in s.failed:
-            print(f"  - {r.name} [{r.status}] {r.detail}")
-        sys.exit(1)
-    print("All E2E checks passed.")
-    sys.exit(0)
+        elapsed = time.time() - t0
+        passed = sum(1 for r in s.results if r.ok)
+        total = len(s.results)
+        print(f"\n{'='*60}")
+        print(f"RESULT: {passed}/{total} passed in {elapsed:.1f}s")
+        if s.failed:
+            print("\nFailures:")
+            for r in s.failed:
+                print(f"  - {r.name} [{r.status}] {r.detail}")
+            exit_code = 1
+        else:
+            print("All E2E checks passed.")
+    finally:
+        if os.environ.get("E2E_SKIP_CLEANUP", "0") != "1":
+            run_cleanup()
+
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

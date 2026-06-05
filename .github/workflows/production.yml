@@ -246,7 +246,7 @@ jobs:
             git reset --hard "origin/${{ inputs.git_ref }}"
             chmod +x scripts/ci-remote-platform.sh scripts/platform-start.sh scripts/sync-production-env.sh \
               scripts/build-scenario-images.sh scripts/validate-scenario-images.sh \
-              scripts/ci-post-deploy-verify.sh scripts/run-full-e2e.sh
+              scripts/ci-post-deploy-verify.sh scripts/run-full-e2e.sh scripts/cleanup-test-data.py
             export BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
             ./scripts/ci-remote-platform.sh deploy
 
@@ -287,7 +287,8 @@ jobs:
             set -e
             cd /opt/fixitlab
             chmod +x scripts/ci-post-deploy-verify.sh scripts/run-full-e2e.sh \
-              scripts/validate-scenario-images.sh scripts/validate-scenario-labs.py 2>/dev/null || true
+              scripts/validate-scenario-images.sh scripts/validate-scenario-labs.py \
+              scripts/cleanup-test-data.py 2>/dev/null || true
             export RUN_E2E="${RUN_E2E:-true}"
             ./scripts/ci-post-deploy-verify.sh
 

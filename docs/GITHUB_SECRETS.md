@@ -18,6 +18,8 @@ Pipeline options when running workflow:
 - **build_scenarios** — rebuild all lab Docker images (required for labs to start)
 - **run_e2e** — post-deploy health, scenario image check, sample lab provisioning, full API E2E
 
+After E2E tests finish, `scripts/cleanup-test-data.py` automatically removes test users (`@fixitlab-test.local`), lab sessions, Jira tickets, and containers. Set `E2E_SKIP_CLEANUP=1` on the server to disable.
+
 Pull requests run **CI Tests** only (no deploy).
 
 ### Launch (brand-new server)

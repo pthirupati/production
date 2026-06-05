@@ -92,4 +92,17 @@ EXIT=0
 if [ "$EXIT" -eq 0 ]; then
   echo "ALL CHECKS PASSED"
 fi
+
+# ── 6. Remove all test users/data created during this run ──
+echo ""
+echo ">>> [6/6] Test data cleanup"
+if [ "${E2E_SKIP_CLEANUP:-0}" != "1" ]; then
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    python /scripts/cleanup-test-data.py 2>&1 | tee "$LOG_DIR/cleanup.log" || CLEANUP_FAIL=1
+else
+  echo "  Skipped (E2E_SKIP_CLEANUP=1)"
+fi
+
+[ "${CLEANUP_FAIL:-0}" = "1" ] && EXIT=1 && echo "CLEANUP: FAILED"
+
 exit "$EXIT"

@@ -144,7 +144,7 @@ def main():
 
     if SKIP_LAB:
         print("E2E_SKIP_LAB=1 — skipping lab starts")
-        sys.exit(1 if missing_images else 0)
+        return 1 if missing_images else 0
 
     user_a = ensure_user("user-a")
     user_b = ensure_user("user-b")
@@ -212,8 +212,33 @@ def main():
                 pass
 
     print(f"\nLab validation: {ok} passed, {fail} failed, {len(missing_images)} missing images")
-    sys.exit(0 if fail == 0 and not missing_images else 1)
+    exit_code = 0 if fail == 0 and not missing_images else 1
+    return exit_code
+
+
+def cleanup():
+    print("\n=== Cleaning up lab validation test users ===")
+    try:
+        import subprocess
+        r = subprocess.run(
+            [sys.executable, "/scripts/cleanup-test-data.py"],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if r.stdout:
+            print(r.stdout.rstrip())
+        if r.returncode != 0 and r.stderr:
+            print(r.stderr[:300])
+    except Exception as exc:
+        print(f"WARN cleanup: {exc}")
 
 
 if __name__ == "__main__":
-    main()
+    code = 1
+    try:
+        code = main()
+    finally:
+        if os.environ.get("E2E_SKIP_CLEANUP", "0") != "1":
+            cleanup()
+    sys.exit(code)

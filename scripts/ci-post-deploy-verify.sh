@@ -101,6 +101,16 @@ else
   echo "  Skipped (RUN_E2E=$RUN_E2E)"
 fi
 
+# ── 7. Remove test users and artifacts ──
+echo ""
+echo ">>> [7/7] Test data cleanup"
+if [ "${E2E_SKIP_CLEANUP:-0}" != "1" ]; then
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    python /scripts/cleanup-test-data.py || fail=1
+else
+  echo "  Skipped (E2E_SKIP_CLEANUP=1)"
+fi
+
 echo ""
 if [ "$fail" -ne 0 ]; then
   echo "=== VERIFICATION FAILED ==="
