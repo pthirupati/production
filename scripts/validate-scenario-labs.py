@@ -103,8 +103,10 @@ def start_lab(user, scenario_id):
 
 
 def wait_running(session_id, timeout=120):
+    from django.db import close_old_connections
     deadline = time.time() + timeout
     while time.time() < deadline:
+        close_old_connections()
         session = LabSession.objects.filter(id=session_id).first()
         if not session:
             return None, "missing"
@@ -147,7 +149,9 @@ def main():
     ok = 0
     fail = 0
     from django.core.cache import cache
+    from django.db import close_old_connections
     for sc in to_test:
+        close_old_connections()
         cache.clear()
         print(f"\n--- {sc.slug} ---")
         st_a, data_a = start_lab(user_a, sc.id)
