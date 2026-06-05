@@ -12,6 +12,22 @@ GitHub (production environment secrets)
 
 On every **Platform Start** or **CI/CD deploy**, `scripts/sync-production-env.sh` writes `.env.production` before Docker starts.
 
+## Updating production host (new droplet / IP change)
+
+After creating or replacing the DO droplet:
+
+```bash
+./scripts/create-production-droplet.sh              # creates droplet + auto-updates files + commit
+./scripts/create-production-droplet.sh --sync-only  # droplet already exists — sync only
+./scripts/update-production-host.sh --from-doctl fixitlab-prod --commit --push-secrets
+```
+
+**Auto-updated (local, gitignored):** `deploy/production.env`, `.env.production` — includes `PROD_HOST`, `DO_PROTECTED_DROPLET_IDS`, `DJANGO_ALLOWED_HOSTS`.
+
+**Auto-updated + committed (no secrets):** `infra/digitalocean/production.json`, docs, `env.production.example`.
+
+**GitHub secrets:** use `--push-secrets` or run `./scripts/upload-secrets-to-github.sh` after `gh auth login`.
+
 ## One-time setup (5 minutes)
 
 ### 1. Create local env file
