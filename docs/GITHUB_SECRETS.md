@@ -6,11 +6,15 @@ FixitLab **does not store secrets in git**. Workflows inject the full production
 
 **GitHub → Actions → FixitLab Production → Run workflow**
 
+**Manual only** — push to `main` does **not** run this workflow. Use **Run workflow** in GitHub Actions.
+
 | Action | When to use | What runs automatically |
 |--------|-------------|-------------------------|
-| **launch** | First time or full rebuild | Optional ☑ create server → GitHub secrets → GoDaddy DNS → tests → deploy → health |
-| **deploy** | Day-to-day code updates | Tests → deploy → health |
-| **stop** | Pause platform (save cost) | Stop containers (database volume kept) |
+| **launch** | First time or full rebuild | Optional create server → GitHub secrets → GoDaddy DNS → tests → **deploy & start app** → health |
+| **deploy** | Day-to-day updates | Tests → **deploy & start app** → health |
+| **stop** | Pause platform | **Stop** containers (database volume kept) |
+
+Pull requests run **CI Tests** only (no deploy).
 
 ### Launch (brand-new server)
 
@@ -60,8 +64,10 @@ cp env.production.example deploy/production.env
 ./scripts/upload-secrets-to-github.sh   # once, after gh auth login
 ```
 
-Re-run upload **only** when you change `deploy/production.env` locally.  
-**Not** needed after **launch + create server** — the workflow updates secrets for you.
+Re-run upload **only** when you change `deploy/production.env` locally (new API keys, passwords, etc.).  
+**Not** needed for normal deploy/launch/stop — the workflow uses GitHub secrets already stored.
+
+**You never push env files to git** — only `./scripts/upload-secrets-to-github.sh` once after editing `deploy/production.env`.
 
 ## How secrets reach the server
 

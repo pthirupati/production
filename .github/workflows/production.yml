@@ -1,15 +1,10 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-#  FixitLab Production — ONE workflow for everything
+# FixitLab Production — manual only (workflow_dispatch)
 #
-#  GitHub → Actions → "FixitLab Production" → Run workflow
+# GitHub → Actions → FixitLab Production → Run workflow
 #
-#  Actions:
-#    launch  — Full pipeline: optional new server → secrets → DNS → tests → deploy → health
-#    deploy  — Tests + deploy to existing server (default day-to-day)
-#    stop    — Stop containers (data preserved)
-#
-#  PR / push to main → tests only (no auto-deploy; use this workflow to launch)
-# ═══════════════════════════════════════════════════════════════════════════════
+#   launch + create_server  →  new DO droplet, secrets, DNS, tests, deploy, health
+#   launch / deploy         →  tests, deploy, start application, health
+#   stop                    →  stop containers (database volume preserved)
 
 name: FixitLab Production
 
@@ -26,15 +21,15 @@ on:
           - deploy
           - stop
       create_server:
-        description: "Create DigitalOcean droplet (launch only — skip if server already exists)"
+        description: "Create DigitalOcean droplet (only for launch — skip if server exists)"
         type: boolean
         default: false
       run_tests:
-        description: "Run backend & frontend tests before deploy"
+        description: "Run backend and frontend tests before deploy"
         type: boolean
         default: true
       build_scenarios:
-        description: "Rebuild all scenario lab Docker images on server"
+        description: "Rebuild scenario lab Docker images on server"
         type: choice
         options:
           - "true"
@@ -45,62 +40,17 @@ on:
         type: string
         default: main
 
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
-
 concurrency:
   group: fixitlab-production
   cancel-in-progress: false
-
-permissions:
-  contents: write
-  secrets: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ─── CI gate (PR + push) ───────────────────────────────────────────────────
-  ci-tests:
-    name: CI tests
-    if: github.event_name != 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: chmod +x scripts/check-no-secrets-in-git.sh && ./scripts/check-no-secrets-in-git.sh
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - run: pip install -r backend/requirements.txt
-      - run: |
-          python3 -c "
-          import glob, yaml
-          for p in glob.glob('scenarios/**/scenario.yaml', recursive=True):
-              yaml.safe_load(open(p))
-          print('Scenario YAML OK')
-          "
-      - working-directory: backend
-        env:
-          DJANGO_SETTINGS_MODULE: config.test_settings
-        run: |
-          python manage.py migrate --run-syncdb
-          python manage.py test tests --verbosity=1
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci && npm run build
-        working-directory: frontend
-
-  # ─── Stop platform ─────────────────────────────────────────────────────────
   stop:
-    name: "⏹ Stop platform"
-    if: github.event_name == 'workflow_dispatch' && inputs.action == 'stop'
+    name: Stop platform
+    if: inputs.action == 'stop'
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -112,27 +62,24 @@ jobs:
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
             set -e
-            REPO="https://github.com/${{ github.repository }}.git"
             if [ ! -d /opt/fixitlab/.git ]; then
               echo "Nothing to stop — /opt/fixitlab not deployed yet"
               exit 0
             fi
             cd /opt/fixitlab
-            git fetch origin main 2>/dev/null || true
             chmod +x scripts/ci-remote-platform.sh scripts/platform-stop.sh 2>/dev/null || true
             ./scripts/ci-remote-platform.sh stop
 
-      - run: echo "Platform stopped. Data in Docker volume fixitlab_db_data is preserved." >> "$GITHUB_STEP_SUMMARY"
+      - run: echo "Platform stopped. Database volume fixitlab_db_data is preserved." >> "$GITHUB_STEP_SUMMARY"
 
-  # ─── Create DO server (launch + create_server) ─────────────────────────────
   create-server:
-    name: "① Create server"
-    if: |
-      github.event_name == 'workflow_dispatch' &&
-      inputs.action == 'launch' &&
-      inputs.create_server
+    name: Create server
+    if: inputs.action == 'launch' && inputs.create_server
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: write
+      secrets: write
     outputs:
       prod_host: ${{ steps.sync.outputs.prod_host }}
     steps:
@@ -154,7 +101,7 @@ jobs:
         with:
           token: ${{ steps.do_token.outputs.token }}
 
-      - name: Create droplet & wait for SSH
+      - name: Create droplet and wait for SSH
         id: droplet
         env:
           PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
@@ -164,7 +111,7 @@ jobs:
           chmod +x scripts/ci-create-production-droplet.sh
           ./scripts/ci-create-production-droplet.sh
 
-      - name: Update GitHub secrets, DNS & metadata
+      - name: Update GitHub secrets, DNS, and metadata
         id: sync
         env:
           PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
@@ -185,12 +132,10 @@ jobs:
           git diff --cached --quiet || git commit -m "ci: production droplet ${{ steps.droplet.outputs.public_ip }}"
           git push origin HEAD:main || true
 
-  # ─── Tests (launch / deploy) ───────────────────────────────────────────────
   test-backend:
-    name: "② Test backend"
+    name: Test backend
     needs: [create-server]
     if: |
-      github.event_name == 'workflow_dispatch' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_tests &&
       always() &&
@@ -229,10 +174,9 @@ jobs:
           python manage.py test tests --verbosity=2
 
   test-frontend:
-    name: "② Test frontend"
+    name: Test frontend
     needs: [create-server]
     if: |
-      github.event_name == 'workflow_dispatch' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_tests &&
       always() &&
@@ -248,12 +192,10 @@ jobs:
       - run: npm ci && npm run build
         working-directory: frontend
 
-  # ─── Deploy ─────────────────────────────────────────────────────────────────
   deploy:
-    name: "③ Deploy application"
+    name: Deploy and start application
     needs: [create-server, test-backend, test-frontend]
     if: |
-      github.event_name == 'workflow_dispatch' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       always() &&
       (needs.create-server.result == 'skipped' || needs.create-server.result == 'success') &&
@@ -270,12 +212,12 @@ jobs:
           H="${{ needs.create-server.outputs.prod_host }}"
           if [ -z "$H" ]; then H="${{ secrets.PROD_HOST }}"; fi
           if [ -z "$H" ]; then
-            echo "ERROR: PROD_HOST not set — run launch with create_server or set GitHub secret"
+            echo "ERROR: PROD_HOST not set. Run launch with create_server, or set PROD_HOST in GitHub secrets."
             exit 1
           fi
           echo "host=$H" >> "$GITHUB_OUTPUT"
 
-      - name: Clone repo & start platform
+      - name: Deploy and start platform
         uses: appleboy/ssh-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -303,46 +245,39 @@ jobs:
             export BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
             ./scripts/ci-remote-platform.sh deploy
 
-  # ─── Health check ───────────────────────────────────────────────────────────
   health:
-    name: "④ Health check"
+    name: Health check
     needs: [deploy]
     if: |
-      github.event_name == 'workflow_dispatch' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Wait for site
+      - name: Wait for API health
         run: |
           HOST="${{ needs.deploy.outputs.prod_host }}"
           URL="http://${HOST}/api/health/"
           echo "Checking $URL ..."
           for i in $(seq 1 30); do
             if curl -sf "$URL" >/dev/null; then
-              echo "✅ Health OK"
+              echo "Health OK"
               exit 0
             fi
             sleep 10
           done
-          echo "WARN: Health check timed out — deploy may still be starting (scenario builds take time)"
-          exit 0
+          echo "WARN: Health check timed out — scenario image builds may still be running"
 
-      - name: Pipeline summary
+      - name: Summary
         run: |
           {
             echo "## FixitLab Production — complete"
             echo ""
-            echo "| Step | Status |"
-            echo "|------|--------|"
+            echo "| | |"
+            echo "|---|---|"
             echo "| Action | \`${{ inputs.action }}\` |"
             echo "| Host | \`${{ needs.deploy.outputs.prod_host }}\` |"
             echo "| Branch | \`${{ inputs.git_ref }}\` |"
-            echo "| Create server | ${{ inputs.create_server }} |"
-            echo "| Tests | ${{ inputs.run_tests }} |"
-            echo "| Build scenarios | ${{ inputs.build_scenarios }} |"
+            echo "| Site | https://fixitlab.in |"
             echo ""
-            echo "**Site:** https://fixitlab.in (after DNS propagates)"
-            echo ""
-            echo "Secrets updated automatically when create_server was enabled."
+            echo "Application is deployed and started (Docker compose up, migrations, SSL attempt)."
           } >> "$GITHUB_STEP_SUMMARY"
