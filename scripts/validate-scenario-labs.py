@@ -48,9 +48,10 @@ def image_exists(slug: str) -> bool:
 
 
 def ensure_user(suffix: str):
-    email = f"labval-{suffix}@fixitlab-test.local"
+    username = f"labval_{suffix.replace('-', '_')}"
+    email = f"{username}@fixitlab-test.local"
     user, created = User.objects.get_or_create(
-        username=email,
+        username=username,
         defaults={"email": email, "is_active": True},
     )
     if created:
@@ -131,7 +132,9 @@ def main():
 
     ok = 0
     fail = 0
+    from django.core.cache import cache
     for sc in to_test:
+        cache.clear()
         print(f"\n--- {sc.slug} ---")
         st_a, data_a = start_lab(user_a, sc.id)
         st_b, data_b = start_lab(user_b, sc.id)

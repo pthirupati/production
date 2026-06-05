@@ -4,12 +4,19 @@ Spins up isolated containers with pre-broken scenarios for users to fix.
 Each lab session gets its own Docker network for full network isolation.
 """
 import logging
+import re
 import time as _time
 import docker
 from docker.errors import DockerException, NotFound, APIError
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_container_username(username: str) -> str:
+    """Docker names allow [a-zA-Z0-9][a-zA-Z0-9_.-] only."""
+    safe = re.sub(r"[^a-zA-Z0-9_.-]", "-", (username or "user").strip())[:40]
+    return safe.strip("-") or "user"
 
 
 class DockerProvisioner:
@@ -65,7 +72,9 @@ class DockerProvisioner:
         """
         image_name = self._get_image_name(lab_session.scenario)
         # Human-readable name: fixitlab-{username}-{short_id}
-        username = lab_session.user.username if hasattr(lab_session, 'user') and lab_session.user else 'unknown'
+        username = _safe_container_username(
+            lab_session.user.username if hasattr(lab_session, "user") and lab_session.user else "unknown"
+        )
         short_id = str(lab_session.id).split('-')[0]
         container_name = f"fixitlab-{username}-{short_id}"
 
