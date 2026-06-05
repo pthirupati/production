@@ -1,13 +1,13 @@
 # FixitLab — Production Nginx Gateway with SSL
 FROM nginx:1.25-alpine
 
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl openssl
 
 RUN rm /etc/nginx/conf.d/default.conf
 
-# Store both configs; entrypoint picks HTTP vs HTTPS at runtime
 COPY nginx.prod.conf /etc/nginx/templates/nginx.prod.conf
 COPY nginx.http.conf /etc/nginx/templates/nginx.http.conf
+COPY nginx.bootstrap.conf /etc/nginx/templates/nginx.bootstrap.conf
 COPY .htpasswd /etc/nginx/.htpasswd
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh

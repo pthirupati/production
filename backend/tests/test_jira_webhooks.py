@@ -1,5 +1,9 @@
 """Tests for Jira inbound webhooks."""
 
+import hashlib
+import hmac
+import json
+
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
 
@@ -34,6 +38,23 @@ class JiraWebhookTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(resp.status_code, 403)
+
+    def test_webhook_accepts_hmac_signature(self):
+        client = Client()
+        payload = json.dumps({
+            "webhookEvent": "jira:issue_updated",
+            "issue": {"key": "FIXIT-99", "fields": {"status": {"name": "Done"}}},
+        }).encode()
+        sig = hmac.new(b"test-secret", payload, hashlib.sha256).hexdigest()
+        resp = client.post(
+            "/api/jira/webhooks/",
+            data=payload,
+            content_type="application/json",
+            HTTP_X_FIXITLAB_SIGNATURE=f"sha256={sig}",
+        )
+        self.assertEqual(resp.status_code, 200)
+        ticket = UserScenarioJiraTicket.objects.get(issue_key="FIXIT-99")
+        self.assertEqual(ticket.jira_status, "Done")
 
     def test_webhook_updates_status(self):
         client = Client()

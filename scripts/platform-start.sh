@@ -22,7 +22,7 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
 
 echo "Waiting for backend..."
 for i in $(seq 1 60); do
-  if docker compose -f "$COMPOSE_FILE" exec -T backend python -c \
+  if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python -c \
     "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/'); assert r.status==200" 2>/dev/null; then
     break
   fi
@@ -38,21 +38,24 @@ else
 fi
 
 echo "Running migrations (safe — does not wipe data)..."
-docker compose -f "$COMPOSE_FILE" exec -T backend python manage.py migrate --noinput
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py migrate --noinput
+
+echo "Syncing superuser credentials from env..."
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python /scripts/create_superuser.py || true
 
 echo "Seeding/updating scenarios..."
-docker compose -f "$COMPOSE_FILE" exec -T backend python manage.py seed_scenarios --dir /scenarios
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_scenarios --dir /scenarios
 
 if [ "${BUILD_SCENARIOS:-1}" = "1" ]; then
   echo "Building scenario lab images..."
-  docker compose -f "$COMPOSE_FILE" exec -T backend bash /scripts/build-scenario-images.sh 2>/dev/null || \
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend bash /scripts/build-scenario-images.sh 2>/dev/null || \
     bash "$ROOT/scripts/build-scenario-images.sh"
 fi
 
 echo ""
 echo "✅ Platform is UP"
 echo "   Users, subscriptions, and progress are stored in Docker volume: fixitlab_db_data"
-# shellcheck disable=SC1090
-set -a && source "$ENV_FILE" && set +a
-echo "   Site: ${SITE_URL:-http://localhost}"
-docker compose -f "$COMPOSE_FILE" ps
+# shellcheck source=env-helpers.sh
+source "$ROOT/scripts/env-helpers.sh"
+echo "   Site: $(env_val SITE_URL "$ENV_FILE")"
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps

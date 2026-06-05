@@ -16,21 +16,9 @@ python manage.py migrate --noinput
 echo "[startup] Collecting static files..."
 python manage.py collectstatic --noinput
 
-if [ "${CREATE_SUPERUSER:-0}" = "1" ] && [ -n "${SUPERUSER_EMAIL:-}" ]; then
-  python manage.py shell -c "
-from django.contrib.auth import get_user_model
-User = get_user_model()
-u, created = User.objects.get_or_create(
-    email='${SUPERUSER_EMAIL}',
-    defaults={'username': '${SUPERUSER_USERNAME:-admin}', 'is_staff': True, 'is_superuser': True}
-)
-if created and '${SUPERUSER_PASSWORD:-}':
-    u.set_password('${SUPERUSER_PASSWORD}')
-    u.save()
-    print('[startup] Superuser created')
-else:
-    print('[startup] Superuser already exists')
-" 2>/dev/null || true
+if [ "${CREATE_SUPERUSER:-0}" = "1" ] && [ -n "${SUPERUSER_EMAIL:-}" ] && [ -n "${SUPERUSER_PASSWORD:-}" ]; then
+  echo "[startup] Ensuring superuser..."
+  python /scripts/create_superuser.py 2>/dev/null || true
 fi
 
 echo "[startup] Starting Daphne on :8000"

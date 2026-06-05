@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Obtain or renew Let's Encrypt certificates using webroot (gateway must be running).
+# Obtain Let's Encrypt certificates using webroot (gateway must be running on :80).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -9,19 +9,20 @@ COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-.env.production}"
 [ -f "$ENV_FILE" ] || ENV_FILE=".env"
 
-# shellcheck disable=SC1090
-set -a
-source "$ENV_FILE"
-set +a
+# shellcheck source=env-helpers.sh
+source "$(dirname "$0")/env-helpers.sh"
 
-DOMAIN="${SSL_DOMAIN:-fixitlab.in}"
-if [ -n "${SITE_URL:-}" ]; then
+DOMAIN="$(env_val SSL_DOMAIN "$ENV_FILE")"
+DOMAIN="${DOMAIN:-fixitlab.in}"
+SITE_URL="$(env_val SITE_URL "$ENV_FILE")"
+if [ -n "$SITE_URL" ]; then
   DOMAIN="${SITE_URL#https://}"
   DOMAIN="${DOMAIN#http://}"
   DOMAIN="${DOMAIN%%/*}"
 fi
 
-EMAIL="${LETSENCRYPT_EMAIL:-${PRIMARY_EMAIL:-}}"
+EMAIL="$(env_val LETSENCRYPT_EMAIL "$ENV_FILE")"
+[ -n "$EMAIL" ] || EMAIL="$(env_val PRIMARY_EMAIL "$ENV_FILE")"
 CERT_FILE="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
 
 cert_exists() {
@@ -30,11 +31,13 @@ cert_exists() {
 }
 
 if cert_exists; then
-  echo "[ssl] Certificate already present for ${DOMAIN}"
+  echo "[ssl] Let's Encrypt certificate already present for ${DOMAIN}"
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" restart gateway || true
   exit 0
 fi
 
-echo "[ssl] Requesting Let's Encrypt certificate for ${DOMAIN} (webroot)..."
+echo "[ssl] DNS check: ${DOMAIN} should resolve to this server"
+echo "[ssl] Requesting Let's Encrypt certificate for ${DOMAIN} and www.${DOMAIN}..."
 
 CERTBOT_ARGS=(
   certonly
@@ -52,12 +55,14 @@ else
   CERTBOT_ARGS+=(--register-unsafely-without-email)
 fi
 
-if ! docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --entrypoint certbot certbot \
+if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --entrypoint certbot certbot \
   "${CERTBOT_ARGS[@]}"; then
-  echo "[ssl] WARNING: Certificate request failed."
-  echo "  Check: DNS A record for ${DOMAIN} → this server, port 80 open, gateway running HTTP mode."
-  exit 1
+  echo "[ssl] Certificate obtained — restarting gateway with trusted HTTPS"
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" restart gateway
+  exit 0
 fi
 
-echo "[ssl] Certificate obtained — restarting gateway for HTTPS"
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" restart gateway
+echo "[ssl] WARNING: Let's Encrypt failed (site still works on http://${DOMAIN} and https with self-signed cert)"
+echo "  Verify GoDaddy DNS: A @ → server IP only, CNAME www → fixitlab.in"
+echo "  Ensure port 80 is open: ufw allow 80 && ufw allow 443"
+exit 0

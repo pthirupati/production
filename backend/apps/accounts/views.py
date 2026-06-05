@@ -464,6 +464,7 @@ class GitHubCallbackView(APIView):
 
     def post(self, request):
         code = request.data.get("code", "").strip()
+        redirect_uri = request.data.get("redirect_uri", "").strip()
         if not code:
             return Response({"error": "Authorization code is required."}, status=400)
 
@@ -474,19 +475,31 @@ class GitHubCallbackView(APIView):
 
         import requests as http_requests
 
+        if not redirect_uri:
+            redirect_uri = f"{settings.FRONTEND_URL}/auth/callback/github"
+
         # 1. Exchange code for access token
         try:
             token_resp = http_requests.post(
                 "https://github.com/login/oauth/access_token",
-                json={"client_id": client_id, "client_secret": client_secret, "code": code},
+                json={
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "code": code,
+                    "redirect_uri": redirect_uri,
+                },
                 headers={"Accept": "application/json"},
                 timeout=15,
             )
             token_data = token_resp.json()
             access_token = token_data.get("access_token")
             if not access_token:
+                err = token_data.get("error_description") or token_data.get("error") or token_data
                 logger.warning(f"GitHub OAuth token exchange failed: {token_data}")
-                return Response({"error": "Failed to authenticate with GitHub. Please try again."}, status=400)
+                return Response(
+                    {"error": f"GitHub authentication failed: {err}"},
+                    status=400,
+                )
         except Exception as e:
             logger.error(f"GitHub OAuth token exchange error: {e}")
             return Response({"error": "Unable to reach GitHub. Please try again."}, status=502)
@@ -621,8 +634,9 @@ class GoogleCallbackView(APIView):
             id_token_str = token_data.get("id_token")
             access_token = token_data.get("access_token")
             if not access_token:
+                err = token_data.get("error_description") or token_data.get("error") or "unknown error"
                 logger.warning(f"Google OAuth token exchange failed: {token_data}")
-                return Response({"error": "Failed to authenticate with Google."}, status=400)
+                return Response({"error": f"Google authentication failed: {err}"}, status=400)
         except Exception as e:
             logger.error(f"Google OAuth token exchange error: {e}")
             return Response({"error": "Unable to reach Google. Please try again."}, status=502)

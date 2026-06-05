@@ -60,8 +60,10 @@ api.interceptors.response.use(
       toast.error('Too many requests. Please slow down.', { id: 'rate-limit', duration: 5000 })
     }
 
-    // ── 500+ Server error ──
-    if (error.response.status >= 500) {
+    // 500+ Server error (skip auth forms — they handle errors locally)
+    const path = original?.url || ''
+    const isAuthRequest = /\/auth\//.test(path)
+    if (error.response.status >= 500 && !isAuthRequest) {
       toast.error('Server error. Please try again later.', { id: 'server-error', duration: 4000 })
     }
 

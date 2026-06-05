@@ -67,3 +67,10 @@ if [ "$MISSING" -ne 0 ]; then
 fi
 
 echo "[env] OK — $(grep -c '^[A-Z]' "$OUT" || true) variables loaded"
+
+# Docker Compose interpolates ${VAR} from .env in project root (not .env.production).
+# Keep both in sync so redis/rabbitmq passwords match backend env_file.
+COMPOSE_ENV="$ROOT/.env"
+cp "$OUT" "$COMPOSE_ENV"
+chmod 600 "$COMPOSE_ENV"
+echo "[env] Synced $COMPOSE_ENV for docker compose variable substitution"

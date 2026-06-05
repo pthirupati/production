@@ -171,3 +171,81 @@ class BillingWebhookTests(TestCase):
 
                         self.assertEqual(fake_tx2.status, 'success')
                         self.assertTrue(fake_tx2.gateway_payment_id in ('pi_test_123', 'cs_test_123'))
+
+
+@override_settings(
+    RAZORPAY_KEY_ID='rzp_test',
+    RAZORPAY_KEY_SECRET='test_razor_secret',
+    ROOT_URLCONF='config.urls',
+)
+class VerifyRazorpayPaymentTests(TestCase):
+    """VerifyRazorpayPaymentView signature + amount validation."""
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+        from apps.question_bank.models import Technology
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='payuser', email='pay@test.com', password='password',
+        )
+        self.client.force_authenticate(user=self.user)
+        self.tech = Technology.objects.create(
+            name='Docker', icon='box', price=499, is_active=True,
+        )
+
+    def _valid_signature(self, order_id, payment_id):
+        message = f"{order_id}|{payment_id}"
+        return hmac.new(
+            b'test_razor_secret', message.encode(), hashlib.sha256,
+        ).hexdigest()
+
+    def test_rejects_amount_mismatch(self):
+        from unittest.mock import patch, MagicMock
+        order_id = 'order_abc'
+        payment_id = 'pay_abc'
+        url = reverse('razorpay_verify')
+
+        mock_payment = {
+            'order_id': order_id,
+            'amount': 10000,  # ₹100 — technology price is ₹499
+            'status': 'captured',
+        }
+        mock_client = MagicMock()
+        mock_client.payment.fetch.return_value = mock_payment
+
+        with patch('razorpay.Client', return_value=mock_client):
+            resp = self.client.post(url, data={
+                'razorpay_order_id': order_id,
+                'razorpay_payment_id': payment_id,
+                'razorpay_signature': self._valid_signature(order_id, payment_id),
+                'technology_id': self.tech.id,
+            }, content_type='application/json')
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('amount', resp.json().get('error', '').lower())
+
+    def test_accepts_matching_payment(self):
+        from unittest.mock import patch, MagicMock
+        order_id = 'order_ok'
+        payment_id = 'pay_ok'
+        url = reverse('razorpay_verify')
+
+        mock_payment = {
+            'order_id': order_id,
+            'amount': 49900,
+            'status': 'captured',
+        }
+        mock_client = MagicMock()
+        mock_client.payment.fetch.return_value = mock_payment
+
+        with patch('razorpay.Client', return_value=mock_client):
+            resp = self.client.post(url, data={
+                'razorpay_order_id': order_id,
+                'razorpay_payment_id': payment_id,
+                'razorpay_signature': self._valid_signature(order_id, payment_id),
+                'technology_id': self.tech.id,
+            }, content_type='application/json')
+
+        self.assertEqual(resp.status_code, 201)
+        self.assertTrue(resp.json().get('payment_verified'))
+

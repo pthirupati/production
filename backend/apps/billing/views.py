@@ -566,8 +566,25 @@ class VerifyRazorpayPaymentView(APIView):
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
-        # Get server-side price
+        # Server-side price — never trust client-supplied amount
         amount = int(getattr(technology, 'price', 0) or 0)
+        if amount <= 0:
+            return Response(
+                {"error": "Invalid technology price"},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not self._verify_payment_with_gateway(
+            razorpay_order_id, razorpay_payment_id, amount
+        ):
+            logger.warning(
+                "Razorpay payment amount/order mismatch for user %s order %s",
+                request.user.username, razorpay_order_id,
+            )
+            return Response(
+                {"error": "Payment verification failed — amount or order mismatch."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
 
         # Create verified subscription
         sub_id = TechnologySubscription.generate_subscription_id(
@@ -615,6 +632,26 @@ class VerifyRazorpayPaymentView(APIView):
             return hmac.compare_digest(expected_signature, signature)
         except Exception as e:
             logger.error(f"Signature verification error: {e}")
+            return False
+
+    def _verify_payment_with_gateway(self, order_id, payment_id, expected_amount_inr):
+        """Fetch payment from Razorpay and validate order + amount server-side."""
+        if not settings.RAZORPAY_KEY_SECRET or not settings.RAZORPAY_KEY_ID:
+            return True  # demo mode
+
+        try:
+            import razorpay
+            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            payment = client.payment.fetch(payment_id)
+            if payment.get("order_id") != order_id:
+                return False
+            if int(payment.get("amount", 0)) != int(expected_amount_inr) * 100:
+                return False
+            if payment.get("status") not in ("captured", "authorized"):
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Razorpay payment fetch failed: {e}")
             return False
 
 
