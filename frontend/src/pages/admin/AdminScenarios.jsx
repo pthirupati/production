@@ -29,6 +29,7 @@ export default function AdminScenarios() {
     technology_id: '', scenario_type: 'fix', infrastructure_type: 'docker',
     cloud_setup_script: '', blocked_commands: [], tag_ids: [], time_limit: 900,
     max_score: 100, is_active: true, is_free: true, solution_explanation: '',
+    jira_priority: 'Medium', jira_issue_template: '',
   })
   const [newBlockedCmd, setNewBlockedCmd] = useState('')
 
@@ -96,6 +97,8 @@ export default function AdminScenarios() {
       is_active: scenario.is_active,
       is_free: scenario.is_free ?? true,
       solution_explanation: scenario.solution_explanation || '',
+      jira_priority: scenario.jira_priority || 'Medium',
+      jira_issue_template: scenario.jira_issue_template || '',
     })
     setEditingId(scenario.id)
     setShowForm(true)
@@ -116,8 +119,9 @@ export default function AdminScenarios() {
       initial_state: '', validation_script: '', category: '', difficulty: 'easy',
       technology_id: '', scenario_type: 'fix', infrastructure_type: 'docker',
       cloud_setup_script: '', blocked_commands: [], tag_ids: [], time_limit: 900,
-      max_score: 100, is_active: true, is_free: true, solution_explanation: '',
-    })
+    max_score: 100, is_active: true, is_free: true, solution_explanation: '',
+    jira_priority: 'Medium', jira_issue_template: '',
+  })
     setNewBlockedCmd('')
   }
 
@@ -256,6 +260,28 @@ export default function AdminScenarios() {
               <div className="col-span-3">
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Solution Explanation (shown after solving)</label>
                 <textarea value={form.solution_explanation} onChange={(e) => setForm(f => ({ ...f, solution_explanation: e.target.value }))} className="input-field h-20 resize-y" placeholder="Explain the solution step by step..." />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-surface-400 mb-1 block">Jira Priority</label>
+                  <select value={form.jira_priority} onChange={(e) => setForm(f => ({ ...f, jira_priority: e.target.value }))} className="input-field w-full">
+                    <option value="Highest">Highest</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                    <option value="Lowest">Lowest</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-surface-400 mb-1 block">Jira Issue Template (optional)</label>
+                <textarea
+                  value={form.jira_issue_template}
+                  onChange={(e) => setForm(f => ({ ...f, jira_issue_template: e.target.value }))}
+                  className="input-field h-24 resize-y font-mono text-xs"
+                  placeholder="Custom Jira description. Placeholders: {scenario_title}, {user}, {lab_url}, {objectives}, ..."
+                />
               </div>
 
               {/* Blocked Commands */}

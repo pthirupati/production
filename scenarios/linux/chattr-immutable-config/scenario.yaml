@@ -11,17 +11,29 @@ jira_priority: "Medium"
 topics_covered: "Q4 chattr +i — lsattr, remove immutable"
 
 description: |
-  Config change for PORT=9090 fails with 'Operation not permitted'. File has immutable attribute set.
+  The application team reports that updating PORT in `/etc/myapp/config.env` fails with
+  "Operation not permitted" even as root. The service must listen on port 9090 after the fix.
+
+  Investigate file attributes on the config path before attempting edits.
 
 objectives:
-  - Use lsattr to see 'i' flag
-  - chattr -i to clear immutable
-  - Apply required config change
+  - Identify why the config file cannot be modified (check extended attributes)
+  - Remove the immutable flag safely with chattr
+  - Update PORT to 9090 and verify the change persists
 
 initial_state: |
-  Ubuntu 22.04 lab container with a realistic misconfiguration.
+  - Ubuntu 22.04 container with `/etc/myapp/config.env` containing PORT=8080
+  - The config file has the immutable (+i) attribute set
+  - `echo` or `vim` edits fail with "Operation not permitted"
+  - Your goal: clear the attribute, set PORT=9090, confirm with `cat /etc/myapp/config.env`
 
 hints:
   - order: 1
+    cost: 10
+    content: "Run `lsattr /etc/myapp/config.env` — look for the `i` flag in the attribute list."
+  - order: 2
     cost: 15
-    content: "`lsattr /etc/myapp/config.env` then `chattr -i` before editing"
+    content: "Clear immutable with `chattr -i /etc/myapp/config.env`, then edit PORT to 9090."
+  - order: 3
+    cost: 20
+    content: "Verify with `cat /etc/myapp/config.env` — validation checks for PORT=9090."

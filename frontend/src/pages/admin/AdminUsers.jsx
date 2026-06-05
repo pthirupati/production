@@ -363,6 +363,23 @@ export default function AdminUsers() {
                 </div>
               )}
 
+              {showDetail.jira_tickets?.length > 0 && (
+                <div className="border-t border-surface-700 pt-4">
+                  <p className="text-xs text-surface-500 uppercase mb-3">Jira Tickets</p>
+                  <div className="space-y-2">
+                    {showDetail.jira_tickets.map((t) => (
+                      <div key={t.issue_key} className="flex items-center justify-between text-sm bg-blue-500/5 border border-blue-500/10 rounded px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-surface-300 truncate">{t.scenario?.title}</p>
+                          <p className="text-xs text-surface-500">{t.jira_status || (t.is_closed ? 'Closed' : 'Open')}</p>
+                        </div>
+                        <span className="text-xs font-mono text-blue-400 shrink-0 ml-2">{t.issue_key}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="text-xs text-surface-600 space-y-1 border-t border-surface-700 pt-4">
                 <p>Joined: {new Date(showDetail.date_joined).toLocaleString()}</p>
                 <p>Last Login: {showDetail.last_login ? new Date(showDetail.last_login).toLocaleString() : 'Never'}</p>

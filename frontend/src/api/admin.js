@@ -222,6 +222,30 @@ export const adminApi = {
     const { data } = await api.get('/admin/config/')
     return data
   },
+
+  async getJiraTickets(filters = {}) {
+    const params = new URLSearchParams(filters)
+    const { data } = await api.get(`/admin/jira/tickets/?${params}`)
+    return data
+  },
+
+  async createJiraTicket(userId, scenarioId) {
+    const { data } = await api.post('/admin/jira/tickets/create/', {
+      user_id: userId,
+      scenario_id: scenarioId,
+    })
+    return data
+  },
+
+  async getThreadDetail(threadId) {
+    const { data } = await api.get(`/admin/threads/${threadId}/`)
+    return data
+  },
+
+  async replyToThread(threadId, body) {
+    const { data } = await api.post(`/admin/threads/${threadId}/`, { body })
+    return data
+  },
 }
 
 /** Trigger a browser download for a Blob */

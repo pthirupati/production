@@ -24,7 +24,7 @@ const SERVICE_ICONS = {
   'Database': Database,
   'Redis': Cpu,
   'Docker': Server,
-  'Email (SMTP)': Mail,
+  'Email': Mail,
   'RabbitMQ': MessageSquare,
   'Celery Workers': Activity,
 }
@@ -64,30 +64,47 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
-  const fetchData = useCallback(async (showRefresh = false) => {
-    if (showRefresh) setRefreshing(true)
+  const fetchOverview = useCallback(async () => {
     try {
-      const [o, h, a] = await Promise.all([
+      const [o, a] = await Promise.all([
         adminApi.getOverview(),
-        adminApi.getHealth(),
         adminApi.getActivityFeed().catch(() => []),
       ])
       setOverview(o)
-      setHealth(h)
       setActivity(a)
     } catch (e) {
-      console.error('Dashboard load error:', e)
+      console.error('Dashboard overview error:', e)
+    }
+  }, [])
+
+  const fetchHealth = useCallback(async () => {
+    try {
+      const h = await adminApi.getHealth()
+      setHealth(h)
+    } catch (e) {
+      console.error('Dashboard health error:', e)
+    }
+  }, [])
+
+  const fetchData = useCallback(async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true)
+    try {
+      await Promise.all([fetchOverview(), fetchHealth()])
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [fetchOverview, fetchHealth])
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(() => fetchData(), 30000)
-    return () => clearInterval(interval)
-  }, [fetchData])
+    const overviewInterval = setInterval(fetchOverview, 60000)
+    const healthInterval = setInterval(fetchHealth, 120000)
+    return () => {
+      clearInterval(overviewInterval)
+      clearInterval(healthInterval)
+    }
+  }, [fetchData, fetchOverview, fetchHealth])
 
   if (loading) {
     return (
@@ -100,7 +117,7 @@ export default function AdminDashboard() {
   const stats = [
     { label: 'Total Users', value: overview?.users?.total || 0, sub: `${overview?.users?.new_7d || 0} new this week`, icon: Users, color: 'text-accent-cyan' },
     { label: 'Paid Subscribers', value: overview?.users?.paid_subscribers || 0, sub: `${overview?.users?.inactive_90d || 0} inactive (90d)`, icon: UserCheck, color: 'text-accent-green' },
-    { label: 'Revenue', value: `$${overview?.revenue?.total || 0}`, sub: `${overview?.revenue?.subscriptions_count || 0} active subs`, icon: DollarSign, color: 'text-accent-amber' },
+    { label: 'Revenue', value: `₹${overview?.revenue?.total || 0}`, sub: `${overview?.revenue?.subscriptions_count || 0} active subs`, icon: DollarSign, color: 'text-accent-amber' },
     { label: 'Active Labs', value: overview?.labs?.running || 0, sub: `${overview?.labs?.completed_24h || 0} completed today`, icon: MonitorPlay, color: 'text-accent-purple' },
     { label: 'Scenarios', value: overview?.scenarios?.active || 0, sub: `${overview?.scenarios?.draft || 0} draft`, icon: Target, color: 'text-accent-cyan' },
     { label: 'Completion Rate', value: `${overview?.completion_rate || 0}%`, sub: `Avg score: ${Math.round(overview?.labs?.avg_score || 0)}`, icon: TrendingUp, color: 'text-accent-green' },
@@ -112,7 +129,7 @@ export default function AdminDashboard() {
     { name: 'Database', key: 'database' },
     { name: 'Redis', key: 'redis' },
     { name: 'Docker', key: 'docker' },
-    { name: 'Email (SMTP)', key: 'email' },
+    { name: 'Email', key: 'email' },
     { name: 'RabbitMQ', key: 'rabbitmq' },
     { name: 'Celery Workers', key: 'celery' },
   ]
@@ -329,9 +346,12 @@ export default function AdminDashboard() {
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       !prov.configured ? 'bg-surface-700 text-surface-400' :
                       prov.status === 'healthy' ? `bg-accent-green/15 text-accent-green` :
+                      prov.status === 'auth_error' ? 'bg-accent-amber/15 text-accent-amber' :
                       'bg-accent-red/15 text-accent-red'
                     }`}>
-                      {!prov.configured ? 'Not Configured' : prov.status === 'healthy' ? 'Connected' : 'Error'}
+                      {!prov.configured ? 'Not Configured' :
+                        prov.status === 'healthy' ? 'Connected' :
+                        prov.status === 'auth_error' ? 'Token Invalid' : 'Error'}
                     </span>
                   </div>
                   {prov.configured && (

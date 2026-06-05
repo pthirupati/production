@@ -121,7 +121,7 @@ class ReplyView(APIView):
         except Thread.DoesNotExist:
             return Response({"error": "Thread not found"}, status=http_status.HTTP_404_NOT_FOUND)
 
-        if thread.is_locked:
+        if thread.is_locked and not request.user.is_staff:
             return Response(
                 {"error": "This thread is locked"},
                 status=http_status.HTTP_403_FORBIDDEN,

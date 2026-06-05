@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db.models import Count, Q, Avg, Sum
+from django.db.models import Count, Q, Avg, Sum, F
 from django.http import HttpResponse
 from django.utils import timezone
 from datetime import timedelta
@@ -508,6 +508,24 @@ class AdminUserDetailView(APIView):
         # Recent labs
         recent_labs = labs.select_related("scenario").order_by("-started_at")[:10]
 
+        jira_tickets = []
+        try:
+            from apps.jira_integration.models import UserScenarioJiraTicket
+            from apps.jira_integration.helpers import is_jira_closed
+
+            for t in UserScenarioJiraTicket.objects.filter(user=user, issue_key__gt="").select_related("scenario"):
+                jira_tickets.append({
+                    "issue_key": t.issue_key,
+                    "issue_url": t.issue_url,
+                    "jira_status": t.jira_status,
+                    "is_closed": is_jira_closed(t.jira_status),
+                    "run_count": t.run_count,
+                    "scenario": {"id": t.scenario_id, "slug": t.scenario.slug, "title": t.scenario.title},
+                    "updated_at": t.updated_at.isoformat(),
+                })
+        except Exception:
+            pass
+
         return Response({
             "id": user.id,
             "username": user.username,
@@ -538,6 +556,7 @@ class AdminUserDetailView(APIView):
                 }
                 for lab in recent_labs
             ],
+            "jira_tickets": jira_tickets,
         })
 
     def put(self, request, pk):
@@ -772,7 +791,18 @@ class AdminAnalyticsView(APIView):
 class AdminSystemHealthView(APIView):
     permission_classes = [IsPlatformAdmin]
 
+    CACHE_KEY = "admin_system_health_v2"
+    CACHE_TTL = 90
+
     def get(self, request):
+        from django.core.cache import cache
+
+        force = request.query_params.get("refresh") == "1"
+        if not force:
+            cached = cache.get(self.CACHE_KEY)
+            if cached:
+                return Response(cached)
+
         health = {
             "database": self._check_db(),
             "redis": self._check_redis(),
@@ -782,10 +812,10 @@ class AdminSystemHealthView(APIView):
             "celery": self._check_celery(),
         }
 
-        # Cloud provider health
+        # Cloud provider health (optional — does not affect core overall)
         health["cloud_providers"] = self._check_cloud_providers()
 
-        # Container-level health
+        # Container-level health (platform services only)
         health["containers"] = self._check_containers()
 
         # Email statistics
@@ -794,11 +824,13 @@ class AdminSystemHealthView(APIView):
         # Cloud lab usage
         health["cloud_labs"] = self._get_cloud_lab_stats()
 
-        # Overall health — healthy only if all core services are up
+        # Overall health — core services only (not cloud providers or lab containers)
         core_services = ["database", "redis", "docker", "email", "rabbitmq", "celery"]
         health["overall"] = all(
             health.get(svc, {}).get("status") == "healthy" for svc in core_services
         )
+        health["cached_at"] = timezone.now().isoformat()
+        cache.set(self.CACHE_KEY, health, self.CACHE_TTL)
         return Response(health)
 
     def _check_db(self):
@@ -833,13 +865,40 @@ class AdminSystemHealthView(APIView):
             return {"status": "unhealthy", "error": str(e)}
 
     def _check_email(self):
-        """Check SMTP connectivity."""
+        """Check email delivery path (Gmail API in prod, SMTP in dev)."""
         try:
+            from apps.notifications.gmail_api import is_gmail_api_configured
+
+            if is_gmail_api_configured():
+                from google.auth.transport.requests import Request
+                from google.oauth2.credentials import Credentials
+
+                creds = Credentials(
+                    token=None,
+                    refresh_token=settings.GMAIL_OAUTH_REFRESH_TOKEN,
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=settings.GMAIL_OAUTH_CLIENT_ID,
+                    client_secret=settings.GMAIL_OAUTH_CLIENT_SECRET,
+                    scopes=["https://www.googleapis.com/auth/gmail.send"],
+                )
+                if not creds.valid:
+                    creds.refresh(Request())
+                sender = getattr(settings, "EMAIL_HOST_USER", "")
+                return {
+                    "status": "healthy",
+                    "details": f"Gmail API → {sender}",
+                    "provider": "gmail_api",
+                }
+
             import smtplib
-            from django.conf import settings
+
             host = settings.EMAIL_HOST
             port = settings.EMAIL_PORT
             use_tls = getattr(settings, "EMAIL_USE_TLS", False)
+
+            # MailHog / dev SMTP — skip strict check if no credentials
+            if host in ("mailhog", "localhost", "127.0.0.1") and not getattr(settings, "EMAIL_HOST_USER", ""):
+                return {"status": "healthy", "details": f"Dev SMTP ({host}:{port})", "provider": "smtp_dev"}
 
             if use_tls:
                 server = smtplib.SMTP(host, port, timeout=5)
@@ -852,7 +911,7 @@ class AdminSystemHealthView(APIView):
             if user and password:
                 server.login(user, password)
             server.quit()
-            return {"status": "healthy", "details": f"{host}:{port}"}
+            return {"status": "healthy", "details": f"{host}:{port}", "provider": "smtp"}
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}
 
@@ -885,13 +944,32 @@ class AdminSystemHealthView(APIView):
             return {"status": "unhealthy", "error": str(e)}
 
     def _check_containers(self):
-        """Get health status of all fixitlab Docker containers."""
+        """Get health status of platform Docker containers (not ephemeral lab containers)."""
         try:
             import docker
             client = docker.from_env()
-            containers = client.containers.list(all=True, filters={"name": "fixitlab"})
+            all_containers = client.containers.list(all=True)
             result = []
-            for c in containers:
+            skip_names = ("mailhog",)
+
+            for c in all_containers:
+                labels = c.labels or {}
+                # Skip ephemeral lab containers
+                if labels.get("fixitlab.session_id"):
+                    continue
+                name_lower = c.name.lower()
+                if any(skip in name_lower for skip in skip_names):
+                    continue
+
+                project = labels.get("com.docker.compose.project", "")
+                is_platform = (
+                    project == "fixitlab-main"
+                    or c.name.startswith("fixitlab_")
+                    or c.name in ("fixitlab_db", "fixitlab_redis", "fixitlab_rabbitmq")
+                )
+                if not is_platform:
+                    continue
+
                 health = c.attrs.get("State", {}).get("Health", {})
                 health_status = health.get("Status", "none")
                 result.append({
@@ -901,21 +979,6 @@ class AdminSystemHealthView(APIView):
                     "image": c.image.tags[0] if c.image.tags else str(c.image.id)[:20],
                     "up_since": c.attrs.get("State", {}).get("StartedAt", ""),
                 })
-            # Also check for non-fixitlab project containers (compose services)
-            all_containers = client.containers.list(all=True)
-            fixitlab_names = {c.name for c in containers}
-            for c in all_containers:
-                labels = c.labels or {}
-                project = labels.get("com.docker.compose.project", "")
-                if project == "fixitlab-main" and c.name not in fixitlab_names:
-                    health = c.attrs.get("State", {}).get("Health", {})
-                    result.append({
-                        "name": c.name,
-                        "status": c.status,
-                        "health": health.get("Status", "none"),
-                        "image": c.image.tags[0] if c.image.tags else str(c.image.id)[:20],
-                        "up_since": c.attrs.get("State", {}).get("StartedAt", ""),
-                    })
             return sorted(result, key=lambda x: x["name"])
         except Exception as e:
             return [{"name": "error", "status": "unknown", "error": str(e)}]
@@ -1003,10 +1066,18 @@ class AdminSystemHealthView(APIView):
                         "region": getattr(settings, "DO_REGION", "nyc1"),
                         "size": getattr(settings, "DO_SIZE", "s-1vcpu-1gb"),
                     }
+                elif resp.status_code == 401:
+                    providers["digitalocean"] = {
+                        "configured": True,
+                        "status": "auth_error",
+                        "optional": True,
+                        "error": "Invalid or expired DO_API_TOKEN — update .env.production",
+                    }
                 else:
                     providers["digitalocean"] = {
                         "configured": True,
                         "status": "unhealthy",
+                        "optional": True,
                         "error": f"API returned {resp.status_code}",
                     }
             except Exception as e:
@@ -1405,7 +1476,10 @@ class AdminThreadModerationView(APIView):
     """Moderate community threads — delete inappropriate content."""
     permission_classes = [IsPlatformAdmin]
 
-    def get(self, request):
+    def get(self, request, thread_id=None):
+        if thread_id:
+            return self._get_thread_detail(thread_id)
+
         threads = Thread.objects.filter(
             is_deleted=False
         ).select_related("author", "technology").order_by("-created_at")[:100]
@@ -1424,6 +1498,63 @@ class AdminThreadModerationView(APIView):
         } for t in threads]
 
         return Response({"threads": data})
+
+    def _get_thread_detail(self, thread_id):
+        try:
+            thread = Thread.objects.select_related("author", "technology").get(
+                id=thread_id, is_deleted=False
+            )
+        except Thread.DoesNotExist:
+            return Response({"error": "Thread not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        replies = Reply.objects.filter(thread=thread, is_deleted=False).select_related(
+            "author"
+        ).order_by("created_at")
+
+        return Response({
+            "id": str(thread.id),
+            "title": thread.title,
+            "body": thread.body,
+            "author": thread.author.username,
+            "technology": thread.technology.name if thread.technology else None,
+            "is_pinned": thread.is_pinned,
+            "is_locked": thread.is_locked,
+            "reply_count": thread.reply_count,
+            "upvotes": thread.upvotes,
+            "created_at": thread.created_at.isoformat(),
+            "replies": [
+                {
+                    "id": str(r.id),
+                    "body": r.body,
+                    "author": r.author.username,
+                    "upvotes": r.upvotes,
+                    "created_at": r.created_at.isoformat(),
+                }
+                for r in replies
+            ],
+        })
+
+    def post(self, request, thread_id):
+        """Admin reply to a thread (works even when locked)."""
+        try:
+            thread = Thread.objects.get(id=thread_id, is_deleted=False)
+        except Thread.DoesNotExist:
+            return Response({"error": "Thread not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        body = (request.data.get("body") or "").strip()
+        if not body:
+            return Response({"error": "Reply body required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        reply = Reply.objects.create(author=request.user, thread=thread, body=body)
+        Thread.objects.filter(id=thread_id).update(reply_count=F("reply_count") + 1)
+        logger.info(f"Admin {request.user.username} replied to thread {thread_id}")
+
+        return Response({
+            "id": str(reply.id),
+            "body": reply.body,
+            "author": reply.author.username,
+            "created_at": reply.created_at.isoformat(),
+        }, status=status.HTTP_201_CREATED)
 
     def delete(self, request, thread_id):
         """Soft-delete a thread."""
@@ -1448,6 +1579,100 @@ class AdminThreadModerationView(APIView):
             return Response({"status": "updated"})
         except Thread.DoesNotExist:
             return Response({"error": "Thread not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class AdminJiraTicketsView(APIView):
+    """List all user Jira tickets for admin dashboard."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.jira_integration.models import UserScenarioJiraTicket
+        from apps.jira_integration.client import JiraClient
+        from apps.jira_integration.helpers import is_jira_closed
+        from apps.jira_integration.views import _sync_ticket_status
+
+        qs = UserScenarioJiraTicket.objects.filter(
+            issue_key__gt=""
+        ).select_related("user", "scenario").order_by("-updated_at")
+
+        user_id = request.query_params.get("user_id")
+        scenario_id = request.query_params.get("scenario_id")
+        if user_id:
+            qs = qs.filter(user_id=user_id)
+        if scenario_id:
+            qs = qs.filter(scenario_id=scenario_id)
+
+        client = JiraClient()
+        sync = client.enabled
+        tickets = []
+        for t in qs[:300]:
+            status_name = _sync_ticket_status(t, client) if sync else (t.jira_status or "")
+            tickets.append({
+                "issue_key": t.issue_key,
+                "issue_url": t.issue_url,
+                "jira_status": status_name,
+                "is_closed": is_jira_closed(status_name),
+                "run_count": t.run_count,
+                "user": {
+                    "id": t.user_id,
+                    "username": t.user.username,
+                    "email": t.user.email,
+                },
+                "scenario": {
+                    "id": t.scenario_id,
+                    "slug": t.scenario.slug,
+                    "title": t.scenario.title,
+                },
+                "updated_at": t.updated_at.isoformat(),
+                "created_at": t.created_at.isoformat(),
+            })
+
+        open_count = sum(1 for t in tickets if not t["is_closed"])
+        return Response({
+            "tickets": tickets,
+            "count": len(tickets),
+            "open_count": open_count,
+            "closed_count": len(tickets) - open_count,
+            "jira_enabled": sync,
+        })
+
+
+class AdminJiraCreateView(APIView):
+    """Create or ensure a Jira ticket for a user+scenario."""
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        from apps.jira_integration.sync import ensure_scenario_ticket
+
+        user_id = request.data.get("user_id")
+        scenario_id = request.data.get("scenario_id")
+        if not user_id or not scenario_id:
+            return Response(
+                {"error": "user_id and scenario_id required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = User.objects.get(pk=user_id)
+            scenario = Scenario.objects.get(pk=scenario_id, is_active=True)
+        except (User.DoesNotExist, Scenario.DoesNotExist):
+            return Response({"error": "User or scenario not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        result = ensure_scenario_ticket(user, scenario)
+        if not result.get("jira_enabled"):
+            return Response(
+                {"error": result.get("jira_error", "Jira integration disabled")},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        from apps.jira_integration.models import UserScenarioJiraTicket
+        ticket = UserScenarioJiraTicket.objects.get(user=user, scenario=scenario)
+        return Response({
+            "issue_key": ticket.issue_key,
+            "issue_url": ticket.issue_url,
+            "jira_status": ticket.jira_status,
+            "jira_created": result.get("jira_created", False),
+        }, status=status.HTTP_201_CREATED if result.get("jira_created") else status.HTTP_200_OK)
 
 
 class AdminConfigView(APIView):

@@ -26,6 +26,8 @@ from .views import (
     AdminInactiveUsersView,
     AdminSubscriptionLogsView,
     AdminThreadModerationView,
+    AdminJiraTicketsView,
+    AdminJiraCreateView,
     AdminConfigView,
 )
 
@@ -74,6 +76,10 @@ urlpatterns = [
     # Thread Moderation
     path("threads/", AdminThreadModerationView.as_view()),
     path("threads/<uuid:thread_id>/", AdminThreadModerationView.as_view()),
+
+    # Jira tickets
+    path("jira/tickets/", AdminJiraTicketsView.as_view()),
+    path("jira/tickets/create/", AdminJiraCreateView.as_view()),
 
     # Data Exports (CSV)
     path("export/users/", AdminExportUsersView.as_view()),

@@ -4,12 +4,13 @@ import { useThemeStore } from '../../store/themeStore'
 import { useState } from 'react'
 import {
   LayoutDashboard, Target, Cpu, Users, MonitorPlay, ArrowLeft, Shield, Sun, Moon,
-  CreditCard, MessageSquare, Wrench, Menu, X
+  CreditCard, MessageSquare, Wrench, Menu, X, Ticket
 } from 'lucide-react'
 
 const adminNav = [
   { path: '/admin', icon: LayoutDashboard, label: 'Overview' },
   { path: '/admin/scenarios', icon: Target, label: 'Scenarios' },
+  { path: '/admin/jira', icon: Ticket, label: 'Jira Tickets' },
   { path: '/admin/technologies', icon: Cpu, label: 'Technologies' },
   { path: '/admin/users', icon: Users, label: 'Users' },
   { path: '/admin/labs', icon: MonitorPlay, label: 'Active Labs' },

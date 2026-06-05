@@ -75,6 +75,7 @@ class ScenarioAdminSerializer(serializers.ModelSerializer):
             "solution_explanation", "docker_image",
             "infrastructure_type", "cloud_setup_script", "cloud_ami", "cloud_image",
             "blocked_commands",
+            "jira_priority", "jira_issue_template",
             "time_limit", "max_score",
             "definition_path", "is_free", "is_active",
             "attempts_count", "completions_count", "avg_completion_time",

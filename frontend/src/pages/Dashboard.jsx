@@ -7,7 +7,7 @@ import { useAuthStore } from '../store/authStore'
 import {
   Target, Trophy, Zap, Clock, TrendingUp, ArrowRight,
   CheckCircle2, Award, BookOpen, Play, Star,
-  Calendar, CreditCard, Crown, Layers, ArrowUpRight, XCircle, AlertTriangle, Sparkles, Download, ExternalLink
+  Calendar, CreditCard, Crown, Layers, ArrowUpRight, XCircle, AlertTriangle, Sparkles, Download, Ticket
 } from 'lucide-react'
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
 import { ACHIEVEMENT_META } from '../utils/constants'
@@ -176,19 +176,45 @@ export default function Dashboard() {
       {jiraTickets.length > 0 && (
         <div className="glass-card p-4 border-blue-500/20 bg-blue-500/5 relative overflow-hidden">
           <h3 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
-            <ExternalLink size={14} /> Jira Incidents
+            <Ticket size={14} /> My Incident Tickets
           </h3>
-          <div className="space-y-2">
-            {jiraTickets.slice(0, 5).map(t => (
-              <div key={t.issue_key} className="flex items-center justify-between p-3 bg-surface-800/50 rounded-lg">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{t.scenario?.title}</p>
-                  <p className="text-xs text-surface-400">{t.jira_status || 'Open'} · {t.run_count} run{t.run_count !== 1 ? 's' : ''}</p>
-                </div>
-                <span className="text-xs font-mono text-blue-400 shrink-0 ml-2">{t.issue_key}</span>
-              </div>
-            ))}
-          </div>
+          {jiraTickets.filter(t => !t.is_closed).length > 0 && (
+            <div className="space-y-2 mb-4">
+              <p className="text-[10px] uppercase tracking-wide text-surface-500">Open</p>
+              {jiraTickets.filter(t => !t.is_closed).slice(0, 5).map(t => (
+                <Link
+                  key={t.issue_key}
+                  to={`/scenarios/${t.scenario?.slug}`}
+                  className="flex items-center justify-between p-3 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{t.scenario?.title}</p>
+                    <p className="text-xs text-surface-400">{t.jira_status || 'Open'} · {t.run_count} run{t.run_count !== 1 ? 's' : ''}</p>
+                  </div>
+                  <span className="text-xs font-mono text-blue-400 shrink-0 ml-2">{t.issue_key}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+          {jiraTickets.filter(t => t.is_closed).length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] uppercase tracking-wide text-surface-500">Closed</p>
+              {jiraTickets.filter(t => t.is_closed).slice(0, 3).map(t => (
+                <Link
+                  key={t.issue_key}
+                  to={`/scenarios/${t.scenario?.slug}`}
+                  className="flex items-center justify-between p-3 bg-surface-900/30 rounded-lg opacity-75 hover:opacity-100 transition-opacity"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm text-surface-300 truncate">{t.scenario?.title}</p>
+                    <p className="text-xs text-surface-500">{t.jira_status} · closed</p>
+                  </div>
+                  <span className="text-xs font-mono text-surface-500 shrink-0 ml-2">{t.issue_key}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+          <p className="text-[11px] text-surface-500 mt-3">Personal tickets only — you cannot see other learners&apos; incidents.</p>
         </div>
       )}
 

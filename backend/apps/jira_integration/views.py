@@ -8,7 +8,27 @@ from rest_framework.views import APIView
 from apps.question_bank.models import Scenario
 
 from .models import JiraCommentLog, UserScenarioJiraTicket
+from .helpers import is_jira_closed
 from .sync import ensure_scenario_ticket
+
+
+def _sync_ticket_status(ticket, client=None):
+    """Refresh jira_status from Jira API when possible."""
+    if not ticket.issue_key:
+        return ticket.jira_status or ""
+    if client is None:
+        from .client import JiraClient
+        client = JiraClient()
+    if not client.enabled:
+        return ticket.jira_status or ""
+    try:
+        status = client.get_issue_status(ticket.issue_key)
+        if status and status != ticket.jira_status:
+            ticket.jira_status = status
+            ticket.save(update_fields=["jira_status", "updated_at"])
+        return status or ticket.jira_status or ""
+    except Exception:
+        return ticket.jira_status or ""
 
 
 class UserJiraTicketsView(APIView):
@@ -17,14 +37,24 @@ class UserJiraTicketsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        tickets = UserScenarioJiraTicket.objects.filter(user=request.user).select_related(
-            "scenario", "last_session"
-        )
-        data = [
-            {
+        tickets_qs = UserScenarioJiraTicket.objects.filter(
+            user=request.user,
+            issue_key__gt="",
+        ).select_related("scenario", "last_session").order_by("-updated_at")
+
+        from .client import JiraClient
+        client = JiraClient()
+        sync = client.enabled
+
+        open_tickets = []
+        closed_tickets = []
+        for t in tickets_qs:
+            status = _sync_ticket_status(t, client) if sync else (t.jira_status or "")
+            entry = {
                 "issue_key": t.issue_key,
                 "issue_url": t.issue_url,
-                "jira_status": t.jira_status,
+                "jira_status": status,
+                "is_closed": is_jira_closed(status),
                 "run_count": t.run_count,
                 "scenario": {
                     "id": t.scenario_id,
@@ -34,9 +64,18 @@ class UserJiraTicketsView(APIView):
                 "last_session_id": str(t.last_session_id) if t.last_session_id else None,
                 "updated_at": t.updated_at.isoformat(),
             }
-            for t in tickets
-        ]
-        return Response({"tickets": data, "count": len(data)})
+            if entry["is_closed"]:
+                closed_tickets.append(entry)
+            else:
+                open_tickets.append(entry)
+
+        all_tickets = open_tickets + closed_tickets
+        return Response({
+            "tickets": all_tickets,
+            "open_tickets": open_tickets,
+            "closed_tickets": closed_tickets,
+            "count": len(all_tickets),
+        })
 
 
 def _scenario_ticket_payload(ticket, include_details=False):

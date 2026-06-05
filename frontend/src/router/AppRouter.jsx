@@ -45,6 +45,7 @@ const AdminUsers = lazy(() => import('../pages/admin/AdminUsers'))
 const AdminLabs = lazy(() => import('../pages/admin/AdminLabs'))
 const AdminSubscriptions = lazy(() => import('../pages/admin/AdminSubscriptions'))
 const AdminThreads = lazy(() => import('../pages/admin/AdminThreads'))
+const AdminJira = lazy(() => import('../pages/admin/AdminJira'))
 const AdminSettings = lazy(() => import('../pages/admin/AdminSettings'))
 
 function PageLoader() {
@@ -117,6 +118,7 @@ export default function AppRouter() {
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/labs" element={<AdminLabs />} />
           <Route path="/admin/subscriptions" element={<AdminSubscriptions />} />
+          <Route path="/admin/jira" element={<AdminJira />} />
           <Route path="/admin/threads" element={<AdminThreads />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
         </Route>
