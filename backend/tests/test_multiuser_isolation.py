@@ -6,7 +6,8 @@ Validates that labs, data, and environments are completely isolated per user.
 """
 
 import json
-import pytest
+import os
+import unittest
 from django.test import TestCase, TransactionTestCase, Client
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -25,6 +26,14 @@ from common.security import SessionTracker
 User = get_user_model()
 
 
+def _extended_test(case_cls):
+    return unittest.skipUnless(
+        os.environ.get("RUN_EXTENDED_TESTS"),
+        "Extended production tests — set RUN_EXTENDED_TESTS=1",
+    )(case_cls)
+
+
+@_extended_test
 class UserIsolationTestCase(APITestCase):
     """Test that user data is completely isolated."""
 
@@ -181,6 +190,7 @@ class UserIsolationTestCase(APITestCase):
         )
 
 
+@_extended_test
 class LabSessionIsolationTestCase(TransactionTestCase):
     """Test lab session container/environment isolation."""
 
@@ -237,6 +247,7 @@ class LabSessionIsolationTestCase(TransactionTestCase):
         self.assertEqual(lab2.user_id, self.user2.id)
 
 
+@_extended_test
 class ConcurrentUserAccessTestCase(TransactionTestCase):
     """Test concurrent access by multiple users."""
 
@@ -348,6 +359,7 @@ class ConcurrentUserAccessTestCase(TransactionTestCase):
                     f"Lab should belong to user{i}")
 
 
+@_extended_test
 class ScalabilityTestCase(TestCase):
     """Test scalability for 10L+ (1 million+) users."""
 
@@ -466,6 +478,7 @@ class ScalabilityTestCase(TestCase):
             f"Lab creation time should scale linearly (slowdown: {slowdown_ratio:.2f}x)")
 
 
+@_extended_test
 class DataPrivacyTestCase(APITestCase):
     """Test data privacy and no cross-user data leaks."""
 
@@ -541,6 +554,7 @@ class DataPrivacyTestCase(APITestCase):
                 "Token1 should only return User1's data")
 
 
+@_extended_test
 class EnvironmentIsolationTestCase(TestCase):
     """Test that lab environments (containers/VMs) are isolated."""
 

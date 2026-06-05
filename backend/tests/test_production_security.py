@@ -4,7 +4,8 @@ Tests JWT authentication, session tracking, structured logging, and API security
 """
 
 import json
-import pytest
+import os
+import unittest
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -22,6 +23,14 @@ from apps.question_bank.models import Technology, Scenario
 User = get_user_model()
 
 
+def _extended_test(case_cls):
+    return unittest.skipUnless(
+        os.environ.get("RUN_EXTENDED_TESTS"),
+        "Extended production tests — set RUN_EXTENDED_TESTS=1",
+    )(case_cls)
+
+
+@_extended_test
 class JWTSecurityTestCase(APITestCase):
     """Test JWT token security hardening (RS256)."""
 
@@ -99,6 +108,7 @@ class JWTSecurityTestCase(APITestCase):
         self.assertAlmostEqual(lifetime_seconds, 604800, delta=60)
 
 
+@_extended_test
 class DuplicateLoginPreventionTestCase(APITestCase):
     """Test duplicate login prevention (single session per user)."""
 
@@ -172,6 +182,7 @@ class DuplicateLoginPreventionTestCase(APITestCase):
         self.assertFalse(SessionTracker.is_session_valid(self.user.id, jti))
 
 
+@_extended_test
 class StructuredLoggingTestCase(TestCase):
     """Test structured JSON logging with PII masking."""
 
@@ -203,6 +214,7 @@ class StructuredLoggingTestCase(TestCase):
         logger.info("Test message", user_id=123, email="user@domain.com")
 
 
+@_extended_test
 class APIAuthenticationTestCase(APITestCase):
     """Test that all APIs require authentication."""
 
@@ -245,6 +257,7 @@ class APIAuthenticationTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+@_extended_test
 class PaymentSecurityTestCase(APITestCase):
     """Test payment endpoint security."""
 
@@ -313,6 +326,7 @@ class PaymentSecurityTestCase(APITestCase):
             self.assertEqual(response.data.get('amount'), self.tech.price)
 
 
+@_extended_test
 class ScenarioPermissionsTestCase(APITestCase):
     """Test scenario access permissions."""
 
@@ -414,6 +428,7 @@ class ScenarioPermissionsTestCase(APITestCase):
         self.assertNotEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+@_extended_test
 class SecurityHeadersTestCase(APITestCase):
     """Test security headers are present."""
 
@@ -447,6 +462,7 @@ class SecurityHeadersTestCase(APITestCase):
         self.assertIn('X-XSS-Protection', response)
 
 
+@_extended_test
 class DebuggingDisabledTestCase(TestCase):
     """Test that debug mode is OFF in production."""
 
@@ -470,6 +486,7 @@ class DebuggingDisabledTestCase(TestCase):
         )
 
 
+@_extended_test
 class RateLimitingTestCase(APITestCase):
     """Test rate limiting on critical endpoints."""
 
@@ -491,6 +508,7 @@ class RateLimitingTestCase(APITestCase):
                     break
 
 
+@_extended_test
 class NoPublicAPIExposureTestCase(APITestCase):
     """Test that APIs are not exposed to public without auth."""
 

@@ -139,8 +139,13 @@ def jira_webhook(request):
                 {"issue_key": issue_key, "author": author},
             )
 
-    JiraWebhookEvent.objects.filter(
-        jira_issue_key=issue_key, processed=False
-    ).order_by("-created_at")[:1].update(processed=True)
+    latest_event = (
+        JiraWebhookEvent.objects.filter(jira_issue_key=issue_key, processed=False)
+        .order_by("-created_at")
+        .first()
+    )
+    if latest_event:
+        latest_event.processed = True
+        latest_event.save(update_fields=["processed"])
 
     return JsonResponse({"status": "ok", "issue_key": issue_key})
