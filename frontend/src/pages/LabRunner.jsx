@@ -695,11 +695,20 @@ export default function LabRunner() {
             {scenario.title || 'Lab Session'}
           </h2>
           {scenario.difficulty && <span className={`badge-${scenario.difficulty} text-[10px] py-0`}>{scenario.difficulty}</span>}
-          {session?.jira_issue_key && (
-            <span
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20"
-              title="Your personal incident ticket — view details in the scenario page"
+          {session?.jira_issue_key && session?.jira_issue_url && (
+            <a
+              href={session.jira_issue_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+              title="Open Jira ticket"
             >
+              <ExternalLink size={10} />
+              {session.jira_issue_key}
+            </a>
+          )}
+          {session?.jira_issue_key && !session?.jira_issue_url && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
               {session.jira_issue_key}
             </span>
           )}

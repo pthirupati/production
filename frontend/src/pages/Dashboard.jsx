@@ -185,7 +185,18 @@ export default function Dashboard() {
                   <p className="text-sm font-medium text-white truncate">{t.scenario?.title}</p>
                   <p className="text-xs text-surface-400">{t.jira_status || 'Open'} · {t.run_count} run{t.run_count !== 1 ? 's' : ''}</p>
                 </div>
-                <span className="text-xs font-mono text-blue-400 shrink-0 ml-2">{t.issue_key}</span>
+                {t.issue_url ? (
+                  <a
+                    href={t.issue_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-mono text-blue-400 hover:underline shrink-0 ml-2"
+                  >
+                    {t.issue_key}
+                  </a>
+                ) : (
+                  <span className="text-xs font-mono text-blue-400 shrink-0 ml-2">{t.issue_key}</span>
+                )}
               </div>
             ))}
           </div>

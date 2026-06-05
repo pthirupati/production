@@ -1,15 +1,13 @@
-import { Ticket, MessageSquare } from 'lucide-react'
-import { useAuthStore } from '../store/authStore'
+import { Ticket, MessageSquare, ExternalLink } from 'lucide-react'
 
 /**
- * In-app Jira incident panel — users never need Atlassian login.
- * External Jira link is staff-only (managers use JIRA_EMAIL bot account).
+ * In-app Jira incident panel with link to the Jira ticket.
+ * Learners with Atlassian access can open the ticket; others see details here.
  */
 export default function JiraTicketPanel({ ticket, comments = [], compact = false }) {
-  const { user } = useAuthStore()
-  const isStaff = user?.is_staff
-
   if (!ticket?.issue_key) return null
+
+  const ticketUrl = ticket.issue_url || null
 
   return (
     <div className={`border border-blue-500/20 bg-blue-500/5 rounded-lg ${compact ? 'p-3' : 'p-4 mb-6'}`}>
@@ -20,30 +18,43 @@ export default function JiraTicketPanel({ ticket, comments = [], compact = false
             <p className={`font-medium text-blue-400 uppercase tracking-wide ${compact ? 'text-[10px]' : 'text-xs'}`}>
               Your incident ticket
             </p>
-            <p className={`text-surface-200 font-mono ${compact ? 'text-sm' : 'text-base'}`}>
-              {ticket.issue_key}
-            </p>
+            {ticketUrl ? (
+              <a
+                href={ticketUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 hover:underline font-mono ${compact ? 'text-sm' : 'text-base'}`}
+                title="Open ticket in Jira"
+              >
+                {ticket.issue_key}
+                <ExternalLink size={compact ? 12 : 14} />
+              </a>
+            ) : (
+              <p className={`text-surface-200 font-mono ${compact ? 'text-sm' : 'text-base'}`}>
+                {ticket.issue_key}
+              </p>
+            )}
             <p className={`text-surface-400 ${compact ? 'text-[11px]' : 'text-sm'} mt-0.5`}>
               {ticket.jira_status ? `Status: ${ticket.jira_status}` : 'Open'}
               {ticket.run_count > 1 && ` · Attempt #${ticket.run_count}`}
             </p>
             {!compact && (
               <p className="text-xs text-surface-500 mt-2 max-w-md">
-                This ticket is yours only — other learners get separate tickets for the same scenario.
-                Updates appear here; you do not need a Jira login.
+                Your personal ticket — other learners get separate tickets for this scenario.
               </p>
             )}
           </div>
         </div>
-        {isStaff && ticket.issue_url && (
+        {ticketUrl && (
           <a
-            href={ticket.issue_url}
+            href={ticketUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-blue-400 hover:underline shrink-0"
-            title="Staff only — opens Atlassian Jira"
+            className={`flex items-center gap-1.5 shrink-0 rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors ${compact ? 'px-2 py-1 text-[10px]' : 'px-3 py-1.5 text-sm'}`}
+            title="Open ticket in Jira"
           >
-            Open in Jira ↗
+            <ExternalLink size={compact ? 12 : 14} />
+            View in Jira
           </a>
         )}
       </div>
