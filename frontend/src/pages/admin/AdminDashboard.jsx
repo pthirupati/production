@@ -89,9 +89,10 @@ export default function AdminDashboard() {
   const fetchData = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true)
     try {
-      await Promise.all([fetchOverview(), fetchHealth()])
-    } finally {
+      await fetchOverview()
       setLoading(false)
+      fetchHealth()
+    } finally {
       setRefreshing(false)
     }
   }, [fetchOverview, fetchHealth])

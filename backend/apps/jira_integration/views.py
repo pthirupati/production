@@ -44,12 +44,12 @@ class UserJiraTicketsView(APIView):
 
         from .client import JiraClient
         client = JiraClient()
-        sync = client.enabled
+        live_sync = request.query_params.get("sync") == "1" and client.enabled
 
         open_tickets = []
         closed_tickets = []
         for t in tickets_qs:
-            status = _sync_ticket_status(t, client) if sync else (t.jira_status or "")
+            status = _sync_ticket_status(t, client) if live_sync else (t.jira_status or "")
             entry = {
                 "issue_key": t.issue_key,
                 "issue_url": t.issue_url if (request.user.is_staff or request.user.is_superuser) else "",
@@ -118,7 +118,8 @@ class ScenarioJiraTicketView(APIView):
         ).first()
         if not ticket or not ticket.issue_key:
             return Response({"ticket": None, "recent_comments": []})
-        return Response(_scenario_ticket_payload(ticket, user=request.user, include_details=True))
+        include_details = request.query_params.get("details") == "1"
+        return Response(_scenario_ticket_payload(ticket, user=request.user, include_details=include_details))
 
     def post(self, request, scenario_id):
         """Ensure a Jira ticket exists for this user+scenario (create if missing)."""

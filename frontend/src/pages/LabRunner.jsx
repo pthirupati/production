@@ -204,7 +204,7 @@ export default function LabRunner() {
 
           if (lab.jira_issue_key && lab.scenario?.id) {
             import('../api/jira').then(({ jiraApi }) =>
-              jiraApi.getScenarioTicket(lab.scenario.id)
+              jiraApi.getScenarioTicket(lab.scenario.id, { details: 1 })
                 .then(res => {
                   setJiraComments(res.data?.recent_comments || [])
                   if (res.data?.ticket) setJiraTicket(res.data.ticket)

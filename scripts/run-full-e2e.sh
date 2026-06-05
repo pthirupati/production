@@ -13,7 +13,13 @@ mkdir -p "$LOG_DIR"
 
 echo "=== FixitLab Full E2E Test Run ==="
 echo "Log directory: $LOG_DIR"
+echo "E2E_SKIP_LAB=${E2E_SKIP_LAB:-0} RUN_FULL_E2E=${RUN_FULL_E2E:-1}"
 echo ""
+
+# ── 0. Scenario images must exist ──
+echo ">>> [0/5] Scenario image check"
+chmod +x "$ROOT/scripts/validate-scenario-images.sh"
+bash "$ROOT/scripts/validate-scenario-images.sh" | tee "$LOG_DIR/scenario-images.txt"
 
 # ── 1. Container health ──
 echo ">>> [1/5] Container status"
@@ -63,12 +69,14 @@ echo ">>> [5/5] E2E API tests"
 
 # Internal (backend localhost — bypasses nginx)
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+  env E2E_SKIP_LAB="${E2E_SKIP_LAB:-0}" RUN_FULL_E2E="${RUN_FULL_E2E:-1}" \
   python /scripts/e2e_production_test.py \
   2>&1 | tee "$LOG_DIR/e2e-internal.log" || E2E_INTERNAL_FAIL=1
 
 # External (through gateway + TLS)
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-  env BASE_URL="$BASE_URL" python /scripts/e2e_production_test.py \
+  env BASE_URL="$BASE_URL" E2E_SKIP_LAB="${E2E_SKIP_LAB:-0}" RUN_FULL_E2E="${RUN_FULL_E2E:-1}" \
+  python /scripts/e2e_production_test.py \
   2>&1 | tee "$LOG_DIR/e2e-external.log" || E2E_EXTERNAL_FAIL=1
 
 echo ""

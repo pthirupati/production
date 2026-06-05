@@ -2,8 +2,8 @@
 #
 # GitHub → Actions → FixitLab Production → Run workflow
 #
-#   launch + create_server  →  new DO droplet, secrets, DNS, tests, deploy, health
-#   launch / deploy         →  tests, deploy, start application, health
+#   launch + create_server  →  new DO droplet, secrets, DNS, tests, deploy, verify
+#   launch / deploy         →  tests, deploy, start application, health + E2E verify
 #   stop                    →  stop containers (database volume preserved)
 
 name: FixitLab Production
@@ -25,7 +25,7 @@ on:
         type: boolean
         default: false
       run_tests:
-        description: "Run backend and frontend tests before deploy"
+        description: "Run backend and frontend unit tests before deploy"
         type: boolean
         default: true
       build_scenarios:
@@ -35,6 +35,10 @@ on:
           - "true"
           - "false"
         default: "true"
+      run_e2e:
+        description: "Run post-deploy health checks + full E2E on server"
+        type: boolean
+        default: true
       git_ref:
         description: "Git branch or tag to deploy"
         type: string
@@ -227,7 +231,7 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           envs: GITHUB_TOKEN,PRODUCTION_ENV_B64,BUILD_SCENARIOS
-          command_timeout: 90m
+          command_timeout: 120m
           script: |
             set -e
             REPO="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
@@ -240,33 +244,55 @@ jobs:
             git fetch origin
             git checkout ${{ inputs.git_ref }}
             git reset --hard "origin/${{ inputs.git_ref }}"
-            chmod +x scripts/ci-remote-platform.sh scripts/platform-start.sh scripts/sync-production-env.sh
+            chmod +x scripts/ci-remote-platform.sh scripts/platform-start.sh scripts/sync-production-env.sh \
+              scripts/build-scenario-images.sh scripts/validate-scenario-images.sh \
+              scripts/ci-post-deploy-verify.sh scripts/run-full-e2e.sh
             export BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
             ./scripts/ci-remote-platform.sh deploy
 
-  health:
-    name: Health check
+  verify:
+    name: Health & E2E verification
     needs: [deploy]
     if: |
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       needs.deploy.result == 'success'
     runs-on: ubuntu-latest
+    environment: production
     steps:
-      - name: Wait for API health
+      - name: Quick public health (GitHub runner)
         run: |
           HOST="${{ needs.deploy.outputs.prod_host }}"
-          URL="http://${HOST}/api/health/"
-          echo "Checking $URL ..."
-          for i in $(seq 1 30); do
-            if curl -sf "$URL" >/dev/null; then
-              echo "Health OK"
+          echo "Checking http://${HOST}/health ..."
+          for i in $(seq 1 20); do
+            if curl -sf --max-time 10 "http://${HOST}/health" | grep -q ok; then
+              echo "Public health OK"
               exit 0
             fi
-            sleep 10
+            sleep 5
           done
-          echo "WARN: Health check timed out — scenario image builds may still be running"
+          echo "ERROR: Public health check failed on http://${HOST}/health"
+          exit 1
+
+      - name: Full server verification (images, labs, E2E)
+        uses: appleboy/ssh-action@v1
+        env:
+          RUN_E2E: ${{ inputs.run_e2e }}
+        with:
+          host: ${{ needs.deploy.outputs.prod_host }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          envs: RUN_E2E
+          command_timeout: 120m
+          script: |
+            set -e
+            cd /opt/fixitlab
+            chmod +x scripts/ci-post-deploy-verify.sh scripts/run-full-e2e.sh \
+              scripts/validate-scenario-images.sh scripts/validate-scenario-labs.py 2>/dev/null || true
+            export RUN_E2E="${RUN_E2E:-true}"
+            ./scripts/ci-post-deploy-verify.sh
 
       - name: Summary
+        if: always()
         run: |
           {
             echo "## FixitLab Production — complete"
@@ -276,7 +302,7 @@ jobs:
             echo "| Action | \`${{ inputs.action }}\` |"
             echo "| Host | \`${{ needs.deploy.outputs.prod_host }}\` |"
             echo "| Branch | \`${{ inputs.git_ref }}\` |"
+            echo "| Build scenarios | \`${{ inputs.build_scenarios }}\` |"
+            echo "| E2E verify | \`${{ inputs.run_e2e }}\` |"
             echo "| Site | https://fixitlab.in |"
-            echo ""
-            echo "Application is deployed and started (Docker compose up, migrations, SSL attempt)."
           } >> "$GITHUB_STEP_SUMMARY"

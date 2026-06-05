@@ -18,10 +18,10 @@ export default function AdminJira() {
 
   useEffect(() => { loadTickets() }, [])
 
-  const loadTickets = async () => {
+  const loadTickets = async (liveSync = false) => {
     setLoading(true)
     try {
-      const data = await adminApi.getJiraTickets()
+      const data = await adminApi.getJiraTickets(liveSync ? { sync: '1' } : {})
       setTickets(data.tickets || [])
       setStats(data)
     } catch {
@@ -100,8 +100,8 @@ export default function AdminJira() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={loadTickets} className="btn-secondary flex items-center gap-2 text-sm">
-            <RefreshCw size={14} /> Refresh
+          <button onClick={() => loadTickets(true)} className="btn-secondary flex items-center gap-2 text-sm">
+            <RefreshCw size={14} /> Refresh from Jira
           </button>
           <button onClick={openCreateModal} className="btn-primary flex items-center gap-2 text-sm">
             <Plus size={14} /> Create Ticket

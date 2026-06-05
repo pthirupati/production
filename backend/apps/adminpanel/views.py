@@ -13,6 +13,8 @@ from django.contrib.auth import get_user_model
 from django.db.models import Count, Q, Avg, Sum, F
 from django.http import HttpResponse
 from django.utils import timezone
+from django.core.cache import cache
+from django.db.models.functions import TruncDate
 from datetime import timedelta
 
 from apps.question_bank.models import Scenario, Technology, Tag
@@ -32,8 +34,15 @@ logger = logging.getLogger(__name__)
 
 class AdminOverviewView(APIView):
     permission_classes = [IsPlatformAdmin]
+    CACHE_KEY = "admin_overview_v1"
+    CACHE_TTL = 60
 
     def get(self, request):
+        if request.query_params.get("refresh") != "1":
+            cached = cache.get(self.CACHE_KEY)
+            if cached is not None:
+                return Response(cached)
+
         now = timezone.now()
         last_24h = now - timedelta(hours=24)
         last_7d = now - timedelta(days=7)
@@ -55,7 +64,7 @@ class AdminOverviewView(APIView):
             Q(last_login__lt=inactive_threshold) | Q(last_login__isnull=True)
         ).count()
 
-        return Response({
+        payload = {
             "users": {
                 "total": User.objects.count(),
                 "active_24h": User.objects.filter(last_login__gte=last_24h).count(),
@@ -93,7 +102,10 @@ class AdminOverviewView(APIView):
             },
             "completion_rate": self._get_completion_rate(),
             "maintenance_mode": settings.MAINTENANCE_MODE,
-        })
+            "cached_at": now.isoformat(),
+        }
+        cache.set(self.CACHE_KEY, payload, self.CACHE_TTL)
+        return Response(payload)
 
     def _get_completion_rate(self):
         total = LabSession.objects.filter(
@@ -405,11 +417,14 @@ class AdminUsersView(APIView):
                 "lab_sessions", filter=Q(lab_sessions__status="COMPLETED")
             ),
             total_labs=Count("lab_sessions"),
-        )
+            active_subscriptions=Count(
+                "tech_subscriptions",
+                filter=Q(tech_subscriptions__is_active=True),
+            ),
+        ).select_related("profile")
 
         data = []
         for u in qs[:100]:
-            # Get phone number and country from profile
             phone_number = None
             country = ""
             try:
@@ -418,13 +433,6 @@ class AdminUsersView(APIView):
             except Exception:
                 pass
 
-            # Check if user has active tech subscriptions
-            from apps.billing.models import TechnologySubscription
-            active_subs = TechnologySubscription.objects.filter(
-                user=u, is_active=True
-            ).count()
-
-            # Check 90-day inactive
             is_inactive_90d = False
             if u.last_login:
                 from django.utils import timezone as tz
@@ -441,8 +449,8 @@ class AdminUsersView(APIView):
                 "is_active": u.is_active,
                 "is_staff": u.is_staff,
                 "is_superuser": u.is_superuser,
-                "is_paid": active_subs > 0,
-                "active_subscriptions": active_subs,
+                "is_paid": u.active_subscriptions > 0,
+                "active_subscriptions": u.active_subscriptions,
                 "is_inactive_90d": is_inactive_90d,
                 "date_joined": u.date_joined.isoformat(),
                 "last_login": u.last_login.isoformat() if u.last_login else None,
@@ -746,21 +754,31 @@ class AdminTerminateAllIdleLabsView(APIView):
 
 class AdminAnalyticsView(APIView):
     permission_classes = [IsPlatformAdmin]
+    CACHE_KEY = "admin_analytics_v1"
+    CACHE_TTL = 120
 
     def get(self, request):
-        now = timezone.now()
         days = int(request.query_params.get("days", 30))
+        cache_key = f"{self.CACHE_KEY}:{days}"
+        if request.query_params.get("refresh") != "1":
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+
+        now = timezone.now()
         start_date = now - timedelta(days=days)
 
-        # Daily lab starts
-        daily_labs = []
-        for i in range(days):
-            day = start_date + timedelta(days=i)
-            next_day = day + timedelta(days=1)
-            count = LabSession.objects.filter(
-                started_at__gte=day, started_at__lt=next_day
-            ).count()
-            daily_labs.append({"date": day.strftime("%Y-%m-%d"), "count": count})
+        daily_rows = (
+            LabSession.objects.filter(started_at__gte=start_date)
+            .annotate(day=TruncDate("started_at"))
+            .values("day")
+            .annotate(count=Count("id"))
+            .order_by("day")
+        )
+        daily_labs = [
+            {"date": row["day"].strftime("%Y-%m-%d"), "count": row["count"]}
+            for row in daily_rows
+        ]
 
         # Top scenarios
         top_scenarios = (
@@ -779,11 +797,14 @@ class AdminAnalyticsView(APIView):
             .annotate(count=Count("id"))
         )
 
-        return Response({
+        payload = {
             "daily_labs": daily_labs,
             "top_scenarios": list(top_scenarios),
             "difficulty_distribution": list(difficulty_stats),
-        })
+            "cached_at": now.isoformat(),
+        }
+        cache.set(cache_key, payload, self.CACHE_TTL)
+        return Response(payload)
 
 
 # ─── System Health ───────────────────────────────────────────────────
@@ -1603,10 +1624,10 @@ class AdminJiraTicketsView(APIView):
             qs = qs.filter(scenario_id=scenario_id)
 
         client = JiraClient()
-        sync = client.enabled
+        live_sync = request.query_params.get("sync") == "1" and client.enabled
         tickets = []
         for t in qs[:300]:
-            status_name = _sync_ticket_status(t, client) if sync else (t.jira_status or "")
+            status_name = _sync_ticket_status(t, client) if live_sync else (t.jira_status or "")
             tickets.append({
                 "issue_key": t.issue_key,
                 "issue_url": t.issue_url,
@@ -1633,7 +1654,8 @@ class AdminJiraTicketsView(APIView):
             "count": len(tickets),
             "open_count": open_count,
             "closed_count": len(tickets) - open_count,
-            "jira_enabled": sync,
+            "jira_enabled": client.enabled,
+            "live_sync": live_sync,
         })
 
 

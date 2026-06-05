@@ -78,10 +78,10 @@ export default function ScenarioDetail() {
     setStarting(true)
     try {
       const session = await labApi.startLab(scenario.id)
-      if (session.jira_issue_url) {
+      if (session.jira_issue_key) {
         setJiraTicket({
           issue_key: session.jira_issue_key,
-          issue_url: session.jira_issue_url,
+          issue_url: '',
           jira_status: session.jira_status || 'In Progress',
           run_count: session.jira_run_count || 1,
         })

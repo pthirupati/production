@@ -25,7 +25,7 @@ from urllib.request import Request, urlopen
 BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 ADMIN_EMAIL = os.environ.get("SUPERUSER_EMAIL", "")
 ADMIN_PASSWORD = os.environ.get("SUPERUSER_PASSWORD", "")
-SKIP_LAB = os.environ.get("E2E_SKIP_LAB", "1") == "1"  # lab start is slow; set E2E_SKIP_LAB=0 to test
+SKIP_LAB = os.environ.get("E2E_SKIP_LAB", "0" if os.environ.get("RUN_FULL_E2E") == "1" else "1") == "1"
 VERBOSE = os.environ.get("E2E_VERBOSE", "0") == "1"
 # Django SECURE_SSL_REDIRECT requires this when hitting Daphne directly over HTTP
 INTERNAL_HTTP = BASE_URL.startswith("http://127.0.0.1") or BASE_URL.startswith("http://backend")
@@ -187,6 +187,58 @@ def run_user_flow(s: Suite, token: str, label: str = "user"):
         status, data = api(method, path, token=token)
         ok = status == 200
         s.record(f"{label} {method} {path}", ok, status, err_msg(data))
+
+
+def run_technology_scenario_flow(s: Suite, token: str):
+    """Per technology: ensure Jira ticket, start lab, poll status, stop."""
+    if SKIP_LAB:
+        s.record("Technology scenario E2E", True, detail="skipped E2E_SKIP_LAB=1")
+        return
+    print("\n=== Technology → scenario → Jira → lab (per tech) ===")
+    status, techs = api("GET", "/api/technologies/", token=token)
+    if status != 200 or not techs:
+        s.record("Fetch technologies", False, status)
+        return
+
+    for tech in techs[:8]:
+        slug = tech.get("slug", "")
+        status, detail = api("GET", f"/api/scenarios/?technology_slug={slug}&limit=5", token=token)
+        if status != 200:
+            s.record(f"Scenarios for {slug}", False, status)
+            continue
+        items = detail if isinstance(detail, list) else detail.get("results", detail)
+        if not items:
+            s.record(f"Scenarios for {slug}", True, detail="no scenarios")
+            continue
+        scenario = next((sc for sc in items if sc.get("is_active")), items[0])
+        sid = scenario.get("id")
+        title = (scenario.get("title") or slug)[:40]
+
+        st_j, jira = api("POST", f"/api/jira/tickets/scenario/{sid}/", token=token)
+        key = (jira.get("ticket") or {}).get("issue_key", "")
+        s.record(f"[{slug}] Jira ticket", st_j in (200, 201) and bool(key), st_j, key[:20])
+
+        st, data = api("POST", f"/api/labs/{sid}/start/", token=token)
+        if st not in (200, 201, 202):
+            err = str(data.get("error", data.get("code", "")))[:60]
+            if "not deployed" in err.lower() or "PROVISION_FAILED" in str(data.get("code", "")):
+                s.record(f"[{slug}] lab start {title}", False, st, err)
+            else:
+                s.record(f"[{slug}] lab start {title}", False, st, err)
+            continue
+        s.record(f"[{slug}] lab start {title}", True, st, data.get("status", "")[:20])
+
+        session_id = data.get("session_id") or data.get("id")
+        if session_id and data.get("jira_issue_key"):
+            s.record(f"[{slug}] Jira linked on start", True, detail=data.get("jira_issue_key"))
+
+        if session_id:
+            for _ in range(12):
+                st_s, st_data = api("GET", f"/api/labs/{session_id}/status/", token=token)
+                if st_s == 200 and st_data.get("status") in ("RUNNING", "COMPLETED", "FAILED", "TERMINATED"):
+                    break
+                time.sleep(2)
+            api("POST", f"/api/labs/{session_id}/stop/", token=token)
 
 
 def run_lab_flow(s: Suite, token: str):
@@ -443,6 +495,7 @@ def main():
         run_billing_flow(s, token)
         run_community_flow(s, token)
         run_lab_flow(s, token)
+        run_technology_scenario_flow(s, token)
     else:
         s.record("User registration flow", False, detail="no token")
 

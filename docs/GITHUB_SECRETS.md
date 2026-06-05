@@ -11,8 +11,12 @@ FixitLab **does not store secrets in git**. Workflows inject the full production
 | Action | When to use | What runs automatically |
 |--------|-------------|-------------------------|
 | **launch** | First time or full rebuild | Optional create server → GitHub secrets → GoDaddy DNS → tests → **deploy & start app** → health |
-| **deploy** | Day-to-day updates | Tests → **deploy & start app** → health |
+| **deploy** | Day-to-day updates | Tests → **deploy & start app** → health + E2E verify |
 | **stop** | Pause platform | **Stop** containers (database volume kept) |
+
+Pipeline options when running workflow:
+- **build_scenarios** — rebuild all lab Docker images (required for labs to start)
+- **run_e2e** — post-deploy health, scenario image check, sample lab provisioning, full API E2E
 
 Pull requests run **CI Tests** only (no deploy).
 

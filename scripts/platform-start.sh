@@ -46,10 +46,25 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python 
 echo "Seeding/updating scenarios..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_scenarios --dir /scenarios
 
-if [ "${BUILD_SCENARIOS:-1}" = "1" ]; then
-  echo "Building scenario lab images..."
+should_build_scenarios() {
+  case "${1:-true}" in
+    1|true|TRUE|True|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+if should_build_scenarios "${BUILD_SCENARIOS:-true}"; then
+  echo "Building scenario lab images (BUILD_SCENARIOS=${BUILD_SCENARIOS:-true})..."
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend bash /scripts/build-scenario-images.sh 2>/dev/null || \
     bash "$ROOT/scripts/build-scenario-images.sh"
+  echo "Validating scenario images..."
+  bash "$ROOT/scripts/validate-scenario-images.sh"
+else
+  echo "Skipping scenario image build (BUILD_SCENARIOS=${BUILD_SCENARIOS})"
+  bash "$ROOT/scripts/validate-scenario-images.sh" || {
+    echo "ERROR: Scenario images missing. Re-run with BUILD_SCENARIOS=true"
+    exit 1
+  }
 fi
 
 echo ""
