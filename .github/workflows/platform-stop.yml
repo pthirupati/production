@@ -1,0 +1,27 @@
+# One-click STOP — stops containers, keeps all user/database data
+name: Platform Stop
+
+on:
+  workflow_dispatch:
+
+jobs:
+  stop:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Stop platform (preserve volumes)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/fixitlab
+            chmod +x scripts/platform-stop.sh
+            COMPOSE_FILE=docker-compose.prod.yml ./scripts/platform-stop.sh
+
+      - name: Summary
+        run: |
+          echo "FixitLab production stopped"
+          echo "Database volume fixitlab_db_data preserved — run Platform Start to resume"

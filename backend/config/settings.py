@@ -11,12 +11,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
 )
-environ.Env.read_env(os.path.join(BASE_DIR.parent, ".env"))
+_env_root = BASE_DIR.parent
+_env_file = _env_root / ".env.production" if (_env_root / ".env.production").exists() else _env_root / ".env"
+if _env_file.exists():
+    environ.Env.read_env(str(_env_file))
 
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
+ALLOWED_HOSTS = env.list(
+    "DJANGO_ALLOWED_HOSTS",
+    default=["localhost", "127.0.0.1"] if env.bool("DJANGO_DEBUG", default=False) else [],
+)
 
 # --------------------------------------------------
 # Applications
@@ -55,6 +61,7 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.community",
     "apps.ratings",
+    "apps.jira_integration",
 ]
 
 # --------------------------------------------------
@@ -71,6 +78,11 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+
+    # Security: request metadata extraction and JWT session validation
+    "common.middleware_security.RequestMetadataMiddleware",
+    "common.middleware_security.JWTSessionValidationMiddleware",
+    "common.middleware_security.SecurityHeadersMiddleware",
 
     # Security: restrict Django admin to superusers only
     "common.middleware.AdminAccessMiddleware",
@@ -195,12 +207,66 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=2),
+    # SECURITY: Use RS256 (asymmetric) instead of HS256 for higher security
+    # RS256 uses a private key to sign and public key to verify
+    # This prevents token tampering even if someone intercepts the token
+    "ALGORITHM": env("JWT_ALGORITHM", default="RS256"),
+    
+    # Token lifetimes
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),  # Reduced from 2 hours for security
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-    "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": True,
+    
+    # RSA Keys (set from environment variables or PEM file paths)
+    # Generate with: python common/security.py generate_keys
+    "SIGNING_KEY": env("JWT_SIGNING_KEY", default=None),
+    "VERIFYING_KEY": env("JWT_VERIFYING_KEY", default=None),
+    
+    # Token management
+    "ROTATE_REFRESH_TOKENS": True,  # Issue new refresh token on each refresh
+    "BLACKLIST_AFTER_ROTATION": True,  # Invalidate old refresh tokens
+    "UPDATE_LAST_LOGIN": True,  # Update user.last_login on each token refresh
+    
+    # JWT ID for session tracking and revocation
+    "JTI_CLAIM": "jti",  # Custom claim for unique token identifier
+    "JTI_GENERATION_ENABLED": True,  # EnableJWT ID generation
+    
     "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
 }
+
+def _read_pem_file(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+if not SIMPLE_JWT["SIGNING_KEY"]:
+    SIMPLE_JWT["SIGNING_KEY"] = env("JWT_RSA_PRIVATE_KEY", default=None) or _read_pem_file(
+        env("JWT_RSA_PRIVATE_KEY_PATH", default="")
+    )
+if not SIMPLE_JWT["VERIFYING_KEY"]:
+    SIMPLE_JWT["VERIFYING_KEY"] = env("JWT_RSA_PUBLIC_KEY", default=None) or _read_pem_file(
+        env("JWT_RSA_PUBLIC_KEY_PATH", default="")
+    )
+
+# HS256 fallback when explicitly configured or in debug mode
+if not SIMPLE_JWT["SIGNING_KEY"]:
+    if SIMPLE_JWT["ALGORITHM"] == "HS256":
+        SIMPLE_JWT["SIGNING_KEY"] = env("JWT_HS256_SECRET", default=SECRET_KEY)
+    elif DEBUG:
+        SIMPLE_JWT["ALGORITHM"] = "HS256"
+        SIMPLE_JWT["SIGNING_KEY"] = SECRET_KEY
+    else:
+        import warnings
+        warnings.warn(
+            "JWT RSA keys not configured in production — set JWT_RSA_PRIVATE_KEY, "
+            "JWT_SIGNING_KEY, or JWT_ALGORITHM=HS256",
+            stacklevel=1,
+        )
+
 
 # --------------------------------------------------
 # Channels (Redis)
@@ -322,7 +388,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # --------------------------------------------------
 # Lab / Docker provisioning
 # --------------------------------------------------
-LAB_PROVIDER = env("LAB_PROVIDER", default="docker")  # docker | aws
+LAB_PROVIDER = env("LAB_PROVIDER", default="docker")  # docker recommended — no per-user cloud VM cost
 LAB_MAX_DURATION_MINUTES = env.int("LAB_MAX_DURATION_MINUTES", default=60)
 LAB_CLEANUP_INTERVAL_MINUTES = env.int("LAB_CLEANUP_INTERVAL_MINUTES", default=5)
 DOCKER_SOCKET = env("DOCKER_SOCKET", default="unix:///var/run/docker.sock")
@@ -353,6 +419,20 @@ DO_REGION = env("DO_REGION", default="nyc1")
 DO_SIZE = env("DO_SIZE", default="s-1vcpu-1gb")
 
 # --------------------------------------------------
+# Jira Cloud integration
+# --------------------------------------------------
+JIRA_ENABLED = env.bool("JIRA_ENABLED", default=False)
+JIRA_BASE_URL = env("JIRA_BASE_URL", default="")
+JIRA_EMAIL = env("JIRA_EMAIL", default="")
+JIRA_API_TOKEN = env("JIRA_API_TOKEN", default="")
+JIRA_PROJECT_KEY = env("JIRA_PROJECT_KEY", default="FIXIT")
+JIRA_ISSUE_TYPE = env("JIRA_ISSUE_TYPE", default="Task")
+JIRA_TRANSITION_IN_PROGRESS = env("JIRA_TRANSITION_IN_PROGRESS", default="In Progress")
+JIRA_TRANSITION_TODO = env("JIRA_TRANSITION_TODO", default="To Do")
+JIRA_TRANSITION_DONE = env("JIRA_TRANSITION_DONE", default="Done")
+JIRA_WEBHOOK_SECRET = env("JIRA_WEBHOOK_SECRET", default="")
+
+# --------------------------------------------------
 # Social OAuth (GitHub + Google)
 # --------------------------------------------------
 GITHUB_CLIENT_ID = env("GITHUB_CLIENT_ID", default="")
@@ -375,6 +455,29 @@ SITE_URL = env("SITE_URL", default="http://localhost:8080")
 # --------------------------------------------------
 RAZORPAY_KEY_ID = env("RAZORPAY_KEY_ID", default="")
 RAZORPAY_KEY_SECRET = env("RAZORPAY_KEY_SECRET", default="")
+RAZORPAY_WEBHOOK_SECRET = env("RAZORPAY_WEBHOOK_SECRET", default="")
+# Demo payments when Razorpay keys are absent; respect explicit env override
+DEMO_PAYMENT_ENABLED = env.bool(
+    "DEMO_PAYMENT_ENABLED",
+    default=not bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET),
+)
+
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.celery import CeleryIntegration
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration(), CeleryIntegration()],
+            traces_sample_rate=0.1,
+            send_default_pii=False,
+            environment="production" if not DEBUG else "development",
+        )
+    except ImportError:
+        pass
 
 # --------------------------------------------------
 # Currency Settings
@@ -414,8 +517,9 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
-# Password hashing — Argon2 preferred (install via requirements.txt)
+# Password hashing — Argon2 preferred
 PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
     "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
@@ -434,30 +538,83 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # --------------------------------------------------
-# Logging (structured)
+# Logging (structured JSON with PII masking)
 # --------------------------------------------------
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
+        # Structured JSON format with PII masking
+        "json": {
+            "()": "common.logging_utils.JSONFormatter",
+        },
+        # Fallback verbose format for local development
         "verbose": {
             "format": "[{asctime}] {levelname} {name} {message}",
             "style": "{",
         },
     },
     "handlers": {
-        "console": {
+        # Console handler for Docker logs
+        "console_json": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "level": "INFO",
+        },
+        # Console handler for development
+        "console_verbose": {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
+            "level": "DEBUG",
         },
     },
     "root": {
-        "handlers": ["console"],
+        "handlers": ["console_json"] if not DEBUG else ["console_verbose"],
         "level": "INFO",
     },
     "loggers": {
-        "django": {"handlers": ["console"], "level": "WARNING", "propagate": False},
-        "apps": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        # Django core loggers
+        "django": {
+            "handlers": ["console_json"] if not DEBUG else ["console_verbose"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console_json"] if not DEBUG else ["console_verbose"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console_json"] if not DEBUG else ["console_verbose"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        
+        # App loggers
+        "apps": {
+            "handlers": ["console_json"] if not DEBUG else ["console_verbose"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        
+        # Security-related loggers
+        "common.security": {
+            "handlers": ["console_json"] if not DEBUG else ["console_verbose"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "common.middleware_security": {
+            "handlers": ["console_json"] if not DEBUG else ["console_verbose"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        
+        # Celery loggers
+        "celery": {
+            "handlers": ["console_json"] if not DEBUG else ["console_verbose"],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
 }
 

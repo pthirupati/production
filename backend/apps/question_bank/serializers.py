@@ -51,7 +51,7 @@ class ScenarioDetailSerializer(serializers.ModelSerializer):
             "initial_state", "solution_explanation", "time_limit", "max_score",
             "is_free", "attempts_count", "completions_count",
             "avg_completion_time", "hints_count", "is_bookmarked",
-            "blocked_commands", "created_at", "updated_at",
+            "blocked_commands", "infrastructure_type", "created_at", "updated_at",
         ]
 
 

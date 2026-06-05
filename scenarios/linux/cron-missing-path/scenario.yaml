@@ -1,0 +1,27 @@
+title: "Cron Job Fails — PATH Not Set"
+slug: "cron-missing-path"
+technology: "Linux"
+category: "Scheduling"
+difficulty: "hard"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q193 cron environment — PATH in crontab"
+
+description: |
+  Minute cron job never creates /var/run/cron-ok. Crontab calls backup.sh without PATH or full path.
+
+objectives:
+  - Check /var/log/syslog for cron errors
+  - Fix crontab PATH or use absolute path
+  - Wait for job or run manually
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 20
+    content: "Use `* * * * * /usr/local/bin/backup.sh` or set PATH in crontab"

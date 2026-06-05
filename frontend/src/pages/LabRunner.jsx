@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/authStore'
 import {
   Clock, CheckCircle2, XCircle, Lightbulb, StopCircle,
   ChevronRight, Trophy, Target, Eye, FileText,
-  PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard
+  PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard, ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ConfirmDialog } from '../components/ConfirmModal'
@@ -684,6 +684,18 @@ export default function LabRunner() {
             {scenario.title || 'Lab Session'}
           </h2>
           {scenario.difficulty && <span className={`badge-${scenario.difficulty} text-[10px] py-0`}>{scenario.difficulty}</span>}
+          {session?.jira_issue_url && (
+            <a
+              href={session.jira_issue_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+              title="Open Jira ticket for this incident"
+            >
+              <ExternalLink size={10} />
+              {session.jira_issue_key || 'Jira'}
+            </a>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

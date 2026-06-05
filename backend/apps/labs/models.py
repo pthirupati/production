@@ -98,6 +98,10 @@ class LabSession(models.Model):
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(null=True, blank=True)
 
+    # Jira integration
+    jira_issue_key = models.CharField(max_length=50, blank=True, default="")
+    jira_issue_url = models.URLField(max_length=500, blank=True, default="")
+
     # Scoring
     score = models.PositiveIntegerField(default=0)
     hints_used = models.PositiveIntegerField(default=0)

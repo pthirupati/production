@@ -137,3 +137,55 @@ def notify_achievement_earned(user_id, achievement_key, achievement_name):
     except Exception as e:
         logger.warning(f"Failed to send achievement notification: {e}")
 
+
+@shared_task
+def send_payment_error_notification(user_id, email, technology_name, error_message, order_id=None):
+    """
+    Send email to both user and tech support when payment fails.
+    Called when payment gateway errors occur.
+    """
+    try:
+        from django.conf import settings
+        from django.utils import timezone
+        
+        # Email to user
+        try:
+            send_email(
+                subject="FixitLab: Payment Failed — We're Here to Help",
+                to_email=email,
+                template="emails/payment_error.html",
+                context={
+                    "technology_name": technology_name,
+                    "error_message": error_message,
+                    "order_id": order_id or "N/A",
+                    "timestamp": timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "support_email": settings.SUPPORT_EMAIL,
+                    "support_url": f"{settings.FRONTEND_URL}/support",
+                },
+            )
+        except Exception as e:
+            logger.error(f"Failed to send payment error email to user {user_id}: {e}")
+        
+        # Email to tech support
+        try:
+            support_email = getattr(settings, "SUPPORT_EMAIL", "fixitlab.techsupport@gmail.com")
+            if support_email:
+                send_email(
+                    subject="[URGENT] Payment Error Report",
+                    to_email=support_email,
+                    template="emails/payment_error_admin.html",
+                    context={
+                        "user_id": user_id,
+                        "user_email": email,
+                        "technology_name": technology_name,
+                        "error_message": error_message,
+                        "order_id": order_id or "N/A",
+                        "timestamp": timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "admin_url": f"{settings.FRONTEND_URL}/admin/payments",
+                    },
+                )
+        except Exception as e:
+            logger.error(f"Failed to send payment error alert to tech support: {e}")
+            
+    except Exception as e:
+        logger.error(f"Payment error notification failed: {e}")

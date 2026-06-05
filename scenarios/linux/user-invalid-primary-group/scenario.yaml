@@ -1,0 +1,26 @@
+title: "User Has Invalid Primary Group"
+slug: "user-invalid-primary-group"
+technology: "Linux"
+category: "User Management"
+difficulty: "medium"
+time_limit: 900
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q21 primary group — usermod -g"
+
+description: |
+  User baduser cannot login — GID in /etc/passwd does not exist in /etc/group.
+
+objectives:
+  - Compare passwd and group entries
+  - Fix primary group with usermod -g
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 15
+    content: "`getent passwd baduser` vs `getent group GID`"

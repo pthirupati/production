@@ -15,9 +15,13 @@ from .serializers import (
 )
 from .models import Profile, PasswordResetToken, EmailVerificationOTP, SocialAccount
 from apps.notifications.tasks import send_notification_email, create_in_app_notification
+from common.security import SessionTracker, TokenHelper
+from common.logging_utils import get_structured_logger
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(__name__)
+
 
 
 class AuthRateThrottle(AnonRateThrottle):
@@ -194,14 +198,34 @@ class LoginView(APIView):
         # Look up user by email, then authenticate by username
         user_obj = User.objects.filter(email=email).first()
         if not user_obj:
+            structured_logger.warning(
+                "Login attempt with non-existent email",
+                email=email,
+                ip=request.client_ip if hasattr(request, 'client_ip') else '',
+                tags=["auth", "security"]
+            )
             return Response({"error": "Invalid credentials"}, status=401)
 
         user = authenticate(username=user_obj.username, password=password)
 
         if not user:
+            structured_logger.warning(
+                "Login attempt with incorrect password",
+                user_id=user_obj.id,
+                email=email,
+                ip=request.client_ip if hasattr(request, 'client_ip') else '',
+                tags=["auth", "security"]
+            )
             return Response({"error": "Invalid credentials"}, status=401)
 
         if not user.is_active:
+            structured_logger.warning(
+                "Login attempt on disabled account",
+                user_id=user.id,
+                email=email,
+                ip=request.client_ip if hasattr(request, 'client_ip') else '',
+                tags=["auth"]
+            )
             return Response({"error": "Account is disabled"}, status=403)
 
         # Update last_login timestamp
@@ -209,10 +233,23 @@ class LoginView(APIView):
         user.last_login = tz.now()
         user.save(update_fields=["last_login"])
 
-        refresh = RefreshToken.for_user(user)
+        # Create tokens with session tracking
+        ip_address = request.client_ip if hasattr(request, 'client_ip') else ''
+        user_agent = request.user_agent if hasattr(request, 'user_agent') else ''
+        
+        tokens = TokenHelper.create_tokens_with_session(user, ip_address, user_agent)
+        
+        structured_logger.info(
+            "User login successful",
+            user_id=user.id,
+            email=email,
+            ip=ip_address,
+            tags=["auth", "success"]
+        )
+        
         return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
+            "access": tokens["access"],
+            "refresh": tokens["refresh"],
             "user": {
                 "id": user.id,
                 "email": user.email,

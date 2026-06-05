@@ -83,7 +83,11 @@ class Scenario(models.Model):
         max_length=20,
         choices=INFRA_CHOICES,
         default="docker",
-        help_text="Where to run this scenario: docker, aws_ec2, or digitalocean",
+        help_text="Where to run this scenario: docker (recommended), aws_ec2, or digitalocean",
+    )
+    docker_privileged = models.BooleanField(
+        default=False,
+        help_text="Run lab container privileged (required for LVM/device scenarios)",
     )
     cloud_setup_script = models.TextField(
         blank=True,
@@ -100,6 +104,14 @@ class Scenario(models.Model):
     cloud_image = models.CharField(
         max_length=100, blank=True,
         help_text="DigitalOcean image slug for droplet-based scenarios (default: ubuntu-22-04-x64)",
+    )
+    jira_priority = models.CharField(
+        max_length=20, blank=True, default="",
+        help_text="Jira priority name (e.g. High, Medium, Low)",
+    )
+    jira_issue_template = models.TextField(
+        blank=True,
+        help_text="Optional custom Jira ticket body override (plain text)",
     )
     time_limit = models.PositiveIntegerField(default=900, help_text="Time limit in seconds")
     max_score = models.PositiveIntegerField(default=100)

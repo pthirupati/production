@@ -1,0 +1,29 @@
+title: "MySQL Won't Start"
+slug: "mysql-wont-start"
+technology: "Database"
+category: "MySQL"
+difficulty: "medium"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+jira_priority: "High"
+
+description: |
+  MySQL fails to start after a config change. Error logs mention memory
+  settings. Fix mysqld.cnf and bring the database online.
+
+objectives:
+  - Read MySQL error log
+  - Fix invalid configuration in mysqld.cnf
+  - Start MySQL and verify with mysqladmin ping
+
+initial_state: |
+  Ubuntu with MySQL installed; invalid innodb_buffer_pool_size in config.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "Check `/var/log/mysql/error.log`"
+  - order: 2
+    cost: 20
+    content: "Set innodb_buffer_pool_size to 128M or remove the bad line."

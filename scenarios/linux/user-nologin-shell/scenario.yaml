@@ -1,0 +1,27 @@
+title: "User Shell Set to /usr/sbin/nologin"
+slug: "user-nologin-shell"
+technology: "Linux"
+category: "Users / Groups"
+difficulty: "medium"
+time_limit: 900
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q21 nologin shell — usermod -s /bin/bash"
+
+description: |
+  deploy user exists but interactive login immediately closes. Shell is /usr/sbin/nologin.
+
+objectives:
+  - Check /etc/passwd shell field
+  - Change shell with usermod -s
+  - Verify login works
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "`usermod -s /bin/bash deploy`"

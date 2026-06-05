@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+import hashlib
 import uuid
 
 
@@ -99,5 +100,84 @@ class TechnologySubscription(models.Model):
                 self.user.username,
             )
         super().save(*args, **kwargs)
+
+
+class PaymentTransaction(models.Model):
+    """Track all payment transactions with idempotency and audit trail."""
+
+    PAYMENT_STATUS = [
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("success", "Success"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+        ("refunded", "Refunded"),
+    ]
+    PAYMENT_METHOD = [
+        ("razorpay", "Razorpay"),
+        ("stripe", "Stripe"),
+        ("demo", "Demo"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="transactions"
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default="INR")
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD)
+    status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default="pending")
+    idempotency_key = models.CharField(max_length=128, unique=True, db_index=True)
+    gateway_order_id = models.CharField(max_length=200, blank=True, db_index=True)
+    gateway_payment_id = models.CharField(max_length=200, blank=True, db_index=True)
+    gateway_response = models.JSONField(default=dict, blank=True)
+    tech_subscription = models.ForeignKey(
+        TechnologySubscription, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="transactions",
+    )
+    plan = models.ForeignKey(
+        Plan, on_delete=models.SET_NULL, null=True, blank=True, related_name="transactions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "-created_at"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["gateway_order_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} — {self.amount} {self.currency} ({self.status})"
+
+    @classmethod
+    def generate_idempotency_key(cls, user_id, amount, currency):
+        key_str = f"{user_id}-{amount}-{currency}-{timezone.now().isoformat()}"
+        return hashlib.sha256(key_str.encode()).hexdigest()
+
+    def mark_success(self, gateway_payment_id=None, gateway_response=None):
+        self.status = "success"
+        self.verified_at = timezone.now()
+        if gateway_payment_id:
+            self.gateway_payment_id = gateway_payment_id
+        if gateway_response:
+            self.gateway_response = gateway_response
+        self.save(update_fields=[
+            "status", "verified_at", "gateway_payment_id", "gateway_response",
+        ])
+
+    def mark_failed(self, error_message=""):
+        self.status = "failed"
+        self.error_message = error_message
+        self.save(update_fields=["status", "error_message"])
+
+    def mark_cancelled(self, error_message=""):
+        self.status = "cancelled"
+        self.error_message = error_message
+        self.save(update_fields=["status", "error_message"])
 
 

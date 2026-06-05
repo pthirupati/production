@@ -1,0 +1,33 @@
+title: "Fix the Broken CI/CD Pipeline"
+slug: "cicd-pipeline-broken"
+technology: "Devops"
+category: "CI/CD"
+difficulty: "easy"
+time_limit: 900
+max_score: 100
+infrastructure_type: "docker"
+jira_priority: "Medium"
+
+description: |
+  The deployment pipeline has been failing since yesterday's merge.
+  GitLab CI reports YAML errors and invalid Docker image references.
+  Fix the pipeline configuration so builds can run again.
+
+objectives:
+  - Fix YAML syntax errors in .gitlab-ci.yml
+  - Correct the Docker image tag typo
+  - Ensure build script steps are properly indented
+
+initial_state: |
+  Repository at /opt/app with a broken .gitlab-ci.yml file.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "Validate YAML: `python3 -c \"import yaml; yaml.safe_load(open('.gitlab-ci.yml'))\"`"
+  - order: 2
+    cost: 15
+    content: "Check the `image:` line for typos in the tag name."
+  - order: 3
+    cost: 20
+    content: "Fix indentation under `script:` — YAML requires consistent spacing."

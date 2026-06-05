@@ -83,8 +83,9 @@ class DockerProvisioner:
             # Create per-session isolated network
             session_network = self._create_session_network(lab_session.id)
 
-            # Create and start container on its own isolated network
-            container = self.client.containers.run(
+            # Security: privileged only for LVM/device scenarios (e.g. lvm-extend)
+            privileged = getattr(lab_session.scenario, "docker_privileged", False)
+            run_kwargs = dict(
                 image=image_name,
                 name=container_name,
                 detach=True,
@@ -101,23 +102,23 @@ class DockerProvisioner:
                     "FIXITLAB_SESSION_ID": str(lab_session.id),
                     "FIXITLAB_SCENARIO": lab_session.scenario.slug,
                 },
-                # Security: drop all capabilities, add only what's needed
-                cap_drop=["ALL"],
-                cap_add=["NET_BIND_SERVICE", "SYS_PTRACE", "DAC_OVERRIDE"],
-                # No privileged mode
-                privileged=False,
-                # Read-only root filesystem with writable /tmp and /var
                 read_only=False,
-                # Auto-remove after stop
                 auto_remove=False,
-                # Resource limits
                 pids_limit=256,
-                # Keep container alive (bash needs TTY)
                 tty=True,
                 stdin_open=True,
-                # Prevent container from accessing host network
                 network_mode=None,
             )
+            if privileged:
+                run_kwargs["privileged"] = True
+            else:
+                run_kwargs.update(
+                    cap_drop=["ALL"],
+                    cap_add=["NET_BIND_SERVICE", "SYS_PTRACE", "DAC_OVERRIDE"],
+                    privileged=False,
+                )
+
+            container = self.client.containers.run(**run_kwargs)
 
             # Wait for container to be ready
             self._wait_for_container(container)

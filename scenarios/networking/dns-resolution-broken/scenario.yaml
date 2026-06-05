@@ -1,0 +1,35 @@
+title: "DNS Resolution Failure"
+slug: "dns-resolution-broken"
+technology: "Networking"
+category: "DNS"
+difficulty: "medium"
+time_limit: 900
+max_score: 100
+infrastructure_type: "docker"
+jira_priority: "High"
+
+description: |
+  Applications on the server cannot resolve hostnames. curl and
+  apt fail with "Temporary failure in name resolution". The
+  resolver configuration was changed during a migration. Fix DNS
+  so the server can resolve external hostnames again.
+
+objectives:
+  - Diagnose why DNS resolution is failing
+  - Fix /etc/resolv.conf or systemd-resolved configuration
+  - Verify hostname resolution works (e.g., ping google.com)
+
+initial_state: |
+  You have shell access to a Linux server where DNS resolution is broken.
+  nslookup and dig commands fail or return no results.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "Check /etc/resolv.conf for valid nameserver entries."
+  - order: 2
+    cost: 15
+    content: "Try `resolvectl status` or `systemd-resolve --status`."
+  - order: 3
+    cost: 25
+    content: "Add nameserver 8.8.8.8 to /etc/resolv.conf or fix systemd-resolved."

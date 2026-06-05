@@ -1,6 +1,8 @@
 """
 FixitLab Public API — Full-featured REST endpoints.
 Technologies, scenarios, labs, bookmarks, progress, leaderboard.
+
+⚠️ PRODUCTION SECURITY: All endpoints require authentication except whitelisted public endpoints
 """
 import logging
 from django.core.cache import cache
@@ -14,6 +16,7 @@ from django.db import transaction
 from django.db.models import Q, Count, Avg, Sum, F, Exists, OuterRef, Value, BooleanField
 
 from common.throttles import LabStartThrottle
+from common.api_security import require_authentication
 
 from apps.question_bank.models import Scenario, Technology, Tag, Bookmark
 from apps.question_bank.serializers import (
@@ -27,6 +30,7 @@ from apps.progress.models import UserScenarioProgress, UserAchievement
 from apps.billing.services import can_start_lab
 from apps.billing.models import TechnologySubscription
 from apps.notifications.tasks import notify_lab_completed, notify_achievement_earned
+from apps.jira_integration.sync import sync_lab_started, sync_lab_completed, sync_lab_stopped, sync_lab_in_progress
 
 # For PDF certificate generation
 import io
@@ -34,6 +38,7 @@ import base64
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
 
 
 def _get_subscribed_tech_ids(user):
@@ -451,7 +456,9 @@ class StartLabView(APIView):
                 )
 
                 serializer = LabSessionSerializer(session)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
+                jira_info = sync_lab_started(session)
+                response_data = {**serializer.data, **jira_info}
+                return Response(response_data, status=status.HTTP_201_CREATED)
 
             # Docker labs: provision synchronously (instant)
             resource_id, resource_name = provisioner.provision(session)
@@ -476,8 +483,10 @@ class StartLabView(APIView):
                 attempts_count=F("attempts_count") + 1
             )
 
+            jira_info = sync_lab_started(session)
             serializer = LabSessionSerializer(session)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            response_data = {**serializer.data, **jira_info}
+            return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             session.status = "FAILED"
@@ -509,6 +518,7 @@ class StopLabView(APIView):
                 # Still mark as terminated even if cleanup fails
 
         session.mark_terminated()
+        sync_lab_stopped(session, reason="Lab stopped by user")
 
         # For cloud labs, return the provider so frontend can decide
         # whether to poll for full termination
@@ -570,6 +580,7 @@ class ValidateLabView(APIView):
                 score = max(10, 100 + time_bonus - hint_penalty)
 
                 session.mark_completed(score=score)
+                sync_lab_completed(session, score=score, time_taken=int(elapsed))
 
                 # Update progress and check achievements using centralized service
                 from apps.progress.services import record_attempt
@@ -685,6 +696,8 @@ class LabSessionStatusView(APIView):
             "hints_used": session.hints_used,
             "validation_passed": session.validation_passed,
             "is_expired": session.is_expired,
+            "jira_issue_key": session.jira_issue_key or "",
+            "jira_issue_url": session.jira_issue_url or "",
         }
         return Response(data)
 

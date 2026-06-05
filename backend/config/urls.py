@@ -63,5 +63,8 @@ urlpatterns = [
 
     # Ratings
     path("api/ratings/", include("apps.ratings.urls")),
+
+    # Jira integration (webhooks + ticket status)
+    path("api/jira/", include("apps.jira_integration.urls")),
 ]
 

@@ -24,7 +24,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         scenarios_dir = options["dir"]
 
-        # Also try relative path from project root
         if not os.path.exists(scenarios_dir):
             scenarios_dir = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
@@ -42,7 +41,6 @@ class Command(BaseCommand):
             if not os.path.isdir(tech_path):
                 continue
 
-            # Get or create the technology
             technology, _ = Technology.objects.get_or_create(
                 name=tech_dir.replace("-", " ").title(),
                 defaults={"icon": "terminal", "description": f"{tech_dir.title()} troubleshooting scenarios"},
@@ -62,6 +60,12 @@ class Command(BaseCommand):
                     with open(check_path) as f:
                         validation_script = f.read()
 
+                service_path = os.path.join(tech_path, scenario_dir, "service.sh")
+                cloud_setup = ""
+                if os.path.isfile(service_path):
+                    with open(service_path) as f:
+                        cloud_setup = f.read()
+
                 scenario, created = Scenario.objects.update_or_create(
                     slug=data.get("slug", scenario_dir),
                     defaults={
@@ -77,10 +81,17 @@ class Command(BaseCommand):
                         "time_limit": data.get("time_limit", 900),
                         "max_score": data.get("max_score", 100),
                         "is_active": True,
+                        "is_free": data.get("is_free", False),
+                        "infrastructure_type": "docker",
+                        "docker_privileged": data.get("docker_privileged", False),
+                        "cloud_setup_script": data.get("cloud_setup_script", cloud_setup),
+                        "cloud_image": data.get("cloud_image", "ubuntu-22-04-x64"),
+                        "jira_priority": data.get("jira_priority", "Medium"),
+                        "jira_issue_template": data.get("jira_issue_template", ""),
+                        "blocked_commands": data.get("blocked_commands", []),
                     },
                 )
 
-                # Create hints
                 for hint_data in data.get("hints", []):
                     Hint.objects.update_or_create(
                         scenario=scenario,
@@ -92,7 +103,7 @@ class Command(BaseCommand):
                     )
 
                 action = "Created" if created else "Updated"
-                self.stdout.write(f"  {action}: {data['title']}")
+                self.stdout.write(f"  {action}: {data['title']} ({scenario.infrastructure_type})")
                 count += 1
 
         self.stdout.write(self.style.SUCCESS(f"\nSeeded {count} scenarios successfully."))

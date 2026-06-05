@@ -1,0 +1,30 @@
+title: "Inode Exhaustion on /var/cache"
+slug: "inode-exhausted"
+technology: "Linux"
+category: "Storage"
+difficulty: "hard"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q8 inodes — df -i, delete tiny files"
+
+description: |
+  Cannot create new files though df shows space available. Inodes on /var/cache are exhausted.
+
+objectives:
+  - Check inode usage with df -i
+  - Find directories with many small files
+  - Delete unneeded files to free inodes
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "`df -i /var/cache` — look at IUse%"
+  - order: 2
+    cost: 20
+    content: "`find /var/cache/app -type f | wc -l` — remove old cache files"

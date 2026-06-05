@@ -1,0 +1,27 @@
+title: "AllowUsers Blocks SSH Login"
+slug: "ssh-allowusers-block"
+technology: "Linux"
+category: "SSH"
+difficulty: "medium"
+time_limit: 900
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q39 Q40 AllowUsers/DenyUsers"
+
+description: |
+  deploy user cannot SSH. AllowUsers directive permits only adminonly.
+
+objectives:
+  - grep AllowUsers in sshd_config
+  - Add deploy or fix directive
+  - sshd -t to validate
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 15
+    content: "Change to `AllowUsers adminonly deploy` or remove file"

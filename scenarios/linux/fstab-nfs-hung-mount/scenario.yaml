@@ -1,0 +1,27 @@
+title: "fstab NFS Entry Causes df Hang"
+slug: "fstab-nfs-hung-mount"
+technology: "Linux"
+category: "Storage / NFS"
+difficulty: "hard"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q10 df hang — noserver, nobootwait, fix fstab"
+
+description: |
+  df and ls hang on /mnt/nfs. Unreachable NFS server in /etc/fstab blocks mount lookups.
+
+objectives:
+  - Identify stale NFS in fstab
+  - Add nofail/nobootwait or remove entry
+  - Use timeout mount options
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 20
+    content: "Comment bad line or use `nofail,nobootwait,soft,timeo=5`"

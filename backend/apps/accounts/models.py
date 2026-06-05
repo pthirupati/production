@@ -13,6 +13,11 @@ phone_validator = RegexValidator(
 
 
 class Profile(models.Model):
+    CURRENCY_CHOICES = [
+        ("INR", "Indian Rupees (₹)"),
+        ("USD", "US Dollars ($)"),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     phone_number = models.CharField(
         max_length=17, blank=True, null=True,
@@ -22,6 +27,10 @@ class Profile(models.Model):
     country = models.CharField(
         max_length=100, blank=True, default="",
         help_text="User's country or location"
+    )
+    currency_preference = models.CharField(
+        max_length=3, choices=CURRENCY_CHOICES, default="INR",
+        help_text="Preferred currency for pricing display"
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

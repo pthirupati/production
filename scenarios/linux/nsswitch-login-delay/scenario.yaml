@@ -1,0 +1,27 @@
+title: "Slow SSH Login — NSS/DNS Delay"
+slug: "nsswitch-login-delay"
+technology: "Linux"
+category: "Authentication"
+difficulty: "medium"
+time_limit: 900
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q169 login delay — nsswitch, UseDNS no"
+
+description: |
+  SSH password prompt takes 30+ seconds. Misconfigured nsswitch causes lookup timeouts.
+
+objectives:
+  - Inspect /etc/nsswitch.conf
+  - Fix hosts line order
+  - Optionally set UseDNS no in sshd_config
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 15
+    content: "Set `hosts: files dns` in /etc/nsswitch.conf"

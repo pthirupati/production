@@ -1,0 +1,26 @@
+title: "/etc/hosts Breaks Application"
+slug: "etc-hosts-breaks-app"
+technology: "Linux"
+category: "Networking"
+difficulty: "easy"
+time_limit: 600
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q62 /etc/hosts vs resolv.conf"
+
+description: |
+  App cannot reach api.internal — /etc/hosts overrides DNS with wrong address.
+
+objectives:
+  - Compare /etc/hosts and getent hosts
+  - Fix or remove bad entry
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "`getent hosts api.internal`"

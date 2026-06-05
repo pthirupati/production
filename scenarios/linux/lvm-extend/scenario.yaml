@@ -1,0 +1,31 @@
+title: "Extend LVM Logical Volume"
+slug: "lvm-extend"
+technology: "Linux"
+category: "Storage / LVM"
+difficulty: "hard"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: true
+jira_priority: "High"
+
+description: |
+  /data is full on a server using LVM. The volume group has free space but
+  the logical volume was never extended. Extend the LV and grow the XFS
+  filesystem so applications can write again.
+
+objectives:
+  - Inspect VG/LV with vgs, lvs, df
+  - Extend logical volume datalv in VG fixitlab
+  - Grow the XFS filesystem on /data
+
+initial_state: |
+  Ubuntu container with loop-backed LVM. VG fixitlab, LV datalv mounted at /data.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "Run `vgs` and `lvs` to see free space in the volume group."
+  - order: 2
+    cost: 20
+    content: "`lvextend -L +200M /dev/fixitlab/datalv` then `xfs_growfs /data`."

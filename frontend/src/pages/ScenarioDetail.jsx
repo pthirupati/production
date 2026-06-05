@@ -3,11 +3,12 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { scenarioApi } from '../api/scenarios'
 import { labApi } from '../api/labs'
 import { ratingsApi } from '../api/ratings'
+import { jiraApi } from '../api/jira'
 import { useAuthStore } from '../store/authStore'
 import {
   Clock, Target, Lightbulb, Play, CheckCircle2,
   Wrench, Skull, ArrowLeft, BookmarkPlus, Bookmark,
-  Users, BarChart3, Hash, Award, Lock, Eye, Zap, Star, Send
+  Users, BarChart3, Hash, Award, Lock, Eye, Zap, Star, Send, ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -32,6 +33,7 @@ export default function ScenarioDetail() {
   const [hoverRating, setHoverRating] = useState(0)
   const [reviewText, setReviewText] = useState('')
   const [submittingRating, setSubmittingRating] = useState(false)
+  const [jiraTicket, setJiraTicket] = useState(null)
 
   useEffect(() => {
     // Show lab expired toast if redirected from LabRunner timeout
@@ -47,6 +49,11 @@ export default function ScenarioDetail() {
     scenarioApi.getScenarioDetail(slug)
       .then(data => {
         setScenario(data)
+        if (isAuthenticated && data?.id) {
+          jiraApi.getScenarioTicket(data.id)
+            .then(res => setJiraTicket(res.data?.ticket || null))
+            .catch(() => setJiraTicket(null))
+        }
         // Fetch ratings for this scenario
         ratingsApi.getRatings({ type: 'scenario', scenario: data.id })
           .then(r => setRatings(r.ratings || r.results || []))
@@ -451,6 +458,30 @@ export default function ScenarioDetail() {
           </div>
         )}
       </div>
+
+      {/* Jira incident ticket (realistic workflow) */}
+      {jiraTicket?.issue_url && (
+        <div className="card p-4 mb-6 border-blue-500/20 bg-blue-500/5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-xs text-blue-400 font-medium uppercase tracking-wide mb-1">Jira Incident</p>
+              <p className="text-sm text-surface-300">
+                {jiraTicket.jira_status ? `Status: ${jiraTicket.jira_status}` : 'Linked ticket'}
+                {jiraTicket.run_count > 1 && ` · Run #${jiraTicket.run_count}`}
+              </p>
+            </div>
+            <a
+              href={jiraTicket.issue_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20"
+            >
+              <ExternalLink size={14} />
+              {jiraTicket.issue_key}
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Start Lab button */}
       <div className="flex gap-3">

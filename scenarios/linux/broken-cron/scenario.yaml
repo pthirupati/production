@@ -1,0 +1,36 @@
+# Scenario definition — loaded by seed_scenarios
+title: "Fix the Broken Cron Job"
+slug: "broken-cron"
+technology: "Linux"
+category: "Scheduling"
+difficulty: "easy"
+time_limit: 900
+max_score: 100
+infrastructure_type: "docker"
+jira_priority: "Medium"
+
+description: |
+  The nightly backup cron job stopped running three days ago.
+  Operations reported missing backup files. Investigate why cron
+  is not executing the backup script and restore the scheduled job.
+
+objectives:
+  - Find why the backup cron job is not running
+  - Fix permissions on /opt/backup.sh
+  - Ensure a valid crontab entry exists for the backup
+  - Verify the backup script runs successfully
+
+initial_state: |
+  You have shell access to an Ubuntu 22.04 server.
+  A backup script exists at /opt/backup.sh but cron is not running it.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "Check `crontab -l` and look for backup-related entries."
+  - order: 2
+    cost: 15
+    content: "Run `ls -la /opt/backup.sh` — the script must be executable."
+  - order: 3
+    cost: 25
+    content: "Fix with `chmod 755 /opt/backup.sh` and add `0 2 * * * /opt/backup.sh` to crontab."

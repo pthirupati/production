@@ -1,0 +1,26 @@
+title: "SUID Binary Not Working"
+slug: "suid-binary-broken"
+technology: "Linux"
+category: "Permissions"
+difficulty: "medium"
+time_limit: 900
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q19 SUID — chmod u+s"
+
+description: |
+  A custom privileged helper lost its SUID bit and no longer runs with elevated privileges.
+
+objectives:
+  - Understand SUID with ls -l
+  - Restore chmod u+s on the binary
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 15
+    content: "`chmod u+s /usr/local/bin/reads-shadow`"

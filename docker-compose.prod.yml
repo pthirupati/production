@@ -20,6 +20,9 @@ services:
       - static_volume:/static
       - certbot_www:/var/www/certbot:ro
       - certbot_certs:/etc/letsencrypt:ro
+      # Example host mount (uncomment and adjust for single-host installs):
+      # - /etc/letsencrypt/live/fixitlab.in:/etc/letsencrypt/live/fixitlab.in:ro
+      # - /var/www/certbot:/var/www/certbot:ro
     networks:
       - fixitlab_net
     healthcheck:
@@ -61,6 +64,7 @@ services:
       - static_volume:/app/staticfiles
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
     networks:
       - fixitlab_net
       - fixitlab_labs
@@ -88,6 +92,7 @@ services:
       - static_volume:/app/staticfiles
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
     networks:
       - fixitlab_net
       - fixitlab_labs
@@ -113,6 +118,7 @@ services:
       - static_volume:/app/staticfiles
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
     networks:
       - fixitlab_net
       - fixitlab_labs
@@ -138,6 +144,7 @@ services:
       - static_volume:/app/staticfiles
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
     networks:
       - fixitlab_net
       - fixitlab_labs
@@ -213,11 +220,15 @@ services:
 
 volumes:
   fixitlab_db_data:
+    name: fixitlab_db_data
   static_volume:
+    name: fixitlab_static
   certbot_www:
   certbot_certs:
   redis_data:
+    name: fixitlab_redis_data
   rabbitmq_data:
+    name: fixitlab_rabbitmq_data
 
 networks:
   fixitlab_net:

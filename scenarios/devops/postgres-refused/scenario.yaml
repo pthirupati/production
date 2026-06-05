@@ -1,0 +1,33 @@
+title: "PostgreSQL Connection Refused"
+slug: "postgres-refused"
+technology: "Devops"
+category: "Database"
+difficulty: "medium"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+jira_priority: "High"
+
+description: |
+  The application team reports database connection failures after a config
+  change. PostgreSQL is installed but refuses connections. Fix the
+  configuration and restore database connectivity.
+
+objectives:
+  - Diagnose why PostgreSQL refuses connections
+  - Fix listen_addresses in postgresql.conf
+  - Restart PostgreSQL and verify psql connects
+
+initial_state: |
+  Ubuntu server with PostgreSQL 14 installed. Connections to 127.0.0.1 fail.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "Check if PostgreSQL is running: `service postgresql status`"
+  - order: 2
+    cost: 15
+    content: "Inspect `/etc/postgresql/14/main/postgresql.conf` for listen_addresses."
+  - order: 3
+    cost: 25
+    content: "Set `listen_addresses = 'localhost'` or `'*'`, remove invalid lines, restart postgres."

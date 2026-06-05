@@ -17,6 +17,7 @@ class LabSessionSerializer(serializers.ModelSerializer):
             "started_at", "ended_at", "duration_limit",
             "time_remaining", "is_expired",
             "score", "hints_used", "validation_passed",
+            "jira_issue_key", "jira_issue_url",
         ]
         read_only_fields = [
             "id", "user", "status", "container_id", "container_name",

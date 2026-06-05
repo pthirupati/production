@@ -1,0 +1,26 @@
+title: "Sticky Bit Missing on Shared /tmp/app"
+slug: "sticky-bit-tmp-issue"
+technology: "Linux"
+category: "Permissions"
+difficulty: "easy"
+time_limit: 600
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q19 sticky bit — chmod +t"
+
+description: |
+  Users delete each other's files in shared /tmp/app. Sticky bit not set.
+
+objectives:
+  - Understand sticky bit on world-writable dirs
+  - Apply chmod +t or 1777
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "`chmod 1777 /tmp/app` or `chmod +t /tmp/app`"

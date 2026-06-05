@@ -1,0 +1,27 @@
+title: "ACL Required for Shared Directory"
+slug: "acl-permission-denied"
+technology: "Linux"
+category: "Permissions / ACL"
+difficulty: "medium"
+time_limit: 900
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q19 ACL — setfacl -m u:user:rx"
+
+description: |
+  User alice cannot access /srv/shared despite group membership. ACL entry missing.
+
+objectives:
+  - Check getfacl output
+  - Grant ACL with setfacl
+  - Verify access as alice
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 15
+    content: "`setfacl -m u:alice:rwx /srv/shared`"

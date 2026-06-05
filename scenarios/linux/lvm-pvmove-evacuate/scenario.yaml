@@ -1,0 +1,34 @@
+title: "LVM — Evacuate PV Before Disk Removal"
+slug: "lvm-pvmove-evacuate"
+technology: "Linux"
+category: "Storage / LVM"
+difficulty: "hard"
+time_limit: 1800
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: true
+jira_priority: "Medium"
+topics_covered: "Q14 pvmove — migrate extents off failing PV"
+
+description: |
+  Operations must retire /dev/loop disk1. LV datalv spans two PVs; evacuate all extents to disk2 with pvmove before vgreduce.
+
+objectives:
+  - Inspect pvs/lvs extent layout
+  - Run pvmove for old PV
+  - Verify PV is empty and data intact
+  - vgreduce old PV (optional)
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 20
+    content: "`pvs -o+pv_used,vg_name` — datalv uses both PVs"
+  - order: 2
+    cost: 40
+    content: "`pvmove /dev/loop0p1` (use actual old PV path from pvs)"
+  - order: 3
+    cost: 55
+    content: "`vgreduce fixitlab /dev/loop0p1` after pvmove completes"

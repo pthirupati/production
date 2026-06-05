@@ -42,8 +42,11 @@ from rest_framework import status as http_status
 
 from .models import Plan, Subscription, TechnologySubscription
 from .services import get_user_subscription
+from common.logging_utils import get_structured_logger
 
 logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(__name__)
+
 
 
 class BillingRateThrottle(UserRateThrottle):
@@ -250,6 +253,31 @@ class BillingStatusView(APIView):
         })
 
 
+class PaymentGatewayStatusView(APIView):
+    """Check if payment gateway is ready and return configuration status."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        razorpay_configured = bool(settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET)
+        razorpay_ready = "ready" if razorpay_configured else "not_configured"
+        
+        banner_message = None
+        if not razorpay_configured:
+            banner_message = (
+                "Payment gateway is not configured yet. "
+                "Free scenarios are available, but paid technologies are temporarily unavailable. "
+                "Contact support for access."
+            )
+        
+        return Response({
+            "razorpay_configured": razorpay_configured,
+            "razorpay_key_id": settings.RAZORPAY_KEY_ID if razorpay_configured else None,
+            "status": razorpay_ready,
+            "banner_message": banner_message,
+            "banner_type": "warning" if banner_message else None,
+        })
+
+
 class CreateRazorpayOrderView(APIView):
     """Create a Razorpay order for a technology subscription."""
     permission_classes = [IsAuthenticated]
@@ -257,6 +285,7 @@ class CreateRazorpayOrderView(APIView):
 
     def post(self, request):
         from apps.question_bank.models import Technology
+        from apps.notifications.tasks import send_payment_error_notification
 
         technology_id = request.data.get("technology_id")
         if not technology_id:
@@ -330,9 +359,43 @@ class CreateRazorpayOrderView(APIView):
             })
 
         except Exception as e:
-            logger.error(f"Razorpay order creation failed: {e}")
-            # Fallback: create subscription directly (demo mode)
-            return self._create_direct_subscription(request, technology, amount)
+            error_msg = str(e)
+            structured_logger.error(
+                "Razorpay order creation failed",
+                user_id=request.user.id,
+                email=request.user.email,
+                technology_id=technology.id,
+                technology_name=technology.name,
+                error_message=error_msg,
+                tags=["payment", "razorpay", "error"]
+            )
+            
+            # Send error notification
+            try:
+                send_payment_error_notification.delay(
+                    user_id=request.user.id,
+                    email=request.user.email,
+                    technology_name=technology.name,
+                    error_message=f"Order creation failed: {error_msg}",
+                )
+            except Exception as notify_err:
+                structured_logger.error(
+                    "Failed to send payment error notification",
+                    user_id=request.user.id,
+                    email=request.user.email,
+                    error_message=str(notify_err),
+                    tags=["payment", "notification", "error"]
+                )
+            
+            # Return error. Don't cascade to demo mode if gateway is configured but failing.
+            return Response(
+                {
+                    "error": "Payment gateway error. Our team has been notified. Please try again later or contact support.",
+                    "code": "GATEWAY_ERROR",
+                    "support_email": settings.SUPPORT_EMAIL,
+                },
+                status=http_status.HTTP_502_BAD_GATEWAY,
+            )
 
     def _create_direct_subscription(self, request, technology, amount):
         """Demo mode: return a payment token instead of creating subscription directly.
@@ -448,6 +511,7 @@ class VerifyRazorpayPaymentView(APIView):
 
     def post(self, request):
         from apps.question_bank.models import Technology
+        from apps.notifications.tasks import send_payment_error_notification
 
         razorpay_order_id = request.data.get("razorpay_order_id")
         razorpay_payment_id = request.data.get("razorpay_payment_id")
@@ -481,8 +545,24 @@ class VerifyRazorpayPaymentView(APIView):
         # Verify Razorpay signature
         if not self._verify_signature(razorpay_order_id, razorpay_payment_id, razorpay_signature):
             logger.warning(f"Razorpay signature verification failed for user {request.user.username}")
+            
+            # Send error notification
+            try:
+                send_payment_error_notification.delay(
+                    user_id=request.user.id,
+                    email=request.user.email,
+                    technology_name=technology.name,
+                    error_message="Payment verification failed - invalid signature",
+                    order_id=razorpay_order_id,
+                )
+            except Exception as notify_err:
+                logger.error(f"Failed to send payment error notification: {notify_err}")
+            
             return Response(
-                {"error": "Payment verification failed. Please contact support."},
+                {
+                    "error": "Payment verification failed. Our support team has been notified. Please contact support if the problem persists.",
+                    "support_email": settings.SUPPORT_EMAIL,
+                },
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
@@ -864,8 +944,15 @@ class ConfirmPaymentView(APIView):
     throttle_classes = [BillingRateThrottle]
 
     def post(self, request):
+        from django.conf import settings
         from apps.question_bank.models import Technology
         from apps.notifications.tasks import send_notification_email, create_in_app_notification
+
+        if not getattr(settings, "DEMO_PAYMENT_ENABLED", True):
+            return Response(
+                {"error": "Demo payment is disabled. Use Razorpay checkout."},
+                status=http_status.HTTP_403_FORBIDDEN,
+            )
 
         payment_token = request.data.get("payment_token")
         payment_method = request.data.get("payment_method", "card")

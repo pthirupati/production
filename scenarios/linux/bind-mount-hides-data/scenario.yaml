@@ -1,0 +1,31 @@
+title: "Bind Mount Hides Production Web Root"
+slug: "bind-mount-hides-data"
+technology: "Linux"
+category: "Storage / Mounts"
+difficulty: "hard"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q5 bind mounts — findmnt, umount overlay, restore content"
+
+description: |
+  Nginx serves a blank page. Real site files exist on disk but an empty directory is bind-mounted over /var/www/html.
+
+objectives:
+  - Compare ls vs findmnt
+  - Identify bind mount
+  - Unmount overlay
+  - Verify index.html content
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 15
+    content: "`findmnt /var/www/html` shows a bind mount"
+  - order: 2
+    cost: 25
+    content: "`umount /var/www/html` — do not delete files under /var/www"

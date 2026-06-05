@@ -5,7 +5,7 @@ services:
   gateway:
     build: ./gateway
     ports:
-      - "8080:80"
+      - "80:80"
     depends_on:
       frontend:
         condition: service_started
@@ -45,6 +45,7 @@ services:
       - static_volume:/app/staticfiles
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
     networks:
       - fixitlab_net
       - fixitlab_labs
@@ -72,6 +73,7 @@ services:
       - static_volume:/app/staticfiles
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
     networks:
       - fixitlab_net
       - fixitlab_labs
@@ -97,6 +99,7 @@ services:
       - static_volume:/app/staticfiles
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
     networks:
       - fixitlab_net
       - fixitlab_labs
@@ -122,6 +125,7 @@ services:
       - static_volume:/app/staticfiles
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
     networks:
       - fixitlab_net
       - fixitlab_labs
@@ -168,6 +172,8 @@ services:
     command: redis-server --maxmemory 1gb --maxmemory-policy allkeys-lru --tcp-backlog 511 --timeout 300
     networks:
       - fixitlab_net
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -180,6 +186,8 @@ services:
     container_name: fixitlab_rabbitmq
     networks:
       - fixitlab_net
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 15s
@@ -198,7 +206,13 @@ services:
 
 volumes:
   fixitlab_db_data:
+    name: fixitlab_db_data
   static_volume:
+    name: fixitlab_static
+  redis_data:
+    name: fixitlab_redis_data
+  rabbitmq_data:
+    name: fixitlab_rabbitmq_data
 
 networks:
   fixitlab_net:
@@ -206,4 +220,3 @@ networks:
   fixitlab_labs:
     driver: bridge
     name: fixitlab_labs
-

@@ -1,0 +1,27 @@
+title: "ext4 Filesystem Needs fsck"
+slug: "ext4-superblock-corrupt"
+technology: "Linux"
+category: "Storage"
+difficulty: "hard"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q7 ext fsck — e2fsck -y"
+
+description: |
+  ext4 volume on /data fails to mount cleanly after unclean shutdown.
+
+objectives:
+  - Unmount filesystem
+  - Run fsck.ext4
+  - Remount and verify data
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 20
+    content: "`umount /data && fsck.ext4 -y /data.img`"

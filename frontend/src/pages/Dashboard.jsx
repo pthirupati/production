@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { labApi } from '../api/labs'
 import { subscriptionApi } from '../api/subscriptions'
+import { jiraApi } from '../api/jira'
 import { useAuthStore } from '../store/authStore'
 import {
   Target, Trophy, Zap, Clock, TrendingUp, ArrowRight,
   CheckCircle2, Award, BookOpen, Play, Star,
-  Calendar, CreditCard, Crown, Layers, ArrowUpRight, XCircle, AlertTriangle, Sparkles, Download
+  Calendar, CreditCard, Crown, Layers, ArrowUpRight, XCircle, AlertTriangle, Sparkles, Download, ExternalLink
 } from 'lucide-react'
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
 import { ACHIEVEMENT_META } from '../utils/constants'
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [cancelModal, setCancelModal] = useState(null)
   const [cancelling, setCancelling] = useState(false)
+  const [jiraTickets, setJiraTickets] = useState([])
 
   useEffect(() => {
     Promise.all([
@@ -29,11 +31,13 @@ export default function Dashboard() {
       labApi.getAchievements().catch(() => []),
       labApi.getActiveLabs().catch(() => []),
       subscriptionApi.getMySubscriptions().catch(() => ({ subscriptions: [] })),
-    ]).then(([prog, ach, labs, subs]) => {
+      jiraApi.getUserTickets().catch(() => ({ data: { tickets: [] } })),
+    ]).then(([prog, ach, labs, subs, jiraRes]) => {
       setProgress(prog)
       setAchievements(ach)
       setActiveLabs(labs.filter(l => l.status === 'RUNNING'))
       setSubscriptions(subs?.subscriptions || [])
+      setJiraTickets(jiraRes?.data?.tickets || [])
     }).finally(() => setLoading(false))
   }, [])
 
@@ -164,6 +168,25 @@ export default function Dashboard() {
                 </div>
                 <ArrowRight size={14} className="text-accent-amber" />
               </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {jiraTickets.length > 0 && (
+        <div className="glass-card p-4 border-blue-500/20 bg-blue-500/5 relative overflow-hidden">
+          <h3 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
+            <ExternalLink size={14} /> Jira Incidents
+          </h3>
+          <div className="space-y-2">
+            {jiraTickets.slice(0, 5).map(t => (
+              <div key={t.issue_key} className="flex items-center justify-between p-3 bg-surface-800/50 rounded-lg">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{t.scenario?.title}</p>
+                  <p className="text-xs text-surface-400">{t.jira_status || 'Open'} · {t.run_count} run{t.run_count !== 1 ? 's' : ''}</p>
+                </div>
+                <a href={t.issue_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline shrink-0 ml-2">{t.issue_key}</a>
+              </div>
             ))}
           </div>
         </div>

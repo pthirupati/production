@@ -6,6 +6,9 @@ category: "Web Servers"
 difficulty: "easy"
 time_limit: 900  # 15 minutes
 max_score: 100
+infrastructure_type: "docker"
+jira_priority: "Medium"
+is_free: true
 
 description: |
   A web server was recently deployed, but it refuses to start.

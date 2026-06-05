@@ -1,0 +1,27 @@
+title: "PAM access.conf Denies Console Login"
+slug: "pam-access-blocks-user"
+technology: "Linux"
+category: "Authentication / PAM"
+difficulty: "hard"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q33 PAM access — /etc/security/access.conf"
+
+description: |
+  opsuser receives 'access denied' on login. PAM access.conf contains a negative rule for this account.
+
+objectives:
+  - Inspect /etc/security/access.conf
+  - Understand +/- PAM access syntax
+  - Restore opsuser login
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 20
+    content: "Remove `- : opsuser : ALL` or add `+ : opsuser : LOCAL`"

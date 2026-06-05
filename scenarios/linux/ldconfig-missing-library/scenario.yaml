@@ -1,0 +1,30 @@
+title: "Application Fails — Shared Library Not Found"
+slug: "ldconfig-missing-library"
+technology: "Linux"
+category: "Libraries"
+difficulty: "hard"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q156 ldconfig — /etc/ld.so.conf.d, ldd"
+
+description: |
+  /usr/local/bin/myapp exits with 'error while loading shared libraries'. Custom library path was removed from ld.so.conf.d.
+
+objectives:
+  - Run ldd on myapp
+  - Inspect /etc/ld.so.conf.d
+  - Restore library path and ldconfig
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 15
+    content: "`ldd /usr/local/bin/myapp` shows libfixit.so not found"
+  - order: 2
+    cost: 25
+    content: "Recreate `/etc/ld.so.conf.d/fixitlab.conf` with `/usr/local/lib` and `ldconfig`"

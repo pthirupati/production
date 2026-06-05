@@ -1,0 +1,27 @@
+title: "NTP/Chrony Not Synchronizing"
+slug: "chrony-not-syncing"
+technology: "Linux"
+category: "Services"
+difficulty: "medium"
+time_limit: 900
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q49 NTP port 123 — chrony sources"
+
+description: |
+  System clock drifts. chrony configured with invalid time server.
+
+objectives:
+  - Check chronyc sources
+  - Fix chrony.conf pool/server
+  - Restart chrony
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 15
+    content: "Use `pool pool.ntp.org iburst`"

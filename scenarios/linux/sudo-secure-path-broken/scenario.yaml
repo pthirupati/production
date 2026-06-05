@@ -1,0 +1,27 @@
+title: "sudo secure_path Blocks Admin Commands"
+slug: "sudo-secure-path-broken"
+technology: "Linux"
+category: "Sudo / Security"
+difficulty: "hard"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q32 sudoers secure_path — visudo"
+
+description: |
+  sudo ip or sudo systemctl fail with 'command not found'. secure_path in sudoers omits /usr/sbin and /sbin.
+
+objectives:
+  - sudo -l as admin
+  - Inspect /etc/sudoers.d/
+  - Fix secure_path to standard paths
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 20
+    content: "Set `Defaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"`"

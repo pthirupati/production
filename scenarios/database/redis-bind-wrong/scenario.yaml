@@ -1,0 +1,28 @@
+title: "Redis Bind Address Misconfigured"
+slug: "redis-bind-wrong"
+technology: "Database"
+category: "Redis"
+difficulty: "easy"
+time_limit: 600
+max_score: 100
+infrastructure_type: "docker"
+jira_priority: "Medium"
+
+description: |
+  Redis fails to start after changing bind address. Fix redis.conf
+  so the service listens on localhost and accepts connections.
+
+objectives:
+  - Fix bind directive in /etc/redis/redis.conf
+  - Start Redis and verify with redis-cli ping
+
+initial_state: |
+  Redis configured with invalid bind IP 10.255.255.1.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "Set `bind 127.0.0.1` in /etc/redis/redis.conf"
+  - order: 2
+    cost: 15
+    content: "`service redis-server restart`"

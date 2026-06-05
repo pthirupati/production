@@ -1,0 +1,36 @@
+title: "Password Change Broken"
+slug: "password-change-broken"
+technology: "Linux"
+category: "Authentication"
+difficulty: "medium"
+time_limit: 900
+max_score: 100
+infrastructure_type: "docker"
+jira_priority: "Medium"
+
+description: |
+  Users report they cannot change their passwords. The PAM
+  configuration was recently modified and passwd commands fail
+  with authentication errors. Fix the PAM stack and unlock the
+  affected user account.
+
+objectives:
+  - Diagnose why passwd fails for devuser
+  - Fix the typo in /etc/pam.d/common-password
+  - Unlock the devuser account if locked
+  - Successfully change devuser's password
+
+initial_state: |
+  You have root shell access to an Ubuntu 22.04 server.
+  PAM configuration has a typo preventing password changes.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "Try `passwd devuser` and read the error message."
+  - order: 2
+    cost: 15
+    content: "Inspect /etc/pam.d/common-password for typos in module names."
+  - order: 3
+    cost: 25
+    content: "Fix pam_unixx.so → pam_unix.so and unlock devuser with `passwd -u devuser`."

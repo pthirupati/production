@@ -1,0 +1,34 @@
+title: "Kill the Zombie Process"
+slug: "zombie-process"
+technology: "Linux"
+category: "Process Management"
+difficulty: "easy"
+time_limit: 600
+max_score: 100
+infrastructure_type: "docker"
+jira_priority: "Medium"
+
+description: |
+  CPU usage spiked to 100% on a production node. Monitoring shows
+  a runaway process consuming all CPU cycles. Find and terminate
+  the offending process to restore normal system performance.
+
+objectives:
+  - Identify the process consuming excessive CPU
+  - Terminate the runaway.sh process
+  - Verify CPU usage returns to normal levels
+
+initial_state: |
+  You have shell access to a Linux server with CPU at 100%.
+  A background script is running in an infinite loop.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "Use `top` or `ps aux --sort=-%cpu` to find the highest CPU consumer."
+  - order: 2
+    cost: 15
+    content: "Look for a process named runaway.sh or similar."
+  - order: 3
+    cost: 20
+    content: "Kill it with `kill <PID>` or `pkill -f runaway.sh`."

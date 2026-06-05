@@ -6,7 +6,9 @@ category: "User Management"
 difficulty: "medium"
 time_limit: 900  # 15 minutes
 max_score: 100
-infrastructure_type: "aws_ec2"
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "High"
 
 description: |
   The system administrator received an urgent ticket: new employees
@@ -23,7 +25,7 @@ objectives:
   - Verify the user can log in with 'su - devops'
 
 initial_state: |
-  You have SSH access to an Ubuntu 22.04 EC2 instance.
+  Ubuntu 22.04 lab container with root shell access.
   The useradd command is broken due to corrupted system files.
   Someone has tampered with critical user management configurations.
 

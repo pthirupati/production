@@ -1,0 +1,39 @@
+title: "Disk Space Crisis"
+slug: "disk-full"
+technology: "Linux"
+category: "Storage"
+difficulty: "medium"
+time_limit: 1200
+max_score: 100
+infrastructure_type: "docker"
+jira_priority: "High"
+
+description: |
+  Production alerts fired: disk usage at 98%. A web application
+  cannot write logs and services are failing. Find what's consuming
+  disk space, stop runaway processes, and free enough space for
+  normal operations.
+
+objectives:
+  - Identify large files and directories consuming disk space
+  - Remove or truncate oversized log files
+  - Find and remove hidden cache files
+  - Kill the log_generator process that keeps growing logs
+
+initial_state: |
+  You have shell access to a Linux server with critically low disk space.
+  df -h shows the root filesystem is nearly full.
+
+hints:
+  - order: 1
+    cost: 10
+    content: "Start with `df -h` and `du -sh /*` to find large directories."
+  - order: 2
+    cost: 15
+    content: "Check /var/log/webapp/ for oversized log files."
+  - order: 3
+    cost: 20
+    content: "Look for hidden directories: `du -sh /tmp/.*`"
+  - order: 4
+    cost: 25
+    content: "Kill the log_generator process with `pkill -f log_generator`."

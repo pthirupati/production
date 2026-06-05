@@ -1,0 +1,31 @@
+title: "XFS Filesystem Requires xfs_repair"
+slug: "xfs-repair-damage"
+technology: "Linux"
+category: "Storage / XFS"
+difficulty: "hard"
+time_limit: 1500
+max_score: 100
+infrastructure_type: "docker"
+docker_privileged: false
+jira_priority: "Medium"
+topics_covered: "Q7 XFS repair — xfs_repair, mount after clean log"
+
+description: |
+  /data fails to mount after unclean shutdown. xfs_repair is required before the application config can be read.
+
+objectives:
+  - Read mount/dmesg errors
+  - Unmount broken mountpoint
+  - Run xfs_repair
+  - Remount and verify data
+
+initial_state: |
+  Ubuntu 22.04 lab container with a realistic misconfiguration.
+
+hints:
+  - order: 1
+    cost: 15
+    content: "`dmesg | tail` and `xfs_repair -n /dev/loop0`"
+  - order: 2
+    cost: 30
+    content: "`umount /data && xfs_repair /dev/loop0 && mount /data`"
