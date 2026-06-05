@@ -11,6 +11,7 @@ import {
 import toast from 'react-hot-toast'
 import { ConfirmDialog } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
+import JiraTicketLink from '../components/JiraTicketLink'
 import useLabShortcuts from '../hooks/useLabShortcuts'
 
 export default function LabRunner() {
@@ -32,7 +33,9 @@ export default function LabRunner() {
   const [sidebarTab, setSidebarTab] = useState('instructions') // instructions | hints | result
   const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [stopping, setStopping] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [jiraComments, setJiraComments] = useState([])
+  const [jiraTicket, setJiraTicket] = useState(null)
 
   const terminalRef = useRef(null)
   const xtermRef = useRef(null)
@@ -199,8 +202,11 @@ export default function LabRunner() {
           if (lab.jira_issue_key && lab.scenario?.id) {
             import('../api/jira').then(({ jiraApi }) =>
               jiraApi.getScenarioTicket(lab.scenario.id)
-                .then(res => setJiraComments(res.data?.recent_comments || []))
-                .catch(() => setJiraComments([]))
+                .then(res => {
+                  setJiraComments(res.data?.recent_comments || [])
+                  if (res.data?.ticket) setJiraTicket(res.data.ticket)
+                })
+                .catch(() => { setJiraComments([]); setJiraTicket(null) })
             )
           }
 
@@ -697,10 +703,14 @@ export default function LabRunner() {
           {scenario.difficulty && <span className={`badge-${scenario.difficulty} text-[10px] py-0`}>{scenario.difficulty}</span>}
           {session?.jira_issue_key && (
             <span
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 border border-blue-500/20"
               title="Your incident ticket — see sidebar for details"
             >
-              {session.jira_issue_key}
+              <JiraTicketLink
+                issueKey={session.jira_issue_key}
+                issueUrl={session.jira_issue_url}
+                className="text-[10px]"
+              />
             </span>
           )}
         </div>
@@ -784,7 +794,7 @@ export default function LabRunner() {
                   {session?.jira_issue_key && (
                     <JiraTicketPanel
                       compact
-                      ticket={{
+                      ticket={jiraTicket || {
                         issue_key: session.jira_issue_key,
                         issue_url: session.jira_issue_url,
                         run_count: session.jira_run_count || 1,

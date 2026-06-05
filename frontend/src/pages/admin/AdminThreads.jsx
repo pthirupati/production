@@ -34,6 +34,25 @@ export default function AdminThreads() {
     }
   }
 
+  // Live poll for new replies while modal is open
+  useEffect(() => {
+    if (!selectedThread?.id) return
+    const poll = async () => {
+      try {
+        const data = await adminApi.getThreadDetail(selectedThread.id)
+        setSelectedThread((prev) => {
+          if (!prev || prev.id !== data.id) return data
+          if ((prev.replies?.length || 0) !== (data.replies?.length || 0)) {
+            return { ...prev, replies: data.replies, reply_count: data.reply_count }
+          }
+          return prev
+        })
+      } catch { /* ignore */ }
+    }
+    const interval = setInterval(poll, 4000)
+    return () => clearInterval(interval)
+  }, [selectedThread?.id])
+
   const handleReply = async () => {
     if (!replyBody.trim() || !selectedThread) return
     setReplying(true)

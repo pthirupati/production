@@ -9,6 +9,7 @@ import {
   CheckCircle2, Award, BookOpen, Play, Star,
   Calendar, CreditCard, Crown, Layers, ArrowUpRight, XCircle, AlertTriangle, Sparkles, Download, Ticket
 } from 'lucide-react'
+import JiraTicketLink from '../components/JiraTicketLink'
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
 import { ACHIEVEMENT_META } from '../utils/constants'
 import ActivityHeatmap from '../components/ActivityHeatmap'
@@ -191,7 +192,7 @@ export default function Dashboard() {
                     <p className="text-sm font-medium text-white truncate">{t.scenario?.title}</p>
                     <p className="text-xs text-surface-400">{t.jira_status || 'Open'} · {t.run_count} run{t.run_count !== 1 ? 's' : ''}</p>
                   </div>
-                  <span className="text-xs font-mono text-blue-400 shrink-0 ml-2">{t.issue_key}</span>
+                  <JiraTicketLink issueKey={t.issue_key} issueUrl={t.issue_url} className="text-xs shrink-0 ml-2" />
                 </Link>
               ))}
             </div>
@@ -209,7 +210,7 @@ export default function Dashboard() {
                     <p className="text-sm text-surface-300 truncate">{t.scenario?.title}</p>
                     <p className="text-xs text-surface-500">{t.jira_status} · closed</p>
                   </div>
-                  <span className="text-xs font-mono text-surface-500 shrink-0 ml-2">{t.issue_key}</span>
+                  <JiraTicketLink issueKey={t.issue_key} issueUrl={t.issue_url} className="text-xs shrink-0 ml-2 text-surface-500" />
                 </Link>
               ))}
             </div>

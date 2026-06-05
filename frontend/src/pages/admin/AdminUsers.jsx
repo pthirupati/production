@@ -6,6 +6,7 @@ import { SkeletonTable } from '../../components/Skeleton'
 import { ConfirmDialog } from '../../components/ConfirmModal'
 import ConfirmModal from '../../components/ConfirmModal'
 import { validators } from '../../utils/validators'
+import JiraTicketLink from '../../components/JiraTicketLink'
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([])
@@ -373,7 +374,7 @@ export default function AdminUsers() {
                           <p className="text-surface-300 truncate">{t.scenario?.title}</p>
                           <p className="text-xs text-surface-500">{t.jira_status || (t.is_closed ? 'Closed' : 'Open')}</p>
                         </div>
-                        <span className="text-xs font-mono text-blue-400 shrink-0 ml-2">{t.issue_key}</span>
+                        <JiraTicketLink issueKey={t.issue_key} issueUrl={t.issue_url} className="text-xs shrink-0 ml-2" />
                       </div>
                     ))}
                   </div>

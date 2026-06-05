@@ -1,8 +1,8 @@
 import { Ticket, MessageSquare } from 'lucide-react'
+import JiraTicketLink from './JiraTicketLink'
 
 /**
- * In-app Jira incident panel — ticket details fetched by FixitLab server.
- * Users never need Atlassian login; do not link to fixitlab.atlassian.net.
+ * In-app Jira incident panel — user's personal ticket for this scenario only.
  */
 export default function JiraTicketPanel({ ticket, comments = [], compact = false }) {
   if (!ticket?.issue_key) return null
@@ -15,9 +15,13 @@ export default function JiraTicketPanel({ ticket, comments = [], compact = false
           <p className={`font-medium text-blue-400 uppercase tracking-wide ${compact ? 'text-[10px]' : 'text-xs'}`}>
             Your incident ticket
           </p>
-          <p className={`text-blue-300 font-mono font-semibold ${compact ? 'text-sm' : 'text-base'}`}>
-            {ticket.issue_key}
-          </p>
+          <div className={`mt-0.5 ${compact ? 'text-sm' : 'text-base'}`}>
+            <JiraTicketLink
+              issueKey={ticket.issue_key}
+              issueUrl={ticket.issue_url}
+              showIcon={!compact}
+            />
+          </div>
           {ticket.summary && (
             <p className={`text-surface-200 font-medium mt-1 ${compact ? 'text-xs' : 'text-sm'}`}>
               {ticket.summary}

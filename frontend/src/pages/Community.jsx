@@ -66,6 +66,31 @@ export default function Community() {
     scenarioApi.getTechnologies().then(setTechnologies).catch(() => {})
   }, [fetchThreads])
 
+  // Live updates for open thread (poll every 4s)
+  useEffect(() => {
+    if (!selectedThread?.id) return
+
+    const poll = async () => {
+      try {
+        const data = await communityApi.getThread(selectedThread.id)
+        setSelectedThread((prev) => {
+          if (!prev || prev.id !== data.id) return data
+          const prevCount = prev.replies?.length || 0
+          const newCount = data.replies?.length || 0
+          if (newCount !== prevCount || prev.reply_count !== data.reply_count) {
+            return { ...prev, replies: data.replies, reply_count: data.reply_count }
+          }
+          return prev
+        })
+      } catch {
+        /* ignore transient poll errors */
+      }
+    }
+
+    const interval = setInterval(poll, 4000)
+    return () => clearInterval(interval)
+  }, [selectedThread?.id])
+
   const loadThread = async (threadId) => {
     try {
       const data = await communityApi.getThread(threadId)
@@ -363,12 +388,12 @@ export default function Community() {
                 {selectedThread.replies?.map(renderReply)}
               </div>
 
-              {/* Reply Form */}
-              {!selectedThread.is_locked && (
+              {/* Reply Form — admins can reply on locked threads */}
+              {(!selectedThread.is_locked || isAdmin) && (
                 <form onSubmit={handleReply} className="flex gap-2 pt-4 border-t border-surface-700/50">
                   <input
                     type="text"
-                    placeholder="Write a reply..."
+                    placeholder={selectedThread.is_locked && isAdmin ? 'Admin reply (thread locked for others)...' : 'Write a reply...'}
                     className="input-field flex-1"
                     value={replyBody}
                     onChange={(e) => setReplyBody(e.target.value)}
@@ -378,7 +403,7 @@ export default function Community() {
                   </button>
                 </form>
               )}
-              {selectedThread.is_locked && (
+              {selectedThread.is_locked && !isAdmin && (
                 <p className="text-center text-surface-400 text-sm py-2">
                   This thread is locked. No new replies.
                 </p>

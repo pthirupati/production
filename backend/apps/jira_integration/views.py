@@ -83,6 +83,7 @@ def _scenario_ticket_payload(ticket, include_details=False):
     payload = {
         "ticket": {
             "issue_key": ticket.issue_key,
+            "issue_url": ticket.issue_url,
             "jira_status": ticket.jira_status,
             "run_count": ticket.run_count,
         },
