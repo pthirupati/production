@@ -22,7 +22,8 @@ fi
 echo "=== FixitLab Platform START ==="
 echo "Compose: $COMPOSE_FILE | Env: $ENV_FILE"
 
-docker network create fixitlab_labs 2>/dev/null || true
+# Lab network is external to compose (shared by per-user lab containers)
+docker network inspect fixitlab_labs >/dev/null 2>&1 || docker network create fixitlab_labs
 
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
 

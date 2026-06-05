@@ -73,5 +73,12 @@ CACHES = {
     }
 }
 
-# Silence logging during tests
-LOGGING["root"]["level"] = "WARNING"  # noqa: F405
+# Simple logging for tests — avoids JSONFormatter loading Django models too early
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+}

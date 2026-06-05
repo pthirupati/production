@@ -27,7 +27,12 @@ import logging
 import time
 from datetime import datetime
 from django.conf import settings
-from .security import mask_pii
+
+
+def _mask_pii(value):
+    """Lazy import avoids AppRegistryNotReady during logging setup."""
+    from .security import mask_pii
+    return mask_pii(value)
 
 
 class JSONFormatter(logging.Formatter):
@@ -60,21 +65,21 @@ class JSONFormatter(logging.Formatter):
             # Add user info if authenticated
             if hasattr(request, 'user') and request.user.is_authenticated:
                 log_data["user_id"] = request.user.id
-                log_data["email"] = mask_pii(request.user.email)
+                log_data["email"] = _mask_pii(request.user.email)
                 log_data["username"] = request.user.username
         
         # Add custom fields from record (e.g., fields passed in extra={})
         if hasattr(record, 'fields'):
             for key, value in record.fields.items():
                 if key in ['email', 'phone', 'ssn', 'card', 'passcode']:
-                    value = mask_pii(str(value)) if value else None
+                    value = _mask_pii(str(value)) if value else None
                 log_data[key] = value
         
         # Add structured fields if present
         if hasattr(record, 'structured'):
             for key, value in record.structured.items():
                 if key in ['email', 'phone', 'ssn', 'card', 'passcode', 'password']:
-                    value = mask_pii(str(value)) if value else None
+                    value = _mask_pii(str(value)) if value else None
                 log_data[key] = value
         
         # Add tags if present

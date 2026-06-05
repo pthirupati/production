@@ -27,8 +27,8 @@ ufw --force enable
 mkdir -p /opt/fixitlab
 chown -R "${SUDO_USER:-root}:${SUDO_USER:-root}" /opt/fixitlab
 
-# Lab network for isolated containers
-docker network create fixitlab_labs 2>/dev/null || true
+# Lab network (external to docker compose — used by platform-start.sh)
+docker network inspect fixitlab_labs >/dev/null 2>&1 || docker network create fixitlab_labs
 
 echo ""
 echo "=== Bootstrap complete ==="
