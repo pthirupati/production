@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ConfirmDialog } from '../components/ConfirmModal'
+import JiraTicketPanel from '../components/JiraTicketPanel'
 import useLabShortcuts from '../hooks/useLabShortcuts'
 
 export default function LabRunner() {
@@ -31,7 +32,7 @@ export default function LabRunner() {
   const [sidebarTab, setSidebarTab] = useState('instructions') // instructions | hints | result
   const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [stopping, setStopping] = useState(false)
-  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [jiraComments, setJiraComments] = useState([])
 
   const terminalRef = useRef(null)
   const xtermRef = useRef(null)
@@ -194,6 +195,14 @@ export default function LabRunner() {
             jira_issue_url: lab.jira_issue_url || '',
           }
           setSession(sessionData)
+
+          if (lab.jira_issue_key && lab.scenario?.id) {
+            import('../api/jira').then(({ jiraApi }) =>
+              jiraApi.getScenarioTicket(lab.scenario.id)
+                .then(res => setJiraComments(res.data?.recent_comments || []))
+                .catch(() => setJiraComments([]))
+            )
+          }
 
           // Compile blocked command patterns from scenario
           const blockedCmds = lab.scenario?.blocked_commands || []
@@ -686,17 +695,13 @@ export default function LabRunner() {
             {scenario.title || 'Lab Session'}
           </h2>
           {scenario.difficulty && <span className={`badge-${scenario.difficulty} text-[10px] py-0`}>{scenario.difficulty}</span>}
-          {session?.jira_issue_url && (
-            <a
-              href={session.jira_issue_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
-              title="Open Jira ticket for this incident"
+          {session?.jira_issue_key && (
+            <span
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20"
+              title="Your personal incident ticket — view details in the scenario page"
             >
-              <ExternalLink size={10} />
-              {session.jira_issue_key || 'Jira'}
-            </a>
+              {session.jira_issue_key}
+            </span>
           )}
         </div>
 
@@ -776,6 +781,17 @@ export default function LabRunner() {
               {/* Instructions tab */}
               {sidebarTab === 'instructions' && (
                 <>
+                  {session?.jira_issue_key && (
+                    <JiraTicketPanel
+                      compact
+                      ticket={{
+                        issue_key: session.jira_issue_key,
+                        issue_url: session.jira_issue_url,
+                        run_count: session.jira_run_count || 1,
+                      }}
+                      comments={jiraComments}
+                    />
+                  )}
                   <div>
                     <h3 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Description</h3>
                     <p className="text-sm text-surface-300 leading-relaxed">{scenario.description || 'Fix the broken server.'}</p>

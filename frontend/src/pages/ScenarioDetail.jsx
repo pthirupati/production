@@ -4,6 +4,7 @@ import { scenarioApi } from '../api/scenarios'
 import { labApi } from '../api/labs'
 import { ratingsApi } from '../api/ratings'
 import { jiraApi } from '../api/jira'
+import JiraTicketPanel from '../components/JiraTicketPanel'
 import { useAuthStore } from '../store/authStore'
 import {
   Clock, Target, Lightbulb, Play, CheckCircle2,
@@ -34,6 +35,7 @@ export default function ScenarioDetail() {
   const [reviewText, setReviewText] = useState('')
   const [submittingRating, setSubmittingRating] = useState(false)
   const [jiraTicket, setJiraTicket] = useState(null)
+  const [jiraComments, setJiraComments] = useState([])
 
   useEffect(() => {
     // Show lab expired toast if redirected from LabRunner timeout
@@ -51,8 +53,11 @@ export default function ScenarioDetail() {
         setScenario(data)
         if (isAuthenticated && data?.id) {
           jiraApi.ensureScenarioTicket(data.id)
-            .then(res => setJiraTicket(res.data?.ticket || null))
-            .catch(() => setJiraTicket(null))
+            .then(res => {
+              setJiraTicket(res.data?.ticket || null)
+              setJiraComments(res.data?.recent_comments || [])
+            })
+            .catch(() => { setJiraTicket(null); setJiraComments([]) })
         }
         // Fetch ratings for this scenario
         ratingsApi.getRatings({ type: 'scenario', scenario: data.id })
@@ -468,27 +473,8 @@ export default function ScenarioDetail() {
       </div>
 
       {/* Jira incident ticket (realistic workflow) */}
-      {jiraTicket?.issue_url && (
-        <div className="card p-4 mb-6 border-blue-500/20 bg-blue-500/5">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <p className="text-xs text-blue-400 font-medium uppercase tracking-wide mb-1">Jira Incident</p>
-              <p className="text-sm text-surface-300">
-                {jiraTicket.jira_status ? `Status: ${jiraTicket.jira_status}` : 'Linked ticket'}
-                {jiraTicket.run_count > 1 && ` · Run #${jiraTicket.run_count}`}
-              </p>
-            </div>
-            <a
-              href={jiraTicket.issue_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20"
-            >
-              <ExternalLink size={14} />
-              {jiraTicket.issue_key}
-            </a>
-          </div>
-        </div>
+      {jiraTicket?.issue_key && (
+        <JiraTicketPanel ticket={jiraTicket} comments={jiraComments} />
       )}
 
       {/* Start Lab button */}

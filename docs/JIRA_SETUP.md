@@ -55,13 +55,27 @@ When a manager updates a ticket in Jira, FixitLab:
 
 ## 5. User flow
 
-1. User opens scenario → sees existing Jira ticket (if any)
-2. User starts lab → ticket created or reset → **In Progress**
-3. User clicks Jira link → reads full incident details in Atlassian
-4. User fixes issue in terminal → validates → ticket → **Done**
-5. User restarts same lab → ticket reset → **In Progress** again (run count increments)
+1. User opens scenario → FixitLab creates **their own** Jira ticket (e.g. `KAN-12`)
+2. User sees ticket **inside FixitLab** (key, status, activity) — **no Jira login required**
+3. User starts lab → ticket → **In Progress**
+4. User completes lab → ticket → **Done**
+5. User retries → same ticket reset, run count increments
 
-## 6. Verify
+**Staff only:** Admins with `is_staff` see an "Open in Jira ↗" link to Atlassian.
+
+## 6. Multi-user model (important)
+
+| Question | Answer |
+|----------|--------|
+| Same ticket for all users? | **No** — one ticket per **user + scenario** |
+| User A vs User B on "Broken Nginx" | User A → `KAN-12`, User B → `KAN-13` (separate issues) |
+| Can users see each other's comments? | **No** — API filters by logged-in user; each ticket is private in Jira |
+| Who logs into Jira? | **Only the server bot** (`JIRA_EMAIL` + API token). Learners never need Atlassian accounts |
+| Why did Jira ask for a password? | The old UI linked to `atlassian.net` — that site requires login. Use the in-app ticket panel instead |
+
+Database: `UserScenarioJiraTicket` with `unique_together (user, scenario)`.
+
+## 7. Verify
 
 ```bash
 docker compose exec backend python manage.py seed_scenarios
