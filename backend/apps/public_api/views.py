@@ -30,7 +30,10 @@ from apps.progress.models import UserScenarioProgress, UserAchievement
 from apps.billing.services import can_start_lab
 from apps.billing.models import TechnologySubscription
 from apps.notifications.tasks import notify_lab_completed, notify_achievement_earned
-from apps.jira_integration.sync import sync_lab_started, sync_lab_completed, sync_lab_stopped, sync_lab_in_progress
+from apps.jira_integration.sync import (
+    sync_lab_started, sync_lab_completed, sync_lab_stopped, sync_lab_in_progress,
+    mask_jira_url_for_user,
+)
 
 # For PDF certificate generation
 import io
@@ -403,7 +406,9 @@ class StartLabView(APIView):
             # Resume: if there's already an active session for THIS scenario, return it
             active_same_scenario = existing_sessions.filter(scenario=scenario).first()
             if active_same_scenario:
-                serializer = LabSessionSerializer(active_same_scenario)
+                serializer = LabSessionSerializer(
+                    active_same_scenario, context={"request": request}
+                )
                 if active_same_scenario.jira_issue_key:
                     jira_info = {
                         "jira_issue_key": active_same_scenario.jira_issue_key,
@@ -412,6 +417,7 @@ class StartLabView(APIView):
                     }
                 else:
                     jira_info = sync_lab_started(active_same_scenario)
+                jira_info = mask_jira_url_for_user(jira_info, request.user)
                 return Response(
                     {**serializer.data, "resumed": True, **jira_info},
                     status=status.HTTP_200_OK,
@@ -463,8 +469,8 @@ class StartLabView(APIView):
                     attempts_count=F("attempts_count") + 1
                 )
 
-                serializer = LabSessionSerializer(session)
-                jira_info = sync_lab_started(session)
+                serializer = LabSessionSerializer(session, context={"request": request})
+                jira_info = mask_jira_url_for_user(sync_lab_started(session), request.user)
                 response_data = {**serializer.data, **jira_info}
                 return Response(response_data, status=status.HTTP_201_CREATED)
 
@@ -491,8 +497,8 @@ class StartLabView(APIView):
                 attempts_count=F("attempts_count") + 1
             )
 
-            jira_info = sync_lab_started(session)
-            serializer = LabSessionSerializer(session)
+            jira_info = mask_jira_url_for_user(sync_lab_started(session), request.user)
+            serializer = LabSessionSerializer(session, context={"request": request})
             response_data = {**serializer.data, **jira_info}
             return Response(response_data, status=status.HTTP_201_CREATED)
 
@@ -663,7 +669,9 @@ class ActiveLabsView(APIView):
         if status_filter:
             sessions = sessions.filter(status=status_filter)
 
-        serializer = LabSessionSerializer(sessions[:20], many=True)
+        serializer = LabSessionSerializer(
+            sessions[:20], many=True, context={"request": request}
+        )
         return Response(serializer.data)
 
 
@@ -713,7 +721,11 @@ class LabSessionStatusView(APIView):
             "validation_passed": session.validation_passed,
             "is_expired": session.is_expired,
             "jira_issue_key": session.jira_issue_key or "",
-            "jira_issue_url": session.jira_issue_url or "",
+            "jira_issue_url": (
+                session.jira_issue_url or ""
+                if request.user.is_staff or request.user.is_superuser
+                else ""
+            ),
         }
         return Response(data)
 

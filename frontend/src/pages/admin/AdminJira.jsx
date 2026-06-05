@@ -138,7 +138,7 @@ export default function AdminJira() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-mono text-blue-400 font-semibold">
-                    <JiraTicketLink issueKey={t.issue_key} issueUrl={t.issue_url} />
+                    <JiraTicketLink issueKey={t.issue_key} issueUrl={t.issue_url} allowExternalLink />
                   </span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
                     t.is_closed

@@ -374,7 +374,7 @@ export default function AdminUsers() {
                           <p className="text-surface-300 truncate">{t.scenario?.title}</p>
                           <p className="text-xs text-surface-500">{t.jira_status || (t.is_closed ? 'Closed' : 'Open')}</p>
                         </div>
-                        <JiraTicketLink issueKey={t.issue_key} issueUrl={t.issue_url} className="text-xs shrink-0 ml-2" />
+                        <JiraTicketLink issueKey={t.issue_key} issueUrl={t.issue_url} allowExternalLink className="text-xs shrink-0 ml-2" />
                       </div>
                     ))}
                   </div>

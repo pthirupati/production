@@ -115,27 +115,36 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 )
             }))
 
-        # Create interactive shell (Docker exec or SSH channel)
+        # Create interactive shell (Docker exec or SSH channel) — retry for slow containers
         try:
             self.provisioner = await asyncio.to_thread(
                 get_provisioner, self.provider_type
             )
 
-            # For cloud providers, pass the SSH user stored on the session
-            if is_cloud:
-                ssh_user = self.lab_session.ssh_user or "ec2-user"
-                self.exec_id, self.raw_socket = await asyncio.to_thread(
-                    self.provisioner.create_exec_stream,
-                    resource_id,
-                    ssh_user,
-                )
-            else:
-                self.exec_id, self.raw_socket = await asyncio.to_thread(
-                    self.provisioner.create_exec_stream,
-                    resource_id,
-                )
+            exec_error = None
+            for attempt in range(5):
+                try:
+                    if is_cloud:
+                        ssh_user = self.lab_session.ssh_user or "ec2-user"
+                        self.exec_id, self.raw_socket = await asyncio.to_thread(
+                            self.provisioner.create_exec_stream,
+                            resource_id,
+                            ssh_user,
+                        )
+                    else:
+                        self.exec_id, self.raw_socket = await asyncio.to_thread(
+                            self.provisioner.create_exec_stream,
+                            resource_id,
+                        )
+                    exec_error = None
+                    break
+                except Exception as e:
+                    exec_error = e
+                    if attempt < 4:
+                        await asyncio.sleep(1.5 * (attempt + 1))
+                    else:
+                        raise exec_error
 
-            # Provider info for the welcome banner
             provider_label = {
                 "docker": "Docker Container",
                 "aws_ec2": "AWS EC2 Instance",

@@ -142,6 +142,15 @@ def ensure_scenario_ticket(user, scenario) -> dict:
         return {**_empty_response(), "jira_error": str(exc)[:200]}
 
 
+def mask_jira_url_for_user(info: dict, user) -> dict:
+    """Learners see tickets in-app only; staff may open Atlassian."""
+    if not user or user.is_staff or user.is_superuser:
+        return info
+    masked = dict(info)
+    masked["jira_issue_url"] = ""
+    return masked
+
+
 def _empty_response():
     return {"jira_issue_key": "", "jira_issue_url": "", "jira_enabled": False}
 

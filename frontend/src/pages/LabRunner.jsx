@@ -17,7 +17,6 @@ import useLabShortcuts from '../hooks/useLabShortcuts'
 export default function LabRunner() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
-  const { accessToken } = useAuthStore()
   const { timeRemaining, startTimer, stopTimer, clearSession } = useLabStore()
 
   const [session, setSession] = useState(null)
@@ -46,6 +45,10 @@ export default function LabRunner() {
   const labChannelRef = useRef(null)  // BroadcastChannel for cross-tab sync
   const inputBufferRef = useRef('')   // Accumulate keystrokes to check blocked commands
   const blockedPatternsRef = useRef([]) // [{pattern: RegExp, label: string}]
+  const reconnectTimerRef = useRef(null)
+  const terminalSessionRef = useRef(null)
+
+  const WS_NO_RECONNECT = new Set([1000, 4001, 4003, 4004, 4005, 4008, 4500])
 
   // Keyboard shortcuts
   const toggleHints = useCallback(() => {
@@ -301,9 +304,14 @@ export default function LabRunner() {
     }
   }, [sessionId])
 
-  // Initialize xterm.js and WebSocket
+  // Initialize xterm.js and WebSocket (once per session when RUNNING)
   useEffect(() => {
-    if (!session || !terminalRef.current) return
+    if (!session || session.status !== 'RUNNING' || !terminalRef.current) return
+    const hasResource = session.container_id || session.instance_id
+    if (!hasResource) return
+    if (terminalSessionRef.current === sessionId) return
+
+    let disposed = false
     let cleanup = () => {}
 
     const initTerminal = async () => {
@@ -311,6 +319,10 @@ export default function LabRunner() {
       const { FitAddon } = await import('@xterm/addon-fit')
       const { WebLinksAddon } = await import('@xterm/addon-web-links')
       await import('@xterm/xterm/css/xterm.css')
+
+      if (disposed) return
+      terminalSessionRef.current = sessionId
+      reconnectAttempts.current = 0
 
       const term = new Terminal({
         cursorBlink: true,
@@ -342,11 +354,34 @@ export default function LabRunner() {
       xtermRef.current = term
       fitAddonRef.current = fitAddon
 
-      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      const wsUrl = `${protocol}://${window.location.host}/ws/terminal/${sessionId}/?token=${accessToken}`
+      const wsCloseMessages = {
+        4001: '\r\n\x1b[1;31mAuthentication expired — refresh the page to reconnect.\x1b[0m\r\n',
+        4003: '\r\n\x1b[1;33mLab is not running yet — wait for provisioning to finish.\x1b[0m\r\n',
+        4004: '\r\n\x1b[1;31mLab session not found.\x1b[0m\r\n',
+        4005: '\r\n\x1b[1;31mLab environment not ready — try again in a few seconds.\x1b[0m\r\n',
+        4008: '\r\n\x1b[1;31mToo many terminal tabs open — close another tab and refresh.\x1b[0m\r\n',
+        4500: '\r\n\x1b[1;31mCould not connect to lab shell.\x1b[0m\r\n',
+      }
+
+      const buildWsUrl = () => {
+        const token = useAuthStore.getState().accessToken
+        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+        return `${protocol}://${window.location.host}/ws/terminal/${sessionId}/?token=${token}`
+      }
 
       const connectWs = () => {
-        const ws = new WebSocket(wsUrl)
+        if (disposed) return
+        if (reconnectTimerRef.current) {
+          clearTimeout(reconnectTimerRef.current)
+          reconnectTimerRef.current = null
+        }
+        if (wsRef.current) {
+          wsRef.current.onclose = null
+          wsRef.current.close(1000)
+          wsRef.current = null
+        }
+
+        const ws = new WebSocket(buildWsUrl())
         wsRef.current = ws
 
         ws.onopen = () => {
@@ -360,23 +395,35 @@ export default function LabRunner() {
           } catch { term.write(event.data) }
         }
         ws.onclose = (e) => {
-          // Don't reconnect if code 1000 (normal close) or component unmounting
-          if (e.code === 1000) {
-            term.write('\r\n\x1b[1;33mSession ended\x1b[0m\r\n')
+          if (disposed || e.code === 1000) {
+            if (e.code === 1000) term.write('\r\n\x1b[1;33mSession ended\x1b[0m\r\n')
+            return
+          }
+          if (WS_NO_RECONNECT.has(e.code)) {
+            term.write(wsCloseMessages[e.code] || '\r\n\x1b[1;31mConnection closed.\x1b[0m\r\n')
+            if (e.code === 4500) {
+              term.write('\x1b[1;33mPress Enter to retry connection...\x1b[0m\r\n')
+              const retryHandler = term.onData((data) => {
+                if (data === '\r' || data === '\n') {
+                  retryHandler.dispose()
+                  reconnectAttempts.current = 0
+                  term.write('\r\n\x1b[1;36mRetrying connection...\x1b[0m\r\n')
+                  connectWs()
+                }
+              })
+            }
             return
           }
           if (reconnectAttempts.current < maxReconnectAttempts) {
             reconnectAttempts.current++
-            // Cloud labs need longer delays — SSH may still be initializing
             const isCloud = session?.provider === 'aws_ec2' || session?.provider === 'digitalocean'
-            const baseDelay = isCloud ? 3000 : 1000
+            const baseDelay = isCloud ? 3000 : 2000
             const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts.current - 1), 20000)
-            term.write(`\r\n\x1b[1;33mReconnecting in ${Math.round(delay/1000)}s... (${reconnectAttempts.current}/${maxReconnectAttempts})\x1b[0m\r\n`)
-            setTimeout(connectWs, delay)
+            term.write(`\r\n\x1b[1;33mReconnecting in ${Math.round(delay / 1000)}s... (${reconnectAttempts.current}/${maxReconnectAttempts})\x1b[0m\r\n`)
+            reconnectTimerRef.current = setTimeout(connectWs, delay)
           } else {
             term.write('\r\n\x1b[1;31mConnection lost after multiple attempts.\x1b[0m\r\n')
             term.write('\x1b[1;33mPress Enter to retry connection...\x1b[0m\r\n')
-            // Allow user to retry by pressing Enter
             const retryHandler = term.onData((data) => {
               if (data === '\r' || data === '\n') {
                 retryHandler.dispose()
@@ -387,7 +434,7 @@ export default function LabRunner() {
             })
           }
         }
-        ws.onerror = () => {} // onclose will handle it
+        ws.onerror = () => {} // onclose handles recovery
       }
 
       connectWs()
@@ -447,16 +494,26 @@ export default function LabRunner() {
       window.addEventListener('resize', handleResize)
 
       cleanup = () => {
+        disposed = true
         window.removeEventListener('resize', handleResize)
-        reconnectAttempts.current = maxReconnectAttempts // prevent reconnect on unmount
-        if (wsRef.current) { wsRef.current.close(1000); wsRef.current = null }
+        if (reconnectTimerRef.current) {
+          clearTimeout(reconnectTimerRef.current)
+          reconnectTimerRef.current = null
+        }
+        reconnectAttempts.current = maxReconnectAttempts
+        if (wsRef.current) {
+          wsRef.current.onclose = null
+          wsRef.current.close(1000)
+          wsRef.current = null
+        }
         term.dispose()
+        if (terminalSessionRef.current === sessionId) terminalSessionRef.current = null
       }
     }
 
     initTerminal()
     return () => cleanup()
-  }, [session])
+  }, [sessionId, session?.status, session?.container_id, session?.instance_id])
 
   // Auto-terminate lab on tab close / navigate away
   useEffect(() => {

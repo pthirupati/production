@@ -95,6 +95,8 @@ print('API token set', bool(settings.JIRA_API_TOKEN))
 
 ## Security notes
 
-- `deploy/production.env` is **gitignored** — never commit it.
+- `deploy/production.env` and `.env.production` are **gitignored** — never commit them.
 - Use `env.production.example` as the template (no real secrets).
-- Rotate `JIRA_API_TOKEN` and `DJANGO_SECRET_KEY` if they were ever committed to git history.
+- CI runs `scripts/check-no-secrets-in-git.sh` on every push to block accidental token commits.
+- Store production env only in GitHub **Environment secret** `PRODUCTION_ENV_B64` (see `./scripts/upload-secrets-to-github.sh`).
+- **If a token was ever committed** (e.g. DigitalOcean `dop_v1_*`): GitHub may revoke it automatically. Create a new token, rotate all exposed secrets (`DJANGO_SECRET_KEY`, DB passwords, `JIRA_API_TOKEN`, etc.), update `PRODUCTION_ENV_B64`, and redeploy. Old commits may still contain secrets in git history — consider `git filter-repo` or BFG if the repo is public.

@@ -215,34 +215,33 @@ class DockerProvisioner:
         Returns (exec_id, raw_socket) for streaming I/O.
         Docker SDK >=7 changed socket handling — we extract the raw socket.
         """
-        try:
-            container = self.client.containers.get(container_id)
-            exec_instance = self.client.api.exec_create(
-                container.id,
-                cmd="/bin/bash",
-                stdin=True,
-                tty=True,
-                stderr=True,
-                stdout=True,
-                environment={"TERM": "xterm-256color", "COLUMNS": "120", "LINES": "40"},
-            )
-            # IMPORTANT: Do NOT pass stream=True with socket=True.
-            # In Docker SDK >=7, combining them breaks stdin writes.
-            sock = self.client.api.exec_start(
-                exec_instance["Id"],
-                detach=False,
-                tty=True,
-                socket=True,
-            )
-            # Extract the underlying raw socket for direct read/write.
-            # Docker SDK wraps it in SocketIO — we need the real socket.
-            raw_socket = self._unwrap_socket(sock)
-            raw_socket.setblocking(True)
-
-            return exec_instance["Id"], raw_socket
-        except (NotFound, APIError) as e:
-            logger.error(f"Failed to create exec stream: {e}")
-            raise
+        last_error = None
+        for shell in ("/bin/bash", "/bin/sh"):
+            try:
+                container = self.client.containers.get(container_id)
+                exec_instance = self.client.api.exec_create(
+                    container.id,
+                    cmd=shell,
+                    stdin=True,
+                    tty=True,
+                    stderr=True,
+                    stdout=True,
+                    environment={"TERM": "xterm-256color", "COLUMNS": "120", "LINES": "40"},
+                )
+                sock = self.client.api.exec_start(
+                    exec_instance["Id"],
+                    detach=False,
+                    tty=True,
+                    socket=True,
+                )
+                raw_socket = self._unwrap_socket(sock)
+                raw_socket.setblocking(True)
+                return exec_instance["Id"], raw_socket
+            except (NotFound, APIError) as e:
+                last_error = e
+                logger.warning(f"Exec stream with {shell} failed for {container_id}: {e}")
+        logger.error(f"Failed to create exec stream for {container_id}: {last_error}")
+        raise last_error
 
     @staticmethod
     def _unwrap_socket(sock):

@@ -190,7 +190,7 @@ RAZORPAY_KEY_SECRET=af4293ad792211c3eebad84ee20f5fe3a40238fee39fdf71d9a50bfbc19c
 
 ### AWS EC2 (for Cloud Labs)
 ```bash
-AWS_ACCESS_KEY_ID=AKIAYEOKPLEUJOWOSCBC  # ⚠️  UPDATE with your AWS IAM key
+AWS_ACCESS_KEY_ID=AKIA...your-key-here  # ⚠️  UPDATE with your AWS IAM key
 AWS_SECRET_ACCESS_KEY=ADzBQC6agRx79WSR4mzZeMNctylwIL8dctzCviH9  # ⚠️  UPDATE with your AWS secret
 AWS_REGION=ap-south-1
 AWS_LAB_BASE_AMI=ami-03793655b06c6e29a  # ⚠️  UPDATE for your region

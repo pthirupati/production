@@ -19,6 +19,8 @@ check() { [ "$1" -eq 0 ] && echo "  OK: $2" || { echo "  FAIL: $2"; FAIL=1; }; }
 [ -f .github/workflows/ci-cd-digitalocean.yml ] && check 0 "ci-cd workflow" || check 1 "ci-cd workflow"
 [ -f docs/GITHUB_SECRETS.md ] && check 0 "GITHUB_SECRETS.md" || check 1 "GITHUB_SECRETS.md"
 
+[ -f scripts/check-no-secrets-in-git.sh ] && check 0 "check-no-secrets-in-git.sh" || check 1 "check-no-secrets-in-git.sh"
+
 if git ls-files --error-unmatch deploy/production.env >/dev/null 2>&1; then
   echo "  WARN: deploy/production.env is tracked in git — run: git rm --cached deploy/production.env"
   FAIL=1

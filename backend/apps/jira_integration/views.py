@@ -52,7 +52,7 @@ class UserJiraTicketsView(APIView):
             status = _sync_ticket_status(t, client) if sync else (t.jira_status or "")
             entry = {
                 "issue_key": t.issue_key,
-                "issue_url": t.issue_url,
+                "issue_url": t.issue_url if (request.user.is_staff or request.user.is_superuser) else "",
                 "jira_status": status,
                 "is_closed": is_jira_closed(status),
                 "run_count": t.run_count,
@@ -78,12 +78,13 @@ class UserJiraTicketsView(APIView):
         })
 
 
-def _scenario_ticket_payload(ticket, include_details=False):
+def _scenario_ticket_payload(ticket, user=None, include_details=False):
     comments = JiraCommentLog.objects.filter(issue_key=ticket.issue_key).order_by("-created_at")[:10]
+    show_url = user and (user.is_staff or user.is_superuser)
     payload = {
         "ticket": {
             "issue_key": ticket.issue_key,
-            "issue_url": ticket.issue_url,
+            "issue_url": ticket.issue_url if show_url else "",
             "jira_status": ticket.jira_status,
             "run_count": ticket.run_count,
         },
@@ -117,7 +118,7 @@ class ScenarioJiraTicketView(APIView):
         ).first()
         if not ticket or not ticket.issue_key:
             return Response({"ticket": None, "recent_comments": []})
-        return Response(_scenario_ticket_payload(ticket, include_details=True))
+        return Response(_scenario_ticket_payload(ticket, user=request.user, include_details=True))
 
     def post(self, request, scenario_id):
         """Ensure a Jira ticket exists for this user+scenario (create if missing)."""
@@ -133,6 +134,6 @@ class ScenarioJiraTicketView(APIView):
                 status=200,
             )
         ticket = UserScenarioJiraTicket.objects.get(user=request.user, scenario=scenario)
-        payload = _scenario_ticket_payload(ticket, include_details=True)
+        payload = _scenario_ticket_payload(ticket, user=request.user, include_details=True)
         payload["jira_created"] = result.get("jira_created", False)
         return Response(payload, status=201 if result.get("jira_created") else 200)

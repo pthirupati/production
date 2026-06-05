@@ -7,6 +7,14 @@ class LabSessionSerializer(serializers.ModelSerializer):
     scenario_detail = ScenarioListSerializer(source="scenario", read_only=True)
     time_remaining = serializers.IntegerField(read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
+    jira_issue_url = serializers.SerializerMethodField()
+
+    def get_jira_issue_url(self, obj):
+        """Learners use in-app Jira panel; only staff get external Atlassian URLs."""
+        request = self.context.get("request")
+        if request and (request.user.is_staff or request.user.is_superuser):
+            return obj.jira_issue_url or ""
+        return ""
 
     class Meta:
         model = LabSession
