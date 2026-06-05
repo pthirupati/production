@@ -536,6 +536,8 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
     SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # Internal Docker/k8s probes hit Daphne over HTTP — must not 301 to HTTPS
+    SECURE_REDIRECT_EXEMPT = [r"^api/health/?$"]
 
 # --------------------------------------------------
 # Logging (structured JSON with PII masking)
