@@ -23,6 +23,13 @@ import django
 
 django.setup()
 
+from django.db import close_old_connections, connection
+
+
+def db_refresh():
+    close_old_connections()
+    connection.ensure_connection()
+
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -103,10 +110,9 @@ def start_lab(user, scenario_id):
 
 
 def wait_running(session_id, timeout=120):
-    from django.db import close_old_connections
     deadline = time.time() + timeout
     while time.time() < deadline:
-        close_old_connections()
+        db_refresh()
         session = LabSession.objects.filter(id=session_id).first()
         if not session:
             return None, "missing"
@@ -149,12 +155,13 @@ def main():
     ok = 0
     fail = 0
     from django.core.cache import cache
-    from django.db import close_old_connections
     for sc in to_test:
-        close_old_connections()
+        db_refresh()
         cache.clear()
         print(f"\n--- {sc.slug} ---")
+        db_refresh()
         st_a, data_a = start_lab(user_a, sc.id)
+        db_refresh()
         st_b, data_b = start_lab(user_b, sc.id)
         sid_a = data_a.get("session_id") or data_a.get("id")
         sid_b = data_b.get("session_id") or data_b.get("id")
@@ -196,6 +203,7 @@ def main():
         # Stop labs to free resources
         for sid in (sid_a, sid_b):
             try:
+                db_refresh()
                 from apps.public_api.views import StopLabView
                 req = APIRequestFactory().post(f"/api/labs/{sid}/stop/")
                 force_authenticate(req, user=user_a if sid == sid_a else user_b)
