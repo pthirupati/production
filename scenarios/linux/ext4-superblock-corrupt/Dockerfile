@@ -5,9 +5,7 @@ COPY systemctl.py /usr/local/bin/systemctl
 COPY service.sh /usr/local/bin/service
 RUN chmod +x /usr/local/bin/systemctl /usr/local/bin/service
 RUN mkdir -p /opt/fixitlab
-RUN mkdir -p /data && dd if=/dev/zero of=/data.img bs=1M count=100 && mkfs.ext4 /data.img && mount -o loop /data.img /data && echo corrupt > /data/.marker
 COPY check.sh /opt/fixitlab/check.sh
 COPY setup.sh /opt/fixitlab/setup.sh
-RUN chmod +x /opt/fixitlab/setup.sh
-RUN chmod +x /opt/fixitlab/check.sh
-CMD ["/bin/bash", "-c", "/opt/fixitlab/setup.sh 2>/dev/null; exec /bin/bash"]
+RUN chmod +x /opt/fixitlab/setup.sh /opt/fixitlab/check.sh
+CMD ["/bin/bash", "-c", "exec /bin/bash"]

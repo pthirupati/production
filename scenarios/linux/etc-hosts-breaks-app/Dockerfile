@@ -5,7 +5,7 @@ COPY systemctl.py /usr/local/bin/systemctl
 COPY service.sh /usr/local/bin/service
 RUN chmod +x /usr/local/bin/systemctl /usr/local/bin/service
 RUN mkdir -p /opt/fixitlab
-RUN echo '127.0.0.1 api.internal.wrong' >> /etc/hosts
+COPY setup.sh /opt/fixitlab/setup.sh
 COPY check.sh /opt/fixitlab/check.sh
-RUN chmod +x /opt/fixitlab/check.sh
+RUN chmod +x /opt/fixitlab/setup.sh /opt/fixitlab/check.sh
 CMD ["/bin/bash", "-c", "exec /bin/bash"]

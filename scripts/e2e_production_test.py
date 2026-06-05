@@ -264,6 +264,7 @@ def run_admin_flow(s: Suite):
         "/api/admin/labs/active/",
         "/api/admin/subscriptions/",
         "/api/admin/threads/",
+        "/api/admin/jira/tickets/",
         "/api/admin/config/",
         "/api/admin/audit-logs/",
         "/api/billing/subscription-logs/",
