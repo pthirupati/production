@@ -12,6 +12,29 @@ GitHub (production environment secrets)
 
 On every **Platform Start** or **CI/CD deploy**, `scripts/sync-production-env.sh` writes `.env.production` before Docker starts.
 
+## Production Deploy workflow (all-in-one)
+
+**Actions → Production Deploy → Run workflow**
+
+| Checkbox / input | What it does |
+|------------------|--------------|
+| **Create server** | Creates `fixitlab-prod` on DO, runs bootstrap, updates `PROD_HOST` + `PRODUCTION_ENV_B64` secrets, commits `infra/digitalocean/production.json` |
+| **Run tests** | Backend + frontend tests before deploy |
+| **Build scenarios** | Rebuild lab Docker images on server |
+| **Git ref** | Branch to deploy (default `main`) |
+
+Required **production** environment secrets:
+
+| Secret | Required when |
+|--------|----------------|
+| `PRODUCTION_ENV_B64` | Always |
+| `PROD_SSH_KEY` | Always (SSH deploy + droplet root login) |
+| `PROD_USER` | Always (usually `root`) |
+| `PROD_HOST` | Deploy only (auto-set when **Create server** is checked) |
+| `DO_API_TOKEN` | Optional if `DO_API_TOKEN` is inside `PRODUCTION_ENV_B64` |
+
+Push to `main` still runs **CI/CD Production** (tests + deploy, no droplet create).
+
 ## Updating production host (new droplet / IP change)
 
 After creating or replacing the DO droplet:

@@ -1,0 +1,221 @@
+# Full production pipeline — optional droplet create, tests, deploy.
+#
+# Manual: Actions → "Production Deploy" → Run workflow
+#   ☑ Create server — new DO droplet + bootstrap + update GitHub secrets
+#   ☑ Run tests     — backend + frontend before deploy
+#
+# Push to main still uses CI/CD Production (tests + deploy only, no droplet create).
+
+name: Production Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_server:
+        description: "Create DigitalOcean droplet (fixitlab-prod) if missing"
+        type: boolean
+        default: false
+      run_tests:
+        description: "Run backend & frontend tests before deploy"
+        type: boolean
+        default: true
+      build_scenarios:
+        description: "Rebuild scenario Docker images on server"
+        type: choice
+        options:
+          - "true"
+          - "false"
+        default: "true"
+      git_ref:
+        description: "Git branch or tag to deploy"
+        required: false
+        default: "main"
+
+permissions:
+  contents: write
+  secrets: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  create-server:
+    name: Create DO droplet
+    if: inputs.create_server
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      prod_host: ${{ steps.sync.outputs.prod_host }}
+      droplet_id: ${{ steps.droplet.outputs.droplet_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve DigitalOcean API token
+        id: do_token
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+        run: |
+          if [ -n "$DO_API_TOKEN" ]; then
+            echo "token=$DO_API_TOKEN" >> "$GITHUB_OUTPUT"
+          elif [ -n "$PRODUCTION_ENV_B64" ]; then
+            echo "token=$(echo "$PRODUCTION_ENV_B64" | base64 -d | grep '^DO_API_TOKEN=' | cut -d= -f2- | tr -d '\r')" >> "$GITHUB_OUTPUT"
+          else
+            echo "ERROR: Set DO_API_TOKEN or PRODUCTION_ENV_B64 secret"
+            exit 1
+          fi
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ steps.do_token.outputs.token }}
+
+      - name: Create droplet & wait for SSH
+        id: droplet
+        env:
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          DO_API_TOKEN: ${{ steps.do_token.outputs.token }}
+          DO_REGION: blr1
+          DO_SIZE: s-2vcpu-8gb-160gb-intel
+        run: |
+          chmod +x scripts/ci-create-production-droplet.sh
+          ./scripts/ci-create-production-droplet.sh
+
+      - name: Update GitHub secrets & metadata
+        id: sync
+        env:
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+          PUBLIC_IP: ${{ steps.droplet.outputs.public_ip }}
+          DROPLET_ID: ${{ steps.droplet.outputs.droplet_id }}
+          SSH_KEY_ID: ${{ steps.droplet.outputs.ssh_key_id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ENVIRONMENT: production
+        run: |
+          chmod +x scripts/ci-sync-droplet-secrets.sh scripts/update-production-host.sh
+          ./scripts/ci-sync-droplet-secrets.sh
+
+      - name: Commit production host metadata
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add infra/digitalocean/production.json env.production.example docs/PUSH_AND_RUN.md docs/GITHUB_SECRETS.md docs/DNS_AND_SSL.md 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "ci: update production droplet metadata (${{ steps.droplet.outputs.public_ip }})"
+          git push origin HEAD:main || echo "Push skipped (no changes or permissions)"
+
+  test-backend:
+    name: Test backend
+    needs: [create-server]
+    if: |
+      always() &&
+      (needs.create-server.result == 'skipped' || needs.create-server.result == 'success') &&
+      inputs.run_tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fixitlab_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - run: chmod +x scripts/check-no-secrets-in-git.sh && ./scripts/check-no-secrets-in-git.sh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+        run: |
+          python manage.py migrate --run-syncdb
+          python manage.py test tests --verbosity=2
+
+  test-frontend:
+    name: Test frontend
+    needs: [create-server]
+    if: |
+      always() &&
+      (needs.create-server.result == 'skipped' || needs.create-server.result == 'success') &&
+      inputs.run_tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+  deploy:
+    name: Deploy to production
+    needs: [create-server, test-backend, test-frontend]
+    if: |
+      always() &&
+      (needs.create-server.result == 'skipped' || needs.create-server.result == 'success') &&
+      (needs.test-backend.result == 'skipped' || needs.test-backend.result == 'success') &&
+      (needs.test-frontend.result == 'skipped' || needs.test-frontend.result == 'success')
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Resolve deploy host
+        id: host
+        run: |
+          if [ -n "${{ needs.create-server.outputs.prod_host }}" ]; then
+            echo "host=${{ needs.create-server.outputs.prod_host }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "host=${{ secrets.PROD_HOST }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy platform
+        uses: appleboy/ssh-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+        with:
+          host: ${{ steps.host.outputs.host }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          envs: GITHUB_TOKEN,PRODUCTION_ENV_B64
+          command_timeout: 90m
+          script: |
+            set -e
+            REPO="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+            if [ ! -d /opt/fixitlab/.git ]; then
+              mkdir -p /opt/fixitlab
+              git clone "$REPO" /opt/fixitlab
+            fi
+            cd /opt/fixitlab
+            git remote set-url origin "$REPO"
+            git fetch origin
+            git checkout ${{ inputs.git_ref }}
+            git reset --hard "origin/${{ inputs.git_ref }}"
+            chmod +x scripts/platform-start.sh scripts/platform-stop.sh scripts/build-scenario-images.sh scripts/startup.sh scripts/ensure-ssl-certs.sh scripts/sync-production-env.sh
+            export BUILD_SCENARIOS=${{ inputs.build_scenarios }}
+            export COMPOSE_FILE=docker-compose.prod.yml
+            export ENV_FILE=.env.production
+            ./scripts/platform-start.sh
+
+      - name: Summary
+        run: |
+          echo "## Production deploy complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Host: ${{ steps.host.outputs.host }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ref: ${{ inputs.git_ref }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Create server: ${{ inputs.create_server }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tests: ${{ inputs.run_tests }}" >> "$GITHUB_STEP_SUMMARY"
