@@ -77,7 +77,7 @@ fi
 SSH_KEY_ID="$(read_env DO_SSH_KEY_ID)"
 DO_REGION="$(read_env DO_REGION blr1)"
 DO_SIZE="$(read_env DO_SIZE s-2vcpu-8gb-160gb-intel)"
-DOMAIN="$(read_env SITE_URL https://fixitlab.in | sed 's|https\?://||;s|/.*||')"
+DOMAIN="$(read_env SITE_URL https://fixitlab.in | sed -E 's|https?://||; s|/.*||')"
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "Missing $ENV_FILE — copy from env.production.example first"

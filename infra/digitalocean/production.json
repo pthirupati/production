@@ -4,7 +4,7 @@
   "public_ipv4": "64.227.175.89",
   "region": "blr1",
   "size": "s-2vcpu-8gb-160gb-intel",
-  "domain": "https:",
+  "domain": "fixitlab.in",
   "ssh_user": "root",
   "updated_at": "2026-06-05T18:03:52Z"
 }
