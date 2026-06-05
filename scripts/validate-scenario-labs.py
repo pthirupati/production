@@ -30,6 +30,7 @@ from apps.question_bank.models import Scenario
 from apps.public_api.views import StartLabView
 from apps.labs.models import LabSession
 from apps.labs.provisioner.docker_provisioner import DockerProvisioner
+from apps.billing.models import TechnologySubscription
 
 User = get_user_model()
 SKIP_LAB = os.environ.get("E2E_SKIP_LAB", "0") == "1"
@@ -56,6 +57,19 @@ def ensure_user(suffix: str):
         user.set_password("LabValPass123!")
         user.save()
     return user
+
+
+def grant_subscriptions(user, scenarios):
+    """Ensure test user can start labs for all technologies in the sample."""
+    from django.core.cache import cache
+    cache.clear()
+    tech_ids = {sc.technology_id for sc in scenarios}
+    for tech_id in tech_ids:
+        TechnologySubscription.objects.get_or_create(
+            user=user,
+            technology_id=tech_id,
+            defaults={"is_active": True, "amount": 0},
+        )
 
 
 def start_lab(user, scenario_id):
@@ -106,6 +120,8 @@ def main():
     user_a = ensure_user("user-a")
     user_b = ensure_user("user-b")
     to_test = present[:SAMPLE] if SAMPLE else present
+    grant_subscriptions(user_a, to_test)
+    grant_subscriptions(user_b, to_test)
 
     ok = 0
     fail = 0
