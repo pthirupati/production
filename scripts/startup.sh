@@ -21,5 +21,8 @@ if [ "${CREATE_SUPERUSER:-0}" = "1" ] && [ -n "${SUPERUSER_EMAIL:-}" ] && [ -n "
   python /scripts/create_superuser.py 2>/dev/null || true
 fi
 
+# Ensure argon2 password hasher is available (required for registration)
+python -c "import argon2" 2>/dev/null || pip install -q argon2-cffi
+
 echo "[startup] Starting Daphne on :8000"
 exec daphne -b 0.0.0.0 -p 8000 config.asgi:application

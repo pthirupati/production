@@ -14,7 +14,7 @@ from apps.question_bank.models import Scenario, Technology
 User = get_user_model()
 
 
-@override_settings(JIRA_WEBHOOK_SECRET="test-secret", DEBUG=False)
+@override_settings(JIRA_WEBHOOK_SECRET="test-secret", DEBUG=False, SECURE_SSL_REDIRECT=False)
 class JiraWebhookTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="whuser", email="w@t.com", password="pass12345")

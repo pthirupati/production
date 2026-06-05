@@ -344,7 +344,16 @@ else:
 
 EMAIL_HOST_USER = _email_user
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
-DEFAULT_FROM_EMAIL = "FixitLab <no-reply@fixitlab.com>"
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="FixitLab <no-reply@fixitlab.com>")
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=15)
+
+# Gmail API (HTTPS — use on DigitalOcean where SMTP 587/465 is blocked)
+GMAIL_OAUTH_CLIENT_ID = env("GMAIL_OAUTH_CLIENT_ID", default=env("GOOGLE_CLIENT_ID", default=""))
+GMAIL_OAUTH_CLIENT_SECRET = env("GMAIL_OAUTH_CLIENT_SECRET", default=env("GOOGLE_CLIENT_SECRET", default=""))
+GMAIL_OAUTH_REFRESH_TOKEN = env("GMAIL_OAUTH_REFRESH_TOKEN", default="")
+
+# Optional SendGrid HTTP API (100/day free tier)
+SENDGRID_API_KEY = env("SENDGRID_API_KEY", default="")
 
 # Frontend URL for email links
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:8080")

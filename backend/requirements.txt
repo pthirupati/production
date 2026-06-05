@@ -11,6 +11,7 @@ django-redis>=5.4
 # Auth
 djangorestframework-simplejwt>=5.3
 PyJWT>=2.8
+argon2-cffi>=23.1
 
 # WebSockets
 channels>=4.0
@@ -53,4 +54,9 @@ python-slugify>=8.0
 python-dateutil>=2.8
 pyyaml>=6.0
 cryptography>=42.0
+
+# Email (Gmail API over HTTPS — works when SMTP ports are blocked)
+google-api-python-client>=2.100
+google-auth>=2.23
+google-auth-httplib2>=0.2
 

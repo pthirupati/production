@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-@override_settings(ROOT_URLCONF='config.urls', MIGRATION_MODULES={"billing": None})
+@override_settings(ROOT_URLCONF='config.urls', MIGRATION_MODULES={"billing": None}, SECURE_SSL_REDIRECT=False)
 class BillingWebhookTests(TestCase):
     def setUp(self):
         cache.clear()
@@ -177,6 +177,7 @@ class BillingWebhookTests(TestCase):
     RAZORPAY_KEY_ID='rzp_test',
     RAZORPAY_KEY_SECRET='test_razor_secret',
     ROOT_URLCONF='config.urls',
+    SECURE_SSL_REDIRECT=False,
 )
 class VerifyRazorpayPaymentTests(TestCase):
     """VerifyRazorpayPaymentView signature + amount validation."""
