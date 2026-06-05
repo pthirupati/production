@@ -50,7 +50,7 @@ export default function ScenarioDetail() {
       .then(data => {
         setScenario(data)
         if (isAuthenticated && data?.id) {
-          jiraApi.getScenarioTicket(data.id)
+          jiraApi.ensureScenarioTicket(data.id)
             .then(res => setJiraTicket(res.data?.ticket || null))
             .catch(() => setJiraTicket(null))
         }
@@ -73,6 +73,14 @@ export default function ScenarioDetail() {
     setStarting(true)
     try {
       const session = await labApi.startLab(scenario.id)
+      if (session.jira_issue_url) {
+        setJiraTicket({
+          issue_key: session.jira_issue_key,
+          issue_url: session.jira_issue_url,
+          jira_status: session.jira_status || 'In Progress',
+          run_count: session.jira_run_count || 1,
+        })
+      }
       if (session.resumed) {
         toast('You already have an active lab for this scenario — reconnecting...', { icon: '🔄', duration: 4000 })
       } else if (session.status === 'PROVISIONING') {

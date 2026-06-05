@@ -9,6 +9,7 @@ from django.test import Client, TestCase, override_settings
 
 from apps.jira_integration.models import JiraTicketLog, UserScenarioJiraTicket
 from apps.jira_integration.sync import (
+    ensure_scenario_ticket,
     sync_lab_completed,
     sync_lab_started,
     sync_lab_stopped,
@@ -149,3 +150,23 @@ class JiraSyncEnabledTests(TestCase):
 
         sync_lab_stopped(self.session, reason="User stopped")
         mock_client.transition_issue.assert_called_with("FIXIT-101", "To Do")
+
+    @patch("apps.jira_integration.sync.JiraClient")
+    def test_ensure_scenario_ticket_creates_without_session(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client.enabled = True
+        mock_client.create_issue.return_value = {"key": "FIXIT-200"}
+        mock_client.issue_url.return_value = "https://example.atlassian.net/browse/FIXIT-200"
+        mock_client.get_issue_status.return_value = "To Do"
+        mock_client_cls.return_value = mock_client
+
+        result = ensure_scenario_ticket(self.user, self.scenario)
+
+        self.assertTrue(result["jira_enabled"])
+        self.assertEqual(result["jira_issue_key"], "FIXIT-200")
+        self.assertTrue(result["jira_created"])
+        self.assertTrue(
+            UserScenarioJiraTicket.objects.filter(
+                user=self.user, scenario=self.scenario, issue_key="FIXIT-200"
+            ).exists()
+        )

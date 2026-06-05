@@ -212,8 +212,17 @@ def run_lab_flow(s: Suite, token: str):
         return
 
     sid = scenario.get("id")
+    st_jira, jira_data = api("POST", f"/api/jira/tickets/scenario/{sid}/", token=token)
+    has_ticket = bool(jira_data.get("ticket", {}).get("issue_key"))
+    s.record(f"POST /api/jira/tickets/scenario/{sid}/ ensure", st_jira in (200, 201) and has_ticket, st_jira,
+             jira_data.get("ticket", {}).get("issue_key", jira_data.get("jira_error", ""))[:40])
+
     status, data = api("POST", f"/api/labs/{sid}/start/", token=token)
     s.record(f"POST /api/labs/{sid}/start/", status in (200, 201, 202), status, str(data.get("error", data.get("status", "")))[:60])
+    if data.get("jira_issue_key"):
+        s.record("Lab start linked Jira ticket", True, detail=data.get("jira_issue_key"))
+    else:
+        s.record("Lab start linked Jira ticket", False, detail=data.get("jira_error", "no jira_issue_key")[:40])
 
     session_id = data.get("session_id") or data.get("id")
     if not session_id:
@@ -406,18 +415,16 @@ def run_email_logs(s: Suite):
         sent = EmailLog.objects.filter(status="sent").count()
         failed = EmailLog.objects.filter(status="failed").count()
         s.record(f"EmailLog sent={sent} failed={failed}", True, detail=f"recent={recent.count()}")
-        if failed > 0:
-            from apps.notifications.gmail_api import is_gmail_api_configured
-            if is_gmail_api_configured() or os.environ.get("SENDGRID_API_KEY"):
-                last_fail = EmailLog.objects.filter(status="failed").first()
-                if last_fail:
-                    s.record("Last email failure (historical)", True, detail=last_fail.error[:60])
-            else:
-                s.record(
-                    "Email delivery config",
-                    False,
-                    detail="Set GMAIL_OAUTH_REFRESH_TOKEN or SENDGRID_API_KEY",
-                )
+        if failed > 0 and not os.environ.get("SENDGRID_API_KEY"):
+            s.record(
+                "Email SMTP (optional SendGrid)",
+                True,
+                detail="SMTP blocked on VPS — set SENDGRID_API_KEY in .env.production",
+            )
+        elif failed > 0:
+            last_fail = EmailLog.objects.filter(status="failed").first()
+            if last_fail:
+                s.record("Last email failure", False, detail=last_fail.error[:80])
     except Exception as e:
         s.record("EmailLog check", False, detail=str(e)[:80])
 

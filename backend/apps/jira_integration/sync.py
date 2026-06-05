@@ -37,11 +37,13 @@ def _log_action(session, issue_key, issue_url, action, jira_status="", details=N
     )
 
 
-def _build_issue_body(session) -> str:
-    scenario = session.scenario
+def _build_issue_body(session=None, user=None, scenario=None) -> str:
+    if session is not None:
+        scenario = session.scenario
+        user = session.user
     site = settings.SITE_URL.rstrip("/")
-    lab_url = f"{site}/lab/{session.id}"
     scenario_url = f"{site}/scenarios/{scenario.slug}"
+    lab_url = f"{site}/lab/{session.id}" if session else scenario_url
 
     custom = (getattr(scenario, "jira_issue_template", "") or "").strip()
     if custom:
@@ -53,9 +55,9 @@ def _build_issue_body(session) -> str:
             initial_state=scenario.initial_state,
             difficulty=scenario.difficulty,
             technology=scenario.technology.name,
-            user=session.user.username,
-            user_email=session.user.email,
-            session_id=str(session.id),
+            user=user.username,
+            user_email=user.email,
+            session_id=str(session.id) if session else "",
             lab_url=lab_url,
             scenario_url=scenario_url,
             site_url=site,
@@ -75,14 +77,68 @@ def _build_issue_body(session) -> str:
         f"INITIAL STATE\n"
         f"{scenario.initial_state or 'SSH access to a Linux server with a misconfiguration.'}\n\n"
         f"ASSIGNED TO\n"
-        f"{session.user.get_full_name() or session.user.username} ({session.user.email})\n\n"
+        f"{user.get_full_name() or user.username} ({user.email})\n\n"
         f"FIXITLAB LINKS\n"
         f"Start lab: {lab_url}\n"
         f"Scenario details: {scenario_url}\n\n"
-        f"Session ID: {session.id}\n"
+        f"Session ID: {session.id if session else 'pending'}\n"
         f"Difficulty: {scenario.difficulty}\n"
         f"Time limit: {scenario.time_limit // 60} minutes"
     )
+
+
+def _ticket_response(mapping, enabled=True, **extra):
+    return {
+        "jira_issue_key": mapping.issue_key,
+        "jira_issue_url": mapping.issue_url,
+        "jira_enabled": enabled,
+        "jira_status": mapping.jira_status,
+        "jira_run_count": mapping.run_count,
+        **extra,
+    }
+
+
+def ensure_scenario_ticket(user, scenario) -> dict:
+    """
+    Get or create a Jira ticket when user opens a scenario (no active lab required).
+    Does not transition to In Progress — that happens on lab start.
+    """
+    client = _client()
+    if not client:
+        return _empty_response()
+
+    try:
+        mapping, created = UserScenarioJiraTicket.objects.get_or_create(
+            user=user,
+            scenario=scenario,
+            defaults={"issue_key": "", "issue_url": ""},
+        )
+
+        needs_create = created or not mapping.issue_key
+        if needs_create:
+            summary = f"[FixitLab] {scenario.title} — {user.username}"
+            priority = getattr(scenario, "jira_priority", "") or "Medium"
+            body = _build_issue_body(user=user, scenario=scenario)
+            result = client.create_issue(
+                summary=summary,
+                description=body,
+                priority=priority,
+                labels=["fixitlab", scenario.slug, scenario.technology.name.lower()],
+            )
+            issue_key = result["key"]
+            issue_url = client.issue_url(issue_key)
+            mapping.issue_key = issue_key
+            mapping.issue_url = issue_url
+            mapping.jira_status = client.get_issue_status(issue_key)
+            if mapping.run_count < 1:
+                mapping.run_count = 1
+            mapping.save()
+
+        return _ticket_response(mapping, jira_created=needs_create)
+
+    except JiraClientError as exc:
+        logger.error("Jira ensure_scenario_ticket failed user=%s scenario=%s: %s", user.id, scenario.id, exc)
+        return {**_empty_response(), "jira_error": str(exc)[:200]}
 
 
 def _empty_response():
@@ -109,7 +165,7 @@ def sync_lab_started(session) -> dict:
         if created or not mapping.issue_key:
             summary = f"[FixitLab] {scenario.title} — {user.username}"
             priority = getattr(scenario, "jira_priority", "") or "Medium"
-            body = _build_issue_body(session)
+            body = _build_issue_body(session=session)
             result = client.create_issue(
                 summary=summary,
                 description=body,

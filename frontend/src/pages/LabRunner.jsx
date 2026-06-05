@@ -190,6 +190,8 @@ export default function LabRunner() {
             validation_passed: lab.validation_passed,
             scenario: lab.scenario,
             scenario_detail: lab.scenario,
+            jira_issue_key: lab.jira_issue_key || '',
+            jira_issue_url: lab.jira_issue_url || '',
           }
           setSession(sessionData)
 

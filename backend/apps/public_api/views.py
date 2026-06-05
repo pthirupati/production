@@ -404,8 +404,16 @@ class StartLabView(APIView):
             active_same_scenario = existing_sessions.filter(scenario=scenario).first()
             if active_same_scenario:
                 serializer = LabSessionSerializer(active_same_scenario)
+                if active_same_scenario.jira_issue_key:
+                    jira_info = {
+                        "jira_issue_key": active_same_scenario.jira_issue_key,
+                        "jira_issue_url": active_same_scenario.jira_issue_url,
+                        "jira_enabled": True,
+                    }
+                else:
+                    jira_info = sync_lab_started(active_same_scenario)
                 return Response(
-                    {**serializer.data, "resumed": True},
+                    {**serializer.data, "resumed": True, **jira_info},
                     status=status.HTTP_200_OK,
                 )
 

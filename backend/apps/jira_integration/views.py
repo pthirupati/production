@@ -1,10 +1,14 @@
 """Jira integration REST endpoints."""
 
+from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.question_bank.models import Scenario
+
 from .models import JiraCommentLog, UserScenarioJiraTicket
+from .sync import ensure_scenario_ticket
 
 
 class UserJiraTicketsView(APIView):
@@ -35,8 +39,24 @@ class UserJiraTicketsView(APIView):
         return Response({"tickets": data, "count": len(data)})
 
 
+def _scenario_ticket_payload(ticket):
+    comments = JiraCommentLog.objects.filter(issue_key=ticket.issue_key).order_by("-created_at")[:10]
+    return {
+        "ticket": {
+            "issue_key": ticket.issue_key,
+            "issue_url": ticket.issue_url,
+            "jira_status": ticket.jira_status,
+            "run_count": ticket.run_count,
+        },
+        "recent_comments": [
+            {"author": c.author, "text": c.text, "created_at": c.created_at.isoformat()}
+            for c in comments
+        ],
+    }
+
+
 class ScenarioJiraTicketView(APIView):
-    """GET /api/jira/tickets/scenario/<scenario_id>/"""
+    """GET/POST /api/jira/tickets/scenario/<scenario_id>/"""
 
     permission_classes = [IsAuthenticated]
 
@@ -44,18 +64,24 @@ class ScenarioJiraTicketView(APIView):
         ticket = UserScenarioJiraTicket.objects.filter(
             user=request.user, scenario_id=scenario_id
         ).first()
-        if not ticket:
-            return Response({"ticket": None})
-        comments = JiraCommentLog.objects.filter(issue_key=ticket.issue_key).order_by("-created_at")[:10]
-        return Response({
-            "ticket": {
-                "issue_key": ticket.issue_key,
-                "issue_url": ticket.issue_url,
-                "jira_status": ticket.jira_status,
-                "run_count": ticket.run_count,
-            },
-            "recent_comments": [
-                {"author": c.author, "text": c.text, "created_at": c.created_at.isoformat()}
-                for c in comments
-            ],
-        })
+        if not ticket or not ticket.issue_key:
+            return Response({"ticket": None, "recent_comments": []})
+        return Response(_scenario_ticket_payload(ticket))
+
+    def post(self, request, scenario_id):
+        """Ensure a Jira ticket exists for this user+scenario (create if missing)."""
+        scenario = get_object_or_404(Scenario, pk=scenario_id, is_active=True)
+        result = ensure_scenario_ticket(request.user, scenario)
+        if not result.get("jira_enabled"):
+            return Response(
+                {
+                    "ticket": None,
+                    "recent_comments": [],
+                    "jira_error": result.get("jira_error", "Jira integration disabled"),
+                },
+                status=200,
+            )
+        ticket = UserScenarioJiraTicket.objects.get(user=request.user, scenario=scenario)
+        payload = _scenario_ticket_payload(ticket)
+        payload["jira_created"] = result.get("jira_created", False)
+        return Response(payload, status=201 if result.get("jira_created") else 200)
