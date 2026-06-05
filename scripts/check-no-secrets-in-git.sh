@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 FAIL=0
+SELF="scripts/check-no-secrets-in-git.sh"
 
 echo "=== Checking tracked files for leaked secrets ==="
 
@@ -21,10 +22,11 @@ for f in "${FORBIDDEN_TRACKED[@]}"; do
   fi
 done
 
-# High-confidence secret patterns (avoid matching docs/examples with placeholder text)
+# Build patterns from parts so this script's source does not match its own rules.
+DOP_PREFIX='dop_v1_'
 PATTERNS=(
-  'dop_v1_[a-f0-9]{64}'
-  'DO_API_TOKEN=dop_v1_'
+  "${DOP_PREFIX}[a-f0-9]{64}"
+  "DO_API_TOKEN=${DOP_PREFIX}"
   '-----BEGIN (RSA )?PRIVATE KEY-----'
   'ghp_[a-zA-Z0-9]{20,}'
   'github_pat_[a-zA-Z0-9_]{20,}'
@@ -34,6 +36,7 @@ PATTERNS=(
 )
 
 while IFS= read -r -d '' f; do
+  [[ "$f" == "$SELF" ]] && continue
   for pat in "${PATTERNS[@]}"; do
     if grep -qE "$pat" "$f" 2>/dev/null; then
       echo "  FAIL: $f matches high-confidence secret pattern"
