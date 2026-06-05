@@ -35,8 +35,6 @@ No manual steps: droplet, bootstrap, `PROD_HOST`, `PRODUCTION_ENV_B64`, GoDaddy 
 1. Action: **stop**
 2. Run workflow
 
-**Push / PR to `main`** runs CI tests only — does **not** deploy. Deploy only via this workflow.
-
 ## Required GitHub secrets (production environment)
 
 | Secret | Purpose |

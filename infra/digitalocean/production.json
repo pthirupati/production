@@ -1,10 +1,10 @@
 {
   "droplet_name": "fixitlab-prod",
-  "droplet_id": "575580846",
-  "public_ipv4": "64.227.175.89",
+  "droplet_id": "575581363",
+  "public_ipv4": "165.22.211.41",
   "region": "blr1",
   "size": "s-2vcpu-8gb-160gb-intel",
   "domain": "fixitlab.in",
   "ssh_user": "root",
-  "updated_at": "2026-06-05T18:03:52Z"
+  "updated_at": "2026-06-05T18:26:58Z"
 }

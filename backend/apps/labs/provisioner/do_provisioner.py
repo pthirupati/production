@@ -4,6 +4,7 @@ Launches droplets for scenarios that need full Linux servers
 (filesystem operations, kernel modules, LVM, real systemd, etc.)
 """
 import logging
+import re
 import time
 import io
 import requests
@@ -13,6 +14,11 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 DO_API_BASE = "https://api.digitalocean.com/v2"
+# Lab droplets only: fixitlab-<session-uuid>
+LAB_DROPLET_NAME = re.compile(
+    r"^fixitlab-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
 
 
 class DOProvisioner:
@@ -114,7 +120,7 @@ echo "FixitLab setup complete" >> /var/log/fixitlab-setup.log
                 "ipv6": False,
                 "monitoring": False,
                 "tags": [
-                    "fixitlab",
+                    getattr(settings, "DO_LAB_TAG", "fixitlab-lab"),
                     f"session:{lab_session.id}",
                     f"scenario:{scenario.slug}",
                 ],
@@ -335,13 +341,68 @@ echo "FixitLab setup complete" >> /var/log/fixitlab-setup.log
             logger.error(f"Validation failed on droplet {droplet_id}: {e}")
             return False, str(e)
 
-    def terminate(self, droplet_id):
-        """Destroy the DigitalOcean droplet."""
+    def _is_protected_droplet(self, droplet):
+        """Never delete production infrastructure (fixitlab-prod, PROD_HOST, etc.)."""
+        droplet_id = str(droplet.get("id", ""))
+        protected_ids = getattr(settings, "DO_PROTECTED_DROPLET_IDS", "") or ""
+        if droplet_id in {x.strip() for x in protected_ids.split(",") if x.strip()}:
+            logger.warning(f"Skipping protected droplet id={droplet_id}")
+            return True
+
+        name = (droplet.get("name") or "").lower()
+        protected_names = getattr(settings, "DO_PROTECTED_DROPLET_NAMES", "fixitlab-prod") or ""
+        for protected in protected_names.split(","):
+            protected = protected.strip().lower()
+            if not protected:
+                continue
+            if name == protected or name.startswith(f"{protected}-"):
+                logger.warning(f"Skipping protected droplet name={name}")
+                return True
+
+        prod_host = (getattr(settings, "PROD_HOST", "") or "").strip()
+        if prod_host:
+            for net in droplet.get("networks", {}).get("v4", []):
+                if net.get("ip_address") == prod_host:
+                    logger.warning(f"Skipping production host droplet ip={prod_host}")
+                    return True
+        return False
+
+    def _is_lab_droplet(self, droplet):
+        """Only ephemeral lab session droplets may be auto-deleted."""
+        name = droplet.get("name") or ""
+        if not LAB_DROPLET_NAME.match(name):
+            return False
+        tag_names = {t.get("name", "") for t in droplet.get("tags", [])}
+        return any(t.startswith("session:") for t in tag_names)
+
+    def _fetch_droplet(self, droplet_id):
+        data = self._api("GET", f"/droplets/{droplet_id}")
+        return data["droplet"]
+
+    def terminate(self, droplet_id, session_id=None):
+        """Destroy a lab session droplet. Refuses production or non-lab droplets."""
+        try:
+            droplet = self._fetch_droplet(droplet_id)
+            if self._is_protected_droplet(droplet):
+                logger.error(
+                    f"Refusing to terminate protected droplet {droplet_id} ({droplet.get('name')})"
+                )
+                return
+            if not self._is_lab_droplet(droplet):
+                logger.error(
+                    f"Refusing to terminate non-lab droplet {droplet_id} ({droplet.get('name')})"
+                )
+                return
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                logger.warning(f"Droplet {droplet_id} already destroyed")
+                return
+            raise
+
         try:
             self._api("DELETE", f"/droplets/{droplet_id}")
-            logger.info(f"Destroyed DO droplet {droplet_id}")
+            logger.info(f"Destroyed DO lab droplet {droplet_id}")
 
-            # Clean up SSH connections
             for key in list(self._ssh_connections.keys()):
                 try:
                     self._ssh_connections[key].close()
@@ -368,22 +429,28 @@ echo "FixitLab setup complete" >> /var/log/fixitlab-setup.log
             return "unknown"
 
     def cleanup_expired(self, max_age_seconds=3600):
-        """Destroy all FixitLab droplets older than max_age_seconds."""
+        """Destroy expired lab session droplets only — never production."""
+        lab_tag = getattr(settings, "DO_LAB_TAG", "fixitlab-lab")
         try:
-            data = self._api("GET", "/droplets?tag_name=fixitlab&per_page=200")
+            data = self._api("GET", f"/droplets?tag_name={lab_tag}&per_page=200")
             destroyed = 0
 
             for droplet in data.get("droplets", []):
+                if self._is_protected_droplet(droplet):
+                    continue
+                if not self._is_lab_droplet(droplet):
+                    continue
                 created_at = droplet.get("created_at", "")
-                if created_at:
-                    from dateutil.parser import parse as parse_date
-                    created = parse_date(created_at)
-                    age = time.time() - created.timestamp()
-                    if age > max_age_seconds:
-                        droplet_id = str(droplet["id"])
-                        self._api("DELETE", f"/droplets/{droplet_id}")
-                        destroyed += 1
-                        logger.info(f"Cleaned up expired droplet {droplet_id}")
+                if not created_at:
+                    continue
+                from dateutil.parser import parse as parse_date
+                created = parse_date(created_at)
+                age = time.time() - created.timestamp()
+                if age > max_age_seconds:
+                    droplet_id = str(droplet["id"])
+                    self._api("DELETE", f"/droplets/{droplet_id}")
+                    destroyed += 1
+                    logger.info(f"Cleaned up expired lab droplet {droplet_id}")
 
             return destroyed
         except Exception as e:

@@ -7,13 +7,51 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ENV_FILE="${1:-$ROOT/deploy/production.env}"
-REPO="${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)}"
-
+ENV_FILE="$ROOT/deploy/production.env"
+if [ -n "${1:-}" ] && [ "${1:-}" != "--print-manual" ]; then
+  ENV_FILE="$1"
+fi
 if ! command -v gh >/dev/null 2>&1; then
-  echo "Install GitHub CLI: https://cli.github.com/"
+  echo "GitHub CLI (gh) is not installed."
+  echo ""
+  echo "  macOS:   brew install gh"
+  echo "  Linux:   https://github.com/cli/cli/blob/trunk/docs/install_linux.md"
+  echo "  Windows: winget install GitHub.cli"
+  echo ""
+  echo "Then:  gh auth login"
+  echo "       ./scripts/upload-secrets-to-github.sh"
   exit 1
 fi
+
+if ! gh auth status >/dev/null 2>&1; then
+  echo "GitHub CLI is installed but you are not logged in."
+  echo ""
+  echo "  gh auth login"
+  echo ""
+  echo "Choose: GitHub.com → HTTPS → Login with browser (or paste a token)."
+  echo "Then re-run:  ./scripts/upload-secrets-to-github.sh"
+  exit 1
+fi
+
+if [ "${1:-}" = "--print-manual" ]; then
+  ENV_FILE="${2:-$ROOT/deploy/production.env}"
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "Missing $ENV_FILE"
+    exit 1
+  fi
+  echo "Manual upload (GitHub web UI):"
+  echo "  Repo → Settings → Environments → production → Add secret"
+  echo ""
+  echo "PRODUCTION_ENV_B64 — paste output of:"
+  echo "  base64 < deploy/production.env | pbcopy   # macOS, copies to clipboard"
+  echo ""
+  echo "PROD_HOST=139.59.58.8"
+  echo "PROD_USER=root"
+  echo "PROD_SSH_KEY — paste contents of ~/.ssh/id_ed25519 (full PEM)"
+  exit 0
+fi
+
+REPO="${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)}"
 
 if [ -z "$REPO" ]; then
   echo "Run from inside the git repo or set GITHUB_REPOSITORY=owner/repo"
