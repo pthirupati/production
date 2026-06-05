@@ -79,7 +79,6 @@ jobs:
     environment: production
     permissions:
       contents: write
-      secrets: write
     outputs:
       prod_host: ${{ steps.sync.outputs.prod_host }}
     steps:
@@ -118,7 +117,7 @@ jobs:
           PUBLIC_IP: ${{ steps.droplet.outputs.public_ip }}
           DROPLET_ID: ${{ steps.droplet.outputs.droplet_id }}
           SSH_KEY_ID: ${{ steps.droplet.outputs.ssh_key_id }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN || github.token }}
           GITHUB_ENVIRONMENT: production
         run: |
           chmod +x scripts/ci-sync-droplet-secrets.sh
