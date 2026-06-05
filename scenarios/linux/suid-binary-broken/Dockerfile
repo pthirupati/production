@@ -5,8 +5,7 @@ COPY systemctl.py /usr/local/bin/systemctl
 COPY service.sh /usr/local/bin/service
 RUN chmod +x /usr/local/bin/systemctl /usr/local/bin/service
 RUN mkdir -p /opt/fixitlab
-RUN echo '#!/bin/bash
-cat /etc/shadow' > /usr/local/bin/reads-shadow && chmod 755 /usr/local/bin/reads-shadow && chown root:root /usr/local/bin/reads-shadow
+RUN printf '#!/bin/bash\ncat /etc/shadow\n' > /usr/local/bin/reads-shadow && chmod 755 /usr/local/bin/reads-shadow && chown root:root /usr/local/bin/reads-shadow
 COPY check.sh /opt/fixitlab/check.sh
 RUN chmod +x /opt/fixitlab/check.sh
 CMD ["/bin/bash", "-c", "exec /bin/bash"]
