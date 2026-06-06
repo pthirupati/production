@@ -141,6 +141,8 @@ def cleanup_test_data() -> dict:
         "otps": 0,
         "contacts": 0,
         "webhooks": 0,
+        "threads": 0,
+        "tags": 0,
     }
 
     test_users = list(User.objects.filter(is_active=True).iterator())
@@ -173,6 +175,13 @@ def cleanup_test_data() -> dict:
             Q(email__iendswith=f"@{TEST_EMAIL_DOMAIN}") | Q(email__istartswith="e2e")
         ).delete()[0]
         stats["webhooks"] = JiraWebhookEvent.objects.filter(jira_issue_key__startswith="E2E-").delete()[0]
+        # Community threads/replies from E2E (before user cascade)
+        from apps.community.models import Thread
+        stats["threads"] = Thread.objects.filter(
+            Q(title__icontains="E2E") | Q(body__icontains="Automated E2E")
+        ).delete()[0]
+        from apps.question_bank.models import Tag
+        stats["tags"] = Tag.objects.filter(name__istartswith="E2E-Cleanup-").delete()[0]
         PaymentTransaction.objects.filter(user_id__in=user_ids).delete()
         stats["users"] = User.objects.filter(id__in=user_ids).delete()[0]
         cache.delete("admin_overview_v1")
@@ -195,7 +204,7 @@ def main():
     print(
         f"Done: users={stats['users']} labs_stopped={stats['labs_stopped']} "
         f"containers={stats['containers']} jira={stats['jira_issues']} "
-        f"otps={stats['otps']} contacts={stats['contacts']}"
+        f"otps={stats['otps']} contacts={stats['contacts']} threads={stats['threads']} tags={stats.get('tags', 0)}"
     )
 
 

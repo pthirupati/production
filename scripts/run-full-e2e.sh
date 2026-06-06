@@ -8,6 +8,8 @@ cd "$ROOT"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-.env.production}"
 BASE_URL="${BASE_URL:-https://fixitlab.in}"
+SITE_URL="${SITE_URL:-$BASE_URL}"
+export SITE_URL
 LOG_DIR="${LOG_DIR:-/tmp/fixitlab-e2e-logs-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$LOG_DIR"
 
