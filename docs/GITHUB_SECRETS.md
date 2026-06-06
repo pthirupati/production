@@ -24,6 +24,17 @@ E2E coverage (`scripts/e2e_tab_coverage.py`) tests every main app tab, admin tab
 
 Pull requests run **CI Tests** only (no deploy).
 
+## Tests-only workflow (no deploy)
+
+**GitHub → Actions → FixitLab Tests → Run workflow**
+
+| Target | What runs |
+|--------|-----------|
+| **production** | SSH to server: unit tests + lab validation + full E2E (every tab/feature) + auto cleanup |
+| **ci** | GitHub runners: unit tests + frontend build (no server needed) |
+
+Options: `run_unit`, `run_e2e`, `run_lab_validation`; use `skip_cleanup` only when debugging.
+
 ### Launch (brand-new server)
 
 1. Action: **launch**
