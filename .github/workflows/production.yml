@@ -171,6 +171,7 @@ jobs:
       - working-directory: backend
         env:
           DJANGO_SETTINGS_MODULE: config.test_settings
+          JIRA_SIMULATION_MODE: "False"
         run: |
           python manage.py migrate --run-syncdb
           python manage.py test tests --verbosity=2

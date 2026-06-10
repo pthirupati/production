@@ -25,8 +25,22 @@ User = get_user_model()
     JIRA_BASE_URL="",
     JIRA_EMAIL="",
     JIRA_API_TOKEN="",
+    JIRA_SIMULATION_MODE=False,
 )
 class JiraSyncDisabledTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._sim_patcher = patch(
+            "apps.jira_integration.simulated.use_simulated_jira", return_value=False
+        )
+        cls._sim_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._sim_patcher.stop()
+        super().tearDownClass()
+
     def setUp(self):
         self.user = User.objects.create_user(username="jirauser", email="j@t.com", password="pass12345")
         self.tech = Technology.objects.create(name="Linux", icon="terminal")
@@ -59,9 +73,23 @@ class JiraSyncDisabledTests(TestCase):
     JIRA_TRANSITION_IN_PROGRESS="In Progress",
     JIRA_TRANSITION_TODO="To Do",
     JIRA_TRANSITION_DONE="Done",
+    JIRA_SIMULATION_MODE=False,
     SITE_URL="https://fixitlab.example.com",
 )
 class JiraSyncEnabledTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._sim_patcher = patch(
+            "apps.jira_integration.simulated.use_simulated_jira", return_value=False
+        )
+        cls._sim_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._sim_patcher.stop()
+        super().tearDownClass()
+
     def setUp(self):
         self.user = User.objects.create_user(username="jirauser2", email="j2@t.com", password="pass12345")
         self.tech = Technology.objects.create(name="Linux", icon="terminal")
