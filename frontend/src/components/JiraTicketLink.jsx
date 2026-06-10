@@ -1,8 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 
 /**
- * Jira issue key — clickable in-app link to the incident panel.
- * Staff may also open the external Atlassian URL when allowExternalLink is set.
+ * Jira issue key — opens in-app Jira simulation in a new tab.
  */
 export default function JiraTicketLink({
   issueKey,
@@ -11,15 +10,20 @@ export default function JiraTicketLink({
   showIcon = true,
   allowExternalLink = false,
   onNavigate,
+  openInNewTab = true,
 }) {
   if (!issueKey) return null
 
+  const href = issueUrl || `/jira/${issueKey}`
   const baseClass = `font-mono font-semibold text-blue-400 underline decoration-blue-400/40 underline-offset-2 hover:text-blue-300 hover:decoration-blue-300 cursor-pointer transition-colors ${className}`
 
   const scrollToPanel = (e) => {
     if (onNavigate) {
       e.preventDefault()
       onNavigate()
+      return
+    }
+    if (openInNewTab) {
       return
     }
     e.preventDefault()
@@ -31,7 +35,7 @@ export default function JiraTicketLink({
     }
   }
 
-  if (allowExternalLink && issueUrl) {
+  if (allowExternalLink && issueUrl && issueUrl.startsWith('http')) {
     return (
       <a
         href={issueUrl}
@@ -48,12 +52,15 @@ export default function JiraTicketLink({
 
   return (
     <a
-      href="#jira-ticket-panel"
+      href={href}
+      target={openInNewTab ? '_blank' : undefined}
+      rel={openInNewTab ? 'noopener noreferrer' : undefined}
       onClick={scrollToPanel}
       className={`inline-flex items-center gap-1 ${baseClass}`}
-      title="View incident ticket details"
+      title="Open incident ticket (Jira simulation)"
     >
       {issueKey}
+      {showIcon && openInNewTab && <ExternalLink size={12} className="opacity-70" />}
     </a>
   )
 }

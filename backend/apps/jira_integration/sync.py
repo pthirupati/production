@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 def _client() -> Optional[JiraClient]:
+    from .simulated import use_simulated_jira
+    if use_simulated_jira():
+        return None
     client = JiraClient()
     return client if client.enabled else None
 
@@ -104,6 +107,12 @@ def ensure_scenario_ticket(user, scenario) -> dict:
     Get or create a Jira ticket when user opens a scenario (no active lab required).
     Does not transition to In Progress — that happens on lab start.
     """
+    from .simulated import ensure_scenario_ticket as sim_ensure
+    from .simulated import use_simulated_jira
+
+    if use_simulated_jira():
+        return sim_ensure(user, scenario)
+
     client = _client()
     if not client:
         return _empty_response()
@@ -143,10 +152,18 @@ def ensure_scenario_ticket(user, scenario) -> dict:
 
 
 def mask_jira_url_for_user(info: dict, user) -> dict:
-    """Learners see tickets in-app only; staff may open Atlassian."""
-    if not user or user.is_staff or user.is_superuser:
+    """Learners get in-app simulation URL; staff may open external Atlassian when configured."""
+    from .simulated import use_simulated_jira
+
+    if not user:
         return info
     masked = dict(info)
+    key = info.get("jira_issue_key") or masked.get("jira_issue_key")
+    if key and (info.get("simulated") or use_simulated_jira()):
+        masked["jira_issue_url"] = f"{settings.SITE_URL.rstrip('/')}/jira/{key}"
+        return masked
+    if user.is_staff or user.is_superuser:
+        return info
     masked["jira_issue_url"] = ""
     return masked
 
@@ -157,6 +174,12 @@ def _empty_response():
 
 def sync_lab_started(session) -> dict:
     """Create or reuse Jira ticket and set status to In Progress."""
+    from .simulated import sync_lab_started as sim_started
+    from .simulated import use_simulated_jira
+
+    if use_simulated_jira():
+        return sim_started(session)
+
     client = _client()
     if not client:
         return _empty_response()
@@ -240,6 +263,12 @@ def sync_lab_started(session) -> dict:
 
 def sync_lab_in_progress(session) -> dict:
     """Ensure ticket is In Progress (idempotent)."""
+    from .simulated import sync_lab_in_progress as sim_progress
+    from .simulated import use_simulated_jira
+
+    if use_simulated_jira():
+        return sim_progress(session)
+
     client = _client()
     if not client or not session.jira_issue_key:
         return _empty_response()
@@ -260,6 +289,12 @@ def sync_lab_in_progress(session) -> dict:
 
 def sync_lab_completed(session, score=0, time_taken=0) -> dict:
     """Mark Jira ticket as Done when lab validation passes."""
+    from .simulated import sync_lab_completed as sim_completed
+    from .simulated import use_simulated_jira
+
+    if use_simulated_jira():
+        return sim_completed(session, score=score, time_taken=time_taken)
+
     client = _client()
     if not client or not session.jira_issue_key:
         return _empty_response()
@@ -288,6 +323,12 @@ def sync_lab_completed(session, score=0, time_taken=0) -> dict:
 
 def sync_lab_stopped(session, reason="Lab stopped") -> dict:
     """Reset Jira ticket to To Do when user stops lab without completing."""
+    from .simulated import sync_lab_stopped as sim_stopped
+    from .simulated import use_simulated_jira
+
+    if use_simulated_jira():
+        return sim_stopped(session, reason=reason)
+
     client = _client()
     if not client or not session.jira_issue_key:
         return _empty_response()

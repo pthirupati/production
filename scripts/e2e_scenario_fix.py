@@ -35,7 +35,10 @@ def apply_scenario_fix(session) -> tuple[bool, str]:
 
     provisioner = get_provisioner(session.provider or "docker")
     try:
-        exit_code, output = provisioner.execute_command(resource_id, script)
+        if hasattr(provisioner, "execute_script"):
+            exit_code, output = provisioner.execute_script(resource_id, script)
+        else:
+            exit_code, output = provisioner.execute_command(resource_id, script)
         return exit_code == 0, (output or "")[:500]
     except Exception as exc:
         return False, str(exc)[:200]

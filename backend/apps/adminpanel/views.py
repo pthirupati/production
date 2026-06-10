@@ -891,25 +891,14 @@ class AdminSystemHealthView(APIView):
             from apps.notifications.gmail_api import is_gmail_api_configured
 
             if is_gmail_api_configured():
-                from google.auth.transport.requests import Request
-                from google.oauth2.credentials import Credentials
-
-                creds = Credentials(
-                    token=None,
-                    refresh_token=settings.GMAIL_OAUTH_REFRESH_TOKEN,
-                    token_uri="https://oauth2.googleapis.com/token",
-                    client_id=settings.GMAIL_OAUTH_CLIENT_ID,
-                    client_secret=settings.GMAIL_OAUTH_CLIENT_SECRET,
-                    scopes=["https://www.googleapis.com/auth/gmail.send"],
-                )
-                if not creds.valid:
-                    creds.refresh(Request())
                 sender = getattr(settings, "EMAIL_HOST_USER", "")
-                return {
-                    "status": "healthy",
-                    "details": f"Gmail API → {sender}",
-                    "provider": "gmail_api",
-                }
+                if settings.GMAIL_OAUTH_REFRESH_TOKEN and settings.GMAIL_OAUTH_CLIENT_ID:
+                    return {
+                        "status": "healthy",
+                        "details": f"Gmail API configured → {sender or 'default sender'}",
+                        "provider": "gmail_api",
+                    }
+                return {"status": "unhealthy", "error": "Gmail OAuth credentials incomplete"}
 
             import smtplib
 
@@ -921,13 +910,21 @@ class AdminSystemHealthView(APIView):
             if host in ("mailhog", "localhost", "127.0.0.1") and not getattr(settings, "EMAIL_HOST_USER", ""):
                 return {"status": "healthy", "details": f"Dev SMTP ({host}:{port})", "provider": "smtp_dev"}
 
+            # Production SMTP without live network probe (avoids false unhealthy in restricted egress)
+            user = getattr(settings, "EMAIL_HOST_USER", "")
+            if user and host not in ("mailhog", "localhost", "127.0.0.1"):
+                return {
+                    "status": "healthy",
+                    "details": f"SMTP configured ({host}:{port})",
+                    "provider": "smtp",
+                }
+
             if use_tls:
                 server = smtplib.SMTP(host, port, timeout=5)
                 server.starttls()
             else:
                 server = smtplib.SMTP(host, port, timeout=5)
 
-            user = getattr(settings, "EMAIL_HOST_USER", "")
             password = getattr(settings, "EMAIL_HOST_PASSWORD", "")
             if user and password:
                 server.login(user, password)

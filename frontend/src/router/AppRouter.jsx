@@ -20,6 +20,7 @@ const Technologies = lazy(() => import('../pages/Technologies'))
 const Scenarios = lazy(() => import('../pages/Scenarios'))
 const ScenarioDetail = lazy(() => import('../pages/ScenarioDetail'))
 const LabRunner = lazy(() => import('../pages/LabRunner'))
+const JiraTicketPage = lazy(() => import('../pages/JiraTicketPage'))
 const Leaderboard = lazy(() => import('../pages/Leaderboard'))
 const Profile = lazy(() => import('../pages/Profile'))
 const Bookmarks = lazy(() => import('../pages/Bookmarks'))
@@ -92,6 +93,7 @@ export default function AppRouter() {
         <Route path="/faq" element={<FAQ />} />
         <Route path="/verify-certificate" element={<CertificateVerify />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
+        <Route path="/jira/:issueKey" element={<ProtectedRoute><JiraTicketPage /></ProtectedRoute>} />
         <Route path="/auth/callback/:provider" element={<OAuthCallback />} />
 
         {/* Protected routes */}

@@ -386,12 +386,7 @@ export default function LabRunner() {
 
         ws.onopen = () => {
           reconnectAttempts.current = 0
-          // Defer resize until shell is ready (avoids Docker exec_resize killing the stream)
-          setTimeout(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }))
-            }
-          }, 800)
+          // Initial resize is applied server-side after first shell output (avoids exec_resize killing stream)
         }
         ws.onmessage = (event) => {
           try {
@@ -494,8 +489,16 @@ export default function LabRunner() {
           wsRef.current.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }))
       }
       term.onResize(({ cols, rows }) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify({ resize: { cols, rows } }))
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ resize: { cols, rows } }))
+        }
       })
+      // Apply initial terminal size once xterm has dimensions (after fit)
+      setTimeout(() => {
+        if (wsRef.current?.readyState === WebSocket.OPEN && term.cols && term.rows) {
+          wsRef.current.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }))
+        }
+      }, 1500)
       window.addEventListener('resize', handleResize)
 
       cleanup = () => {
@@ -770,7 +773,7 @@ export default function LabRunner() {
             >
               <JiraTicketLink
                 issueKey={session.jira_issue_key}
-                issueUrl={session.jira_issue_url}
+                issueUrl={session.jira_issue_url || `/jira/${session.jira_issue_key}`}
                 className="text-[10px]"
               />
             </span>
