@@ -3,8 +3,10 @@ Real Docker-based lab provisioner.
 Spins up isolated containers with pre-broken scenarios for users to fix.
 Each lab session gets its own Docker network for full network isolation.
 """
+import io
 import logging
 import re
+import tarfile
 import time as _time
 import docker
 from docker.errors import DockerException, NotFound, APIError
@@ -190,11 +192,43 @@ class DockerProvisioner:
         except Exception as e:
             logger.warning(f"Setup script execution failed (non-fatal): {e}")
 
+    def execute_script(self, container_id, script_content):
+        """
+        Run a multi-line bash script by copying it into the container.
+        Avoids bash -c parsing errors with newlines, quotes, and semicolons.
+        """
+        try:
+            container = self.client.containers.get(container_id)
+            script_bytes = script_content.encode("utf-8")
+            tarstream = io.BytesIO()
+            with tarfile.open(fileobj=tarstream, mode="w") as tar:
+                info = tarfile.TarInfo(name="fixitlab_exec.sh")
+                info.size = len(script_bytes)
+                info.mode = 0o755
+                tar.addfile(info, io.BytesIO(script_bytes))
+            tarstream.seek(0)
+            container.put_archive("/tmp", tarstream.getvalue())
+
+            exit_code, output = container.exec_run(
+                cmd=["/bin/bash", "/tmp/fixitlab_exec.sh"],
+                demux=True,
+                user="root",
+            )
+            stdout = output[0].decode("utf-8", errors="replace") if output[0] else ""
+            stderr = output[1].decode("utf-8", errors="replace") if output[1] else ""
+            return exit_code, stdout + stderr
+        except (NotFound, APIError) as e:
+            logger.error(f"Failed to execute script in container {container_id}: {e}")
+            raise
+
     def execute_command(self, container_id, command):
         """
         Execute a command inside the container.
         Returns (exit_code, output).
         """
+        if "\n" in command:
+            return self.execute_script(container_id, command)
+
         try:
             container = self.client.containers.get(container_id)
             exit_code, output = container.exec_run(
@@ -221,7 +255,7 @@ class DockerProvisioner:
                 container = self.client.containers.get(container_id)
                 exec_instance = self.client.api.exec_create(
                     container.id,
-                    cmd=[shell, "-i"],
+                    cmd=[shell],
                     stdin=True,
                     tty=True,
                     stderr=True,
@@ -277,9 +311,10 @@ class DockerProvisioner:
         Returns (passed: bool, output: str).
         """
         try:
-            exit_code, output = self.execute_command(
-                container_id, validation_script
-            )
+            if "\n" in validation_script:
+                exit_code, output = self.execute_script(container_id, validation_script)
+            else:
+                exit_code, output = self.execute_command(container_id, validation_script)
             return exit_code == 0, output
         except Exception as e:
             logger.error(f"Validation failed: {e}")

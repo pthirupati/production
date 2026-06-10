@@ -165,10 +165,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 )
             }))
 
-            self._shell_ready = True
-            if self._resize_pending:
-                await self._apply_resize(self._resize_pending)
-                self._resize_pending = None
+            self._shell_ready = False
 
             # Start reading output
             self.reader_task = asyncio.create_task(self._read_output())
@@ -284,17 +281,26 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
     async def _read_output(self):
         """Continuously read output from the exec socket/SSH channel and send to client."""
-        empty_reads = 0
+        import select
+
         try:
             while True:
+                readable, _, _ = await asyncio.to_thread(
+                    select.select, [self.raw_socket], [], [], 60.0
+                )
+                if not readable:
+                    continue
                 data = await asyncio.to_thread(self.raw_socket.recv, 4096)
                 if not data:
-                    empty_reads += 1
-                    if empty_reads >= 3:
-                        break
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(0.2)
                     continue
-                empty_reads = 0
+
+                if not self._shell_ready:
+                    self._shell_ready = True
+                    if self._resize_pending:
+                        await self._apply_resize(self._resize_pending)
+                        self._resize_pending = None
+
                 output = data.decode("utf-8", errors="replace")
 
                 # Record output for replay

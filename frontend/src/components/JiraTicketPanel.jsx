@@ -21,8 +21,9 @@ export default function JiraTicketPanel({ ticket, comments = [], compact = false
           <div className={`mt-0.5 ${compact ? 'text-sm' : 'text-base'}`}>
             <JiraTicketLink
               issueKey={ticket.issue_key}
-              issueUrl={ticket.issue_url}
+              issueUrl={ticket.issue_url || `/jira/${ticket.issue_key}`}
               showIcon={!compact}
+              openInNewTab
             />
           </div>
           {ticket.summary && (

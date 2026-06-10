@@ -55,6 +55,10 @@ class UserScenarioJiraTicket(models.Model):
     issue_key = models.CharField(max_length=50)
     issue_url = models.URLField(max_length=500, blank=True)
     jira_status = models.CharField(max_length=50, blank=True, default="")
+    summary = models.CharField(max_length=255, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    priority = models.CharField(max_length=30, blank=True, default="Medium")
+    simulated = models.BooleanField(default=False)
     last_session = models.ForeignKey(
         "labs.LabSession",
         on_delete=models.SET_NULL,

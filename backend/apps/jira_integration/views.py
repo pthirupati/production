@@ -43,16 +43,19 @@ class UserJiraTicketsView(APIView):
         ).select_related("scenario", "last_session").order_by("-updated_at")
 
         from .client import JiraClient
+        from .simulated import use_simulated_jira
+
         client = JiraClient()
-        live_sync = request.query_params.get("sync") == "1" and client.enabled
+        live_sync = request.query_params.get("sync") == "1" and client.enabled and not use_simulated_jira()
 
         open_tickets = []
         closed_tickets = []
         for t in tickets_qs:
             status = _sync_ticket_status(t, client) if live_sync else (t.jira_status or "")
+            show_url = t.simulated or use_simulated_jira() or request.user.is_staff or request.user.is_superuser
             entry = {
                 "issue_key": t.issue_key,
-                "issue_url": t.issue_url if (request.user.is_staff or request.user.is_superuser) else "",
+                "issue_url": t.issue_url if show_url else "",
                 "jira_status": status,
                 "is_closed": is_jira_closed(status),
                 "run_count": t.run_count,
@@ -79,31 +82,42 @@ class UserJiraTicketsView(APIView):
 
 
 def _scenario_ticket_payload(ticket, user=None, include_details=False):
+    from .simulated import ticket_detail_payload, use_simulated_jira
+
     comments = JiraCommentLog.objects.filter(issue_key=ticket.issue_key).order_by("-created_at")[:10]
-    show_url = user and (user.is_staff or user.is_superuser)
+    show_url = user and (user.is_staff or user.is_superuser or ticket.simulated or use_simulated_jira())
     payload = {
         "ticket": {
             "issue_key": ticket.issue_key,
             "issue_url": ticket.issue_url if show_url else "",
             "jira_status": ticket.jira_status,
             "run_count": ticket.run_count,
+            "simulated": ticket.simulated or use_simulated_jira(),
         },
         "recent_comments": [
             {"author": c.author, "text": c.text, "created_at": c.created_at.isoformat()}
             for c in comments
         ],
     }
-    if include_details and ticket.issue_key:
-        from .client import JiraClient, JiraClientError
-        client = JiraClient()
-        if client.enabled:
-            try:
-                details = client.get_issue_details(ticket.issue_key)
-                payload["ticket"]["summary"] = details.get("summary", "")
-                payload["ticket"]["description"] = details.get("description", "")
-                payload["ticket"]["jira_status"] = details.get("status") or ticket.jira_status
-            except JiraClientError:
-                pass
+    if include_details:
+        if ticket.simulated or use_simulated_jira():
+            detail = ticket_detail_payload(ticket)
+            payload["ticket"]["summary"] = detail["summary"]
+            payload["ticket"]["description"] = detail["description"]
+            payload["ticket"]["priority"] = detail["priority"]
+            payload["ticket"]["jira_status"] = detail["jira_status"]
+            payload["ticket"]["allowed_transitions"] = detail["allowed_transitions"]
+        elif ticket.issue_key:
+            from .client import JiraClient, JiraClientError
+            client = JiraClient()
+            if client.enabled:
+                try:
+                    details = client.get_issue_details(ticket.issue_key)
+                    payload["ticket"]["summary"] = details.get("summary", "")
+                    payload["ticket"]["description"] = details.get("description", "")
+                    payload["ticket"]["jira_status"] = details.get("status") or ticket.jira_status
+                except JiraClientError:
+                    pass
     return payload
 
 
@@ -138,3 +152,68 @@ class ScenarioJiraTicketView(APIView):
         payload = _scenario_ticket_payload(ticket, user=request.user, include_details=True)
         payload["jira_created"] = result.get("jira_created", False)
         return Response(payload, status=201 if result.get("jira_created") else 200)
+
+
+class JiraIssueDetailView(APIView):
+    """GET /api/jira/issues/<issue_key>/ — full in-app ticket view."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, issue_key):
+        from .simulated import get_ticket_for_user, ticket_detail_payload
+
+        ticket = get_ticket_for_user(issue_key, request.user)
+        if not ticket:
+            return Response({"error": "Ticket not found"}, status=404)
+        return Response(ticket_detail_payload(ticket))
+
+
+class JiraIssueTransitionView(APIView):
+    """POST /api/jira/issues/<issue_key>/transition/ — change ticket status."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, issue_key):
+        from .simulated import get_ticket_for_user, ticket_detail_payload, transition_ticket, use_simulated_jira
+
+        if not use_simulated_jira():
+            return Response({"error": "Status updates require Jira simulation mode"}, status=400)
+
+        ticket = get_ticket_for_user(issue_key, request.user)
+        if not ticket:
+            return Response({"error": "Ticket not found"}, status=404)
+
+        new_status = (request.data.get("status") or "").strip()
+        if not new_status:
+            return Response({"error": "status is required"}, status=400)
+
+        try:
+            transition_ticket(ticket, request.user, new_status, session=ticket.last_session)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=400)
+
+        ticket.refresh_from_db()
+        return Response(ticket_detail_payload(ticket))
+
+
+class JiraIssueCommentView(APIView):
+    """POST /api/jira/issues/<issue_key>/comments/ — add a comment."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, issue_key):
+        from .simulated import add_comment, get_ticket_for_user, ticket_detail_payload, use_simulated_jira
+
+        if not use_simulated_jira():
+            return Response({"error": "Comments require Jira simulation mode"}, status=400)
+
+        ticket = get_ticket_for_user(issue_key, request.user)
+        if not ticket:
+            return Response({"error": "Ticket not found"}, status=404)
+
+        text = (request.data.get("text") or "").strip()
+        if not text:
+            return Response({"error": "text is required"}, status=400)
+
+        add_comment(ticket, request.user, text, session=ticket.last_session)
+        return Response(ticket_detail_payload(ticket))

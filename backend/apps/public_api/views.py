@@ -576,24 +576,26 @@ class ValidateLabView(APIView):
                 status=400,
             )
 
-        # Use validation script priority:
-        # 1. Check for /opt/fixitlab/check.sh inside the container
-        # 2. Use scenario.validation_script from DB
-        # 3. Fallback to default check
-        validation_script = (
-            "if [ -f /opt/fixitlab/check.sh ]; then "
-            "  bash /opt/fixitlab/check.sh; "
-            "elif [ -f /check.sh ]; then "
-            "  bash /check.sh; "
-            "else "
-            f"  {session.scenario.validation_script or 'echo NO_VALIDATION_SCRIPT && exit 1'}; "
-            "fi"
+        # Run check.sh inside the container (never inline DB script — breaks bash -c)
+        file_check_cmd = (
+            "if [ -x /opt/fixitlab/check.sh ]; then bash /opt/fixitlab/check.sh; "
+            "elif [ -x /check.sh ]; then bash /check.sh; "
+            "else exit 127; fi"
         )
 
         try:
-            passed, output = provisioner.run_validation(
-                resource_id, validation_script
-            )
+            exit_code, output = provisioner.execute_command(resource_id, file_check_cmd)
+            if exit_code == 127:
+                db_script = (session.scenario.validation_script or "").strip()
+                if not db_script:
+                    return Response({
+                        "passed": False,
+                        "output": "NO_VALIDATION_SCRIPT",
+                        "message": "Validation failed. Keep trying!",
+                    })
+                passed, output = provisioner.run_validation(resource_id, db_script)
+            else:
+                passed = exit_code == 0
 
             if passed:
                 elapsed = (timezone.now() - session.started_at).total_seconds()

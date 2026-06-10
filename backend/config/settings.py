@@ -441,6 +441,9 @@ JIRA_TRANSITION_IN_PROGRESS = env("JIRA_TRANSITION_IN_PROGRESS", default="In Pro
 JIRA_TRANSITION_TODO = env("JIRA_TRANSITION_TODO", default="To Do")
 JIRA_TRANSITION_DONE = env("JIRA_TRANSITION_DONE", default="Done")
 JIRA_WEBHOOK_SECRET = env("JIRA_WEBHOOK_SECRET", default="")
+# In-app Jira simulation (no Atlassian dependency). Set false to use real Jira Cloud API.
+JIRA_SIMULATION_MODE = env.bool("JIRA_SIMULATION_MODE", default=True)
+JIRA_SIMULATION_PREFIX = env("JIRA_SIMULATION_PREFIX", default="KAN")
 
 # Comma-separated IPs allowed to access /django-admin/ and /api/admin/
 # Empty = allow all (set in production to your office/VPN IP)

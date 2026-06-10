@@ -140,7 +140,6 @@ jobs:
     needs: [create-server]
     if: |
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
-      inputs.run_tests &&
       always() &&
       (needs.create-server.result == 'skipped' || needs.create-server.result == 'success')
     runs-on: ubuntu-latest
@@ -181,7 +180,6 @@ jobs:
     needs: [create-server]
     if: |
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
-      inputs.run_tests &&
       always() &&
       (needs.create-server.result == 'skipped' || needs.create-server.result == 'success')
     runs-on: ubuntu-latest
