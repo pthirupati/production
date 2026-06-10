@@ -66,6 +66,9 @@ CHANNEL_LAYERS = {
 # ── Disable audit middleware for cleaner test output ──
 MIDDLEWARE = [m for m in MIDDLEWARE if "AuditMiddleware" not in m]  # noqa: F405
 
+# ── No HTTPS redirect in test client (APIClient does not send X-Forwarded-Proto) ──
+SECURE_SSL_REDIRECT = False
+
 # ── Caches ──
 CACHES = {
     "default": {

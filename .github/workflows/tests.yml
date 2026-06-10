@@ -48,7 +48,7 @@ env:
 
 jobs:
   ci-tests:
-    name: CI unit tests
+    name: GitHub unit tests (target=ci only)
     if: inputs.target == 'ci'
     runs-on: ubuntu-latest
     steps:
@@ -125,7 +125,8 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| Target | \`${{ inputs.target }}\` |"
-            echo "| Unit tests | \`${{ inputs.run_unit }}\` |"
+            echo "| Unit tests on server | \`${{ inputs.run_unit }}\` |"
+            echo "| GitHub unit job | skipped when target=production |"
             echo "| E2E (all tabs) | \`${{ inputs.run_e2e }}\` |"
             echo "| Lab validation | \`${{ inputs.run_lab_validation }}\` |"
             echo "| Cleanup | \`${{ !inputs.skip_cleanup }}\` |"

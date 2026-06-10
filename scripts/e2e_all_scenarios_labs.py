@@ -116,7 +116,10 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c):
     stats.ok(f"{label} scenario detail API")
 
     # Jira — user A
-    st = _factory_view(ScenarioJiraTicketView, "POST", f"/api/jira/tickets/scenario/{scenario.id}/", user_a)
+    st = _factory_view(
+        ScenarioJiraTicketView, "POST", f"/api/jira/tickets/scenario/{scenario.id}/", user_a,
+        scenario_id=scenario.id,
+    )
     jira_a = (getattr(st, "data", {}) or {}).get("ticket", {}).get("issue_key", "")
     if getattr(st, "status_code", 0) not in (200, 201):
         stats.fail(f"{label} jira user_a", str(getattr(st, "data", ""))[:60])
@@ -126,7 +129,10 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c):
         stats.ok(f"{label} jira user_a {jira_a}")
 
     # Jira — user B (isolated ticket)
-    st = _factory_view(ScenarioJiraTicketView, "POST", f"/api/jira/tickets/scenario/{scenario.id}/", user_b)
+    st = _factory_view(
+        ScenarioJiraTicketView, "POST", f"/api/jira/tickets/scenario/{scenario.id}/", user_b,
+        scenario_id=scenario.id,
+    )
     jira_b = (getattr(st, "data", {}) or {}).get("ticket", {}).get("issue_key", "")
     if jira_b and jira_a and jira_a == jira_b:
         stats.fail(f"{label} jira isolation", f"shared ticket {jira_a}")

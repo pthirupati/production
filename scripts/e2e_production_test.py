@@ -17,6 +17,10 @@ import os
 import sys
 import time
 import uuid
+
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -189,11 +193,20 @@ def run_user_flow(s: Suite, token: str, label: str = "user"):
         s.record(f"{label} {method} {path}", ok, status, err_msg(data))
 
 
-def run_technology_scenario_flow(s: Suite, token: str):
+def run_technology_scenario_flow(s: Suite, token: str, email: str = ""):
     """Per technology: ensure Jira ticket, start lab, poll status, stop."""
     if SKIP_LAB:
         s.record("Technology scenario E2E", True, detail="skipped E2E_SKIP_LAB=1")
         return
+    if os.environ.get("E2E_SKIP_DUPLICATE_LABS") == "1":
+        s.record("Technology scenario E2E", True, detail="covered by e2e_all_scenarios_labs.py")
+        return
+    if email:
+        try:
+            from e2e_tab_coverage import grant_test_subscriptions
+            grant_test_subscriptions(email)
+        except Exception:
+            pass
     print("\n=== Technology → scenario → Jira → lab (per tech) ===")
     status, techs = api("GET", "/api/technologies/", token=token)
     if status != 200 or not techs:
@@ -241,10 +254,20 @@ def run_technology_scenario_flow(s: Suite, token: str):
             api("POST", f"/api/labs/{session_id}/stop/", token=token)
 
 
-def run_lab_flow(s: Suite, token: str):
+def run_lab_flow(s: Suite, token: str, email: str = ""):
     if SKIP_LAB:
         s.record("Lab provisioning", True, detail="skipped E2E_SKIP_LAB=1")
         return
+    if os.environ.get("E2E_SKIP_DUPLICATE_LABS") == "1":
+        s.record("Lab lifecycle", True, detail="covered by e2e_all_scenarios_labs.py")
+        return
+    if email:
+        try:
+            from e2e_tab_coverage import grant_test_subscriptions
+            if grant_test_subscriptions(email):
+                s.record("Grant tech subscriptions for labs", True)
+        except Exception:
+            pass
     print("\n=== Lab lifecycle ===")
     status, scenarios = api("GET", "/api/scenarios/", token=token)
     if status != 200 or not scenarios:
@@ -518,16 +541,11 @@ def main():
         run_public_tests(s)
         token, test_email = run_auth_registration(s)
         if token:
-            run_user_flow(s, token, "new_user")
-            run_auth_extras(s, token, test_email, "E2eTestPass123!")
-            run_billing_flow(s, token)
-            run_community_flow(s, token)
-            run_lab_flow(s, token)
-            run_technology_scenario_flow(s, token)
+            from e2e_tab_coverage import run_full_ui_coverage
+            run_full_ui_coverage(s, token, test_email, "E2eTestPass123!")
         else:
             s.record("User registration flow", False, detail="no token")
 
-        run_admin_flow(s)
         run_contact(s)
         run_jira_webhook(s)
         run_concurrent_users(s, 3)

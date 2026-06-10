@@ -35,6 +35,7 @@ if [ "$RUN_UNIT" = "true" ] || [ "$RUN_UNIT" = "1" ]; then
   echo ""
   echo ">>> Django unit tests"
   if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    env DJANGO_SETTINGS_MODULE=config.test_settings \
     python manage.py test tests --verbosity=1; then
     echo "  ✓ Unit tests passed"
   else
