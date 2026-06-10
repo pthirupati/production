@@ -1,3 +1,4 @@
 #!/bin/bash
 set -e
-sed -i '/api\.internal\.wrong/d' /etc/hosts
+grep -v 'api\.internal\.wrong' /etc/hosts > /tmp/hosts.new
+cat /tmp/hosts.new > /etc/hosts

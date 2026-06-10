@@ -354,6 +354,22 @@ export default function LabRunner() {
       xtermRef.current = term
       fitAddonRef.current = fitAddon
 
+      const shellReadyRef = { current: false }
+      const resizeDebounceRef = { current: null }
+
+      const sendResize = () => {
+        const isCloud = session?.provider === 'aws_ec2' || session?.provider === 'digitalocean'
+        if (!isCloud || !shellReadyRef.current) return
+        if (wsRef.current?.readyState === WebSocket.OPEN && term.cols && term.rows) {
+          wsRef.current.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }))
+        }
+      }
+
+      const scheduleResize = () => {
+        if (resizeDebounceRef.current) clearTimeout(resizeDebounceRef.current)
+        resizeDebounceRef.current = setTimeout(sendResize, 300)
+      }
+
       const wsCloseMessages = {
         4001: '\r\n\x1b[1;31mAuthentication expired — refresh the page to reconnect.\x1b[0m\r\n',
         4003: '\r\n\x1b[1;33mLab is not running yet — wait for provisioning to finish.\x1b[0m\r\n',
@@ -386,11 +402,16 @@ export default function LabRunner() {
 
         ws.onopen = () => {
           reconnectAttempts.current = 0
-          // Initial resize is applied server-side after first shell output (avoids exec_resize killing stream)
+          shellReadyRef.current = false
         }
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data)
+            if (data.type === 'shell_ready') {
+              shellReadyRef.current = true
+              scheduleResize()
+              return
+            }
             if (data.output) term.write(data.output)
           } catch { term.write(event.data) }
         }
@@ -485,25 +506,20 @@ export default function LabRunner() {
 
       const handleResize = () => {
         fitAddon.fit()
-        if (wsRef.current?.readyState === WebSocket.OPEN)
-          wsRef.current.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }))
+        scheduleResize()
       }
-      term.onResize(({ cols, rows }) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ resize: { cols, rows } }))
-        }
-      })
-      // Apply initial terminal size once xterm has dimensions (after fit)
-      setTimeout(() => {
-        if (wsRef.current?.readyState === WebSocket.OPEN && term.cols && term.rows) {
-          wsRef.current.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }))
-        }
-      }, 1500)
+      term.onResize(() => scheduleResize())
       window.addEventListener('resize', handleResize)
+
+      const wsCloseMessages = {
 
       cleanup = () => {
         disposed = true
         window.removeEventListener('resize', handleResize)
+        if (resizeDebounceRef.current) {
+          clearTimeout(resizeDebounceRef.current)
+          resizeDebounceRef.current = null
+        }
         if (reconnectTimerRef.current) {
           clearTimeout(reconnectTimerRef.current)
           reconnectTimerRef.current = null

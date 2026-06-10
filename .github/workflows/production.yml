@@ -3,7 +3,7 @@
 # GitHub → Actions → FixitLab Production → Run workflow
 #
 #   launch + create_server  →  new DO droplet, secrets, DNS, tests, deploy, verify
-#   launch / deploy         →  tests, deploy, start application, health + E2E verify
+#   launch / deploy         →  tests, deploy, health + E2E verify (in deploy job)
 #   stop                    →  stop containers (database volume preserved)
 
 name: FixitLab Production
@@ -249,18 +249,10 @@ jobs:
             export BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
             ./scripts/ci-remote-platform.sh deploy
 
-  verify:
-    name: Health & E2E verification
-    needs: [deploy]
-    if: |
-      (inputs.action == 'launch' || inputs.action == 'deploy') &&
-      needs.deploy.result == 'success'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
       - name: Quick public health (GitHub runner)
+        if: inputs.action == 'launch' || inputs.action == 'deploy'
         run: |
-          HOST="${{ needs.deploy.outputs.prod_host }}"
+          HOST="${{ steps.host.outputs.host }}"
           echo "Checking http://${HOST}/health ..."
           for i in $(seq 1 20); do
             if curl -sf --max-time 10 "http://${HOST}/health" | grep -q ok; then
@@ -273,11 +265,12 @@ jobs:
           exit 1
 
       - name: Full server verification (images, labs, E2E)
+        if: inputs.action == 'launch' || inputs.action == 'deploy'
         uses: appleboy/ssh-action@v1
         env:
           RUN_E2E: ${{ inputs.run_e2e }}
         with:
-          host: ${{ needs.deploy.outputs.prod_host }}
+          host: ${{ steps.host.outputs.host }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           envs: RUN_E2E
@@ -292,7 +285,7 @@ jobs:
             ./scripts/ci-post-deploy-verify.sh
 
       - name: Summary
-        if: always()
+        if: always() && (inputs.action == 'launch' || inputs.action == 'deploy')
         run: |
           {
             echo "## FixitLab Production — complete"
@@ -300,7 +293,7 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| Action | \`${{ inputs.action }}\` |"
-            echo "| Host | \`${{ needs.deploy.outputs.prod_host }}\` |"
+            echo "| Host | \`${{ steps.host.outputs.host }}\` |"
             echo "| Branch | \`${{ inputs.git_ref }}\` |"
             echo "| Build scenarios | \`${{ inputs.build_scenarios }}\` |"
             echo "| E2E verify | \`${{ inputs.run_e2e }}\` |"

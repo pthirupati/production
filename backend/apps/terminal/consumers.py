@@ -259,16 +259,9 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         cols = resize_data.get("cols", 120)
         rows = resize_data.get("rows", 40)
         if self.provider_type == "docker":
-            if self.exec_id and self.provisioner:
-                try:
-                    await asyncio.to_thread(
-                        self.provisioner.client.api.exec_resize,
-                        self.exec_id,
-                        height=rows,
-                        width=cols,
-                    )
-                except Exception:
-                    pass
+            # Docker exec_resize frequently kills the PTY socket (reconnect loop).
+            # Initial COLUMNS/LINES are set at exec_create; skip runtime resize for Docker.
+            return
         else:
             try:
                 await asyncio.to_thread(
@@ -281,16 +274,13 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
     async def _read_output(self):
         """Continuously read output from the exec socket/SSH channel and send to client."""
-        import select
-
         try:
+            await asyncio.to_thread(self.raw_socket.settimeout, 60.0)
             while True:
-                readable, _, _ = await asyncio.to_thread(
-                    select.select, [self.raw_socket], [], [], 60.0
-                )
-                if not readable:
+                try:
+                    data = await asyncio.to_thread(self.raw_socket.recv, 4096)
+                except TimeoutError:
                     continue
-                data = await asyncio.to_thread(self.raw_socket.recv, 4096)
                 if not data:
                     await asyncio.sleep(0.2)
                     continue
@@ -300,6 +290,10 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     if self._resize_pending:
                         await self._apply_resize(self._resize_pending)
                         self._resize_pending = None
+                    try:
+                        await self.send(text_data=json.dumps({"type": "shell_ready"}))
+                    except Exception:
+                        pass
 
                 output = data.decode("utf-8", errors="replace")
 

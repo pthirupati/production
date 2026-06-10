@@ -1,10 +1,13 @@
 #!/bin/bash
 set -e
-CI=/opt/app/.gitlab-ci.yml
-[ -f "$CI" ] || exit 0
-sed -i 's/node:18-alpinee/node:18-alpine/g' "$CI"
-grep -q 'npm ci' "$CI" || printf '
-  - npm ci
-' >> "$CI"
-grep -q 'npm run build' "$CI" || printf '  - npm run build
-' >> "$CI"
+cat > /opt/app/.gitlab-ci.yml <<'EOF'
+stages:
+  - build
+
+build_job:
+  stage: build
+  image: node:18-alpine
+  script:
+    - npm ci
+    - npm run build
+EOF

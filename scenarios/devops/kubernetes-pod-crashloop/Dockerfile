@@ -21,4 +21,4 @@ RUN chmod +x /opt/fixitlab/check.sh
 
 RUN echo '<html><body><h1>Webapp OK</h1></body></html>' > /var/www/html/index.html
 
-CMD ["/bin/bash", "-c", "nginx && exec /bin/bash"]
+CMD ["/bin/bash", "-c", "nginx 2>/dev/null || true; exec /bin/bash"]

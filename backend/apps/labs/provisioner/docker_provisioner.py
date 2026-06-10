@@ -125,7 +125,16 @@ class DockerProvisioner:
             else:
                 run_kwargs.update(
                     cap_drop=["ALL"],
-                    cap_add=["NET_BIND_SERVICE", "SYS_PTRACE", "DAC_OVERRIDE"],
+                    cap_add=[
+                        "NET_BIND_SERVICE",
+                        "SYS_PTRACE",
+                        "DAC_OVERRIDE",
+                        "CHOWN",
+                        "FOWNER",
+                        "SETUID",
+                        "SETGID",
+                        "LINUX_IMMUTABLE",
+                    ],
                     privileged=False,
                 )
 
@@ -255,7 +264,7 @@ class DockerProvisioner:
                 container = self.client.containers.get(container_id)
                 exec_instance = self.client.api.exec_create(
                     container.id,
-                    cmd=[shell],
+                    cmd=[shell, "-i"],
                     stdin=True,
                     tty=True,
                     stderr=True,

@@ -1,15 +1,57 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { jiraApi } from '../api/jira'
-import { ArrowLeft, MessageSquare, Ticket, Loader2 } from 'lucide-react'
+import {
+  ArrowLeft, MessageSquare, Loader2, ChevronRight, Clock, User,
+  Tag, AlertCircle, CheckCircle2, Circle, MoreHorizontal, Search, Bell, HelpCircle
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const STATUS_COLORS = {
-  'To Do': 'bg-surface-600 text-surface-100',
-  'In Progress': 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
-  'On Hold': 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
-  'Done': 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
-  'Closed': 'bg-surface-700 text-surface-400 border border-surface-600',
+const STATUS_STYLES = {
+  'To Do': { bg: 'bg-[#DFE1E6]', text: 'text-[#42526E]', dot: 'bg-[#42526E]' },
+  'In Progress': { bg: 'bg-[#DEEBFF]', text: 'text-[#0052CC]', dot: 'bg-[#0052CC]' },
+  'On Hold': { bg: 'bg-[#FFF0B3]', text: 'text-[#974F0C]', dot: 'bg-[#FF991F]' },
+  'Done': { bg: 'bg-[#E3FCEF]', text: 'text-[#006644]', dot: 'bg-[#00875A]' },
+  'Closed': { bg: 'bg-[#EBECF0]', text: 'text-[#42526E]', dot: 'bg-[#42526E]' },
+}
+
+const PRIORITY_STYLES = {
+  Highest: { color: 'text-[#CD1316]', label: 'Highest' },
+  High: { color: 'text-[#E9494A]', label: 'High' },
+  Medium: { color: 'text-[#FF991F]', label: 'Medium' },
+  Low: { color: 'text-[#006644]', label: 'Low' },
+  Lowest: { color: 'text-[#006644]', label: 'Lowest' },
+}
+
+function PriorityIcon({ priority }) {
+  const p = PRIORITY_STYLES[priority] || PRIORITY_STYLES.Medium
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-sm ${p.color}`}>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+        <path d="M8 1l2.5 5.5H14L10 10.5 11.5 16 8 13 4.5 16 6 10.5 2 6.5h3.5z" />
+      </svg>
+      {p.label}
+    </span>
+  )
+}
+
+function StatusLozenge({ status }) {
+  const s = STATUS_STYLES[status] || STATUS_STYLES['To Do']
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${s.bg} ${s.text}`}>
+      <span className={`w-2 h-2 rounded-full ${s.dot}`} />
+      {status}
+    </span>
+  )
+}
+
+function FieldRow({ label, children }) {
+  return (
+    <div className="py-2 border-b border-[#DFE1E6] last:border-0">
+      <dt className="text-xs text-[#6B778C] font-medium mb-1">{label}</dt>
+      <dd className="text-sm text-[#172B4D]">{children}</dd>
+    </div>
+  )
 }
 
 export default function JiraTicketPage() {
@@ -18,6 +60,7 @@ export default function JiraTicketPage() {
   const [loading, setLoading] = useState(true)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [activeTab, setActiveTab] = useState('comments')
 
   const loadTicket = async () => {
     try {
@@ -40,7 +83,7 @@ export default function JiraTicketPage() {
     try {
       const res = await jiraApi.transitionIssue(issueKey, status)
       setTicket(res.data)
-      toast.success(`Status updated to ${status}`)
+      toast.success(`Moved to ${status}`)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to update status')
     } finally {
@@ -66,142 +109,284 @@ export default function JiraTicketPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0c1424] flex items-center justify-center">
-        <Loader2 className="animate-spin text-blue-400" size={32} />
+      <div className="min-h-screen bg-[#F4F5F7] flex items-center justify-center">
+        <Loader2 className="animate-spin text-[#0052CC]" size={32} />
       </div>
     )
   }
 
   if (!ticket) {
     return (
-      <div className="min-h-screen bg-[#0c1424] text-surface-200 flex flex-col items-center justify-center gap-4">
-        <p>Ticket {issueKey} not found.</p>
-        <Link to="/dashboard" className="text-blue-400 hover:underline">Back to dashboard</Link>
+      <div className="min-h-screen bg-[#F4F5F7] text-[#172B4D] flex flex-col items-center justify-center gap-4">
+        <AlertCircle size={40} className="text-[#DE350B]" />
+        <p className="text-lg font-medium">Issue {issueKey} does not exist or you do not have permission to view it.</p>
+        <Link to="/dashboard" className="text-[#0052CC] hover:underline text-sm">Return to FixitLab</Link>
       </div>
     )
   }
 
-  const statusClass = STATUS_COLORS[ticket.jira_status] || STATUS_COLORS['To Do']
+  const projectKey = (ticket.issue_key || issueKey || 'KAN').split('-')[0]
 
   return (
-    <div className="min-h-screen bg-[#0c1424] text-surface-100">
-      <header className="border-b border-[#1e293b] bg-[#071018] px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Ticket className="text-blue-400" size={22} />
-          <div>
-            <p className="text-xs text-surface-500 uppercase tracking-wide">FixitLab Jira Simulation</p>
-            <h1 className="font-mono text-lg font-semibold text-blue-300">{ticket.issue_key}</h1>
+    <div className="min-h-screen bg-[#F4F5F7] text-[#172B4D] font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]">
+      {/* Jira top navigation */}
+      <header className="bg-[#0747A6] text-white h-12 flex items-center px-4 gap-4 shadow-sm">
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="w-7 h-7 bg-white rounded flex items-center justify-center">
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="#0052CC">
+              <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.232a5.215 5.215 0 0 0-5.215 5.214h2.128v2.057a5.218 5.218 0 0 0 5.215 5.214h2.128V11.51a1.005 1.005 0 0 0-1.005-1.005h-.005a1.005 1.005 0 0 0-1.004 1.005v2.057a3.205 3.205 0 0 1-3.204-3.204V5.973a3.205 3.205 0 0 1 3.204-3.204h9.062a3.205 3.205 0 0 1 3.204 3.204v2.057a1.005 1.005 0 0 0 1.004 1.005 1.005 1.005 0 0 0 1.005-1.005V5.973a5.218 5.218 0 0 0-5.215-5.216z" />
+            </svg>
+          </div>
+          <span className="font-semibold text-sm tracking-tight">Jira</span>
+        </div>
+        <div className="flex-1 max-w-xl">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B778C]" />
+            <input
+              type="text"
+              placeholder="Search"
+              className="w-full pl-9 pr-3 py-1.5 rounded text-sm text-[#172B4D] bg-[#253858] border border-[#344563] placeholder:text-[#8993A4] focus:outline-none focus:ring-2 focus:ring-[#4C9AFF]"
+              readOnly
+            />
           </div>
         </div>
-        <Link to="/dashboard" className="text-sm text-surface-400 hover:text-surface-200 flex items-center gap-1">
-          <ArrowLeft size={14} /> FixitLab
-        </Link>
+        <div className="flex items-center gap-3 text-[#DEEBFF]">
+          <HelpCircle size={18} className="opacity-80" />
+          <Bell size={18} className="opacity-80" />
+          <div className="w-7 h-7 rounded-full bg-[#6554C0] flex items-center justify-center text-xs font-bold text-white">
+            FL
+          </div>
+        </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div>
-            <h2 className="text-2xl font-semibold text-white mb-2">{ticket.summary}</h2>
-            {ticket.scenario && (
-              <p className="text-sm text-surface-400">
-                Scenario: {ticket.scenario.title}
-              </p>
-            )}
-          </div>
+      {/* Project breadcrumb bar */}
+      <div className="bg-white border-b border-[#DFE1E6] px-6 py-2 flex items-center justify-between">
+        <nav className="flex items-center gap-1 text-sm text-[#6B778C]">
+          <span className="font-medium text-[#0052CC]">{projectKey}</span>
+          <ChevronRight size={14} />
+          <span className="text-[#172B4D] font-medium">{ticket.issue_key}</span>
+        </nav>
+        <Link
+          to="/dashboard"
+          className="text-xs text-[#6B778C] hover:text-[#0052CC] flex items-center gap-1"
+        >
+          <ArrowLeft size={12} /> Back to FixitLab
+        </Link>
+      </div>
 
-          <section className="bg-[#111827] border border-[#1e293b] rounded-lg p-5">
-            <h3 className="text-sm font-semibold text-surface-300 mb-3 uppercase tracking-wide">Description</h3>
-            <pre className="text-sm text-surface-300 whitespace-pre-wrap font-sans leading-relaxed">
-              {ticket.description || 'No description.'}
-            </pre>
-          </section>
-
-          <section className="bg-[#111827] border border-[#1e293b] rounded-lg p-5">
-            <h3 className="text-sm font-semibold text-surface-300 mb-4 flex items-center gap-2">
-              <MessageSquare size={16} /> Comments
-            </h3>
-            <form onSubmit={handleComment} className="mb-4 flex gap-2">
-              <input
-                type="text"
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Add a comment..."
-                className="input-field flex-1 text-sm"
-                disabled={submitting}
-              />
-              <button type="submit" className="btn-primary text-sm px-4" disabled={submitting || !comment.trim()}>
-                Add
-              </button>
-            </form>
-            <div className="space-y-3">
-              {(ticket.comments || []).map((c, i) => (
-                <div key={i} className="border-l-2 border-blue-500/40 pl-3 py-1">
-                  <p className="text-xs text-surface-500">
-                    <span className="font-medium text-surface-300">{c.author}</span>
-                    {' · '}
-                    {new Date(c.created_at).toLocaleString()}
-                  </p>
-                  <p className="text-sm text-surface-200 mt-1 whitespace-pre-wrap">{c.text}</p>
+      <div className="max-w-6xl mx-auto px-6 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
+          {/* Main content */}
+          <main className="space-y-4">
+            {/* Issue header */}
+            <div className="bg-white rounded border border-[#DFE1E6] shadow-sm">
+              <div className="px-6 pt-5 pb-4 border-b border-[#DFE1E6]">
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 w-6 h-6 rounded bg-[#FF5630] flex items-center justify-center shrink-0">
+                    <AlertCircle size={14} className="text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-[#6B778C] mb-1">
+                      Incident / <span className="font-mono">{ticket.issue_key}</span>
+                    </p>
+                    <h1 className="text-xl font-normal text-[#172B4D] leading-snug">{ticket.summary}</h1>
+                  </div>
                 </div>
-              ))}
-              {(!ticket.comments || ticket.comments.length === 0) && (
-                <p className="text-sm text-surface-500">No comments yet.</p>
-              )}
-            </div>
-          </section>
-        </div>
 
-        <aside className="space-y-4">
-          <div className="bg-[#111827] border border-[#1e293b] rounded-lg p-5 space-y-4">
-            <div>
-              <p className="text-xs text-surface-500 uppercase mb-1">Status</p>
-              <span className={`inline-block px-3 py-1 rounded text-sm font-medium ${statusClass}`}>
-                {ticket.jira_status}
-              </span>
-            </div>
-            <div>
-              <p className="text-xs text-surface-500 uppercase mb-1">Priority</p>
-              <p className="text-sm">{ticket.priority || 'Medium'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-surface-500 uppercase mb-1">Attempts</p>
-              <p className="text-sm">{ticket.run_count || 1}</p>
-            </div>
-
-            {(ticket.allowed_transitions || []).length > 0 && (
-              <div>
-                <p className="text-xs text-surface-500 uppercase mb-2">Update status</p>
-                <div className="flex flex-col gap-2">
-                  {ticket.allowed_transitions.map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      disabled={submitting}
-                      onClick={() => handleTransition(status)}
-                      className="text-left text-sm px-3 py-2 rounded border border-[#334155] hover:border-blue-500/50 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
-                    >
-                      → {status}
-                    </button>
-                  ))}
-                </div>
+                {/* Workflow transition buttons */}
+                {(ticket.allowed_transitions || []).length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {ticket.allowed_transitions.map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        disabled={submitting}
+                        onClick={() => handleTransition(status)}
+                        className="px-3 py-1.5 text-sm font-medium rounded border border-[#DFE1E6] bg-[#FAFBFC] text-[#42526E] hover:bg-[#EBECF0] hover:border-[#C1C7D0] transition-colors disabled:opacity-50"
+                      >
+                        {status === 'Done' || status === 'Closed' ? (
+                          <CheckCircle2 size={14} className="inline mr-1 -mt-0.5" />
+                        ) : status === 'In Progress' ? (
+                          <Circle size={14} className="inline mr-1 -mt-0.5 text-[#0052CC]" />
+                        ) : null}
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {(ticket.activity || []).length > 0 && (
-            <div className="bg-[#111827] border border-[#1e293b] rounded-lg p-5">
-              <p className="text-xs text-surface-500 uppercase mb-3">Activity</p>
-              <ul className="space-y-2 text-xs text-surface-400">
-                {ticket.activity.slice(0, 8).map((a, i) => (
-                  <li key={i}>
-                    {a.action} · {a.jira_status}
-                    <span className="block text-surface-600">{new Date(a.created_at).toLocaleString()}</span>
-                  </li>
-                ))}
-              </ul>
+              {/* Description */}
+              <div className="px-6 py-5">
+                <h2 className="text-xs font-semibold text-[#6B778C] uppercase tracking-wider mb-3">Description</h2>
+                <div className="text-sm text-[#172B4D] leading-relaxed whitespace-pre-wrap">
+                  {ticket.description || 'No description provided.'}
+                </div>
+                {ticket.scenario && (
+                  <div className="mt-4 p-3 bg-[#DEEBFF]/40 border border-[#B3D4FF] rounded text-xs text-[#0747A6]">
+                    <strong>Linked lab scenario:</strong> {ticket.scenario.title}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </aside>
+
+            {/* Activity tabs */}
+            <div className="bg-white rounded border border-[#DFE1E6] shadow-sm">
+              <div className="flex border-b border-[#DFE1E6] px-4">
+                {[
+                  { key: 'comments', label: 'Comments', icon: MessageSquare },
+                  { key: 'history', label: 'History', icon: Clock },
+                ].map(({ key, label, icon: Icon }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveTab(key)}
+                    className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                      activeTab === key
+                        ? 'border-[#0052CC] text-[#0052CC]'
+                        : 'border-transparent text-[#6B778C] hover:text-[#172B4D]'
+                    }`}
+                  >
+                    <Icon size={14} /> {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="p-5">
+                {activeTab === 'comments' && (
+                  <>
+                    <form onSubmit={handleComment} className="mb-6">
+                      <textarea
+                        value={comment}
+                        onChange={(e) => setComment(e.target.value)}
+                        placeholder="Add a comment..."
+                        rows={3}
+                        disabled={submitting}
+                        className="w-full px-3 py-2 text-sm border border-[#DFE1E6] rounded focus:outline-none focus:ring-2 focus:ring-[#4C9AFF] focus:border-[#0052CC] resize-none bg-white text-[#172B4D]"
+                      />
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={submitting || !comment.trim()}
+                          className="px-4 py-1.5 text-sm font-medium rounded bg-[#0052CC] text-white hover:bg-[#0065FF] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Comment
+                        </button>
+                      </div>
+                    </form>
+
+                    <div className="space-y-5">
+                      {(ticket.comments || []).map((c, i) => (
+                        <div key={i} className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-[#6554C0] flex items-center justify-center text-xs font-bold text-white shrink-0">
+                            {(c.author || 'U').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-2 mb-1">
+                              <span className="text-sm font-semibold text-[#172B4D]">{c.author || 'User'}</span>
+                              <span className="text-xs text-[#6B778C]">
+                                {new Date(c.created_at).toLocaleString(undefined, {
+                                  dateStyle: 'medium',
+                                  timeStyle: 'short',
+                                })}
+                              </span>
+                            </div>
+                            <div className="text-sm text-[#172B4D] whitespace-pre-wrap bg-[#F4F5F7] rounded px-3 py-2 border border-[#EBECF0]">
+                              {c.text}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {(!ticket.comments || ticket.comments.length === 0) && (
+                        <p className="text-sm text-[#6B778C] text-center py-6">No comments yet. Be the first to add one.</p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {activeTab === 'history' && (
+                  <ul className="space-y-3">
+                    {(ticket.activity || []).map((a, i) => (
+                      <li key={i} className="flex gap-3 text-sm">
+                        <div className="w-8 h-8 rounded-full bg-[#DEEBFF] flex items-center justify-center shrink-0">
+                          <Clock size={14} className="text-[#0052CC]" />
+                        </div>
+                        <div>
+                          <p className="text-[#172B4D]">
+                            <span className="font-medium capitalize">{a.action.replace(/_/g, ' ')}</span>
+                            {a.jira_status && (
+                              <> — moved to <StatusLozenge status={a.jira_status} /></>
+                            )}
+                          </p>
+                          <p className="text-xs text-[#6B778C] mt-0.5">
+                            {new Date(a.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                    {(!ticket.activity || ticket.activity.length === 0) && (
+                      <p className="text-sm text-[#6B778C] text-center py-6">No activity recorded yet.</p>
+                    )}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </main>
+
+          {/* Right sidebar — Details panel */}
+          <aside>
+            <div className="bg-white rounded border border-[#DFE1E6] shadow-sm sticky top-4">
+              <div className="px-4 py-3 border-b border-[#DFE1E6] flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-[#6B778C] uppercase tracking-wider">Details</h3>
+                <MoreHorizontal size={16} className="text-[#6B778C]" />
+              </div>
+              <dl className="px-4 py-2">
+                <FieldRow label="Status">
+                  <StatusLozenge status={ticket.jira_status || 'To Do'} />
+                </FieldRow>
+                <FieldRow label="Priority">
+                  <PriorityIcon priority={ticket.priority || 'Medium'} />
+                </FieldRow>
+                <FieldRow label="Assignee">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-[#36B37E] flex items-center justify-center text-[10px] font-bold text-white">Y</span>
+                    You
+                  </span>
+                </FieldRow>
+                <FieldRow label="Reporter">
+                  <span className="inline-flex items-center gap-2">
+                    <User size={14} className="text-[#6B778C]" />
+                    FixitLab System
+                  </span>
+                </FieldRow>
+                <FieldRow label="Labels">
+                  <span className="inline-flex items-center gap-1 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-[#DFE1E6] text-[#42526E]">
+                      <Tag size={10} /> lab-incident
+                    </span>
+                    {ticket.scenario?.slug && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-[#DEEBFF] text-[#0052CC]">
+                        {ticket.scenario.slug}
+                      </span>
+                    )}
+                  </span>
+                </FieldRow>
+                <FieldRow label="Lab attempt">
+                  #{ticket.run_count || 1}
+                </FieldRow>
+                <FieldRow label="Created">
+                  {ticket.created_at
+                    ? new Date(ticket.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })
+                    : '—'}
+                </FieldRow>
+              </dl>
+            </div>
+
+            <p className="mt-3 text-[10px] text-[#8993A4] text-center px-2">
+              FixitLab incident simulation — styled like Jira Cloud. No external Atlassian account required.
+            </p>
+          </aside>
+        </div>
       </div>
     </div>
   )

@@ -7,7 +7,7 @@ difficulty: "medium"
 time_limit: 900  # 15 minutes
 max_score: 100
 infrastructure_type: "docker"
-docker_privileged: false
+docker_privileged: true
 jira_priority: "High"
 
 description: |
