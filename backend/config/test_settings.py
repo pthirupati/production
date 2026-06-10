@@ -22,6 +22,7 @@ _test_env = {
     "EMAIL_HOST_USER": "",
     "EMAIL_HOST_PASSWORD": "",
     "FRONTEND_URL": "http://localhost:5173",
+    "JIRA_SIMULATION_MODE": "False",
 }
 for k, v in _test_env.items():
     os.environ[k] = v  # override production env in container
