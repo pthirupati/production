@@ -20,7 +20,10 @@ Pipeline options when running workflow:
 
 After E2E tests finish, `scripts/cleanup-test-data.py` automatically removes test users (`@fixitlab-test.local`), lab sessions, Jira tickets, community threads, and containers. Set `E2E_SKIP_CLEANUP=1` on the server to disable.
 
-E2E coverage (`scripts/e2e_tab_coverage.py`) tests every main app tab, admin tab, lab runner options, billing, community actions, and per-technology Jira/scenario flows.
+E2E coverage:
+- `e2e_all_scenarios_labs.py` — **every active technology & scenario** from DB (auto-includes new admin content), 3 users, full lab lifecycle + Jira + validate + DB progress
+- `e2e_tab_coverage.py` — every user/admin tab, billing, community, notifications
+- `e2e_playwright_site.py` — frontend routes + dynamic scenario pages (optional)
 
 Pull requests run **CI Tests** only (no deploy).
 

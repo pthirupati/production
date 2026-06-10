@@ -29,7 +29,7 @@ from django.core.cache import cache
 User = get_user_model()
 
 TEST_EMAIL_DOMAIN = "fixitlab-test.local"
-TEST_USERNAME_PREFIXES = ("e2e", "e2e-concurrent", "labval_")
+TEST_USERNAME_PREFIXES = ("e2e", "e2e-concurrent", "e2e_lab_", "labval_")
 DRY_RUN = os.environ.get("DRY_RUN", "0") == "1"
 PROTECTED_EMAIL = (os.environ.get("SUPERUSER_EMAIL") or "").strip().lower()
 

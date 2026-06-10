@@ -450,6 +450,9 @@ def run_billing_subscribe_cancel_user(s, token: str):
 
 def run_lab_runner_all_tabs(s, token: str, scenario: dict | None) -> None:
     print("\n=== [Tab] Lab Runner (Instructions/Hints/Result APIs) ===")
+    if os.environ.get("E2E_SKIP_DUPLICATE_LABS") == "1":
+        s.record("Lab runner tabs", True, detail="covered by e2e_all_scenarios_labs.py")
+        return
     if SKIP_LAB:
         s.record("Lab runner tabs", True, detail="skipped E2E_SKIP_LAB=1")
         return
@@ -548,6 +551,8 @@ def run_admin_all_tabs(s, admin_token: str):
 
 def run_technology_all_scenarios(s, token: str):
     """Every technology: at least one scenario Jira + optional lab start."""
+    if os.environ.get("E2E_SKIP_DUPLICATE_LABS") == "1":
+        return
     if SKIP_LAB:
         return
     print("\n=== [Tab] All technologies → scenarios → Jira ===")

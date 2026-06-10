@@ -65,13 +65,21 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
   python manage.py test tests.test_jira_webhooks tests.test_api_security tests.test_billing_webhooks --verbosity=1 \
   2>&1 | tee "$LOG_DIR/unit-tests.log" || UNIT_FAIL=1
 
-# ── 5. E2E API tests (inside + external) ──
+# ── 5. Dynamic all-scenarios lab E2E (every tech/scenario, multi-user, auto catalog) ──
 echo ""
-echo ">>> [5/5] E2E API tests"
+echo ">>> [5/7] All scenarios lab E2E (dynamic catalog)"
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+  env E2E_SKIP_LAB="${E2E_SKIP_LAB:-0}" E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 \
+  python /scripts/e2e_all_scenarios_labs.py \
+  2>&1 | tee "$LOG_DIR/e2e-all-scenarios.log" || ALL_SCENARIOS_FAIL=1
+
+# ── 6. E2E API tests (tabs, features, admin) ──
+echo ""
+echo ">>> [6/7] E2E API tests (all tabs & features)"
 
 # Internal (backend localhost — bypasses nginx)
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-  env E2E_SKIP_LAB="${E2E_SKIP_LAB:-0}" RUN_FULL_E2E="${RUN_FULL_E2E:-1}" \
+  env E2E_SKIP_LAB="${E2E_SKIP_LAB:-0}" RUN_FULL_E2E="${RUN_FULL_E2E:-1}" E2E_SKIP_DUPLICATE_LABS=1 E2E_SKIP_CLEANUP=1 \
   python /scripts/e2e_production_test.py \
   2>&1 | tee "$LOG_DIR/e2e-internal.log" || E2E_INTERNAL_FAIL=1
 
@@ -88,6 +96,7 @@ echo "Logs saved to: $LOG_DIR"
 
 EXIT=0
 [ "${UNIT_FAIL:-0}" = "1" ] && EXIT=1 && echo "UNIT TESTS: FAILED"
+[ "${ALL_SCENARIOS_FAIL:-0}" = "1" ] && EXIT=1 && echo "ALL SCENARIOS E2E: FAILED"
 [ "${E2E_INTERNAL_FAIL:-0}" = "1" ] && EXIT=1 && echo "E2E INTERNAL: FAILED"
 [ "${E2E_EXTERNAL_FAIL:-0}" = "1" ] && EXIT=1 && echo "E2E EXTERNAL: FAILED"
 

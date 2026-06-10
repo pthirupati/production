@@ -54,13 +54,25 @@ if [ "$RUN_LAB_VALIDATION" = "true" ] || [ "$RUN_LAB_VALIDATION" = "1" ]; then
   fi
 
   echo ""
-  echo ">>> Lab provisioning sample"
+  echo ">>> All scenarios lab E2E (dynamic — every tech/scenario, 3 users)"
   if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-    env E2E_SKIP_LAB=0 LAB_SAMPLE=5 python /scripts/validate-scenario-labs.py; then
-    echo "  ✓ Lab validation passed"
+    env E2E_SKIP_LAB=0 E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 python /scripts/e2e_all_scenarios_labs.py; then
+    echo "  ✓ All scenarios lab E2E passed"
   else
-    echo "ERROR: Lab validation failed"
+    echo "ERROR: All scenarios lab E2E failed"
     fail=1
+  fi
+fi
+
+RUN_PLAYWRIGHT="${RUN_PLAYWRIGHT:-false}"
+if [ "$RUN_PLAYWRIGHT" = "true" ] || [ "$RUN_PLAYWRIGHT" = "1" ]; then
+  echo ""
+  echo ">>> Playwright frontend E2E"
+  if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    env SITE_URL="$SITE_URL" E2E_SKIP_LAB=1 python /scripts/e2e_playwright_site.py 2>/dev/null; then
+    echo "  ✓ Playwright passed"
+  else
+    echo "WARN: Playwright skipped or failed (install playwright in backend image for full UI tests)"
   fi
 fi
 
@@ -69,6 +81,7 @@ if [ "$RUN_E2E" = "true" ] || [ "$RUN_E2E" = "1" ]; then
   echo ">>> Full E2E (all tabs, features, admin)"
   export E2E_SKIP_LAB=0
   export RUN_FULL_E2E=1
+  export E2E_SKIP_DUPLICATE_LABS=1
   export BASE_URL="$SITE_URL"
   if bash "$ROOT/scripts/run-full-e2e.sh"; then
     echo "  ✓ E2E passed"

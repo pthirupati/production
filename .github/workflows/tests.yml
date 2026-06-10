@@ -27,7 +27,7 @@ on:
         type: boolean
         default: true
       run_lab_validation:
-        description: "Validate scenario images + sample lab provisioning"
+        description: "All scenarios lab E2E (every tech/scenario, 3 users, auto catalog)"
         type: boolean
         default: true
       skip_cleanup:
@@ -93,7 +93,7 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           envs: GITHUB_TOKEN,RUN_UNIT,RUN_E2E,RUN_LAB_VALIDATION,E2E_SKIP_CLEANUP
-          command_timeout: 120m
+          command_timeout: 240m
           script: |
             set -e
             REPO="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
@@ -108,7 +108,8 @@ jobs:
             git reset --hard "origin/${{ inputs.git_ref }}"
             chmod +x scripts/ci-run-tests.sh scripts/run-full-e2e.sh \
               scripts/cleanup-test-data.py scripts/validate-scenario-*.sh \
-              scripts/validate-scenario-labs.py 2>/dev/null || true
+              scripts/validate-scenario-labs.py scripts/e2e_all_scenarios_labs.py \
+              scripts/e2e_dynamic_catalog.py scripts/e2e_tab_coverage.py 2>/dev/null || true
             export RUN_UNIT="${RUN_UNIT:-true}"
             export RUN_E2E="${RUN_E2E:-true}"
             export RUN_LAB_VALIDATION="${RUN_LAB_VALIDATION:-true}"
