@@ -6,7 +6,7 @@ difficulty: "hard"
 time_limit: 1500
 max_score: 100
 infrastructure_type: "docker"
-docker_privileged: false
+docker_privileged: true
 jira_priority: "Medium"
 topics_covered: "Q7 XFS repair — xfs_repair, mount after clean log"
 

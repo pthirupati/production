@@ -6,7 +6,7 @@ difficulty: "easy"
 time_limit: 600
 max_score: 100
 infrastructure_type: "docker"
-docker_privileged: false
+docker_privileged: true
 jira_priority: "Medium"
 topics_covered: "Q147-Q148 swap — swapon, /etc/fstab"
 

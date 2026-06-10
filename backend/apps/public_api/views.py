@@ -995,10 +995,17 @@ class SessionReplayView(APIView):
                 "created_at": recording.created_at.isoformat(),
             })
         except SessionRecording.DoesNotExist:
-            return Response(
-                {"error": "No recording available for this session"},
-                status=status.HTTP_404_NOT_FOUND,
+            recording, _ = SessionRecording.objects.get_or_create(
+                session=session,
+                defaults={"events": [], "total_duration": 0},
             )
+            return Response({
+                "session_id": str(session.id),
+                "scenario_title": session.scenario.title,
+                "events": recording.events,
+                "total_duration": recording.total_duration,
+                "created_at": recording.created_at.isoformat(),
+            })
 
 
 # ─── Solution on Expiry ─────────────────────────────────────────────

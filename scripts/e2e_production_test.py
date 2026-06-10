@@ -125,7 +125,7 @@ def run_public_tests(s: Suite):
         s.record(f"{method} {path}", ok, status, err)
 
 
-def run_auth_registration(s: Suite) -> tuple[str | None, str]:
+def run_auth_registration(s: Suite) -> tuple[str | None, str, str]:
     print("\n=== Auth: OTP + registration ===")
     email = f"e2e-{uuid.uuid4().hex[:8]}@fixitlab-test.local"
     password = "E2eTestPass123!"
@@ -166,10 +166,10 @@ def run_auth_registration(s: Suite) -> tuple[str | None, str]:
         })
         s.record("POST /api/auth/register/", status in (200, 201), status, str(data.get("error", "")))
         if data.get("access"):
-            return data["access"], email
+            return data["access"], email, data.get("refresh", "")
 
-    token, _ = login(email, password)
-    return token, email
+    token, login_data = login(email, password)
+    return token, email, login_data.get("refresh", "")
 
 
 def run_user_flow(s: Suite, token: str, label: str = "user"):
@@ -539,10 +539,10 @@ def main():
 
     try:
         run_public_tests(s)
-        token, test_email = run_auth_registration(s)
+        token, test_email, refresh = run_auth_registration(s)
         if token:
             from e2e_tab_coverage import run_full_ui_coverage
-            run_full_ui_coverage(s, token, test_email, "E2eTestPass123!")
+            run_full_ui_coverage(s, token, test_email, "E2eTestPass123!", refresh)
         else:
             s.record("User registration flow", False, detail="no token")
 

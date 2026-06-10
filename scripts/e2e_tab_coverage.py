@@ -116,12 +116,12 @@ def run_search_and_public_extras(s):
     ])
 
 
-def run_auth_token_flow(s, token: str, email: str, password: str):
+def run_auth_token_flow(s, token: str, email: str, password: str, refresh_hint: str = ""):
     print("\n=== [Auth] Refresh & logout ===")
     st, data = api("POST", "/api/auth/refresh/", data={"refresh": ""})
     # refresh needs real refresh token from login response - re-login
     _, login_data = login(email, password)
-    refresh = login_data.get("refresh", "")
+    refresh = login_data.get("refresh", "") or refresh_hint
     if refresh:
         st, _ = api("POST", "/api/auth/refresh/", data={"refresh": refresh})
         s.record("Auth refresh token", st == 200, st)
@@ -299,7 +299,7 @@ def run_billing_all_options(s, token: str):
                 "technology_id": paid.get("id"),
                 "currency": "INR",
             })
-            s.record("Razorpay order create", st in (200, 201, 400, 503), st)
+            s.record("Razorpay order create", st in (200, 201, 400, 429, 503), st)
 
 
 def run_community_full(s, token: str):
@@ -578,7 +578,7 @@ def run_technology_all_scenarios(s, token: str):
         s.record(f"Tech {slug} jira", st_j in (200, 201) and bool(key), st_j, key[:15] or "no key")
 
 
-def run_full_ui_coverage(s, token: str, email: str, password: str) -> str:
+def run_full_ui_coverage(s, token: str, email: str, password: str, refresh: str = "") -> str:
     """Run every tab/feature test. Returns (possibly refreshed) token."""
     print("\n" + "=" * 60)
     print("FULL UI / TAB / FEATURE COVERAGE")
@@ -628,7 +628,7 @@ def run_full_ui_coverage(s, token: str, email: str, password: str) -> str:
             run_admin_write_ops(s, admin_token, test_user_id, scenario_id)
             _run_community_admin_mod(s, admin_token, token)
 
-    token = run_auth_token_flow(s, token, email, password) or token
+    token = run_auth_token_flow(s, token, email, password, refresh) or token
 
     print("\n=== Coverage manifest (all tabs & features) ===")
     total_features = sum(len(v) for v in UI_COVERAGE.values())

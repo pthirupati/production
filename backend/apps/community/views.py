@@ -1,6 +1,7 @@
 import logging
 from django.db import models
 from django.db.models import F
+from django.db.models.functions import Greatest
 from rest_framework import status as http_status
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
@@ -199,15 +200,19 @@ class VoteView(APIView):
                     # Remove vote (toggle off)
                     existing.delete()
                     if vote_type == "up":
-                        Thread.objects.filter(id=thread_id).update(upvotes=F("upvotes") - 1)
+                        Thread.objects.filter(id=thread_id).update(
+                            upvotes=Greatest(F("upvotes") - 1, 0)
+                        )
                     return Response({"status": "vote_removed"})
                 else:
                     existing.vote_type = vote_type
                     existing.save(update_fields=["vote_type"])
                     if vote_type == "up":
-                        Thread.objects.filter(id=thread_id).update(upvotes=F("upvotes") + 2)
+                        Thread.objects.filter(id=thread_id).update(upvotes=F("upvotes") + 1)
                     else:
-                        Thread.objects.filter(id=thread_id).update(upvotes=F("upvotes") - 2)
+                        Thread.objects.filter(id=thread_id).update(
+                            upvotes=Greatest(F("upvotes") - 1, 0)
+                        )
                     return Response({"status": "vote_changed"})
             else:
                 ThreadVote.objects.create(user=request.user, thread=target, vote_type=vote_type)
@@ -226,15 +231,19 @@ class VoteView(APIView):
                 if existing.vote_type == vote_type:
                     existing.delete()
                     if vote_type == "up":
-                        Reply.objects.filter(id=reply_id).update(upvotes=F("upvotes") - 1)
+                        Reply.objects.filter(id=reply_id).update(
+                            upvotes=Greatest(F("upvotes") - 1, 0)
+                        )
                     return Response({"status": "vote_removed"})
                 else:
                     existing.vote_type = vote_type
                     existing.save(update_fields=["vote_type"])
                     if vote_type == "up":
-                        Reply.objects.filter(id=reply_id).update(upvotes=F("upvotes") + 2)
+                        Reply.objects.filter(id=reply_id).update(upvotes=F("upvotes") + 1)
                     else:
-                        Reply.objects.filter(id=reply_id).update(upvotes=F("upvotes") - 2)
+                        Reply.objects.filter(id=reply_id).update(
+                            upvotes=Greatest(F("upvotes") - 1, 0)
+                        )
                     return Response({"status": "vote_changed"})
             else:
                 ThreadVote.objects.create(user=request.user, reply=target, vote_type=vote_type)

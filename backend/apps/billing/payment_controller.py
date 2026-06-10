@@ -47,14 +47,14 @@ class PaymentStatusView(APIView):
         service = PaymentService(user=None, amount=0)
         gateways = service.check_gateway_configured()
 
-        # If no gateway configured, return 503 (do not send sync email — blocks request on SMTP timeout)
+        # Report gateway availability without failing the request when unset.
         if not any(gateways.values()):
             logger.warning("Payment gateways not configured")
             return Response({
                 "configured": False,
                 "message": "Payment gateway is not configured. Please contact support.",
                 "gateways": gateways,
-            }, status=http_status.HTTP_503_SERVICE_UNAVAILABLE)
+            })
 
         return Response({
             "configured": True,
