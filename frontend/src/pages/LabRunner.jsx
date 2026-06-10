@@ -511,8 +511,6 @@ export default function LabRunner() {
       term.onResize(() => scheduleResize())
       window.addEventListener('resize', handleResize)
 
-      const wsCloseMessages = {
-
       cleanup = () => {
         disposed = true
         window.removeEventListener('resize', handleResize)
