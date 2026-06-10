@@ -221,7 +221,7 @@ class DockerProvisioner:
                 container = self.client.containers.get(container_id)
                 exec_instance = self.client.api.exec_create(
                     container.id,
-                    cmd=shell,
+                    cmd=[shell, "-i"],
                     stdin=True,
                     tty=True,
                     stderr=True,

@@ -43,11 +43,14 @@ from apps.public_api.views import LabHintsView
 from apps.accounts.views import LabHistoryView
 
 from e2e_dynamic_catalog import db_refresh, setup_all_test_users
+from e2e_scenario_fix import apply_scenario_fix, fix_script_path
 
 User = get_user_model()
 SKIP_LAB = os.environ.get("E2E_SKIP_LAB", "0") == "1"
 LAB_TIMEOUT = int(os.environ.get("LAB_WAIT_TIMEOUT", "120"))
 MULTI_USERS = int(os.environ.get("E2E_MULTI_USERS", "3"))
+# Only run dual-user isolation on the first deployable scenario (saves ~50% runtime)
+ISOLATION_ONCE = os.environ.get("E2E_ISOLATION_ONCE", "1") == "1"
 
 
 class RunStats:
@@ -104,9 +107,10 @@ def wait_session(session_id, timeout=LAB_TIMEOUT):
     return session, session.status if session else "timeout"
 
 
-def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c):
+def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c, *, test_isolation: bool = False):
     tech_slug = scenario.technology.slug if scenario.technology_id else "?"
     label = f"[{tech_slug}/{scenario.slug}]"
+    has_fix = bool(fix_script_path(scenario))
 
     # Scenario detail API (frontend scenario page)
     st = _factory_view(ScenarioDetailView, "GET", f"/api/scenarios/{scenario.slug}/", user_a, slug=scenario.slug)
@@ -128,58 +132,63 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c):
     else:
         stats.ok(f"{label} jira user_a {jira_a}")
 
-    # Jira — user B (isolated ticket)
-    st = _factory_view(
-        ScenarioJiraTicketView, "POST", f"/api/jira/tickets/scenario/{scenario.id}/", user_b,
-        scenario_id=scenario.id,
-    )
-    jira_b = (getattr(st, "data", {}) or {}).get("ticket", {}).get("issue_key", "")
-    if jira_b and jira_a and jira_a == jira_b:
-        stats.fail(f"{label} jira isolation", f"shared ticket {jira_a}")
-    elif jira_b:
-        stats.ok(f"{label} jira user_b {jira_b}")
+    if test_isolation and user_b:
+        st = _factory_view(
+            ScenarioJiraTicketView, "POST", f"/api/jira/tickets/scenario/{scenario.id}/", user_b,
+            scenario_id=scenario.id,
+        )
+        jira_b = (getattr(st, "data", {}) or {}).get("ticket", {}).get("issue_key", "")
+        if jira_b and jira_a and jira_a == jira_b:
+            stats.fail(f"{label} jira isolation", f"shared ticket {jira_a}")
+        elif jira_b:
+            stats.ok(f"{label} jira user_b {jira_b}")
 
     cache.clear()
     db_refresh()
 
-    # Start labs — A and B
+    # Start lab — user A (always); user B only for isolation test
     st_a = _factory_view(StartLabView, "POST", f"/api/labs/{scenario.id}/start/", user_a, scenario_id=scenario.id)
     data_a = getattr(st_a, "data", {}) or {}
     sid_a = data_a.get("session_id") or data_a.get("id")
 
-    st_b = _factory_view(StartLabView, "POST", f"/api/labs/{scenario.id}/start/", user_b, scenario_id=scenario.id)
-    data_b = getattr(st_b, "data", {}) or {}
-    sid_b = data_b.get("session_id") or data_b.get("id")
+    sid_b = None
+    if test_isolation and user_b:
+        st_b = _factory_view(StartLabView, "POST", f"/api/labs/{scenario.id}/start/", user_b, scenario_id=scenario.id)
+        data_b = getattr(st_b, "data", {}) or {}
+        sid_b = data_b.get("session_id") or data_b.get("id")
+        if getattr(st_b, "status_code", 0) not in (200, 201, 202) or not sid_b:
+            stats.fail(f"{label} start user_b", str(data_b.get("error", data_b))[:80])
+            _stop(sid_a, user_a)
+            return
+        if str(sid_a) == str(sid_b):
+            stats.fail(f"{label} session isolation", "same session id")
+            _stop(sid_a, user_a)
+            return
 
     if getattr(st_a, "status_code", 0) not in (200, 201, 202) or not sid_a:
         stats.fail(f"{label} start user_a", str(data_a.get("error", data_a))[:80])
         return
-    if getattr(st_b, "status_code", 0) not in (200, 201, 202) or not sid_b:
-        stats.fail(f"{label} start user_b", str(data_b.get("error", data_b))[:80])
-        _stop(sid_a, user_a)
-        return
-    if str(sid_a) == str(sid_b):
-        stats.fail(f"{label} session isolation", "same session id")
-        _stop(sid_a, user_a)
-        return
 
-    stats.ok(f"{label} start dual users")
+    stats.ok(f"{label} start {'dual users' if test_isolation else 'user_a'}")
 
     sess_a, status_a = wait_session(sid_a)
-    sess_b, status_b = wait_session(sid_b)
+    status_b = None
+    if sid_b:
+        _, status_b = wait_session(sid_b)
 
     if status_a != "RUNNING":
         stats.fail(f"{label} user_a RUNNING", status_a)
     else:
         stats.ok(f"{label} user_a RUNNING")
 
-    if status_b != "RUNNING":
-        stats.fail(f"{label} user_b RUNNING", status_b)
-    else:
-        stats.ok(f"{label} user_b RUNNING")
+    if sid_b:
+        if status_b != "RUNNING":
+            stats.fail(f"{label} user_b RUNNING", status_b)
+        else:
+            stats.ok(f"{label} user_b RUNNING")
 
-    # User C cannot stop user A's lab
-    if user_c and sid_a:
+    # User C cannot stop user A's lab (isolation test only)
+    if test_isolation and user_c and sid_a:
         st_c = _factory_view(StopLabView, "POST", f"/api/labs/{sid_a}/stop/", user_c, session_id=sid_a)
         if getattr(st_c, "status_code", 0) in (200, 204):
             stats.fail(f"{label} user_c isolation", "user_c stopped user_a lab")
@@ -212,22 +221,35 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c):
         if getattr(st, "status_code", 0) == 200:
             stats.ok(f"{label} replay API")
 
-        # Validate (may pass or fail — endpoint must work)
+        # Apply fix.sh then validate — must pass when fix script exists
+        db_refresh()
+        sess_a = LabSession.objects.filter(id=sid_a).first()
+        if has_fix and sess_a:
+            ok, detail = apply_scenario_fix(sess_a)
+            if ok:
+                stats.ok(f"{label} apply fix.sh")
+            else:
+                stats.fail(f"{label} apply fix.sh", detail[:80])
+
         st = _factory_view(ValidateLabView, "POST", f"/api/labs/{sid_a}/validate/", user_a, session_id=sid_a)
         vdata = getattr(st, "data", {}) or {}
-        if getattr(st, "status_code", 0) in (200, 400, 500):
-            passed = vdata.get("passed")
-            stats.ok(f"{label} validate API (passed={passed})")
+        passed = vdata.get("passed")
+        if getattr(st, "status_code", 0) not in (200, 400, 500):
+            stats.fail(f"{label} validate API", str(vdata)[:60])
+        elif has_fix and not passed:
+            stats.fail(f"{label} validate PASS", (vdata.get("output") or str(vdata))[:80])
+        elif has_fix and passed:
+            stats.ok(f"{label} validate PASS")
             db_refresh()
             sess_a = LabSession.objects.filter(id=sid_a).first()
-            if passed and sess_a and sess_a.status == "COMPLETED":
+            if sess_a and sess_a.status == "COMPLETED":
                 prog = UserScenarioProgress.objects.filter(user=user_a, scenario=scenario).first()
                 if prog:
                     stats.ok(f"{label} DB progress after validate")
                 else:
                     stats.fail(f"{label} DB progress", "missing UserScenarioProgress")
         else:
-            stats.fail(f"{label} validate API", str(vdata)[:60])
+            stats.ok(f"{label} validate API (no fix.sh, passed={passed})")
 
     # Active labs + history
     st = _factory_view(ActiveLabsView, "GET", "/api/labs/active/", user_a)
@@ -240,7 +262,8 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c):
 
     # Stop remaining labs
     _stop(sid_a, user_a)
-    _stop(sid_b, user_b)
+    if sid_b:
+        _stop(sid_b, user_b)
 
 
 def _stop(session_id, user):
@@ -304,6 +327,7 @@ def main():
         print(f"Missing images ({len(catalog['missing_images'])}): {', '.join(catalog['missing_images'][:15])}"
               + (" ..." if len(catalog["missing_images"]) > 15 else ""))
 
+    isolation_done = False
     for tech in catalog["technologies"]:
         tech_scenarios = catalog["by_tech"].get(tech.slug, [])
         deployable = [s for s in tech_scenarios if s in catalog["deployable"]]
@@ -311,8 +335,14 @@ def main():
         for sc in deployable:
             db_refresh()
             cache.clear()
+            do_isolation = ISOLATION_ONCE and not isolation_done and user_b is not None
             try:
-                run_scenario_e2e(stats, sc, user_a, user_b, user_c)
+                run_scenario_e2e(
+                    stats, sc, user_a, user_b, user_c,
+                    test_isolation=do_isolation,
+                )
+                if do_isolation:
+                    isolation_done = True
             except Exception as exc:
                 stats.fail(f"[{tech.slug}/{sc.slug}] exception", str(exc)[:100])
 

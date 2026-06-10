@@ -24,9 +24,11 @@ _test_env = {
     "FRONTEND_URL": "http://localhost:5173",
 }
 for k, v in _test_env.items():
-    os.environ.setdefault(k, v)
+    os.environ[k] = v  # override production env in container
 
 from .settings import *  # noqa
+
+DEBUG = True
 
 # ── Override database to SQLite for fast, isolated tests ──
 DATABASES = {

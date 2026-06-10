@@ -386,7 +386,12 @@ export default function LabRunner() {
 
         ws.onopen = () => {
           reconnectAttempts.current = 0
-          ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }))
+          // Defer resize until shell is ready (avoids Docker exec_resize killing the stream)
+          setTimeout(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }))
+            }
+          }, 800)
         }
         ws.onmessage = (event) => {
           try {

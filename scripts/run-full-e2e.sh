@@ -62,8 +62,8 @@ done
 echo ""
 echo ">>> [4/5] Django unit tests"
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-  env DJANGO_SETTINGS_MODULE=config.test_settings \
-  python manage.py test tests.test_jira_webhooks tests.test_api_security tests.test_billing_webhooks --verbosity=1 \
+  python manage.py test tests.test_jira_webhooks tests.test_api_security tests.test_billing_webhooks \
+  --settings=config.test_settings --verbosity=1 \
   2>&1 | tee "$LOG_DIR/unit-tests.log" || UNIT_FAIL=1
 
 # ── 5. Dynamic all-scenarios lab E2E (every tech/scenario, multi-user, auto catalog) ──

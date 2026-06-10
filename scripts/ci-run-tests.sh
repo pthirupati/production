@@ -29,14 +29,28 @@ echo "=== FixitLab Tests (no deploy) ==="
 echo "RUN_UNIT=$RUN_UNIT RUN_E2E=$RUN_E2E RUN_LAB_VALIDATION=$RUN_LAB_VALIDATION"
 echo "SITE_URL=$SITE_URL"
 
+# Rebuild app images so server tests use latest code (backend is baked into image, not mounted)
+if [ "$RUN_UNIT" = "true" ] || [ "$RUN_UNIT" = "1" ] || [ "$RUN_E2E" = "true" ] || [ "$RUN_E2E" = "1" ] || [ "$RUN_LAB_VALIDATION" = "true" ] || [ "$RUN_LAB_VALIDATION" = "1" ]; then
+  echo ""
+  echo ">>> Rebuild backend / frontend / gateway (latest code)"
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build backend frontend-prod gateway
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d backend frontend-prod gateway
+  echo ">>> Waiting for backend healthy..."
+  for _ in $(seq 1 90); do
+    if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps backend 2>/dev/null | grep -q "(healthy)"; then
+      break
+    fi
+    sleep 2
+  done
+fi
+
 fail=0
 
 if [ "$RUN_UNIT" = "true" ] || [ "$RUN_UNIT" = "1" ]; then
   echo ""
   echo ">>> Django unit tests"
   if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-    env DJANGO_SETTINGS_MODULE=config.test_settings \
-    python manage.py test tests --verbosity=1; then
+    python manage.py test tests --settings=config.test_settings --verbosity=1; then
     echo "  ✓ Unit tests passed"
   else
     echo "ERROR: Unit tests failed"

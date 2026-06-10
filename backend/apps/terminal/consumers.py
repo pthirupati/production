@@ -57,7 +57,9 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         self._recording_events = []
         self._session_start_time = None
         self._tracked_user_id = None  # For per-user connection counting
-        self._blocked_patterns = []   # Compiled regex patterns for blocked commands
+        self._blocked_patterns = []
+        self._shell_ready = False
+        self._resize_pending = None
 
     async def connect(self):
         user = self.scope.get("user", AnonymousUser())
@@ -163,6 +165,11 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 )
             }))
 
+            self._shell_ready = True
+            if self._resize_pending:
+                await self._apply_resize(self._resize_pending)
+                self._resize_pending = None
+
             # Start reading output
             self.reader_task = asyncio.create_task(self._read_output())
 
@@ -241,44 +248,53 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     self._recording_events.append([elapsed, "i", data["input"]])
 
             elif "resize" in data:
-                cols = data["resize"].get("cols", 120)
-                rows = data["resize"].get("rows", 40)
-
-                if self.provider_type == "docker":
-                    # Docker: use exec_resize API
-                    if self.exec_id and self.provisioner:
-                        try:
-                            await asyncio.to_thread(
-                                self.provisioner.client.api.exec_resize,
-                                self.exec_id,
-                                height=rows,
-                                width=cols,
-                            )
-                        except Exception:
-                            pass
+                if not self._shell_ready:
+                    self._resize_pending = data["resize"]
                 else:
-                    # Cloud (SSH): use channel resize_pty
-                    try:
-                        await asyncio.to_thread(
-                            self.raw_socket.resize_pty,
-                            width=cols,
-                            height=rows,
-                        )
-                    except Exception:
-                        pass
+                    await self._apply_resize(data["resize"])
 
         except json.JSONDecodeError:
             pass
         except Exception as e:
             logger.error(f"Error handling terminal input: {e}")
 
+    async def _apply_resize(self, resize_data):
+        cols = resize_data.get("cols", 120)
+        rows = resize_data.get("rows", 40)
+        if self.provider_type == "docker":
+            if self.exec_id and self.provisioner:
+                try:
+                    await asyncio.to_thread(
+                        self.provisioner.client.api.exec_resize,
+                        self.exec_id,
+                        height=rows,
+                        width=cols,
+                    )
+                except Exception:
+                    pass
+        else:
+            try:
+                await asyncio.to_thread(
+                    self.raw_socket.resize_pty,
+                    width=cols,
+                    height=rows,
+                )
+            except Exception:
+                pass
+
     async def _read_output(self):
         """Continuously read output from the exec socket/SSH channel and send to client."""
+        empty_reads = 0
         try:
             while True:
                 data = await asyncio.to_thread(self.raw_socket.recv, 4096)
                 if not data:
-                    break
+                    empty_reads += 1
+                    if empty_reads >= 3:
+                        break
+                    await asyncio.sleep(0.3)
+                    continue
+                empty_reads = 0
                 output = data.decode("utf-8", errors="replace")
 
                 # Record output for replay

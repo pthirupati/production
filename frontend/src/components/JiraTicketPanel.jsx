@@ -8,7 +8,10 @@ export default function JiraTicketPanel({ ticket, comments = [], compact = false
   if (!ticket?.issue_key) return null
 
   return (
-    <div className={`border border-blue-500/20 bg-blue-500/5 rounded-lg ${compact ? 'p-3' : 'p-4 mb-6'}`}>
+    <div
+      id="jira-ticket-panel"
+      className={`border border-blue-500/20 bg-blue-500/5 rounded-lg scroll-mt-4 ${compact ? 'p-3' : 'p-4 mb-6'}`}
+    >
       <div className="flex items-start gap-2">
         <Ticket size={compact ? 16 : 18} className="text-blue-400 mt-0.5 shrink-0" />
         <div className="min-w-0 flex-1">
