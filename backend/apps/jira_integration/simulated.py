@@ -29,10 +29,7 @@ ALLOWED_TRANSITIONS = {
 
 def use_simulated_jira() -> bool:
     """Use local ticket simulation instead of Jira Cloud API."""
-    if getattr(settings, "JIRA_SIMULATION_MODE", True):
-        return True
-    from .client import JiraClient
-    return not JiraClient().enabled
+    return getattr(settings, "JIRA_SIMULATION_MODE", True)
 
 
 def _next_issue_key() -> str:

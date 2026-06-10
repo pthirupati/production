@@ -71,6 +71,9 @@ MIDDLEWARE = [m for m in MIDDLEWARE if "AuditMiddleware" not in m]  # noqa: F405
 # ── No HTTPS redirect in test client (APIClient does not send X-Forwarded-Proto) ──
 SECURE_SSL_REDIRECT = False
 
+# ── Jira: unit tests mock JiraClient; keep simulation off unless explicitly tested ──
+JIRA_SIMULATION_MODE = False
+
 # ── Caches ──
 CACHES = {
     "default": {

@@ -25,6 +25,7 @@ User = get_user_model()
     JIRA_BASE_URL="",
     JIRA_EMAIL="",
     JIRA_API_TOKEN="",
+    JIRA_SIMULATION_MODE=False,
 )
 class JiraSyncDisabledTests(TestCase):
     def setUp(self):
@@ -59,6 +60,7 @@ class JiraSyncDisabledTests(TestCase):
     JIRA_TRANSITION_IN_PROGRESS="In Progress",
     JIRA_TRANSITION_TODO="To Do",
     JIRA_TRANSITION_DONE="Done",
+    JIRA_SIMULATION_MODE=False,
     SITE_URL="https://fixitlab.example.com",
 )
 class JiraSyncEnabledTests(TestCase):
