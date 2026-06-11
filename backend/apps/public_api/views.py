@@ -34,6 +34,7 @@ from apps.jira_integration.sync import (
     sync_lab_started, sync_lab_completed, sync_lab_stopped, sync_lab_in_progress,
     mask_jira_url_for_user,
 )
+from apps.jira_integration.helpers import resolve_jira_issue_url
 
 # For PDF certificate generation
 import io
@@ -723,10 +724,9 @@ class LabSessionStatusView(APIView):
             "validation_passed": session.validation_passed,
             "is_expired": session.is_expired,
             "jira_issue_key": session.jira_issue_key or "",
-            "jira_issue_url": (
-                session.jira_issue_url or ""
-                if request.user.is_staff or request.user.is_superuser
-                else ""
+            "jira_issue_url": resolve_jira_issue_url(
+                session.jira_issue_key or "",
+                session.jira_issue_url or "",
             ),
         }
         return Response(data)

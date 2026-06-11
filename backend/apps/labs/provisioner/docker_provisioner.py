@@ -304,17 +304,29 @@ class DockerProvisioner:
         Docker SDK >=7 changed socket handling — we extract the raw socket.
         """
         last_error = None
-        for shell in ("/bin/bash", "/bin/sh"):
+        shells = (
+            ["/bin/bash", "-li"],
+            ["/bin/bash", "-i"],
+            ["/bin/sh", "-i"],
+        )
+        for cmd in shells:
             try:
                 container = self.client.containers.get(container_id)
                 exec_instance = self.client.api.exec_create(
                     container.id,
-                    cmd=[shell, "-i"],
+                    cmd=cmd,
                     stdin=True,
                     tty=True,
                     stderr=True,
                     stdout=True,
-                    environment={"TERM": "xterm-256color", "COLUMNS": "120", "LINES": "40"},
+                    user="root",
+                    workdir="/root",
+                    environment={
+                        "TERM": "xterm-256color",
+                        "COLUMNS": "120",
+                        "LINES": "40",
+                        "PS1": r"\u@\h:\w\$ ",
+                    },
                 )
                 sock = self.client.api.exec_start(
                     exec_instance["Id"],
@@ -327,7 +339,10 @@ class DockerProvisioner:
                 return exec_instance["Id"], raw_socket
             except (NotFound, APIError) as e:
                 last_error = e
-                logger.warning(f"Exec stream with {shell} failed for {container_id}: {e}")
+                logger.warning(
+                    "Exec stream with %s failed for %s: %s",
+                    " ".join(cmd), container_id[:12], e,
+                )
         logger.error(f"Failed to create exec stream for {container_id}: {last_error}")
         raise last_error
 

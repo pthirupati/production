@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from apps.question_bank.models import Scenario
 
 from .models import JiraCommentLog, UserScenarioJiraTicket
-from .helpers import is_jira_closed
+from .helpers import is_jira_closed, resolve_jira_issue_url
 from .sync import ensure_scenario_ticket
 
 
@@ -52,10 +52,9 @@ class UserJiraTicketsView(APIView):
         closed_tickets = []
         for t in tickets_qs:
             status = _sync_ticket_status(t, client) if live_sync else (t.jira_status or "")
-            show_url = t.simulated or use_simulated_jira() or request.user.is_staff or request.user.is_superuser
             entry = {
                 "issue_key": t.issue_key,
-                "issue_url": t.issue_url if show_url else "",
+                "issue_url": resolve_jira_issue_url(t.issue_key, t.issue_url),
                 "jira_status": status,
                 "is_closed": is_jira_closed(status),
                 "run_count": t.run_count,
@@ -82,14 +81,14 @@ class UserJiraTicketsView(APIView):
 
 
 def _scenario_ticket_payload(ticket, user=None, include_details=False):
+    from .helpers import resolve_jira_issue_url
     from .simulated import ticket_detail_payload, use_simulated_jira
 
     comments = JiraCommentLog.objects.filter(issue_key=ticket.issue_key).order_by("-created_at")[:10]
-    show_url = user and (user.is_staff or user.is_superuser or ticket.simulated or use_simulated_jira())
     payload = {
         "ticket": {
             "issue_key": ticket.issue_key,
-            "issue_url": ticket.issue_url if show_url else "",
+            "issue_url": resolve_jira_issue_url(ticket.issue_key, ticket.issue_url),
             "jira_status": ticket.jira_status,
             "run_count": ticket.run_count,
             "simulated": ticket.simulated or use_simulated_jira(),

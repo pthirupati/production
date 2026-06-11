@@ -6,7 +6,7 @@ listen-address=127.0.0.1
 bind-interfaces
 address=/app.fixitlab.local/10.20.0.5
 EOF
-rm -f /etc/resolv.conf
+# resolv.conf is often a Docker mount — overwrite in place instead of rm
 cat > /etc/resolv.conf <<'EOF'
 nameserver 127.0.0.1
 EOF

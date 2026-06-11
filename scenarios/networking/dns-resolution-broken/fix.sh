@@ -7,7 +7,6 @@ bind-interfaces
 address=/google.com/10.20.0.10
 address=/github.com/10.20.0.11
 EOF
-rm -f /etc/resolv.conf
 cat > /etc/resolv.conf <<'EOF'
 nameserver 127.0.0.1
 EOF

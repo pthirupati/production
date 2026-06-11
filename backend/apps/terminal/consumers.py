@@ -274,6 +274,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
     async def _read_output(self):
         """Continuously read output from the exec socket/SSH channel and send to client."""
+        empty_reads = 0
         try:
             await asyncio.to_thread(self.raw_socket.settimeout, 60.0)
             while True:
@@ -282,9 +283,21 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 except TimeoutError:
                     continue
                 if not data:
+                    empty_reads += 1
+                    if empty_reads > 150:
+                        logger.info("Exec stream EOF for session %s", self.lab_session.id)
+                        try:
+                            await self.send(text_data=json.dumps({
+                                "output": "\r\n\x1b[1;33mShell session ended — reconnecting...\x1b[0m\r\n"
+                            }))
+                        except Exception:
+                            pass
+                        await self.close(code=4500)
+                        break
                     await asyncio.sleep(0.2)
                     continue
 
+                empty_reads = 0
                 if not self._shell_ready:
                     self._shell_ready = True
                     if self._resize_pending:

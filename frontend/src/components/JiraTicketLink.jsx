@@ -14,7 +14,13 @@ export default function JiraTicketLink({
 }) {
   if (!issueKey) return null
 
-  const href = issueUrl || `/jira/${issueKey}`
+  const inAppHref = `/jira/${issueKey}`
+  const useExternal =
+    allowExternalLink &&
+    issueUrl &&
+    issueUrl.startsWith('http') &&
+    !issueUrl.includes('/jira/')
+  const href = useExternal ? issueUrl : inAppHref
   const baseClass = `font-mono font-semibold text-blue-400 underline decoration-blue-400/40 underline-offset-2 hover:text-blue-300 hover:decoration-blue-300 cursor-pointer transition-colors ${className}`
 
   const scrollToPanel = (e) => {
@@ -35,10 +41,10 @@ export default function JiraTicketLink({
     }
   }
 
-  if (allowExternalLink && issueUrl && issueUrl.startsWith('http')) {
+  if (useExternal) {
     return (
       <a
-        href={issueUrl}
+        href={href}
         target="_blank"
         rel="noopener noreferrer"
         className={`inline-flex items-center gap-1 ${baseClass}`}

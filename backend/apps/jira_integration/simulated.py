@@ -73,8 +73,8 @@ def _log(session, issue_key, issue_url, action, jira_status="", details=None):
 
 
 def _ticket_url(issue_key: str) -> str:
-    site = settings.SITE_URL.rstrip("/")
-    return f"{site}/jira/{issue_key}"
+    from .helpers import in_app_jira_url
+    return in_app_jira_url(issue_key)
 
 
 def ensure_scenario_ticket(user, scenario) -> dict:

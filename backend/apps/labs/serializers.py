@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import LabSession
 from apps.question_bank.serializers import ScenarioListSerializer
+from apps.jira_integration.helpers import resolve_jira_issue_url
 
 
 class LabSessionSerializer(serializers.ModelSerializer):
@@ -10,11 +11,7 @@ class LabSessionSerializer(serializers.ModelSerializer):
     jira_issue_url = serializers.SerializerMethodField()
 
     def get_jira_issue_url(self, obj):
-        """Learners use in-app Jira panel; only staff get external Atlassian URLs."""
-        request = self.context.get("request")
-        if request and (request.user.is_staff or request.user.is_superuser):
-            return obj.jira_issue_url or ""
-        return ""
+        return resolve_jira_issue_url(obj.jira_issue_key or "")
 
     class Meta:
         model = LabSession

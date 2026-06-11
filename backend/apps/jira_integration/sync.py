@@ -152,19 +152,16 @@ def ensure_scenario_ticket(user, scenario) -> dict:
 
 
 def mask_jira_url_for_user(info: dict, user) -> dict:
-    """Learners get in-app simulation URL; staff may open external Atlassian when configured."""
-    from .simulated import use_simulated_jira
+    """All users get in-app simulation URLs (no Atlassian login required)."""
+    from .helpers import resolve_jira_issue_url
 
     if not user:
         return info
     masked = dict(info)
     key = info.get("jira_issue_key") or masked.get("jira_issue_key")
-    if key and (info.get("simulated") or use_simulated_jira()):
-        masked["jira_issue_url"] = f"{settings.SITE_URL.rstrip('/')}/jira/{key}"
-        return masked
-    if user.is_staff or user.is_superuser:
-        return info
-    masked["jira_issue_url"] = ""
+    if key:
+        masked["jira_issue_url"] = resolve_jira_issue_url(key, info.get("jira_issue_url", ""))
+        masked["simulated"] = True
     return masked
 
 
