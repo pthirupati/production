@@ -1,5 +1,5 @@
 import logging
-from django.db import models
+from django.db import models, transaction
 from django.db.models import F
 from django.db.models.functions import Greatest
 from rest_framework import status as http_status
@@ -207,6 +207,10 @@ class VoteView(APIView):
         except Thread.DoesNotExist:
             return Response({"error": "Thread not found"}, status=http_status.HTTP_404_NOT_FOUND)
 
+        with transaction.atomic():
+            return self._apply_thread_vote(request, thread_id, target, vote_type)
+
+    def _apply_thread_vote(self, request, thread_id, target, vote_type):
         existing = ThreadVote.objects.filter(user=request.user, thread=target).first()
         if existing:
             if existing.vote_type == vote_type:
@@ -238,6 +242,10 @@ class VoteView(APIView):
         except Reply.DoesNotExist:
             return Response({"error": "Reply not found"}, status=http_status.HTTP_404_NOT_FOUND)
 
+        with transaction.atomic():
+            return self._apply_reply_vote(request, reply_id, target, vote_type)
+
+    def _apply_reply_vote(self, request, reply_id, target, vote_type):
         existing = ThreadVote.objects.filter(user=request.user, reply=target).first()
         if existing:
             if existing.vote_type == vote_type:

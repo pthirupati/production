@@ -53,7 +53,7 @@ class PaymentStatusView(APIView):
                 "configured": False,
                 "message": "Payment gateway status unavailable.",
                 "gateways": {"razorpay": False, "stripe": False},
-            })
+            }, status=http_status.HTTP_200_OK)
 
         if not any(gateways.values()):
             logger.warning("Payment gateways not configured")
@@ -61,7 +61,7 @@ class PaymentStatusView(APIView):
                 "configured": False,
                 "message": "Payment gateway is not configured. Please contact support.",
                 "gateways": gateways,
-            })
+            }, status=http_status.HTTP_200_OK)
 
         return Response({
             "configured": True,

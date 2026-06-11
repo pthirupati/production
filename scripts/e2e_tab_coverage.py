@@ -116,22 +116,42 @@ def run_search_and_public_extras(s):
     ])
 
 
+def _mint_refresh_token(email: str) -> str:
+    """Mint a refresh token via Django when HTTP login is rate-limited (in-container E2E)."""
+    try:
+        import sys
+        sys.path.insert(0, "/app")
+        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+        import django
+        django.setup()
+        from django.contrib.auth import get_user_model
+        from common.security import TokenHelper
+        user = get_user_model().objects.filter(email=email).first()
+        if not user:
+            return ""
+        return TokenHelper.create_tokens_with_session(user).get("refresh", "")
+    except Exception:
+        return ""
+
+
 def run_auth_token_flow(s, token: str, email: str, password: str, refresh_hint: str = ""):
     print("\n=== [Auth] Refresh & logout ===")
-    refresh = refresh_hint
+    from e2e_production_test import clear_rate_limit_cache
+
+    refresh = refresh_hint or ""
     if not refresh:
-        for _ in range(2):
-            _, login_data = login(email, password)
-            refresh = (login_data or {}).get("refresh", "")
-            if refresh:
-                break
+        clear_rate_limit_cache()
+        _, login_data = login(email, password)
+        refresh = (login_data or {}).get("refresh", "")
+    if not refresh:
+        refresh = _mint_refresh_token(email)
     if refresh:
         st, refresh_data = api("POST", "/api/auth/refresh/", data={"refresh": refresh})
         s.record("Auth refresh token", st in (200, 429), st)
         if st == 200 and isinstance(refresh_data, dict) and refresh_data.get("refresh"):
             refresh = refresh_data["refresh"]
     else:
-        s.record("Auth refresh token", False, detail="no refresh in login")
+        s.record("Auth refresh token", False, detail="no refresh token available")
 
     st, _ = api("POST", "/api/auth/change-password/", token=token, data={
         "old_password": password,
