@@ -44,10 +44,17 @@ class PaymentStatusView(APIView):
 
     def get(self, request):
         """Check which gateways are configured."""
-        service = PaymentService(user=None, amount=0)
-        gateways = service.check_gateway_configured()
+        try:
+            service = PaymentService(user=None, amount=0)
+            gateways = service.check_gateway_configured()
+        except Exception as exc:
+            logger.warning("Payment status check failed: %s", exc)
+            return Response({
+                "configured": False,
+                "message": "Payment gateway status unavailable.",
+                "gateways": {"razorpay": False, "stripe": False},
+            })
 
-        # Report gateway availability without failing the request when unset.
         if not any(gateways.values()):
             logger.warning("Payment gateways not configured")
             return Response({

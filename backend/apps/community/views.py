@@ -188,67 +188,77 @@ class VoteView(APIView):
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
-        if thread_id:
-            try:
-                target = Thread.objects.get(id=thread_id, is_deleted=False)
-            except Thread.DoesNotExist:
-                return Response({"error": "Thread not found"}, status=http_status.HTTP_404_NOT_FOUND)
+        try:
+            if thread_id:
+                return self._vote_thread(request, thread_id, vote_type)
+            if reply_id:
+                return self._vote_reply(request, reply_id, vote_type)
+            return Response({"error": "Invalid target"}, status=http_status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logger.exception("Vote failed for thread=%s reply=%s: %s", thread_id, reply_id, exc)
+            return Response(
+                {"error": "Vote could not be recorded"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-            existing = ThreadVote.objects.filter(user=request.user, thread=target).first()
-            if existing:
-                if existing.vote_type == vote_type:
-                    # Remove vote (toggle off)
-                    existing.delete()
-                    if vote_type == "up":
-                        Thread.objects.filter(id=thread_id).update(
-                            upvotes=Greatest(F("upvotes") - 1, 0)
-                        )
-                    return Response({"status": "vote_removed"})
-                else:
-                    existing.vote_type = vote_type
-                    existing.save(update_fields=["vote_type"])
-                    if vote_type == "up":
-                        Thread.objects.filter(id=thread_id).update(upvotes=F("upvotes") + 1)
-                    else:
-                        Thread.objects.filter(id=thread_id).update(
-                            upvotes=Greatest(F("upvotes") - 1, 0)
-                        )
-                    return Response({"status": "vote_changed"})
-            else:
-                ThreadVote.objects.create(user=request.user, thread=target, vote_type=vote_type)
-                if vote_type == "up":
-                    Thread.objects.filter(id=thread_id).update(upvotes=F("upvotes") + 1)
-                return Response({"status": "voted"}, status=http_status.HTTP_201_CREATED)
+    def _vote_thread(self, request, thread_id, vote_type):
+        try:
+            target = Thread.objects.get(id=thread_id, is_deleted=False)
+        except Thread.DoesNotExist:
+            return Response({"error": "Thread not found"}, status=http_status.HTTP_404_NOT_FOUND)
 
-        elif reply_id:
-            try:
-                target = Reply.objects.get(id=reply_id, is_deleted=False)
-            except Reply.DoesNotExist:
-                return Response({"error": "Reply not found"}, status=http_status.HTTP_404_NOT_FOUND)
+        existing = ThreadVote.objects.filter(user=request.user, thread=target).first()
+        if existing:
+            if existing.vote_type == vote_type:
+                existing.delete()
+                if vote_type == "up" and target.upvotes > 0:
+                    Thread.objects.filter(id=thread_id).update(
+                        upvotes=Greatest(F("upvotes") - 1, 0)
+                    )
+                return Response({"status": "vote_removed"})
+            was_up = existing.vote_type == "up"
+            existing.vote_type = vote_type
+            existing.save(update_fields=["vote_type"])
+            if was_up and vote_type == "down" and target.upvotes > 0:
+                Thread.objects.filter(id=thread_id).update(
+                    upvotes=Greatest(F("upvotes") - 1, 0)
+                )
+            elif not was_up and vote_type == "up":
+                Thread.objects.filter(id=thread_id).update(upvotes=F("upvotes") + 1)
+            return Response({"status": "vote_changed"})
 
-            existing = ThreadVote.objects.filter(user=request.user, reply=target).first()
-            if existing:
-                if existing.vote_type == vote_type:
-                    existing.delete()
-                    if vote_type == "up":
-                        Reply.objects.filter(id=reply_id).update(
-                            upvotes=Greatest(F("upvotes") - 1, 0)
-                        )
-                    return Response({"status": "vote_removed"})
-                else:
-                    existing.vote_type = vote_type
-                    existing.save(update_fields=["vote_type"])
-                    if vote_type == "up":
-                        Reply.objects.filter(id=reply_id).update(upvotes=F("upvotes") + 1)
-                    else:
-                        Reply.objects.filter(id=reply_id).update(
-                            upvotes=Greatest(F("upvotes") - 1, 0)
-                        )
-                    return Response({"status": "vote_changed"})
-            else:
-                ThreadVote.objects.create(user=request.user, reply=target, vote_type=vote_type)
-                if vote_type == "up":
-                    Reply.objects.filter(id=reply_id).update(upvotes=F("upvotes") + 1)
-                return Response({"status": "voted"}, status=http_status.HTTP_201_CREATED)
+        ThreadVote.objects.create(user=request.user, thread=target, vote_type=vote_type)
+        if vote_type == "up":
+            Thread.objects.filter(id=thread_id).update(upvotes=F("upvotes") + 1)
+        return Response({"status": "voted"}, status=http_status.HTTP_201_CREATED)
 
-        return Response({"error": "Invalid target"}, status=http_status.HTTP_400_BAD_REQUEST)
+    def _vote_reply(self, request, reply_id, vote_type):
+        try:
+            target = Reply.objects.get(id=reply_id, is_deleted=False)
+        except Reply.DoesNotExist:
+            return Response({"error": "Reply not found"}, status=http_status.HTTP_404_NOT_FOUND)
+
+        existing = ThreadVote.objects.filter(user=request.user, reply=target).first()
+        if existing:
+            if existing.vote_type == vote_type:
+                existing.delete()
+                if vote_type == "up" and target.upvotes > 0:
+                    Reply.objects.filter(id=reply_id).update(
+                        upvotes=Greatest(F("upvotes") - 1, 0)
+                    )
+                return Response({"status": "vote_removed"})
+            was_up = existing.vote_type == "up"
+            existing.vote_type = vote_type
+            existing.save(update_fields=["vote_type"])
+            if was_up and vote_type == "down" and target.upvotes > 0:
+                Reply.objects.filter(id=reply_id).update(
+                    upvotes=Greatest(F("upvotes") - 1, 0)
+                )
+            elif not was_up and vote_type == "up":
+                Reply.objects.filter(id=reply_id).update(upvotes=F("upvotes") + 1)
+            return Response({"status": "vote_changed"})
+
+        ThreadVote.objects.create(user=request.user, reply=target, vote_type=vote_type)
+        if vote_type == "up":
+            Reply.objects.filter(id=reply_id).update(upvotes=F("upvotes") + 1)
+        return Response({"status": "voted"}, status=http_status.HTTP_201_CREATED)

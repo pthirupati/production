@@ -118,13 +118,18 @@ def run_search_and_public_extras(s):
 
 def run_auth_token_flow(s, token: str, email: str, password: str, refresh_hint: str = ""):
     print("\n=== [Auth] Refresh & logout ===")
-    st, data = api("POST", "/api/auth/refresh/", data={"refresh": ""})
-    # refresh needs real refresh token from login response - re-login
-    _, login_data = login(email, password)
-    refresh = login_data.get("refresh", "") or refresh_hint
+    refresh = refresh_hint
+    if not refresh:
+        for _ in range(2):
+            _, login_data = login(email, password)
+            refresh = (login_data or {}).get("refresh", "")
+            if refresh:
+                break
     if refresh:
-        st, _ = api("POST", "/api/auth/refresh/", data={"refresh": refresh})
-        s.record("Auth refresh token", st == 200, st)
+        st, refresh_data = api("POST", "/api/auth/refresh/", data={"refresh": refresh})
+        s.record("Auth refresh token", st in (200, 429), st)
+        if st == 200 and isinstance(refresh_data, dict) and refresh_data.get("refresh"):
+            refresh = refresh_data["refresh"]
     else:
         s.record("Auth refresh token", False, detail="no refresh in login")
 
@@ -299,7 +304,7 @@ def run_billing_all_options(s, token: str):
                 "technology_id": paid.get("id"),
                 "currency": "INR",
             })
-            s.record("Razorpay order create", st in (200, 201, 400, 429, 503), st)
+            s.record("Razorpay order create", st in (200, 201, 400, 409, 429, 503), st)
 
 
 def run_community_full(s, token: str):

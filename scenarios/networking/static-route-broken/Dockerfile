@@ -7,5 +7,6 @@ COPY service.sh /usr/local/bin/service
 RUN chmod +x /usr/local/bin/systemctl /usr/local/bin/service
 RUN mkdir -p /opt/fixitlab
 COPY check.sh /opt/fixitlab/check.sh
-RUN chmod +x /opt/fixitlab/check.sh
-CMD ["/bin/bash"]
+COPY setup.sh /opt/fixitlab/setup.sh
+RUN chmod +x /opt/fixitlab/check.sh /opt/fixitlab/setup.sh
+CMD ["/bin/bash", "-c", "/opt/fixitlab/setup.sh 2>/dev/null; exec /bin/bash"]

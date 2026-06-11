@@ -5,14 +5,33 @@ Each lab session gets its own Docker network for full network isolation.
 """
 import io
 import logging
+import os
 import re
 import tarfile
 import time as _time
 import docker
+import yaml
 from docker.errors import DockerException, NotFound, APIError
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+# Scenarios that need full privileges (LVM, loop devices, mount, setcap, swapon).
+_PRIVILEGED_SLUGS = frozenset({
+    "lvm-extend",
+    "lvm-add-pv-extend",
+    "lvm-pvmove-evacuate",
+    "mdadm-degraded-array",
+    "xfs-repair-damage",
+    "fstab-bad-uuid",
+    "fs-readonly-remount",
+    "chattr-immutable-config",
+    "broken-useradd",
+    "swap-disabled",
+    "capabilities-ping-fails",
+    "static-route-broken",
+    "account-locked-faillock",
+})
 
 
 def _safe_container_username(username: str) -> str:
@@ -26,6 +45,28 @@ class DockerProvisioner:
 
     def __init__(self):
         self.client = docker.DockerClient(base_url=settings.DOCKER_SOCKET)
+
+    @staticmethod
+    def _scenario_privileged(scenario) -> bool:
+        """Resolve privileged flag from DB, scenario YAML, or known slug list."""
+        if getattr(scenario, "docker_privileged", False):
+            return True
+        if scenario.slug in _PRIVILEGED_SLUGS:
+            return True
+        tech_slug = ""
+        if getattr(scenario, "technology", None):
+            tech_slug = getattr(scenario.technology, "slug", "") or ""
+        if tech_slug and scenario.slug:
+            yaml_path = f"/scenarios/{tech_slug}/{scenario.slug}/scenario.yaml"
+            if os.path.isfile(yaml_path):
+                try:
+                    with open(yaml_path, encoding="utf-8") as fh:
+                        data = yaml.safe_load(fh) or {}
+                    if data.get("docker_privileged"):
+                        return True
+                except (OSError, yaml.YAMLError):
+                    pass
+        return False
 
     def _get_session_network_name(self, session_id):
         """Per-session network name for full isolation."""
@@ -94,8 +135,8 @@ class DockerProvisioner:
             # Create per-session isolated network
             session_network = self._create_session_network(lab_session.id)
 
-            # Security: privileged only for LVM/device scenarios (e.g. lvm-extend)
-            privileged = getattr(lab_session.scenario, "docker_privileged", False)
+            # Security: privileged for LVM/device/network-cap scenarios
+            privileged = self._scenario_privileged(lab_session.scenario)
             run_kwargs = dict(
                 image=image_name,
                 name=container_name,
@@ -128,6 +169,8 @@ class DockerProvisioner:
                     cap_add=[
                         "NET_BIND_SERVICE",
                         "NET_ADMIN",
+                        "NET_RAW",
+                        "SYS_ADMIN",
                         "SYS_PTRACE",
                         "DAC_OVERRIDE",
                         "CHOWN",
