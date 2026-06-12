@@ -196,6 +196,15 @@ class DockerProvisioner:
             # Wait for container to be ready
             self._wait_for_container(container)
 
+            if privileged:
+                container.exec_run(
+                    ["/bin/bash", "-c",
+                     "modprobe dm_mod 2>/dev/null; "
+                     "modprobe dm-mirror 2>/dev/null || modprobe dm_mirror 2>/dev/null; "
+                     "modprobe loop 2>/dev/null; true"],
+                    user="root",
+                )
+
             # Run scenario setup script if available (ensures broken state is applied)
             self._run_setup_script(container, lab_session.scenario)
 

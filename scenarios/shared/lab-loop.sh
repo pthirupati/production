@@ -8,7 +8,9 @@ fixitlab_backing_dir() {
 
 fixitlab_loop_init() {
   modprobe loop 2>/dev/null || true
-  modprobe dm-mod 2>/dev/null || true
+  modprobe dm-mod 2>/dev/null || modprobe dm_mod 2>/dev/null || true
+  modprobe dm-mirror 2>/dev/null || modprobe dm_mirror 2>/dev/null || true
+  modprobe dm-snapshot 2>/dev/null || modprobe dm_snapshot 2>/dev/null || true
   mkdir -p /dev/mapper /dev
   [ -e /dev/loop-control ] || mknod -m 0666 /dev/loop-control c 10 237 2>/dev/null || true
   dmsetup mknodes 2>/dev/null || true

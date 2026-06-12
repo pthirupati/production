@@ -31,11 +31,11 @@ class ExecStreamHolder:
 
     __slots__ = ("socket", "_roots", "exec_id")
 
-    def __init__(self, socket, exec_id: str = "", *roots: Any):
+    def __init__(self, socket, exec_id: str = "", *, extra_roots: tuple = ()):
         self.socket = socket
         self.exec_id = exec_id or ""
         # Strong refs: docker API response, wrapper socket, container, etc.
-        self._roots = tuple(r for r in roots if r is not None)
+        self._roots = tuple(r for r in extra_roots if r is not None)
 
     def send(self, data: bytes) -> None:
         exec_send(self.socket, data)
@@ -139,8 +139,8 @@ def open_docker_exec(
             roots = _collect_roots(raw_sock) + (container, exec_instance)
             holder = ExecStreamHolder(
                 prepared,
-                exec_id=exec_instance.get("Id", ""),
-                *roots,
+                exec_instance.get("Id", ""),
+                extra_roots=roots,
             )
             if session_key:
                 register_holder(session_key, holder)

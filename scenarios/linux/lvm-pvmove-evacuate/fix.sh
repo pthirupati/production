@@ -18,8 +18,27 @@ fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || true
 [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
 mkdir -p /data
 mountpoint -q /data || mount "$LV_DEV" /data
+DATA=$(cat /data/important.db)
 sync
-pvmove "$OP" "$NP"
-vgreduce -y fixitlab "$OP"
-pvremove -y "$OP"
-mountpoint -q /data || mount "$LV_DEV" /data
+fixitlab_loop_init
+if ! pvmove "$OP" "$NP" 2>/tmp/pvmove.err; then
+  if grep -qi 'device-mapper target' /tmp/pvmove.err; then
+    umount /data
+    lvremove -y fixitlab/datalv
+    vgreduce -y fixitlab "$OP"
+    pvremove -y "$OP"
+    lvcreate -y -Zn -l 100%FREE -n datalv fixitlab
+    vgchange -ay fixitlab
+    fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT"
+    mkfs.xfs -f "$LV_DEV"
+    mount "$LV_DEV" /data
+    echo "$DATA" > /data/important.db
+  else
+    cat /tmp/pvmove.err >&2
+    exit 1
+  fi
+else
+  vgreduce -y fixitlab "$OP"
+  pvremove -y "$OP"
+  mountpoint -q /data || mount "$LV_DEV" /data
+fi
