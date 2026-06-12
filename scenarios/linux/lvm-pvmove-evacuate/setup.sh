@@ -25,9 +25,11 @@ echo "$OLD" > /etc/fixitlab-old-loop
 echo "$NEW" > /etc/fixitlab-new-loop
 
 wipefs -a "$OLD" "$NEW" 2>/dev/null || true
-pvcreate -y --metadatasize 128m -ff "$OLD" "$NEW"
-vgcreate -y fixitlab "$OLD" "$NEW"
+pvcreate -y --metadatasize 128m -ff "$OLD"
+vgcreate -y fixitlab "$OLD"
 lvcreate -y -Zn -l 100%FREE -n datalv fixitlab
+pvcreate -y --metadatasize 128m -ff "$NEW"
+vgextend -y fixitlab "$NEW"
 vgchange -ay fixitlab
 fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || { echo "datalv missing after lvcreate" >&2; exit 1; }
 [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"

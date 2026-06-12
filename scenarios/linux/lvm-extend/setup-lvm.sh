@@ -23,13 +23,13 @@ fixitlab_loop_init
 
 IMG=/opt/fixitlab/backing/lvm-backing.img
 fixitlab_loop_detach_image "$IMG"
-DEV=$(fixitlab_loop_attach "$IMG" 512M)
+DEV=$(fixitlab_loop_attach "$IMG" 768M)
 echo "$DEV" > /etc/fixitlab-lvm-dev
 
 wipefs -a "$DEV" 2>/dev/null || true
-pvcreate -y --metadatasize 128m -ff "$DEV"
+pvcreate -y --metadatasize 64m -ff "$DEV"
 vgcreate -y fixitlab "$DEV"
-lvcreate -y -Zn -L 180M -n datalv fixitlab 2>&1 || lvcreate -y -l 50%VG -n datalv fixitlab 2>&1
+lvcreate -y -Zn -L 180M -n datalv fixitlab
 vgchange -ay fixitlab 2>&1
 fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || { echo "datalv device not found after lvcreate" >&2; exit 1; }
 [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"

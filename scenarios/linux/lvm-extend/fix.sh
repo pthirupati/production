@@ -11,7 +11,7 @@ vgchange -ay fixitlab 2>/dev/null || true
 fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || true
 [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
 [ -b "$LV_DEV" ] || { echo "datalv block device missing" >&2; exit 1; }
-lvextend -y -L 350M "$LV_DEV"
+lvextend -y -L 350M "$LV_DEV" || lvextend -y -l +100%FREE "$LV_DEV"
 mkdir -p /data
 if ! mountpoint -q /data; then
   if ! blkid "$LV_DEV" >/dev/null 2>&1; then
