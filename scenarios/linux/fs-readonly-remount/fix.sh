@@ -1,9 +1,13 @@
 #!/bin/bash
 set -e
-mountpoint -q /data || true
-mount -o remount,rw /data 2>/dev/null || true
-chmod u+w /data /data/file.txt 2>/dev/null || true
-# Fallback if remount fails: bind-mount a writable layer
+if mountpoint -q /data 2>/dev/null; then
+  mount -o remount,rw /data
+else
+  [ -x /opt/fixitlab/setup.sh ] && bash /opt/fixitlab/setup.sh
+  mkdir -p /data
+  mount -o remount,rw /data 2>/dev/null || mount -o rw /data 2>/dev/null || true
+fi
+test -w /data/file.txt 2>/dev/null || chmod u+w /data /data/file.txt 2>/dev/null || true
 if ! test -w /data/file.txt 2>/dev/null; then
   mkdir -p /tmp/data-rw
   cp -a /data/. /tmp/data-rw/ 2>/dev/null || echo test > /tmp/data-rw/file.txt

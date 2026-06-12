@@ -7,7 +7,7 @@ if [ -z "$SIZE" ] || [ "${SIZE%%.*}" -lt 350 ]; then
 else
     echo "OK: LV size ${SIZE}M"
 fi
-mountpoint -q /data || mount /data 2>/dev/null || true
+mountpoint -q /data || mount /dev/mapper/fixitlab-datalv /data 2>/dev/null || mount /dev/fixitlab/datalv /data 2>/dev/null || mount /data 2>/dev/null || true
 if mountpoint -q /data; then
     AVAIL=$(df -BM /data | tail -1 | awk '{print $4}' | tr -d M)
     if [ "${AVAIL:-0}" -lt 50 ]; then

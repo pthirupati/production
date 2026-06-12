@@ -14,6 +14,8 @@ import yaml
 from docker.errors import DockerException, NotFound, APIError
 from django.conf import settings
 
+from apps.labs.provisioner.exec_socket import prepare_exec_socket
+
 logger = logging.getLogger(__name__)
 
 # Scenarios that need full privileges (LVM, loop devices, mount, setcap, swapon).
@@ -305,7 +307,7 @@ class DockerProvisioner:
         """
         last_error = None
         shells = (
-            ["/bin/bash", "-li"],
+            ["/bin/bash", "--noprofile", "--norc", "-i"],
             ["/bin/bash", "-i"],
             ["/bin/sh", "-i"],
         )
@@ -334,9 +336,8 @@ class DockerProvisioner:
                     tty=True,
                     socket=True,
                 )
-                raw_socket = self._unwrap_socket(sock)
-                raw_socket.setblocking(True)
-                return exec_instance["Id"], raw_socket
+                # Keep docker-py socket wrapper (preserves _response ref — do not unwrap)
+                return exec_instance["Id"], prepare_exec_socket(sock)
             except (NotFound, APIError) as e:
                 last_error = e
                 logger.warning(
@@ -345,34 +346,6 @@ class DockerProvisioner:
                 )
         logger.error(f"Failed to create exec stream for {container_id}: {last_error}")
         raise last_error
-
-    @staticmethod
-    def _unwrap_socket(sock):
-        """
-        Unwrap Docker SDK socket wrappers to get the raw OS socket.
-        Works across Docker SDK 6.x, 7.x+.
-        """
-        # Try ._sock first (Docker SDK 6.x SocketIO wrapper)
-        if hasattr(sock, '_sock'):
-            raw = sock._sock
-            # ._sock itself might be wrapped (urllib3 response socket)
-            if hasattr(raw, '_sock'):
-                return raw._sock
-            return raw
-        # Docker SDK 7.x uses a response-based wrapper
-        if hasattr(sock, '_response'):
-            try:
-                fp = sock._response._fp
-                if hasattr(fp, 'fp') and hasattr(fp.fp, 'raw'):
-                    return fp.fp.raw._sock
-                if hasattr(fp, 'raw'):
-                    return fp.raw._sock
-            except AttributeError:
-                pass
-        # Fallback: it might already be a raw socket
-        if hasattr(sock, 'fileno'):
-            return sock
-        raise RuntimeError("Cannot unwrap Docker exec socket — unsupported SDK version")
 
     def run_validation(self, container_id, validation_script):
         """

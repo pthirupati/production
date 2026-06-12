@@ -407,6 +407,7 @@ export default function LabRunner() {
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data)
+            if (data.type === 'ping') return
             if (data.type === 'shell_ready') {
               shellReadyRef.current = true
               scheduleResize()

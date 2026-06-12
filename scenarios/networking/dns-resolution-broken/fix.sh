@@ -10,7 +10,9 @@ EOF
 cat > /etc/resolv.conf <<'EOF'
 nameserver 127.0.0.1
 EOF
-pkill dnsmasq 2>/dev/null || true
-sleep 1
-dnsmasq
+if pidof dnsmasq >/dev/null 2>&1; then
+  kill -HUP "$(pidof dnsmasq | awk '{print $1}')"
+else
+  dnsmasq
+fi
 sleep 1

@@ -6,6 +6,7 @@ import {
   Tag, AlertCircle, CheckCircle2, Circle, MoreHorizontal, Search, Bell, HelpCircle
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { JiraRichText } from '../components/JiraRichText'
 
 const STATUS_STYLES = {
   'To Do': { bg: 'bg-[#DFE1E6]', text: 'text-[#42526E]', dot: 'bg-[#42526E]' },
@@ -128,7 +129,7 @@ export default function JiraTicketPage() {
   const projectKey = (ticket.issue_key || issueKey || 'KAN').split('-')[0]
 
   return (
-    <div className="min-h-screen bg-[#F4F5F7] text-[#172B4D] font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]">
+    <div className="min-h-screen bg-[#F4F5F7] text-[#172B4D] font-sans antialiased">
       {/* Jira top navigation */}
       <header className="bg-[#0747A6] text-white h-12 flex items-center px-4 gap-4 shadow-sm">
         <div className="flex items-center gap-2 shrink-0">
@@ -219,9 +220,7 @@ export default function JiraTicketPage() {
               {/* Description */}
               <div className="px-6 py-5">
                 <h2 className="text-xs font-semibold text-[#6B778C] uppercase tracking-wider mb-3">Description</h2>
-                <div className="text-sm text-[#172B4D] leading-relaxed whitespace-pre-wrap">
-                  {ticket.description || 'No description provided.'}
-                </div>
+                <JiraRichText text={ticket.description || 'No description provided.'} />
                 {ticket.scenario && (
                   <div className="mt-4 p-3 bg-[#DEEBFF]/40 border border-[#B3D4FF] rounded text-xs text-[#0747A6]">
                     <strong>Linked lab scenario:</strong> {ticket.scenario.title}
@@ -291,8 +290,8 @@ export default function JiraTicketPage() {
                                 })}
                               </span>
                             </div>
-                            <div className="text-sm text-[#172B4D] whitespace-pre-wrap bg-[#F4F5F7] rounded px-3 py-2 border border-[#EBECF0]">
-                              {c.text}
+                            <div className="text-sm text-[#172B4D] bg-[#F4F5F7] rounded px-3 py-2 border border-[#EBECF0]">
+                              <JiraRichText text={c.text} />
                             </div>
                           </div>
                         </div>

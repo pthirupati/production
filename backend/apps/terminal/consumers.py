@@ -18,6 +18,7 @@ from django.contrib.auth.models import AnonymousUser
 
 from apps.labs.models import LabSession, CommandHistory, SessionRecording
 from apps.labs.provisioner import get_provisioner
+from apps.labs.provisioner.exec_socket import exec_close, exec_recv, exec_send, exec_set_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         self._blocked_patterns = []
         self._shell_ready = False
         self._resize_pending = None
+        self._ping_task = None
+        self._exec_holder = None  # keep docker exec socket + HTTP response alive
 
     async def connect(self):
         user = self.scope.get("user", AnonymousUser())
@@ -138,6 +141,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                             self.provisioner.create_exec_stream,
                             resource_id,
                         )
+                    self._exec_holder = self.raw_socket
                     exec_error = None
                     break
                 except Exception as e:
@@ -169,6 +173,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
             # Start reading output
             self.reader_task = asyncio.create_task(self._read_output())
+            self._ping_task = asyncio.create_task(self._ping_loop())
 
         except Exception as e:
             logger.error(f"Failed to create exec stream: {e}", exc_info=True)
@@ -230,14 +235,14 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                             # We eat the Enter keystroke — write nothing to the socket
                             # Instead, send Ctrl+C to cancel and get a new prompt
                             await asyncio.to_thread(
-                                self.raw_socket.send, b"\x03"
+                                exec_send, self.raw_socket, b"\x03"
                             )
                             return
 
                     if cmd and len(cmd) < 2000 and self.lab_session:
                         await self._save_command(cmd)
 
-                await asyncio.to_thread(self.raw_socket.send, input_bytes)
+                await asyncio.to_thread(exec_send, self.raw_socket, input_bytes)
 
                 # Record input for replay
                 if self._session_start_time:
@@ -272,14 +277,25 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             except Exception:
                 pass
 
+    async def _ping_loop(self):
+        """Keep the Channels websocket alive through proxies."""
+        try:
+            while True:
+                await asyncio.sleep(25)
+                await self.send(text_data=json.dumps({"type": "ping"}))
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
+
     async def _read_output(self):
         """Continuously read output from the exec socket/SSH channel and send to client."""
         empty_reads = 0
         try:
-            await asyncio.to_thread(self.raw_socket.settimeout, 60.0)
+            await asyncio.to_thread(exec_set_timeout, self.raw_socket, 60.0)
             while True:
                 try:
-                    data = await asyncio.to_thread(self.raw_socket.recv, 4096)
+                    data = await asyncio.to_thread(exec_recv, self.raw_socket, 4096)
                 except TimeoutError:
                     continue
                 if not data:
@@ -358,14 +374,23 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             except asyncio.CancelledError:
                 pass
 
+        if self._ping_task:
+            self._ping_task.cancel()
+            try:
+                await self._ping_task
+            except asyncio.CancelledError:
+                pass
+
         if self.raw_socket:
             try:
                 # For SSH channels, also close the parent SSH client
                 if hasattr(self.raw_socket, '_ssh_client'):
                     self.raw_socket._ssh_client.close()
-                self.raw_socket.close()
+                exec_close(self.raw_socket)
             except Exception:
                 pass
+            self.raw_socket = None
+            self._exec_holder = None
 
     @database_sync_to_async
     def _load_blocked_patterns(self):

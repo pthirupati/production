@@ -47,6 +47,10 @@ PASSWD_PERM=$(get_perm /etc/passwd)
 SHADOW_PERM=$(get_perm /etc/shadow)
 GROUP_PERM=$(get_perm /etc/group)
 
+if [ "$PASSWD_PERM" = "777" ] || [ "$PASSWD_PERM" = "666" ]; then
+    echo "FAIL: /etc/passwd is still world-writable ($PASSWD_PERM) — run chmod 644 /etc/passwd"
+    exit 1
+fi
 if [ "$PASSWD_PERM" != "644" ]; then
     echo "FAIL: /etc/passwd has wrong permissions ($PASSWD_PERM, expected 644)"
     exit 1
