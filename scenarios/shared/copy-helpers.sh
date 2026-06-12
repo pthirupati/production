@@ -7,3 +7,11 @@ SRC="$(dirname "$0")"
 cp "$SRC/systemctl.py" "$DEST/"
 cp "$SRC/service.sh" "$DEST/"
 chmod +x "$DEST/service.sh"
+if [ -f "$SRC/lab-loop.sh" ]; then
+  cp "$SRC/lab-loop.sh" "$DEST/"
+  chmod +x "$DEST/lab-loop.sh"
+fi
+if [ -f "$SRC/lab-dnsmasq.sh" ]; then
+  cp "$SRC/lab-dnsmasq.sh" "$DEST/"
+  chmod +x "$DEST/lab-dnsmasq.sh"
+fi
