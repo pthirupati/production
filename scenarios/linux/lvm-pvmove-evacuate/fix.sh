@@ -19,7 +19,7 @@ fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || true
 mkdir -p /data
 mountpoint -q /data || mount "$LV_DEV" /data
 sync
-pvmove -n "$OP" "$NP"
+pvmove "$OP" "$NP"
 vgreduce -y fixitlab "$OP"
 pvremove -y "$OP"
 mountpoint -q /data || mount "$LV_DEV" /data

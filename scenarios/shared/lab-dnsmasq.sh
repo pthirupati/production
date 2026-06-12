@@ -3,6 +3,9 @@
 
 fixitlab_resolv_write() {
   chattr -i /etc/resolv.conf 2>/dev/null || true
+  if [ -L /etc/resolv.conf ]; then
+    rm -f /etc/resolv.conf
+  fi
   {
     printf '%s\n' "$@"
   } > /etc/resolv.conf
@@ -10,7 +13,7 @@ fixitlab_resolv_write() {
 }
 
 fixitlab_resolv_local() {
-  fixitlab_resolv_write "nameserver 127.0.0.1" "options edns0 trust-ad"
+  fixitlab_resolv_write "nameserver 127.0.0.1"
 }
 
 fixitlab_resolv_broken() {
@@ -19,15 +22,12 @@ fixitlab_resolv_broken() {
 
 fixitlab_dnsmasq_reload() {
   mkdir -p /etc/dnsmasq.d /run/dnsmasq 2>/dev/null || true
-  # Setup already starts dnsmasq — reload config with HUP instead of restart (port 53 stays bound).
-  if pgrep -x dnsmasq >/dev/null 2>&1; then
-    killall -HUP dnsmasq 2>/dev/null || pkill -HUP -x dnsmasq 2>/dev/null || true
-    sleep 0.5
-    return 0
-  fi
+  # Ubuntu's /etc/dnsmasq.conf has conf-dir commented out — bare `dnsmasq` ignores
+  # /etc/dnsmasq.d/fixitlab.conf. Always start with an explicit config file.
   pkill -x dnsmasq 2>/dev/null || true
-  sleep 0.5
-  dnsmasq
+  sleep 0.2
+  dnsmasq -k -p 53 -a 127.0.0.1 --no-resolv --no-poll \
+    -C /etc/dnsmasq.d/fixitlab.conf 2>/dev/null &
   sleep 0.5
 }
 

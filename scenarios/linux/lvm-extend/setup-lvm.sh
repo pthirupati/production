@@ -10,15 +10,17 @@ if [ -f /etc/lvm/lvm.conf ]; then
 fi
 
 if vgs fixitlab >/dev/null 2>&1 && lvs fixitlab/datalv >/dev/null 2>&1; then
-  fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || true
-  [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
-  mkdir -p /data
-  mountpoint -q /data || mount "$LV_DEV" /data 2>/dev/null || true
-  exit 0
+  LV_SIZE=$(fixitlab_lvm_lv_size_m || echo 0)
+  if [ "${LV_SIZE:-0}" -ge 150 ] && [ "${LV_SIZE:-0}" -lt 300 ]; then
+    fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || true
+    [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
+    mkdir -p /data
+    mountpoint -q /data || mount "$LV_DEV" /data 2>/dev/null || true
+    exit 0
+  fi
 fi
 
-vgchange -an fixitlab 2>/dev/null || true
-vgremove -ff fixitlab 2>/dev/null || true
+fixitlab_lvm_teardown
 fixitlab_loop_init
 
 IMG=/opt/fixitlab/backing/lvm-backing.img

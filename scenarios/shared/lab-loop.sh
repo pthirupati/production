@@ -97,6 +97,16 @@ fixitlab_lvm_wait_lv() {
   return 1
 }
 
+fixitlab_lvm_teardown() {
+  vgchange -an fixitlab 2>/dev/null || true
+  vgremove -ff fixitlab 2>/dev/null || true
+}
+
+fixitlab_lvm_lv_size_m() {
+  lvs --noheadings -o lv_size --units m --nosuffix fixitlab/datalv 2>/dev/null \
+    | tr -d ' ' | cut -d. -f1
+}
+
 fixitlab_mdadm_cleanup() {
   for md in /dev/md*; do
     [ -b "$md" ] || continue

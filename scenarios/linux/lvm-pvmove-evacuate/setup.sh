@@ -9,14 +9,19 @@ if [ -f /etc/lvm/lvm.conf ]; then
 fi
 
 if vgs fixitlab >/dev/null 2>&1 && lvs fixitlab/datalv >/dev/null 2>&1 && [ -f /data/important.db ]; then
-  fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || true
-  [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
-  mountpoint -q /data || mount "$LV_DEV" /data 2>/dev/null || true
-  exit 0
+  NP=$(cat /etc/fixitlab-new-loop 2>/dev/null || true)
+  if [ -n "$NP" ] && pvs "$NP" >/dev/null 2>&1; then
+    FREE=$(pvs --noheadings -o pv_free --units m --nosuffix "$NP" 2>/dev/null | tr -d ' ' | cut -d. -f1)
+    if [ "${FREE:-0}" -ge 100 ]; then
+      fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || true
+      [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
+      mountpoint -q /data || mount "$LV_DEV" /data 2>/dev/null || true
+      exit 0
+    fi
+  fi
 fi
 
-vgchange -an fixitlab 2>/dev/null || true
-vgremove -ff fixitlab 2>/dev/null || true
+fixitlab_lvm_teardown
 fixitlab_loop_init
 
 OLD=$(fixitlab_loop_attach /opt/fixitlab/backing/old.img 200M)
