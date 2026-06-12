@@ -15,11 +15,13 @@ fi
 vgchange -an fixitlab 2>/dev/null || true
 vgremove -ff fixitlab 2>/dev/null || true
 modprobe dm-mod 2>/dev/null || true
+mkdir -p /dev/mapper /opt/fixitlab/backing
+dmsetup mknodes 2>/dev/null || true
 
-dd if=/dev/zero of=/var/disk1.img bs=1M count=400 status=none
-dd if=/dev/zero of=/var/disk2.img bs=1M count=350 status=none
-D1=$(losetup -f --show /var/disk1.img)
-D2=$(losetup -f --show /var/disk2.img)
+dd if=/dev/zero of=/opt/fixitlab/backing/disk1.img bs=1M count=400 status=none
+dd if=/dev/zero of=/opt/fixitlab/backing/disk2.img bs=1M count=350 status=none
+D1=$(losetup -f --show /opt/fixitlab/backing/disk1.img)
+D2=$(losetup -f --show /opt/fixitlab/backing/disk2.img)
 echo "$D1" > /etc/fixitlab-disk1-loop
 echo "$D2" > /etc/fixitlab-disk2-loop
 

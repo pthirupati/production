@@ -4,9 +4,9 @@ LV_DEV="/dev/mapper/fixitlab-datalv"
 P2=$(cat /etc/fixitlab-disk2-part 2>/dev/null || true)
 if [ -z "$P2" ] || [ ! -b "$P2" ]; then
   D2=$(cat /etc/fixitlab-disk2-loop 2>/dev/null || true)
-  [ -n "$D2" ] && [ -b "$D2" ] || D2=$(losetup -j /var/disk2.img 2>/dev/null | cut -d: -f1 | head -1)
-  if [ -z "$D2" ] && [ -f /var/disk2.img ]; then
-    D2=$(losetup -f --show /var/disk2.img)
+  [ -n "$D2" ] && [ -b "$D2" ] || D2=$(losetup -j /opt/fixitlab/backing/disk2.img 2>/dev/null | cut -d: -f1 | head -1)
+  if [ -z "$D2" ] && [ -f /opt/fixitlab/backing/disk2.img ]; then
+    D2=$(losetup -f --show /opt/fixitlab/backing/disk2.img)
   fi
   P2="${D2}p1"; [ -b "$P2" ] || P2="${D2}1"
   [ -b "$P2" ] && echo "$P2" > /etc/fixitlab-disk2-part

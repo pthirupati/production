@@ -1,29 +1,32 @@
-title: "Firewall Blocking Web Port"
-slug: "firewall-port-blocked"
-technology: "Networking"
-category: "Firewall"
-difficulty: "medium"
+title: Firewall Blocking Web Port
+slug: firewall-port-blocked
+technology: Networking
+category: Firewall
+difficulty: medium
 time_limit: 900
 max_score: 100
-infrastructure_type: "docker"
-jira_priority: "High"
+infrastructure_type: docker
+jira_priority: High
+description: 'Nginx is running but users cannot reach the site on port 80.
 
-description: |
-  Nginx is running but users cannot reach the site on port 80.
-  A firewall rule is dropping HTTP traffic. Remove the blocking rule.
-
+  A firewall rule is dropping HTTP traffic. Remove the blocking rule.'
 objectives:
-  - Verify nginx is running
-  - Find iptables rule blocking port 80
-  - Remove the rule and confirm curl works
+- Verify nginx is running
+- Find iptables rule blocking port 80
+- Affected service behaves normally
+initial_state: 'Ubuntu with nginx and an iptables DROP rule on tcp/80.
 
-initial_state: |
-  Ubuntu with nginx and an iptables DROP rule on tcp/80.
-
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "`iptables -L INPUT -n --line-numbers`"
-  - order: 2
-    cost: 20
-    content: "`iptables -D INPUT <line>` to delete the DROP rule for dpt:80"
+- order: 1
+  cost: 10
+  content: '`iptables -L INPUT -n --line-numbers`'
+- order: 2
+  cost: 20
+  content: '`iptables -D INPUT <line>` to delete the DROP rule for dpt:80'
+- order: 3
+  cost: 15
+  content: Verify nginx is running
+- order: 4
+  cost: 15
+  content: Remove the rule and confirm curl works

@@ -1,31 +1,33 @@
-title: "XFS Filesystem Requires xfs_repair"
-slug: "xfs-repair-damage"
-technology: "Linux"
-category: "Storage / XFS"
-difficulty: "hard"
+title: XFS Filesystem Requires xfs_repair
+slug: xfs-repair-damage
+technology: Linux
+category: Storage / XFS
+difficulty: hard
 time_limit: 1500
 max_score: 100
-infrastructure_type: "docker"
+infrastructure_type: docker
 docker_privileged: true
-jira_priority: "Medium"
-topics_covered: "Q7 XFS repair — xfs_repair, mount after clean log"
-
-description: |
-  /data fails to mount after unclean shutdown. xfs_repair is required before the application config can be read.
-
+jira_priority: Medium
+topics_covered: Q7 XFS repair — xfs_repair, mount after clean log
+description: /data fails to mount after unclean shutdown. xfs_repair is required before the application config can be read.
 objectives:
-  - Read mount/dmesg errors
-  - Unmount broken mountpoint
-  - Run xfs_repair
-  - Remount and verify data
+- Read mount/dmesg errors
+- Unmount broken mountpoint
+- Affected service behaves normally
+- /data accepts writes again
+initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
 
-initial_state: |
-  Ubuntu 22.04 lab container with a realistic misconfiguration.
-
+  '
 hints:
-  - order: 1
-    cost: 15
-    content: "`dmesg | tail` and `xfs_repair -n /dev/loop0`"
-  - order: 2
-    cost: 30
-    content: "`umount /data && xfs_repair /dev/loop0 && mount /data`"
+- order: 1
+  cost: 15
+  content: '`dmesg | tail` and `xfs_repair -n /dev/loop0`'
+- order: 2
+  cost: 30
+  content: '`umount /data && xfs_repair /dev/loop0 && mount /data`'
+- order: 3
+  cost: 15
+  content: Run xfs_repair
+- order: 4
+  cost: 15
+  content: Remount and verify data

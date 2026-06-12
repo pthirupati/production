@@ -1,36 +1,43 @@
-title: "SSH Configuration Lockout"
-slug: "ssh-lockout"
-technology: "Linux"
-category: "Security"
-difficulty: "hard"
+title: SSH Configuration Lockout
+slug: ssh-lockout
+technology: Linux
+category: Security
+difficulty: hard
 time_limit: 1200
 max_score: 100
-infrastructure_type: "docker"
-jira_priority: "High"
+infrastructure_type: docker
+jira_priority: High
+description: 'After a rushed security hardening, SSH access to the production
 
-description: |
-  After a rushed security hardening, SSH access to the production
-  server is broken. The team cannot connect remotely. You must fix
   the sshd configuration, restore valid host key permissions, and
-  get SSH running on port 22 again.
 
+  get SSH running on port 22 again.'
 objectives:
-  - Fix invalid options in /etc/ssh/sshd_config
-  - Restore SSH to listen on port 22
-  - Fix host key file permissions (600)
-  - Start and verify the sshd service
+- Affected service behaves normally
+initial_state: 'You have console/shell access to an Ubuntu 22.04 DigitalOcean droplet.
 
-initial_state: |
-  You have console/shell access to an Ubuntu 22.04 DigitalOcean droplet.
   SSH daemon fails to start due to configuration errors.
 
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run `sshd -t` to validate the configuration syntax."
-  - order: 2
-    cost: 15
-    content: "Check for typos in sshd_config — look for invalid directives."
-  - order: 3
-    cost: 20
-    content: "Host keys must be mode 600: `chmod 600 /etc/ssh/ssh_host_*_key`"
+- order: 1
+  cost: 10
+  content: Run `sshd -t` to validate the configuration syntax.
+- order: 2
+  cost: 15
+  content: Check for typos in sshd_config — look for invalid directives.
+- order: 3
+  cost: 20
+  content: 'Host keys must be mode 600: `chmod 600 /etc/ssh/ssh_host_*_key`'
+- order: 4
+  cost: 15
+  content: Fix invalid options in /etc/ssh/sshd_config
+- order: 5
+  cost: 15
+  content: Restore SSH to listen on port 22
+- order: 6
+  cost: 15
+  content: Fix host key file permissions (600)
+- order: 7
+  cost: 15
+  content: Start and verify the sshd service

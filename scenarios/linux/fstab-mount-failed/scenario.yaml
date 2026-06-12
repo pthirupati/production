@@ -1,28 +1,26 @@
-title: "Fix Broken fstab Entry"
-slug: "fstab-mount-failed"
-technology: "Linux"
-category: "Storage"
-difficulty: "medium"
+title: Fix Broken fstab Entry
+slug: fstab-mount-failed
+technology: Linux
+category: Storage
+difficulty: medium
 time_limit: 900
 max_score: 100
-infrastructure_type: "docker"
-jira_priority: "Medium"
-
-description: |
-  After a storage migration, the server fails to mount /mnt/data on boot.
-  A bad UUID was added to /etc/fstab. Fix the entry so mounts succeed.
-
+infrastructure_type: docker
+jira_priority: Medium
+description: After a storage migration, the server fails to mount /mnt/data on boot.
 objectives:
-  - Identify the invalid fstab line
-  - Remove or correct the UUID entry for /mnt/data
+- Identify the invalid fstab line
+- /mnt/data is mounted and data is accessible
+initial_state: 'Shell access to Ubuntu. /etc/fstab contains a bogus UUID for /mnt/data.
 
-initial_state: |
-  Shell access to Ubuntu. /etc/fstab contains a bogus UUID for /mnt/data.
-
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run `mount -a` or read /etc/fstab for invalid UUIDs."
-  - order: 2
-    cost: 20
-    content: "Comment out or fix the line with UUID dead-beef..."
+- order: 1
+  cost: 10
+  content: Run `mount -a` or read /etc/fstab for invalid UUIDs.
+- order: 2
+  cost: 20
+  content: Comment out or fix the line with UUID dead-beef...
+- order: 3
+  cost: 15
+  content: Remove or correct the UUID entry for /mnt/data

@@ -274,7 +274,7 @@ export default function ScenarioDetail() {
       {/* Objectives */}
       {objectives.length > 0 && (
         <div className="glass-card p-6">
-          <h2 className="text-base font-semibold text-white mb-3">Objectives</h2>
+          <h2 className="text-base font-semibold text-white mb-3">Expected outcome</h2>
           <ul className="space-y-2">
             {objectives.map((obj, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-surface-300">

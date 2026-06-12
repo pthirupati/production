@@ -16,10 +16,12 @@ vgchange -an fixitlab 2>/dev/null || true
 vgremove -ff fixitlab 2>/dev/null || true
 modprobe dm-mod 2>/dev/null || true
 
-dd if=/dev/zero of=/var/old.img bs=1M count=200 status=none
-dd if=/dev/zero of=/var/new.img bs=1M count=200 status=none
-OLD=$(losetup -f --show /var/old.img)
-NEW=$(losetup -f --show /var/new.img)
+mkdir -p /opt/fixitlab/backing /dev/mapper
+dmsetup mknodes 2>/dev/null || true
+dd if=/dev/zero of=/opt/fixitlab/backing/old.img bs=1M count=200 status=none
+dd if=/dev/zero of=/opt/fixitlab/backing/new.img bs=1M count=200 status=none
+OLD=$(losetup -f --show /opt/fixitlab/backing/old.img)
+NEW=$(losetup -f --show /opt/fixitlab/backing/new.img)
 
 for D in "$OLD" "$NEW"; do
   parted -s "$D" mklabel gpt

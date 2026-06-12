@@ -1,26 +1,26 @@
-title: "Missing Static Route"
-slug: "static-route-broken"
-technology: "Networking"
-category: "Routing"
-difficulty: "medium"
+title: Missing Static Route
+slug: static-route-broken
+technology: Networking
+category: Routing
+difficulty: medium
 time_limit: 900
 max_score: 100
-infrastructure_type: "docker"
+infrastructure_type: docker
 docker_privileged: true
-jira_priority: "Medium"
-
-description: |
-  Applications cannot reach the 10.50.0.0/24 subnet after a network change.
-  Add the missing static route via gateway 172.16.0.1.
-
+jira_priority: Medium
+description: Applications cannot reach the 10.50.0.0/24 subnet after a network change.
 objectives:
-  - Inspect routing table with ip route
-  - Add static route for 10.50.0.0/24
+- Affected service behaves normally
+initial_state: 'Ubuntu server missing route to internal subnet 10.50.0.0/24.
 
-initial_state: |
-  Ubuntu server missing route to internal subnet 10.50.0.0/24.
-
+  '
 hints:
-  - order: 1
-    cost: 15
-    content: "`ip route add 10.50.0.0/24 via 172.16.0.1`"
+- order: 1
+  cost: 15
+  content: '`ip route add 10.50.0.0/24 via 172.16.0.1`'
+- order: 2
+  cost: 15
+  content: Inspect routing table with ip route
+- order: 3
+  cost: 15
+  content: Add static route for 10.50.0.0/24

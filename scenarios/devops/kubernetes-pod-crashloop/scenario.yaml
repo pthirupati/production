@@ -1,34 +1,34 @@
-title: "Kubernetes Pod CrashLoopBackOff"
-slug: "kubernetes-pod-crashloop"
-technology: "Devops"
-category: "Kubernetes"
-difficulty: "hard"
+title: Kubernetes Pod CrashLoopBackOff
+slug: kubernetes-pod-crashloop
+technology: Devops
+category: Kubernetes
+difficulty: hard
 time_limit: 1200
 max_score: 100
-infrastructure_type: "docker"
-jira_priority: "High"
+infrastructure_type: docker
+jira_priority: High
+description: 'Production pods are in CrashLoopBackOff. The Service routes traffic to
 
-description: |
-  Production pods are in CrashLoopBackOff. The Service routes traffic to
-  port 8080 but the container exposes port 80. Fix the Kubernetes manifest
-  and ensure the web application is reachable.
-
+  and ensure the web application is reachable.'
 objectives:
-  - Analyze /opt/k8s/deployment.yaml for port mismatches
-  - Align Service targetPort with containerPort
-  - Verify the web server responds on the correct port
+- Analyze /opt/k8s/deployment.yaml for port mismatches
+- Align Service targetPort with containerPort
+- Verify the web server responds on the correct port
+initial_state: 'Simulated Kubernetes environment on Ubuntu. Manifest at /opt/k8s/deployment.yaml.
 
-initial_state: |
-  Simulated Kubernetes environment on Ubuntu. Manifest at /opt/k8s/deployment.yaml.
   Nginx is installed but Service config points to wrong port.
 
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Compare `targetPort` in the Service spec with `containerPort` in the Deployment."
-  - order: 2
-    cost: 15
-    content: "Change targetPort from 8080 to 80 to match nginx."
-  - order: 3
-    cost: 25
-    content: "Start nginx: `service nginx start` and verify with `curl localhost`."
+- order: 1
+  cost: 10
+  content: Compare `targetPort` in the Service spec with `containerPort` in the Deployment.
+- order: 2
+  cost: 15
+  content: Change targetPort from 8080 to 80 to match nginx.
+- order: 3
+  cost: 25
+  content: 'Start nginx: `service nginx start` and verify with `curl localhost`.'
+- order: 4
+  cost: 15
+  content: Verify the web server responds on the correct port

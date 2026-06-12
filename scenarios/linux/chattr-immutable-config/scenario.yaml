@@ -1,39 +1,43 @@
-title: "Immutable Flag Blocks Config Edit"
-slug: "chattr-immutable-config"
-technology: "Linux"
-category: "Filesystem / Attributes"
-difficulty: "hard"
+title: Immutable Flag Blocks Config Edit
+slug: chattr-immutable-config
+technology: Linux
+category: Filesystem / Attributes
+difficulty: hard
 time_limit: 900
 max_score: 100
-infrastructure_type: "docker"
+infrastructure_type: docker
 docker_privileged: true
-jira_priority: "Medium"
-topics_covered: "Q4 chattr +i — lsattr, remove immutable"
+jira_priority: Medium
+topics_covered: Q4 chattr +i — lsattr, remove immutable
+description: '"Operation not permitted" even as root. The service must listen on port 9090 after the fix.
 
-description: |
-  The application team reports that updating PORT in `/etc/myapp/config.env` fails with
-  "Operation not permitted" even as root. The service must listen on port 9090 after the fix.
 
-  Investigate file attributes on the config path before attempting edits.
-
+  Investigate file attributes on the config path before attempting edits.'
 objectives:
-  - Identify why the config file cannot be modified (check extended attributes)
-  - Remove the immutable flag safely with chattr
-  - Update PORT to 9090 and verify the change persists
+- Identify why the config file cannot be modified (check extended attributes)
+- Affected service behaves normally
+initial_state: '- Ubuntu 22.04 container with `/etc/myapp/config.env` containing PORT=8080
 
-initial_state: |
-  - Ubuntu 22.04 container with `/etc/myapp/config.env` containing PORT=8080
   - The config file has the immutable (+i) attribute set
+
   - `echo` or `vim` edits fail with "Operation not permitted"
+
   - Your goal: clear the attribute, set PORT=9090, confirm with `cat /etc/myapp/config.env`
 
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run `lsattr /etc/myapp/config.env` — look for the `i` flag in the attribute list."
-  - order: 2
-    cost: 15
-    content: "Clear immutable with `chattr -i /etc/myapp/config.env`, then edit PORT to 9090."
-  - order: 3
-    cost: 20
-    content: "Verify with `cat /etc/myapp/config.env` — validation checks for PORT=9090."
+- order: 1
+  cost: 10
+  content: Run `lsattr /etc/myapp/config.env` — look for the `i` flag in the attribute list.
+- order: 2
+  cost: 15
+  content: Clear immutable with `chattr -i /etc/myapp/config.env`, then edit PORT to 9090.
+- order: 3
+  cost: 20
+  content: Verify with `cat /etc/myapp/config.env` — validation checks for PORT=9090.
+- order: 4
+  cost: 15
+  content: Remove the immutable flag safely with chattr
+- order: 5
+  cost: 15
+  content: Update PORT to 9090 and verify the change persists

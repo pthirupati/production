@@ -1,28 +1,26 @@
-title: "Broken sudoers Configuration"
-slug: "broken-sudoers"
-technology: "Linux"
-category: "User Management"
-difficulty: "easy"
+title: Broken sudoers Configuration
+slug: broken-sudoers
+technology: Linux
+category: User Management
+difficulty: easy
 time_limit: 600
 max_score: 100
-infrastructure_type: "docker"
-jira_priority: "Low"
-
-description: |
-  User devops cannot run sudo commands. The sudoers file has a typo.
-  Fix it so devops can run administrative commands.
-
+infrastructure_type: docker
+jira_priority: Low
+description: User devops cannot run sudo commands. The sudoers file has a typo.
 objectives:
-  - Diagnose why sudo fails for devops
-  - Fix /etc/sudoers typo
+- Diagnose why sudo fails for devops
+- Affected service behaves normally
+initial_state: 'User devops exists but sudo reports syntax or permission errors.
 
-initial_state: |
-  User devops exists but sudo reports syntax or permission errors.
-
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run `sudo -u devops sudo -n true` and check visudo."
-  - order: 2
-    cost: 20
-    content: "Change ALLL to ALL in the devops sudoers line."
+- order: 1
+  cost: 10
+  content: Run `sudo -u devops sudo -n true` and check visudo.
+- order: 2
+  cost: 20
+  content: Change ALLL to ALL in the devops sudoers line.
+- order: 3
+  cost: 15
+  content: Fix /etc/sudoers typo

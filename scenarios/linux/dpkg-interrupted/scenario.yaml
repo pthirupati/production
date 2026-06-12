@@ -1,27 +1,31 @@
-title: "APT/DPKG Database Interrupted"
-slug: "dpkg-interrupted"
-technology: "Linux"
-category: "Package Management"
-difficulty: "hard"
+title: APT/DPKG Database Interrupted
+slug: dpkg-interrupted
+technology: Linux
+category: Package Management
+difficulty: hard
 time_limit: 1200
 max_score: 100
-infrastructure_type: "docker"
+infrastructure_type: docker
 docker_privileged: false
-jira_priority: "Medium"
-topics_covered: "Q117 package DB — dpkg --configure -a, rm /var/lib/dpkg/lock*"
-
-description: |
-  apt/dpkg fails with lock errors after interrupted upgrade.
-
+jira_priority: Medium
+topics_covered: Q117 package DB — dpkg --configure -a, rm /var/lib/dpkg/lock*
+description: apt/dpkg fails with lock errors after interrupted upgrade.
 objectives:
-  - Remove stale dpkg locks
-  - Run dpkg --configure -a
-  - Verify apt works
+- Affected service behaves normally
+- Verify apt works
+initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
 
-initial_state: |
-  Ubuntu 22.04 lab container with a realistic misconfiguration.
-
+  '
 hints:
-  - order: 1
-    cost: 20
-    content: "`rm /var/lib/dpkg/lock* && dpkg --configure -a`"
+- order: 1
+  cost: 20
+  content: '`rm /var/lib/dpkg/lock* && dpkg --configure -a`'
+- order: 2
+  cost: 15
+  content: Remove stale dpkg locks
+- order: 3
+  cost: 15
+  content: Run dpkg --configure -a
+- order: 4
+  cost: 15
+  content: Verify apt works

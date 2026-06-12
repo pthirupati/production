@@ -17,21 +17,25 @@ fi
 vgchange -an fixitlab 2>/dev/null || true
 vgremove -ff fixitlab 2>/dev/null || true
 modprobe dm-mod 2>/dev/null || true
+mkdir -p /dev/mapper /opt/fixitlab/backing
+dmsetup mknodes 2>/dev/null || true
 
-[ -f /var/lvm-backing.img ] || dd if=/dev/zero of=/var/lvm-backing.img bs=1M count=512 status=none
-losetup -j /var/lvm-backing.img 2>/dev/null | cut -d: -f1 | while read -r loop; do
+[ -f /opt/fixitlab/backing/lvm-backing.img ] || \
+  dd if=/dev/zero of=/opt/fixitlab/backing/lvm-backing.img bs=1M count=512 status=none
+losetup -j /opt/fixitlab/backing/lvm-backing.img 2>/dev/null | cut -d: -f1 | while read -r loop; do
   [ -n "$loop" ] && losetup -d "$loop" 2>/dev/null || true
 done
 
-DEV=$(losetup -f --show /var/lvm-backing.img)
+DEV=$(losetup -f --show /opt/fixitlab/backing/lvm-backing.img)
 echo "$DEV" > /etc/fixitlab-lvm-dev
 
 wipefs -a "$DEV" 2>/dev/null || true
 pvcreate -y --metadatasize 128m -ff "$DEV"
 vgcreate -y fixitlab "$DEV"
-lvcreate -y -L 180M -n datalv fixitlab || lvcreate -y -l 50%VG -n datalv fixitlab
-vgchange -ay fixitlab
-udevadm settle 2>/dev/null || sleep 2
+lvcreate -y -L 180M -n datalv fixitlab 2>&1 || lvcreate -y -l 50%VG -n datalv fixitlab 2>&1
+vgchange -ay fixitlab 2>&1
+udevadm settle 2>/dev/null || sleep 3
+dmsetup ls 2>/dev/null || true
 [ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"
 [ -b "$LV_DEV" ] || { echo "datalv device not found after lvcreate" >&2; exit 1; }
 

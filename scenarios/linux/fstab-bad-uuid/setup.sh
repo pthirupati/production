@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
-dd if=/dev/zero of=/var/data.img bs=1M count=80 status=none
-DEV=$(losetup -f --show /var/data.img)
+mkdir -p /opt/fixitlab/backing
+dd if=/dev/zero of=/opt/fixitlab/backing/data.img bs=1M count=80 status=none
+DEV=$(losetup -f --show /opt/fixitlab/backing/data.img)
 mkfs.ext4 -F "$DEV"
 mkdir -p /mnt/data
 REAL_UUID=$(blkid -s UUID -o value "$DEV")

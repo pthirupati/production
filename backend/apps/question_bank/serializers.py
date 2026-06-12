@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Technology, Scenario, Tag, Bookmark
+from .scenario_copy import public_objectives
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -37,22 +38,26 @@ class ScenarioListSerializer(serializers.ModelSerializer):
 
 
 class ScenarioDetailSerializer(serializers.ModelSerializer):
-    """Full serializer for scenario detail view"""
+    """Full serializer for scenario detail view (no fix spoilers)."""
     technology = TechnologySerializer(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
     hints_count = serializers.IntegerField(read_only=True, required=False)
     is_bookmarked = serializers.BooleanField(read_only=True, required=False, default=False)
+    objectives = serializers.SerializerMethodField()
 
     class Meta:
         model = Scenario
         fields = [
             "id", "slug", "title", "subtitle", "category", "difficulty",
             "scenario_type", "technology", "tags", "description", "objectives",
-            "initial_state", "solution_explanation", "time_limit", "max_score",
+            "initial_state", "time_limit", "max_score",
             "is_free", "attempts_count", "completions_count",
             "avg_completion_time", "hints_count", "is_bookmarked",
             "blocked_commands", "infrastructure_type", "created_at", "updated_at",
         ]
+
+    def get_objectives(self, scenario):
+        return public_objectives(scenario.objectives)
 
 
 class ScenarioAdminSerializer(serializers.ModelSerializer):

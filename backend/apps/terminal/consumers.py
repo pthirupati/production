@@ -18,7 +18,11 @@ from django.contrib.auth.models import AnonymousUser
 
 from apps.labs.models import LabSession, CommandHistory, SessionRecording
 from apps.labs.provisioner import get_provisioner
-from apps.labs.provisioner.exec_socket import exec_close, exec_recv, exec_send, exec_set_timeout
+from apps.labs.provisioner.exec_stream import (
+    ExecStreamHolder,
+    open_docker_exec,
+    release_holder,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +52,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lab_session = None
-        self.raw_socket = None       # raw OS socket (Docker) or SSH channel (Cloud)
+        self.raw_socket = None       # ExecStreamHolder (Docker) or SSH channel (Cloud)
         self.exec_id = None
         self.reader_task = None
         self.provisioner = None
@@ -62,7 +66,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         self._shell_ready = False
         self._resize_pending = None
         self._ping_task = None
-        self._exec_holder = None  # keep docker exec socket + HTTP response alive
+        self._respawn_in_progress = False
 
     async def connect(self):
         user = self.scope.get("user", AnonymousUser())
@@ -140,8 +144,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                         self.exec_id, self.raw_socket = await asyncio.to_thread(
                             self.provisioner.create_exec_stream,
                             resource_id,
+                            str(self.lab_session.id),
                         )
-                    self._exec_holder = self.raw_socket
                     exec_error = None
                     break
                 except Exception as e:
@@ -235,14 +239,14 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                             # We eat the Enter keystroke — write nothing to the socket
                             # Instead, send Ctrl+C to cancel and get a new prompt
                             await asyncio.to_thread(
-                                exec_send, self.raw_socket, b"\x03"
+                                self.raw_socket.send, b"\x03"
                             )
                             return
 
                     if cmd and len(cmd) < 2000 and self.lab_session:
                         await self._save_command(cmd)
 
-                await asyncio.to_thread(exec_send, self.raw_socket, input_bytes)
+                await asyncio.to_thread(self.raw_socket.send, input_bytes)
 
                 # Record input for replay
                 if self._session_start_time:
@@ -288,28 +292,94 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         except Exception:
             pass
 
+    async def _open_shell(self, resource_id: str) -> bool:
+        """Attach to container/VM shell."""
+        if self.provider_type == "docker":
+            self.exec_id, self.raw_socket = await asyncio.to_thread(
+                self.provisioner.create_exec_stream,
+                resource_id,
+                str(self.lab_session.id),
+            )
+        else:
+            ssh_user = self.lab_session.ssh_user or "ec2-user"
+            self.exec_id, self.raw_socket = await asyncio.to_thread(
+                self.provisioner.create_exec_stream,
+                resource_id,
+                ssh_user,
+            )
+        return True
+
+    async def _respawn_shell(self, reason: str = "") -> bool:
+        """Re-attach to shell without closing the WebSocket (avoids client reconnect loops)."""
+        if self._respawn_in_progress or not self.lab_session:
+            return False
+        self._respawn_in_progress = True
+        try:
+            resource_id = self._get_resource_id()
+            if not resource_id:
+                return False
+
+            if isinstance(self.raw_socket, ExecStreamHolder):
+                release_holder(str(self.lab_session.id), self.raw_socket)
+            elif self.raw_socket:
+                try:
+                    if hasattr(self.raw_socket, "close"):
+                        self.raw_socket.close()
+                except Exception:
+                    pass
+            self.raw_socket = None
+            self._shell_ready = False
+
+            await self.send(text_data=json.dumps({
+                "type": "shell_respawn",
+                "output": "\r\n\x1b[1;33mRestoring shell connection...\x1b[0m\r\n",
+            }))
+
+            await self._open_shell(resource_id)
+            return True
+        except Exception as exc:
+            logger.warning(
+                "Shell respawn failed for session %s (%s): %s",
+                getattr(self.lab_session, "id", "?"),
+                reason,
+                exc,
+            )
+            return False
+        finally:
+            self._respawn_in_progress = False
+
     async def _read_output(self):
         """Continuously read output from the exec socket/SSH channel and send to client."""
         empty_reads = 0
         try:
-            await asyncio.to_thread(exec_set_timeout, self.raw_socket, 60.0)
+            if isinstance(self.raw_socket, ExecStreamHolder):
+                await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
             while True:
                 try:
-                    data = await asyncio.to_thread(exec_recv, self.raw_socket, 4096)
+                    if isinstance(self.raw_socket, ExecStreamHolder):
+                        data = await asyncio.to_thread(self.raw_socket.recv, 4096)
+                    else:
+                        data = await asyncio.to_thread(self.raw_socket.recv, 4096)
                 except TimeoutError:
                     continue
                 if not data:
                     empty_reads += 1
-                    if empty_reads > 150:
-                        logger.info("Exec stream EOF for session %s", self.lab_session.id)
-                        try:
-                            await self.send(text_data=json.dumps({
-                                "output": "\r\n\x1b[1;33mShell session ended — reconnecting...\x1b[0m\r\n"
-                            }))
-                        except Exception:
-                            pass
-                        await self.close(code=4500)
-                        break
+                    if empty_reads > 30:
+                        logger.info(
+                            "Exec stream EOF for session %s — respawning shell",
+                            self.lab_session.id,
+                        )
+                        if not await self._respawn_shell("eof"):
+                            try:
+                                await self.send(text_data=json.dumps({
+                                    "output": "\r\n\x1b[1;31mLab shell unavailable.\x1b[0m\r\n",
+                                }))
+                            except Exception:
+                                pass
+                            await self.close(code=4500)
+                            break
+                        empty_reads = 0
+                        continue
                     await asyncio.sleep(0.2)
                     continue
 
@@ -334,22 +404,24 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 await self.send(text_data=json.dumps({"output": output}))
         except asyncio.CancelledError:
             pass
-        except (ConnectionResetError, OSError):
-            logger.info("Terminal connection reset (container/instance stopped)")
-            try:
-                await self.send(text_data=json.dumps({
-                    "output": "\r\n\x1b[1;33mSession ended\x1b[0m\r\n"
-                }))
-            except Exception:
-                pass
+        except (ConnectionResetError, OSError) as exc:
+            logger.info("Terminal stream reset for session %s: %s", self.lab_session.id, exc)
+            if not await self._respawn_shell("reset"):
+                try:
+                    await self.send(text_data=json.dumps({
+                        "output": "\r\n\x1b[1;33mSession ended\x1b[0m\r\n"
+                    }))
+                except Exception:
+                    pass
         except Exception as e:
             logger.error(f"Error reading terminal output: {e}")
-            try:
-                await self.send(text_data=json.dumps({
-                    "output": "\r\n\x1b[1;31mConnection lost\x1b[0m\r\n"
-                }))
-            except Exception:
-                pass
+            if not await self._respawn_shell("error"):
+                try:
+                    await self.send(text_data=json.dumps({
+                        "output": "\r\n\x1b[1;31mConnection lost\x1b[0m\r\n"
+                    }))
+                except Exception:
+                    pass
 
     async def disconnect(self, close_code):
         """Cleanup on disconnect and save recording."""
@@ -381,16 +453,18 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             except asyncio.CancelledError:
                 pass
 
-        if self.raw_socket:
+        if self.lab_session and isinstance(self.raw_socket, ExecStreamHolder):
+            release_holder(str(self.lab_session.id), self.raw_socket)
+            self.raw_socket = None
+        elif self.raw_socket:
             try:
-                # For SSH channels, also close the parent SSH client
-                if hasattr(self.raw_socket, '_ssh_client'):
+                if hasattr(self.raw_socket, "_ssh_client"):
                     self.raw_socket._ssh_client.close()
-                exec_close(self.raw_socket)
+                if hasattr(self.raw_socket, "close"):
+                    self.raw_socket.close()
             except Exception:
                 pass
             self.raw_socket = None
-            self._exec_holder = None
 
     @database_sync_to_async
     def _load_blocked_patterns(self):

@@ -15,6 +15,8 @@ from typing import Optional
 from django.conf import settings
 from django.utils import timezone
 
+from apps.question_bank.scenario_copy import incident_summary, public_objectives
+
 from .client import JiraClient, JiraClientError
 from .models import JiraTicketLog, UserScenarioJiraTicket
 
@@ -54,7 +56,7 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
             scenario_title=scenario.title,
             scenario_slug=scenario.slug,
             scenario_description=scenario.description,
-            objectives="\n".join(f"- {o}" for o in (scenario.objectives or [])),
+            objectives="\n".join(f"- {o}" for o in public_objectives(scenario.objectives or [])),
             initial_state=scenario.initial_state,
             difficulty=scenario.difficulty,
             technology=scenario.technology.name,
@@ -66,8 +68,13 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
             site_url=site,
         )
 
-    objectives = scenario.objectives or []
-    obj_text = "\n".join(f"• {o}" for o in objectives) if objectives else "See scenario page."
+    outcomes = public_objectives(scenario.objectives or [])
+    outcome_text = (
+        "\n".join(f"• {o}" for o in outcomes)
+        if outcomes
+        else "• Restore normal service for the affected system."
+    )
+    incident = incident_summary(scenario)
 
     return (
         f"h2. Production Incident — {scenario.title}\n\n"
@@ -77,12 +84,10 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
         f"*Time limit:* {scenario.time_limit // 60} minutes\n\n"
         f"h3. Summary\n"
         f"{scenario.subtitle or scenario.title}\n\n"
-        f"h3. Description\n"
-        f"{scenario.description.strip() if scenario.description else 'See FixitLab scenario page.'}\n\n"
-        f"h3. Objectives\n"
-        f"{obj_text}\n\n"
-        f"h3. Initial State / Symptoms\n"
-        f"{scenario.initial_state.strip() if scenario.initial_state else 'SSH access to a Linux server with a misconfiguration.'}\n\n"
+        f"h3. Incident description\n"
+        f"{incident}\n\n"
+        f"h3. Expected outcome\n"
+        f"{outcome_text}\n\n"
         f"h3. FixitLab Links\n"
         f"* [Open lab|{lab_url}]\n"
         f"* [Scenario details|{scenario_url}]\n\n"

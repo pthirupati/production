@@ -1,29 +1,26 @@
-title: "Renew Expired SSL Certificate"
-slug: "ssl-cert-expired"
-technology: "Security"
-category: "TLS/SSL"
-difficulty: "medium"
+title: Renew Expired SSL Certificate
+slug: ssl-cert-expired
+technology: Security
+category: TLS/SSL
+difficulty: medium
 time_limit: 900
 max_score: 100
-infrastructure_type: "docker"
-jira_priority: "High"
+infrastructure_type: docker
+jira_priority: High
+description: 'HTTPS endpoints fail certificate validation. The nginx SSL certificate
 
-description: |
-  HTTPS endpoints fail certificate validation. The nginx SSL certificate
-  expires in one day. Generate a new certificate and reload nginx.
-
+  expires in one day. Generate a new certificate and reload nginx.'
 objectives:
-  - Check certificate expiry with openssl
-  - Generate new self-signed cert for /etc/nginx/ssl/
-  - Validate nginx config and reload
+- Check certificate expiry with openssl
+- Generate new self-signed cert for /etc/nginx/ssl/
+- Validate nginx config and reload
+initial_state: 'Nginx with 1-day self-signed certificate in /etc/nginx/ssl/.
 
-initial_state: |
-  Nginx with 1-day self-signed certificate in /etc/nginx/ssl/.
-
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "`openssl x509 -in /etc/nginx/ssl/cert.pem -noout -dates`"
-  - order: 2
-    cost: 20
-    content: "Regenerate with `openssl req -x509 -days 365 ...` then `nginx -t && service nginx reload`"
+- order: 1
+  cost: 10
+  content: '`openssl x509 -in /etc/nginx/ssl/cert.pem -noout -dates`'
+- order: 2
+  cost: 20
+  content: Regenerate with `openssl req -x509 -days 365 ...` then `nginx -t && service nginx reload`

@@ -1,39 +1,47 @@
-# Scenario definition — loaded by admin or seed script
-title: "Fix the Broken Nginx Server"
-slug: "broken-nginx"
-technology: "Linux"
-category: "Web Servers"
-difficulty: "easy"
-time_limit: 900  # 15 minutes
+title: Fix the Broken Nginx Server
+slug: broken-nginx
+technology: Linux
+category: Web Servers
+difficulty: easy
+time_limit: 900
 max_score: 100
-infrastructure_type: "docker"
-jira_priority: "Medium"
+infrastructure_type: docker
+jira_priority: Medium
 is_free: true
+description: 'A web server was recently deployed, but it refuses to start.
 
-description: |
-  A web server was recently deployed, but it refuses to start.
   Your mission is to investigate the Nginx configuration, identify
+
   the error, fix it, and ensure the server is running and serving
-  the default page on port 80.
 
+  the default page on port 80.'
 objectives:
-  - Find the error in the Nginx configuration
-  - Fix the configuration so `nginx -t` passes
-  - Start the Nginx service
-  - Verify that http://localhost returns a 200 status
+- Find the error in the Nginx configuration
+- Affected service behaves normally
+- Verify that http://localhost returns a 200 status
+initial_state: 'You have SSH access to an Ubuntu 22.04 server.
 
-initial_state: |
-  You have SSH access to an Ubuntu 22.04 server.
   Nginx is installed but fails to start.
+
   The default site configuration has been modified.
 
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Try running `nginx -t` to check the configuration for syntax errors."
-  - order: 2
-    cost: 15
-    content: "Look at the `listen` directive in `/etc/nginx/sites-available/default`."
-  - order: 3
-    cost: 25
-    content: "The word `listen` has a typo — it says `listn`. Fix it and restart nginx."
+- order: 1
+  cost: 10
+  content: Try running `nginx -t` to check the configuration for syntax errors.
+- order: 2
+  cost: 15
+  content: Look at the `listen` directive in `/etc/nginx/sites-available/default`.
+- order: 3
+  cost: 25
+  content: The word `listen` has a typo — it says `listn`. Fix it and restart nginx.
+- order: 4
+  cost: 15
+  content: Fix the configuration so `nginx -t` passes
+- order: 5
+  cost: 15
+  content: Start the Nginx service
+- order: 6
+  cost: 15
+  content: Verify that http://localhost returns a 200 status

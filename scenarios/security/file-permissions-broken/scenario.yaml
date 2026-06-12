@@ -1,28 +1,30 @@
-title: "Fix Insecure File Permissions"
-slug: "file-permissions-broken"
-technology: "Security"
-category: "Permissions"
-difficulty: "easy"
+title: Fix Insecure File Permissions
+slug: file-permissions-broken
+technology: Security
+category: Permissions
+difficulty: easy
 time_limit: 600
 max_score: 100
-infrastructure_type: "docker"
-jira_priority: "Medium"
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security audit flagged world-readable application secrets.
 
-description: |
-  Security audit flagged world-readable application secrets.
-  /opt/app/config.env must be owned by appuser with mode 600.
-
+  /opt/app/config.env must be owned by appuser with mode 600.'
 objectives:
-  - Fix ownership of /opt/app/config.env
-  - Set permissions to 600
+- Affected service behaves normally
+initial_state: 'Config file owned by root, mode 644.
 
-initial_state: |
-  Config file owned by root, mode 644.
-
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "`ls -la /opt/app/config.env`"
-  - order: 2
-    cost: 15
-    content: "`chown appuser /opt/app/config.env && chmod 600 /opt/app/config.env`"
+- order: 1
+  cost: 10
+  content: '`ls -la /opt/app/config.env`'
+- order: 2
+  cost: 15
+  content: '`chown appuser /opt/app/config.env && chmod 600 /opt/app/config.env`'
+- order: 3
+  cost: 15
+  content: Fix ownership of /opt/app/config.env
+- order: 4
+  cost: 15
+  content: Set permissions to 600

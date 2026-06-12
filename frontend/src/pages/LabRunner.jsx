@@ -408,6 +408,12 @@ export default function LabRunner() {
           try {
             const data = JSON.parse(event.data)
             if (data.type === 'ping') return
+            if (data.type === 'shell_respawn') {
+              reconnectAttempts.current = 0
+              shellReadyRef.current = false
+              if (data.output) term.write(data.output)
+              return
+            }
             if (data.type === 'shell_ready') {
               shellReadyRef.current = true
               scheduleResize()
@@ -434,6 +440,13 @@ export default function LabRunner() {
                 }
               })
             }
+            return
+          }
+          // Abnormal closure (1006) — server respawns shell in-place; brief pause then one retry
+          if (e.code === 1006 && reconnectAttempts.current < 2) {
+            reconnectAttempts.current++
+            term.write('\r\n\x1b[1;33mConnection interrupted — retrying...\x1b[0m\r\n')
+            reconnectTimerRef.current = setTimeout(connectWs, 1500)
             return
           }
           if (reconnectAttempts.current < maxReconnectAttempts) {
@@ -886,9 +899,9 @@ export default function LabRunner() {
                     <h3 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Description</h3>
                     <p className="text-sm text-surface-300 leading-relaxed">{scenario.description || 'Fix the broken server.'}</p>
                   </div>
-                  {scenario.objectives && (
+                  {scenario.objectives && scenario.objectives.length > 0 && (
                     <div>
-                      <h3 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Objectives</h3>
+                      <h3 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Expected outcome</h3>
                       {Array.isArray(scenario.objectives) ? (
                         <ul className="space-y-1.5">
                           {scenario.objectives.map((obj, i) => (

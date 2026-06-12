@@ -5,9 +5,9 @@ if [ -z "$SPARE" ] || [ ! -b "$SPARE" ]; then
   SPARE=$(cat /etc/fixitlab-raid2-loop 2>/dev/null || true)
 fi
 if [ -z "$SPARE" ] || [ ! -b "$SPARE" ]; then
-  if [ -f /var/raid2.img ]; then
-    SPARE=$(losetup -j /var/raid2.img 2>/dev/null | cut -d: -f1 | head -1)
-    [ -n "$SPARE" ] || SPARE=$(losetup -f --show /var/raid2.img)
+  if [ -f /opt/fixitlab/backing/raid2.img ]; then
+    SPARE=$(losetup -j /opt/fixitlab/backing/raid2.img 2>/dev/null | cut -d: -f1 | head -1)
+    [ -n "$SPARE" ] || SPARE=$(losetup -f --show /opt/fixitlab/backing/raid2.img)
   fi
 fi
 [ -n "$SPARE" ] && [ -b "$SPARE" ] || exit 1

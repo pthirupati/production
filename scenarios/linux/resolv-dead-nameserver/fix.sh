@@ -9,7 +9,7 @@ EOF
 cat > /etc/resolv.conf <<'EOF'
 nameserver 127.0.0.1
 EOF
-if ! pidof dnsmasq >/dev/null 2>&1; then
-  dnsmasq
-fi
+pkill dnsmasq 2>/dev/null || true
+dnsmasq
 sleep 1
+getent hosts app.fixitlab.local >/dev/null

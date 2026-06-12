@@ -1,27 +1,29 @@
-title: "Wrong umask — Insecure New Files"
-slug: "umask-wrong-newfiles"
-technology: "Linux"
-category: "Permissions"
-difficulty: "easy"
+title: Wrong umask — Insecure New Files
+slug: umask-wrong-newfiles
+technology: Linux
+category: Permissions
+difficulty: easy
 time_limit: 600
 max_score: 100
-infrastructure_type: "docker"
+infrastructure_type: docker
 docker_privileged: false
-jira_priority: "Medium"
-topics_covered: "Q24 umask — /etc/profile.d"
-
-description: |
-  New files created world-writable. Global umask set to 000 in profile.d.
-
+jira_priority: Medium
+topics_covered: Q24 umask — /etc/profile.d
+description: New files created world-writable. Global umask set to 000 in profile.d.
 objectives:
-  - Check umask command
-  - Fix system umask to 022
-  - Verify new file permissions
+- Check umask command
+- Affected service behaves normally
+- Verify new file permissions
+initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
 
-initial_state: |
-  Ubuntu 22.04 lab container with a realistic misconfiguration.
-
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Change to `umask 022`"
+- order: 1
+  cost: 10
+  content: Change to `umask 022`
+- order: 2
+  cost: 15
+  content: Fix system umask to 022
+- order: 3
+  cost: 15
+  content: Verify new file permissions

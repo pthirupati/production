@@ -14,7 +14,7 @@ import yaml
 from docker.errors import DockerException, NotFound, APIError
 from django.conf import settings
 
-from apps.labs.provisioner.exec_socket import prepare_exec_socket
+from apps.labs.provisioner.exec_stream import open_docker_exec
 
 logger = logging.getLogger(__name__)
 
@@ -243,8 +243,15 @@ class DockerProvisioner:
                 user="root",
                 demux=True,
             )
+            chunks = []
             if output and output[0]:
-                logger.info(f"Setup script output: {output[0].decode('utf-8', errors='replace')}")
+                chunks.append(output[0].decode("utf-8", errors="replace"))
+            if output and output[1]:
+                chunks.append(output[1].decode("utf-8", errors="replace"))
+            if exit_code != 0:
+                chunks.append(f"(setup exit code {exit_code})")
+            if chunks:
+                logger.info("Setup script output: %s", "".join(chunks).strip())
         except Exception as e:
             logger.warning(f"Setup script execution failed (non-fatal): {e}")
 
@@ -299,53 +306,24 @@ class DockerProvisioner:
             logger.error(f"Failed to execute command in container {container_id}: {e}")
             raise
 
-    def create_exec_stream(self, container_id):
+    def create_exec_stream(self, container_id, session_key: str = ""):
         """
         Create an interactive exec instance for WebSocket terminal.
-        Returns (exec_id, raw_socket) for streaming I/O.
-        Docker SDK >=7 changed socket handling — we extract the raw socket.
+        Returns (exec_id, ExecStreamHolder) for streaming I/O.
+
+        Uses a detached tmux session so reconnects attach to the same shell.
         """
-        last_error = None
-        shells = (
-            ["/bin/bash", "--noprofile", "--norc", "-i"],
-            ["/bin/bash", "-i"],
-            ["/bin/sh", "-i"],
-        )
-        for cmd in shells:
-            try:
-                container = self.client.containers.get(container_id)
-                exec_instance = self.client.api.exec_create(
-                    container.id,
-                    cmd=cmd,
-                    stdin=True,
-                    tty=True,
-                    stderr=True,
-                    stdout=True,
-                    user="root",
-                    workdir="/root",
-                    environment={
-                        "TERM": "xterm-256color",
-                        "COLUMNS": "120",
-                        "LINES": "40",
-                        "PS1": r"\u@\h:\w\$ ",
-                    },
-                )
-                sock = self.client.api.exec_start(
-                    exec_instance["Id"],
-                    detach=False,
-                    tty=True,
-                    socket=True,
-                )
-                # Keep docker-py socket wrapper (preserves _response ref — do not unwrap)
-                return exec_instance["Id"], prepare_exec_socket(sock)
-            except (NotFound, APIError) as e:
-                last_error = e
-                logger.warning(
-                    "Exec stream with %s failed for %s: %s",
-                    " ".join(cmd), container_id[:12], e,
-                )
-        logger.error(f"Failed to create exec stream for {container_id}: {last_error}")
-        raise last_error
+        try:
+            holder = open_docker_exec(
+                self.client,
+                container_id,
+                session_key=session_key,
+                ensure_tmux=True,
+            )
+            return holder.exec_id, holder
+        except (NotFound, APIError) as e:
+            logger.error(f"Failed to create exec stream for {container_id}: {e}")
+            raise
 
     def run_validation(self, container_id, validation_script):
         """
