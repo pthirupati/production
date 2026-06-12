@@ -1,11 +1,15 @@
 #!/bin/bash
 set -e
 LV_DEV="/dev/mapper/fixitlab-datalv"
-[ -x /opt/fixitlab/setup.sh ] && bash /opt/fixitlab/setup.sh
 P2=$(cat /etc/fixitlab-disk2-part 2>/dev/null || true)
 if [ -z "$P2" ] || [ ! -b "$P2" ]; then
-  D2=$(losetup -j /var/disk2.img 2>/dev/null | cut -d: -f1 | head -1)
+  D2=$(cat /etc/fixitlab-disk2-loop 2>/dev/null || true)
+  [ -n "$D2" ] && [ -b "$D2" ] || D2=$(losetup -j /var/disk2.img 2>/dev/null | cut -d: -f1 | head -1)
+  if [ -z "$D2" ] && [ -f /var/disk2.img ]; then
+    D2=$(losetup -f --show /var/disk2.img)
+  fi
   P2="${D2}p1"; [ -b "$P2" ] || P2="${D2}1"
+  [ -b "$P2" ] && echo "$P2" > /etc/fixitlab-disk2-part
 fi
 [ -b "$P2" ] || { partprobe 2>/dev/null || true; sleep 2; [ -b "$P2" ] || exit 1; }
 pvcreate -y -ff "$P2"

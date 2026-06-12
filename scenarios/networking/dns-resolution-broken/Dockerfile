@@ -21,4 +21,4 @@ COPY check.sh /opt/fixitlab/check.sh
 COPY setup.sh /opt/fixitlab/setup.sh
 RUN chmod +x /opt/fixitlab/check.sh /opt/fixitlab/setup.sh
 
-CMD ["/bin/bash", "-c", "/opt/fixitlab/setup.sh 2>/dev/null; exec /bin/bash"]
+CMD ["/bin/bash"]

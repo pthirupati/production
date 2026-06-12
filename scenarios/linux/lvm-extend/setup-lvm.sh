@@ -2,6 +2,11 @@
 # Initialize loop-backed LVM: small LV on /data — user must extend
 set -e
 LV_DEV="/dev/mapper/fixitlab-datalv"
+
+if [ -f /etc/lvm/lvm.conf ]; then
+  sed -i 's/^\s*use_lvmetad\s*=\s*1/use_lvmetad = 0/' /etc/lvm/lvm.conf 2>/dev/null || true
+fi
+
 if vgs fixitlab >/dev/null 2>&1 && lvs fixitlab/datalv >/dev/null 2>&1; then
   [ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"
   mkdir -p /data
@@ -9,17 +14,22 @@ if vgs fixitlab >/dev/null 2>&1 && lvs fixitlab/datalv >/dev/null 2>&1; then
   exit 0
 fi
 
+vgchange -an fixitlab 2>/dev/null || true
 vgremove -ff fixitlab 2>/dev/null || true
 modprobe dm-mod 2>/dev/null || true
 
-dd if=/dev/zero of=/var/lvm-backing.img bs=1M count=512 status=none conv=notrunc 2>/dev/null || \
-  dd if=/dev/zero of=/var/lvm-backing.img bs=1M count=512 status=none
-DEV=$(losetup -j /var/lvm-backing.img 2>/dev/null | cut -d: -f1 | head -1)
-[ -n "$DEV" ] || DEV=$(losetup -f --show /var/lvm-backing.img)
+[ -f /var/lvm-backing.img ] || dd if=/dev/zero of=/var/lvm-backing.img bs=1M count=512 status=none
+losetup -j /var/lvm-backing.img 2>/dev/null | cut -d: -f1 | while read -r loop; do
+  [ -n "$loop" ] && losetup -d "$loop" 2>/dev/null || true
+done
 
-pvcreate -y -ff "$DEV"
-vgcreate fixitlab "$DEV"
-lvcreate -y -L 180M -n datalv fixitlab
+DEV=$(losetup -f --show /var/lvm-backing.img)
+echo "$DEV" > /etc/fixitlab-lvm-dev
+
+wipefs -a "$DEV" 2>/dev/null || true
+pvcreate -y --metadatasize 128m -ff "$DEV"
+vgcreate -y fixitlab "$DEV"
+lvcreate -y -L 180M -n datalv fixitlab || lvcreate -y -l 50%VG -n datalv fixitlab
 vgchange -ay fixitlab
 udevadm settle 2>/dev/null || sleep 2
 [ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"

@@ -9,4 +9,4 @@ RUN mkdir -p /opt/fixitlab
 COPY setup-lvm.sh /opt/fixitlab/setup.sh
 COPY check.sh /opt/fixitlab/check.sh
 RUN chmod +x /opt/fixitlab/setup.sh /opt/fixitlab/check.sh
-CMD ["/bin/bash", "-c", "/opt/fixitlab/setup.sh 2>/dev/null; exec /bin/bash"]
+CMD ["/bin/bash"]

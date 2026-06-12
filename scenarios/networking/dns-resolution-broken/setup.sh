@@ -7,9 +7,7 @@ bind-interfaces
 address=/google.com/10.20.0.10
 address=/github.com/10.20.0.11
 EOF
-if pidof dnsmasq >/dev/null 2>&1; then
-  kill -HUP "$(pidof dnsmasq | awk '{print $1}')"
-else
+if ! pidof dnsmasq >/dev/null 2>&1; then
   dnsmasq
 fi
 echo 'nameserver 192.0.2.1' > /etc/resolv.conf

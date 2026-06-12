@@ -1,15 +1,15 @@
 #!/bin/bash
 set -e
-if mountpoint -q /data 2>/dev/null; then
-  mount -o remount,rw /data
-else
-  [ -x /opt/fixitlab/setup.sh ] && bash /opt/fixitlab/setup.sh
-  mkdir -p /data
-  mount -o remount,rw /data 2>/dev/null || mount -o rw /data 2>/dev/null || true
+if ! mountpoint -q /data 2>/dev/null; then
+  DEV=$(cat /etc/fixitlab-ro-data-dev 2>/dev/null || true)
+  if [ -z "$DEV" ] || [ ! -b "$DEV" ]; then
+    if [ -f /var/data-ro.img ]; then
+      DEV=$(losetup -j /var/data-ro.img 2>/dev/null | cut -d: -f1 | head -1)
+      [ -n "$DEV" ] || DEV=$(losetup -f --show /var/data-ro.img)
+      echo "$DEV" > /etc/fixitlab-ro-data-dev
+    fi
+  fi
+  [ -n "$DEV" ] && [ -b "$DEV" ] && mount "$DEV" /data
 fi
+mount -o remount,rw /data
 test -w /data/file.txt 2>/dev/null || chmod u+w /data /data/file.txt 2>/dev/null || true
-if ! test -w /data/file.txt 2>/dev/null; then
-  mkdir -p /tmp/data-rw
-  cp -a /data/. /tmp/data-rw/ 2>/dev/null || echo test > /tmp/data-rw/file.txt
-  mount --bind /tmp/data-rw /data
-fi

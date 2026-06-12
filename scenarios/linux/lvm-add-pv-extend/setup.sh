@@ -1,21 +1,27 @@
 #!/bin/bash
 set -e
 LV_DEV="/dev/mapper/fixitlab-datalv"
-if vgs fixitlab >/dev/null 2>&1 && lvs fixitlab/datalv >/dev/null 2>&1; then
+
+if [ -f /etc/lvm/lvm.conf ]; then
+  sed -i 's/^\s*use_lvmetad\s*=\s*1/use_lvmetad = 0/' /etc/lvm/lvm.conf 2>/dev/null || true
+fi
+
+if vgs fixitlab >/dev/null 2>&1 && lvs fixitlab/datalv >/dev/null 2>&1 && [ -f /etc/fixitlab-disk2-part ]; then
   [ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"
   mountpoint -q /data || mount "$LV_DEV" /data 2>/dev/null || true
   exit 0
 fi
 
+vgchange -an fixitlab 2>/dev/null || true
 vgremove -ff fixitlab 2>/dev/null || true
 modprobe dm-mod 2>/dev/null || true
 
 dd if=/dev/zero of=/var/disk1.img bs=1M count=400 status=none
 dd if=/dev/zero of=/var/disk2.img bs=1M count=350 status=none
-D1=$(losetup -j /var/disk1.img 2>/dev/null | cut -d: -f1 | head -1)
-D2=$(losetup -j /var/disk2.img 2>/dev/null | cut -d: -f1 | head -1)
-[ -n "$D1" ] || D1=$(losetup -f --show /var/disk1.img)
-[ -n "$D2" ] || D2=$(losetup -f --show /var/disk2.img)
+D1=$(losetup -f --show /var/disk1.img)
+D2=$(losetup -f --show /var/disk2.img)
+echo "$D1" > /etc/fixitlab-disk1-loop
+echo "$D2" > /etc/fixitlab-disk2-loop
 
 parted -s "$D1" mklabel gpt
 parted -s "$D1" mkpart primary 1MiB 100%
@@ -28,8 +34,9 @@ P2="${D2}p1"; [ -b "$P2" ] || P2="${D2}1"
 [ -b "$P1" ] && [ -b "$P2" ] || { echo "partition devices missing" >&2; exit 1; }
 echo "$P2" > /etc/fixitlab-disk2-part
 
-pvcreate -y -ff "$P1"
-vgcreate fixitlab "$P1"
+wipefs -a "$P1" 2>/dev/null || true
+pvcreate -y --metadatasize 128m -ff "$P1"
+vgcreate -y fixitlab "$P1"
 lvcreate -y -l 100%FREE -n datalv fixitlab
 vgchange -ay fixitlab
 udevadm settle 2>/dev/null || sleep 2

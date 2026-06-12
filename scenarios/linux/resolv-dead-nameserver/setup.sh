@@ -6,9 +6,7 @@ listen-address=127.0.0.1
 bind-interfaces
 address=/app.fixitlab.local/10.20.0.5
 EOF
-if pidof dnsmasq >/dev/null 2>&1; then
-  kill -HUP "$(pidof dnsmasq | awk '{print $1}')"
-else
+if ! pidof dnsmasq >/dev/null 2>&1; then
   dnsmasq
 fi
 echo 'nameserver 192.0.2.1' > /etc/resolv.conf
