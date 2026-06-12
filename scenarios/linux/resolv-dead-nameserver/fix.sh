@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+. /opt/fixitlab/lab-dnsmasq.sh
 mkdir -p /etc/dnsmasq.d
 cat > /etc/dnsmasq.d/fixitlab.conf <<'EOF'
 listen-address=127.0.0.1
@@ -9,7 +10,5 @@ EOF
 cat > /etc/resolv.conf <<'EOF'
 nameserver 127.0.0.1
 EOF
-pkill dnsmasq 2>/dev/null || true
-dnsmasq
-sleep 1
+fixitlab_dnsmasq_reload
 getent hosts app.fixitlab.local >/dev/null

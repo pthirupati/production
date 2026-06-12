@@ -1,13 +1,11 @@
 #!/bin/bash
 set -e
+. /opt/fixitlab/lab-loop.sh
 if ! mountpoint -q /data 2>/dev/null; then
   DEV=$(cat /etc/fixitlab-ro-data-dev 2>/dev/null || true)
   if [ -z "$DEV" ] || [ ! -b "$DEV" ]; then
-    if [ -f /opt/fixitlab/backing/data-ro.img ]; then
-      DEV=$(losetup -j /opt/fixitlab/backing/data-ro.img 2>/dev/null | cut -d: -f1 | head -1)
-      [ -n "$DEV" ] || DEV=$(losetup -f --show /opt/fixitlab/backing/data-ro.img)
-      echo "$DEV" > /etc/fixitlab-ro-data-dev
-    fi
+    DEV=$(fixitlab_loop_attach /opt/fixitlab/backing/data-ro.img 32M)
+    echo "$DEV" > /etc/fixitlab-ro-data-dev
   fi
   [ -n "$DEV" ] && [ -b "$DEV" ] && mount "$DEV" /data
 fi

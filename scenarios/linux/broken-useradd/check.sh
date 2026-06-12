@@ -5,8 +5,12 @@
 SCORE=0
 TOTAL=5
 
-# Helper: portable stat (Linux vs macOS)
-get_perm() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null; }
+# Helper: portable stat (Linux vs macOS), normalize to decimal (644 not 0644)
+get_perm() {
+  local p
+  p=$(stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null)
+  echo "$((10#$p))"
+}
 
 # Step 1: Check /etc/passwd is readable and valid
 if command -v pwck &>/dev/null; then
@@ -51,15 +55,15 @@ if [ "$PASSWD_PERM" = "777" ] || [ "$PASSWD_PERM" = "666" ]; then
     echo "FAIL: /etc/passwd is still world-writable ($PASSWD_PERM) — run chmod 644 /etc/passwd"
     exit 1
 fi
-if [ "$PASSWD_PERM" != "644" ]; then
+if [ "$PASSWD_PERM" -ne 644 ]; then
     echo "FAIL: /etc/passwd has wrong permissions ($PASSWD_PERM, expected 644)"
     exit 1
 fi
-if [ "$SHADOW_PERM" != "640" ] && [ "$SHADOW_PERM" != "600" ]; then
+if [ "$SHADOW_PERM" -ne 640 ] && [ "$SHADOW_PERM" -ne 600 ]; then
     echo "FAIL: /etc/shadow has wrong permissions ($SHADOW_PERM, expected 640)"
     exit 1
 fi
-if [ "$GROUP_PERM" != "644" ]; then
+if [ "$GROUP_PERM" -ne 644 ]; then
     echo "FAIL: /etc/group has wrong permissions ($GROUP_PERM, expected 644)"
     exit 1
 fi

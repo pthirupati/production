@@ -1,11 +1,9 @@
 #!/bin/bash
 set -e
+. /opt/fixitlab/lab-loop.sh
 DEV=$(cat /etc/fixitlab-data-dev 2>/dev/null || true)
 if [ -z "$DEV" ] || [ ! -b "$DEV" ]; then
-  DEV=$(losetup -j /opt/fixitlab/backing/data.img 2>/dev/null | cut -d: -f1 | head -1)
-fi
-if [ -z "$DEV" ] && [ -f /opt/fixitlab/backing/data.img ]; then
-  DEV=$(losetup -f --show /opt/fixitlab/backing/data.img)
+  DEV=$(fixitlab_loop_attach /opt/fixitlab/backing/data.img 80M)
   echo "$DEV" > /etc/fixitlab-data-dev
 fi
 [ -n "$DEV" ] && [ -b "$DEV" ] || { echo "data volume loop device not found" >&2; exit 1; }

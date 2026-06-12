@@ -347,6 +347,20 @@ class DockerProvisioner:
             # Extract session_id from labels if not provided
             if not session_id:
                 session_id = container.labels.get("fixitlab.session_id")
+            # Release host-visible loop/LVM resources before teardown (privileged labs).
+            try:
+                container.exec_run(
+                    cmd=[
+                        "/bin/bash",
+                        "-c",
+                        "if [ -f /opt/fixitlab/lab-loop.sh ]; then "
+                        ". /opt/fixitlab/lab-loop.sh && fixitlab_loop_cleanup; fi; "
+                        "losetup -D 2>/dev/null || true",
+                    ],
+                    user="root",
+                )
+            except Exception as e:
+                logger.debug("Loop cleanup before terminate (non-fatal): %s", e)
             container.stop(timeout=5)
             container.remove(force=True)
             logger.info(f"Terminated container {container_id[:12]}")

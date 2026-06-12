@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+. /opt/fixitlab/lab-loop.sh
 LV_DEV="/dev/mapper/fixitlab-datalv"
 
 if [ -f /etc/lvm/lvm.conf ]; then
@@ -14,14 +15,10 @@ fi
 
 vgchange -an fixitlab 2>/dev/null || true
 vgremove -ff fixitlab 2>/dev/null || true
-modprobe dm-mod 2>/dev/null || true
+fixitlab_loop_init
 
-mkdir -p /opt/fixitlab/backing /dev/mapper
-dmsetup mknodes 2>/dev/null || true
-dd if=/dev/zero of=/opt/fixitlab/backing/old.img bs=1M count=200 status=none
-dd if=/dev/zero of=/opt/fixitlab/backing/new.img bs=1M count=200 status=none
-OLD=$(losetup -f --show /opt/fixitlab/backing/old.img)
-NEW=$(losetup -f --show /opt/fixitlab/backing/new.img)
+OLD=$(fixitlab_loop_attach /opt/fixitlab/backing/old.img 200M)
+NEW=$(fixitlab_loop_attach /opt/fixitlab/backing/new.img 200M)
 
 for D in "$OLD" "$NEW"; do
   parted -s "$D" mklabel gpt
@@ -38,7 +35,7 @@ echo "$NP" > /etc/fixitlab-new-part
 wipefs -a "$OP" "$NP" 2>/dev/null || true
 pvcreate -y --metadatasize 128m -ff "$OP" "$NP"
 vgcreate -y fixitlab "$OP" "$NP"
-lvcreate -y -l 100%FREE -n datalv fixitlab
+lvcreate -y -Zn -l 100%FREE -n datalv fixitlab
 vgchange -ay fixitlab
 udevadm settle 2>/dev/null || sleep 2
 [ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"

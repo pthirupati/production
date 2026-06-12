@@ -1,6 +1,7 @@
 #!/bin/bash
 # Initialize loop-backed LVM: small LV on /data — user must extend
 set -e
+. /opt/fixitlab/lab-loop.sh
 LV_DEV="/dev/mapper/fixitlab-datalv"
 
 if [ -f /etc/lvm/lvm.conf ]; then
@@ -16,26 +17,19 @@ fi
 
 vgchange -an fixitlab 2>/dev/null || true
 vgremove -ff fixitlab 2>/dev/null || true
-modprobe dm-mod 2>/dev/null || true
-mkdir -p /dev/mapper /opt/fixitlab/backing
-dmsetup mknodes 2>/dev/null || true
+fixitlab_loop_init
 
-[ -f /opt/fixitlab/backing/lvm-backing.img ] || \
-  dd if=/dev/zero of=/opt/fixitlab/backing/lvm-backing.img bs=1M count=512 status=none
-losetup -j /opt/fixitlab/backing/lvm-backing.img 2>/dev/null | cut -d: -f1 | while read -r loop; do
-  [ -n "$loop" ] && losetup -d "$loop" 2>/dev/null || true
-done
-
-DEV=$(losetup -f --show /opt/fixitlab/backing/lvm-backing.img)
+IMG=/opt/fixitlab/backing/lvm-backing.img
+fixitlab_loop_detach_image "$IMG"
+DEV=$(fixitlab_loop_attach "$IMG" 512M)
 echo "$DEV" > /etc/fixitlab-lvm-dev
 
 wipefs -a "$DEV" 2>/dev/null || true
 pvcreate -y --metadatasize 128m -ff "$DEV"
 vgcreate -y fixitlab "$DEV"
-lvcreate -y -L 180M -n datalv fixitlab 2>&1 || lvcreate -y -l 50%VG -n datalv fixitlab 2>&1
+lvcreate -y -Zn -L 180M -n datalv fixitlab 2>&1 || lvcreate -y -l 50%VG -n datalv fixitlab 2>&1
 vgchange -ay fixitlab 2>&1
 udevadm settle 2>/dev/null || sleep 3
-dmsetup ls 2>/dev/null || true
 [ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"
 [ -b "$LV_DEV" ] || { echo "datalv device not found after lvcreate" >&2; exit 1; }
 

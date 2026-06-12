@@ -17,6 +17,8 @@ RUN chmod +x /usr/local/bin/systemctl /usr/local/bin/service
 
 # Copy validation script
 RUN mkdir -p /opt/fixitlab
+COPY lab-dnsmasq.sh /opt/fixitlab/lab-dnsmasq.sh
+RUN chmod +x /opt/fixitlab/lab-dnsmasq.sh
 COPY check.sh /opt/fixitlab/check.sh
 COPY setup.sh /opt/fixitlab/setup.sh
 RUN chmod +x /opt/fixitlab/check.sh /opt/fixitlab/setup.sh
