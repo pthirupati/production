@@ -370,6 +370,18 @@ export default function LabRunner() {
         resizeDebounceRef.current = setTimeout(sendResize, 300)
       }
 
+      const resizeObserver =
+        typeof ResizeObserver !== 'undefined'
+          ? new ResizeObserver(() => {
+              if (disposed) return
+              fitAddon.fit()
+              scheduleResize()
+            })
+          : null
+      if (resizeObserver && terminalRef.current) {
+        resizeObserver.observe(terminalRef.current)
+      }
+
       const wsCloseMessages = {
         4001: '\r\n\x1b[1;31mAuthentication expired — refresh the page to reconnect.\x1b[0m\r\n',
         4003: '\r\n\x1b[1;33mLab is not running yet — wait for provisioning to finish.\x1b[0m\r\n',
@@ -527,6 +539,7 @@ export default function LabRunner() {
 
       cleanup = () => {
         disposed = true
+        resizeObserver?.disconnect()
         window.removeEventListener('resize', handleResize)
         if (resizeDebounceRef.current) {
           clearTimeout(resizeDebounceRef.current)

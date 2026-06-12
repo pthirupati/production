@@ -98,15 +98,18 @@ def open_docker_exec(
     """
     container = docker_client.containers.get(container_id)
 
-    if ensure_tmux:
-        _ensure_tmux_session(container)
+    use_tmux = ensure_tmux and _ensure_tmux_session(container)
 
     last_error = None
-    shells = (
-        ["tmux", "attach", "-d", "-t", _TMUX_SESSION],
-        ["/bin/bash", "--noprofile", "--norc", "-i"],
-        ["/bin/bash", "-i"],
-        ["/bin/sh", "-i"],
+    shells = []
+    if use_tmux:
+        shells.append(["tmux", "attach", "-d", "-t", _TMUX_SESSION])
+    shells.extend(
+        [
+            ["/bin/bash", "--noprofile", "--norc", "-i"],
+            ["/bin/bash", "-i"],
+            ["/bin/sh", "-i"],
+        ]
     )
     for cmd in shells:
         try:
@@ -141,6 +144,7 @@ def open_docker_exec(
             )
             if session_key:
                 register_holder(session_key, holder)
+            _wake_shell_prompt(holder)
             return holder
         except Exception as exc:
             last_error = exc
@@ -153,20 +157,34 @@ def open_docker_exec(
     raise last_error or RuntimeError("Failed to open docker exec stream")
 
 
-def _ensure_tmux_session(container) -> None:
-    """Create a long-lived tmux shell if tmux is available."""
+def _ensure_tmux_session(container) -> bool:
+    """
+    Create a long-lived tmux shell when tmux is already installed in the image.
+
+    Never apt-install tmux on connect — that blocks the terminal for minutes with no output.
+    """
     script = (
-        "command -v tmux >/dev/null 2>&1 || "
-        "(export DEBIAN_FRONTEND=noninteractive; "
-        "apt-get update -qq && apt-get install -y -qq tmux >/dev/null 2>&1); "
+        "command -v tmux >/dev/null 2>&1 || exit 1; "
         f"tmux has-session -t {_TMUX_SESSION} 2>/dev/null || "
-        f"tmux new-session -d -s {_TMUX_SESSION} /bin/bash --noprofile --norc -i"
+        f"tmux new-session -d -s {_TMUX_SESSION} "
+        "bash -lc 'printf \"\\n\\r\"; export PS1=\"\\u@\\h:\\w\\$ \"; exec bash --noprofile --norc -i'; "
+        "exit 0"
     )
     try:
-        container.exec_run(
+        exit_code, _ = container.exec_run(
             ["/bin/bash", "-c", script],
             user="root",
             demux=True,
         )
+        return exit_code == 0
     except Exception as exc:
         logger.debug("tmux bootstrap skipped: %s", exc)
+        return False
+
+
+def _wake_shell_prompt(holder: ExecStreamHolder) -> None:
+    """Send Enter so bash/tmux emits a prompt after attach."""
+    try:
+        holder.send(b"\r")
+    except Exception:
+        pass

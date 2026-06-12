@@ -18,6 +18,12 @@ from apps.labs.provisioner.exec_stream import open_docker_exec
 
 logger = logging.getLogger(__name__)
 
+_SHARED_HELPERS_DIR = "/scenarios/shared"
+_SHARED_HELPER_FILES = (
+    ("lab-loop.sh", "/opt/fixitlab/lab-loop.sh"),
+    ("lab-dnsmasq.sh", "/opt/fixitlab/lab-dnsmasq.sh"),
+)
+
 # Scenarios that need full privileges (LVM, loop devices, mount, setcap, swapon).
 _PRIVILEGED_SLUGS = frozenset({
     "lvm-extend",
@@ -231,12 +237,44 @@ class DockerProvisioner:
             _time.sleep(1)
         logger.warning(f"Container {container.short_id} not running after {timeout}s (status: {container.status})")
 
+    def _put_file_in_container(self, container, host_path: str, dest_path: str) -> None:
+        """Copy a single host file into a running container via put_archive."""
+        dest_dir = os.path.dirname(dest_path)
+        fname = os.path.basename(dest_path)
+        with open(host_path, "rb") as fh:
+            payload = fh.read()
+        tarstream = io.BytesIO()
+        with tarfile.open(fileobj=tarstream, mode="w") as tar:
+            info = tarfile.TarInfo(name=fname)
+            info.size = len(payload)
+            info.mode = 0o755
+            tar.addfile(info, io.BytesIO(payload))
+        tarstream.seek(0)
+        container.put_archive(dest_dir, tarstream.getvalue())
+
+    def _sync_shared_helpers(self, container) -> None:
+        """
+        Copy latest shared lab helpers from the backend scenarios mount into the container.
+
+        Scenario images bake helpers at build time; fix/setup scripts on the host can be
+        newer. Syncing at runtime keeps E2E fix.sh and setup.sh in sync with helpers.
+        """
+        for name, dest in _SHARED_HELPER_FILES:
+            src = os.path.join(_SHARED_HELPERS_DIR, name)
+            if not os.path.isfile(src):
+                continue
+            try:
+                self._put_file_in_container(container, src, dest)
+            except Exception as exc:
+                logger.warning("Failed to sync helper %s into container: %s", name, exc)
+
     def _run_setup_script(self, container, scenario):
         """
         Run the setup script inside the container to ensure the broken state is applied.
         Looks for /opt/fixitlab/setup.sh inside the container image.
         """
         try:
+            self._sync_shared_helpers(container)
             exit_code, output = container.exec_run(
                 cmd=["/bin/bash", "-c",
                      "if [ -f /opt/fixitlab/setup.sh ]; then bash /opt/fixitlab/setup.sh; fi"],
@@ -262,6 +300,7 @@ class DockerProvisioner:
         """
         try:
             container = self.client.containers.get(container_id)
+            self._sync_shared_helpers(container)
             script_bytes = script_content.encode("utf-8")
             tarstream = io.BytesIO()
             with tarfile.open(fileobj=tarstream, mode="w") as tar:
