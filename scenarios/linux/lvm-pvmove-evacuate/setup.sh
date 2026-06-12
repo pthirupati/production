@@ -2,13 +2,15 @@
 set -e
 . /opt/fixitlab/lab-loop.sh
 LV_DEV="/dev/mapper/fixitlab-datalv"
+LV_ALT="/dev/fixitlab/datalv"
 
 if [ -f /etc/lvm/lvm.conf ]; then
   sed -i 's/^\s*use_lvmetad\s*=\s*1/use_lvmetad = 0/' /etc/lvm/lvm.conf 2>/dev/null || true
 fi
 
 if vgs fixitlab >/dev/null 2>&1 && lvs fixitlab/datalv >/dev/null 2>&1 && [ -f /data/important.db ]; then
-  [ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"
+  fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || true
+  [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
   mountpoint -q /data || mount "$LV_DEV" /data 2>/dev/null || true
   exit 0
 fi
@@ -24,11 +26,8 @@ for D in "$OLD" "$NEW"; do
   parted -s "$D" mklabel gpt
   parted -s "$D" mkpart primary 1MiB 100%
 done
-partprobe "$OLD" "$NEW" 2>/dev/null || true
-sleep 2
-OP="${OLD}p1"; [ -b "$OP" ] || OP="${OLD}1"
-NP="${NEW}p1"; [ -b "$NP" ] || NP="${NEW}1"
-[ -b "$OP" ] && [ -b "$NP" ] || { echo "partition devices missing" >&2; exit 1; }
+OP=$(fixitlab_loop_partdev "$OLD" 1)
+NP=$(fixitlab_loop_partdev "$NEW" 1)
 echo "$OP" > /etc/fixitlab-old-part
 echo "$NP" > /etc/fixitlab-new-part
 
@@ -37,8 +36,8 @@ pvcreate -y --metadatasize 128m -ff "$OP" "$NP"
 vgcreate -y fixitlab "$OP" "$NP"
 lvcreate -y -Zn -l 100%FREE -n datalv fixitlab
 vgchange -ay fixitlab
-udevadm settle 2>/dev/null || sleep 2
-[ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"
+fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || { echo "datalv missing after lvcreate" >&2; exit 1; }
+[ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
 mkfs.xfs -f "$LV_DEV"
 mkdir -p /data && mount "$LV_DEV" /data
 echo "production data" > /data/important.db

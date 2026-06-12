@@ -7,8 +7,9 @@ if [ -z "$SPARE" ] || [ ! -b "$SPARE" ]; then
   echo "$SPARE" > /etc/fixitlab-raid-spare
 fi
 [ -b "$SPARE" ] || { echo "spare loop device missing" >&2; exit 1; }
+grep -q 'md0' /proc/mdstat 2>/dev/null || { echo "/dev/md0 not active" >&2; exit 1; }
 mdadm --manage /dev/md0 --add "$SPARE" 2>/dev/null || mdadm /dev/md0 --add "$SPARE"
-for _ in $(seq 1 30); do
+for _ in $(seq 1 60); do
   grep -q '\[UU\]' /proc/mdstat 2>/dev/null && break
   sleep 1
 done

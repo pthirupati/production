@@ -35,7 +35,7 @@ fixitlab_loop_detach_image() {
   done < <(losetup -j "$img" 2>/dev/null | cut -d: -f1)
 }
 
-# Attach img to a loop device; reuse an existing attachment when present.
+# Attach img to a loop device with partition scanning enabled.
 fixitlab_loop_attach() {
   local img="$1"
   local size="${2:-64M}"
@@ -44,21 +44,71 @@ fixitlab_loop_attach() {
   local dev
   dev=$(losetup -j "$img" 2>/dev/null | cut -d: -f1 | head -1)
   if [ -n "$dev" ] && [ -b "$dev" ]; then
+    losetup -P "$dev" "$img" 2>/dev/null || losetup --partscan "$dev" 2>/dev/null || true
     echo "$dev"
     return 0
   fi
-  dev=$(losetup --find --show "$img" 2>/dev/null || losetup -f --show "$img" 2>/dev/null || true)
+  dev=$(losetup --find --show --partscan "$img" 2>/dev/null \
+    || losetup -f -P --show "$img" 2>/dev/null \
+    || losetup --find --show "$img" 2>/dev/null \
+    || losetup -f --show "$img" 2>/dev/null || true)
   if [ -z "$dev" ] || [ ! -b "$dev" ]; then
     fixitlab_loop_detach_image "$img"
-    dev=$(losetup --find --show "$img" 2>/dev/null || losetup -f --show "$img")
+    dev=$(losetup --find --show --partscan "$img" 2>/dev/null || losetup -f -P --show "$img")
   fi
   [ -n "$dev" ] && [ -b "$dev" ] || { echo "losetup failed for $img" >&2; return 1; }
   echo "$dev"
 }
 
-# Release loop devices and LVM state before container teardown (host-visible in privileged labs).
+# Wait for loop partition node (loop8p1) after parted.
+fixitlab_loop_partdev() {
+  local loop="$1"
+  local partnum="${2:-1}"
+  local p="${loop}p${partnum}"
+  partprobe "$loop" 2>/dev/null || true
+  blockdev --rereadpt "$loop" 2>/dev/null || true
+  losetup -P "$loop" 2>/dev/null || true
+  for _ in $(seq 1 30); do
+    if [ -b "$p" ]; then
+      echo "$p"
+      return 0
+    fi
+    partx -u "$loop" 2>/dev/null || true
+    sleep 0.2
+  done
+  echo "partition $p missing for $loop" >&2
+  return 1
+}
+
+# Wait for an LVM logical volume block device.
+fixitlab_lvm_wait_lv() {
+  local lv="$1"
+  local alt="${2:-}"
+  for _ in $(seq 1 30); do
+    vgchange -ay fixitlab 2>/dev/null || true
+    dmsetup mknodes 2>/dev/null || true
+    udevadm settle 2>/dev/null || true
+    [ -b "$lv" ] && return 0
+    if [ -n "$alt" ] && [ -b "$alt" ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+fixitlab_mdadm_cleanup() {
+  for md in /dev/md*; do
+    [ -b "$md" ] || continue
+    mdadm --stop "$md" 2>/dev/null || true
+  done
+  mdadm --stop --scan 2>/dev/null || true
+}
+
+# Release loop devices and LVM/MD state before container teardown (host-visible in privileged labs).
 fixitlab_loop_cleanup() {
   fixitlab_loop_init
+  fixitlab_mdadm_cleanup
   vgchange -an fixitlab 2>/dev/null || true
   for img in /opt/fixitlab/backing/*.img /var/*.img; do
     [ -f "$img" ] || continue

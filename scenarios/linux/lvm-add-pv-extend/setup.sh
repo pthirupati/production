@@ -2,13 +2,15 @@
 set -e
 . /opt/fixitlab/lab-loop.sh
 LV_DEV="/dev/mapper/fixitlab-datalv"
+LV_ALT="/dev/fixitlab/datalv"
 
 if [ -f /etc/lvm/lvm.conf ]; then
   sed -i 's/^\s*use_lvmetad\s*=\s*1/use_lvmetad = 0/' /etc/lvm/lvm.conf 2>/dev/null || true
 fi
 
 if vgs fixitlab >/dev/null 2>&1 && lvs fixitlab/datalv >/dev/null 2>&1 && [ -f /etc/fixitlab-disk2-part ]; then
-  [ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"
+  fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || true
+  [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
   mountpoint -q /data || mount "$LV_DEV" /data 2>/dev/null || true
   exit 0
 fi
@@ -26,11 +28,8 @@ parted -s "$D1" mklabel gpt
 parted -s "$D1" mkpart primary 1MiB 100%
 parted -s "$D2" mklabel gpt
 parted -s "$D2" mkpart primary 1MiB 100%
-partprobe "$D1" "$D2" 2>/dev/null || true
-sleep 2
-P1="${D1}p1"; [ -b "$P1" ] || P1="${D1}1"
-P2="${D2}p1"; [ -b "$P2" ] || P2="${D2}1"
-[ -b "$P1" ] && [ -b "$P2" ] || { echo "partition devices missing" >&2; exit 1; }
+P1=$(fixitlab_loop_partdev "$D1" 1)
+P2=$(fixitlab_loop_partdev "$D2" 1)
 echo "$P2" > /etc/fixitlab-disk2-part
 
 wipefs -a "$P1" 2>/dev/null || true
@@ -38,9 +37,8 @@ pvcreate -y --metadatasize 128m -ff "$P1"
 vgcreate -y fixitlab "$P1"
 lvcreate -y -Zn -l 100%FREE -n datalv fixitlab
 vgchange -ay fixitlab
-udevadm settle 2>/dev/null || sleep 2
-LV_DEV="/dev/mapper/fixitlab-datalv"
-[ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"
+fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || { echo "datalv missing after lvcreate" >&2; exit 1; }
+[ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
 mkfs.xfs -f "$LV_DEV"
 mkdir -p /data && mount "$LV_DEV" /data
 dd if=/dev/zero of=/data/fill bs=1M count=360 status=none 2>/dev/null || true

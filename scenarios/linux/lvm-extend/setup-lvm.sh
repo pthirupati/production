@@ -3,15 +3,17 @@
 set -e
 . /opt/fixitlab/lab-loop.sh
 LV_DEV="/dev/mapper/fixitlab-datalv"
+LV_ALT="/dev/fixitlab/datalv"
 
 if [ -f /etc/lvm/lvm.conf ]; then
   sed -i 's/^\s*use_lvmetad\s*=\s*1/use_lvmetad = 0/' /etc/lvm/lvm.conf 2>/dev/null || true
 fi
 
 if vgs fixitlab >/dev/null 2>&1 && lvs fixitlab/datalv >/dev/null 2>&1; then
-  [ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"
+  fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || true
+  [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
   mkdir -p /data
-  mountpoint -q /data || mount "$LV_DEV" /data
+  mountpoint -q /data || mount "$LV_DEV" /data 2>/dev/null || true
   exit 0
 fi
 
@@ -29,9 +31,8 @@ pvcreate -y --metadatasize 128m -ff "$DEV"
 vgcreate -y fixitlab "$DEV"
 lvcreate -y -Zn -L 180M -n datalv fixitlab 2>&1 || lvcreate -y -l 50%VG -n datalv fixitlab 2>&1
 vgchange -ay fixitlab 2>&1
-udevadm settle 2>/dev/null || sleep 3
-[ -b "$LV_DEV" ] || LV_DEV="/dev/fixitlab/datalv"
-[ -b "$LV_DEV" ] || { echo "datalv device not found after lvcreate" >&2; exit 1; }
+fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || { echo "datalv device not found after lvcreate" >&2; exit 1; }
+[ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
 
 mkfs.xfs -f "$LV_DEV"
 mkdir -p /data

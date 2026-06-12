@@ -7,6 +7,7 @@ if grep -q 'md0' /proc/mdstat 2>/dev/null && [ -f /etc/fixitlab-raid-spare ]; th
 fi
 
 fixitlab_loop_init
+fixitlab_mdadm_cleanup
 D1=$(fixitlab_loop_attach /opt/fixitlab/backing/raid1.img 120M)
 D2=$(fixitlab_loop_attach /opt/fixitlab/backing/raid2.img 120M)
 echo "$D1" > /etc/fixitlab-raid1-loop

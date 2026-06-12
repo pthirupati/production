@@ -354,7 +354,8 @@ class DockerProvisioner:
                         "/bin/bash",
                         "-c",
                         "if [ -f /opt/fixitlab/lab-loop.sh ]; then "
-                        ". /opt/fixitlab/lab-loop.sh && fixitlab_loop_cleanup; fi; "
+                        ". /opt/fixitlab/lab-loop.sh && fixitlab_loop_cleanup; "
+                        "else mdadm --stop --scan 2>/dev/null || true; fi; "
                         "losetup -D 2>/dev/null || true",
                     ],
                     user="root",
