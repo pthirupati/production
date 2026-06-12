@@ -14,7 +14,7 @@ import yaml
 from docker.errors import DockerException, NotFound, APIError
 from django.conf import settings
 
-from apps.labs.provisioner.exec_stream import open_docker_exec
+from apps.labs.provisioner.exec_stream import open_docker_exec, release_holder
 
 logger = logging.getLogger(__name__)
 
@@ -410,6 +410,8 @@ class DockerProvisioner:
                 )
             except Exception as e:
                 logger.debug("Loop cleanup before terminate (non-fatal): %s", e)
+            if session_id:
+                release_holder(str(session_id))
             container.stop(timeout=5)
             container.remove(force=True)
             logger.info(f"Terminated container {container_id[:12]}")

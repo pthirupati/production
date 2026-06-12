@@ -146,6 +146,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                             resource_id,
                             str(self.lab_session.id),
                         )
+                    if isinstance(self.raw_socket, ExecStreamHolder):
+                        await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
                     exec_error = None
                     break
                 except Exception as e:
@@ -336,6 +338,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             }))
 
             await self._open_shell(resource_id)
+            if isinstance(self.raw_socket, ExecStreamHolder):
+                await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
             return True
         except Exception as exc:
             logger.warning(
@@ -379,6 +383,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                             await self.close(code=4500)
                             break
                         empty_reads = 0
+                        if isinstance(self.raw_socket, ExecStreamHolder):
+                            await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
                         continue
                     await asyncio.sleep(0.2)
                     continue
@@ -454,7 +460,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 pass
 
         if self.lab_session and isinstance(self.raw_socket, ExecStreamHolder):
-            release_holder(str(self.lab_session.id), self.raw_socket)
+            # Keep exec holder registered for WebSocket reconnects; released on lab terminate.
             self.raw_socket = None
         elif self.raw_socket:
             try:

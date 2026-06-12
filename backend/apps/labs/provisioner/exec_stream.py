@@ -24,17 +24,27 @@ _TMUX_SESSION = "fixitlab"
 _registry_lock = threading.Lock()
 # session_id -> ExecStreamHolder (keeps streams alive for the WS consumer lifetime)
 _active_holders: dict[str, "ExecStreamHolder"] = {}
+# exec_id -> strong refs that must outlive the holder (docker-py GC guard)
+_gc_roots: dict[str, tuple] = {}
 
 
 class ExecStreamHolder:
     """Socket wrapper that preserves docker-py GC roots."""
 
-    __slots__ = ("socket", "_roots", "exec_id")
+    __slots__ = ("socket", "_roots", "exec_id", "_session_key")
 
-    def __init__(self, socket, exec_id: str = "", *, extra_roots: tuple = ()):
+    def __init__(
+        self,
+        socket,
+        exec_id: str = "",
+        *,
+        extra_roots: tuple = (),
+        session_key: str = "",
+    ):
         self.socket = socket
         self.exec_id = exec_id or ""
-        # Strong refs: docker API response, wrapper socket, container, etc.
+        self._session_key = session_key or ""
+        # Strong refs: docker API response, wrapper socket, container, client, etc.
         self._roots = tuple(r for r in extra_roots if r is not None)
 
     def send(self, data: bytes) -> None:
@@ -49,16 +59,37 @@ class ExecStreamHolder:
     def close(self) -> None:
         exec_close(self.socket)
 
+    def is_alive(self) -> bool:
+        try:
+            return self.socket.fileno() >= 0
+        except Exception:
+            return False
+
+
+def get_registered_holder(session_key: str) -> Optional["ExecStreamHolder"]:
+    if not session_key:
+        return None
+    with _registry_lock:
+        holder = _active_holders.get(session_key)
+    if holder and holder.is_alive():
+        return holder
+    if holder:
+        release_holder(session_key, holder)
+    return None
+
 
 def register_holder(session_key: str, holder: ExecStreamHolder) -> None:
     with _registry_lock:
         old = _active_holders.pop(session_key, None)
         if old and old is not holder:
+            _drop_gc_roots(old.exec_id)
             try:
                 old.close()
             except Exception:
                 pass
         _active_holders[session_key] = holder
+        if holder.exec_id:
+            _gc_roots[holder.exec_id] = holder._roots
 
 
 def release_holder(session_key: str, holder: Optional[ExecStreamHolder] = None) -> None:
@@ -66,20 +97,29 @@ def release_holder(session_key: str, holder: Optional[ExecStreamHolder] = None) 
         current = _active_holders.get(session_key)
         if holder is not None and current is not holder:
             return
-        _active_holders.pop(session_key, None)
-    if holder:
+        removed = _active_holders.pop(session_key, None)
+    if removed:
+        _drop_gc_roots(removed.exec_id)
         try:
-            holder.close()
+            removed.close()
         except Exception:
             pass
 
 
-def _collect_roots(sock) -> tuple:
-    roots = [sock]
-    for attr in ("_response", "_sock", "_container", "_exec"):
+def _drop_gc_roots(exec_id: str) -> None:
+    if exec_id:
+        _gc_roots.pop(exec_id, None)
+
+
+def _collect_roots(sock, *extra: Any) -> tuple:
+    roots: list[Any] = [sock]
+    for attr in ("_response", "_sock", "_container", "_exec", "_c", "_http_response"):
         val = getattr(sock, attr, None)
         if val is not None:
             roots.append(val)
+    for item in extra:
+        if item is not None:
+            roots.append(item)
     return tuple(roots)
 
 
@@ -93,27 +133,32 @@ def open_docker_exec(
     """
     Open an interactive shell in the container.
 
-    Uses a detached tmux session so WebSocket reconnects attach to the same shell
-    state instead of starting a fresh exec that may drop when docker-py GC runs.
+    Reuses an existing live holder for the same session when possible so WebSocket
+    reconnects do not spawn competing exec streams.
     """
+    if session_key:
+        existing = get_registered_holder(session_key)
+        if existing:
+            _wake_shell_prompt(existing)
+            return existing
+
     container = docker_client.containers.get(container_id)
+    api = docker_client.api
 
     use_tmux = ensure_tmux and _ensure_tmux_session(container)
 
     last_error = None
-    shells = []
+    shells: list[list[str]] = [
+        ["/bin/bash", "--noprofile", "--norc", "-i"],
+        ["/bin/bash", "-i"],
+        ["/bin/sh", "-i"],
+    ]
     if use_tmux:
-        shells.append(["tmux", "attach", "-d", "-t", _TMUX_SESSION])
-    shells.extend(
-        [
-            ["/bin/bash", "--noprofile", "--norc", "-i"],
-            ["/bin/bash", "-i"],
-            ["/bin/sh", "-i"],
-        ]
-    )
+        shells.insert(0, ["tmux", "attach", "-d", "-t", _TMUX_SESSION])
+
     for cmd in shells:
         try:
-            exec_instance = docker_client.api.exec_create(
+            exec_instance = api.exec_create(
                 container.id,
                 cmd=cmd,
                 stdin=True,
@@ -129,18 +174,20 @@ def open_docker_exec(
                     "PS1": r"\u@\h:\w\$ ",
                 },
             )
-            raw_sock = docker_client.api.exec_start(
-                exec_instance["Id"],
+            exec_id = exec_instance.get("Id", "")
+            raw_sock = api.exec_start(
+                exec_id,
                 detach=False,
                 tty=True,
                 socket=True,
             )
             prepared = prepare_exec_socket(raw_sock)
-            roots = _collect_roots(raw_sock) + (container, exec_instance)
+            roots = _collect_roots(raw_sock, prepared, api, docker_client, container, exec_instance)
             holder = ExecStreamHolder(
                 prepared,
-                exec_instance.get("Id", ""),
+                exec_id,
                 extra_roots=roots,
+                session_key=session_key,
             )
             if session_key:
                 register_holder(session_key, holder)
