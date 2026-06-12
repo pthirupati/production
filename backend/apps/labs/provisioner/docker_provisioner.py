@@ -366,7 +366,6 @@ class DockerProvisioner:
                 self.client,
                 container_id,
                 session_key=session_key,
-                ensure_tmux=True,
             )
             return holder.exec_id, holder
         except (NotFound, APIError) as e:

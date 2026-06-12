@@ -45,8 +45,14 @@ from apps.accounts.views import LabHistoryView
 from e2e_dynamic_catalog import db_refresh, setup_all_test_users
 from e2e_scenario_fix import apply_scenario_fix, fix_script_path
 
+try:
+    from e2e_terminal import verify_lab_terminal
+except ImportError:
+    verify_lab_terminal = None
+
 User = get_user_model()
 SKIP_LAB = os.environ.get("E2E_SKIP_LAB", "0") == "1"
+SKIP_TERMINAL = os.environ.get("E2E_SKIP_TERMINAL", "0") == "1"
 LAB_TIMEOUT = int(os.environ.get("LAB_WAIT_TIMEOUT", "120"))
 MULTI_USERS = int(os.environ.get("E2E_MULTI_USERS", "3"))
 # Only run dual-user isolation on the first deployable scenario (saves ~50% runtime)
@@ -220,6 +226,22 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c, *, test_
         st = _factory_view(SessionReplayView, "GET", f"/api/labs/{sid_a}/replay/", user_a, session_id=sid_a)
         if getattr(st, "status_code", 0) == 200:
             stats.ok(f"{label} replay API")
+
+        if (
+            not SKIP_TERMINAL
+            and verify_lab_terminal
+            and sess_a
+            and (sess_a.provider or "docker") == "docker"
+            and sess_a.container_id
+        ):
+            from rest_framework_simplejwt.tokens import AccessToken
+
+            token = str(AccessToken.for_user(user_a))
+            ok, detail = verify_lab_terminal(str(sid_a), token)
+            if ok:
+                stats.ok(f"{label} terminal WebSocket")
+            else:
+                stats.fail(f"{label} terminal WebSocket", detail[:80])
 
         # Apply fix.sh then validate — must pass when fix script exists
         db_refresh()

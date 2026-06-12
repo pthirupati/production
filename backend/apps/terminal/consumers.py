@@ -460,7 +460,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 pass
 
         if self.lab_session and isinstance(self.raw_socket, ExecStreamHolder):
-            # Keep exec holder registered for WebSocket reconnects; released on lab terminate.
+            release_holder(str(self.lab_session.id), self.raw_socket)
             self.raw_socket = None
         elif self.raw_socket:
             try:
