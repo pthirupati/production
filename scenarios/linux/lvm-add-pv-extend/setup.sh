@@ -8,7 +8,7 @@ if [ -f /etc/lvm/lvm.conf ]; then
   sed -i 's/^\s*use_lvmetad\s*=\s*1/use_lvmetad = 0/' /etc/lvm/lvm.conf 2>/dev/null || true
 fi
 
-if vgs fixitlab >/dev/null 2>&1 && lvs fixitlab/datalv >/dev/null 2>&1 && [ -f /etc/fixitlab-disk2-part ]; then
+if vgs fixitlab >/dev/null 2>&1 && lvs fixitlab/datalv >/dev/null 2>&1 && [ -f /etc/fixitlab-disk2-loop ]; then
   fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || true
   [ -b "$LV_DEV" ] || LV_DEV="$LV_ALT"
   mountpoint -q /data || mount "$LV_DEV" /data 2>/dev/null || true
@@ -24,17 +24,9 @@ D2=$(fixitlab_loop_attach /opt/fixitlab/backing/disk2.img 350M)
 echo "$D1" > /etc/fixitlab-disk1-loop
 echo "$D2" > /etc/fixitlab-disk2-loop
 
-parted -s "$D1" mklabel gpt
-parted -s "$D1" mkpart primary 1MiB 100%
-parted -s "$D2" mklabel gpt
-parted -s "$D2" mkpart primary 1MiB 100%
-P1=$(fixitlab_loop_partdev "$D1" 1)
-P2=$(fixitlab_loop_partdev "$D2" 1)
-echo "$P2" > /etc/fixitlab-disk2-part
-
-wipefs -a "$P1" 2>/dev/null || true
-pvcreate -y --metadatasize 128m -ff "$P1"
-vgcreate -y fixitlab "$P1"
+wipefs -a "$D1" 2>/dev/null || true
+pvcreate -y --metadatasize 128m -ff "$D1"
+vgcreate -y fixitlab "$D1"
 lvcreate -y -Zn -l 100%FREE -n datalv fixitlab
 vgchange -ay fixitlab
 fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || { echo "datalv missing after lvcreate" >&2; exit 1; }
@@ -42,4 +34,4 @@ fixitlab_lvm_wait_lv "$LV_DEV" "$LV_ALT" || { echo "datalv missing after lvcreat
 mkfs.xfs -f "$LV_DEV"
 mkdir -p /data && mount "$LV_DEV" /data
 dd if=/dev/zero of=/data/fill bs=1M count=360 status=none 2>/dev/null || true
-echo "Disk2 $P2 is unused — add to VG and extend datalv"
+echo "Disk2 $D2 is unused — add to VG and extend datalv"
