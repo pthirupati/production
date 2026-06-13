@@ -75,8 +75,22 @@ async def _check_terminal_async(session_id: str, token: str) -> tuple[bool, str]
                 continue
         return False, f"stream dropped after {HOLD_SECONDS}s hold"
     finally:
-        await comm.disconnect()
+        try:
+            await comm.disconnect()
+        except Exception:
+            pass
+        try:
+            from apps.labs.provisioner.exec_stream import release_holder
+
+            release_holder(session_id)
+        except Exception:
+            pass
 
 
 def verify_lab_terminal(session_id: str, token: str) -> tuple[bool, str]:
-    return asyncio.run(_check_terminal_async(session_id, token))
+    try:
+        from asgiref.sync import async_to_sync
+
+        return async_to_sync(_check_terminal_async)(session_id, token)
+    except Exception as exc:
+        return False, str(exc)[:120]

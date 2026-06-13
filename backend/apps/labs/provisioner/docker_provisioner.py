@@ -48,6 +48,27 @@ def _safe_container_username(username: str) -> str:
     return safe.strip("-") or "user"
 
 
+def _exec_stream_text(output, index: int) -> str:
+    """Decode stdout/stderr from docker-py exec_run (bytes, None, or nested tuple)."""
+    if output is None:
+        return ""
+    if isinstance(output, bytes):
+        return output.decode("utf-8", errors="replace") if index == 0 else ""
+    if isinstance(output, (tuple, list)):
+        if index >= len(output):
+            return ""
+        chunk = output[index]
+        if chunk is None:
+            return ""
+        if isinstance(chunk, bytes):
+            return chunk.decode("utf-8", errors="replace")
+        if isinstance(chunk, str):
+            return chunk
+        if isinstance(chunk, (tuple, list)):
+            return _exec_stream_text(chunk, 0)
+    return ""
+
+
 class DockerProvisioner:
     """Manages Docker containers for lab sessions."""
 
@@ -291,10 +312,13 @@ class DockerProvisioner:
                 demux=True,
             )
             chunks = []
-            if output and output[0]:
-                chunks.append(output[0].decode("utf-8", errors="replace"))
-            if output and output[1]:
-                chunks.append(output[1].decode("utf-8", errors="replace"))
+            if output:
+                stdout = _exec_stream_text(output, 0)
+                stderr = _exec_stream_text(output, 1)
+                if stdout:
+                    chunks.append(stdout)
+                if stderr:
+                    chunks.append(stderr)
             if exit_code != 0:
                 chunks.append(f"(setup exit code {exit_code})")
             if chunks:
@@ -325,8 +349,8 @@ class DockerProvisioner:
                 demux=True,
                 user="root",
             )
-            stdout = output[0].decode("utf-8", errors="replace") if output[0] else ""
-            stderr = output[1].decode("utf-8", errors="replace") if output[1] else ""
+            stdout = _exec_stream_text(output, 0)
+            stderr = _exec_stream_text(output, 1)
             return exit_code, stdout + stderr
         except (NotFound, APIError) as e:
             logger.error(f"Failed to execute script in container {container_id}: {e}")
@@ -347,8 +371,8 @@ class DockerProvisioner:
                 demux=True,
                 user="root",
             )
-            stdout = output[0].decode("utf-8", errors="replace") if output[0] else ""
-            stderr = output[1].decode("utf-8", errors="replace") if output[1] else ""
+            stdout = _exec_stream_text(output, 0)
+            stderr = _exec_stream_text(output, 1)
             return exit_code, stdout + stderr
         except (NotFound, APIError) as e:
             logger.error(f"Failed to execute command in container {container_id}: {e}")

@@ -9,6 +9,7 @@ Records command history and terminal I/O for replay.
 import json
 import asyncio
 import logging
+import os
 import re
 import time
 import threading
@@ -23,13 +24,14 @@ from apps.labs.provisioner.exec_stream import (
     open_docker_exec,
     release_holder,
 )
+from apps.labs.provisioner.exec_socket import _coerce_recv_bytes
 
 logger = logging.getLogger(__name__)
 
 # Per-user WebSocket connection tracking (prevents resource exhaustion)
 _user_connections = {}  # user_id -> count
 _conn_lock = threading.Lock()
-MAX_WS_PER_USER = 3  # Max concurrent terminal sessions per user
+MAX_WS_PER_USER = int(os.environ.get("TERMINAL_MAX_WS_PER_USER", "3"))
 
 
 class TerminalConsumer(AsyncWebsocketConsumer):
@@ -68,6 +70,19 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         self._ping_task = None
         self._respawn_in_progress = False
 
+    def _release_connection_slot(self) -> None:
+        """Decrement per-user WS counter (safe if called more than once)."""
+        user_id = getattr(self, "_tracked_user_id", None)
+        if user_id is None:
+            return
+        self._tracked_user_id = None
+        with _conn_lock:
+            count = _user_connections.get(user_id, 1)
+            if count <= 1:
+                _user_connections.pop(user_id, None)
+            else:
+                _user_connections[user_id] = count - 1
+
     async def connect(self):
         user = self.scope.get("user", AnonymousUser())
         session_id = self.scope["url_route"]["kwargs"].get("session_id")
@@ -90,10 +105,12 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         # Verify session ownership and status
         self.lab_session = await self._get_session(session_id, user)
         if not self.lab_session:
+            self._release_connection_slot()
             await self.close(code=4004)
             return
 
         if self.lab_session.status != "RUNNING":
+            self._release_connection_slot()
             await self.close(code=4003)
             return
 
@@ -102,6 +119,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         resource_id = self._get_resource_id()
 
         if not resource_id:
+            self._release_connection_slot()
             await self.close(code=4005)
             return
 
@@ -400,7 +418,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     except Exception:
                         pass
 
-                output = data.decode("utf-8", errors="replace")
+                output = _coerce_recv_bytes(data).decode("utf-8", errors="replace")
 
                 # Record output for replay
                 if self._session_start_time:
@@ -431,17 +449,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         """Cleanup on disconnect and save recording."""
-        # Decrement per-user connection count
-        user_id = getattr(self, "_tracked_user_id", None)
-        if user_id is not None:
-            with _conn_lock:
-                count = _user_connections.get(user_id, 1)
-                if count <= 1:
-                    _user_connections.pop(user_id, None)
-                else:
-                    _user_connections[user_id] = count - 1
-
-        # Save session recording
+        self._release_connection_slot()
         if self.lab_session and self._recording_events:
             await self._save_recording()
 

@@ -7,6 +7,29 @@ socket, so the HTTP response is garbage-collected and the exec stream drops afte
 """
 
 
+def _coerce_recv_bytes(data) -> bytes:
+    """Normalize docker exec socket reads to bytes (some SDK paths return tuples)."""
+    if data is None:
+        return b""
+    if isinstance(data, bytes):
+        return data
+    if isinstance(data, str):
+        return data.encode("utf-8", errors="replace")
+    if isinstance(data, tuple):
+        parts = []
+        for item in data:
+            if item is None:
+                continue
+            if isinstance(item, bytes):
+                parts.append(item)
+            elif isinstance(item, str):
+                parts.append(item.encode("utf-8", errors="replace"))
+            elif isinstance(item, int):
+                continue
+        return b"".join(parts)
+    return bytes(data)
+
+
 class DockerExecSocket:
     """Wraps the raw exec socket and holds the requests Response alive."""
 
@@ -29,10 +52,10 @@ class DockerExecSocket:
     def recv(self, size: int) -> bytes:
         if hasattr(self._sock, "recv"):
             data = self._sock.recv(size)
-            return data if data else b""
+            return _coerce_recv_bytes(data)
         if hasattr(self._sock, "read"):
             data = self._sock.read(size)
-            return data if data else b""
+            return _coerce_recv_bytes(data)
         raise RuntimeError("Exec socket has no recv/read method")
 
     def settimeout(self, seconds: float) -> None:
@@ -92,11 +115,9 @@ def exec_recv(sock, size: int) -> bytes:
         return sock.recv(size)
     target = _io_target(sock)
     if hasattr(target, "recv"):
-        data = target.recv(size)
-        return data if data else b""
+        return _coerce_recv_bytes(target.recv(size))
     if hasattr(target, "read"):
-        data = target.read(size)
-        return data if data else b""
+        return _coerce_recv_bytes(target.read(size))
     raise RuntimeError("Exec socket has no recv/read method")
 
 

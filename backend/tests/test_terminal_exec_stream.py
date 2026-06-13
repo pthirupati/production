@@ -3,7 +3,42 @@ from unittest.mock import MagicMock
 
 from django.test import SimpleTestCase
 
-from apps.labs.provisioner.exec_socket import DockerExecSocket, start_exec_stream
+from apps.labs.provisioner.docker_provisioner import _exec_stream_text
+from apps.labs.provisioner.exec_socket import (
+    DockerExecSocket,
+    _coerce_recv_bytes,
+    start_exec_stream,
+)
+from apps.terminal.middleware import _scope_query_string
+
+
+class CoerceRecvTests(SimpleTestCase):
+    def test_tuple_stream_chunks(self):
+        self.assertEqual(_coerce_recv_bytes((b"hi", b" there")), b"hi there")
+
+    def test_bytes_passthrough(self):
+        self.assertEqual(_coerce_recv_bytes(b"ok"), b"ok")
+
+
+class ExecStreamTextTests(SimpleTestCase):
+    def test_demux_tuple(self):
+        out = (b"stdout", b"stderr")
+        self.assertEqual(_exec_stream_text(out, 0), "stdout")
+        self.assertEqual(_exec_stream_text(out, 1), "stderr")
+
+    def test_raw_bytes(self):
+        self.assertEqual(_exec_stream_text(b"only", 0), "only")
+
+
+class QueryStringTests(SimpleTestCase):
+    def test_bytes(self):
+        self.assertEqual(_scope_query_string({"query_string": b"a=1&b=2"}), "a=1&b=2")
+
+    def test_tuple(self):
+        self.assertEqual(
+            _scope_query_string({"query_string": (b"token=abc",)}),
+            "token=abc",
+        )
 
 
 class DockerExecSocketTests(SimpleTestCase):
