@@ -227,11 +227,12 @@ class PaymentService:
 
     def _activate_subscription(self, transaction):
         """Activate subscription after payment verification."""
+        from .subscription_utils import activate_technology_subscription, subscription_expires_at
+
         if transaction.tech_subscription:
-            transaction.tech_subscription.is_active = True
-            transaction.tech_subscription.payment_verified = True
-            transaction.tech_subscription.save(update_fields=["is_active", "payment_verified"])
-            logger.info(f"Activated tech subscription {transaction.tech_subscription.id}")
+            sub = transaction.tech_subscription
+            activate_technology_subscription(sub, renew=True)
+            logger.info(f"Activated tech subscription {sub.id} until {sub.expires_at}")
 
         elif transaction.plan:
             subscription = Subscription.objects.get_or_create(
@@ -241,7 +242,8 @@ class PaymentService:
             subscription.plan = transaction.plan
             subscription.is_active = True
             subscription.started_at = timezone.now()
-            subscription.save(update_fields=["plan", "is_active", "started_at"])
+            subscription.expires_at = subscription_expires_at()
+            subscription.save(update_fields=["plan", "is_active", "started_at", "expires_at"])
             logger.info(f"Upgraded user {self.user.id} to plan {transaction.plan.code}")
 
     def check_gateway_configured(self):

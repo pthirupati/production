@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [achievements, setAchievements] = useState([])
   const [activeLabs, setActiveLabs] = useState([])
   const [subscriptions, setSubscriptions] = useState([])
+  const [complimentaryAccess, setComplimentaryAccess] = useState(false)
   const [loading, setLoading] = useState(true)
   const [cancelModal, setCancelModal] = useState(null)
   const [cancelling, setCancelling] = useState(false)
@@ -38,6 +39,7 @@ export default function Dashboard() {
       setAchievements(ach)
       setActiveLabs(labs.filter(l => l.status === 'RUNNING'))
       setSubscriptions(subs?.subscriptions || [])
+      setComplimentaryAccess(subs?.complimentary_access || false)
       setJiraTickets(jiraRes?.data?.tickets || [])
     }).finally(() => setLoading(false))
   }, [])
@@ -228,7 +230,13 @@ export default function Dashboard() {
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><Crown size={18} className="text-accent-amber" /> My Subscriptions</h2>
           <Link to="/pricing" className="text-xs text-accent-cyan hover:underline flex items-center gap-1 bg-accent-cyan/5 px-3 py-1 rounded-full border border-accent-cyan/20 hover:border-accent-cyan/40 transition-all">Manage <ArrowUpRight size={12} /></Link>
         </div>
-        {subscriptions.filter(s => s.is_active).length === 0 ? (
+        {complimentaryAccess && (
+          <div className="mb-4 p-3 rounded-lg bg-accent-green/10 border border-accent-green/20 flex items-center gap-2 relative">
+            <Sparkles size={16} className="text-accent-green shrink-0" />
+            <p className="text-sm text-accent-green">You have complimentary free access to all technologies.</p>
+          </div>
+        )}
+        {subscriptions.filter(s => s.is_active).length === 0 && !complimentaryAccess ? (
           <div className="text-center py-8 relative">
             <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-surface-800/50 flex items-center justify-center"><Layers size={28} className="text-surface-600" /></div>
             <p className="text-surface-400 text-sm mb-4">No active subscriptions</p>
@@ -265,6 +273,25 @@ export default function Dashboard() {
                     </Link>
                   )}
                   <p className="text-[10px] text-surface-500 mt-2 truncate font-mono">ID: {sub.subscription_id}</p>
+                  {sub.created_at && (
+                    <p className="text-[10px] text-surface-500 mt-1">
+                      Started: {new Date(sub.created_at).toLocaleDateString()}
+                    </p>
+                  )}
+                  {sub.expires_at && (
+                    <p className={`text-[10px] mt-0.5 ${sub.needs_renewal ? 'text-accent-amber font-medium' : 'text-surface-500'}`}>
+                      Expires: {new Date(sub.expires_at).toLocaleDateString()}
+                      {sub.days_until_expiry != null && ` (${sub.days_until_expiry}d left)`}
+                    </p>
+                  )}
+                  {(sub.needs_renewal || sub.is_expired) && (
+                    <Link
+                      to={`/payment?technology=${sub.technology?.slug}&renew=1`}
+                      className="mt-2 inline-flex items-center gap-1 text-[10px] text-accent-amber hover:text-accent-amber/80 font-semibold"
+                    >
+                      <CreditCard size={10} /> Renew Subscription
+                    </Link>
+                  )}
                 </div>
               )
             })}

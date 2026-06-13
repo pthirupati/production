@@ -29,5 +29,9 @@ CELERY_BEAT_SCHEDULE = {
         "task": "celery_app.tasks.cleanup_old_notifications",
         "schedule": crontab(hour=4, minute=15, day_of_week=0),  # Sunday 4:15 AM UTC
     },
+    "process-subscription-expiry-daily": {
+        "task": "celery_app.tasks.process_subscription_expiry",
+        "schedule": crontab(hour=6, minute=0),  # 6:00 AM UTC daily
+    },
 }
 

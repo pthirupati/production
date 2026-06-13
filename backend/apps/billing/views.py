@@ -684,11 +684,13 @@ class TechnologySubscribeView(APIView):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
-        # Check if already subscribed
+        # Check if already subscribed (active and not expired)
+        from .subscription_utils import activate_technology_subscription, is_tech_subscription_active
+
         existing = TechnologySubscription.objects.filter(
-            user=request.user, technology=technology, is_active=True
-        ).first()
-        if existing:
+            user=request.user, technology=technology
+        ).order_by("-created_at").first()
+        if existing and is_tech_subscription_active(existing):
             return Response(
                 {"error": "Already subscribed to this technology", "subscription_id": existing.subscription_id},
                 status=http_status.HTTP_409_CONFLICT,
@@ -697,23 +699,29 @@ class TechnologySubscribeView(APIView):
         # Determine price from technology (server-side — never trust client)
         amount = getattr(technology, 'price', 0) or 0
 
-        # Generate unique subscription ID
-        sub_id = TechnologySubscription.generate_subscription_id(
-            technology.name, request.user.username
-        )
-
-        # Create subscription
-        tech_sub = TechnologySubscription.objects.create(
-            user=request.user,
-            technology=technology,
-            subscription_id=sub_id,
-            amount=amount,
-            is_active=True,
-        )
+        if existing:
+            # Renewal of expired/inactive subscription
+            tech_sub = existing
+            tech_sub.amount = amount
+            activate_technology_subscription(tech_sub, renew=True)
+            sub_id = tech_sub.subscription_id
+        else:
+            # Generate unique subscription ID
+            sub_id = TechnologySubscription.generate_subscription_id(
+                technology.name, request.user.username
+            )
+            tech_sub = TechnologySubscription.objects.create(
+                user=request.user,
+                technology=technology,
+                subscription_id=sub_id,
+                amount=amount,
+            )
+            activate_technology_subscription(tech_sub, renew=True)
 
         # Get user profile info
         profile = getattr(request.user, "profile", None)
         phone = profile.phone_number if profile else "N/A"
+        expiry_str = tech_sub.expires_at.strftime("%B %d, %Y") if tech_sub.expires_at else "1 Year"
 
         # Send email to user
         try:
@@ -725,9 +733,9 @@ class TechnologySubscribeView(APIView):
                 context={
                     "username": request.user.get_full_name() or request.user.username,
                     "technology": technology.name,
-                    "plan_name": "Technology Access",
+                    "plan_name": "1-Year Technology Access",
                     "amount": f"₹{amount}",
-                    "expiry_date": "Lifetime",
+                    "expiry_date": expiry_str,
                     "scenarios_url": f"{settings.FRONTEND_URL}/scenarios",
                     "subscription_id": sub_id,
                 },
@@ -764,13 +772,13 @@ class TechnologySubscribeView(APIView):
                     "username": request.user.get_full_name() or request.user.username,
                     "email": request.user.email,
                     "technology": technology.name,
-                    "plan_name": "Technology Access — Lifetime",
+                    "plan_name": "1-Year Technology Access — Annual",
                     "amount": f"₹{amount}",
                     "subscription_id": sub_id,
                     "invoice_date": timezone.now().strftime("%B %d, %Y"),
                     "invoice_number": f"INV-{sub_id}",
                     "payment_method": "Online Payment",
-                    "billing_period": "Lifetime",
+                    "billing_period": "1 Year",
                     "scenarios_url": f"{settings.FRONTEND_URL}/scenarios",
                 },
             )
@@ -793,6 +801,7 @@ class TechnologySubscribeView(APIView):
             "technology": technology.name,
             "amount": str(amount),
             "is_active": True,
+            "expires_at": tech_sub.expires_at.isoformat() if tech_sub.expires_at else None,
         }, status=http_status.HTTP_201_CREATED)
 
 
@@ -801,25 +810,31 @@ class UserTechSubscriptionsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from .subscription_utils import subscription_status_payload, user_has_complimentary_access
+
         subs = TechnologySubscription.objects.filter(
             user=request.user
         ).select_related("technology").order_by("-created_at")
 
-        data = [{
-            "id": str(sub.id),
-            "subscription_id": sub.subscription_id,
-            "technology": {
-                "id": sub.technology.id,
-                "name": sub.technology.name,
-                "slug": sub.technology.slug,
-            },
-            "amount": str(sub.amount),
-            "is_active": sub.is_active,
-            "created_at": sub.created_at.isoformat(),
-            "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
-        } for sub in subs]
+        data = []
+        for sub in subs:
+            status = subscription_status_payload(sub)
+            data.append({
+                "id": str(sub.id),
+                "subscription_id": sub.subscription_id,
+                "technology": {
+                    "id": sub.technology.id,
+                    "name": sub.technology.name,
+                    "slug": sub.technology.slug,
+                },
+                "amount": str(sub.amount),
+                **status,
+            })
 
-        return Response({"subscriptions": data})
+        return Response({
+            "subscriptions": data,
+            "complimentary_access": user_has_complimentary_access(request.user),
+        })
 
 
 class SubscriptionLogsView(APIView):
@@ -851,9 +866,19 @@ class SubscriptionLogsView(APIView):
         if tech_filter:
             subs = subs.filter(technology__name__icontains=tech_filter)
         if status_filter == "active":
-            subs = subs.filter(is_active=True)
+            from django.utils import timezone as tz
+            from django.db.models import Q
+            now = tz.now()
+            subs = subs.filter(is_active=True).filter(
+                Q(expires_at__isnull=True) | Q(expires_at__gt=now)
+            )
         elif status_filter == "expired":
-            subs = subs.filter(is_active=False)
+            from django.utils import timezone as tz
+            from django.db.models import Q
+            now = tz.now()
+            subs = subs.filter(
+                Q(is_active=False) | Q(expires_at__lte=now)
+            )
         if user_filter:
             subs = subs.filter(
                 models_Q(user__username__icontains=user_filter) |
@@ -880,7 +905,8 @@ class SubscriptionLogsView(APIView):
         exchange_rate = float(get_usd_to_inr_rate()) if display_currency == "USD" else None
 
         # Calculate totals
-        total_inr = sum(float(sub.amount) for sub in subs if sub.is_active)
+        from .subscription_utils import is_tech_subscription_active
+        total_inr = sum(float(sub.amount) for sub in subs if is_tech_subscription_active(sub))
         total_display = total_inr
         if display_currency == "USD" and exchange_rate:
             total_display = round(total_inr / exchange_rate, 2)
@@ -895,6 +921,9 @@ class SubscriptionLogsView(APIView):
                 amount_display = amount_inr
                 amount_str = f"₹{int(amount_inr)}"
 
+            from .subscription_utils import subscription_status_payload
+            status = subscription_status_payload(sub)
+
             data.append({
                 "id": str(sub.id),
                 "subscription_id": sub.subscription_id,
@@ -907,9 +936,10 @@ class SubscriptionLogsView(APIView):
                 "amount": str(sub.amount),
                 "amount_inr": amount_inr,
                 "amount_display": amount_str,
-                "is_active": sub.is_active,
                 "payment_verified": sub.payment_verified,
                 "created_at": sub.created_at.isoformat(),
+                "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+                **status,
             })
 
         return Response({

@@ -77,6 +77,7 @@ def grant_test_subscriptions(email: str) -> bool:
         from django.contrib.auth import get_user_model
         from apps.question_bank.models import Technology
         from apps.billing.models import Plan, Subscription, TechnologySubscription
+        from apps.billing.subscription_utils import activate_technology_subscription
 
         User = get_user_model()
         user = User.objects.filter(email=email).first()
@@ -93,16 +94,15 @@ def grant_test_subscriptions(email: str) -> bool:
         )
         Subscription.objects.update_or_create(user=user, defaults={"plan": plan, "is_active": True})
         for tech in Technology.objects.filter(is_active=True):
-            TechnologySubscription.objects.get_or_create(
+            sub, _ = TechnologySubscription.objects.get_or_create(
                 user=user,
                 technology=tech,
                 defaults={
                     "subscription_id": f"E2E-{user.username[:12]}-{tech.id}-TEST",
-                    "is_active": True,
                     "amount": 0,
-                    "payment_verified": True,
                 },
             )
+            activate_technology_subscription(sub, renew=True)
         return True
     except Exception:
         return False
@@ -114,6 +114,7 @@ def run_search_and_public_extras(s):
         ("GET", "/api/search/?q=docker", None, (200,), "search docker"),
         ("GET", "/api/search/?q=linux", None, (200,), "search linux"),
         ("GET", "/api/achievements/certificate/verify/?certificate_id=INVALID", None, (200,), "cert verify invalid"),
+        ("GET", "/api/achievements/certificate/verify/?certificate_id=FIXIT-TEST-ADMIN-CERT-2026", None, (200,), "cert verify test admin"),
         ("GET", "/api/billing/status/", None, (200, 401), "billing status"),
     ])
 
@@ -178,6 +179,14 @@ def run_dashboard_tab(s, token: str):
         ("GET", "/api/jira/tickets/", None, (200,), "jira tickets"),
         ("GET", "/api/plan/", None, (200,), "plan usage"),
     ], token)
+
+    st, subs_data = api("GET", "/api/billing/subscriptions/", token=token)
+    subs = (subs_data or {}).get("subscriptions", []) if isinstance(subs_data, dict) else []
+    has_dates = all(
+        "expires_at" in (s or {}) and "created_at" in (s or {})
+        for s in subs[:3]
+    ) if subs else True
+    s.record("User subscriptions expiry fields", st == 200 and has_dates, st)
 
 
 def run_technologies_tab(s, token: str):
@@ -635,6 +644,30 @@ def run_admin_all_tabs(s, admin_token: str):
 
     st, overview = api("GET", "/api/admin/overview/?currency=INR", token=admin_token)
     s.record("Admin overview INR revenue", st == 200 and (overview or {}).get("revenue", {}).get("currency") == "INR", st)
+
+    # Subscription expiry fields in admin logs
+    st, sub_logs = api("GET", "/api/admin/subscriptions/", token=admin_token)
+    logs = (sub_logs or {}).get("logs", []) if isinstance(sub_logs, dict) else []
+    has_expiry = any("expires_at" in (l or {}) for l in logs[:5]) if logs else True
+    s.record("Admin subscriptions expiry fields", st == 200 and has_expiry, st)
+
+    # Test certificate validation response
+    st, cert = api("GET", "/api/achievements/certificate/verify/?certificate_id=FIXIT-TEST-ADMIN-CERT-2026", token=None)
+    s.record("Test admin certificate valid", st == 200 and (cert or {}).get("valid") is True, st)
+
+    # Bulk grant free access (revoke immediately to avoid side effects)
+    st, users = api("GET", "/api/admin/users/", token=admin_token)
+    if st == 200 and isinstance(users, list):
+        test_user = next((u for u in users if not u.get("is_superuser") and not u.get("is_staff")), None)
+        if test_user:
+            st_grant, _ = api("POST", "/api/admin/users/bulk/", token=admin_token, data={
+                "action": "grant_free", "user_ids": [test_user["id"]],
+            })
+            s.record("Admin grant free access", st_grant == 200, st_grant)
+            st_revoke, _ = api("POST", "/api/admin/users/bulk/", token=admin_token, data={
+                "action": "revoke_free", "user_ids": [test_user["id"]],
+            })
+            s.record("Admin revoke free access", st_revoke == 200, st_revoke)
 
 
 def run_technology_all_scenarios(s, token: str):

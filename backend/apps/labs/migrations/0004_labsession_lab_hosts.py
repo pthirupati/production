@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("labs", "0001_initial"),
+        ("labs", "0003_labsession_jira_fields"),
     ]
 
     operations = [

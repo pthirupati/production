@@ -72,6 +72,7 @@ class TechnologySubscription(models.Model):
     payment_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True, blank=True)
+    renewal_reminder_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ("user", "technology")

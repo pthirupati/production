@@ -528,9 +528,9 @@ export default function Pricing() {
           <h2 className="text-xl font-bold text-white text-center mb-6">Frequently Asked Questions</h2>
           <div className="space-y-4">
             {[
-              { q: 'How does per-technology pricing work?', a: 'You subscribe to individual technologies (e.g., Linux, Docker). Each subscription gives you lifetime access to all scenarios, hints, and the certificate for that technology.' },
+              { q: 'How does per-technology pricing work?', a: 'You subscribe to individual technologies (e.g., Linux, Docker). Each subscription gives you 1-year access to all scenarios, hints, and the certificate for that technology.' },
               { q: 'What can I access for free?', a: 'Free users get access to demo scenarios for every technology, the community forum, leaderboard, and basic progress tracking.' },
-              { q: 'Is the subscription one-time or recurring?', a: 'Currently all subscriptions are one-time payments with lifetime access. No recurring charges.' },
+              { q: 'Is the subscription one-time or recurring?', a: 'Subscriptions are valid for 1 year from purchase. You will receive renewal reminders 7 days before expiry via email and in-app notifications. Renew anytime to extend access for another year.' },
               { q: 'Can I subscribe to multiple technologies at once?', a: 'Yes! Use the "Add to Cart" button for each technology you want, then click "Subscribe All" in the cart panel to subscribe in one go.' },
               { q: 'Will I get a certificate?', a: 'Yes! After completing all scenarios for a subscribed technology, you can generate a verifiable certificate that can be shared and verified by anyone.' },
               { q: 'Are prices shown in different currencies?', a: 'Yes! Use the INR/USD toggle to see prices in your preferred currency. We fetch live exchange rates updated hourly. Payment is processed in INR by Razorpay.' },

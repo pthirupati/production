@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { authApi } from '../api/auth'
 import { labApi } from '../api/labs'
+import { subscriptionApi } from '../api/subscriptions'
 import api from '../api/client'
-import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff } from 'lucide-react'
+import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { validators } from '../utils/validators'
 import { SkeletonCard } from '../components/Skeleton'
@@ -23,6 +24,8 @@ export default function Profile() {
   const [errors, setErrors] = useState({})
   const [planInfo, setPlanInfo] = useState(null)
   const [notifPrefs, setNotifPrefs] = useState(null)
+  const [techSubscriptions, setTechSubscriptions] = useState([])
+  const [complimentaryAccess, setComplimentaryAccess] = useState(false)
 
   // Load full profile data including phone number
   useEffect(() => {
@@ -30,7 +33,8 @@ export default function Profile() {
       authApi.getProfile(),
       labApi.getUserPlan().catch(() => null),
       api.get('/notifications/preferences/').then(r => r.data).catch(() => null),
-    ]).then(([profileData, plan, prefs]) => {
+      subscriptionApi.getMySubscriptions().catch(() => ({ subscriptions: [] })),
+    ]).then(([profileData, plan, prefs, subsData]) => {
       setUsername(profileData.username || '')
       setFirstName(profileData.first_name || '')
       setLastName(profileData.last_name || '')
@@ -38,6 +42,8 @@ export default function Profile() {
       setCountry(profileData.country || '')
       if (plan) setPlanInfo(plan)
       if (prefs) setNotifPrefs(prefs)
+      setTechSubscriptions(subsData?.subscriptions || [])
+      setComplimentaryAccess(subsData?.complimentary_access || false)
     }).catch(console.error)
       .finally(() => setLoading(false))
   }, [])
@@ -321,6 +327,58 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      {/* Technology Subscriptions */}
+      <div className="glass-card p-6">
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <CreditCard size={18} className="text-accent-amber" /> Technology Subscriptions
+        </h2>
+        {complimentaryAccess ? (
+          <div className="p-4 rounded-lg bg-accent-green/10 border border-accent-green/20 text-sm text-accent-green">
+            You have complimentary free access to all technologies.
+          </div>
+        ) : techSubscriptions.filter(s => s.is_active).length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-surface-400 text-sm mb-3">No active technology subscriptions</p>
+            <Link to="/pricing" className="btn-primary text-sm inline-flex items-center gap-1.5">
+              <Zap size={14} /> View Pricing
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {techSubscriptions.filter(s => s.is_active || s.is_expired).map(sub => (
+              <div key={sub.id} className="p-4 rounded-lg bg-surface-800/50 border border-surface-700/40">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-white font-medium">{sub.technology?.name}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    sub.is_active ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-red/10 text-accent-red'
+                  }`}>{sub.is_active ? 'Active' : 'Expired'}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-surface-400">
+                  {sub.created_at && (
+                    <div className="flex items-center gap-1">
+                      <Calendar size={12} /> Started: {new Date(sub.created_at).toLocaleDateString()}
+                    </div>
+                  )}
+                  {sub.expires_at && (
+                    <div className={`flex items-center gap-1 ${sub.needs_renewal ? 'text-accent-amber' : ''}`}>
+                      <Calendar size={12} /> Expires: {new Date(sub.expires_at).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+                {(sub.needs_renewal || sub.is_expired) && (
+                  <Link
+                    to={`/payment?technology=${sub.technology?.slug}&renew=1`}
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm text-accent-amber hover:text-accent-amber/80 font-medium"
+                  >
+                    <CreditCard size={14} /> Renew for ₹{sub.amount}
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Plan & Subscription */}
       <div className="glass-card p-6">

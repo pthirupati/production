@@ -341,3 +341,109 @@ def cleanup_old_notifications():
     logger.info(f"Cleaned up {deleted} old read notifications")
     return {"deleted_notifications": deleted}
 
+
+@shared_task
+def process_subscription_expiry():
+    """
+    Deactivate expired technology subscriptions and send renewal reminders
+    7 days before expiry (in-app + email).
+    """
+    from django.conf import settings
+    from django.db.models import Q
+    from apps.billing.models import TechnologySubscription
+    from apps.billing.subscription_utils import (
+        RENEWAL_WARNING_DAYS,
+        is_tech_subscription_active,
+    )
+    from apps.notifications.tasks import create_in_app_notification, send_notification_email
+
+    now = timezone.now()
+    warning_cutoff = now + timedelta(days=RENEWAL_WARNING_DAYS)
+
+    expired_count = 0
+    reminder_count = 0
+
+    # Deactivate subscriptions past expiry
+    expired_qs = TechnologySubscription.objects.filter(
+        is_active=True,
+        expires_at__isnull=False,
+        expires_at__lte=now,
+    ).select_related("user", "technology")
+
+    for sub in expired_qs.iterator(chunk_size=200):
+        sub.is_active = False
+        sub.save(update_fields=["is_active"])
+        expired_count += 1
+        try:
+            create_in_app_notification.delay(
+                user_id=sub.user_id,
+                notification_type="system",
+                title=f"Subscription Expired — {sub.technology.name}",
+                message=(
+                    f"Your {sub.technology.name} subscription has expired. "
+                    "Renew to regain access to all scenarios."
+                ),
+                metadata={"technology_slug": sub.technology.slug, "needs_renewal": True},
+            )
+        except Exception as e:
+            logger.warning(f"Failed expiry notification for sub {sub.id}: {e}")
+
+    # Send renewal reminders for subs expiring within 7 days
+    reminder_qs = TechnologySubscription.objects.filter(
+        is_active=True,
+        expires_at__isnull=False,
+        expires_at__gt=now,
+        expires_at__lte=warning_cutoff,
+    ).filter(
+        Q(renewal_reminder_at__isnull=True) | Q(renewal_reminder_at__lt=now - timedelta(days=1))
+    ).select_related("user", "technology")
+
+    for sub in reminder_qs.iterator(chunk_size=200):
+        if not is_tech_subscription_active(sub):
+            continue
+        days_left = (sub.expires_at - now).days
+        amount = float(sub.amount or sub.technology.price or 0)
+        renew_url = f"{settings.FRONTEND_URL}/payment?technology={sub.technology.slug}&renew=1"
+        profile_url = f"{settings.FRONTEND_URL}/profile"
+        expiry_str = sub.expires_at.strftime("%B %d, %Y")
+
+        try:
+            create_in_app_notification.delay(
+                user_id=sub.user_id,
+                notification_type="system",
+                title=f"Renew {sub.technology.name} — expires in {days_left} day(s)",
+                message=(
+                    f"Your subscription expires on {expiry_str}. "
+                    "Renew now to keep access to all scenarios."
+                ),
+                metadata={
+                    "technology_slug": sub.technology.slug,
+                    "expires_at": sub.expires_at.isoformat(),
+                    "needs_renewal": True,
+                },
+            )
+            send_notification_email.delay(
+                subject=f"FixitLab: Renew your {sub.technology.name} subscription",
+                to_email=sub.user.email,
+                template="emails/subscription_renewal_reminder.html",
+                context={
+                    "username": sub.user.get_full_name() or sub.user.username,
+                    "technology": sub.technology.name,
+                    "amount": f"₹{int(amount)}",
+                    "expiry_date": expiry_str,
+                    "days_remaining": days_left,
+                    "renew_url": renew_url,
+                    "profile_url": profile_url,
+                },
+            )
+            sub.renewal_reminder_at = now
+            sub.save(update_fields=["renewal_reminder_at"])
+            reminder_count += 1
+        except Exception as e:
+            logger.warning(f"Failed renewal reminder for sub {sub.id}: {e}")
+
+    logger.info(
+        f"Subscription expiry: deactivated={expired_count}, reminders_sent={reminder_count}"
+    )
+    return {"expired": expired_count, "reminders_sent": reminder_count}
+

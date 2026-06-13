@@ -465,7 +465,8 @@ class AdminUsersView(APIView):
                 "is_active": u.is_active,
                 "is_staff": u.is_staff,
                 "is_superuser": u.is_superuser,
-                "is_paid": u.active_subscriptions > 0,
+                "complimentary_access": getattr(u.profile, "complimentary_access", False) if hasattr(u, "profile") else False,
+                "is_paid": u.active_subscriptions > 0 or getattr(u.profile, "complimentary_access", False) if hasattr(u, "profile") else u.active_subscriptions > 0,
                 "active_subscriptions": u.active_subscriptions,
                 "is_inactive_90d": is_inactive_90d,
                 "date_joined": u.date_joined.isoformat(),
@@ -514,8 +515,10 @@ class AdminUserDetailView(APIView):
 
         # Profile info
         phone_number = None
+        complimentary_access = False
         try:
             phone_number = user.profile.phone_number
+            complimentary_access = user.profile.complimentary_access
         except Exception:
             pass
 
@@ -555,6 +558,7 @@ class AdminUserDetailView(APIView):
             "username": user.username,
             "email": user.email,
             "phone_number": phone_number,
+            "complimentary_access": complimentary_access,
             "is_active": user.is_active,
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
@@ -610,6 +614,10 @@ class AdminUserDetailView(APIView):
             profile, _ = Profile.objects.get_or_create(user=user)
             profile.phone_number = phone_number or None
             profile.save()
+
+        if "complimentary_access" in request.data:
+            from apps.billing.subscription_utils import grant_complimentary_access
+            grant_complimentary_access(user, bool(request.data["complimentary_access"]))
 
         return Response({
             "id": user.id,
@@ -684,9 +692,25 @@ class AdminBulkUsersView(APIView):
             updated = users.update(is_staff=False)
             return Response({"message": f"{updated} user(s) had admin removed", "count": updated})
 
+        elif action == "grant_free":
+            from apps.billing.subscription_utils import grant_complimentary_access
+            count = 0
+            for u in users:
+                grant_complimentary_access(u, True)
+                count += 1
+            return Response({"message": f"{count} user(s) granted free access", "count": count})
+
+        elif action == "revoke_free":
+            from apps.billing.subscription_utils import grant_complimentary_access
+            count = 0
+            for u in users:
+                grant_complimentary_access(u, False)
+                count += 1
+            return Response({"message": f"{count} user(s) had free access revoked", "count": count})
+
         else:
             return Response(
-                {"error": f"Unknown action: {action}. Valid: delete, activate, deactivate, make_staff, remove_staff"},
+                {"error": f"Unknown action: {action}. Valid: delete, activate, deactivate, make_staff, remove_staff, grant_free, revoke_free"},
                 status=400,
             )
 
@@ -1525,9 +1549,15 @@ class AdminSubscriptionLogsView(APIView):
         if tech_filter:
             subs = subs.filter(technology__name__icontains=tech_filter)
         if status_filter == "active":
-            subs = subs.filter(is_active=True)
+            from django.utils import timezone as tz
+            now = tz.now()
+            subs = subs.filter(is_active=True).filter(
+                Q(expires_at__isnull=True) | Q(expires_at__gt=now)
+            )
         elif status_filter == "expired":
-            subs = subs.filter(is_active=False)
+            from django.utils import timezone as tz
+            now = tz.now()
+            subs = subs.filter(Q(is_active=False) | Q(expires_at__lte=now))
         if user_filter:
             subs = subs.filter(
                 Q(user__username__icontains=user_filter) |
@@ -1562,7 +1592,8 @@ class AdminSubscriptionLogsView(APIView):
         data = []
         for sub in subs:
             amount_inr = float(sub.amount)
-            if sub.is_active:
+            from apps.billing.subscription_utils import is_tech_subscription_active
+            if is_tech_subscription_active(sub):
                 total_inr += amount_inr
                 active_count += 1
 
@@ -1571,6 +1602,9 @@ class AdminSubscriptionLogsView(APIView):
                 amount_str = f"${amt_converted}"
             else:
                 amount_str = f"₹{int(amount_inr)}"
+
+            from apps.billing.subscription_utils import subscription_status_payload
+            status = subscription_status_payload(sub)
 
             data.append({
                 "id": str(sub.id),
@@ -1584,9 +1618,10 @@ class AdminSubscriptionLogsView(APIView):
                 "technology": sub.technology.name,
                 "amount": str(sub.amount),
                 "amount_display": amount_str,
-                "is_active": sub.is_active,
                 "payment_verified": sub.payment_verified,
                 "created_at": sub.created_at.isoformat(),
+                "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+                **status,
             })
 
         total_display = total_inr

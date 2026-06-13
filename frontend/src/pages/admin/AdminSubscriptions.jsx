@@ -85,7 +85,7 @@ export default function AdminSubscriptions() {
   const hasActiveFilters = debouncedSearch || statusFilter !== 'all' || techFilter || dateFrom || dateTo
 
   const handleExportCSV = () => {
-    const headers = ['Subscription ID', 'Username', 'Email', 'Technology', `Amount (${currency})`, 'Status', 'Payment Verified', 'Date']
+    const headers = ['Subscription ID', 'Username', 'Email', 'Technology', `Amount (${currency})`, 'Status', 'Payment Verified', 'Started', 'Expires']
     const rows = logs.map(l => [
       l.subscription_id,
       l.user?.username,
@@ -94,7 +94,8 @@ export default function AdminSubscriptions() {
       l.amount_display || `\u20B9${l.amount}`,
       l.is_active ? 'Active' : 'Expired',
       l.payment_verified ? 'Yes' : 'No',
-      new Date(l.created_at).toLocaleDateString(),
+      l.created_at ? new Date(l.created_at).toLocaleDateString() : '',
+      l.expires_at ? new Date(l.expires_at).toLocaleDateString() : '',
     ])
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -295,7 +296,8 @@ export default function AdminSubscriptions() {
                 <th className="text-left p-3 text-surface-400 font-medium">Amount ({currency})</th>
                 <th className="text-left p-3 text-surface-400 font-medium">Status</th>
                 <th className="text-left p-3 text-surface-400 font-medium">Verified</th>
-                <th className="text-left p-3 text-surface-400 font-medium">Date</th>
+                <th className="text-left p-3 text-surface-400 font-medium">Started</th>
+                <th className="text-left p-3 text-surface-400 font-medium">Expires</th>
               </tr>
             </thead>
             <tbody>
@@ -327,13 +329,23 @@ export default function AdminSubscriptions() {
                     )}
                   </td>
                   <td className="p-3 text-surface-400 text-xs">
-                    {new Date(log.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {log.created_at ? new Date(log.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                  </td>
+                  <td className="p-3 text-xs">
+                    {log.expires_at ? (
+                      <span className={log.needs_renewal ? 'text-accent-amber font-medium' : 'text-surface-400'}>
+                        {new Date(log.expires_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        {log.days_until_expiry != null && log.is_active && (
+                          <span className="text-surface-500 ml-1">({log.days_until_expiry}d)</span>
+                        )}
+                      </span>
+                    ) : '—'}
                   </td>
                 </tr>
               ))}
               {logs.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-surface-400">
+                  <td colSpan={8} className="p-8 text-center text-surface-400">
                     {hasActiveFilters ? 'No matching subscriptions found' : 'No subscriptions yet'}
                   </td>
                 </tr>

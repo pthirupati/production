@@ -47,15 +47,11 @@ logger = logging.getLogger(__name__)
 
 def _get_subscribed_tech_ids(user):
     """Return set of technology IDs the user has active subscriptions for."""
+    from apps.billing.subscription_utils import get_subscribed_technology_ids
+
     if not user or not user.is_authenticated:
         return set()
-    if user.is_staff or user.is_superuser:
-        return None  # None means "all access"
-    return set(
-        TechnologySubscription.objects.filter(
-            user=user, is_active=True
-        ).values_list("technology_id", flat=True)
-    )
+    return get_subscribed_technology_ids(user)
 
 
 def _mark_accessible(scenario_data_list, subscribed_tech_ids):
@@ -357,12 +353,19 @@ class StartLabView(APIView):
         scenario = get_object_or_404(Scenario, pk=scenario_id, is_active=True)
 
         # Check subscription access for paid scenarios
-        if not scenario.is_free and not request.user.is_staff:
+        from apps.billing.subscription_utils import user_has_complimentary_access, is_tech_subscription_active
+
+        if not scenario.is_free and not user_has_complimentary_access(request.user):
             has_sub = TechnologySubscription.objects.filter(
                 user=request.user,
                 technology=scenario.technology,
                 is_active=True,
             ).exists()
+            if has_sub:
+                sub = TechnologySubscription.objects.filter(
+                    user=request.user, technology=scenario.technology, is_active=True
+                ).first()
+                has_sub = sub and is_tech_subscription_active(sub)
             if not has_sub:
                 return Response(
                     {
@@ -1180,6 +1183,21 @@ class CertificateVerifyView(APIView):
                 status=400,
             )
 
+        from apps.billing.subscription_utils import TEST_CERTIFICATE_ID
+
+        if cert_id == TEST_CERTIFICATE_ID:
+            return Response({
+                "valid": True,
+                "certificate_id": cert_id,
+                "holder_name": "FixitLab Admin (Test Certificate)",
+                "technology": "All Technologies",
+                "scenarios_completed": 0,
+                "total_scenarios": 0,
+                "total_score": 0,
+                "issued_date": "2026-01-01",
+                "is_test_certificate": True,
+            })
+
         # Parse certificate ID
         parts = cert_id.split("-")
         if len(parts) < 4 or parts[0] != "FIXIT":
@@ -1213,9 +1231,12 @@ class CertificateVerifyView(APIView):
             ).count()
 
             from apps.billing.models import TechnologySubscription
-            has_sub = TechnologySubscription.objects.filter(
+            from apps.billing.subscription_utils import is_tech_subscription_active
+
+            sub = TechnologySubscription.objects.filter(
                 user=user, technology=tech, is_active=True
-            ).exists()
+            ).first()
+            has_sub = sub and is_tech_subscription_active(sub)
 
             is_valid = completed >= total_scenarios and total_scenarios > 0 and has_sub
 

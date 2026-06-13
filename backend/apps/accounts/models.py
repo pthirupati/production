@@ -32,6 +32,10 @@ class Profile(models.Model):
         max_length=3, choices=CURRENCY_CHOICES, default="INR",
         help_text="Preferred currency for pricing display"
     )
+    complimentary_access = models.BooleanField(
+        default=False,
+        help_text="Admin-granted free access to all technologies",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

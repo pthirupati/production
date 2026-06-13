@@ -62,7 +62,8 @@ export default function AdminUsers() {
     { action: 'activate', label: 'Activate', icon: UserCheck, confirm: 'Activate {n} user(s)?' },
     { action: 'deactivate', label: 'Deactivate', icon: UserX, confirm: 'Deactivate {n} user(s)?' },
     { action: 'make_staff', label: 'Grant Admin', icon: Shield, confirm: 'Grant admin role to {n} user(s)?' },
-    { action: 'remove_staff', label: 'Remove Admin', icon: ShieldOff, confirm: 'Remove admin role from {n} user(s)?' },
+    { action: 'grant_free', label: 'Grant Free Access', icon: Crown, confirm: 'Grant complimentary free access to {n} user(s)?' },
+    { action: 'revoke_free', label: 'Revoke Free Access', icon: ShieldOff, confirm: 'Revoke complimentary access from {n} user(s)?' },
   ]
 
   const handleBulkAction = async () => {
@@ -106,6 +107,16 @@ export default function AdminUsers() {
     try {
       await adminApi.updateUser(user.id, { is_active: !user.is_active })
       toast.success(user.is_active ? 'User disabled' : 'User enabled')
+      loadData()
+    } catch {
+      toast.error('Update failed')
+    }
+  }
+
+  const handleToggleComplimentary = async (user) => {
+    try {
+      await adminApi.updateUser(user.id, { complimentary_access: !user.complimentary_access })
+      toast.success(user.complimentary_access ? 'Free access revoked' : 'Free access granted')
       loadData()
     } catch {
       toast.error('Update failed')
@@ -427,6 +438,7 @@ export default function AdminUsers() {
                     <div className="flex items-center gap-1.5">
                       <p className="text-sm font-medium text-white">{u.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : u.username}</p>
                       {u.is_paid && <Crown size={13} className="text-accent-amber" title="Paid subscriber" />}
+                      {u.complimentary_access && <span className="text-[10px] bg-accent-green/10 text-accent-green px-1.5 py-0.5 rounded font-medium">Free</span>}
                       {u.is_inactive_90d && <AlertTriangle size={13} className="text-accent-red" title="Inactive 90+ days" />}
                     </div>
                     <p className="text-xs text-surface-500">{u.email}</p>
@@ -468,6 +480,10 @@ export default function AdminUsers() {
                       <button onClick={() => handleToggleActive(u)} title={u.is_active ? 'Disable' : 'Enable'}
                         className="p-1.5 text-surface-500 hover:text-accent-amber transition-colors">
                         <Ban size={14} />
+                      </button>
+                      <button onClick={() => handleToggleComplimentary(u)} title={u.complimentary_access ? 'Revoke free access' : 'Grant free access'}
+                        className={`p-1.5 transition-colors ${u.complimentary_access ? 'text-accent-green hover:text-accent-green/80' : 'text-surface-500 hover:text-accent-green'}`}>
+                        <Crown size={14} />
                       </button>
                       <button onClick={() => handleToggleStaff(u)} title={u.is_staff ? 'Remove admin' : 'Make admin'}
                         className="p-1.5 text-surface-500 hover:text-accent-purple transition-colors">
