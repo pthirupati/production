@@ -13,8 +13,10 @@ import os
 import re
 import time
 import threading
+from channels.exceptions import StopConsumer
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from channels.utils import await_many_dispatch
 from django.contrib.auth.models import AnonymousUser
 
 from apps.labs.models import LabSession, CommandHistory, SessionRecording
@@ -44,13 +46,6 @@ def reset_user_ws_connections(user_id: int | None = None) -> None:
 
 
 class TerminalConsumer(AsyncWebsocketConsumer):
-    async def __call__(self, scope, receive, send):
-        """Always release per-user WS slot even if the app crashes before disconnect()."""
-        try:
-            await super().__call__(scope, receive, send)
-        finally:
-            self._release_connection_slot()
-
     """
     WebSocket consumer that bridges xterm.js to a lab shell.
 
@@ -66,6 +61,21 @@ class TerminalConsumer(AsyncWebsocketConsumer):
       - Command history: each line of input is saved as a CommandHistory entry
       - Session recording: all I/O events timestamped for replay
     """
+
+    async def __call__(self, scope, receive, send):
+        """
+        Run without Redis channel_layer — terminal only uses direct WebSocket I/O.
+        Also always release per-user WS slot even if disconnect() never runs.
+        """
+        self.scope = scope
+        self.channel_layer = None
+        self.base_send = send
+        try:
+            await await_many_dispatch([receive], self.dispatch)
+        except StopConsumer:
+            pass
+        finally:
+            self._release_connection_slot()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
