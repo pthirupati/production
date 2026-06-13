@@ -10,6 +10,8 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { scenarioApi } from '../api/scenarios'
 import { subscriptionApi } from '../api/subscriptions'
+import api from '../api/client'
+import { PlatformBanners } from '../components/PlatformBanners'
 import toast from 'react-hot-toast'
 
 const techIcons = { Linux: Server, Docker: Monitor, Networking: Globe, 'Web Servers': Globe, Databases: Database, AWS: Cpu, Kubernetes: Cpu, Security: Shield }
@@ -62,6 +64,11 @@ export default function Pricing() {
   const [showCart, setShowCart] = useState(false)
   const [gatewayDown, setGatewayDown] = useState(false)
   const [gatewayMessage, setGatewayMessage] = useState('')
+  const [platformConfig, setPlatformConfig] = useState(null)
+
+  useEffect(() => {
+    api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
+  }, [])
 
   // Fetch live exchange rate on mount
   useEffect(() => {
@@ -240,6 +247,7 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-surface-950 relative overflow-hidden">
+      <PlatformBanners config={platformConfig} showMaintenance showPromo />
       {/* Animated background orbs */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-20 left-[10%] w-[500px] h-[500px] bg-accent-cyan/[0.03] rounded-full blur-[120px] animate-float" />

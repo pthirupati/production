@@ -66,7 +66,15 @@ class ThreadDetailView(APIView):
 
     def get(self, request, thread_id):
         try:
-            thread = Thread.objects.select_related("author", "technology").get(
+            thread = Thread.objects.select_related("author", "technology").prefetch_related(
+                "attachments",
+                "replies__attachments",
+                "replies__reactions",
+                "replies__author",
+                "replies__children__attachments",
+                "replies__children__reactions",
+                "replies__children__author",
+            ).get(
                 id=thread_id, is_deleted=False
             )
         except Thread.DoesNotExist:
@@ -270,3 +278,74 @@ class VoteView(APIView):
         if vote_type == "up":
             Reply.objects.filter(id=reply_id).update(upvotes=F("upvotes") + 1)
         return Response({"status": "voted"}, status=http_status.HTTP_201_CREATED)
+
+
+class ThreadAttachmentUploadView(APIView):
+    """Upload screenshot/image to a thread or reply."""
+    permission_classes = [IsAuthenticated]
+    MAX_BYTES = 5 * 1024 * 1024
+
+    def post(self, request, thread_id):
+        try:
+            thread = Thread.objects.get(id=thread_id, is_deleted=False)
+        except Thread.DoesNotExist:
+            return Response({"error": "Thread not found"}, status=http_status.HTTP_404_NOT_FOUND)
+
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"error": "No file"}, status=http_status.HTTP_400_BAD_REQUEST)
+        if upload.size > self.MAX_BYTES:
+            return Response({"error": "Max 5MB"}, status=http_status.HTTP_400_BAD_REQUEST)
+        allowed = ("image/png", "image/jpeg", "image/gif", "image/webp")
+        if upload.content_type not in allowed:
+            return Response({"error": "Images only"}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        reply_id = request.data.get("reply_id")
+        reply = None
+        if reply_id:
+            reply = Reply.objects.filter(id=reply_id, thread=thread, is_deleted=False).first()
+            if not reply:
+                return Response({"error": "Reply not found"}, status=http_status.HTTP_404_NOT_FOUND)
+
+        from .models import ThreadAttachment
+        from .serializers import ThreadAttachmentSerializer
+
+        att = ThreadAttachment.objects.create(
+            thread=thread if not reply else None,
+            reply=reply,
+            uploaded_by=request.user,
+            file=upload,
+            original_name=upload.name[:255],
+            content_type=upload.content_type or "",
+        )
+        return Response(
+            ThreadAttachmentSerializer(att, context={"request": request}).data,
+            status=http_status.HTTP_201_CREATED,
+        )
+
+
+class ReplyReactionView(APIView):
+    """Toggle emoji reaction on a reply."""
+    permission_classes = [IsAuthenticated]
+    ALLOWED = ("👍", "👎", "❤️", "🎉", "😂", "🚀", "👀", "✅", "🔥", "💡")
+
+    def post(self, request, reply_id):
+        emoji = (request.data.get("emoji") or "").strip()
+        if emoji not in self.ALLOWED:
+            return Response({"error": "Invalid emoji"}, status=http_status.HTTP_400_BAD_REQUEST)
+        try:
+            reply = Reply.objects.get(id=reply_id, is_deleted=False)
+        except Reply.DoesNotExist:
+            return Response({"error": "Reply not found"}, status=http_status.HTTP_404_NOT_FOUND)
+
+        from .models import ReplyReaction
+        from .serializers import ReplySerializer
+
+        existing = ReplyReaction.objects.filter(reply=reply, user=request.user, emoji=emoji).first()
+        if existing:
+            existing.delete()
+        else:
+            ReplyReaction.objects.create(reply=reply, user=request.user, emoji=emoji)
+
+        reply.refresh_from_db()
+        return Response(ReplySerializer(reply, context={"request": request}).data)

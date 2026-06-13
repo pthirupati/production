@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/authStore'
 import {
   Clock, CheckCircle2, XCircle, Lightbulb, StopCircle,
   ChevronRight, Trophy, Target, Eye, FileText,
-  PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard, ExternalLink
+  PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard, ExternalLink, Terminal
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ConfirmDialog } from '../components/ConfirmModal'
@@ -40,6 +40,7 @@ export default function LabRunner() {
   const [jiraTicket, setJiraTicket] = useState(null)
   const [jiraTransitioning, setJiraTransitioning] = useState(false)
   const [closingIn, setClosingIn] = useState(null)
+  const [terminalHost, setTerminalHost] = useState('primary')
 
   const terminalRef = useRef(null)
   const xtermRef = useRef(null)
@@ -354,7 +355,7 @@ export default function LabRunner() {
     if (!session || session.status !== 'RUNNING' || !terminalRef.current) return
     const hasResource = session.container_id || session.instance_id
     if (!hasResource) return
-    if (terminalSessionRef.current === sessionId) return
+    if (terminalSessionRef.current === `${sessionId}:${terminalHost}`) return
 
     let disposed = false
     let cleanup = () => {}
@@ -366,13 +367,14 @@ export default function LabRunner() {
       await import('@xterm/xterm/css/xterm.css')
 
       if (disposed) return
-      terminalSessionRef.current = sessionId
+      terminalSessionRef.current = `${sessionId}:${terminalHost}`
       reconnectAttempts.current = 0
 
       const term = new Terminal({
         cursorBlink: true,
         cursorStyle: 'bar',
-        fontSize: 14,
+        fontSize: isMobile ? 11 : 14,
+        lineHeight: isMobile ? 1.15 : 1.2,
         fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
         theme: {
           background: '#020617',
@@ -439,7 +441,8 @@ export default function LabRunner() {
       const buildWsUrl = () => {
         const token = useAuthStore.getState().accessToken
         const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-        return `${protocol}://${window.location.host}/ws/terminal/${sessionId}/?token=${token}`
+        const hostQ = terminalHost && terminalHost !== 'primary' ? `&host=${encodeURIComponent(terminalHost)}` : ''
+        return `${protocol}://${window.location.host}/ws/terminal/${sessionId}/?token=${token}${hostQ}`
       }
 
       const connectWs = () => {
@@ -607,7 +610,7 @@ export default function LabRunner() {
 
     initTerminal()
     return () => cleanup()
-  }, [sessionId, session?.status, session?.container_id, session?.instance_id])
+  }, [sessionId, session?.status, session?.container_id, session?.instance_id, terminalHost, isMobile])
 
   // Auto-terminate lab on tab close / navigate away
   useEffect(() => {
@@ -866,13 +869,36 @@ export default function LabRunner() {
   )}
 
   const scenario = session?.scenario_detail || {}
+  const labHosts = session?.lab_hosts || []
+  const sshTargets = labHosts.filter(h => h.ip)
+  const insertSshCommand = (host) => {
+    const user = host.ssh_user || session?.ssh_user || 'root'
+    const ip = host.ip || session?.ssh_host
+    if (!ip || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      toast.error('Terminal not ready for SSH')
+      return
+    }
+    const cmd = `ssh -o StrictHostKeyChecking=no ${user}@${ip}\r`
+    wsRef.current.send(JSON.stringify({ input: cmd }))
+    toast.success(`Sent: ssh ${user}@${ip}`)
+  }
   const isTimeLow = timeRemaining < 120 && timeRemaining > 0
   const isTimeCritical = timeRemaining < 60 && timeRemaining > 0
   const solved = validationResult?.passed
   const expired = validationResult?.expired
 
   return (
-    <div className="min-h-[100dvh] h-[100dvh] flex flex-col">
+    <div className="fixed inset-0 sm:relative flex flex-col bg-surface-950 sm:min-h-[100dvh] sm:h-[100dvh] z-20">
+      {/* Mobile top bar */}
+      <div className="sm:hidden flex items-center justify-between px-3 py-2 bg-surface-900 border-b border-surface-700/50 shrink-0">
+        <button onClick={() => { setSidebarTab('instructions'); setSidebarOpen(true) }} className="p-1.5 text-surface-400">
+          <PanelLeftOpen size={18} />
+        </button>
+        <p className="text-xs font-semibold text-white truncate flex-1 text-center px-2">{scenario.title || 'Lab'}</p>
+        <span className={`text-xs font-mono font-bold ${isTimeCritical ? 'text-accent-red' : 'text-surface-300'}`}>
+          {formatTime(timeRemaining)}
+        </span>
+      </div>
       {closingIn != null && (
         <div className="shrink-0 px-4 py-2 bg-accent-green/15 border-b border-accent-green/30 text-center text-sm text-accent-green font-medium animate-pulse">
           Lab is closing in {closingIn}s…
@@ -1177,9 +1203,38 @@ export default function LabRunner() {
           </div>
         </div>
 
+        {/* Terminal toolbar + SSH */}
+        <div className="shrink-0 flex flex-wrap items-center gap-2 px-2 py-1.5 bg-surface-900/80 border-b border-surface-800 text-xs">
+          {labHosts.length > 1 && labHosts.map(h => (
+            <button
+              key={h.name}
+              type="button"
+              onClick={() => {
+                if (h.name !== terminalHost) {
+                  terminalSessionRef.current = null
+                  setTerminalHost(h.name)
+                }
+              }}
+              className={`px-2 py-1 rounded border ${terminalHost === h.name ? 'border-accent-cyan text-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400'}`}
+            >
+              {h.role || h.name}
+            </button>
+          ))}
+          {sshTargets.map(h => (
+            <button
+              key={`ssh-${h.name}`}
+              type="button"
+              onClick={() => insertSshCommand(h)}
+              className="flex items-center gap-1 px-2 py-1 rounded border border-surface-700 text-surface-300 hover:border-accent-cyan hover:text-accent-cyan"
+              title={`ssh ${h.ssh_user || 'root'}@${h.ip}`}
+            >
+              <Terminal size={12} /> SSH {h.role || h.name}
+            </button>
+          ))}
+        </div>
         {/* Terminal */}
-        <div className="flex-1 bg-surface-950 relative min-h-[200px]">
-          <div ref={terminalRef} className="absolute inset-0 p-1" />
+        <div className="flex-1 bg-surface-950 relative min-h-0 overflow-hidden">
+          <div ref={terminalRef} className="absolute inset-0 p-0.5 sm:p-1" />
         </div>
       </div>
 

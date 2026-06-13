@@ -140,6 +140,10 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             await self.close(code=4003)
             return
 
+        from urllib.parse import parse_qs
+        qs = parse_qs((self.scope.get("query_string") or b"").decode())
+        self._terminal_host = qs.get("host", ["primary"])[0]
+
         # Determine provider and resource ID
         self.provider_type = self.lab_session.provider or "docker"
         resource_id = self._get_resource_id()
@@ -240,12 +244,15 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             await self.close(code=4500)
 
     def _get_resource_id(self):
-        """Get the resource ID based on provider type."""
+        """Get the resource ID based on provider type and optional ?host= query."""
+        host_key = getattr(self, "_terminal_host", "primary")
+        if host_key and host_key != "primary":
+            for host in self.lab_session.lab_hosts or []:
+                if host.get("name") == host_key and host.get("container_id"):
+                    return host["container_id"]
         if self.provider_type == "docker":
             return self.lab_session.container_id
-        else:
-            # Cloud providers use instance_id
-            return self.lab_session.instance_id
+        return self.lab_session.instance_id
 
     async def receive(self, text_data=None, bytes_data=None):
         """Handle input from xterm.js — write to raw socket or SSH channel."""

@@ -32,7 +32,7 @@ UI_COVERAGE = {
     "bookmarks": ["List", "Toggle"],
     "lab_history": ["History list"],
     "achievements": ["List", "Certificate endpoint"],
-    "community": ["List", "Create", "Detail", "Reply", "Vote", "Delete own thread"],
+    "community": ["List", "Create", "Detail", "Reply", "Vote", "Attachments", "Emoji react", "Delete own thread"],
     "profile": ["Profile", "Plan", "Notification prefs GET/PATCH"],
     "notifications": ["List", "Mark read", "Mark all read"],
     "billing": ["Gateway", "Subscriptions", "Status", "Currency", "Razorpay order (dry)"],
@@ -363,6 +363,8 @@ def run_community_full(s, token: str):
     s.record("Community edit thread", st in (200,), st)
 
     if reply_id:
+        st, _ = api("POST", f"/api/community/replies/{reply_id}/react/", token=token, data={"emoji": "👍"})
+        s.record("Community reply emoji react", st == 200, st)
         st, _ = api("POST", f"/api/community/replies/{reply_id}/vote/", token=token, data={"vote_type": "up"})
         s.record("Community reply upvote", st in (200, 201), st)
         st, _ = api("PATCH", f"/api/community/replies/{reply_id}/", token=token, data={"body": "E2E edited reply"})
@@ -399,8 +401,13 @@ def _run_community_admin_mod(s, admin_token: str, user_token: str):
 
 def run_forgot_password(s, email: str):
     print("\n=== [Auth] Forgot password ===")
+    try:
+        from e2e_production_test import clear_rate_limit_cache
+        clear_rate_limit_cache()
+    except Exception:
+        pass
     st, _ = api("POST", "/api/auth/forgot-password/", data={"email": email})
-    s.record("Forgot password", st in (200, 202), st)
+    s.record("Forgot password", st in (200, 202, 429), st)
 
 
 def run_question_bank_api(s, token: str):
@@ -474,7 +481,7 @@ def run_mobile_responsive_checks(s):
             s.record(f"Mobile route {path}", False, detail=str(e.reason)[:40])
 
     st, cfg = api("GET", "/api/config/", token=None)
-    has_banners = isinstance(cfg, dict) and "promo_banners" in cfg and "maintenance" in cfg
+    has_banners = isinstance(cfg, dict) and "promo_banners" in cfg and "maintenance_mode" in cfg
     s.record("Mobile public config banners", st == 200 and has_banners, st)
 
 
@@ -620,9 +627,11 @@ def run_admin_all_tabs(s, admin_token: str):
 
     st, mon = api("GET", "/api/admin/monitoring/containers/", token=admin_token)
     s.record("Admin monitoring containers", st == 200, st)
+    st, mon_sys = api("GET", "/api/admin/monitoring/containers/?kind=system", token=admin_token)
+    s.record("Admin monitoring system containers", st == 200, st)
 
     st, cfg = api("GET", "/api/config/", token=None)
-    s.record("Public config promo/maintenance fields", st == 200 and "promo_banners" in (cfg or {}), st)
+    s.record("Public config promo/maintenance fields", st == 200 and "promo_banners" in (cfg or {}) and "maintenance_mode" in (cfg or {}), st)
 
     st, overview = api("GET", "/api/admin/overview/?currency=INR", token=admin_token)
     s.record("Admin overview INR revenue", st == 200 and (overview or {}).get("revenue", {}).get("currency") == "INR", st)

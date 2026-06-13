@@ -12,6 +12,8 @@ export default function JiraTicketPanel({
   comments = [],
   activity = [],
   compact = false,
+  hideHistory = false,
+  hideComments = false,
   onTransition,
   transitioning = false,
 }) {
@@ -60,7 +62,7 @@ export default function JiraTicketPanel({
             {ticket.priority && <PriorityIcon priority={ticket.priority} className="!text-xs" />}
           </div>
           {ticket.description && !compact && (
-            <div className="mt-3 text-xs text-surface-300 bg-surface-900/40 rounded p-3 border border-surface-700/50 max-h-48 overflow-y-auto">
+            <div className="mt-3 text-sm text-[#B6C2CF] bg-[#1D2125] rounded-md p-3 border border-[#A6C5E229] max-h-48 overflow-y-auto leading-relaxed">
               <JiraRichText text={ticket.description} />
             </div>
           )}
@@ -90,9 +92,9 @@ export default function JiraTicketPanel({
         </div>
       </div>
 
-      {(comments.length > 0 || activity.length > 0) && (
+      {((!hideComments && comments.length > 0) || (!hideHistory && activity.length > 0)) && (
         <div className={`mt-3 pt-3 border-t border-blue-500/15 ${compact ? 'space-y-2' : 'space-y-3'}`}>
-          {activity.length > 0 && (
+          {!hideHistory && activity.length > 0 && (
             <div className="space-y-2">
               <p className="text-[10px] uppercase tracking-wide text-surface-500 flex items-center gap-1">
                 <History size={12} /> Lab history
@@ -108,7 +110,7 @@ export default function JiraTicketPanel({
               ))}
             </div>
           )}
-          {comments.length > 0 && (
+          {!hideComments && comments.length > 0 && (
             <div className="space-y-2">
               <p className="text-[10px] uppercase tracking-wide text-surface-500 flex items-center gap-1">
                 <MessageSquare size={12} /> Comments

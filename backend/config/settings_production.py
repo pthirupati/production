@@ -187,6 +187,8 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/hour",
         "user": "1000/hour",
+        "lab_start": "60/hour",
+        "auth": "30/minute",
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
@@ -344,5 +346,9 @@ DEMO_PAYMENT_ENABLED = False
 if not env("RAZORPAY_KEY_ID", default="") and not env("STRIPE_SECRET_KEY", default=""):
     import warnings
     warnings.warn("No payment gateway configured in production!", stacklevel=1)
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+SERVE_MEDIA = True
 
 print("✅ Production settings loaded - Security checks passed")

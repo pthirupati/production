@@ -37,6 +37,7 @@ export default function ScenarioDetail() {
   const [jiraTicket, setJiraTicket] = useState(null)
   const [jiraComments, setJiraComments] = useState([])
   const [jiraActivity, setJiraActivity] = useState([])
+  const [activeLabSession, setActiveLabSession] = useState(null)
 
   useEffect(() => {
     // Show lab expired toast if redirected from LabRunner timeout
@@ -77,6 +78,15 @@ export default function ScenarioDetail() {
       .catch(() => toast.error('Scenario not found'))
       .finally(() => setLoading(false))
   }, [slug])
+
+  useEffect(() => {
+    if (!isAuthenticated || !scenario?.id) return
+    labApi.getActiveLabs().then(labs => {
+      const list = Array.isArray(labs) ? labs : (labs?.results || [])
+      const active = list.find(l => l.scenario === scenario.id && ['RUNNING', 'PROVISIONING'].includes(l.status))
+      setActiveLabSession(active || null)
+    }).catch(() => setActiveLabSession(null))
+  }, [isAuthenticated, scenario?.id, starting])
 
   const handleStartLab = async () => {
     if (!isAuthenticated) { navigate('/login'); return }
@@ -493,7 +503,13 @@ export default function ScenarioDetail() {
 
       {/* Jira incident ticket (realistic workflow) */}
       {jiraTicket?.issue_key && (
-        <JiraTicketPanel ticket={jiraTicket} comments={jiraComments} activity={jiraActivity} />
+        <JiraTicketPanel
+          ticket={jiraTicket}
+          comments={jiraComments}
+          activity={jiraActivity}
+          hideHistory={!!activeLabSession || starting}
+          hideComments={!!activeLabSession || starting}
+        />
       )}
 
       {/* Start Lab button */}

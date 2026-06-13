@@ -1,0 +1,39 @@
+title: SSH Copy-ID to Remote Host Fails
+slug: ssh-copy-id-remote
+technology: Linux
+category: SSH / Networking
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+docker_privileged: false
+jira_priority: Medium
+topics_covered: ssh-copy-id, authorized_keys, multi-host labs
+description: |
+  Passwordless SSH from the lab client to remote-server is required for deployment scripts.
+  ssh-copy-id has not been run — the remote host rejects key auth.
+companion_hosts:
+  - name: server
+    role: server
+    hostname: remote-server
+    ssh_user: labuser
+    setup_command: |
+      apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server >/dev/null
+      useradd -m labuser 2>/dev/null || true
+      mkdir -p /home/labuser/.ssh && chmod 700 /home/labuser/.ssh
+      chown -R labuser:labuser /home/labuser/.ssh
+      sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+      service ssh restart 2>/dev/null || /usr/sbin/sshd
+objectives:
+  - Copy your SSH public key to labuser@remote-server
+initial_state: |
+  Client container has an SSH key pair. Server remote-server runs sshd but has no authorized_keys for labuser.
+hints:
+  - order: 1
+    cost: 10
+    content: Run `ssh-copy-id labuser@remote-server` from the client (accept host key if prompted).
+  - order: 2
+    cost: 15
+    content: Test with `ssh -o BatchMode=yes labuser@remote-server echo ok`
+validation_script: |
+  ssh -o BatchMode=yes -o StrictHostKeyChecking=no labuser@remote-server echo fixitlab-ok

@@ -24,7 +24,7 @@ from apps.question_bank.serializers import (
 )
 from apps.labs.models import LabSession
 from apps.labs.serializers import LabSessionSerializer
-from apps.labs.provisioner import get_provisioner, DockerProvisioner
+from apps.labs.provisioner import get_provisioner, terminate_lab_session, DockerProvisioner
 from apps.hints.models import Hint
 from apps.progress.models import UserScenarioProgress, UserAchievement
 from apps.billing.services import can_start_lab
@@ -426,7 +426,7 @@ class StartLabView(APIView):
                     old_provisioner = get_provisioner(existing.provider or "docker")
                     resource_id = existing.container_id or existing.instance_id
                     if resource_id:
-                        old_provisioner.terminate(resource_id)
+                        terminate_lab_session(old_provisioner, existing)
                 except Exception as e:
                     logger.warning(f"Failed to terminate existing resource: {e}")
                 existing.mark_terminated()
@@ -531,7 +531,7 @@ class StopLabView(APIView):
         if resource_id:
             try:
                 provisioner = get_provisioner(session.provider or "docker")
-                provisioner.terminate(resource_id, session_id=str(session.id))
+                terminate_lab_session(provisioner, session)
             except Exception as e:
                 logger.error(f"Resource termination error: {e}")
                 # Still mark as terminated even if cleanup fails
@@ -632,7 +632,7 @@ class ValidateLabView(APIView):
                     pass  # Don't block validation response
 
                 # Terminate resource
-                provisioner.terminate(resource_id, session_id=str(session.id))
+                terminate_lab_session(provisioner, session)
 
                 return Response({
                     "passed": True,
@@ -698,6 +698,8 @@ class LabSessionStatusView(APIView):
             "status": session.status,
             "provider": session.provider or "docker",
             "ssh_host": session.ssh_host or "",
+            "ssh_user": session.ssh_user or "root",
+            "lab_hosts": session.lab_hosts or [],
             "instance_id": session.instance_id or "",
             "container_id": session.container_id or "",
             "time_remaining": session.time_remaining,
@@ -1022,7 +1024,7 @@ class ExpiredSessionSolutionView(APIView):
             if resource_id:
                 try:
                     provisioner = get_provisioner(session.provider or "docker")
-                    provisioner.terminate(resource_id, session_id=str(session.id))
+                    terminate_lab_session(provisioner, session)
                 except Exception:
                     pass
             session.status = "EXPIRED"

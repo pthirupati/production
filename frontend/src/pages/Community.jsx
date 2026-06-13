@@ -178,6 +178,28 @@ export default function Community() {
     }
   }
 
+const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀', '✅', '🔥', '💡']
+
+  const handleReact = async (replyId, emoji) => {
+    try {
+      await communityApi.reactToReply(replyId, emoji)
+      loadThread(selectedThread.id)
+    } catch {
+      toast.error('Reaction failed')
+    }
+  }
+
+  const handleAttachment = async (file, replyId = null) => {
+    if (!file || !selectedThread) return
+    try {
+      await communityApi.uploadAttachment(selectedThread.id, file, replyId)
+      loadThread(selectedThread.id)
+      toast.success('Screenshot attached')
+    } catch {
+      toast.error('Upload failed')
+    }
+  }
+
   const renderReply = (reply) => (
     <div key={reply.id} className="border-l-2 border-surface-600/50 pl-4 py-3">
       <div className="flex items-center gap-2 mb-1">
@@ -202,7 +224,36 @@ export default function Community() {
         <p className="text-sm text-surface-200 whitespace-pre-wrap leading-relaxed">{reply.body}</p>
       )}
 
-      <div className="flex items-center gap-3 mt-2">
+      {reply.attachments?.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {reply.attachments.map(att => (
+            <a key={att.id} href={att.url} target="_blank" rel="noreferrer" className="block">
+              <img src={att.url} alt={att.original_name || 'attachment'} className="max-h-32 rounded border border-surface-700" />
+            </a>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-1 mt-2">
+        {REACTION_EMOJIS.map(em => {
+          const count = reply.reactions?.[em] || 0
+          const active = reply.user_reactions?.includes(em)
+          if (!user && !count) return null
+          return (
+            <button
+              key={em}
+              type="button"
+              disabled={!user}
+              onClick={() => handleReact(reply.id, em)}
+              className={`text-xs px-1.5 py-0.5 rounded-full border ${active ? 'border-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400 hover:border-surface-500'}`}
+            >
+              {em}{count ? ` ${count}` : ''}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex items-center gap-3 mt-1">
         <button
           onClick={() => communityApi.voteReply(reply.id, 'up').then(() => loadThread(selectedThread.id))}
           className="flex items-center gap-1 text-xs text-surface-400 hover:text-cyan-400"
@@ -379,6 +430,15 @@ export default function Community() {
               <div className="py-4 border-t border-b border-surface-700/50 whitespace-pre-wrap text-surface-200 leading-relaxed">
                 {selectedThread.body}
               </div>
+              {selectedThread.attachments?.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {selectedThread.attachments.map(att => (
+                    <a key={att.id} href={att.url} target="_blank" rel="noreferrer">
+                      <img src={att.url} alt="" className="max-h-40 rounded border border-surface-700" />
+                    </a>
+                  ))}
+                </div>
+              )}
 
               {/* Replies */}
               <div className="space-y-1">
@@ -390,14 +450,18 @@ export default function Community() {
 
               {/* Reply Form — admins can reply on locked threads */}
               {(!selectedThread.is_locked || isAdmin) && (
-                <form onSubmit={handleReply} className="flex gap-2 pt-4 border-t border-surface-700/50">
+                <form onSubmit={handleReply} className="flex flex-wrap gap-2 pt-4 border-t border-surface-700/50 items-center">
                   <input
                     type="text"
                     placeholder={selectedThread.is_locked && isAdmin ? 'Admin reply (thread locked for others)...' : 'Write a reply...'}
-                    className="input-field flex-1"
+                    className="input-field flex-1 min-w-[200px]"
                     value={replyBody}
                     onChange={(e) => setReplyBody(e.target.value)}
                   />
+                  <label className="btn-secondary text-xs px-3 py-2 cursor-pointer">
+                    📎 Screenshot
+                    <input type="file" accept="image/*" className="hidden" onChange={e => handleAttachment(e.target.files?.[0])} />
+                  </label>
                   <button type="submit" className="btn-primary flex items-center gap-1">
                     <Send size={14} /> Reply
                   </button>

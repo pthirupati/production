@@ -16,18 +16,24 @@ export default function AdminMonitoring() {
   const [search, setSearch] = useState('')
   const [since, setSince] = useState('')
   const [live, setLive] = useState(false)
+  const [kindFilter, setKindFilter] = useState('all')
 
   const loadContainers = useCallback(async () => {
     try {
-      const data = await adminApi.getMonitoringContainers()
+      const data = await adminApi.getMonitoringContainers(kindFilter)
       setContainers(data.containers || [])
-      setSummary({ total: data.total || 0, running: data.running || 0 })
+      setSummary({
+        total: data.total || 0,
+        running: data.running || 0,
+        lab_count: data.lab_count,
+        system_count: data.system_count,
+      })
     } catch {
       toast.error('Could not load containers')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [kindFilter])
 
   const loadDetail = useCallback(async (id) => {
     try {
@@ -76,12 +82,21 @@ export default function AdminMonitoring() {
             <Activity size={22} className="text-accent-cyan" /> Monitoring
           </h1>
           <p className="text-surface-400 text-sm mt-1">
-            {summary.running} running / {summary.total} lab containers
+            {summary.running} running / {summary.total} containers
+            {summary.lab_count != null && ` · ${summary.lab_count} labs · ${summary.system_count} system`}
           </p>
         </div>
-        <button type="button" onClick={loadContainers} className="btn-secondary text-sm flex items-center gap-2">
+        <div className="flex flex-wrap gap-2">
+          {['all', 'lab', 'system'].map(k => (
+            <button key={k} type="button" onClick={() => setKindFilter(k)}
+              className={`px-3 py-1 rounded text-xs border ${kindFilter === k ? 'border-accent-cyan text-accent-cyan' : 'border-surface-700 text-surface-400'}`}>
+              {k === 'all' ? 'All' : k === 'lab' ? 'Lab' : 'System'}
+            </button>
+          ))}
+          <button type="button" onClick={loadContainers} className="btn-secondary text-sm flex items-center gap-2">
           <RefreshCw size={14} /> Refresh
-        </button>
+          </button>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
@@ -104,7 +119,10 @@ export default function AdminMonitoring() {
                   <Container size={14} className="text-surface-500" />
                   <span className="text-sm font-mono text-white truncate">{c.name}</span>
                 </div>
-                <p className="text-xs text-surface-500 mt-1 truncate">{c.scenario || c.session_id}</p>
+                <p className="text-xs text-surface-500 mt-1 truncate">{c.scenario || c.session_id || c.kind}</p>
+                <span className={`text-[10px] uppercase font-bold mt-1 inline-block mr-2 ${
+                  c.kind === 'system' ? 'text-accent-purple' : 'text-accent-cyan'
+                }`}>{c.kind}</span>
                 <span className={`text-[10px] uppercase font-bold mt-1 inline-block ${
                   c.status === 'running' ? 'text-accent-green' : 'text-surface-500'
                 }`}>{c.health || c.status}</span>

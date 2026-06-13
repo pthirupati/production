@@ -13,6 +13,8 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { subscriptionApi } from '../api/subscriptions'
+import api from '../api/client'
+import { PlatformBanners } from '../components/PlatformBanners'
 import {
   ArrowLeft, ShieldCheck, Lock, CheckCircle2, Loader2, AlertTriangle,
   Sun, Moon, Terminal, CreditCard, Smartphone, Building2, BadgeCheck,
@@ -129,6 +131,7 @@ export default function PaymentPage() {
   const [error, setError] = useState('')
   const [gatewayDown, setGatewayDown] = useState(false)
   const [gatewayChecked, setGatewayChecked] = useState(false)
+  const [platformConfig, setPlatformConfig] = useState(null)
   const [upiId, setUpiId] = useState('')
   const cardRef = useRef(null)
 
@@ -142,6 +145,10 @@ export default function PaymentPage() {
     : ''
 
   // Load Razorpay SDK
+  useEffect(() => {
+    api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
+  }, [])
+
   useEffect(() => {
     if (window.Razorpay) { setRazorpayReady(true); return }
     if (document.getElementById('razorpay-sdk')) {
@@ -345,6 +352,7 @@ export default function PaymentPage() {
 
   return (
     <div className="min-h-screen bg-surface-950 relative overflow-hidden">
+      <PlatformBanners config={platformConfig} showMaintenance showPromo />
       <FloatingParticles />
 
       {/* Header */}

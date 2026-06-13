@@ -53,4 +53,19 @@ export const communityApi = {
     const { data } = await api.post(`/community/replies/${replyId}/vote/`, { vote_type: voteType })
     return data
   },
+
+  async uploadAttachment(threadId, file, replyId = null) {
+    const form = new FormData()
+    form.append('file', file)
+    if (replyId) form.append('reply_id', replyId)
+    const { data } = await api.post(`/community/threads/${threadId}/attachments/`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+
+  async reactToReply(replyId, emoji) {
+    const { data } = await api.post(`/community/replies/${replyId}/react/`, { emoji })
+    return data
+  },
 }

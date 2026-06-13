@@ -189,6 +189,29 @@ export default function AdminSettings() {
             onChange={e => setMaintenance({ ...maintenance, maintenance_notify_users: e.target.checked })} />
           Email all registered users when maintenance is enabled
         </label>
+        <label className="flex items-center gap-2 text-sm text-surface-400">
+          <input type="checkbox" checked={config?.maintenance_banner_enabled !== false}
+            onChange={async e => {
+              const result = await adminApi.updateConfig({ ...emailForm, maintenance_banner_enabled: e.target.checked })
+              setConfig(result)
+            }} />
+          Show maintenance banner on site
+        </label>
+        <div className="flex flex-wrap gap-2 items-center">
+          <input type="file" accept="image/*" className="text-xs text-surface-400"
+            onChange={async e => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              setSaving(true)
+              try {
+                const { url } = await adminApi.uploadBanner(file, 'maintenance')
+                setMaintenance(m => ({ ...m, maintenance_banner_image: url }))
+                toast.success('Banner uploaded')
+              } catch { toast.error('Upload failed') }
+              finally { setSaving(false); e.target.value = '' }
+            }} />
+          <span className="text-xs text-surface-500">Upload maintenance banner image</span>
+        </div>
         <input type="url" className="input-field w-full" placeholder="Banner image URL (optional)"
           value={maintenance.maintenance_banner_image || ''}
           onChange={e => setMaintenance({ ...maintenance, maintenance_banner_image: e.target.value })} />
@@ -224,13 +247,34 @@ export default function AdminSettings() {
 
       {/* Promo / discount banners */}
       <div className="glass-card p-6 space-y-4">
-        <h2 className="font-semibold text-lg">Discount & promo banners</h2>
-        <p className="text-sm text-surface-400">Shown on home and logged-in app (like storefront offers).</p>
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-lg">Discount & promo banners</h2>
+          <label className="flex items-center gap-2 text-sm text-surface-400">
+            <input type="checkbox" checked={config?.promo_banners_enabled !== false}
+              onChange={async e => {
+                const result = await adminApi.updateConfig({ ...emailForm, promo_banners_enabled: e.target.checked })
+                setConfig(result)
+              }} />
+            Enabled
+          </label>
+        </div>
+        <p className="text-sm text-surface-400">Shown on home, pricing, and subscription pages only.</p>
         <div className="grid sm:grid-cols-2 gap-3">
           <input className="input-field" placeholder="Title" value={promoDraft.title} onChange={e => setPromoDraft({ ...promoDraft, title: e.target.value })} />
           <input className="input-field" placeholder="Link (/pricing)" value={promoDraft.link} onChange={e => setPromoDraft({ ...promoDraft, link: e.target.value })} />
           <input className="input-field sm:col-span-2" placeholder="Offer text" value={promoDraft.text} onChange={e => setPromoDraft({ ...promoDraft, text: e.target.value })} />
           <input className="input-field sm:col-span-2" placeholder="Image URL (optional)" value={promoDraft.image_url || ''} onChange={e => setPromoDraft({ ...promoDraft, image_url: e.target.value })} />
+          <input type="file" accept="image/*" className="text-xs text-surface-400 sm:col-span-2"
+            onChange={async e => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              try {
+                const { url } = await adminApi.uploadBanner(file, 'promo')
+                setPromoDraft(p => ({ ...p, image_url: url }))
+                toast.success('Promo image uploaded')
+              } catch { toast.error('Upload failed') }
+              e.target.value = ''
+            }} />
         </div>
         <button onClick={handleAddPromo} disabled={saving} className="btn-secondary text-sm">Add promo banner</button>
         {(config?.promo_banners || []).length > 0 && (

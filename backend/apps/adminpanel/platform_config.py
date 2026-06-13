@@ -70,17 +70,20 @@ def public_config_payload() -> dict:
     row = get_settings_row()
     maintenance = is_maintenance_active(row)
     message = row.maintenance_message or getattr(settings, "MAINTENANCE_MESSAGE", "")
+    promos = active_promo_banners(row) if row.promo_banners_enabled else []
     return {
         "primary_email": row.primary_email or settings.PRIMARY_EMAIL,
         "support_email": row.support_email or settings.SUPPORT_EMAIL,
         "maintenance_mode": maintenance,
         "maintenance_message": message if maintenance else None,
+        "maintenance_banner_enabled": row.maintenance_banner_enabled,
+        "promo_banners_enabled": row.promo_banners_enabled,
         "maintenance_banner": {
-            "image_url": row.maintenance_banner_image,
+            "image_url": row.maintenance_banner_image if row.maintenance_banner_enabled else "",
             "style": row.maintenance_banner_style or {},
             "scheduled_end": row.maintenance_scheduled_end.isoformat() if row.maintenance_scheduled_end else None,
         },
-        "promo_banners": active_promo_banners(row),
+        "promo_banners": promos,
     }
 
 
@@ -100,6 +103,8 @@ def admin_config_payload() -> dict:
         "maintenance_scheduled_end": row.maintenance_scheduled_end.isoformat() if row.maintenance_scheduled_end else None,
         "maintenance_notify_users": row.maintenance_notify_users,
         "promo_banners": row.promo_banners or [],
+        "promo_banners_enabled": row.promo_banners_enabled,
+        "maintenance_banner_enabled": row.maintenance_banner_enabled,
         "lab_provider": settings.LAB_PROVIDER,
         "max_lab_duration": settings.LAB_MAX_DURATION_MINUTES,
     }

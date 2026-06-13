@@ -33,6 +33,7 @@ from .views import (
     AdminJiraTicketsView,
     AdminJiraCreateView,
     AdminConfigView,
+    AdminUploadView,
 )
 
 urlpatterns = [
@@ -43,6 +44,7 @@ urlpatterns = [
     path("activity/", AdminActivityFeedView.as_view()),
     path("audit-logs/", AdminAuditLogView.as_view()),
     path("config/", AdminConfigView.as_view()),
+    path("upload/", AdminUploadView.as_view()),
 
     # Maintenance Mode
     path("maintenance/", AdminMaintenanceModeView.as_view()),

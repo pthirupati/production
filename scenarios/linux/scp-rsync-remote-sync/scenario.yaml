@@ -1,0 +1,32 @@
+title: SCP and Rsync Mirror to Remote Host
+slug: scp-rsync-remote-sync
+technology: Linux
+category: SSH / File transfer
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+docker_privileged: false
+jira_priority: Medium
+description: |
+  Sync /var/www/app to the backup server using scp or rsync over SSH.
+  SSH keys work but the destination directory permissions block writes.
+companion_hosts:
+  - name: backup
+    role: backup-server
+    hostname: backup-server
+    ssh_user: syncuser
+    setup_command: |
+      apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server rsync >/dev/null
+      useradd -m syncuser 2>/dev/null || true
+      mkdir -p /var/www/backup && chown root:root /var/www/backup && chmod 755 /var/www/backup
+      mkdir -p /home/syncuser/.ssh && chmod 700 /home/syncuser/.ssh
+      service ssh restart 2>/dev/null || /usr/sbin/sshd
+objectives:
+  - Fix permissions so rsync/scp can write to backup-server:/var/www/backup/
+hints:
+  - order: 1
+    cost: 10
+    content: On backup-server (SSH tab), ensure syncuser owns /var/www/backup or has group write access.
+validation_script: |
+  test -f /var/www/app/index.html && rsync -az -e "ssh -o StrictHostKeyChecking=no" /var/www/app/ syncuser@backup-server:/var/www/backup/ && ssh -o BatchMode=yes syncuser@backup-server test -f /var/www/backup/index.html

@@ -202,9 +202,9 @@ export default function MainLayout() {
           <span className="font-bold text-white">FixitLab</span>
         </header>
 
-        <PlatformBanners config={platformConfig} />
+        <PlatformBanners config={platformConfig} showMaintenance={!isLabRoute} showPromo={false} />
 
-        <main className={`flex-1 overflow-y-auto ${isLabRoute ? 'p-0 lg:p-0' : 'p-4 sm:p-6 lg:p-8'}`} role="main">
+        <main className={`flex-1 overflow-y-auto overflow-x-hidden ${isLabRoute ? 'p-0' : 'p-3 sm:p-6 lg:p-8'}`} role="main">
           {!isLabRoute && (
           <div className="mb-4 sm:mb-6 relative" ref={searchRef}>
             <div className="relative max-w-xl">

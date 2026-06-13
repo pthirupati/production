@@ -203,7 +203,7 @@ REST_FRAMEWORK = {
         "anon": "100/hour",
         "user": "1000/hour",
         "auth": "10/minute",  # Strict limit on auth endpoints
-        "lab_start": "5/hour",  # Limit lab provisioning (DoS protection)
+        "lab_start": "60/hour",  # Limit lab provisioning (DoS protection)
     },
 }
 

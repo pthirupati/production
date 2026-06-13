@@ -107,6 +107,13 @@ class LabSession(models.Model):
     hints_used = models.PositiveIntegerField(default=0)
     validation_passed = models.BooleanField(default=False)
 
+    # Multi-host labs (companion containers on same session network)
+    lab_hosts = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="[{name, role, container_id, ip, ssh_user}] for SSH/SCP/NFS scenarios",
+    )
+
     class Meta:
         ordering = ["-started_at"]
         indexes = [

@@ -52,4 +52,14 @@ def get_provisioner(provider="docker"):
         raise ValueError(f"Unknown provider: {provider}. Use 'docker', 'aws_ec2', or 'digitalocean'.")
 
 
-__all__ = ["DockerProvisioner", "get_provisioner"]
+def terminate_lab_session(provisioner, session):
+    """Terminate all resources for a lab session (primary + companions)."""
+    if hasattr(provisioner, "terminate_lab"):
+        provisioner.terminate_lab(session)
+        return
+    resource_id = session.container_id or session.instance_id
+    if resource_id:
+        provisioner.terminate(resource_id, session_id=str(session.id))
+
+
+__all__ = ["DockerProvisioner", "get_provisioner", "terminate_lab_session"]

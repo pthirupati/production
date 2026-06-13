@@ -57,7 +57,14 @@ api.interceptors.response.use(
 
     // ── 429 Rate limited ──
     if (error.response.status === 429) {
-      toast.error('Too many requests. Please slow down.', { id: 'rate-limit', duration: 5000 })
+      const path = original?.url || ''
+      const isLabStart = /\/labs\/\d+\/start\//.test(path)
+      toast.error(
+        isLabStart
+          ? 'Lab start limit reached. Wait a minute or resume an active lab from Dashboard.'
+          : 'Too many requests. Please slow down.',
+        { id: 'rate-limit', duration: 6000 },
+      )
     }
 
     // 500+ Server error (skip auth forms — they handle errors locally)

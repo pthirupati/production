@@ -20,6 +20,8 @@ class PlatformSettings(models.Model):
     maintenance_notify_users = models.BooleanField(default=True)
 
     promo_banners = models.JSONField(default=list, blank=True)
+    promo_banners_enabled = models.BooleanField(default=True)
+    maintenance_banner_enabled = models.BooleanField(default=True)
 
     updated_at = models.DateTimeField(auto_now=True)
 

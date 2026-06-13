@@ -135,6 +135,117 @@ class DockerProvisioner:
         """Get the Docker image name for a scenario."""
         return f"{settings.DOCKER_SCENARIO_IMAGE_PREFIX}{scenario.slug}:latest"
 
+    def _load_scenario_yaml(self, scenario):
+        """Load scenario.yaml for companion_hosts and extra config."""
+        candidates = []
+        if getattr(scenario, "definition_path", None):
+            candidates.append(scenario.definition_path)
+        slug = scenario.slug
+        tech = getattr(scenario.technology, "slug", None) or getattr(scenario.technology, "name", "linux")
+        tech_dir = str(tech).lower().replace(" ", "-")
+        repo_root = getattr(settings, "SCENARIOS_ROOT", settings.BASE_DIR.parent / "scenarios")
+        candidates.append(os.path.join(repo_root, tech_dir, slug, "scenario.yaml"))
+        candidates.append(os.path.join(repo_root, "linux", slug, "scenario.yaml"))
+        for path in candidates:
+            if path and os.path.isfile(path):
+                try:
+                    with open(path, encoding="utf-8") as fh:
+                        return yaml.safe_load(fh) or {}
+                except OSError as exc:
+                    logger.warning("Could not read scenario yaml %s: %s", path, exc)
+        return {}
+
+    def _get_container_ip(self, container, network_name):
+        container.reload()
+        nets = container.attrs.get("NetworkSettings", {}).get("Networks", {})
+        if network_name in nets and nets[network_name].get("IPAddress"):
+            return nets[network_name]["IPAddress"]
+        for info in nets.values():
+            ip = info.get("IPAddress")
+            if ip:
+                return ip
+        return ""
+
+    def _provision_companion_hosts(self, lab_session, session_network, image_name, privileged, username, short_id):
+        """Start additional containers on the same session network (SSH/SCP/NFS labs)."""
+        yaml_data = self._load_scenario_yaml(lab_session.scenario)
+        companions = yaml_data.get("companion_hosts") or []
+        if not companions:
+            return []
+
+        hosts = []
+        for idx, comp in enumerate(companions):
+            host_name = comp.get("name") or f"host-{idx + 1}"
+            role = comp.get("role") or host_name
+            comp_container_name = f"fixitlab-{username}-{short_id}-{host_name}"
+            self._cleanup_stale_container(comp_container_name)
+            run_kwargs = dict(
+                image=image_name,
+                name=comp_container_name,
+                detach=True,
+                hostname=comp.get("hostname") or host_name,
+                mem_limit=settings.DOCKER_CONTAINER_MEMORY_LIMIT,
+                nano_cpus=int(settings.DOCKER_CONTAINER_CPU_LIMIT * 1e9),
+                network=session_network.name,
+                labels={
+                    "fixitlab.type": "lab",
+                    "fixitlab.session_id": str(lab_session.id),
+                    "fixitlab.user_id": str(lab_session.user_id),
+                    "fixitlab.user": getattr(lab_session.user, "username", "") or "",
+                    "fixitlab.scenario": lab_session.scenario.slug,
+                    "fixitlab.host_role": role,
+                    "fixitlab.created": str(int(_time.time())),
+                },
+                environment={
+                    "FIXITLAB_SESSION_ID": str(lab_session.id),
+                    "FIXITLAB_SCENARIO": lab_session.scenario.slug,
+                    "FIXITLAB_HOST_ROLE": role,
+                },
+                read_only=False,
+                auto_remove=False,
+                pids_limit=256,
+                tty=True,
+                stdin_open=True,
+            )
+            if privileged:
+                run_kwargs["privileged"] = True
+            else:
+                run_kwargs.update(
+                    cap_drop=["ALL"],
+                    cap_add=["NET_BIND_SERVICE", "NET_ADMIN", "NET_RAW", "SYS_ADMIN", "SYS_PTRACE",
+                             "DAC_OVERRIDE", "CHOWN", "FOWNER", "SETUID", "SETGID"],
+                    privileged=False,
+                )
+            comp_container = self.client.containers.run(**run_kwargs)
+            self._wait_for_container(comp_container)
+            setup_cmd = comp.get("setup_command")
+            if setup_cmd:
+                comp_container.exec_run(["/bin/bash", "-c", setup_cmd], user="root")
+            ip = self._get_container_ip(comp_container, session_network.name)
+            hosts.append({
+                "name": host_name,
+                "role": role,
+                "container_id": comp_container.id,
+                "ip": ip or "",
+                "ssh_user": comp.get("ssh_user") or "root",
+            })
+            logger.info("Companion host %s (%s) at %s for session %s", host_name, role, ip, lab_session.id)
+        return hosts
+
+    def terminate_lab(self, lab_session):
+        """Stop primary + companion containers and remove session network."""
+        sid = str(lab_session.id)
+        container_ids = set()
+        if lab_session.container_id:
+            container_ids.add(lab_session.container_id)
+        for host in lab_session.lab_hosts or []:
+            cid = host.get("container_id")
+            if cid:
+                container_ids.add(cid)
+        for cid in container_ids:
+            self.terminate(cid, session_id=None)
+        self._remove_session_network(sid)
+
     def provision(self, lab_session):
         """
         Spin up a fresh Docker container for the lab session.
@@ -174,10 +285,13 @@ class DockerProvisioner:
                 nano_cpus=int(settings.DOCKER_CONTAINER_CPU_LIMIT * 1e9),
                 network=session_network.name,
                 labels={
+                    "fixitlab.type": "lab",
                     "fixitlab.session_id": str(lab_session.id),
                     "fixitlab.user_id": str(lab_session.user_id),
+                    "fixitlab.user": getattr(lab_session.user, "username", "") or "",
                     "fixitlab.scenario": lab_session.scenario.slug,
                     "fixitlab.created": str(int(_time.time())),
+                    "fixitlab.host_role": "primary",
                 },
                 environment={
                     "FIXITLAB_SESSION_ID": str(lab_session.id),
@@ -228,6 +342,23 @@ class DockerProvisioner:
 
             # Run scenario setup script if available (ensures broken state is applied)
             self._run_setup_script(container, lab_session.scenario)
+
+            primary_ip = self._get_container_ip(container, session_network.name)
+            companion_hosts = self._provision_companion_hosts(
+                lab_session, session_network, image_name, privileged, username, short_id
+            )
+            lab_session.ssh_host = primary_ip or ""
+            lab_session.ssh_user = "root"
+            lab_hosts = [{
+                "name": "primary",
+                "role": "client",
+                "container_id": container.id,
+                "ip": primary_ip or "",
+                "ssh_user": "root",
+            }]
+            lab_hosts.extend(companion_hosts)
+            lab_session.lab_hosts = lab_hosts
+            lab_session.save(update_fields=["ssh_host", "ssh_user", "lab_hosts"])
 
             logger.info(
                 f"Provisioned container {container_name} "

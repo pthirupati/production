@@ -20,7 +20,7 @@ from datetime import timedelta
 from apps.question_bank.models import Scenario, Technology, Tag
 from apps.question_bank.serializers import ScenarioAdminSerializer, TechnologySerializer
 from apps.labs.models import LabSession
-from apps.labs.provisioner import get_provisioner, DockerProvisioner
+from apps.labs.provisioner import get_provisioner, DockerProvisioner, terminate_lab_session
 from apps.leaderboard.models import LeaderboardEntry
 from apps.progress.models import UserScenarioProgress
 from apps.billing.models import Plan, Subscription, TechnologySubscription
@@ -743,7 +743,7 @@ class AdminTerminateLabView(APIView):
         if resource_id:
             try:
                 provisioner = get_provisioner(session.provider or "docker")
-                provisioner.terminate(resource_id, session_id=str(session.id))
+                terminate_lab_session(provisioner, session)
             except Exception as e:
                 logger.error(f"Admin terminate error: {e}")
 
@@ -764,7 +764,7 @@ class AdminTerminateAllIdleLabsView(APIView):
                 if resource_id:
                     try:
                         provisioner = get_provisioner(lab.provider or "docker")
-                        provisioner.terminate(resource_id, session_id=str(lab.id))
+                        terminate_lab_session(provisioner, lab)
                     except Exception:
                         pass
                 lab.status = "EXPIRED"
@@ -776,13 +776,11 @@ class AdminTerminateAllIdleLabsView(APIView):
 
 
 def _admin_terminate_session(session) -> bool:
-    resource_id = session.container_id or session.instance_id
-    if resource_id:
-        try:
-            provisioner = get_provisioner(session.provider or "docker")
-            provisioner.terminate(resource_id, session_id=str(session.id))
-        except Exception as exc:
-            logger.error("Admin terminate error for %s: %s", session.id, exc)
+    try:
+        provisioner = get_provisioner(session.provider or "docker")
+        terminate_lab_session(provisioner, session)
+    except Exception as exc:
+        logger.error("Admin terminate error for %s: %s", session.id, exc)
     if session.is_expired and session.status == "RUNNING":
         session.status = "EXPIRED"
         session.ended_at = timezone.now()
@@ -1833,6 +1831,10 @@ class AdminConfigView(APIView):
                 setattr(row, field, request.data.get(key) or "")
         if "promo_banners" in request.data:
             row.promo_banners = request.data.get("promo_banners") or []
+        if "promo_banners_enabled" in request.data:
+            row.promo_banners_enabled = bool(request.data.get("promo_banners_enabled"))
+        if "maintenance_banner_enabled" in request.data:
+            row.maintenance_banner_enabled = bool(request.data.get("maintenance_banner_enabled"))
         row.save()
         persist_config_snapshot(row)
         if row.primary_email:
@@ -1845,11 +1847,39 @@ class AdminConfigView(APIView):
         return Response(admin_config_payload())
 
 
+class AdminUploadView(APIView):
+    """Upload banner/promo images (admin)."""
+    permission_classes = [IsPlatformAdmin]
+    MAX_BYTES = 5 * 1024 * 1024
+
+    def post(self, request):
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"error": "No file uploaded"}, status=400)
+        if upload.size > self.MAX_BYTES:
+            return Response({"error": "File too large (max 5MB)"}, status=400)
+        if not (upload.content_type or "").startswith("image/"):
+            return Response({"error": "Only image uploads are allowed"}, status=400)
+
+        from django.core.files.storage import default_storage
+
+        folder = request.data.get("folder", "platform")
+        safe_name = upload.name.replace("..", "").replace("/", "_")[-120:]
+        path = default_storage.save(f"{folder}/{safe_name}", upload)
+        url = request.build_absolute_uri(settings.MEDIA_URL + path)
+        return Response({"url": url, "path": path})
+
+
 # ─── Container Monitoring ─────────────────────────────────────────────
 
 class AdminMonitoringContainersView(APIView):
-    """List FixitLab Docker containers with health summary."""
+    """List FixitLab lab + platform Docker containers with health summary."""
     permission_classes = [IsPlatformAdmin]
+
+    SYSTEM_NAME_HINTS = (
+        "backend", "frontend", "gateway", "redis", "postgres", "database",
+        "rabbitmq", "celery", "certbot", "nginx",
+    )
 
     def get(self, request):
         try:
@@ -1857,23 +1887,49 @@ class AdminMonitoringContainersView(APIView):
         except Exception as exc:
             return Response({"error": str(exc), "containers": []}, status=503)
 
+        kind_filter = request.query_params.get("kind", "all")
         containers = []
-        for c in client.containers.list(all=True, filters={"label": "fixitlab.type=lab"}):
+        seen = set()
+
+        def add_container(c, kind):
+            if c.id in seen:
+                return
+            seen.add(c.id)
             labels = c.labels or {}
             state = c.attrs.get("State", {})
             containers.append({
                 "id": c.short_id,
                 "full_id": c.id,
                 "name": c.name,
+                "kind": kind,
                 "status": c.status,
                 "health": state.get("Health", {}).get("Status") or ("running" if c.status == "running" else c.status),
                 "session_id": labels.get("fixitlab.session_id", ""),
                 "scenario": labels.get("fixitlab.scenario", ""),
                 "user": labels.get("fixitlab.user", ""),
+                "host_role": labels.get("fixitlab.host_role", ""),
                 "created": c.attrs.get("Created", ""),
             })
+
+        for c in client.containers.list(all=True, filters={"label": "fixitlab.session_id"}):
+            add_container(c, "lab")
+
+        for c in client.containers.list(all=True):
+            name = (c.name or "").lower()
+            if any(h in name for h in self.SYSTEM_NAME_HINTS):
+                add_container(c, "system")
+
+        if kind_filter != "all":
+            containers = [x for x in containers if x["kind"] == kind_filter]
+
         running = sum(1 for x in containers if x["status"] == "running")
-        return Response({"containers": containers, "total": len(containers), "running": running})
+        return Response({
+            "containers": containers,
+            "total": len(containers),
+            "running": running,
+            "lab_count": sum(1 for x in containers if x["kind"] == "lab"),
+            "system_count": sum(1 for x in containers if x["kind"] == "system"),
+        })
 
 
 class AdminMonitoringContainerDetailView(APIView):

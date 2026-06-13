@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.utils.html import strip_tags
-from .models import Thread, Reply, ThreadVote
+from .models import Thread, Reply, ThreadVote, ThreadAttachment, ReplyReaction
 
 User = get_user_model()
 
@@ -31,17 +31,37 @@ class ThreadAuthorSerializer(serializers.ModelSerializer):
             return False
 
 
+class ThreadAttachmentSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+    uploader = serializers.CharField(source="uploaded_by.username", read_only=True)
+
+    class Meta:
+        model = ThreadAttachment
+        fields = ["id", "url", "original_name", "content_type", "uploader", "created_at"]
+
+    def get_url(self, obj):
+        request = self.context.get("request")
+        if not obj.file:
+            return ""
+        if request:
+            return request.build_absolute_uri(obj.file.url)
+        return obj.file.url
+
+
 class ReplySerializer(serializers.ModelSerializer):
     author = ThreadAuthorSerializer(read_only=True)
     children = serializers.SerializerMethodField()
     user_vote = serializers.SerializerMethodField()
+    attachments = ThreadAttachmentSerializer(many=True, read_only=True)
+    reactions = serializers.SerializerMethodField()
+    user_reactions = serializers.SerializerMethodField()
 
     class Meta:
         model = Reply
         fields = [
             "id", "thread", "author", "parent", "body",
             "upvotes", "is_deleted", "created_at", "updated_at",
-            "children", "user_vote",
+            "children", "user_vote", "attachments", "reactions", "user_reactions",
         ]
         read_only_fields = ["id", "thread", "author", "upvotes", "is_deleted", "created_at", "updated_at"]
 
@@ -56,6 +76,19 @@ class ReplySerializer(serializers.ModelSerializer):
             return vote.vote_type if vote else None
         return None
 
+    def get_reactions(self, obj):
+        from django.db.models import Count
+        rows = obj.reactions.values("emoji").annotate(count=Count("id"))
+        return {row["emoji"]: row["count"] for row in rows}
+
+    def get_user_reactions(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return []
+        return list(
+            obj.reactions.filter(user=request.user).values_list("emoji", flat=True)
+        )
+
     def validate_body(self, value):
         return sanitize_text(value)
 
@@ -64,13 +97,14 @@ class ThreadListSerializer(serializers.ModelSerializer):
     author = ThreadAuthorSerializer(read_only=True)
     technology_name = serializers.CharField(source="technology.name", read_only=True, default=None)
     user_vote = serializers.SerializerMethodField()
+    attachments = ThreadAttachmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Thread
         fields = [
             "id", "author", "title", "body", "technology", "technology_name",
             "is_pinned", "is_locked", "upvotes", "reply_count",
-            "created_at", "updated_at", "user_vote",
+            "created_at", "updated_at", "user_vote", "attachments",
         ]
         read_only_fields = [
             "id", "author", "is_pinned", "is_locked",

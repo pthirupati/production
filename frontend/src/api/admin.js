@@ -238,8 +238,19 @@ export const adminApi = {
   },
 
 
-  async getMonitoringContainers() {
-    const { data } = await api.get('/admin/monitoring/containers/')
+  async getMonitoringContainers(kind = 'all') {
+    const qs = kind && kind !== 'all' ? `?kind=${kind}` : ''
+    const { data } = await api.get(`/admin/monitoring/containers/${qs}`)
+    return data
+  },
+
+  async uploadBanner(file, folder = 'platform') {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('folder', folder)
+    const { data } = await api.post('/admin/upload/', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return data
   },
 
