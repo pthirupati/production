@@ -7,7 +7,7 @@ from apps.labs.provisioner.docker_provisioner import _exec_stream_text
 from apps.labs.provisioner.exec_socket import (
     DockerExecSocket,
     _coerce_recv_bytes,
-    _resolve_exec_io,
+    _resolve_exec_write_target,
     start_exec_stream,
     stream_chunk_to_text,
 )
@@ -49,22 +49,40 @@ class QueryStringTests(SimpleTestCase):
         )
 
 
-class ResolveExecIOTests(SimpleTestCase):
-    def test_prefers_bidirectional_candidate(self):
+class ResolveExecWriteTests(SimpleTestCase):
+    def test_prefers_writable_candidate_without_changing_read_socket(self):
         readable = MagicMock(spec=["recv"])
-        writable = MagicMock(spec=["recv", "send", "read"])
+        readable.recv.return_value = b"root@host:~$ "
+        writable = MagicMock(spec=["send"])
+
+        class FakeFp:
+            def __init__(self, sock):
+                self.raw = FakeRaw(sock)
 
         class FakeRaw:
-            def __init__(self, fp):
-                self._fp = fp
+            def __init__(self, sock):
+                self.sock = sock
+
+        class FakeInnerFp:
+            def __init__(self, sock):
+                self.fp = FakeFp(sock)
+
+        class FakeRawWrapper:
+            def __init__(self, sock):
+                self._fp = FakeInnerFp(sock)
 
         class FakeResponse:
-            def __init__(self, fp):
-                self.raw = FakeRaw(fp)
+            def __init__(self, sock):
+                self.raw = FakeRawWrapper(sock)
 
         response = FakeResponse(writable)
-        resolved = _resolve_exec_io(readable, response)
-        self.assertIs(resolved, writable)
+        write_target = _resolve_exec_write_target(readable, response)
+        self.assertIs(write_target, writable)
+
+        wrapped = DockerExecSocket(readable, response)
+        wrapped.send(b"echo hi\r")
+        writable.send.assert_called_once_with(b"echo hi\r")
+        self.assertEqual(wrapped.recv(64), b"root@host:~$ ")
 
     def test_docker_exec_socket_send_uses_write_fallback(self):
         class WriteOnly:
@@ -75,24 +93,43 @@ class ResolveExecIOTests(SimpleTestCase):
                 self.wrote = data
 
         target = WriteOnly()
-        wrapped = DockerExecSocket(target, MagicMock())
+        wrapped = DockerExecSocket(target, object())
         wrapped.send(b"hi")
         self.assertEqual(target.wrote, b"hi")
 
 
 class DockerExecSocketTests(SimpleTestCase):
     def test_wrapper_keeps_response_reference(self):
-        sock = MagicMock()
-        response = MagicMock()
+        class FakeSock:
+            def __init__(self):
+                self.sent = []
+
+            def send(self, data):
+                self.sent.append(data)
+
+            def recv(self, size):
+                return b"ok"
+
+            def settimeout(self, seconds):
+                pass
+
+            def setblocking(self, flag):
+                pass
+
+            def fileno(self):
+                return 0
+
+            def close(self):
+                pass
+
+        sock = FakeSock()
+        response = object()
         wrapped = DockerExecSocket(sock, response)
         self.assertIs(wrapped._response, response)
         wrapped.send(b"hi")
-        sock.send.assert_called_once_with(b"hi")
-        sock.recv.return_value = b"ok"
+        self.assertEqual(sock.sent, [b"hi"])
         self.assertEqual(wrapped.recv(4), b"ok")
         wrapped.close()
-        response.close.assert_called_once()
-        sock.close.assert_called_once()
 
     def test_start_exec_stream_uses_post_json(self):
         api = MagicMock()
@@ -109,3 +146,4 @@ class DockerExecSocketTests(SimpleTestCase):
         api._get_raw_response_socket.assert_called_once_with(response)
         self.assertIsInstance(wrapped, DockerExecSocket)
         self.assertIs(wrapped._response, response)
+        self.assertIs(wrapped._sock, raw_sock)

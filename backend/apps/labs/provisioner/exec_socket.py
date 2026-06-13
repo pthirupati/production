@@ -5,8 +5,8 @@ On Linux (Unix socket to Docker), docker-py cannot set sock._response on the raw
 socket, so the HTTP response is garbage-collected and the exec stream drops after
 ~1–2 seconds. DockerExecSocket keeps the response object alive explicitly.
 
-The raw socket from _get_raw_response_socket is often read-only (HTTPResponse body);
-_resolve_exec_io walks the docker-py/urllib3 chain to find a bidirectional target.
+The read socket from _get_raw_response_socket is correct for output; stdin often
+needs a different object in the docker-py/urllib3 chain (_resolve_exec_write_target).
 """
 from __future__ import annotations
 
@@ -43,11 +43,8 @@ def stream_chunk_to_text(data) -> str:
     return _coerce_recv_bytes(data).decode("utf-8", errors="replace")
 
 
-def _resolve_exec_io(sock, response=None):
-    """Return a socket/file object that supports both read and write for exec attach."""
-    if sock is None:
-        raise RuntimeError("Docker exec returned no socket")
-
+def _exec_write_candidates(sock, response=None) -> list:
+    """Collect docker-py objects that may accept exec stdin."""
     candidates: list = []
 
     def _add(obj) -> None:
@@ -59,38 +56,53 @@ def _resolve_exec_io(sock, response=None):
 
     resp = response or getattr(sock, "_response", None)
     if resp is not None:
-        _add(resp)
+        # Same chain docker-py uses in _get_raw_response_socket (Unix / TCP).
+        try:
+            fp = resp.raw._fp.fp
+            _add(fp)
+            raw = getattr(fp, "raw", None)
+            _add(raw)
+            if raw is not None:
+                _add(getattr(raw, "sock", None))
+                _add(getattr(raw, "_sock", None))
+        except AttributeError:
+            pass
+
         raw = getattr(resp, "raw", None)
         _add(raw)
         if raw is not None:
             _add(getattr(raw, "_fp", None))
-            fp = getattr(raw, "fp", None)
-            _add(fp)
-            if fp is not None:
-                _add(getattr(fp, "raw", None))
-                inner = getattr(fp, "raw", None)
-                if inner is not None:
-                    _add(getattr(inner, "_sock", None))
+            inner = getattr(raw, "_fp", None)
+            if inner is not None:
+                _add(getattr(inner, "fp", None))
+                _add(getattr(inner, "raw", None))
+                inner_raw = getattr(inner, "raw", None)
+                if inner_raw is not None:
+                    _add(getattr(inner_raw, "sock", None))
+                    _add(getattr(inner_raw, "_sock", None))
 
-    # Prefer the innermost bidirectional object (e.g. response.raw._fp) over
-    # shallow HTTP wrappers that may expose read but not a real write path.
+    return candidates
+
+
+def _resolve_exec_write_target(sock, response=None):
+    """Return the best object for writing stdin to a docker exec attach stream."""
+    if sock is None:
+        raise RuntimeError("Docker exec returned no socket")
+
+    candidates = _exec_write_candidates(sock, response)
+
+    # Prefer real sockets over HTTP/file wrappers (deepest first).
     for candidate in reversed(candidates):
-        can_read = hasattr(candidate, "recv") or hasattr(candidate, "read")
-        can_write = (
-            hasattr(candidate, "send")
-            or hasattr(candidate, "sendall")
-            or hasattr(candidate, "write")
-        )
-        if can_read and can_write:
+        if hasattr(candidate, "send") or hasattr(candidate, "sendall"):
             _set_blocking(candidate)
             return candidate
 
-    for candidate in candidates:
-        if hasattr(candidate, "recv") or hasattr(candidate, "read"):
+    for candidate in reversed(candidates):
+        if hasattr(candidate, "write"):
             _set_blocking(candidate)
             return candidate
 
-    raise RuntimeError("Cannot resolve writable Docker exec socket")
+    return sock
 
 
 def _set_blocking(sock) -> None:
@@ -102,16 +114,21 @@ def _set_blocking(sock) -> None:
 
 
 class DockerExecSocket:
-    """Wraps the exec I/O target and holds the requests Response alive."""
+    """Wraps the exec read socket and holds the requests Response alive."""
 
-    __slots__ = ("_sock", "_response")
+    __slots__ = ("_sock", "_response", "_write_target")
 
     def __init__(self, sock, response):
         self._sock = sock
         self._response = response
+        self._write_target = _resolve_exec_write_target(sock, response)
 
     def send(self, data: bytes) -> None:
-        for target in (self._sock, getattr(self._sock, "_sock", None)):
+        for target in (
+            self._write_target,
+            self._sock,
+            getattr(self._sock, "_sock", None),
+        ):
             if target is None:
                 continue
             if hasattr(target, "send"):
@@ -167,8 +184,7 @@ def start_exec_stream(api, exec_id: str, *, tty: bool = True) -> DockerExecSocke
         stream=True,
     )
     raw_sock = api._get_raw_response_socket(response)
-    io_sock = _resolve_exec_io(raw_sock, response)
-    wrapped = DockerExecSocket(io_sock, response)
+    wrapped = DockerExecSocket(raw_sock, response)
     wrapped.setblocking(True)
     return wrapped
 
