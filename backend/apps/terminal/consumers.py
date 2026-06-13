@@ -448,7 +448,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     except Exception:
                         pass
 
-                output = _coerce_recv_bytes(data).decode("utf-8", errors="replace")
+                output = stream_chunk_to_text(data)
 
                 # Record output for replay
                 if self._session_start_time:
