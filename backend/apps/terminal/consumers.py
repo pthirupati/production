@@ -34,6 +34,15 @@ _conn_lock = threading.Lock()
 MAX_WS_PER_USER = int(os.environ.get("TERMINAL_MAX_WS_PER_USER", "3"))
 
 
+def reset_user_ws_connections(user_id: int | None = None) -> None:
+    """Clear per-user WS counters (test helper). Clears all users when user_id is None."""
+    with _conn_lock:
+        if user_id is None:
+            _user_connections.clear()
+        else:
+            _user_connections.pop(int(user_id), None)
+
+
 class TerminalConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer that bridges xterm.js to a lab shell.
