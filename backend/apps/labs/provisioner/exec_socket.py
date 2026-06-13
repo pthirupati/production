@@ -4,7 +4,11 @@ Helpers for Docker exec attach sockets (docker-py 6.x / 7.x).
 On Linux (Unix socket to Docker), docker-py cannot set sock._response on the raw
 socket, so the HTTP response is garbage-collected and the exec stream drops after
 ~1–2 seconds. DockerExecSocket keeps the response object alive explicitly.
+
+The raw socket from _get_raw_response_socket is often read-only (HTTPResponse body);
+_resolve_exec_io walks the docker-py/urllib3 chain to find a bidirectional target.
 """
+from __future__ import annotations
 
 
 def _coerce_recv_bytes(data) -> bytes:
@@ -39,8 +43,66 @@ def stream_chunk_to_text(data) -> str:
     return _coerce_recv_bytes(data).decode("utf-8", errors="replace")
 
 
+def _resolve_exec_io(sock, response=None):
+    """Return a socket/file object that supports both read and write for exec attach."""
+    if sock is None:
+        raise RuntimeError("Docker exec returned no socket")
+
+    candidates: list = []
+
+    def _add(obj) -> None:
+        if obj is not None and obj not in candidates:
+            candidates.append(obj)
+
+    _add(sock)
+    _add(getattr(sock, "_sock", None))
+
+    resp = response or getattr(sock, "_response", None)
+    if resp is not None:
+        _add(resp)
+        raw = getattr(resp, "raw", None)
+        _add(raw)
+        if raw is not None:
+            _add(getattr(raw, "_fp", None))
+            fp = getattr(raw, "fp", None)
+            _add(fp)
+            if fp is not None:
+                _add(getattr(fp, "raw", None))
+                inner = getattr(fp, "raw", None)
+                if inner is not None:
+                    _add(getattr(inner, "_sock", None))
+
+    # Prefer the innermost bidirectional object (e.g. response.raw._fp) over
+    # shallow HTTP wrappers that may expose read but not a real write path.
+    for candidate in reversed(candidates):
+        can_read = hasattr(candidate, "recv") or hasattr(candidate, "read")
+        can_write = (
+            hasattr(candidate, "send")
+            or hasattr(candidate, "sendall")
+            or hasattr(candidate, "write")
+        )
+        if can_read and can_write:
+            _set_blocking(candidate)
+            return candidate
+
+    for candidate in candidates:
+        if hasattr(candidate, "recv") or hasattr(candidate, "read"):
+            _set_blocking(candidate)
+            return candidate
+
+    raise RuntimeError("Cannot resolve writable Docker exec socket")
+
+
+def _set_blocking(sock) -> None:
+    if hasattr(sock, "setblocking"):
+        try:
+            sock.setblocking(True)
+        except Exception:
+            pass
+
+
 class DockerExecSocket:
-    """Wraps the raw exec socket and holds the requests Response alive."""
+    """Wraps the exec I/O target and holds the requests Response alive."""
 
     __slots__ = ("_sock", "_response")
 
@@ -49,22 +111,27 @@ class DockerExecSocket:
         self._response = response
 
     def send(self, data: bytes) -> None:
-        sock = self._sock
-        if hasattr(sock, "send"):
-            sock.send(data)
-            return
-        if hasattr(sock, "sendall"):
-            sock.sendall(data)
-            return
+        for target in (self._sock, getattr(self._sock, "_sock", None)):
+            if target is None:
+                continue
+            if hasattr(target, "send"):
+                target.send(data)
+                return
+            if hasattr(target, "sendall"):
+                target.sendall(data)
+                return
+            if hasattr(target, "write"):
+                target.write(data)
+                if hasattr(target, "flush"):
+                    target.flush()
+                return
         raise RuntimeError("Exec socket is not writable")
 
     def recv(self, size: int) -> bytes:
         if hasattr(self._sock, "recv"):
-            data = self._sock.recv(size)
-            return _coerce_recv_bytes(data)
+            return _coerce_recv_bytes(self._sock.recv(size))
         if hasattr(self._sock, "read"):
-            data = self._sock.read(size)
-            return _coerce_recv_bytes(data)
+            return _coerce_recv_bytes(self._sock.read(size))
         raise RuntimeError("Exec socket has no recv/read method")
 
     def settimeout(self, seconds: float) -> None:
@@ -100,7 +167,8 @@ def start_exec_stream(api, exec_id: str, *, tty: bool = True) -> DockerExecSocke
         stream=True,
     )
     raw_sock = api._get_raw_response_socket(response)
-    wrapped = DockerExecSocket(raw_sock, response)
+    io_sock = _resolve_exec_io(raw_sock, response)
+    wrapped = DockerExecSocket(io_sock, response)
     wrapped.setblocking(True)
     return wrapped
 

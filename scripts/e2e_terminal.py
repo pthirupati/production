@@ -69,29 +69,39 @@ async def _check_terminal_async(session_id: str, token: str) -> tuple[bool, str]
             if "root@" not in output:
                 return False, f"no shell prompt (tail: {output[-120:]!r})"
 
-            await ws.send(json.dumps({"input": f"echo {MARKER}\r"}))
+            await asyncio.sleep(0.3)
+            await ws.send(json.dumps({"input": f"echo {MARKER}\r\n"}))
 
+            echo_out = ""
             saw_marker = False
-            echo_deadline = time.time() + 10
+            echo_deadline = time.time() + 15
             while time.time() < echo_deadline:
                 try:
                     data = await _recv_json(ws, timeout=2.0)
-                    if MARKER in (data.get("output") or ""):
+                    if data.get("type") == "ping":
+                        continue
+                    chunk = data.get("output") or ""
+                    echo_out += chunk
+                    if MARKER in echo_out:
                         saw_marker = True
                         break
                 except asyncio.TimeoutError:
                     continue
             if not saw_marker:
-                return False, f"echo {MARKER} not returned"
+                return False, f"echo {MARKER} not returned (tail: {echo_out[-120:]!r})"
 
             await asyncio.sleep(HOLD_SECONDS)
-            await ws.send(json.dumps({"input": "echo STILL_ALIVE\r"}))
+            await ws.send(json.dumps({"input": "echo STILL_ALIVE\r\n"}))
 
-            alive_deadline = time.time() + 8
+            alive_out = ""
+            alive_deadline = time.time() + 10
             while time.time() < alive_deadline:
                 try:
                     data = await _recv_json(ws, timeout=2.0)
-                    if "STILL_ALIVE" in (data.get("output") or ""):
+                    if data.get("type") == "ping":
+                        continue
+                    alive_out += data.get("output") or ""
+                    if "STILL_ALIVE" in alive_out:
                         return True, f"stable {HOLD_SECONDS}s"
                 except asyncio.TimeoutError:
                     continue

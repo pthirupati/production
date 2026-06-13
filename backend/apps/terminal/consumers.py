@@ -222,7 +222,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             self._shell_ready = False
 
             # Start reading output
-            self.reader_task = asyncio.create_task(self._read_output())
+            self.reader_task = asyncio.create_task(self._read_output_safe())
             self._ping_task = asyncio.create_task(self._ping_loop())
 
         except Exception as e:

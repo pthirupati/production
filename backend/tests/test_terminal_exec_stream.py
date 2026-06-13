@@ -7,6 +7,7 @@ from apps.labs.provisioner.docker_provisioner import _exec_stream_text
 from apps.labs.provisioner.exec_socket import (
     DockerExecSocket,
     _coerce_recv_bytes,
+    _resolve_exec_io,
     start_exec_stream,
     stream_chunk_to_text,
 )
@@ -48,6 +49,37 @@ class QueryStringTests(SimpleTestCase):
         )
 
 
+class ResolveExecIOTests(SimpleTestCase):
+    def test_prefers_bidirectional_candidate(self):
+        readable = MagicMock(spec=["recv"])
+        writable = MagicMock(spec=["recv", "send", "read"])
+
+        class FakeRaw:
+            def __init__(self, fp):
+                self._fp = fp
+
+        class FakeResponse:
+            def __init__(self, fp):
+                self.raw = FakeRaw(fp)
+
+        response = FakeResponse(writable)
+        resolved = _resolve_exec_io(readable, response)
+        self.assertIs(resolved, writable)
+
+    def test_docker_exec_socket_send_uses_write_fallback(self):
+        class WriteOnly:
+            def read(self, n):
+                return b""
+
+            def write(self, data):
+                self.wrote = data
+
+        target = WriteOnly()
+        wrapped = DockerExecSocket(target, MagicMock())
+        wrapped.send(b"hi")
+        self.assertEqual(target.wrote, b"hi")
+
+
 class DockerExecSocketTests(SimpleTestCase):
     def test_wrapper_keeps_response_reference(self):
         sock = MagicMock()
@@ -65,6 +97,8 @@ class DockerExecSocketTests(SimpleTestCase):
     def test_start_exec_stream_uses_post_json(self):
         api = MagicMock()
         raw_sock = MagicMock()
+        raw_sock.recv = MagicMock(return_value=b"")
+        raw_sock.send = MagicMock()
         response = MagicMock()
         api._post_json.return_value = response
         api._get_raw_response_socket.return_value = raw_sock
