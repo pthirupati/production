@@ -70,7 +70,7 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
 echo ""
 echo ">>> [5/7] All scenarios lab E2E (dynamic catalog)"
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-  env E2E_SKIP_LAB="${E2E_SKIP_LAB:-0}" E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 \
+  env E2E_SKIP_LAB="${E2E_SKIP_LAB:-0}" E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 TERMINAL_MAX_WS_PER_USER=64 \
   python /scripts/e2e_all_scenarios_labs.py \
   2>&1 | tee "$LOG_DIR/e2e-all-scenarios.log" || ALL_SCENARIOS_FAIL=1
 

@@ -55,6 +55,8 @@ services:
     build: ./backend
     env_file:
       - .env.production
+    environment:
+      TERMINAL_MAX_WS_PER_USER: ${TERMINAL_MAX_WS_PER_USER:-10}
     depends_on:
       database:
         condition: service_healthy

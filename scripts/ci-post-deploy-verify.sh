@@ -76,7 +76,8 @@ fi
 echo ""
 echo ">>> [5/6] Lab provisioning sample"
 if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-  env E2E_SKIP_LAB=0 E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 python /scripts/e2e_all_scenarios_labs.py; then
+  env E2E_SKIP_LAB=0 E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 TERMINAL_MAX_WS_PER_USER=64 \
+  python /scripts/e2e_all_scenarios_labs.py; then
   echo "  ✓ Sample lab provisioning OK"
 else
   echo "ERROR: Lab provisioning validation failed"

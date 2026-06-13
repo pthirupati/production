@@ -13,21 +13,30 @@ def _coerce_recv_bytes(data) -> bytes:
         return b""
     if isinstance(data, bytes):
         return data
+    if isinstance(data, bytearray):
+        return bytes(data)
     if isinstance(data, str):
         return data.encode("utf-8", errors="replace")
-    if isinstance(data, tuple):
+    if isinstance(data, int):
+        return b""
+    if isinstance(data, (tuple, list)):
         parts = []
         for item in data:
-            if item is None:
-                continue
-            if isinstance(item, bytes):
-                parts.append(item)
-            elif isinstance(item, str):
-                parts.append(item.encode("utf-8", errors="replace"))
-            elif isinstance(item, int):
-                continue
+            parts.append(_coerce_recv_bytes(item))
         return b"".join(parts)
-    return bytes(data)
+    try:
+        return bytes(data)
+    except TypeError:
+        return b""
+
+
+def stream_chunk_to_text(data) -> str:
+    """Decode exec stream chunks without calling .decode() on raw tuples."""
+    if data is None:
+        return ""
+    if isinstance(data, str):
+        return data
+    return _coerce_recv_bytes(data).decode("utf-8", errors="replace")
 
 
 class DockerExecSocket:

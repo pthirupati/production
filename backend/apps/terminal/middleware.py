@@ -20,23 +20,35 @@ def _scope_query_string(scope) -> str:
     if isinstance(raw, str):
         return raw
     if isinstance(raw, bytes):
-        return raw.decode("utf-8")
+        return raw.decode("utf-8", errors="replace")
     if isinstance(raw, (tuple, list)):
         parts = []
         for chunk in raw:
             if isinstance(chunk, bytes):
-                parts.append(chunk.decode("utf-8"))
+                parts.append(chunk.decode("utf-8", errors="replace"))
             elif isinstance(chunk, str):
                 parts.append(chunk)
+            elif isinstance(chunk, (tuple, list)):
+                parts.append(_scope_query_string({"query_string": chunk}))
         return "".join(parts)
     return ""
+
+
+def _coerce_token_str(token_str) -> str:
+    if isinstance(token_str, str):
+        return token_str
+    if isinstance(token_str, bytes):
+        return token_str.decode("utf-8", errors="replace")
+    if isinstance(token_str, (tuple, list)) and token_str:
+        return _coerce_token_str(token_str[0])
+    return str(token_str or "")
 
 
 @database_sync_to_async
 def get_user_from_token(token_str):
     """Validate JWT token and return the user."""
     try:
-        token = AccessToken(token_str)
+        token = AccessToken(_coerce_token_str(token_str))
         user_id = token["user_id"]
         return User.objects.get(id=user_id)
     except Exception as e:

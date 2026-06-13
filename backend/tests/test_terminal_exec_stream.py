@@ -8,6 +8,7 @@ from apps.labs.provisioner.exec_socket import (
     DockerExecSocket,
     _coerce_recv_bytes,
     start_exec_stream,
+    stream_chunk_to_text,
 )
 from apps.terminal.middleware import _scope_query_string
 
@@ -16,8 +17,14 @@ class CoerceRecvTests(SimpleTestCase):
     def test_tuple_stream_chunks(self):
         self.assertEqual(_coerce_recv_bytes((b"hi", b" there")), b"hi there")
 
+    def test_nested_tuple_stream(self):
+        self.assertEqual(_coerce_recv_bytes(((b"a", b"b"), b"c")), b"abc")
+
     def test_bytes_passthrough(self):
         self.assertEqual(_coerce_recv_bytes(b"ok"), b"ok")
+
+    def test_stream_chunk_to_text_tuple(self):
+        self.assertEqual(stream_chunk_to_text((b"root@", b":~$ ")), "root@:~$ ")
 
 
 class ExecStreamTextTests(SimpleTestCase):

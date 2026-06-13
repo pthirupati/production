@@ -237,6 +237,12 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c, *, test_
             from rest_framework_simplejwt.tokens import AccessToken
 
             token = str(AccessToken.for_user(user_a))
+            try:
+                from apps.terminal import consumers as terminal_consumers
+
+                terminal_consumers.reset_user_ws_connections(user_a.id)
+            except Exception:
+                pass
             ok, detail = verify_lab_terminal(str(sid_a), token)
             if ok:
                 stats.ok(f"{label} terminal WebSocket")

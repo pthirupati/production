@@ -43,9 +43,19 @@ async def _recv_json(ws, timeout: float = 2.0) -> dict:
 async def _check_terminal_async(session_id: str, token: str) -> tuple[bool, str]:
     import websockets
 
+    _reset_ws_counter(token)
     uri = f"ws://{WS_HOST}/ws/terminal/{session_id}/?token={token}"
+    extra_headers = {
+        "Origin": os.environ.get("E2E_TERMINAL_ORIGIN", "https://fixitlab.in"),
+        "Host": os.environ.get("E2E_TERMINAL_HOST", "127.0.0.1"),
+    }
     try:
-        async with websockets.connect(uri, open_timeout=15, close_timeout=5) as ws:
+        async with websockets.connect(
+            uri,
+            open_timeout=15,
+            close_timeout=5,
+            additional_headers=extra_headers,
+        ) as ws:
             output = ""
             deadline = time.time() + 20
             got_prompt = False

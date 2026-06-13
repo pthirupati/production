@@ -24,7 +24,7 @@ from apps.labs.provisioner.exec_stream import (
     open_docker_exec,
     release_holder,
 )
-from apps.labs.provisioner.exec_socket import _coerce_recv_bytes
+from apps.labs.provisioner.exec_socket import stream_chunk_to_text
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,13 @@ def reset_user_ws_connections(user_id: int | None = None) -> None:
 
 
 class TerminalConsumer(AsyncWebsocketConsumer):
+    async def __call__(self, scope, receive, send):
+        """Always release per-user WS slot even if the app crashes before disconnect()."""
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self._release_connection_slot()
+
     """
     WebSocket consumer that bridges xterm.js to a lab shell.
 
@@ -379,6 +386,20 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         finally:
             self._respawn_in_progress = False
 
+    async def _read_output_safe(self):
+        """Wrapper so reader failures never propagate to daphne/channels dispatch."""
+        try:
+            await self._read_output()
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            logger.error(
+                "Terminal reader crashed for session %s: %s",
+                getattr(self.lab_session, "id", "?"),
+                exc,
+                exc_info=True,
+            )
+
     async def _read_output(self):
         """Continuously read output from the exec socket/SSH channel and send to client."""
         empty_reads = 0
@@ -447,7 +468,12 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 except Exception:
                     pass
         except Exception as e:
-            logger.error(f"Error reading terminal output: {e}")
+            logger.error(
+                "Error reading terminal output for session %s: %s",
+                getattr(self.lab_session, "id", "?"),
+                e,
+                exc_info=True,
+            )
             if not await self._respawn_shell("error"):
                 try:
                     await self.send(text_data=json.dumps({
