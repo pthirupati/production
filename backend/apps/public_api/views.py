@@ -79,13 +79,9 @@ class PlatformConfigView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        from django.conf import settings
-        return Response({
-            "primary_email": settings.PRIMARY_EMAIL,
-            "support_email": settings.SUPPORT_EMAIL,
-            "maintenance_mode": settings.MAINTENANCE_MODE,
-            "maintenance_message": settings.MAINTENANCE_MESSAGE if settings.MAINTENANCE_MODE else None,
-        })
+        from apps.adminpanel.platform_config import public_config_payload
+
+        return Response(public_config_payload())
 
 
 class TechnologiesListView(APIView):

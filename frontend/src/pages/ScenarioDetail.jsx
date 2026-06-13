@@ -36,6 +36,7 @@ export default function ScenarioDetail() {
   const [submittingRating, setSubmittingRating] = useState(false)
   const [jiraTicket, setJiraTicket] = useState(null)
   const [jiraComments, setJiraComments] = useState([])
+  const [jiraActivity, setJiraActivity] = useState([])
 
   useEffect(() => {
     // Show lab expired toast if redirected from LabRunner timeout
@@ -44,7 +45,15 @@ export default function ScenarioDetail() {
         icon: '⏰',
         duration: 7000,
       })
-      // Clear the state so it doesn't show again on refresh
+      window.history.replaceState({}, '')
+    }
+    if (location.state?.labCompleted) {
+      toast.success(
+        location.state.score != null
+          ? `Challenge solved! Score: ${location.state.score}`
+          : 'Challenge solved! Great work.',
+        { duration: 7000 },
+      )
       window.history.replaceState({}, '')
     }
 
@@ -56,8 +65,9 @@ export default function ScenarioDetail() {
             .then(res => {
               setJiraTicket(res.data?.ticket || null)
               setJiraComments(res.data?.recent_comments || [])
+              setJiraActivity(res.data?.activity || [])
             })
-            .catch(() => { setJiraTicket(null); setJiraComments([]) })
+            .catch(() => { setJiraTicket(null); setJiraComments([]); setJiraActivity([]) })
         }
         // Fetch ratings for this scenario
         ratingsApi.getRatings({ type: 'scenario', scenario: data.id })
@@ -78,7 +88,16 @@ export default function ScenarioDetail() {
     setStarting(true)
     try {
       const session = await labApi.startLab(scenario.id)
-      if (session.jira_issue_key) {
+      if (session.jira_reset) {
+        toast(`Fresh attempt #${session.jira_run_count || 1} — ticket history cleared`, { icon: '🔄', duration: 5000 })
+        jiraApi.getScenarioTicket(scenario.id, { details: 1 })
+          .then(res => {
+            setJiraTicket(res.data?.ticket || null)
+            setJiraComments(res.data?.recent_comments || [])
+            setJiraActivity(res.data?.activity || [])
+          })
+          .catch(() => {})
+      } else if (session.jira_issue_key) {
         setJiraTicket({
           issue_key: session.jira_issue_key,
           issue_url: '',
@@ -474,7 +493,7 @@ export default function ScenarioDetail() {
 
       {/* Jira incident ticket (realistic workflow) */}
       {jiraTicket?.issue_key && (
-        <JiraTicketPanel ticket={jiraTicket} comments={jiraComments} />
+        <JiraTicketPanel ticket={jiraTicket} comments={jiraComments} activity={jiraActivity} />
       )}
 
       {/* Start Lab button */}

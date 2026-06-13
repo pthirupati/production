@@ -146,8 +146,14 @@ export const adminApi = {
   },
 
   // Labs
-  async getActiveLabs() {
-    const { data } = await api.get('/admin/labs/active/')
+  async getActiveLabs(params = {}) {
+    const qs = new URLSearchParams(params).toString()
+    const { data } = await api.get(qs ? `/admin/labs/active/?${qs}` : '/admin/labs/active/')
+    return data
+  },
+
+  async bulkTerminateLabs(payload) {
+    const { data } = await api.post('/admin/labs/bulk/', payload)
     return data
   },
 
@@ -185,8 +191,11 @@ export const adminApi = {
     return data
   },
 
-  async setMaintenanceMode(enabled, message) {
-    const { data } = await api.post('/admin/maintenance/', { enabled, message })
+  async setMaintenanceMode(payload) {
+    const body = typeof payload === 'object'
+      ? payload
+      : { enabled: payload, message: arguments[1] }
+    const { data } = await api.post('/admin/maintenance/', body)
     return data
   },
 
@@ -220,6 +229,33 @@ export const adminApi = {
 
   async getConfig() {
     const { data } = await api.get('/admin/config/')
+    return data
+  },
+
+  async updateConfig(payload) {
+    const { data } = await api.post('/admin/config/', payload)
+    return data
+  },
+
+
+  async getMonitoringContainers() {
+    const { data } = await api.get('/admin/monitoring/containers/')
+    return data
+  },
+
+  async getMonitoringContainer(id) {
+    const { data } = await api.get(`/admin/monitoring/containers/${id}/`)
+    return data
+  },
+
+  async getMonitoringLogs(id, params = {}) {
+    const qs = new URLSearchParams(params).toString()
+    const { data } = await api.get(qs ? `/admin/monitoring/containers/${id}/logs/?${qs}` : `/admin/monitoring/containers/${id}/logs/`)
+    return data
+  },
+
+  async getOverviewWithCurrency(currency = 'INR') {
+    const { data } = await api.get(`/admin/overview/?currency=${currency}`)
     return data
   },
 

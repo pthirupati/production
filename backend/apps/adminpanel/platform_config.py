@@ -1,0 +1,143 @@
+"""Read/write platform settings with env fallbacks."""
+
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+
+from django.conf import settings
+from django.utils import timezone
+
+logger = logging.getLogger(__name__)
+
+CONFIG_FILE = Path(getattr(settings, "PLATFORM_CONFIG_FILE", settings.BASE_DIR / "data" / "platform_config.json"))
+
+
+def get_settings_row():
+    from .models import PlatformSettings
+
+    row, _ = PlatformSettings.objects.get_or_create(pk=1)
+    return row
+
+
+def _scheduled_maintenance_active(row) -> bool:
+    if not row.maintenance_scheduled_start or not row.maintenance_scheduled_end:
+        return False
+    now = timezone.now()
+    return row.maintenance_scheduled_start <= now <= row.maintenance_scheduled_end
+
+
+def is_maintenance_active(row=None) -> bool:
+    row = row or get_settings_row()
+    if row.maintenance_enabled:
+        return True
+    if _scheduled_maintenance_active(row):
+        return True
+    return bool(getattr(settings, "MAINTENANCE_MODE", False))
+
+
+def active_promo_banners(row=None) -> list:
+    row = row or get_settings_row()
+    now = timezone.now()
+    active = []
+    for banner in row.promo_banners or []:
+        if not banner.get("active", True):
+            continue
+        start = banner.get("start_at")
+        end = banner.get("end_at")
+        if start:
+            try:
+                from django.utils.dateparse import parse_datetime
+
+                if parse_datetime(start) and parse_datetime(start) > now:
+                    continue
+            except (TypeError, ValueError):
+                pass
+        if end:
+            try:
+                from django.utils.dateparse import parse_datetime
+
+                if parse_datetime(end) and parse_datetime(end) < now:
+                    continue
+            except (TypeError, ValueError):
+                pass
+        active.append(banner)
+    return active
+
+
+def public_config_payload() -> dict:
+    row = get_settings_row()
+    maintenance = is_maintenance_active(row)
+    message = row.maintenance_message or getattr(settings, "MAINTENANCE_MESSAGE", "")
+    return {
+        "primary_email": row.primary_email or settings.PRIMARY_EMAIL,
+        "support_email": row.support_email or settings.SUPPORT_EMAIL,
+        "maintenance_mode": maintenance,
+        "maintenance_message": message if maintenance else None,
+        "maintenance_banner": {
+            "image_url": row.maintenance_banner_image,
+            "style": row.maintenance_banner_style or {},
+            "scheduled_end": row.maintenance_scheduled_end.isoformat() if row.maintenance_scheduled_end else None,
+        },
+        "promo_banners": active_promo_banners(row),
+    }
+
+
+def admin_config_payload() -> dict:
+    row = get_settings_row()
+    return {
+        "primary_email": row.primary_email or settings.PRIMARY_EMAIL,
+        "payment_email": row.payment_email or settings.PAYMENT_EMAIL,
+        "support_email": row.support_email or settings.SUPPORT_EMAIL,
+        "admin_display_currency": row.admin_display_currency or "INR",
+        "maintenance_mode": is_maintenance_active(row),
+        "maintenance_message": row.maintenance_message or settings.MAINTENANCE_MESSAGE,
+        "maintenance_enabled": row.maintenance_enabled,
+        "maintenance_banner_image": row.maintenance_banner_image,
+        "maintenance_banner_style": row.maintenance_banner_style or {},
+        "maintenance_scheduled_start": row.maintenance_scheduled_start.isoformat() if row.maintenance_scheduled_start else None,
+        "maintenance_scheduled_end": row.maintenance_scheduled_end.isoformat() if row.maintenance_scheduled_end else None,
+        "maintenance_notify_users": row.maintenance_notify_users,
+        "promo_banners": row.promo_banners or [],
+        "lab_provider": settings.LAB_PROVIDER,
+        "max_lab_duration": settings.LAB_MAX_DURATION_MINUTES,
+    }
+
+
+def persist_config_snapshot(row) -> None:
+    """Write emails/currency to JSON file for ops backup (mirrors DB)."""
+    try:
+        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "primary_email": row.primary_email,
+            "payment_email": row.payment_email,
+            "support_email": row.support_email,
+            "admin_display_currency": row.admin_display_currency,
+            "updated_at": timezone.now().isoformat(),
+        }
+        CONFIG_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except OSError as exc:
+        logger.warning("Could not write platform config file: %s", exc)
+
+
+def notify_maintenance_users(message: str) -> int:
+    from django.contrib.auth import get_user_model
+
+    from apps.notifications.email import send_email
+
+    User = get_user_model()
+    sent = 0
+    subject = "FixitLab scheduled maintenance"
+    for user in User.objects.filter(is_active=True).exclude(email=""):
+        try:
+            if send_email(
+                subject,
+                user.email,
+                "emails/maintenance_notification.html",
+                {"message": message or "FixitLab is entering maintenance.", "username": user.username},
+            ):
+                sent += 1
+        except Exception as exc:
+            logger.warning("Maintenance notify failed for %s: %s", user.email, exc)
+    return sent

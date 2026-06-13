@@ -12,9 +12,13 @@ from .views import (
     AdminUsersView,
     AdminUserDetailView,
     AdminBulkUsersView,
+    AdminBulkLabsView,
     AdminActiveLabsView,
     AdminTerminateLabView,
     AdminTerminateAllIdleLabsView,
+    AdminMonitoringContainersView,
+    AdminMonitoringContainerDetailView,
+    AdminMonitoringContainerLogsView,
     AdminAnalyticsView,
     AdminSystemHealthView,
     AdminAuditLogView,
@@ -67,8 +71,14 @@ urlpatterns = [
 
     # Lab Management
     path("labs/active/", AdminActiveLabsView.as_view()),
+    path("labs/bulk/", AdminBulkLabsView.as_view()),
     path("labs/<uuid:session_id>/terminate/", AdminTerminateLabView.as_view()),
     path("labs/terminate-idle/", AdminTerminateAllIdleLabsView.as_view()),
+
+    # Monitoring
+    path("monitoring/containers/", AdminMonitoringContainersView.as_view()),
+    path("monitoring/containers/<str:container_id>/", AdminMonitoringContainerDetailView.as_view()),
+    path("monitoring/containers/<str:container_id>/logs/", AdminMonitoringContainerLogsView.as_view()),
 
     # Subscription Logs
     path("subscriptions/", AdminSubscriptionLogsView.as_view()),

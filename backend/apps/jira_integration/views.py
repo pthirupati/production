@@ -84,7 +84,11 @@ def _scenario_ticket_payload(ticket, user=None, include_details=False):
     from .helpers import resolve_jira_issue_url
     from .simulated import ticket_detail_payload, use_simulated_jira
 
-    comments = JiraCommentLog.objects.filter(issue_key=ticket.issue_key).order_by("-created_at")[:10]
+    session_filter = {"session": ticket.last_session} if ticket.last_session_id else {}
+    comments = (
+        JiraCommentLog.objects.filter(issue_key=ticket.issue_key, **session_filter)
+        .order_by("-created_at")[:10]
+    )
     payload = {
         "ticket": {
             "issue_key": ticket.issue_key,
@@ -92,6 +96,7 @@ def _scenario_ticket_payload(ticket, user=None, include_details=False):
             "jira_status": ticket.jira_status,
             "run_count": ticket.run_count,
             "simulated": ticket.simulated or use_simulated_jira(),
+            "created_at": ticket.created_at.isoformat(),
         },
         "recent_comments": [
             {"author": c.author, "text": c.text, "created_at": c.created_at.isoformat()}
@@ -106,6 +111,7 @@ def _scenario_ticket_payload(ticket, user=None, include_details=False):
             payload["ticket"]["priority"] = detail["priority"]
             payload["ticket"]["jira_status"] = detail["jira_status"]
             payload["ticket"]["allowed_transitions"] = detail["allowed_transitions"]
+            payload["activity"] = detail.get("activity", [])
         elif ticket.issue_key:
             from .client import JiraClient, JiraClientError
             client = JiraClient()

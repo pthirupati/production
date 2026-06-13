@@ -7,6 +7,7 @@ import {
 import { useState, useEffect, useRef } from 'react'
 import NotificationBell from './NotificationBell'
 import api from '../../api/client'
+import { PlatformBanners } from '../PlatformBanners'
 
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -27,6 +28,7 @@ export default function MainLayout() {
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [maintenanceBanner, setMaintenanceBanner] = useState(null)
+  const [platformConfig, setPlatformConfig] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -34,11 +36,14 @@ export default function MainLayout() {
 
   useEffect(() => {
     api.get('/config/').then(res => {
+      setPlatformConfig(res.data)
       if (res.data?.maintenance_mode) {
-        setMaintenanceBanner(res.data.maintenance_message || 'Platform is under maintenance. Some features may be unavailable.')
+        setMaintenanceBanner(res.data.maintenance_message || 'Platform is under maintenance.')
       }
     }).catch(() => {})
   }, [])
+
+  const isLabRoute = location.pathname.startsWith('/lab/')
 
   // Search with debounce
   useEffect(() => {
@@ -197,9 +202,11 @@ export default function MainLayout() {
           <span className="font-bold text-white">FixitLab</span>
         </header>
 
-        <main className="flex-1 p-6 lg:p-8 overflow-y-auto" role="main">
-          {/* Global Search Bar */}
-          <div className="mb-6 relative" ref={searchRef}>
+        <PlatformBanners config={platformConfig} />
+
+        <main className={`flex-1 overflow-y-auto ${isLabRoute ? 'p-0 lg:p-0' : 'p-4 sm:p-6 lg:p-8'}`} role="main">
+          {!isLabRoute && (
+          <div className="mb-4 sm:mb-6 relative" ref={searchRef}>
             <div className="relative max-w-xl">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500" />
               <input
@@ -245,16 +252,8 @@ export default function MainLayout() {
               </div>
             )}
           </div>
-
-          {maintenanceBanner && (
-            <div className="mb-6 flex items-center gap-3 bg-accent-amber/10 border border-accent-amber/30 text-accent-amber rounded-xl px-5 py-3 animate-slide-up">
-              <AlertTriangle size={18} className="shrink-0" />
-              <p className="text-sm font-medium">{maintenanceBanner}</p>
-              <button onClick={() => setMaintenanceBanner(null)} className="ml-auto shrink-0 hover:text-white transition-colors">
-                <X size={16} />
-              </button>
-            </div>
           )}
+
           <Outlet />
         </main>
       </div>

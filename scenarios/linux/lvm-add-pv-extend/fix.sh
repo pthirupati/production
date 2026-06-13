@@ -3,10 +3,11 @@ set -e
 . /opt/fixitlab/lab-loop.sh
 LV_DEV="/dev/mapper/fixitlab-datalv"
 LV_ALT="/dev/fixitlab/datalv"
-D2=$(cat /etc/fixitlab-disk2-loop 2>/dev/null || true)
+D2=$(cat /etc/fixitlab-disk2-loop 2>/dev/null || readlink -f /dev/fixitlab-disk2 2>/dev/null || true)
 if [ -z "$D2" ] || [ ! -b "$D2" ]; then
-  D2=$(fixitlab_loop_attach /opt/fixitlab/backing/disk2.img 350M)
+  D2=$(fixitlab_loop_attach /opt/fixitlab/backing/disk2.img 400M)
   echo "$D2" > /etc/fixitlab-disk2-loop
+  ln -sf "$D2" /dev/fixitlab-disk2
 fi
 [ -b "$D2" ] || { echo "second disk loop device missing" >&2; exit 1; }
 vgchange -ay fixitlab 2>/dev/null || true

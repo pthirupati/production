@@ -7,44 +7,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { JiraRichText } from '../components/JiraRichText'
-
-const STATUS_STYLES = {
-  'To Do': { bg: 'bg-[#DFE1E6]', text: 'text-[#42526E]', dot: 'bg-[#42526E]' },
-  'In Progress': { bg: 'bg-[#DEEBFF]', text: 'text-[#0052CC]', dot: 'bg-[#0052CC]' },
-  'On Hold': { bg: 'bg-[#FFF0B3]', text: 'text-[#974F0C]', dot: 'bg-[#FF991F]' },
-  'Done': { bg: 'bg-[#E3FCEF]', text: 'text-[#006644]', dot: 'bg-[#00875A]' },
-  'Closed': { bg: 'bg-[#EBECF0]', text: 'text-[#42526E]', dot: 'bg-[#42526E]' },
-}
-
-const PRIORITY_STYLES = {
-  Highest: { color: 'text-[#CD1316]', label: 'Highest' },
-  High: { color: 'text-[#E9494A]', label: 'High' },
-  Medium: { color: 'text-[#FF991F]', label: 'Medium' },
-  Low: { color: 'text-[#006644]', label: 'Low' },
-  Lowest: { color: 'text-[#006644]', label: 'Lowest' },
-}
-
-function PriorityIcon({ priority }) {
-  const p = PRIORITY_STYLES[priority] || PRIORITY_STYLES.Medium
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-sm ${p.color}`}>
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-        <path d="M8 1l2.5 5.5H14L10 10.5 11.5 16 8 13 4.5 16 6 10.5 2 6.5h3.5z" />
-      </svg>
-      {p.label}
-    </span>
-  )
-}
-
-function StatusLozenge({ status }) {
-  const s = STATUS_STYLES[status] || STATUS_STYLES['To Do']
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${s.bg} ${s.text}`}>
-      <span className={`w-2 h-2 rounded-full ${s.dot}`} />
-      {status}
-    </span>
-  )
-}
+import { StatusLozenge, PriorityIcon, ActivityItem } from '../components/jira/JiraUi'
 
 function FieldRow({ label, children }) {
   return (
@@ -306,21 +269,13 @@ export default function JiraTicketPage() {
                 {activeTab === 'history' && (
                   <ul className="space-y-3">
                     {(ticket.activity || []).map((a, i) => (
-                      <li key={i} className="flex gap-3 text-sm">
-                        <div className="w-8 h-8 rounded-full bg-[#DEEBFF] flex items-center justify-center shrink-0">
-                          <Clock size={14} className="text-[#0052CC]" />
-                        </div>
-                        <div>
-                          <p className="text-[#172B4D]">
-                            <span className="font-medium capitalize">{a.action.replace(/_/g, ' ')}</span>
-                            {a.jira_status && (
-                              <> — moved to <StatusLozenge status={a.jira_status} /></>
-                            )}
-                          </p>
-                          <p className="text-xs text-[#6B778C] mt-0.5">
-                            {new Date(a.created_at).toLocaleString()}
-                          </p>
-                        </div>
+                      <li key={i}>
+                        <ActivityItem
+                          action={a.action}
+                          jiraStatus={a.jira_status}
+                          createdAt={a.created_at}
+                          light
+                        />
                       </li>
                     ))}
                     {(!ticket.activity || ticket.activity.length === 0) && (

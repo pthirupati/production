@@ -109,6 +109,12 @@ def ensure_scenario_ticket(user, scenario) -> dict:
     }
 
 
+def _clear_ticket_history(ticket: UserScenarioJiraTicket) -> None:
+    """Remove prior run comments/activity so relaunch shows a fresh ticket."""
+    JiraCommentLog.objects.filter(issue_key=ticket.issue_key).delete()
+    JiraTicketLog.objects.filter(issue_key=ticket.issue_key).delete()
+
+
 def sync_lab_started(session) -> dict:
     scenario = session.scenario
     user = session.user
@@ -135,14 +141,16 @@ def sync_lab_started(session) -> dict:
         _log(session, issue_key, mapping.issue_url, "created", "In Progress", {"run": 1})
     else:
         is_reset = True
+        _clear_ticket_history(mapping)
         mapping.run_count += 1
         mapping.last_session = session
         mapping.jira_status = "In Progress"
+        mapping.description = _build_description(session=session)
         mapping.save()
         add_comment(
             mapping,
             user,
-            f"Lab restarted (run #{mapping.run_count}). Session: {session.id}.",
+            f"Lab attempt #{mapping.run_count} started.\nSession: {session.id}",
             session=session,
         )
         _log(session, mapping.issue_key, mapping.issue_url, "reset", "In Progress", {"run_count": mapping.run_count})
@@ -215,8 +223,15 @@ def get_ticket_for_user(issue_key: str, user) -> Optional[UserScenarioJiraTicket
 
 
 def ticket_detail_payload(ticket: UserScenarioJiraTicket) -> dict:
-    comments = JiraCommentLog.objects.filter(issue_key=ticket.issue_key).order_by("-created_at")[:20]
-    logs = JiraTicketLog.objects.filter(issue_key=ticket.issue_key).order_by("-created_at")[:15]
+    session_filter = {"session": ticket.last_session} if ticket.last_session_id else {}
+    comments = (
+        JiraCommentLog.objects.filter(issue_key=ticket.issue_key, **session_filter)
+        .order_by("-created_at")[:20]
+    )
+    logs = (
+        JiraTicketLog.objects.filter(issue_key=ticket.issue_key, **session_filter)
+        .order_by("-created_at")[:15]
+    )
     return {
         "issue_key": ticket.issue_key,
         "issue_url": ticket.issue_url,
@@ -227,6 +242,7 @@ def ticket_detail_payload(ticket: UserScenarioJiraTicket) -> dict:
         "simulated": ticket.simulated,
         "is_closed": is_jira_closed(ticket.jira_status),
         "run_count": ticket.run_count,
+        "created_at": ticket.created_at.isoformat(),
         "allowed_transitions": sorted(ALLOWED_TRANSITIONS.get(ticket.jira_status or "To Do", set())),
         "scenario": {
             "id": ticket.scenario_id,

@@ -3,13 +3,15 @@ import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { scenarioApi } from '../api/scenarios'
+import api from '../api/client'
+import { PlatformBanners } from '../components/PlatformBanners'
 import {
   Terminal, Shield, Clock, Trophy, Zap, Server,
   Cloud, Lock, Cpu, ArrowRight, CheckCircle2,
   Users, Award, BookOpen, Wrench, Skull, Play,
   Star, ChevronRight, Monitor, Globe, Sun, Moon,
   Sparkles, Code2, Rocket, GraduationCap, Layers,
-  Activity, GitBranch, Database, Target, Flame
+  Activity, GitBranch, Database, Target, Flame, Menu, X
 } from 'lucide-react'
 
 const features = [
@@ -50,11 +52,14 @@ export default function Home() {
   const { theme, toggleTheme } = useThemeStore()
   const [technologies, setTechnologies] = useState([])
   const [stats, setStats] = useState({})
+  const [platformConfig, setPlatformConfig] = useState(null)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [activeTestimonial, setActiveTestimonial] = useState(0)
 
   useEffect(() => {
     scenarioApi.getTechnologies().then(setTechnologies).catch(() => {})
     scenarioApi.getPlatformStats().then(setStats).catch(() => {})
+    api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -68,9 +73,10 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-surface-950">
+      <PlatformBanners config={platformConfig} />
       {/* Navbar */}
       <nav className="border-b border-surface-700/30 backdrop-blur-2xl sticky top-0 z-50 bg-surface-950/80">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 group">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center shadow-lg shadow-accent-cyan/25 group-hover:shadow-accent-cyan/40 transition-shadow">
               <Terminal size={18} className="text-white" />
@@ -92,7 +98,10 @@ export default function Home() {
               </Link>
             ))}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button type="button" className="md:hidden p-2 text-surface-400" onClick={() => setMobileNavOpen(v => !v)} aria-label="Menu">
+              {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
             <button onClick={toggleTheme} className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800/50 transition-all" aria-label="Toggle theme">
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -106,6 +115,13 @@ export default function Home() {
             )}
           </div>
         </div>
+        {mobileNavOpen && (
+          <div className="md:hidden border-t border-surface-800 px-4 py-3 flex flex-col gap-2 bg-surface-950/95">
+            {['/scenarios', '/leaderboard', '/pricing', '/faq', '/contact'].map(to => (
+              <Link key={to} to={to} onClick={() => setMobileNavOpen(false)} className="text-sm text-surface-300 py-2">{to.slice(1).replace('-', ' ')}</Link>
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* Hero */}

@@ -13,6 +13,7 @@ import { ConfirmDialog } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
 import JiraTicketLink from '../components/JiraTicketLink'
 import useLabShortcuts from '../hooks/useLabShortcuts'
+import { useIsMobile } from '../hooks/useMediaQuery'
 
 export default function LabRunner() {
   const { sessionId } = useParams()
@@ -28,13 +29,17 @@ export default function LabRunner() {
   const [validating, setValidating] = useState(false)
   const [validationResult, setValidationResult] = useState(null)
   const [hints, setHints] = useState({ revealed: [], next_available: false, total_hints: 0, hints_used: 0 })
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const isMobile = useIsMobile()
   const [sidebarTab, setSidebarTab] = useState('instructions') // instructions | hints | result
   const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [jiraComments, setJiraComments] = useState([])
+  const [jiraActivity, setJiraActivity] = useState([])
   const [jiraTicket, setJiraTicket] = useState(null)
+  const [jiraTransitioning, setJiraTransitioning] = useState(false)
+  const [closingIn, setClosingIn] = useState(null)
 
   const terminalRef = useRef(null)
   const xtermRef = useRef(null)
@@ -47,6 +52,54 @@ export default function LabRunner() {
   const blockedPatternsRef = useRef([]) // [{pattern: RegExp, label: string}]
   const reconnectTimerRef = useRef(null)
   const terminalSessionRef = useRef(null)
+  const closeTimerRef = useRef(null)
+  const closeCountdownRef = useRef(null)
+
+  const LAB_CLOSE_SECONDS = 10
+
+  const cleanupLabResources = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.onclose = null
+      wsRef.current.close(1000)
+      wsRef.current = null
+    }
+    if (xtermRef.current) {
+      xtermRef.current.dispose()
+      xtermRef.current = null
+    }
+    clearSession()
+    stopTimer()
+  }, [clearSession, stopTimer])
+
+  const scheduleLabClose = useCallback((result, slug) => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    if (closeCountdownRef.current) clearInterval(closeCountdownRef.current)
+
+    setClosingIn(LAB_CLOSE_SECONDS)
+    toast(`Lab is closing in ${LAB_CLOSE_SECONDS} seconds…`, { icon: '⏳', duration: LAB_CLOSE_SECONDS * 1000 })
+
+    closeCountdownRef.current = setInterval(() => {
+      setClosingIn(prev => (prev != null && prev > 1 ? prev - 1 : prev))
+    }, 1000)
+
+    closeTimerRef.current = setTimeout(() => {
+      if (closeCountdownRef.current) clearInterval(closeCountdownRef.current)
+      setClosingIn(null)
+      cleanupLabResources()
+      navigate(`/scenarios/${slug || ''}`, {
+        state: {
+          labCompleted: true,
+          score: result?.score,
+          scenarioTitle: session?.scenario?.title || session?.scenario_detail?.title,
+        },
+      })
+    }, LAB_CLOSE_SECONDS * 1000)
+  }, [LAB_CLOSE_SECONDS, cleanupLabResources, navigate, session])
+
+  useEffect(() => () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    if (closeCountdownRef.current) clearInterval(closeCountdownRef.current)
+  }, [])
 
   const WS_NO_RECONNECT = new Set([1000, 4001, 4003, 4004, 4005, 4008, 4500])
 
@@ -74,26 +127,22 @@ export default function LabRunner() {
     labChannelRef.current = channel
 
     channel.onmessage = (event) => {
-      const { type, sessionId: stoppedId, reason } = event.data || {}
+      const { type, sessionId: stoppedId, reason, closingDelayMs } = event.data || {}
       if (type === 'lab_stopped' && stoppedId === sessionId) {
-        // Another tab stopped/expired/completed this lab — clean up and redirect
-        if (wsRef.current) {
-          wsRef.current.onclose = null
-          wsRef.current.close(1000)
-          wsRef.current = null
+        const finish = () => {
+          cleanupLabResources()
+          const msg = reason === 'completed' ? 'Lab completed in another tab!'
+            : reason === 'expired' ? 'Lab time expired!'
+            : 'Lab was stopped in another tab'
+          toast(msg, { icon: '🔄', duration: 4000 })
+          navigate('/scenarios')
         }
-        if (xtermRef.current) {
-          xtermRef.current.dispose()
-          xtermRef.current = null
+        if (reason === 'completed' && closingDelayMs > 0) {
+          toast(`Lab completed — closing in ${Math.ceil(closingDelayMs / 1000)}s…`, { icon: '✅', duration: closingDelayMs })
+          setTimeout(finish, closingDelayMs)
+          return
         }
-        clearSession()
-        stopTimer()
-
-        const msg = reason === 'completed' ? 'Lab completed in another tab!'
-          : reason === 'expired' ? 'Lab time expired!'
-          : 'Lab was stopped in another tab'
-        toast(msg, { icon: '🔄', duration: 4000 })
-        navigate('/scenarios')
+        finish()
       }
     }
 
@@ -101,7 +150,7 @@ export default function LabRunner() {
       channel.close()
       labChannelRef.current = null
     }
-  }, [sessionId])
+  }, [sessionId, cleanupLabResources, navigate])
 
   // ── Background status poll (every 30s) — detect server-side termination ──
   useEffect(() => {
@@ -113,22 +162,17 @@ export default function LabRunner() {
       try {
         const lab = await labApi.getSessionStatus(sessionId)
         if (cancelled) return
-        if (lab.status === 'TERMINATED' || lab.status === 'EXPIRED' || lab.status === 'FAILED') {
-          // Lab was terminated server-side
-          if (wsRef.current) {
-            wsRef.current.onclose = null
-            wsRef.current.close(1000)
-            wsRef.current = null
-          }
-          if (xtermRef.current) {
-            xtermRef.current.dispose()
-            xtermRef.current = null
-          }
-          clearSession()
-          stopTimer()
-          const msg = lab.status === 'EXPIRED' ? 'Lab time expired!' : 'Lab session ended'
-          toast(msg, { icon: '⏰', duration: 4000 })
-          navigate('/scenarios')
+        if (lab.status === 'TERMINATED' || lab.status === 'EXPIRED' || lab.status === 'FAILED' || lab.status === 'COMPLETED') {
+          cleanupLabResources()
+          const msg = lab.status === 'COMPLETED' ? 'Lab completed!'
+            : lab.status === 'EXPIRED' ? 'Lab time expired!'
+            : 'Lab session ended'
+          toast(msg, { icon: lab.status === 'COMPLETED' ? '✅' : '⏰', duration: 4000 })
+          navigate(`/scenarios/${lab.scenario?.slug || ''}`, {
+            state: lab.status === 'COMPLETED'
+              ? { labCompleted: true, scenarioTitle: lab.scenario?.title }
+              : undefined,
+          })
         }
       } catch {
         // Ignore polling errors — don't disrupt the user
@@ -207,9 +251,10 @@ export default function LabRunner() {
               jiraApi.getScenarioTicket(lab.scenario.id, { details: 1 })
                 .then(res => {
                   setJiraComments(res.data?.recent_comments || [])
+                  setJiraActivity(res.data?.activity || [])
                   if (res.data?.ticket) setJiraTicket(res.data.ticket)
                 })
-                .catch(() => { setJiraComments([]); setJiraTicket(null) })
+                .catch(() => { setJiraComments([]); setJiraActivity([]); setJiraTicket(null) })
             )
           }
 
@@ -624,6 +669,21 @@ export default function LabRunner() {
     }
   }, [sidebarOpen])
 
+  const handleJiraTransition = async (status) => {
+    if (!session?.jira_issue_key) return
+    setJiraTransitioning(true)
+    try {
+      const { jiraApi } = await import('../api/jira')
+      const res = await jiraApi.transitionIssue(session.jira_issue_key, status)
+      setJiraTicket(res.data)
+      toast.success(`Ticket moved to ${status}`)
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update ticket')
+    } finally {
+      setJiraTransitioning(false)
+    }
+  }
+
   const handleValidate = async () => {
     setValidating(true)
     try {
@@ -634,15 +694,31 @@ export default function LabRunner() {
       if (result.passed) {
         toast.success(`Challenge solved! Score: ${result.score}`, { duration: 5000 })
         stopTimer()
-        // Broadcast to other tabs that lab is completed
         if (labChannelRef.current) {
-          labChannelRef.current.postMessage({ type: 'lab_stopped', sessionId, reason: 'completed' })
+          labChannelRef.current.postMessage({
+            type: 'lab_stopped',
+            sessionId,
+            reason: 'completed',
+            closingDelayMs: LAB_CLOSE_SECONDS * 1000,
+          })
         }
-        // Close WebSocket since container is terminated on success
         if (wsRef.current) {
           wsRef.current.onclose = null
           wsRef.current.close()
           wsRef.current = null
+        }
+        const slug = session?.scenario?.slug || session?.scenario_detail?.slug || ''
+        scheduleLabClose(result, slug)
+        if (session?.scenario?.id) {
+          import('../api/jira').then(({ jiraApi }) =>
+            jiraApi.getScenarioTicket(session.scenario.id, { details: 1 })
+              .then(res => {
+                setJiraComments(res.data?.recent_comments || [])
+                setJiraActivity(res.data?.activity || [])
+                if (res.data?.ticket) setJiraTicket(res.data.ticket)
+              })
+              .catch(() => {})
+          )
         }
       } else {
         toast('Validation failed. Keep trying!', { icon: '🔍' })
@@ -796,7 +872,12 @@ export default function LabRunner() {
   const expired = validationResult?.expired
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col">
+    <div className="min-h-[100dvh] h-[100dvh] flex flex-col">
+      {closingIn != null && (
+        <div className="shrink-0 px-4 py-2 bg-accent-green/15 border-b border-accent-green/30 text-center text-sm text-accent-green font-medium animate-pulse">
+          Lab is closing in {closingIn}s…
+        </div>
+      )}
       {/* Top bar - hidden on mobile where floating bar is used */}
       <div className="hidden sm:flex items-center justify-between px-4 py-2 bg-surface-900 border-b border-surface-700/50 shrink-0">
         <div className="flex items-center gap-3">
@@ -870,9 +951,16 @@ export default function LabRunner() {
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <div className={`${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 overflow-hidden border-r border-surface-700/50 bg-surface-900 shrink-0`}>
+      <div className="flex-1 flex overflow-hidden relative">
+        {isMobile && sidebarOpen && (
+          <button type="button" className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar" />
+        )}
+        <div className={`${
+          isMobile
+            ? `fixed inset-y-0 left-0 z-40 w-80 max-w-[85vw] transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
+            : `${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300`
+        } overflow-hidden border-r border-surface-700/50 bg-surface-900 shrink-0`}
+        >
           <div className="w-80 h-full flex flex-col">
             {/* Tabs */}
             <div className="flex border-b border-surface-800">
@@ -906,6 +994,9 @@ export default function LabRunner() {
                         run_count: session.jira_run_count || 1,
                       }}
                       comments={jiraComments}
+                      activity={jiraActivity}
+                      onTransition={handleJiraTransition}
+                      transitioning={jiraTransitioning}
                     />
                   )}
                   <div>
@@ -1006,6 +1097,11 @@ export default function LabRunner() {
                         </div>
                         <h3 className="text-lg font-bold text-accent-green mb-1">Challenge Solved!</h3>
                         <p className="text-sm text-surface-400">{validationResult.message}</p>
+                        {closingIn != null && (
+                          <p className="text-sm text-accent-amber mt-2 font-medium">
+                            Lab is closing in {closingIn} seconds…
+                          </p>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
@@ -1088,7 +1184,8 @@ export default function LabRunner() {
       </div>
 
       {/* Mobile: floating action bar */}
-      <div className="sm:hidden fixed bottom-0 inset-x-0 bg-surface-900 border-t border-surface-700/50 p-2 flex items-center justify-around z-30">
+      <div className="sm:hidden fixed bottom-0 inset-x-0 bg-surface-900 border-t border-surface-700/50 px-2 py-2 flex items-center justify-around z-30 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <span className="absolute left-3 top-1 text-[10px] font-mono text-surface-500">{formatTime(timeRemaining)}</span>
         <button onClick={() => { setSidebarTab('instructions'); setSidebarOpen(p => !p) }}
           className="p-2 text-surface-400 hover:text-white" aria-label="Instructions">
           <FileText size={20} />

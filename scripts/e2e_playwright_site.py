@@ -120,8 +120,9 @@ def run_playwright():
     admin_routes = [
         "/admin", "/admin/scenarios", "/admin/technologies", "/admin/users",
         "/admin/labs", "/admin/subscriptions", "/admin/threads", "/admin/jira",
-        "/admin/settings",
+        "/admin/monitoring", "/admin/settings",
     ]
+    mobile_routes = ["/", "/login", "/technologies", "/scenarios", "/dashboard", "/admin/labs", "/admin/monitoring"]
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -137,6 +138,32 @@ def run_playwright():
                 record(f"Page {route}", resp is not None and resp.status < 400, str(resp.status if resp else ""))
             except Exception as e:
                 record(f"Page {route}", False, str(e)[:60])
+
+        # Mobile viewport (375×812 iPhone-like)
+        print("\n=== Mobile viewport routes ===")
+        mobile_ctx = browser.new_context(
+            ignore_https_errors=True,
+            viewport={"width": 375, "height": 812},
+            is_mobile=True,
+            has_touch=True,
+            user_agent=(
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+            ),
+        )
+        mobile_page = mobile_ctx.new_page()
+        mobile_page.set_default_timeout(20000)
+        for route in mobile_routes:
+            try:
+                resp = mobile_page.goto(f"{SITE_URL}{route}", wait_until="domcontentloaded")
+                ok = resp is not None and resp.status < 400
+                record(f"Mobile {route}", ok, str(resp.status if resp else ""))
+                if route == "/":
+                    viewport = mobile_page.locator('meta[name="viewport"]').count()
+                    record("Mobile viewport meta tag", viewport > 0)
+            except Exception as e:
+                record(f"Mobile {route}", False, str(e)[:60])
+        mobile_ctx.close()
 
         # Login via UI
         print("\n=== Frontend auth + user tabs ===")

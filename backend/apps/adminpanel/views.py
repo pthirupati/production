@@ -50,9 +50,19 @@ class AdminOverviewView(APIView):
         inactive_threshold = now - timedelta(days=90)
 
         # Revenue from technology subscriptions
-        total_revenue = TechnologySubscription.objects.filter(
+        from apps.adminpanel.platform_config import get_settings_row
+        from common.currency import get_usd_to_inr_rate, get_price_in_currency
+
+        display_currency = request.query_params.get("currency", "").upper()
+        if not display_currency:
+            display_currency = (get_settings_row().admin_display_currency or "INR").upper()
+
+        total_revenue_inr = TechnologySubscription.objects.filter(
             is_active=True
         ).aggregate(total=Sum("amount"))["total"] or 0
+
+        revenue_display = get_price_in_currency(total_revenue_inr, display_currency)
+        exchange_rate = float(get_usd_to_inr_rate()) if display_currency == "USD" else None
 
         # Paid subscribers count
         paid_subscribers = TechnologySubscription.objects.filter(
@@ -74,7 +84,11 @@ class AdminOverviewView(APIView):
                 "paid_subscribers": paid_subscribers,
             },
             "revenue": {
-                "total": float(total_revenue),
+                "total": float(revenue_display["amount"]),
+                "currency": revenue_display["currency"],
+                "symbol": revenue_display.get("symbol", "₹" if display_currency == "INR" else "$"),
+                "total_inr": float(total_revenue_inr),
+                "exchange_rate": exchange_rate,
                 "subscriptions_count": TechnologySubscription.objects.filter(is_active=True).count(),
             },
             "scenarios": {
@@ -101,7 +115,9 @@ class AdminOverviewView(APIView):
                 "replies": Reply.objects.filter(is_deleted=False).count(),
             },
             "completion_rate": self._get_completion_rate(),
-            "maintenance_mode": settings.MAINTENANCE_MODE,
+            "maintenance_mode": __import__(
+                "apps.adminpanel.platform_config", fromlist=["is_maintenance_active"]
+            ).is_maintenance_active(),
             "cached_at": now.isoformat(),
         }
         cache.set(self.CACHE_KEY, payload, self.CACHE_TTL)
@@ -681,13 +697,19 @@ class AdminActiveLabsView(APIView):
     permission_classes = [IsPlatformAdmin]
 
     def get(self, request):
-        labs = (
-            LabSession.objects.filter(status="RUNNING")
-            .select_related("user", "scenario")
-            .order_by("-started_at")
-        )
+        include_expired = request.query_params.get("include_expired") == "1"
+        status_filter = request.query_params.get("status", "running")
+        qs = LabSession.objects.select_related("user", "scenario").order_by("-started_at")
+        if status_filter == "all":
+            qs = qs.filter(status__in=["RUNNING", "PROVISIONING"])
+        else:
+            qs = qs.filter(status="RUNNING")
+
         data = []
-        for lab in labs:
+        for lab in qs:
+            expired = lab.is_expired if lab.status == "RUNNING" else False
+            if not include_expired and expired:
+                continue
             resource_id = lab.container_id or lab.instance_id or ""
             data.append({
                 "id": str(lab.id),
@@ -697,10 +719,13 @@ class AdminActiveLabsView(APIView):
                 "infrastructure_type": lab.provider,
                 "resource_id": resource_id[:12] if resource_id else None,
                 "container_id": lab.container_id[:12] if lab.container_id else None,
+                "full_container_id": lab.container_id,
                 "instance_id": lab.instance_id[:12] if lab.instance_id else None,
                 "ssh_host": lab.ssh_host or None,
                 "time_remaining": lab.time_remaining,
                 "started_at": lab.started_at.isoformat(),
+                "status": lab.status,
+                "is_expired": expired,
             })
         return Response(data)
 
@@ -748,6 +773,57 @@ class AdminTerminateAllIdleLabsView(APIView):
                 terminated += 1
 
         return Response({"terminated": terminated})
+
+
+def _admin_terminate_session(session) -> bool:
+    resource_id = session.container_id or session.instance_id
+    if resource_id:
+        try:
+            provisioner = get_provisioner(session.provider or "docker")
+            provisioner.terminate(resource_id, session_id=str(session.id))
+        except Exception as exc:
+            logger.error("Admin terminate error for %s: %s", session.id, exc)
+    if session.is_expired and session.status == "RUNNING":
+        session.status = "EXPIRED"
+        session.ended_at = timezone.now()
+        session.save(update_fields=["status", "ended_at"])
+        return True
+    session.mark_terminated()
+    return True
+
+
+class AdminBulkLabsView(APIView):
+    """Bulk terminate selected labs or all expired running labs."""
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        action = request.data.get("action", "terminate")
+        session_ids = request.data.get("session_ids", [])
+        terminate_expired_only = request.data.get("terminate_expired_only", False)
+
+        if action == "terminate_expired":
+            labs = LabSession.objects.filter(status="RUNNING")
+            terminated = 0
+            for lab in labs:
+                if lab.is_expired:
+                    _admin_terminate_session(lab)
+                    terminated += 1
+            cache.delete(AdminOverviewView.CACHE_KEY)
+            return Response({"terminated": terminated, "message": f"{terminated} expired lab(s) terminated"})
+
+        if not session_ids or not isinstance(session_ids, list):
+            return Response({"error": "session_ids must be a non-empty list"}, status=400)
+
+        labs = LabSession.objects.filter(id__in=session_ids, status__in=["RUNNING", "PROVISIONING"])
+        terminated = 0
+        for lab in labs:
+            if terminate_expired_only and not lab.is_expired:
+                continue
+            _admin_terminate_session(lab)
+            terminated += 1
+
+        cache.delete(AdminOverviewView.CACHE_KEY)
+        return Response({"terminated": terminated, "message": f"{terminated} lab(s) terminated"})
 
 
 # ─── Analytics ───────────────────────────────────────────────────────
@@ -1338,23 +1414,63 @@ class AdminMaintenanceModeView(APIView):
     permission_classes = [IsPlatformAdmin]
 
     def get(self, request):
+        from apps.adminpanel.platform_config import admin_config_payload, get_settings_row
+
+        row = get_settings_row()
+        payload = admin_config_payload()
         return Response({
-            "maintenance_mode": settings.MAINTENANCE_MODE,
-            "maintenance_message": settings.MAINTENANCE_MESSAGE,
+            "maintenance_mode": payload["maintenance_mode"],
+            "maintenance_message": payload["maintenance_message"],
+            "maintenance_enabled": row.maintenance_enabled,
+            "maintenance_banner_image": row.maintenance_banner_image,
+            "maintenance_banner_style": row.maintenance_banner_style,
+            "maintenance_scheduled_start": payload["maintenance_scheduled_start"],
+            "maintenance_scheduled_end": payload["maintenance_scheduled_end"],
+            "maintenance_notify_users": row.maintenance_notify_users,
         })
 
     def post(self, request):
-        # Update in-memory settings (persists until restart)
-        # For permanent change, admin should update .env
-        enabled = request.data.get("enabled", False)
-        message = request.data.get("message", settings.MAINTENANCE_MESSAGE)
-        settings.MAINTENANCE_MODE = enabled
-        settings.MAINTENANCE_MESSAGE = message
-        logger.info(f"Maintenance mode {'enabled' if enabled else 'disabled'} by {request.user.username}")
-        return Response({
-            "maintenance_mode": settings.MAINTENANCE_MODE,
-            "maintenance_message": settings.MAINTENANCE_MESSAGE,
-        })
+        from apps.adminpanel.platform_config import (
+            get_settings_row,
+            notify_maintenance_users,
+            persist_config_snapshot,
+        )
+
+        row = get_settings_row()
+        was_active = row.maintenance_enabled
+        if "enabled" in request.data:
+            row.maintenance_enabled = bool(request.data.get("enabled"))
+        if "message" in request.data:
+            row.maintenance_message = request.data.get("message", "")
+        if "banner_image" in request.data:
+            row.maintenance_banner_image = request.data.get("banner_image", "")
+        if "banner_style" in request.data:
+            row.maintenance_banner_style = request.data.get("banner_style") or {}
+        if "scheduled_start" in request.data:
+            from django.utils.dateparse import parse_datetime
+            val = request.data.get("scheduled_start")
+            row.maintenance_scheduled_start = parse_datetime(val) if val else None
+        if "scheduled_end" in request.data:
+            from django.utils.dateparse import parse_datetime
+            val = request.data.get("scheduled_end")
+            row.maintenance_scheduled_end = parse_datetime(val) if val else None
+        if "notify_users" in request.data:
+            row.maintenance_notify_users = bool(request.data.get("notify_users"))
+        row.save()
+        persist_config_snapshot(row)
+        settings.MAINTENANCE_MODE = row.maintenance_enabled
+        settings.MAINTENANCE_MESSAGE = row.maintenance_message
+        cache.delete(AdminOverviewView.CACHE_KEY)
+
+        notified = 0
+        if row.maintenance_enabled and not was_active and row.maintenance_notify_users:
+            notified = notify_maintenance_users(row.maintenance_message)
+
+        from apps.adminpanel.platform_config import admin_config_payload
+
+        payload = admin_config_payload()
+        payload["users_notified"] = notified
+        return Response(payload)
 
 
 class AdminInactiveUsersView(APIView):
@@ -1695,16 +1811,149 @@ class AdminJiraCreateView(APIView):
 
 
 class AdminConfigView(APIView):
-    """Get platform configuration for admin."""
+    """Get/update platform configuration for admin."""
     permission_classes = [IsPlatformAdmin]
 
     def get(self, request):
+        from apps.adminpanel.platform_config import admin_config_payload
+
+        return Response(admin_config_payload())
+
+    def post(self, request):
+        from apps.adminpanel.platform_config import get_settings_row, persist_config_snapshot, admin_config_payload
+
+        row = get_settings_row()
+        for field, key in (
+            ("primary_email", "primary_email"),
+            ("payment_email", "payment_email"),
+            ("support_email", "support_email"),
+            ("admin_display_currency", "admin_display_currency"),
+        ):
+            if key in request.data:
+                setattr(row, field, request.data.get(key) or "")
+        if "promo_banners" in request.data:
+            row.promo_banners = request.data.get("promo_banners") or []
+        row.save()
+        persist_config_snapshot(row)
+        if row.primary_email:
+            settings.PRIMARY_EMAIL = row.primary_email
+        if row.payment_email:
+            settings.PAYMENT_EMAIL = row.payment_email
+        if row.support_email:
+            settings.SUPPORT_EMAIL = row.support_email
+        cache.delete(AdminOverviewView.CACHE_KEY)
+        return Response(admin_config_payload())
+
+
+# ─── Container Monitoring ─────────────────────────────────────────────
+
+class AdminMonitoringContainersView(APIView):
+    """List FixitLab Docker containers with health summary."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        try:
+            client = DockerProvisioner().client
+        except Exception as exc:
+            return Response({"error": str(exc), "containers": []}, status=503)
+
+        containers = []
+        for c in client.containers.list(all=True, filters={"label": "fixitlab.type=lab"}):
+            labels = c.labels or {}
+            state = c.attrs.get("State", {})
+            containers.append({
+                "id": c.short_id,
+                "full_id": c.id,
+                "name": c.name,
+                "status": c.status,
+                "health": state.get("Health", {}).get("Status") or ("running" if c.status == "running" else c.status),
+                "session_id": labels.get("fixitlab.session_id", ""),
+                "scenario": labels.get("fixitlab.scenario", ""),
+                "user": labels.get("fixitlab.user", ""),
+                "created": c.attrs.get("Created", ""),
+            })
+        running = sum(1 for x in containers if x["status"] == "running")
+        return Response({"containers": containers, "total": len(containers), "running": running})
+
+
+class AdminMonitoringContainerDetailView(APIView):
+    """Container metrics and metadata."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request, container_id):
+        try:
+            client = DockerProvisioner().client
+            container = client.containers.get(container_id)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=404)
+
+        stats = None
+        try:
+            raw = container.stats(stream=False)
+            cpu = raw.get("cpu_stats", {})
+            mem = raw.get("memory_stats", {})
+            usage = mem.get("usage", 0)
+            limit = mem.get("limit", 1) or 1
+            stats = {
+                "cpu_usage_percent": round(
+                    (cpu.get("cpu_usage", {}).get("total_usage", 0) or 0) / 1e9, 2
+                ),
+                "memory_usage_mb": round(usage / (1024 * 1024), 1),
+                "memory_limit_mb": round(limit / (1024 * 1024), 1),
+                "memory_percent": round(100 * usage / limit, 1),
+            }
+        except Exception as exc:
+            stats = {"error": str(exc)}
+
         return Response({
-            "primary_email": settings.PRIMARY_EMAIL,
-            "payment_email": settings.PAYMENT_EMAIL,
-            "support_email": settings.SUPPORT_EMAIL,
-            "maintenance_mode": settings.MAINTENANCE_MODE,
-            "maintenance_message": settings.MAINTENANCE_MESSAGE,
-            "lab_provider": settings.LAB_PROVIDER,
-            "max_lab_duration": settings.LAB_MAX_DURATION_MINUTES,
+            "id": container.short_id,
+            "full_id": container.id,
+            "name": container.name,
+            "status": container.status,
+            "labels": container.labels,
+            "attrs": {
+                "image": container.image.tags,
+                "created": container.attrs.get("Created"),
+                "started": container.attrs.get("State", {}).get("StartedAt"),
+            },
+            "stats": stats,
         })
+
+
+class AdminMonitoringContainerLogsView(APIView):
+    """Tail container logs with optional filters."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request, container_id):
+        tail = min(int(request.query_params.get("tail", 200)), 2000)
+        since = request.query_params.get("since", "")
+        log_type = request.query_params.get("type", "all")
+        search = request.query_params.get("q", "").strip().lower()
+        live = request.query_params.get("live") == "1"
+
+        try:
+            client = DockerProvisioner().client
+            container = client.containers.get(container_id)
+            kwargs = {"timestamps": True, "tail": tail}
+            if since:
+                kwargs["since"] = since
+            if log_type == "stderr":
+                kwargs["stderr"] = True
+                kwargs["stdout"] = False
+            elif log_type == "stdout":
+                kwargs["stdout"] = True
+                kwargs["stderr"] = False
+            raw = container.logs(**kwargs)
+            text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+            lines = text.splitlines()
+            if search:
+                lines = [ln for ln in lines if search in ln.lower()]
+            return Response({
+                "container_id": container.short_id,
+                "lines": lines,
+                "live": live,
+                "tail": tail,
+                "type": log_type,
+            })
+        except Exception as exc:
+            return Response({"error": str(exc), "lines": []}, status=404)

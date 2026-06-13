@@ -42,7 +42,9 @@ UI_COVERAGE = {
     "admin_jira": ["Tickets", "Sync param"],
     "admin_technologies": ["Technologies", "Tags"],
     "admin_users": ["List", "Inactive", "Detail", "Export CSV"],
-    "admin_labs": ["Active", "Terminate idle"],
+    "admin_labs": ["Active", "Terminate idle", "Bulk terminate expired/selected"],
+    "admin_monitoring": ["Containers", "Metrics", "Filtered logs", "Live logs"],
+    "mobile": ["Viewport meta", "Public config banners", "SPA routes on mobile UA"],
     "admin_subscriptions": ["Logs", "Subscription-logs"],
     "admin_threads": ["List", "Detail"],
     "admin_settings": ["Config", "Maintenance GET/POST", "Tag CRUD", "Admin thread mod", "Jira create"],
@@ -436,6 +438,46 @@ def run_frontend_static_pages(s):
             s.record(f"Page {path}", False, detail=str(e.reason)[:40])
 
 
+def run_mobile_responsive_checks(s):
+    """Verify SPA ships mobile viewport + platform banners work for small screens."""
+    site = os.environ.get("SITE_URL", "").rstrip("/")
+    if not site or site.startswith("http://127.0.0.1") or site.startswith("http://backend"):
+        s.record("Mobile responsive checks", True, detail="skipped (no SITE_URL)")
+        return
+    from urllib.request import urlopen, Request
+    from urllib.error import HTTPError, URLError
+
+    print("\n=== [Mobile] Responsive SPA checks ===")
+    mobile_ua = (
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+    )
+    try:
+        req = Request(f"{site}/", headers={"Accept": "text/html", "User-Agent": mobile_ua})
+        with urlopen(req, timeout=20) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+            has_viewport = 'name="viewport"' in html.lower() or "width=device-width" in html.lower()
+            s.record("Mobile homepage viewport meta", resp.status == 200 and has_viewport, resp.status)
+    except HTTPError as e:
+        s.record("Mobile homepage viewport meta", False, e.code)
+    except URLError as e:
+        s.record("Mobile homepage viewport meta", False, detail=str(e.reason)[:40])
+
+    for path in ("/", "/login", "/dashboard"):
+        try:
+            req = Request(f"{site}{path}", headers={"Accept": "text/html", "User-Agent": mobile_ua})
+            with urlopen(req, timeout=20) as resp:
+                s.record(f"Mobile route {path}", resp.status == 200, resp.status)
+        except HTTPError as e:
+            s.record(f"Mobile route {path}", e.code in (200, 304), e.code)
+        except URLError as e:
+            s.record(f"Mobile route {path}", False, detail=str(e.reason)[:40])
+
+    st, cfg = api("GET", "/api/config/", token=None)
+    has_banners = isinstance(cfg, dict) and "promo_banners" in cfg and "maintenance" in cfg
+    s.record("Mobile public config banners", st == 200 and has_banners, st)
+
+
 def run_admin_write_ops(s, admin_token: str, test_user_id: int | None, scenario_id: int | None):
     print("\n=== [Admin] Write operations (create/update/delete) ===")
     tag_name = f"E2E-Cleanup-{uuid.uuid4().hex[:8]}"
@@ -573,6 +615,18 @@ def run_admin_all_tabs(s, admin_token: str):
     st, _ = api("POST", "/api/admin/labs/terminate-idle/", token=admin_token, data={})
     s.record("Admin terminate idle labs", st in (200, 204), st)
 
+    st, _ = api("POST", "/api/admin/labs/bulk/", token=admin_token, data={"action": "terminate_expired"})
+    s.record("Admin bulk terminate expired labs", st in (200, 204), st)
+
+    st, mon = api("GET", "/api/admin/monitoring/containers/", token=admin_token)
+    s.record("Admin monitoring containers", st == 200, st)
+
+    st, cfg = api("GET", "/api/config/", token=None)
+    s.record("Public config promo/maintenance fields", st == 200 and "promo_banners" in (cfg or {}), st)
+
+    st, overview = api("GET", "/api/admin/overview/?currency=INR", token=admin_token)
+    s.record("Admin overview INR revenue", st == 200 and (overview or {}).get("revenue", {}).get("currency") == "INR", st)
+
 
 def run_technology_all_scenarios(s, token: str):
     """Every technology: at least one scenario Jira + optional lab start."""
@@ -629,6 +683,7 @@ def run_full_ui_coverage(s, token: str, email: str, password: str, refresh: str 
     run_technology_all_scenarios(s, token)
     run_question_bank_api(s, token)
     run_frontend_static_pages(s)
+    run_mobile_responsive_checks(s)
     run_forgot_password(s, email)
 
     test_user_id = None

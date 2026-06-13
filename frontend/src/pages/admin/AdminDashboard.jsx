@@ -59,6 +59,7 @@ function formatUptime(startedAt) {
 
 export default function AdminDashboard() {
   const [overview, setOverview] = useState(null)
+  const [currency, setCurrency] = useState('INR')
   const [health, setHealth] = useState(null)
   const [activity, setActivity] = useState([])
   const [loading, setLoading] = useState(true)
@@ -66,16 +67,18 @@ export default function AdminDashboard() {
 
   const fetchOverview = useCallback(async () => {
     try {
-      const [o, a] = await Promise.all([
-        adminApi.getOverview(),
+      const [o, a, cfg] = await Promise.all([
+        adminApi.getOverviewWithCurrency(currency),
         adminApi.getActivityFeed().catch(() => []),
+        adminApi.getConfig().catch(() => ({})),
       ])
+      if (cfg?.admin_display_currency) setCurrency(cfg.admin_display_currency)
       setOverview(o)
       setActivity(a)
     } catch (e) {
       console.error('Dashboard overview error:', e)
     }
-  }, [])
+  }, [currency])
 
   const fetchHealth = useCallback(async () => {
     try {
@@ -118,7 +121,7 @@ export default function AdminDashboard() {
   const stats = [
     { label: 'Total Users', value: overview?.users?.total || 0, sub: `${overview?.users?.new_7d || 0} new this week`, icon: Users, color: 'text-accent-cyan' },
     { label: 'Paid Subscribers', value: overview?.users?.paid_subscribers || 0, sub: `${overview?.users?.inactive_90d || 0} inactive (90d)`, icon: UserCheck, color: 'text-accent-green' },
-    { label: 'Revenue', value: `₹${overview?.revenue?.total || 0}`, sub: `${overview?.revenue?.subscriptions_count || 0} active subs`, icon: DollarSign, color: 'text-accent-amber' },
+    { label: 'Revenue', value: `${overview?.revenue?.symbol || '₹'}${overview?.revenue?.total ?? 0}`, sub: `${overview?.revenue?.subscriptions_count || 0} active subs (${overview?.revenue?.currency || currency})`, icon: DollarSign, color: 'text-accent-amber' },
     { label: 'Active Labs', value: overview?.labs?.running || 0, sub: `${overview?.labs?.completed_24h || 0} completed today`, icon: MonitorPlay, color: 'text-accent-purple' },
     { label: 'Scenarios', value: overview?.scenarios?.active || 0, sub: `${overview?.scenarios?.draft || 0} draft`, icon: Target, color: 'text-accent-cyan' },
     { label: 'Completion Rate', value: `${overview?.completion_rate || 0}%`, sub: `Avg score: ${Math.round(overview?.labs?.avg_score || 0)}`, icon: TrendingUp, color: 'text-accent-green' },
