@@ -345,7 +345,7 @@ export default function Pricing() {
               Pay Only For What You Learn
             </h1>
             <p className="text-surface-400 text-lg max-w-2xl mx-auto animate-fade-in">
-              Subscribe to individual technologies. Get lifetime access to all scenarios, hints, and certificates for each technology you choose.
+              Subscribe to individual technologies. Get 1-year access to all scenarios, hints, and certificates for each technology you choose.
             </p>
 
             {/* Exchange rate indicator */}
@@ -388,7 +388,7 @@ export default function Pricing() {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">Per-Technology Subscription</h3>
-                <p className="text-sm text-accent-cyan">Lifetime access per technology</p>
+                <p className="text-sm text-accent-cyan">1-year access per technology</p>
               </div>
             </div>
             <ul className="space-y-3">
@@ -460,7 +460,7 @@ export default function Pricing() {
                   ) : (
                     <>
                       <span className="text-3xl font-extrabold text-white">{priceDisplay.display}</span>
-                      <span className="text-surface-400 ml-1 text-sm">/lifetime</span>
+                      <span className="text-surface-400 ml-1 text-sm">/year</span>
                     </>
                   )}
                 </div>
@@ -574,7 +574,7 @@ export default function Pricing() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-white text-sm">{tech.name}</p>
-                      <p className="text-xs text-surface-400">{tech.scenario_count || 0} scenarios &middot; Lifetime</p>
+                      <p className="text-xs text-surface-400">{tech.scenario_count || 0} scenarios &middot; 1 year</p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-bold text-white text-sm">{priceDisplay.display}</p>

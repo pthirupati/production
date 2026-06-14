@@ -1204,7 +1204,7 @@ export default function LabRunner() {
         </div>
 
         {/* Terminal toolbar + SSH */}
-        <div className="shrink-0 flex flex-wrap items-center gap-2 px-2 py-1.5 bg-surface-900/80 border-b border-surface-800 text-xs">
+        <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-1 sm:py-1.5 bg-surface-900/80 border-b border-surface-800 text-[10px] sm:text-xs overflow-x-auto">
           {labHosts.length > 1 && labHosts.map(h => (
             <button
               key={h.name}
@@ -1233,8 +1233,8 @@ export default function LabRunner() {
           ))}
         </div>
         {/* Terminal */}
-        <div className="flex-1 bg-surface-950 relative min-h-0 overflow-hidden">
-          <div ref={terminalRef} className="absolute inset-0 p-0.5 sm:p-1" />
+        <div className="flex-1 bg-surface-950 relative min-h-0 overflow-hidden pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
+          <div ref={terminalRef} className="absolute inset-0 p-0.5 sm:p-1 touch-manipulation" />
         </div>
       </div>
 
@@ -1249,6 +1249,16 @@ export default function LabRunner() {
           className="p-2 text-surface-400 hover:text-accent-amber" aria-label="Hints">
           <Lightbulb size={20} />
         </button>
+        {sshTargets.length > 0 && (
+          <button
+            onClick={() => insertSshCommand(sshTargets[0])}
+            className="p-2 text-surface-400 hover:text-accent-cyan"
+            aria-label="SSH to remote host"
+            title={`ssh ${sshTargets[0].ssh_user || 'root'}@${sshTargets[0].ip}`}
+          >
+            <Terminal size={20} />
+          </button>
+        )}
         <button onClick={handleValidate} disabled={validating || solved}
           className="p-3 bg-accent-cyan rounded-full text-surface-950" aria-label="Check solution">
           <CheckCircle2 size={22} />

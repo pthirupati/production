@@ -336,7 +336,7 @@ def cleanup_old_notifications():
     from apps.notifications.models import Notification
     cutoff = timezone.now() - timedelta(days=60)
     deleted, _ = Notification.objects.filter(
-        is_read=True, created_at__lt=cutoff
+        read=True, created_at__lt=cutoff
     ).delete()
     logger.info(f"Cleaned up {deleted} old read notifications")
     return {"deleted_notifications": deleted}

@@ -7,6 +7,7 @@ from django.utils import timezone
 
 SUBSCRIPTION_TERM_DAYS = 365
 RENEWAL_WARNING_DAYS = 7
+GRACE_PERIOD_DAYS = 3  # Read-only window after expiry before full lockout
 
 # Always-valid certificate for admin/E2E verification tests
 TEST_CERTIFICATE_ID = "FIXIT-TEST-ADMIN-CERT-2026"
@@ -23,6 +24,31 @@ def is_tech_subscription_active(sub) -> bool:
     if sub.expires_at and sub.expires_at <= timezone.now():
         return False
     return True
+
+
+def is_tech_subscription_in_grace(sub) -> bool:
+    """True during post-expiry grace window (labs blocked, renew encouraged)."""
+    if not sub or not sub.expires_at:
+        return False
+    now = timezone.now()
+    if now <= sub.expires_at:
+        return False
+    grace_end = sub.expires_at + timedelta(days=GRACE_PERIOD_DAYS)
+    return now <= grace_end
+
+
+def user_has_technology_access(user, technology_id) -> bool:
+    """Active subscription, grace period, or complimentary/staff access."""
+    if user_has_complimentary_access(user):
+        return True
+    sub = (
+        user.tech_subscriptions.filter(technology_id=technology_id)
+        .order_by("-created_at")
+        .first()
+    )
+    if not sub:
+        return False
+    return is_tech_subscription_active(sub) or is_tech_subscription_in_grace(sub)
 
 
 def active_tech_subscriptions_qs(user):
@@ -69,18 +95,38 @@ def activate_technology_subscription(sub, *, renew=False):
     sub.save(update_fields=["is_active", "payment_verified", "expires_at", "renewal_reminder_at"])
 
 
-def grant_complimentary_access(user, enabled: bool = True):
+def grant_complimentary_access(user, enabled: bool = True, *, granted_by=None):
     from apps.accounts.models import Profile
 
     profile, _ = Profile.objects.get_or_create(user=user)
     profile.complimentary_access = enabled
     profile.save(update_fields=["complimentary_access"])
+
+    if granted_by:
+        try:
+            from apps.audit.models import AuditLog
+            AuditLog.objects.create(
+                user=granted_by,
+                action="admin_action",
+                resource=f"/admin/users/{user.id}/complimentary_access",
+                metadata={
+                    "event": "complimentary_access",
+                    "enabled": enabled,
+                    "target_user_id": user.id,
+                    "target_email": user.email,
+                    "target_username": user.username,
+                },
+            )
+        except Exception:
+            pass
+
     return profile
 
 
 def subscription_status_payload(sub) -> dict:
     now = timezone.now()
     active = is_tech_subscription_active(sub)
+    in_grace = is_tech_subscription_in_grace(sub)
     days_left = None
     needs_renewal = False
     if sub.expires_at:
@@ -89,9 +135,11 @@ def subscription_status_payload(sub) -> dict:
         needs_renewal = active and delta <= RENEWAL_WARNING_DAYS
     return {
         "is_active": active,
+        "in_grace_period": in_grace,
+        "has_access": active or in_grace,
         "created_at": sub.created_at.isoformat() if sub.created_at else None,
         "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
         "days_until_expiry": days_left,
-        "needs_renewal": needs_renewal,
-        "is_expired": bool(sub.expires_at and sub.expires_at <= now),
+        "needs_renewal": needs_renewal or in_grace,
+        "is_expired": bool(sub.expires_at and sub.expires_at <= now and not in_grace),
     }

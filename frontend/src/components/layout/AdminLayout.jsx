@@ -4,7 +4,7 @@ import { useThemeStore } from '../../store/themeStore'
 import { useState } from 'react'
 import {
   LayoutDashboard, Target, Cpu, Users, MonitorPlay, ArrowLeft, Shield, Sun, Moon,
-  CreditCard, MessageSquare, Wrench, Menu, X, Ticket, Activity
+  CreditCard, MessageSquare, Wrench, Menu, X, Ticket, Activity, ScrollText
 } from 'lucide-react'
 
 const adminNav = [
@@ -17,6 +17,7 @@ const adminNav = [
   { path: '/admin/monitoring', icon: Activity, label: 'Monitoring' },
   { path: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
   { path: '/admin/threads', icon: MessageSquare, label: 'Threads' },
+  { path: '/admin/audit-logs', icon: ScrollText, label: 'Audit Logs' },
   { path: '/admin/settings', icon: Wrench, label: 'Settings' },
 ]
 

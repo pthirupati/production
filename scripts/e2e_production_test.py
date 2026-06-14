@@ -94,6 +94,52 @@ def api(method: str, path: str, token: str | None = None, data: dict | None = No
         return 0, {"error": str(e.reason)}
 
 
+def api_upload(path: str, token: str, file_bytes: bytes, filename: str, content_type: str, fields: dict | None = None):
+    """Multipart file upload for E2E attachment tests."""
+    import uuid as _uuid
+    boundary = f"----FixitLabBoundary{_uuid.uuid4().hex}"
+    parts = []
+    for key, val in (fields or {}).items():
+        parts.append(
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{key}"\r\n\r\n'
+            f"{val}\r\n"
+        )
+    parts.append(
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        f"Content-Type: {content_type}\r\n\r\n"
+    )
+    body = "".join(parts).encode() + file_bytes + f"\r\n--{boundary}--\r\n".encode()
+    url = f"{BASE_URL}{path}"
+    hdrs = {
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    if INTERNAL_HTTP:
+        hdrs["X-Forwarded-Proto"] = "https"
+        hdrs["Host"] = "fixitlab.in"
+    req = Request(url, data=body, headers=hdrs, method="POST")
+    try:
+        with urlopen(req, timeout=60) as resp:
+            raw = resp.read().decode()
+            try:
+                parsed = json.loads(raw) if raw else {}
+            except json.JSONDecodeError:
+                parsed = {"_raw": raw[:200]}
+            return resp.status, parsed
+    except HTTPError as e:
+        raw = e.read().decode() if e.fp else ""
+        try:
+            parsed = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            parsed = {"_raw": raw[:200]}
+        return e.code, parsed
+    except URLError as e:
+        return 0, {"error": str(e.reason)}
+
+
 def login(email: str, password: str) -> tuple[str | None, dict]:
     status, data = api("POST", "/api/auth/login/", data={"email": email, "password": password})
     if status == 200 and data.get("access"):

@@ -284,12 +284,12 @@ export default function Dashboard() {
                       {sub.days_until_expiry != null && ` (${sub.days_until_expiry}d left)`}
                     </p>
                   )}
-                  {(sub.needs_renewal || sub.is_expired) && (
+                  {(sub.needs_renewal || sub.is_expired || sub.in_grace_period) && (
                     <Link
                       to={`/payment?technology=${sub.technology?.slug}&renew=1`}
                       className="mt-2 inline-flex items-center gap-1 text-[10px] text-accent-amber hover:text-accent-amber/80 font-semibold"
                     >
-                      <CreditCard size={10} /> Renew Subscription
+                      <CreditCard size={10} /> {sub.in_grace_period ? 'Renew to restore labs' : 'Renew Subscription'}
                     </Link>
                   )}
                 </div>

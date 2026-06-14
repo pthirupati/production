@@ -366,12 +366,12 @@ export default function Profile() {
                     </div>
                   )}
                 </div>
-                {(sub.needs_renewal || sub.is_expired) && (
+                {(sub.needs_renewal || sub.is_expired || sub.in_grace_period) && (
                   <Link
                     to={`/payment?technology=${sub.technology?.slug}&renew=1`}
                     className="mt-3 inline-flex items-center gap-1.5 text-sm text-accent-amber hover:text-accent-amber/80 font-medium"
                   >
-                    <CreditCard size={14} /> Renew for ₹{sub.amount}
+                    <CreditCard size={14} /> {sub.in_grace_period ? 'Renew to restore lab access' : `Renew for ₹${sub.amount}`}
                   </Link>
                 )}
               </div>

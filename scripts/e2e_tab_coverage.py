@@ -804,6 +804,9 @@ def run_admin_all_tabs(s, admin_token: str):
     st, upload = api_upload("/api/admin/upload/", admin_token, png_bytes, "e2e-banner.png", "image/png", fields={"folder": "promo"})
     s.record("Admin banner image upload", st in (200, 201) and bool((upload or {}).get("url")), st)
 
+    st, audit = api("GET", "/api/admin/audit-logs/?days=7", token=admin_token)
+    s.record("Admin audit logs API", st == 200 and isinstance((audit or {}).get("logs"), list), st)
+
 
 def run_technology_all_scenarios(s, token: str):
     """Every technology: at least one scenario Jira + optional lab start."""

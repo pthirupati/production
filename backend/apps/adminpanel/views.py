@@ -617,7 +617,9 @@ class AdminUserDetailView(APIView):
 
         if "complimentary_access" in request.data:
             from apps.billing.subscription_utils import grant_complimentary_access
-            grant_complimentary_access(user, bool(request.data["complimentary_access"]))
+            grant_complimentary_access(
+                user, bool(request.data["complimentary_access"]), granted_by=request.user
+            )
 
         return Response({
             "id": user.id,
@@ -696,7 +698,7 @@ class AdminBulkUsersView(APIView):
             from apps.billing.subscription_utils import grant_complimentary_access
             count = 0
             for u in users:
-                grant_complimentary_access(u, True)
+                grant_complimentary_access(u, True, granted_by=request.user)
                 count += 1
             return Response({"message": f"{count} user(s) granted free access", "count": count})
 
@@ -704,7 +706,7 @@ class AdminBulkUsersView(APIView):
             from apps.billing.subscription_utils import grant_complimentary_access
             count = 0
             for u in users:
-                grant_complimentary_access(u, False)
+                grant_complimentary_access(u, False, granted_by=request.user)
                 count += 1
             return Response({"message": f"{count} user(s) had free access revoked", "count": count})
 

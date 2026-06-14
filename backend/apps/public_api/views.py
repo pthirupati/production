@@ -353,19 +353,31 @@ class StartLabView(APIView):
         scenario = get_object_or_404(Scenario, pk=scenario_id, is_active=True)
 
         # Check subscription access for paid scenarios
-        from apps.billing.subscription_utils import user_has_complimentary_access, is_tech_subscription_active
+        from apps.billing.subscription_utils import (
+            user_has_complimentary_access,
+            is_tech_subscription_active,
+            is_tech_subscription_in_grace,
+        )
 
         if not scenario.is_free and not user_has_complimentary_access(request.user):
-            has_sub = TechnologySubscription.objects.filter(
+            sub = TechnologySubscription.objects.filter(
                 user=request.user,
                 technology=scenario.technology,
-                is_active=True,
-            ).exists()
-            if has_sub:
-                sub = TechnologySubscription.objects.filter(
-                    user=request.user, technology=scenario.technology, is_active=True
-                ).first()
-                has_sub = sub and is_tech_subscription_active(sub)
+            ).order_by("-created_at").first()
+            if sub and is_tech_subscription_in_grace(sub):
+                return Response(
+                    {
+                        "error": "Subscription expired",
+                        "message": (
+                            f"Your {scenario.technology.name} subscription expired. "
+                            "Renew now to continue labs — grace period allows viewing only."
+                        ),
+                        "needs_renewal": True,
+                        "renew_url": f"/payment?technology={scenario.technology.slug}&renew=1",
+                    },
+                    status=403,
+                )
+            has_sub = sub and is_tech_subscription_active(sub)
             if not has_sub:
                 return Response(
                     {

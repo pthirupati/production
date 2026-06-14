@@ -315,7 +315,7 @@ function generateCertificateHTML(data) {
   <div class="footer">
     Certificate ID: <strong>${data.certificate_id}</strong><br>
     Generated on ${new Date(data.generated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}<br><br>
-    Verify this certificate: <a class="verify-link" href="#">fixitlab.com/verify-certificate</a><br>
+    Verify this certificate: <a class="verify-link" href="${typeof window !== 'undefined' ? window.location.origin : ''}/verify-certificate?certificate_id=${encodeURIComponent(data.certificate_id || '')}">Verify online</a><br>
     FixitLab — Hands-on DevOps & Cloud Learning Platform
   </div>
 </div>

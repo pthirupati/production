@@ -114,14 +114,26 @@ export default function PaymentPage() {
   const [searchParams] = useSearchParams()
 
   const paymentToken = searchParams.get('token')
-  const techName = searchParams.get('tech')
-  const amountINR = searchParams.get('amount')
-  const techId = searchParams.get('tech_id')
+  const techNameParam = searchParams.get('tech')
+  const amountINRParam = searchParams.get('amount')
+  const techIdParam = searchParams.get('tech_id')
+  const renewSlug = searchParams.get('technology')
+  const isRenewFlow = searchParams.get('renew') === '1' && !!renewSlug
   const existingOrderId = searchParams.get('order_id')
   const existingRazorpayKey = searchParams.get('razorpay_key')
   const displayCurrency = searchParams.get('display_currency') || 'INR'
   const displayAmountUSD = searchParams.get('display_amount')
   const paramExchangeRate = searchParams.get('exchange_rate')
+
+  const [renewBootstrap, setRenewBootstrap] = useState(null)
+  const [renewLoading, setRenewLoading] = useState(isRenewFlow)
+
+  const techName = techNameParam || renewBootstrap?.techName
+  const amountINR = amountINRParam || renewBootstrap?.amountINR
+  const techId = techIdParam || renewBootstrap?.techId
+  const paymentTokenResolved = paymentToken || renewBootstrap?.orderId
+  const orderIdResolved = existingOrderId || renewBootstrap?.orderId
+  const razorpayKeyResolved = existingRazorpayKey || renewBootstrap?.razorpayKey
 
   const [step, setStep] = useState('summary') // summary -> processing -> success -> failed
   const [selectedMethod, setSelectedMethod] = useState('upi')
@@ -169,24 +181,67 @@ export default function PaymentPage() {
     document.body.appendChild(script)
   }, [])
 
+  // Renewal deep link: /payment?technology=linux&renew=1
+  useEffect(() => {
+    if (!isRenewFlow) return
+    if (!user) {
+      navigate(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`, { replace: true })
+      return
+    }
+    let cancelled = false
+    setRenewLoading(true)
+    api.get('/technologies/')
+      .then(res => {
+        const techs = Array.isArray(res.data) ? res.data : []
+        const tech = techs.find(t => t.slug === renewSlug)
+        if (!tech || cancelled) {
+          if (!cancelled) navigate('/pricing', { replace: true })
+          return
+        }
+        return subscriptionApi.createRazorpayOrder(tech.id).then(order => {
+          if (cancelled) return
+          if (!order?.order_id) {
+            navigate('/pricing', { replace: true })
+            return
+          }
+          setRenewBootstrap({
+            techName: tech.name,
+            techId: String(tech.id),
+            amountINR: String(tech.price || order.amount_inr || 499),
+            orderId: order.order_id,
+            razorpayKey: order.razorpay_key_id,
+          })
+        })
+      })
+      .catch(() => { if (!cancelled) navigate('/pricing', { replace: true }) })
+      .finally(() => { if (!cancelled) setRenewLoading(false) })
+    return () => { cancelled = true }
+  }, [isRenewFlow, renewSlug, user, navigate])
+
   // Block checkout when payment gateway is not configured
   useEffect(() => {
     subscriptionApi.getGatewayStatus()
       .then((data) => {
-        const down = !data?.razorpay_configured && !existingOrderId
+        const down = !data?.razorpay_configured && !orderIdResolved
         setGatewayDown(down)
         if (down) setStep('gateway_down')
       })
       .catch(() => setGatewayDown(true))
       .finally(() => setGatewayChecked(true))
-  }, [existingOrderId])
+  }, [orderIdResolved])
 
-  // Redirect if no token
+  // Redirect if missing required checkout params (after renewal bootstrap)
   useEffect(() => {
-    if (!paymentToken || !techName || !amountINR) {
+    if (renewLoading) return
+    if (isRenewFlow && !renewBootstrap && !techNameParam) return
+    if (!paymentToken && !orderIdResolved && !isRenewFlow) {
       navigate('/pricing', { replace: true })
+      return
     }
-  }, [paymentToken, techName, amountINR, navigate])
+    if (!techName || !amountINR) {
+      if (!isRenewFlow) navigate('/pricing', { replace: true })
+    }
+  }, [paymentToken, orderIdResolved, techName, amountINR, navigate, renewLoading, isRenewFlow, renewBootstrap, techNameParam])
 
   // 3D tilt effect on card
   useEffect(() => {
@@ -226,7 +281,7 @@ export default function PaymentPage() {
     }
 
     // Require real Razorpay order — no demo/fake payments
-    if (!existingOrderId) {
+    if (!existingOrderId && !orderIdResolved) {
       setError('Payment gateway is unavailable. Please try again later.')
       setStep('gateway_down')
       return
@@ -241,8 +296,8 @@ export default function PaymentPage() {
     try {
       setStep('processing')
 
-      let orderId = existingOrderId
-      let razorpayKey = existingRazorpayKey
+      let orderId = orderIdResolved
+      let razorpayKey = razorpayKeyResolved
       let amountPaise = amountNum * 100
 
       if (!orderId) {
@@ -275,7 +330,7 @@ export default function PaymentPage() {
         amount: amountPaise,
         currency: 'INR',
         name: 'FixitLab',
-        description: `${techName} \u2014 Lifetime Access`,
+        description: `${techName} \u2014 1-Year Access`,
         order_id: orderId,
         prefill: {
           name: user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : user?.username,
@@ -330,7 +385,15 @@ export default function PaymentPage() {
     }
   }
 
-  if (!paymentToken || !gatewayChecked) return null
+  if (renewLoading) {
+    return (
+      <div className="min-h-screen bg-surface-950 flex items-center justify-center">
+        <Loader2 size={32} className="text-accent-cyan animate-spin" />
+      </div>
+    )
+  }
+
+  if ((!paymentToken && !orderIdResolved) || !gatewayChecked) return null
 
   if (step === 'gateway_down' || gatewayDown) {
     return (
@@ -651,7 +714,7 @@ export default function PaymentPage() {
                       <div>
                         <p className="font-extrabold text-white text-xl">{techName}</p>
                         <p className="text-xs text-surface-300 flex items-center gap-1">
-                          <Star size={10} className="text-accent-amber" /> Lifetime Access
+                          <Star size={10} className="text-accent-amber" /> 1-Year Access
                         </p>
                       </div>
                     </div>
@@ -799,7 +862,7 @@ export default function PaymentPage() {
               Payment Successful!
             </h2>
             <p className="text-surface-400 text-sm mb-8 text-center max-w-md">
-              Your {techName} subscription is now active. You have lifetime access to all {techName} scenarios, hints, and certificates.
+              Your {techName} subscription is now active for 1 year. You have full access to all {techName} scenarios, hints, and certificates.
             </p>
 
             <div className="glass-card p-6 w-full mb-8 border-accent-green/20 bg-accent-green/[0.02]">
@@ -826,7 +889,7 @@ export default function PaymentPage() {
                 )}
                 <div className="flex justify-between">
                   <span className="text-surface-400">Access</span>
-                  <span className="text-surface-300">Lifetime</span>
+                  <span className="text-surface-300">1 Year</span>
                 </div>
                 <div className="border-t border-surface-700/30 pt-2 flex justify-between">
                   <span className="text-surface-400">Status</span>
