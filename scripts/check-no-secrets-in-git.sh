@@ -11,6 +11,8 @@ echo "=== Checking tracked files for leaked secrets ==="
 
 FORBIDDEN_TRACKED=(
   deploy/production.env
+  deploy/vault-init.json
+  deploy/vault-approle.env
   .env.production
   .env
 )
@@ -52,6 +54,6 @@ if [ $FAIL -eq 0 ]; then
 fi
 
 echo ""
-echo "Never commit deploy/production.env — use GitHub Environment secret PRODUCTION_ENV_B64."
+echo "Never commit deploy/production.env or deploy/vault-*.json — use Vault or GitHub Environment secrets."
 echo "See docs/GITHUB_SECRETS.md"
 exit 1

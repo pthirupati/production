@@ -5,13 +5,31 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${1:-$ROOT/.env.production}"
 
+_env_true() {
+  case "${1:-}" in
+    1|true|TRUE|True|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 write_env() {
   mkdir -p "$(dirname "$OUT")"
   cp "$1" "$OUT"
   chmod 600 "$OUT"
 }
 
-if [ -n "${PRODUCTION_ENV_B64:-}" ]; then
+_vault_ready() {
+  _env_true "${VAULT_ENABLED:-}" \
+    && [ -n "${VAULT_ROLE_ID:-}" ] \
+    && [ -n "${VAULT_SECRET_ID:-}" ] \
+    && [ -n "${VAULT_UNSEAL_KEY:-}" ] \
+    && [ -x "$ROOT/scripts/vault/render-env.sh" ]
+}
+
+if _vault_ready; then
+  echo "[env] Rendering .env.production from HashiCorp Vault"
+  bash "$ROOT/scripts/vault/render-env.sh" "$OUT"
+elif [ -n "${PRODUCTION_ENV_B64:-}" ]; then
   echo "[env] Writing .env.production from PRODUCTION_ENV_B64 (GitHub secret)"
   echo "$PRODUCTION_ENV_B64" | base64 -d > "$OUT"
   chmod 600 "$OUT"
@@ -19,6 +37,9 @@ elif [ -n "${PRODUCTION_ENV:-}" ]; then
   echo "[env] Writing .env.production from PRODUCTION_ENV (GitHub secret)"
   printf '%s\n' "$PRODUCTION_ENV" > "$OUT"
   chmod 600 "$OUT"
+elif _env_true "${VAULT_ENABLED:-}" && [ -x "$ROOT/scripts/vault/render-env.sh" ]; then
+  echo "[env] Rendering .env.production from HashiCorp Vault (local AppRole file)"
+  bash "$ROOT/scripts/vault/render-env.sh" "$OUT"
 elif [ -f "$ROOT/deploy/production.env" ]; then
   echo "[env] Using local deploy/production.env (dev only — use GitHub secrets in CI)"
   write_env "$ROOT/deploy/production.env"

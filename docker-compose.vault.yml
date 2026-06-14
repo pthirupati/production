@@ -1,0 +1,33 @@
+# HashiCorp Vault for FixitLab secrets (run on production server only)
+# Usage:
+#   docker compose -f docker-compose.vault.yml up -d
+#   ./scripts/vault/bootstrap.sh deploy/production.env
+#
+# Vault listens on 127.0.0.1:8200 — not exposed publicly.
+
+services:
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: fixitlab_vault
+    cap_add:
+      - IPC_LOCK
+    command: server -config=/vault/config/config.hcl
+    ports:
+      - "127.0.0.1:8200:8200"
+    volumes:
+      - ./infra/vault/config.hcl:/vault/config/config.hcl:ro
+      - vault_data:/vault/data
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+      VAULT_API_ADDR: http://127.0.0.1:8200
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(vault status -format=yaml >/dev/null 2>&1; echo $$?); test $$code -eq 0 -o $$code -eq 2"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  vault_data:
+    name: fixitlab_vault_data

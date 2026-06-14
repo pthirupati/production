@@ -7,8 +7,22 @@ cd "$ROOT"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-.env.production}"
 
-# Sync production env from GitHub secrets or local deploy/production.env
-chmod +x "$ROOT/scripts/sync-production-env.sh" "$ROOT/scripts/ensure-ssl-certs.sh" "$ROOT/scripts/startup.sh" 2>/dev/null || true
+_env_true() {
+  case "${1:-}" in
+    1|true|TRUE|True|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Sync production env from Vault, GitHub secrets, or local deploy/production.env
+chmod +x "$ROOT/scripts/sync-production-env.sh" "$ROOT/scripts/ensure-ssl-certs.sh" "$ROOT/scripts/startup.sh" \
+  "$ROOT/scripts/vault/"*.sh "$ROOT/scripts/vault/env-kv-helper.py" 2>/dev/null || true
+
+# Vault must be up before render-env (when enabled via env or local approle file)
+if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; then
+  bash "$ROOT/scripts/vault/start.sh" 2>/dev/null || true
+fi
+
 bash "$ROOT/scripts/sync-production-env.sh" "$ROOT/.env.production"
 ENV_FILE=".env.production"
 

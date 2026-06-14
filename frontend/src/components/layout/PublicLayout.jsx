@@ -1,13 +1,20 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useThemeStore } from '../../store/themeStore'
 import { useAuthStore } from '../../store/authStore'
 import { Sun, Moon, Terminal, Menu, X } from 'lucide-react'
 import { useState } from 'react'
 
+const navLinkClass = (active) =>
+  active
+    ? 'text-sm text-white font-medium'
+    : 'text-sm text-surface-400 hover:text-surface-100'
+
 export default function PublicLayout({ children }) {
   const { theme, toggleTheme } = useThemeStore()
   const { isAuthenticated } = useAuthStore()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { pathname } = useLocation()
+  const onBlog = pathname.startsWith('/blog')
 
   return (
     <div className="min-h-screen">
@@ -21,11 +28,11 @@ export default function PublicLayout({ children }) {
             FixitLab
           </Link>
           <div className="flex items-center gap-4">
-            <Link to="/about" className="text-sm text-surface-400 hover:text-surface-100 hidden sm:block">About</Link>
-            <Link to="/pricing" className="text-sm text-surface-400 hover:text-surface-100 hidden sm:block">Pricing</Link>
-            <Link to="/blog" className="text-sm text-surface-400 hover:text-surface-100 hidden sm:block">Blog</Link>
-            <Link to="/faq" className="text-sm text-surface-400 hover:text-surface-100 hidden sm:block">FAQ</Link>
-            <Link to="/verify-certificate" className="text-sm text-surface-400 hover:text-surface-100 hidden sm:block">Verify Certificate</Link>
+            <Link to="/about" className={`${navLinkClass(pathname === '/about')} hidden sm:block`}>About</Link>
+            <Link to="/pricing" className={`${navLinkClass(pathname === '/pricing')} hidden sm:block`}>Pricing</Link>
+            <Link to="/blog" className={`${navLinkClass(onBlog)} hidden sm:block`}>Blog</Link>
+            <Link to="/faq" className={`${navLinkClass(pathname === '/faq')} hidden sm:block`}>FAQ</Link>
+            <Link to="/verify-certificate" className={`${navLinkClass(pathname === '/verify-certificate')} hidden sm:block`}>Verify Certificate</Link>
             <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-surface-800 transition-colors">
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -90,7 +97,9 @@ export default function PublicLayout({ children }) {
               <div className="space-y-2 text-sm text-surface-400">
                 <Link to="/blog" className="block hover:text-surface-100">Blog</Link>
                 <Link to="/faq" className="block hover:text-surface-100">FAQ</Link>
-                <Link to="/about" className="block hover:text-surface-100">About</Link>                <Link to="/verify-certificate" className="block hover:text-surface-100">Verify Certificate</Link>              </div>
+                <Link to="/about" className="block hover:text-surface-100">About</Link>
+                <Link to="/verify-certificate" className="block hover:text-surface-100">Verify Certificate</Link>
+              </div>
             </div>
             <div>
               <h3 className="font-semibold mb-3">Legal</h3>

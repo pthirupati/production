@@ -8,6 +8,8 @@ __pycache__/
 .env.local
 .env.test
 deploy/production.env
+deploy/vault-init.json
+deploy/vault-approle.env
 env
 venv/
 .venv/

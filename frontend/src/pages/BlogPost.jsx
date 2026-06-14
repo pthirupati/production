@@ -1,7 +1,8 @@
 import { useParams, Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { Terminal, Clock, ArrowLeft, Tag, User, Calendar, ChevronRight } from 'lucide-react'
+import { Clock, ArrowLeft, Tag, User, Calendar, ChevronRight } from 'lucide-react'
 import api from '../api/client'
+import { getCategoryClass } from '../data/blogFallback'
 
 const blogContent = {
   'why-hands-on-learning-works': {
@@ -579,19 +580,46 @@ Our **DNS Resolution Broken** scenario gives you a server where DNS is broken in
 export default function BlogPost() {
   const { slug } = useParams()
   const [post, setPost] = useState(blogContent[slug] || null)
+  const [related, setRelated] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
     api.get(`/blog/${slug}/`)
-      .then(res => setPost({ ...res.data, color: 'accent-cyan' }))
+      .then(res => {
+        const apiPost = res.data
+        const rich = blogContent[slug]
+        setPost({
+          ...apiPost,
+          content: (rich?.content && (!apiPost.content || apiPost.content.length < 200))
+            ? rich.content
+            : (apiPost.content || rich?.content || ''),
+          color: rich?.color || 'accent-cyan',
+        })
+      })
       .catch(() => setPost(blogContent[slug] || null))
       .finally(() => setLoading(false))
   }, [slug])
 
+  useEffect(() => {
+    api.get('/blog/')
+      .then(res => {
+        const list = (res.data || []).filter(p => p.slug !== slug).slice(0, 3)
+        setRelated(list)
+      })
+      .catch(() => {
+        setRelated(
+          Object.entries(blogContent)
+            .filter(([s]) => s !== slug)
+            .slice(0, 3)
+            .map(([s, p]) => ({ slug: s, title: p.title, category: p.category, readTime: p.readTime }))
+        )
+      })
+  }, [slug])
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-surface-950 flex items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <div className="w-8 h-8 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin" />
       </div>
     )
@@ -599,24 +627,12 @@ export default function BlogPost() {
 
   if (!post) {
     return (
-      <div className="min-h-screen bg-surface-950">
-        <nav className="border-b border-surface-800/50 backdrop-blur-xl sticky top-0 z-50 bg-surface-950/90">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-cyan to-brand-600 flex items-center justify-center shadow-lg shadow-accent-cyan/20">
-                <Terminal size={18} className="text-white" />
-              </div>
-              <span className="text-xl font-bold text-white tracking-tight">FixitLab</span>
-            </Link>
-          </div>
-        </nav>
-        <div className="max-w-3xl mx-auto px-6 py-20 text-center">
-          <h1 className="text-3xl font-bold text-white mb-4">Post Not Found</h1>
-          <p className="text-surface-400 mb-6">The blog post you're looking for doesn't exist.</p>
-          <Link to="/blog" className="btn-primary px-6 py-2 inline-flex items-center gap-2">
-            <ArrowLeft size={16} /> Back to Blog
-          </Link>
-        </div>
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-20 text-center">
+        <h1 className="text-3xl font-bold text-white mb-4">Post Not Found</h1>
+        <p className="text-surface-400 mb-6">The blog post you&apos;re looking for doesn&apos;t exist.</p>
+        <Link to="/blog" className="btn-primary px-6 py-2 inline-flex items-center gap-2">
+          <ArrowLeft size={16} /> Back to Blog
+        </Link>
       </div>
     )
   }
@@ -785,43 +801,19 @@ export default function BlogPost() {
     return elements
   }
 
-  // Find related posts (same category or adjacent)
-  const allSlugs = Object.keys(blogContent)
-  const relatedSlugs = allSlugs.filter(s => s !== slug).slice(0, 3)
+  // Find related posts from API (fallback: static catalog)
+  const relatedPosts = related
 
   return (
-    <div className="min-h-screen bg-surface-950">
-      {/* Nav */}
-      <nav className="border-b border-surface-800/50 backdrop-blur-xl sticky top-0 z-50 bg-surface-950/90">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-cyan to-brand-600 flex items-center justify-center shadow-lg shadow-accent-cyan/20">
-              <Terminal size={18} className="text-white" />
-            </div>
-            <span className="text-xl font-bold text-white tracking-tight">FixitLab</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-6">
-            <Link to="/scenarios" className="text-sm text-surface-400 hover:text-white transition-colors">Scenarios</Link>
-            <Link to="/pricing" className="text-sm text-surface-400 hover:text-white transition-colors">Pricing</Link>
-            <Link to="/blog" className="text-sm text-white font-medium">Blog</Link>
-            <Link to="/about" className="text-sm text-surface-400 hover:text-white transition-colors">About</Link>
-          </div>
-          <Link to="/register" className="btn-primary text-sm px-5">Get Started Free</Link>
-        </div>
-      </nav>
-
-      {/* Article */}
-      <article className="max-w-3xl mx-auto px-6 py-12">
-        {/* Back link */}
+    <article className="max-w-3xl mx-auto px-4 sm:px-6 py-8 md:py-12">
         <Link to="/blog" className="inline-flex items-center gap-2 text-sm text-surface-400 hover:text-white transition-colors mb-8">
           <ArrowLeft size={14} /> Back to Blog
         </Link>
 
-        {/* Header */}
         <header className="mb-10">
-          <div className="flex items-center gap-3 mb-4">
-            <span className={`badge bg-${post.color}/10 text-${post.color} border border-${post.color}/20 text-xs`}>
-              <Tag size={10} className="mr-1" />{post.category}
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${getCategoryClass(post.category)}`}>
+              <Tag size={10} className="inline mr-1" />{post.category}
             </span>
             <span className="text-xs text-surface-500 flex items-center gap-1"><Clock size={10} />{post.readTime}</span>
           </div>
@@ -850,39 +842,24 @@ export default function BlogPost() {
         </div>
 
         {/* Related Posts */}
-        {relatedSlugs.length > 0 && (
+        {relatedPosts.length > 0 && (
           <div className="mt-12">
             <h3 className="text-lg font-semibold text-white mb-4">More Articles</h3>
             <div className="grid sm:grid-cols-3 gap-4">
-              {relatedSlugs.map(s => {
-                const p = blogContent[s]
-                return (
-                  <Link key={s} to={`/blog/${s}`} className="glass-card-hover p-4 group">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider text-${p.color}`}>{p.category}</span>
-                    <h4 className="text-sm font-medium text-white mt-1 group-hover:text-accent-cyan transition-colors leading-snug">
+              {relatedPosts.map(p => (
+                  <Link key={p.slug} to={`/blog/${p.slug}`} className="glass-card-hover p-4 group">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${getCategoryClass(p.category)}`}>
+                      {p.category}
+                    </span>
+                    <h4 className="text-sm font-medium text-white mt-2 group-hover:text-accent-cyan transition-colors leading-snug">
                       {p.title}
                     </h4>
                     <span className="text-xs text-surface-500 mt-2 block">{p.readTime}</span>
                   </Link>
-                )
-              })}
+              ))}
             </div>
           </div>
         )}
       </article>
-
-      {/* Footer */}
-      <footer className="border-t border-surface-800/50 bg-surface-900/30">
-        <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent-cyan to-brand-600 flex items-center justify-center">
-              <Terminal size={14} className="text-white" />
-            </div>
-            <span className="text-sm font-bold text-white">FixitLab</span>
-          </div>
-          <p className="text-xs text-surface-600">&copy; 2026 FixitLab. All rights reserved.</p>
-        </div>
-      </footer>
-    </div>
   )
 }

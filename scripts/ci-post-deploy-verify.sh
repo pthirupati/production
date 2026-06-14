@@ -84,6 +84,16 @@ else
   fail=1
 fi
 
+# Heavy all-scenario lab E2E can OOM/restart backend — recover before API E2E suite
+if [ "$RUN_E2E" = "true" ] || [ "$RUN_E2E" = "1" ]; then
+  echo ""
+  chmod +x "$ROOT/scripts/ensure-backend-healthy.sh"
+  if ! bash "$ROOT/scripts/ensure-backend-healthy.sh"; then
+    echo "ERROR: Backend not healthy after lab provisioning tests"
+    fail=1
+  fi
+fi
+
 # ── 6. Full E2E API suite ──
 echo ""
 echo ">>> [6/6] Full E2E API tests"
