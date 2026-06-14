@@ -251,6 +251,9 @@ class SocialLoginAPITest(APITestCase):
 
 
 class EmailHealthTest(APITestCase):
+    def setUp(self):
+        EmailLog.objects.all().delete()
+
     def test_email_delivery_health_no_alert_when_empty(self):
         from apps.notifications.email_health import email_delivery_health
 

@@ -16,8 +16,11 @@ class RHELShell:
 
     def __init__(self, state: RHELOSState | None = None, scenario_slug: str = "", hostname: str = "rhel-sim"):
         self.state = state or RHELOSState(hostname=hostname, scenario_slug=scenario_slug)
-        if scenario_slug:
-            apply_scenario_preset(scenario_slug, self.state)
+        slug = scenario_slug or getattr(self.state, "scenario_slug", "") or ""
+        if slug and not getattr(self.state, "_scenario_preset_applied", False):
+            apply_scenario_preset(slug, self.state)
+            self.state._scenario_preset_applied = True
+            self.state.scenario_slug = slug
         self._extra_handlers: list[Callable[[list[str], str], str | None]] = []
 
     def register_handler(self, handler: Callable[[list[str], str], str | None]) -> None:

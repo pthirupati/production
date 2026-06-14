@@ -171,7 +171,7 @@ def validate_simulation_state(
     if not script or is_trivial_validation_script(script):
         return False, "Validation not configured — fix the scenario before checking"
 
-    shell = RHELShell(state=state, scenario_slug=getattr(state, "scenario_slug", ""))
+    shell = RHELShell(state=state)
     failures: list[str] = []
     checks_run = 0
 
