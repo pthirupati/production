@@ -30,6 +30,8 @@ export default function App() {
         <Toaster
           position="top-right"
           toastOptions={{
+            duration: 5000,
+            closeButton: true,
             style: {
               background: 'rgb(var(--s-800))',
               color: 'rgb(var(--s-100))',

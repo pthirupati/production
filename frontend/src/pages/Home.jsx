@@ -290,8 +290,19 @@ export default function Home() {
             <p className="text-surface-400 max-w-2xl mx-auto text-lg">Subscribe to the technologies you want to master.</p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-            {technologies.filter(t => !t.coming_soon).map((tech) => {
+            {[...technologies.filter(t => !t.coming_soon), ...technologies.filter(t => t.coming_soon)].map((tech) => {
               const Icon = techIcons[tech.name] || Server
+              if (tech.coming_soon) {
+                return (
+                  <div key={tech.id} className="glass-card p-8 text-center opacity-50 cursor-default">
+                    <div className="w-[72px] h-[72px] rounded-2xl bg-surface-800 border border-surface-700 flex items-center justify-center mx-auto mb-5">
+                      <Icon size={34} className="text-surface-600" />
+                    </div>
+                    <h3 className="text-lg font-bold text-surface-500 mb-1.5">{tech.name}</h3>
+                    <p className="text-sm text-accent-amber font-medium">Coming soon</p>
+                  </div>
+                )
+              }
               return (
                 <Link to={isAuthenticated ? '/technologies' : '/register'} key={tech.id} className="glass-card-hover card-3d card-shine p-8 text-center group">
                   <div className="w-[72px] h-[72px] rounded-2xl bg-gradient-to-br from-accent-cyan/15 to-accent-purple/15 border border-accent-cyan/20 flex items-center justify-center mx-auto mb-5 group-hover:scale-110 group-hover:border-accent-cyan/40 transition-all duration-300">
@@ -303,15 +314,6 @@ export default function Home() {
                 </Link>
               )
             })}
-            {technologies.filter(t => t.coming_soon).map(tech => (
-              <div key={tech.id} className="glass-card p-8 text-center opacity-50">
-                <div className="w-[72px] h-[72px] rounded-2xl bg-surface-800 border border-surface-700 flex items-center justify-center mx-auto mb-5">
-                  {(techIcons[tech.name] ? (() => { const I = techIcons[tech.name]; return <I size={34} className="text-surface-600" /> })() : <Server size={34} className="text-surface-600" />)}
-                </div>
-                <h3 className="text-lg font-bold text-surface-500 mb-1.5">{tech.name}</h3>
-                <p className="text-sm text-accent-amber">Coming soon</p>
-              </div>
-            ))}
           </div>
         </div>
       </section>

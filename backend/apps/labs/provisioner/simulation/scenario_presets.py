@@ -23,6 +23,32 @@ def apply_scenario_preset(slug: str, state: RHELOSState) -> None:
         _preset_boot_issue(state)
 
 
+def _preset_wrong_nginx_root(state: RHELOSState) -> None:
+    """Nginx runs but serves wrong document root."""
+    state._mkdir("/etc/nginx")
+    state._mkdir("/etc/nginx/sites-enabled")
+    state._mkdir("/var/www/html")
+    state._mkdir("/var/www/wrong")
+    state._write_file(
+        "/var/www/html/index.html",
+        "<html><body><h1>Correct Site</h1></body></html>\n",
+    )
+    state._write_file(
+        "/var/www/wrong/index.html",
+        "<html><body><h1>Wrong Site</h1></body></html>\n",
+    )
+    state._write_file(
+        "/etc/nginx/nginx.conf",
+        "user nginx;\nworker_processes auto;\ninclude /etc/nginx/sites-enabled/*;\n",
+    )
+    state._write_file(
+        "/etc/nginx/sites-enabled/default",
+        "server {\n    listen 80;\n    server_name localhost;\n    root /var/www/wrong;\n    index index.html;\n}\n",
+    )
+    state.services["nginx"].active = "active"
+    state.services["nginx"].sub_state = "running"
+
+
 def _preset_broken_nginx(state: RHELOSState) -> None:
     state._mkdir("/etc/nginx")
     state._mkdir("/etc/nginx/sites-enabled")
@@ -144,6 +170,6 @@ _PRESETS: dict[str, callable] = {
     "sim-rhel-kernel-panic": _preset_kernel_panic,
     "sim-mysql-wont-start": _preset_mysql_down,
     "sim-postgres-refused": _preset_postgres_down,
-    "sim-html-nginx-root": _preset_broken_nginx,
+    "sim-html-nginx-root": _preset_wrong_nginx_root,
     "sim-rhel-firewalld-port": _preset_firewalld_blocked,
 }

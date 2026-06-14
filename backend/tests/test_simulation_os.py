@@ -83,6 +83,11 @@ getent passwd appuser
 exit 0
 """
 
+    def test_trivial_script_always_fails(self):
+        passed, msg = validate_simulation_state(RHELOSState(), "true\nexit 0")
+        self.assertFalse(passed)
+        self.assertIn("not configured", msg.lower())
+
     def test_nginx_validation_fails_then_passes(self):
         sim = BaseRHELSimulator(scenario_slug="sim-rhel-broken-nginx")
         passed, _ = validate_simulation_state(sim.state, self.NGINX_CHECK)

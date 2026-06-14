@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, CheckCheck, Award, Zap, AlertCircle, MessageCircle, Trash2, CreditCard } from 'lucide-react'
+import { Bell, Check, CheckCheck, Award, Zap, AlertCircle, MessageCircle, Trash2, CreditCard, X } from 'lucide-react'
 import { useNotificationStore } from '../../store/notificationStore'
 
 const TYPE_CONFIG = {
@@ -14,7 +14,7 @@ const TYPE_CONFIG = {
 
 export default function NotificationBell() {
   const navigate = useNavigate()
-  const { notifications, unreadCount, fetchNotifications, markRead, markAllRead, clearAll } = useNotificationStore()
+  const { notifications, unreadCount, fetchNotifications, markRead, markAllRead, clearAll, dismiss } = useNotificationStore()
   const [open, setOpen] = useState(false)
   const btnRef = useRef(null)
   const panelRef = useRef(null)
@@ -124,27 +124,40 @@ export default function NotificationBell() {
             return (
               <div
                 key={n.id}
-                onClick={() => handleNotificationClick(n)}
-                className={`flex items-start gap-3 px-4 py-3 border-b border-surface-800/50 cursor-pointer transition-colors ${
+                className={`flex items-start gap-3 px-4 py-3 border-b border-surface-800/50 transition-colors ${
                   n.read ? 'opacity-60' : 'bg-surface-800/20 hover:bg-surface-800/40'
                 }`}
               >
-                <div className={`mt-0.5 shrink-0 ${cfg.color}`}>
-                  <Icon size={16} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-surface-50 font-medium truncate">{n.title}</p>
-                  {n.message && <p className="text-xs text-surface-400 mt-0.5 line-clamp-2">{n.message}</p>}
-                  <p className="text-[10px] text-surface-600 mt-1">{timeAgo(n.created_at)}</p>
-                  {(n.metadata?.needs_renewal) && (
-                    <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-accent-amber font-medium">
-                      <CreditCard size={10} /> Tap to renew
-                    </span>
+                <button
+                  type="button"
+                  onClick={() => handleNotificationClick(n)}
+                  className="flex items-start gap-3 flex-1 min-w-0 text-left cursor-pointer"
+                >
+                  <div className={`mt-0.5 shrink-0 ${cfg.color}`}>
+                    <Icon size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-surface-50 font-medium truncate">{n.title}</p>
+                    {n.message && <p className="text-xs text-surface-400 mt-0.5 line-clamp-2">{n.message}</p>}
+                    <p className="text-[10px] text-surface-600 mt-1">{timeAgo(n.created_at)}</p>
+                    {(n.metadata?.needs_renewal) && (
+                      <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-accent-amber font-medium">
+                        <CreditCard size={10} /> Tap to renew
+                      </span>
+                    )}
+                  </div>
+                  {!n.read && (
+                    <div className="w-2 h-2 rounded-full bg-accent-cyan mt-1.5 shrink-0" />
                   )}
-                </div>
-                {!n.read && (
-                  <div className="w-2 h-2 rounded-full bg-accent-cyan mt-1.5 shrink-0" />
-                )}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); dismiss(n.id) }}
+                  className="p-1 text-surface-500 hover:text-surface-200 shrink-0"
+                  aria-label="Dismiss notification"
+                >
+                  <X size={14} />
+                </button>
               </div>
             )
           })

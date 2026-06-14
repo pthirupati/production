@@ -47,17 +47,30 @@ export default function Technologies() {
     scenarioApi.getTechnologies()
       .then(data => {
         setTechnologies(data)
-        // Auto-select first technology
-        if (data.length > 0) {
-          loadTechnology(data[0].slug)
+        const available = data.filter(t => !t.coming_soon)
+        if (available.length > 0) {
+          setSelectedTech(available[0].slug)
+          setDetailLoading(true)
+          scenarioApi.getTechnologyDetail(available[0].slug)
+            .then(setTechDetail)
+            .catch(() => toast.error('Failed to load technology details'))
+            .finally(() => setDetailLoading(false))
+        } else if (data.length > 0) {
+          loadTechnology(data[0].slug, true, data[0])
         }
       })
       .catch(() => toast.error('Failed to load technologies'))
       .finally(() => setLoading(false))
   }, [])
 
-  const loadTechnology = async (slug) => {
+  const loadTechnology = async (slug, isComingSoon = false, techMeta = null) => {
     setSelectedTech(slug)
+    if (isComingSoon) {
+      const tech = techMeta || technologies.find(t => t.slug === slug) || { slug, name: slug, coming_soon: true }
+      setTechDetail({ technology: tech, scenarios: [], coming_soon: true })
+      setDetailLoading(false)
+      return
+    }
     setDetailLoading(true)
     try {
       const data = await scenarioApi.getTechnologyDetail(slug)
@@ -77,6 +90,7 @@ export default function Technologies() {
 
   const comingSoonTechs = technologies.filter(t => t.coming_soon)
   const availableTechs = technologies.filter(t => !t.coming_soon)
+  const sortedTechnologies = [...availableTechs, ...comingSoonTechs]
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
@@ -102,14 +116,33 @@ export default function Technologies() {
 
       {/* Technology cards grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {availableTechs.map(tech => {
+        {sortedTechnologies.map(tech => {
           const Icon = techIcons[tech.name] || Server
           const colorClass = techColors[tech.color] || techColors.cyan
           const isSelected = selectedTech === tech.slug
+          if (tech.coming_soon) {
+            return (
+              <button
+                key={tech.id}
+                type="button"
+                onClick={() => loadTechnology(tech.slug, true, tech)}
+                className={`relative p-5 rounded-xl border border-dashed transition-all duration-200 text-left ${
+                  isSelected
+                    ? 'border-surface-600 bg-surface-800/40 opacity-70'
+                    : 'border-surface-700/50 bg-surface-900/30 opacity-50 hover:opacity-65'
+                }`}
+              >
+                <Icon size={28} className="mb-3 text-surface-600" />
+                <h3 className="text-base font-semibold text-surface-500 mb-1">{tech.name}</h3>
+                <span className="text-xs text-accent-amber font-medium">Coming soon</span>
+                <p className="text-[10px] text-surface-600 mt-2">Preview only — not available yet</p>
+              </button>
+            )
+          }
           return (
             <button
               key={tech.id}
-              onClick={() => loadTechnology(tech.slug)}
+              onClick={() => loadTechnology(tech.slug, false)}
               className={`relative p-5 rounded-xl border transition-all duration-200 text-left group ${
                 isSelected
                   ? `bg-gradient-to-br ${colorClass} border-opacity-100 ring-1 ring-current/20 scale-[1.02]`
@@ -129,18 +162,6 @@ export default function Technologies() {
             </button>
           )
         })}
-
-        {/* Coming soon placeholders */}
-        {comingSoonTechs.map(tech => {
-          const Icon = techIcons[tech.name] || Server
-          return (
-            <div key={tech.id} className="p-5 rounded-xl border border-dashed border-surface-700/50 bg-surface-900/30 opacity-50 cursor-not-allowed">
-              <Icon size={28} className="mb-3 text-surface-600" />
-              <h3 className="text-base font-semibold text-surface-500 mb-1">{tech.name}</h3>
-              <span className="text-xs text-surface-600">Coming soon</span>
-            </div>
-          )
-        })}
       </div>
 
       {/* Selected technology detail */}
@@ -149,6 +170,17 @@ export default function Technologies() {
           {detailLoading ? (
             <div className="flex items-center justify-center h-48">
               <div className="w-6 h-6 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : techDetail?.coming_soon || techDetail?.technology?.coming_soon ? (
+            <div className="p-12 text-center">
+              <Lock size={32} className="mx-auto text-accent-amber mb-3" />
+              <h2 className="text-xl font-bold text-white mb-2">{techDetail.technology?.name || 'Technology'} — Coming Soon</h2>
+              <p className="text-surface-400 max-w-md mx-auto">
+                This technology is on our roadmap. You can preview it here, but scenarios and labs are not available yet.
+              </p>
+              {techDetail.technology?.description && (
+                <p className="text-sm text-surface-500 mt-4 max-w-lg mx-auto">{techDetail.technology.description}</p>
+              )}
             </div>
           ) : techDetail ? (
             <>

@@ -472,6 +472,9 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     continue
                 if not data:
                     empty_reads += 1
+                    if self.provider_type == "simulation":
+                        await asyncio.sleep(0.3)
+                        continue
                     if empty_reads > 30:
                         logger.info(
                             "Exec stream EOF for session %s — respawning shell",

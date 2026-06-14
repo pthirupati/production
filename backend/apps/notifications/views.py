@@ -17,8 +17,8 @@ class NotificationListView(APIView):
                 {
                     "id": n.id,
                     "type": n.type,
-                    "title": n.title,
                     "message": n.message,
+                    "title": n.title,
                     "read": n.read,
                     "metadata": n.metadata,
                     "created_at": n.created_at.isoformat(),
@@ -37,9 +37,19 @@ class NotificationMarkReadView(APIView):
         if pk:
             Notification.objects.filter(user=request.user, id=pk).update(read=True)
         else:
-            # Mark all as read
             Notification.objects.filter(user=request.user, read=False).update(read=True)
         return Response({"message": "Marked as read"})
+
+
+class NotificationDismissView(APIView):
+    """Dismiss (delete) a single notification."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        deleted, _ = Notification.objects.filter(user=request.user, id=pk).delete()
+        if not deleted:
+            return Response({"error": "Not found"}, status=404)
+        return Response({"message": "Dismissed"})
 
 
 class NotificationPreferenceView(APIView):

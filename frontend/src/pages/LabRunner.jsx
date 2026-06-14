@@ -48,7 +48,7 @@ export default function LabRunner() {
   const wsRef = useRef(null)
   const fitAddonRef = useRef(null)
   const reconnectAttempts = useRef(0)
-  const maxReconnectAttempts = 10  // More attempts for cloud labs (SSH may be slow)
+  const maxReconnectAttempts = 10  // Cloud labs may need more; simulation capped in onclose handler
   const labChannelRef = useRef(null)  // BroadcastChannel for cross-tab sync
   const inputBufferRef = useRef('')   // Accumulate keystrokes to check blocked commands
   const blockedPatternsRef = useRef([]) // [{pattern: RegExp, label: string}]
@@ -515,10 +515,22 @@ export default function LabRunner() {
           }
           if (reconnectAttempts.current < maxReconnectAttempts) {
             reconnectAttempts.current++
+            const isSim = session?.provider === 'simulation'
             const isCloud = session?.provider === 'aws_ec2' || session?.provider === 'digitalocean'
-            const baseDelay = isCloud ? 3000 : 2000
+            if (isSim && reconnectAttempts.current > 3) {
+              term.write('\r\n\x1b[1;33mSimulation shell paused — press Enter to reconnect\x1b[0m\r\n')
+              return
+            }
+            const baseDelay = isCloud ? 3000 : isSim ? 1000 : 2000
+            const cap = isSim ? 3 : maxReconnectAttempts
+            if (reconnectAttempts.current >= cap) {
+              term.write('\r\n\x1b[1;31mConnection lost.\x1b[0m Press Enter to retry.\x1b[0m\r\n')
+              return
+            }
             const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts.current - 1), 20000)
-            term.write(`\r\n\x1b[1;33mReconnecting in ${Math.round(delay / 1000)}s... (${reconnectAttempts.current}/${maxReconnectAttempts})\x1b[0m\r\n`)
+            if (!isSim) {
+              term.write(`\r\n\x1b[1;33mReconnecting in ${Math.round(delay / 1000)}s... (${reconnectAttempts.current}/${maxReconnectAttempts})\x1b[0m\r\n`)
+            }
             reconnectTimerRef.current = setTimeout(connectWs, delay)
           } else {
             term.write('\r\n\x1b[1;31mConnection lost after multiple attempts.\x1b[0m\r\n')
@@ -954,7 +966,6 @@ export default function LabRunner() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Timer */}
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono font-bold ${
             isTimeCritical ? 'bg-accent-red/20 text-accent-red border border-accent-red/30 animate-pulse'
             : isTimeLow ? 'bg-accent-amber/10 text-accent-amber border border-accent-amber/20'
@@ -963,41 +974,8 @@ export default function LabRunner() {
             <Timer size={13} />
             {formatTime(timeRemaining)}
           </div>
-
-          {/* Hints */}
-          <button
-            onClick={() => { setSidebarTab('hints'); setSidebarOpen(true) }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-all ${
-              sidebarTab === 'hints' && sidebarOpen
-                ? 'bg-accent-amber/10 text-accent-amber border-accent-amber/20'
-                : 'bg-surface-800 text-surface-400 border-surface-700 hover:border-surface-600'
-            }`}
-          >
-            <Lightbulb size={13} />
-            {hints.hints_used}/{hints.total_hints}
-          </button>
-
-          {/* Check solution */}
-          <button
-            onClick={handleValidate}
-            disabled={validating || solved}
-            className={`py-1.5 px-4 text-sm font-medium flex items-center gap-1.5 rounded-lg transition-all disabled:opacity-50 ${
-              solved
-                ? 'bg-accent-green/10 text-accent-green border border-accent-green/20'
-                : 'btn-primary'
-            }`}
-          >
-            {validating ? (
-              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : solved ? (
-              <><CheckCircle2 size={14} /> Solved!</>
-            ) : (
-              <><ChevronRight size={14} /> Check Solution</>
-            )}
-          </button>
-
-          <button onClick={() => setShowStopConfirm(true)} className="btn-danger py-1.5 px-3 text-sm flex items-center gap-1.5">
-            <StopCircle size={13} /> <span className="hidden sm:inline">Stop</span>
+          <button onClick={() => setShowShortcuts(true)} className="p-2 text-surface-400 hover:text-white" title="Keyboard shortcuts">
+            <Keyboard size={16} />
           </button>
         </div>
       </div>
@@ -1241,13 +1219,13 @@ export default function LabRunner() {
           </div>
         </div>
 
-        {/* Terminal toolbar + SSH / dual-host */}
-        <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-1 sm:py-1.5 bg-surface-900/80 border-b border-surface-800 text-[10px] sm:text-xs overflow-x-auto">
+        {/* Terminal action bar — above xterm */}
+        <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-2 bg-surface-900 border-b border-surface-800 text-[10px] sm:text-xs">
           {useDualPane && (
-            <span className="text-accent-purple font-medium mr-2">Dual terminal — side by side</span>
+            <span className="text-accent-purple font-medium mr-1">Dual terminal</span>
           )}
-          {!useDualPane && (scenario.dual_terminal || labHosts.length > 1) && (
-            <span className="text-surface-500 mr-1 hidden sm:inline">Hosts:</span>
+          {!useDualPane && labHosts.length > 1 && (
+            <span className="text-surface-500 mr-0.5 hidden sm:inline">Shell:</span>
           )}
           {!useDualPane && (labHosts.length > 0 ? labHosts : [{ name: 'primary', role: 'Primary' }]).map(h => (
             <button
@@ -1259,9 +1237,9 @@ export default function LabRunner() {
                   setTerminalHost(h.name)
                 }
               }}
-              className={`px-2 py-1 rounded border ${terminalHost === h.name ? 'border-accent-cyan text-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400'}`}
+              className={`px-2.5 py-1.5 rounded-md border font-medium ${terminalHost === h.name ? 'border-accent-cyan text-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400 hover:border-surface-600'}`}
             >
-              {h.role || h.name}
+              {h.role === 'client' || h.name === 'companion' ? 'Client' : (h.role || h.name)}
             </button>
           ))}
           {sshTargets.map(h => (
@@ -1269,12 +1247,39 @@ export default function LabRunner() {
               key={`ssh-${h.name}`}
               type="button"
               onClick={() => insertSshCommand(h)}
-              className="flex items-center gap-1 px-2 py-1 rounded border border-surface-700 text-surface-300 hover:border-accent-cyan hover:text-accent-cyan"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-700 text-surface-300 hover:border-accent-cyan hover:text-accent-cyan bg-surface-800/50"
               title={`ssh ${h.ssh_user || 'root'}@${h.ip}`}
             >
               <Terminal size={12} /> SSH {h.role || h.name}
             </button>
           ))}
+          <div className="w-px h-6 bg-surface-700 mx-0.5 hidden sm:block" />
+          <button
+            onClick={() => { setSidebarTab('hints'); setSidebarOpen(true) }}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-700 text-surface-300 hover:border-accent-amber hover:text-accent-amber"
+          >
+            <Lightbulb size={12} /> Hints ({hints.hints_used}/{hints.total_hints})
+          </button>
+          <button
+            onClick={handleValidate}
+            disabled={validating || solved}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-medium disabled:opacity-50 ${
+              solved ? 'border-accent-green/30 text-accent-green bg-accent-green/10' : 'border-accent-cyan/40 text-accent-cyan bg-accent-cyan/10 hover:bg-accent-cyan/20'
+            }`}
+          >
+            {validating ? (
+              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <CheckCircle2 size={12} />
+            )}
+            Check
+          </button>
+          <button
+            onClick={() => setShowStopConfirm(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-red-500/30 text-red-400 bg-red-500/10 hover:bg-red-500/20"
+          >
+            <StopCircle size={12} /> Stop
+          </button>
         </div>
         {/* Terminal */}
         <div className="flex-1 bg-surface-950 relative min-h-0 overflow-hidden pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))] sm:pb-0">

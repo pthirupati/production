@@ -52,4 +52,19 @@ export const useNotificationStore = create((set, get) => ({
       set({ notifications: [], unreadCount: 0 })
     } catch { /* ignore */ }
   },
+
+  dismiss: async (id) => {
+    try {
+      await api.delete(`/notifications/${id}/`)
+      set((state) => {
+        const target = state.notifications.find(n => n.id === id)
+        return {
+          notifications: state.notifications.filter(n => n.id !== id),
+          unreadCount: target && !target.read
+            ? Math.max(0, state.unreadCount - 1)
+            : state.unreadCount,
+        }
+      })
+    } catch { /* ignore */ }
+  },
 }))

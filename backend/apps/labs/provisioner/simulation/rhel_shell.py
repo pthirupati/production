@@ -624,6 +624,14 @@ class RHELShell:
                 sites = self.state.read_file("/etc/nginx/sites-enabled/default") or ""
                 if "listn" in sites:
                     return "curl: (52) Empty reply from server"
+                if "root /var/www/wrong" in sites:
+                    html = self.state.read_file("/var/www/wrong/index.html") or ""
+                    if "Wrong Site" in html:
+                        return "<html><body><h1>Wrong Site</h1></body></html>"
+                if "root /var/www/html" in sites:
+                    html = self.state.read_file("/var/www/html/index.html") or ""
+                    if html.strip():
+                        return html.strip() if html.startswith("<") else f"<html><body>{html}</body></html>"
                 return "<html><body><h1>Welcome to nginx!</h1></body></html>"
             return "curl: (7) Failed to connect to localhost port 80: Connection refused"
         return f"curl: (6) Could not resolve host: {url}"

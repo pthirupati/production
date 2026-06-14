@@ -16,7 +16,11 @@ from .simulation.shell import (
 from .simulation.sim_types import normalize_sim_type
 from .simulation.simulation_modules import register_modules
 from .simulation.unified_sim import UnifiedSimulationEngine
-from .simulation.validation import validate_simulation_state
+from .simulation.validation import (
+    validate_simulation_state,
+    resolve_simulation_validation_script,
+    is_trivial_validation_script,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -114,13 +118,14 @@ class SimulationProvisioner:
             return 127, "simulation: use validation_script"
         return 0, f"[simulation] {command}"
 
-    def run_validation(self, resource_id, validation_script):
+    def run_validation(self, resource_id, validation_script, scenario_slug: str = ""):
         entry = get_sim_session_by_resource(resource_id)
         engine = entry.get("state", {}).get("engine") if entry else None
+        slug = scenario_slug or (entry.get("state", {}).get("scenario_slug", "") if entry else "")
+        script = resolve_simulation_validation_script(slug, validation_script or "")
         if engine and hasattr(engine, "state"):
-            return validate_simulation_state(engine.state, validation_script)
-        script = (validation_script or "").strip()
-        if not script:
+            return validate_simulation_state(engine.state, script)
+        if not script or is_trivial_validation_script(script):
             return False, "NO_VALIDATION_SCRIPT"
         return False, "Simulation session not found"
 

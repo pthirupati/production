@@ -553,7 +553,14 @@ class StopLabView(APIView):
     def post(self, request, session_id):
         session = get_object_or_404(LabSession, pk=session_id, user=request.user)
 
-        if session.status not in ("RUNNING", "PROVISIONING"):
+        if session.status == "TERMINATED":
+            return Response({
+                "session_id": str(session.id),
+                "status": session.status,
+                "message": "Lab already stopped",
+            })
+
+        if session.status not in ("RUNNING", "PROVISIONING", "COMPLETED"):
             return Response({"error": "Lab is not running"}, status=400)
 
         # Terminate the resource (container or cloud instance)
@@ -603,26 +610,31 @@ class ValidateLabView(APIView):
                 status=400,
             )
 
-        # Run check.sh inside the container (never inline DB script — breaks bash -c)
-        file_check_cmd = (
-            "if [ -x /opt/fixitlab/check.sh ]; then bash /opt/fixitlab/check.sh; "
-            "elif [ -x /check.sh ]; then bash /check.sh; "
-            "else exit 127; fi"
-        )
+        is_simulation = (session.provider or "") == "simulation"
+        db_script = (session.scenario.validation_script or "").strip()
 
         try:
-            exit_code, output = provisioner.execute_command(resource_id, file_check_cmd)
-            if exit_code == 127:
-                db_script = (session.scenario.validation_script or "").strip()
-                if not db_script:
-                    return Response({
-                        "passed": False,
-                        "output": "NO_VALIDATION_SCRIPT",
-                        "message": "Validation failed. Keep trying!",
-                    })
-                passed, output = provisioner.run_validation(resource_id, db_script)
+            if is_simulation:
+                passed, output = provisioner.run_validation(
+                    resource_id, db_script, scenario_slug=session.scenario.slug or "",
+                )
             else:
-                passed = exit_code == 0
+                file_check_cmd = (
+                    "if [ -x /opt/fixitlab/check.sh ]; then bash /opt/fixitlab/check.sh; "
+                    "elif [ -x /check.sh ]; then bash /check.sh; "
+                    "else exit 127; fi"
+                )
+                exit_code, output = provisioner.execute_command(resource_id, file_check_cmd)
+                if exit_code == 127:
+                    if not db_script:
+                        return Response({
+                            "passed": False,
+                            "output": "NO_VALIDATION_SCRIPT",
+                            "message": "Validation failed. Keep trying!",
+                        })
+                    passed, output = provisioner.run_validation(resource_id, db_script)
+                else:
+                    passed = exit_code == 0
 
             if passed:
                 elapsed = (timezone.now() - session.started_at).total_seconds()
@@ -656,7 +668,6 @@ class ValidateLabView(APIView):
                         "to mark this scenario complete."
                     )
 
-                # Terminate resource
                 terminate_lab_session(provisioner, session)
 
                 return Response({
