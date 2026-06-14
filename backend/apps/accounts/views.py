@@ -14,6 +14,7 @@ from .serializers import (
     ForgotPasswordSerializer, ResetPasswordSerializer,
 )
 from .models import Profile, PasswordResetToken, EmailVerificationOTP, SocialAccount
+from apps.notifications.email_dispatch import dispatch_notification_email
 from apps.notifications.tasks import send_notification_email, create_in_app_notification
 from common.security import SessionTracker, TokenHelper
 from common.logging_utils import get_structured_logger
@@ -54,7 +55,7 @@ class SendOTPView(APIView):
         try:
             otp_obj, code, session_token = EmailVerificationOTP.generate(email, minutes=10)
 
-            send_notification_email.delay(
+            dispatch_notification_email(
                 subject="FixitLab - Verify Your Email",
                 to_email=email,
                 template="emails/otp_verification.html",
@@ -62,13 +63,19 @@ class SendOTPView(APIView):
                     "otp_code": code,
                     "expires_minutes": 10,
                 },
+                critical=True,
             )
-            logger.info(f"OTP sent to {email}")
+            logger.info(f"OTP delivered to {email}")
         except Exception as e:
             logger.error(f"Failed to send OTP to {email}: {e}")
             return Response(
-                {"error": "Failed to send verification code. Please try again."},
-                status=500,
+                {
+                    "error": (
+                        "Could not send verification email. "
+                        "Please check your address or try again in a few minutes."
+                    ),
+                },
+                status=503,
             )
 
         return Response({
@@ -406,17 +413,21 @@ class ForgotPasswordView(APIView):
 
                 # Send reset email
                 reset_url = f"{settings.FRONTEND_URL}/reset-password?token={raw_token}"
-                send_notification_email.delay(
-                    subject="Reset your FixitLab password",
-                    to_email=user.email,
-                    template="emails/password_reset.html",
-                    context={
-                        "username": user.username,
-                        "reset_url": reset_url,
-                        "expires_hours": 1,
-                    },
-                )
-                logger.info(f"Password reset email sent to {email}")
+                try:
+                    dispatch_notification_email(
+                        subject="Reset your FixitLab password",
+                        to_email=user.email,
+                        template="emails/password_reset.html",
+                        context={
+                            "username": user.username,
+                            "reset_url": reset_url,
+                            "expires_hours": 1,
+                        },
+                        critical=True,
+                    )
+                    logger.info(f"Password reset email delivered to {email}")
+                except Exception as mail_err:
+                    logger.error(f"Password reset email failed for {email}: {mail_err}")
         except User.DoesNotExist:
             logger.info(f"Password reset requested for nonexistent email: {email}")
         except Exception as e:

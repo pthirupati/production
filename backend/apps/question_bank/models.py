@@ -123,20 +123,14 @@ class Scenario(models.Model):
         ("simulation", "Simulation (no real container)"),
     ]
     SIMULATION_TYPE_CHOICES = [
-        ("none", "None / Generic RHEL"),
-        ("generic", "Generic RHEL"),
-        ("boot", "Boot / IPMI / GRUB"),
-        ("gpu", "GPU (NVIDIA/AMD)"),
-        ("ansible", "Ansible multi-host"),
-        ("baremetal", "Bare metal / IPMI"),
-        ("database", "Database (MySQL/PostgreSQL)"),
-        ("docker", "Docker containers"),
-        ("kubernetes", "Kubernetes"),
-        ("python", "Python development"),
-        ("html", "HTML / Web servers"),
-        ("shell_script", "Shell scripting"),
-        ("vmware", "VMware / Virtualization"),
-        ("patching", "OS patching / updates"),
+        ("generic", "Normal Simulation (full RHEL)"),
+        ("rhel", "RHEL Linux Simulation"),
+        ("kubernetes", "Kubernetes Simulation"),
+        ("gpu", "GPU / NVIDIA Simulation"),
+        ("baremetal", "Bare Metal / IPMI / VMware"),
+        ("database", "Database Simulation"),
+        ("ansible", "Ansible Simulation"),
+        ("python", "Python Simulation"),
     ]
 
     requires_companion_hosts = models.BooleanField(
@@ -156,8 +150,8 @@ class Scenario(models.Model):
     simulation_type = models.CharField(
         max_length=20,
         choices=SIMULATION_TYPE_CHOICES,
-        default="none",
-        help_text="Simulation engine when lab_mode=simulation",
+        default="generic",
+        help_text="Technology persona when lab_mode=simulation (one unified engine)",
     )
 
     time_limit = models.PositiveIntegerField(default=900, help_text="Time limit in seconds")

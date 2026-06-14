@@ -2,10 +2,8 @@
 
 from django.test import SimpleTestCase
 
-from apps.labs.provisioner.simulation.ansible_sim import AnsibleSimulator
 from apps.labs.provisioner.simulation.base_sim import BaseRHELSimulator
-from apps.labs.provisioner.simulation.boot import BootSimulator
-from apps.labs.provisioner.simulation.gpu import GPUSimulator
+from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
 from apps.labs.provisioner.simulation.rhel_os import RHELOSState
 from apps.labs.provisioner.simulation.rhel_shell import RHELShell
 from apps.labs.provisioner.simulation.scenario_presets import apply_scenario_preset
@@ -106,7 +104,7 @@ exit 0
 
 class EngineTests(SimpleTestCase):
     def test_gpu_modprobe_recovery(self):
-        sim = GPUSimulator(scenario_slug="sim-rhel-gpu-fallen-off")
+        sim = UnifiedSimulationEngine(scenario_slug="sim-rhel-gpu-fallen-off", simulation_type="gpu")
         out = sim.shell.run("nvidia-smi")
         self.assertIn("failed", out.lower())
         sim.shell.run("modprobe nvidia")
@@ -114,7 +112,7 @@ class EngineTests(SimpleTestCase):
         self.assertIn("NVIDIA-SMI", out)
 
     def test_ansible_ssh_key_fix(self):
-        sim = AnsibleSimulator(scenario_slug="sim-rhel-ansible-ssh")
+        sim = UnifiedSimulationEngine(scenario_slug="sim-rhel-ansible-ssh", simulation_type="ansible")
         out = sim.shell.run("ansible webservers -m ping")
         self.assertIn("UNREACHABLE", out)
         sim.shell.run("ssh-copy-id root@web2")
@@ -122,12 +120,13 @@ class EngineTests(SimpleTestCase):
         self.assertNotIn("UNREACHABLE", out)
 
     def test_boot_grub_to_shell(self):
-        boot = BootSimulator(scenario_slug="sim-rhel-boot-grub")
-        out = boot.handle("boot")
+        boot = UnifiedSimulationEngine(scenario_slug="sim-rhel-boot-grub", simulation_type="rhel")
+        self.assertIsNotNone(boot.boot)
+        out = boot._handle_boot("boot")
         self.assertIn("login", out.lower())
-        boot.handle("root")
-        boot.handle("password")
-        out = boot.handle("systemctl status sshd")
+        boot._handle_boot("root")
+        boot._handle_boot("password")
+        out = boot._handle_boot("systemctl status sshd")
         self.assertIn("sshd", out)
 
 

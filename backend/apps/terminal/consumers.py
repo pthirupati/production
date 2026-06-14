@@ -408,7 +408,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             }))
 
             await self._open_shell(resource_id)
-            if isinstance(self.raw_socket, ExecStreamHolder):
+            if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
                 await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
             return True
         except Exception as exc:
@@ -440,11 +440,11 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         """Continuously read output from the exec socket/SSH channel and send to client."""
         empty_reads = 0
         try:
-            if isinstance(self.raw_socket, ExecStreamHolder):
+            if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
                 await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
             while True:
                 try:
-                    if isinstance(self.raw_socket, ExecStreamHolder):
+                    if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
                         data = await asyncio.to_thread(self.raw_socket.recv, 4096)
                     elif hasattr(self.raw_socket, "recv"):
                         data = await asyncio.to_thread(self.raw_socket.recv, 4096)
@@ -469,7 +469,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                             await self.close(code=4500)
                             break
                         empty_reads = 0
-                        if isinstance(self.raw_socket, ExecStreamHolder):
+                        if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
                             await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
                         continue
                     await asyncio.sleep(0.2)

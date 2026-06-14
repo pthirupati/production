@@ -21,7 +21,7 @@ objectives:
 - 'Apply fix: bash /opt/scripts/backup.sh'
 - Verify validation passes
 requires_companion_hosts: false
-simulation_type: shell_script
+simulation_type: rhel
 slug: sim-bash-unbound-var
 time_limit: 900
 title: Bash Unbound Variable

@@ -1,0 +1,30 @@
+title: Deploy a Static Website with Nginx
+slug: deploy-static-website
+technology: Linux Administration
+category: Web Servers
+difficulty: easy
+scenario_type: do
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+lab_mode: docker
+jira_priority: Low
+is_free: false
+description: |
+  Task lab — deploy a static website from scratch. Create the HTML file,
+  configure nginx to serve it on port 80, and verify it responds.
+objectives:
+  - Create /var/www/mysite/index.html with your page content
+  - Configure nginx site at /etc/nginx/sites-available/mysite
+  - Enable the site and start nginx
+  - Verify curl http://localhost returns your page
+initial_state: |
+  Fresh Ubuntu server with nginx installed but not configured.
+  No website is deployed yet — this is a greenfield task.
+hints:
+  - order: 1
+    cost: 10
+    content: "Create `/var/www/mysite/index.html` with an `<h1>` tag."
+  - order: 2
+    cost: 15
+    content: "Symlink sites-available to sites-enabled and run `nginx -t`."

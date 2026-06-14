@@ -145,16 +145,38 @@ export default function PaymentPage() {
   const [gatewayChecked, setGatewayChecked] = useState(false)
   const [platformConfig, setPlatformConfig] = useState(null)
   const [upiId, setUpiId] = useState('')
+  const [couponCode, setCouponCode] = useState(searchParams.get('coupon') || '')
+  const [appliedCoupon, setAppliedCoupon] = useState(null)
+  const [couponLoading, setCouponLoading] = useState(false)
   const cardRef = useRef(null)
 
-  // Display amounts
-  const amountNum = parseInt(amountINR) || 0
-  const displayAmount = displayCurrency === 'USD' && displayAmountUSD
+  // Display amounts (coupon may override URL amount)
+  const baseAmount = parseInt(amountINR) || 0
+  const finalAmountINR = appliedCoupon?.discounted_amount ?? baseAmount
+  const discountSaved = appliedCoupon?.discount_saved ?? 0
+  const amountNum = finalAmountINR
+  const displayAmount = displayCurrency === 'USD' && displayAmountUSD && !appliedCoupon
     ? `$${displayAmountUSD}`
-    : `\u20B9${amountINR}`
-  const secondaryAmount = displayCurrency === 'USD' && displayAmountUSD
+    : `\u20B9${finalAmountINR}`
+  const secondaryAmount = displayCurrency === 'USD' && displayAmountUSD && !appliedCoupon
     ? `(\u20B9${amountINR} INR)`
     : ''
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim() || !techId) return
+    setCouponLoading(true)
+    setError('')
+    try {
+      const result = await subscriptionApi.validateCoupon(parseInt(techId), couponCode.trim())
+      setAppliedCoupon(result)
+      toast.success(`Coupon ${result.code} applied — save ₹${result.discount_saved}`)
+    } catch (err) {
+      setAppliedCoupon(null)
+      toast.error(err.response?.data?.error || 'Invalid coupon code')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
 
   // Load Razorpay SDK
   useEffect(() => {
@@ -302,7 +324,10 @@ export default function PaymentPage() {
 
       if (!orderId) {
         // Create a new Razorpay order
-        const orderData = await subscriptionApi.createRazorpayOrder(parseInt(techId))
+        const orderData = await subscriptionApi.createRazorpayOrder(
+          parseInt(techId),
+          appliedCoupon?.code || couponCode.trim() || '',
+        )
 
         if (!orderData.order_id) {
           setError(orderData.error || 'Payment gateway is unavailable.')
@@ -738,7 +763,34 @@ export default function PaymentPage() {
                 <div className="space-y-2.5 text-sm mb-5">
                   <div className="flex justify-between text-surface-400">
                     <span>{techName} Subscription</span>
-                    <span>{'\u20B9'}{amountINR}</span>
+                    <span>{'\u20B9'}{baseAmount || amountINR}</span>
+                  </div>
+                  {discountSaved > 0 && (
+                    <div className="flex justify-between text-accent-green">
+                      <span>Coupon ({appliedCoupon?.code})</span>
+                      <span>-{'\u20B9'}{discountSaved}</span>
+                    </div>
+                  )}
+                  {/* Coupon input */}
+                  <div className="pt-2 border-t border-surface-700/20">
+                    <label className="text-xs text-surface-500 block mb-1.5">Promo code</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponCode}
+                        onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setAppliedCoupon(null) }}
+                        placeholder="SAVE10"
+                        className="input-field flex-1 text-sm py-2"
+                      />
+                      <button
+                        type="button"
+                        onClick={applyCoupon}
+                        disabled={couponLoading || !couponCode.trim()}
+                        className="px-3 py-2 rounded-lg bg-surface-700 text-xs font-medium text-white hover:bg-surface-600 disabled:opacity-40"
+                      >
+                        {couponLoading ? '...' : 'Apply'}
+                      </button>
+                    </div>
                   </div>
                   {displayCurrency === 'USD' && displayAmountUSD && (
                     <div className="flex justify-between text-surface-500 text-xs">

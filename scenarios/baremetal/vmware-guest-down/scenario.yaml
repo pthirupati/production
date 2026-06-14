@@ -21,7 +21,7 @@ objectives:
 - 'Apply fix: virsh list --all'
 - Verify validation passes
 requires_companion_hosts: false
-simulation_type: vmware
+simulation_type: baremetal
 slug: sim-vmware-guest-down
 time_limit: 900
 title: VMware Guest Powered Off

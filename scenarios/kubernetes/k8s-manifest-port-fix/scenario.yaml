@@ -1,0 +1,30 @@
+title: Fix Kubernetes Service Port Mismatch
+slug: k8s-manifest-port-fix
+technology: Kubernetes
+category: Kubernetes
+difficulty: hard
+scenario_type: fix
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+lab_mode: docker
+jira_priority: High
+is_free: false
+description: |
+  Real hands-on Kubernetes troubleshooting lab. The deployment manifest at
+  /opt/k8s/deployment.yaml has a Service targetPort mismatch causing pods to
+  appear unreachable. Fix the manifest and start nginx.
+objectives:
+  - Analyze /opt/k8s/deployment.yaml for port mismatches
+  - Align Service targetPort with containerPort (80)
+  - Start nginx and verify the web server responds
+initial_state: |
+  Ubuntu container simulating a broken K8s deployment.
+  Manifest at /opt/k8s/deployment.yaml — Service points to port 8080 but nginx listens on 80.
+hints:
+  - order: 1
+    cost: 10
+    content: "Compare targetPort in the Service with containerPort in the Deployment."
+  - order: 2
+    cost: 20
+    content: "Change targetPort from 8080 to 80, then `service nginx start`."

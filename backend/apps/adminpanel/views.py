@@ -2184,6 +2184,122 @@ class AdminCouponDetailView(APIView):
         return Response({"message": "Deleted"})
 
 
+# ─── Organization / Team Management ───────────────────────────────────
+
+class AdminOrganizationsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.accounts.models import Organization, OrganizationMember, OrganizationTechnologyGrant
+        from apps.question_bank.models import Technology
+
+        orgs = Organization.objects.select_related("owner").order_by("-created_at")
+        data = []
+        for org in orgs:
+            grants = OrganizationTechnologyGrant.objects.filter(organization=org, is_active=True).select_related("technology")
+            data.append({
+                "id": str(org.id),
+                "name": org.name,
+                "slug": org.slug,
+                "owner": org.owner.username,
+                "owner_email": org.owner.email,
+                "seat_limit": org.seat_limit,
+                "member_count": org.members.count(),
+                "is_active": org.is_active,
+                "billing_email": org.billing_email,
+                "technologies": [g.technology.name for g in grants if g.is_valid_now()],
+                "created_at": org.created_at.isoformat(),
+            })
+        return Response({"organizations": data, "technologies": list(Technology.objects.filter(is_active=True).values("id", "name"))})
+
+    def post(self, request):
+        from django.contrib.auth import get_user_model
+        from django.utils.text import slugify
+        from apps.accounts.models import Organization, OrganizationMember, OrganizationTechnologyGrant
+        from apps.billing.subscription_utils import subscription_expires_at
+        from apps.question_bank.models import Technology
+
+        User = get_user_model()
+        name = (request.data.get("name") or "").strip()
+        owner_id = request.data.get("owner_id")
+        seat_limit = int(request.data.get("seat_limit") or 10)
+        tech_ids = request.data.get("technology_ids") or []
+
+        if not name or not owner_id:
+            return Response({"error": "name and owner_id are required"}, status=400)
+        try:
+            owner = User.objects.get(pk=owner_id)
+        except User.DoesNotExist:
+            return Response({"error": "Owner user not found"}, status=404)
+
+        base_slug = slugify(name)[:60] or "team"
+        slug = base_slug
+        n = 1
+        while Organization.objects.filter(slug=slug).exists():
+            slug = f"{base_slug}-{n}"
+            n += 1
+
+        org = Organization.objects.create(
+            name=name,
+            slug=slug,
+            owner=owner,
+            seat_limit=seat_limit,
+            billing_email=request.data.get("billing_email") or owner.email,
+            notes=request.data.get("notes", ""),
+        )
+        OrganizationMember.objects.create(organization=org, user=owner, role="owner")
+        expires = subscription_expires_at()
+        for tid in tech_ids:
+            try:
+                tech = Technology.objects.get(pk=tid, is_active=True)
+                OrganizationTechnologyGrant.objects.create(
+                    organization=org,
+                    technology=tech,
+                    expires_at=expires,
+                    is_active=True,
+                )
+            except Technology.DoesNotExist:
+                continue
+
+        return Response({"id": str(org.id), "slug": org.slug}, status=201)
+
+
+class AdminOrganizationDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request, org_id):
+        """Add member to organization by email."""
+        from django.contrib.auth import get_user_model
+        from apps.accounts.models import Organization, OrganizationMember
+
+        User = get_user_model()
+        try:
+            org = Organization.objects.get(pk=org_id, is_active=True)
+        except Organization.DoesNotExist:
+            return Response({"error": "Organization not found"}, status=404)
+
+        if org.members.count() >= org.seat_limit:
+            return Response({"error": "Seat limit reached"}, status=400)
+
+        email = (request.data.get("email") or "").strip().lower()
+        if not email:
+            return Response({"error": "email is required"}, status=400)
+        user = User.objects.filter(email=email).first()
+        if not user:
+            return Response({"error": "User not found — they must register first"}, status=404)
+        if OrganizationMember.objects.filter(organization=org, user=user).exists():
+            return Response({"error": "User is already a member"}, status=409)
+
+        role = request.data.get("role", "member")
+        OrganizationMember.objects.create(organization=org, user=user, role=role, invited_email=email)
+        return Response({"message": f"Added {user.username} to {org.name}"})
+
+    def delete(self, request, org_id):
+        from apps.accounts.models import Organization
+        Organization.objects.filter(pk=org_id).update(is_active=False)
+        return Response({"message": "Organization deactivated"})
+
+
 # ─── Security Metrics ─────────────────────────────────────────────────
 
 class AdminSecurityMetricsView(APIView):

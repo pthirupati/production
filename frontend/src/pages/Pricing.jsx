@@ -65,6 +65,9 @@ export default function Pricing() {
   const [gatewayDown, setGatewayDown] = useState(false)
   const [gatewayMessage, setGatewayMessage] = useState('')
   const [platformConfig, setPlatformConfig] = useState(null)
+  const [couponCode, setCouponCode] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState(null)
+  const [couponLoading, setCouponLoading] = useState(false)
 
   useEffect(() => {
     api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
@@ -175,7 +178,7 @@ export default function Pricing() {
     setSubscribing(tech.id)
 
     try {
-      const orderData = await subscriptionApi.createRazorpayOrder(tech.id)
+      const orderData = await subscriptionApi.createRazorpayOrder(tech.id, appliedCoupon?.code || couponCode.trim())
       const params = new URLSearchParams({
         token: orderData.payment_token || orderData.order_id || '',
         tech: tech.name,
@@ -183,6 +186,9 @@ export default function Pricing() {
         tech_id: String(tech.id),
         currency: 'INR',
       })
+      if (appliedCoupon?.code || couponCode.trim()) {
+        params.set('coupon', appliedCoupon?.code || couponCode.trim())
+      }
 
       if (orderData.order_id) {
         params.set('order_id', orderData.order_id)
@@ -334,6 +340,46 @@ export default function Pricing() {
             <AlertTriangle size={18} className="shrink-0 mt-0.5" />
             <span>{gatewayMessage || 'Payment gateway is unavailable. Free scenarios still work.'}</span>
           </div>
+        )}
+        {/* Promo code */}
+        {isAuthenticated && !gatewayDown && (
+          <div className="mb-8 max-w-md mx-auto flex gap-2">
+            <input
+              type="text"
+              value={couponCode}
+              onChange={e => { setCouponCode(e.target.value.toUpperCase()); setAppliedCoupon(null) }}
+              placeholder="Promo code (e.g. SAVE10)"
+              className="input-field flex-1 text-sm"
+            />
+            <button
+              type="button"
+              disabled={couponLoading || !couponCode.trim() || cart.length !== 1}
+              onClick={async () => {
+                if (cart.length !== 1) {
+                  toast('Add one technology to cart to validate coupon', { icon: 'ℹ️' })
+                  return
+                }
+                setCouponLoading(true)
+                try {
+                  const r = await subscriptionApi.validateCoupon(cart[0].id, couponCode.trim())
+                  setAppliedCoupon(r)
+                  toast.success(`Save ₹${r.discount_saved} on checkout!`)
+                } catch (err) {
+                  toast.error(err.response?.data?.error || 'Invalid coupon')
+                } finally {
+                  setCouponLoading(false)
+                }
+              }}
+              className="btn-secondary px-4 text-sm whitespace-nowrap disabled:opacity-40"
+            >
+              {couponLoading ? '...' : 'Apply'}
+            </button>
+          </div>
+        )}
+        {appliedCoupon && (
+          <p className="text-center text-sm text-accent-green mb-6">
+            Coupon {appliedCoupon.code} applied — ₹{appliedCoupon.discount_saved} off at checkout
+          </p>
         )}
         {/* Hero */}
         <div className="text-center mb-14 relative">

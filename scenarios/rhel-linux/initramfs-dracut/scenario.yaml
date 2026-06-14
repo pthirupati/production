@@ -21,7 +21,7 @@ objectives:
 - 'Apply fix: dracut -f'
 - Verify validation passes
 requires_companion_hosts: false
-simulation_type: boot
+simulation_type: rhel
 slug: sim-rhel-initramfs-dracut
 time_limit: 900
 title: Initramfs / Dracut Failure

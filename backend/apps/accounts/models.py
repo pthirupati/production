@@ -189,3 +189,70 @@ class ContactMessage(models.Model):
     def __str__(self):
         return f"{self.subject} — {self.name} ({self.email})"
 
+
+class Organization(models.Model):
+    """Enterprise / team account with shared technology access."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=80, unique=True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="owned_organizations")
+    seat_limit = models.PositiveIntegerField(default=10)
+    is_active = models.BooleanField(default=True)
+    billing_email = models.EmailField(blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def member_count(self):
+        return self.members.count()
+
+
+class OrganizationMember(models.Model):
+    ROLE_CHOICES = [
+        ("owner", "Owner"),
+        ("admin", "Admin"),
+        ("member", "Member"),
+    ]
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="members")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="organization_memberships")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="member")
+    invited_email = models.EmailField(blank=True, default="")
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("organization", "user")]
+        ordering = ["joined_at"]
+
+    def __str__(self):
+        return f"{self.user.username} @ {self.organization.name}"
+
+
+class OrganizationTechnologyGrant(models.Model):
+    """Team-wide access to a technology track."""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="technology_grants")
+    technology = models.ForeignKey(
+        "question_bank.Technology",
+        on_delete=models.CASCADE,
+        related_name="organization_grants",
+    )
+    expires_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("organization", "technology")]
+
+    def is_valid_now(self) -> bool:
+        if not self.is_active:
+            return False
+        if self.expires_at and timezone.now() > self.expires_at:
+            return False
+        return True
+

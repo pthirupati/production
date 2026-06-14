@@ -5,7 +5,7 @@ from django.test import SimpleTestCase
 from apps.labs.provisioner.simulation.editor_mode import EditorSession
 from apps.labs.provisioner.simulation.firewall_state import FirewallState
 from apps.labs.provisioner.simulation.k8s_cluster import K8sCluster
-from apps.labs.provisioner.simulation.kubernetes_sim import KubernetesSimulator
+from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
 from apps.labs.provisioner.simulation.lvm_state import LVMState
 from apps.labs.provisioner.simulation.rhel_shell import RHELShell
 
@@ -73,7 +73,7 @@ class K8sClusterTests(SimpleTestCase):
         self.assertNotIn("<none>", c.get_endpoints("api"))
 
     def test_kubectl_simulator(self):
-        sim = KubernetesSimulator("sim-k8s-crashloop")
+        sim = UnifiedSimulationEngine(scenario_slug="sim-k8s-crashloop", simulation_type="kubernetes")
         out = sim.shell.run("kubectl get pods")
         self.assertIn("CrashLoopBackOff", out)
         sim.shell.run("kubectl rollout restart deployment/nginx")

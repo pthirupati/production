@@ -278,8 +278,49 @@ class PaymentGatewayStatusView(APIView):
         })
 
 
+class ValidateCouponView(APIView):
+    """Preview coupon discount before checkout."""
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [BillingRateThrottle]
+
+    def post(self, request):
+        from apps.question_bank.models import Technology
+        from .coupon_service import apply_coupon_to_amount, CouponError
+
+        code = (request.data.get("coupon_code") or "").strip()
+        technology_id = request.data.get("technology_id")
+        if not code:
+            return Response({"error": "coupon_code is required"}, status=http_status.HTTP_400_BAD_REQUEST)
+        if not technology_id:
+            return Response({"error": "technology_id is required"}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        try:
+            technology = Technology.objects.get(id=technology_id, is_active=True)
+        except Technology.DoesNotExist:
+            return Response({"error": "Technology not found"}, status=http_status.HTTP_404_NOT_FOUND)
+
+        original_amount = int(getattr(technology, "price", 0) or 0)
+        if original_amount <= 0:
+            return Response({"error": "Price not configured for this technology"}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        try:
+            discounted, coupon = apply_coupon_to_amount(code, original_amount)
+        except CouponError as exc:
+            return Response({"valid": False, "error": str(exc)}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            "valid": True,
+            "code": coupon.code,
+            "description": coupon.description,
+            "original_amount": original_amount,
+            "discounted_amount": discounted,
+            "discount_saved": original_amount - discounted,
+            "discount_type": coupon.discount_type,
+            "discount_value": float(coupon.discount_value),
+        })
+
+
 class CreateRazorpayOrderView(APIView):
-    """Create a Razorpay order for a technology subscription."""
     permission_classes = [IsAuthenticated]
     throttle_classes = [BillingRateThrottle]
 
@@ -587,8 +628,36 @@ class VerifyRazorpayPaymentView(APIView):
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
-        # Server-side price — never trust client-supplied amount
-        amount = int(getattr(technology, 'price', 0) or 0)
+        # Server-side price — prefer Razorpay order amount (supports coupons); fallback to catalog price
+        amount = int(getattr(technology, "price", 0) or 0)
+        coupon_applied = None
+        if settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET:
+            try:
+                import razorpay
+                client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+                order = client.order.fetch(razorpay_order_id)
+                if isinstance(order, dict):
+                    order_notes = order.get("notes") or {}
+                    raw_order_amount = order.get("amount")
+                    try:
+                        if raw_order_amount is not None:
+                            parsed = int(raw_order_amount) // 100
+                            if parsed > 0:
+                                amount = parsed
+                    except (TypeError, ValueError):
+                        pass
+                    coupon_code = (order_notes.get("coupon_code") or "").strip()
+                    if coupon_code:
+                        from .coupon_service import validate_coupon
+                        try:
+                            coupon_applied = validate_coupon(coupon_code)
+                        except Exception:
+                            coupon_applied = None
+            except Exception as e:
+                logger.warning("Could not fetch Razorpay order %s: %s", razorpay_order_id, e)
+
+        if amount <= 0:
+            amount = int(getattr(technology, "price", 0) or 0)
         if amount <= 0:
             return Response(
                 {"error": "Invalid technology price"},
@@ -621,6 +690,10 @@ class VerifyRazorpayPaymentView(APIView):
             payment_verified=True,
         )
 
+        if coupon_applied:
+            from .coupon_service import redeem_coupon
+            redeem_coupon(coupon_applied)
+
         logger.info(f"Payment verified for user {request.user.username}: {razorpay_payment_id} — {technology.name}")
 
         # Send all emails (confirmation + admin + invoice)
@@ -632,6 +705,7 @@ class VerifyRazorpayPaymentView(APIView):
             "subscription_id": sub_id,
             "technology": technology.name,
             "amount": str(amount),
+            "coupon_applied": coupon_applied.code if coupon_applied else None,
             "is_active": True,
             "payment_verified": True,
             "razorpay_payment_id": razorpay_payment_id,

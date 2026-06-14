@@ -38,8 +38,10 @@ def is_tech_subscription_in_grace(sub) -> bool:
 
 
 def user_has_technology_access(user, technology_id) -> bool:
-    """Active subscription, grace period, or complimentary/staff access."""
+    """Active subscription, grace period, org grant, or complimentary/staff access."""
     if user_has_complimentary_access(user):
+        return True
+    if user_has_org_technology_access(user, technology_id):
         return True
     sub = (
         user.tech_subscriptions.filter(technology_id=technology_id)
@@ -49,6 +51,57 @@ def user_has_technology_access(user, technology_id) -> bool:
     if not sub:
         return False
     return is_tech_subscription_active(sub) or is_tech_subscription_in_grace(sub)
+
+
+def user_has_org_technology_access(user, technology_id) -> bool:
+    """True if user's organization has an active grant for this technology."""
+    if not user or not user.is_authenticated:
+        return False
+    try:
+        from apps.accounts.models import OrganizationMember, OrganizationTechnologyGrant
+        from django.utils import timezone
+
+        org_ids = OrganizationMember.objects.filter(
+            user=user,
+            organization__is_active=True,
+        ).values_list("organization_id", flat=True)
+        if not org_ids:
+            return False
+        now = timezone.now()
+        grants = OrganizationTechnologyGrant.objects.filter(
+            organization_id__in=org_ids,
+            technology_id=technology_id,
+            is_active=True,
+        )
+        for grant in grants:
+            if grant.is_valid_now():
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def get_subscribed_technology_ids(user):
+    """Return None for full access, else set of technology ids."""
+    if user_has_complimentary_access(user):
+        return None
+    ids = set(active_tech_subscriptions_qs(user).values_list("technology_id", flat=True))
+    try:
+        from apps.accounts.models import OrganizationMember, OrganizationTechnologyGrant
+
+        org_ids = OrganizationMember.objects.filter(
+            user=user,
+            organization__is_active=True,
+        ).values_list("organization_id", flat=True)
+        for grant in OrganizationTechnologyGrant.objects.filter(
+            organization_id__in=org_ids,
+            is_active=True,
+        ):
+            if grant.is_valid_now():
+                ids.add(grant.technology_id)
+    except Exception:
+        pass
+    return ids
 
 
 def active_tech_subscriptions_qs(user):
@@ -73,15 +126,6 @@ def user_has_complimentary_access(user) -> bool:
 
 def user_has_all_technology_access(user) -> bool:
     return user_has_complimentary_access(user)
-
-
-def get_subscribed_technology_ids(user):
-    """Return None for full access, else set of technology ids."""
-    if user_has_complimentary_access(user):
-        return None
-    return set(
-        active_tech_subscriptions_qs(user).values_list("technology_id", flat=True)
-    )
 
 
 def activate_technology_subscription(sub, *, renew=False):

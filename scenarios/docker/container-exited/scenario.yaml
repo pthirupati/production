@@ -21,7 +21,7 @@ objectives:
 - 'Apply fix: docker start web'
 - Verify validation passes
 requires_companion_hosts: false
-simulation_type: docker
+simulation_type: generic
 slug: sim-docker-container-exited
 time_limit: 900
 title: Docker Container Exited

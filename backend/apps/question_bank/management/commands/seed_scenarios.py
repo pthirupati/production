@@ -121,9 +121,9 @@ class Command(BaseCommand):
                 if lab_mode == "simulation":
                     infra = "docker"  # valid choice; runtime uses lab_mode
 
-                sim_type = data.get("simulation_type", "none")
-                if sim_type == "generic":
-                    sim_type = "generic"
+                sim_type = data.get("simulation_type", "generic")
+                from apps.labs.provisioner.simulation.sim_types import normalize_sim_type
+                sim_type = normalize_sim_type(sim_type)
 
                 scenario, created = Scenario.objects.update_or_create(
                     slug=data.get("slug", scenario_dir),
@@ -150,6 +150,7 @@ class Command(BaseCommand):
                         "blocked_commands": data.get("blocked_commands", []),
                         "lab_mode": lab_mode,
                         "simulation_type": sim_type,
+                        "scenario_type": data.get("scenario_type", "fix"),
                         "requires_companion_hosts": data.get("requires_companion_hosts", False),
                         "dual_terminal": data.get("dual_terminal", False),
                     },

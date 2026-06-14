@@ -1,0 +1,30 @@
+title: Start the Docker Engine
+slug: docker-daemon-stopped
+technology: Docker & Containers
+category: Docker Engine
+difficulty: easy
+scenario_type: fix
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+lab_mode: docker
+docker_privileged: true
+jira_priority: Medium
+is_free: false
+description: |
+  Docker is installed on this server but the daemon is not running.
+  Start the Docker engine and verify `docker ps` works.
+objectives:
+  - Diagnose why docker commands fail
+  - Start the Docker service
+  - Verify docker ps succeeds
+initial_state: |
+  Real Ubuntu 22.04 container with Docker CE installed.
+  The docker daemon is stopped — `docker ps` returns a connection error.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run `systemctl status docker` to see service state."
+  - order: 2
+    cost: 15
+    content: "Start Docker with `systemctl start docker`."

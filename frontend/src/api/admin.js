@@ -325,6 +325,21 @@ export const adminApi = {
     return data
   },
 
+  async getOrganizations() {
+    const { data } = await api.get('/admin/organizations/')
+    return data
+  },
+
+  async createOrganization(payload) {
+    const { data } = await api.post('/admin/organizations/', payload)
+    return data
+  },
+
+  async addOrganizationMember(orgId, payload) {
+    const { data } = await api.post(`/admin/organizations/${orgId}/`, payload)
+    return data
+  },
+
   async getSecurityMetrics(days = 7) {
     const { data } = await api.get(`/admin/security/?days=${days}`)
     return data

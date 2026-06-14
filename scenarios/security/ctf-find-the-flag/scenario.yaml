@@ -1,0 +1,29 @@
+title: CTF — Find the Hidden Flag
+slug: ctf-find-the-flag
+technology: Security
+category: CTF
+difficulty: medium
+scenario_type: hack
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+lab_mode: docker
+jira_priority: Medium
+is_free: true
+description: |
+  Capture-the-flag challenge. The flag is hidden somewhere on the filesystem.
+  Use Linux forensics skills to locate FIXITLAB{...} and pass validation.
+objectives:
+  - Search the filesystem for hidden files and strings
+  - Find the flag value
+  - Create /tmp/flag.txt with the discovered flag
+initial_state: |
+  A Linux server with a hidden flag. Standard user access only.
+  Hint — not everything is in plain sight.
+hints:
+  - order: 1
+    cost: 10
+    content: "Try `find / -name '*flag*' 2>/dev/null` and check dotfiles in /home."
+  - order: 2
+    cost: 20
+    content: "Look in `/var/backups/.secret/` for a file named hint.txt."

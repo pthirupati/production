@@ -37,6 +37,8 @@ from .views import (
     AdminUploadView,
     AdminCouponsView,
     AdminCouponDetailView,
+    AdminOrganizationsView,
+    AdminOrganizationDetailView,
     AdminSecurityMetricsView,
 )
 
@@ -51,6 +53,8 @@ urlpatterns = [
     path("upload/", AdminUploadView.as_view()),
     path("coupons/", AdminCouponsView.as_view()),
     path("coupons/<int:pk>/", AdminCouponDetailView.as_view()),
+    path("organizations/", AdminOrganizationsView.as_view()),
+    path("organizations/<uuid:org_id>/", AdminOrganizationDetailView.as_view()),
     path("security/", AdminSecurityMetricsView.as_view()),
 
     # Maintenance Mode

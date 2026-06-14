@@ -20,7 +20,7 @@ objectives:
 - 'Apply fix: grub2-install /dev/sda'
 - Verify validation passes
 requires_companion_hosts: false
-simulation_type: boot
+simulation_type: rhel
 slug: sim-rhel-grub-rescue
 time_limit: 900
 title: GRUB Rescue Mode

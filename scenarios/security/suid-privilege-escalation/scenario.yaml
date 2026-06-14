@@ -1,0 +1,30 @@
+title: Exploit SUID Binary for Root Access
+slug: suid-privilege-escalation
+technology: Security
+category: Privilege Escalation
+difficulty: hard
+scenario_type: hack
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+lab_mode: docker
+jira_priority: High
+is_free: false
+description: |
+  CTF-style privilege escalation lab. A misconfigured SUID binary allows
+  reading protected files. Find the vulnerability and retrieve the flag at
+  /root/flag.txt as the low-privilege user `ctf`.
+objectives:
+  - Enumerate SUID binaries on the system
+  - Exploit the misconfiguration to read /root/flag.txt
+  - Submit the flag via validation
+initial_state: |
+  You are logged in as user `ctf` on a hardened Linux server.
+  A SUID binary has been misconfigured — find and exploit it.
+hints:
+  - order: 1
+    cost: 15
+    content: "Run `find / -perm -4000 -type f 2>/dev/null` to list SUID binaries."
+  - order: 2
+    cost: 25
+    content: "Check `/usr/local/bin/readflag` — it may read any file when invoked incorrectly."

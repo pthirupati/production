@@ -9,6 +9,14 @@ export const subscriptionApi = {
     return data
   },
 
+  async validateCoupon(technologyId, couponCode) {
+    const { data } = await api.post('/billing/coupon/validate/', {
+      technology_id: technologyId,
+      coupon_code: couponCode,
+    })
+    return data
+  },
+
   async createRazorpayOrder(technologyId, couponCode = '') {
     const payload = { technology_id: technologyId }
     if (couponCode) payload.coupon_code = couponCode

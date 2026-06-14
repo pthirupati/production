@@ -1,15 +1,10 @@
-"""Simulation provisioner — boot, GPU, Ansible, bare-metal labs without Docker."""
+"""Simulation provisioner — single unified engine for all simulation labs."""
 
 from __future__ import annotations
 
 import logging
 import uuid
 
-from .simulation.ansible_sim import AnsibleSimulator
-from .simulation.base_sim import BaseRHELSimulator
-from .simulation.baremetal import BaremetalSimulator
-from .simulation.boot import BootSimulator
-from .simulation.gpu import GPUSimulator
 from .simulation.rhel_shell import RHELShell
 from .simulation.shell import (
     SimulationStreamHolder,
@@ -18,51 +13,24 @@ from .simulation.shell import (
     get_sim_session_by_resource,
     register_sim_session,
 )
-from .simulation.database_sim import DatabaseSimulator
-from .simulation.docker_sim import DockerSimulator
-from .simulation.html_sim import HtmlSimulator
-from .simulation.kubernetes_sim import KubernetesSimulator
-from .simulation.python_sim import PythonSimulator
-from .simulation.shell_script_sim import ShellScriptSimulator
+from .simulation.sim_types import normalize_sim_type
+from .simulation.simulation_modules import register_modules
+from .simulation.unified_sim import UnifiedSimulationEngine
 from .simulation.validation import validate_simulation_state
 
 logger = logging.getLogger(__name__)
 
-_ENGINE_MAP = {
-    "boot": BootSimulator,
-    "gpu": GPUSimulator,
-    "ansible": AnsibleSimulator,
-    "baremetal": BaremetalSimulator,
-    "database": DatabaseSimulator,
-    "docker": DockerSimulator,
-    "kubernetes": KubernetesSimulator,
-    "python": PythonSimulator,
-    "html": HtmlSimulator,
-    "shell_script": ShellScriptSimulator,
-    "vmware": BaremetalSimulator,
-    "patching": BootSimulator,
-    "none": BaseRHELSimulator,
-    "generic": BaseRHELSimulator,
-}
-
 
 class SimulationProvisioner:
-    """Provisioner for lab_mode=simulation scenarios."""
+    """Provisioner for lab_mode=simulation — one engine, scenario-driven behavior."""
 
     def provision(self, lab_session):
         scenario = lab_session.scenario
-        sim_type = getattr(scenario, "simulation_type", "none") or "none"
+        raw_type = getattr(scenario, "simulation_type", "generic") or "generic"
+        sim_type = normalize_sim_type(raw_type)
         slug = scenario.slug
 
-        if sim_type == "none":
-            sim_type = "generic"
-
-        engine_cls = _ENGINE_MAP.get(sim_type, BaseRHELSimulator)
-        try:
-            engine = engine_cls(scenario_slug=slug)
-        except TypeError:
-            engine = engine_cls()
-
+        engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
         resource_id = f"sim-{uuid.uuid4().hex[:12]}"
 
         lab_hosts = []
@@ -86,6 +54,7 @@ class SimulationProvisioner:
             {
                 "engine": engine,
                 "scenario_slug": slug,
+                "simulation_type": sim_type,
                 "hosts": {h["name"]: h for h in lab_hosts},
                 "validation_marker": f"/opt/fixitlab/sim-valid-{slug}",
             },
@@ -94,7 +63,7 @@ class SimulationProvisioner:
         lab_session.lab_hosts = lab_hosts
         lab_session.save(update_fields=["lab_hosts"])
 
-        logger.info("Simulation lab %s type=%s resource=%s", lab_session.id, sim_type, resource_id)
+        logger.info("Simulation lab %s persona=%s resource=%s", lab_session.id, sim_type, resource_id)
         return resource_id, f"sim-{slug}"
 
     def create_exec_stream(self, resource_id, session_key: str = "", host_key: str = "primary"):
@@ -114,8 +83,7 @@ class SimulationProvisioner:
                 scenario_slug=entry["state"].get("scenario_slug", ""),
                 hostname=hostname,
             )
-            if hasattr(engine, "_register_extras_on"):
-                engine._register_extras_on(shell)
+            register_modules(engine, shell)
 
             def get_ed():
                 return shell.state.editor
@@ -142,7 +110,6 @@ class SimulationProvisioner:
         return holder.exec_id, holder
 
     def execute_command(self, resource_id, command):
-        # No real check.sh in simulation — force DB script validation path
         if "check.sh" in (command or ""):
             return 127, "simulation: use validation_script"
         return 0, f"[simulation] {command}"

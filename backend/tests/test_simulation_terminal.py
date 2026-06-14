@@ -2,7 +2,7 @@
 
 from django.test import SimpleTestCase
 
-from apps.labs.provisioner.simulation.boot import BootSimulator
+from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
 from apps.labs.provisioner.simulation.boot_sequence import BootState
 from apps.labs.provisioner.simulation.terminal_input import TerminalLineEditor
 
@@ -36,27 +36,25 @@ class TerminalInputTests(SimpleTestCase):
 
 class BootSequenceTests(SimpleTestCase):
     def test_reboot_shows_grub(self):
-        boot = BootSimulator(scenario_slug="sim-rhel-boot-grub")
-        boot.handle("boot")
-        boot.handle("root")
-        boot.handle("pass")
-        out = boot.handle("reboot")
+        boot = UnifiedSimulationEngine(scenario_slug="sim-rhel-boot-grub", simulation_type="rhel")
+        boot._handle_boot("boot")
+        boot._handle_boot("root")
+        boot._handle_boot("pass")
+        out = boot._handle_boot("reboot")
         self.assertIn("grub", out.lower())
 
     def test_initramfs_fix_with_dracut(self):
-        boot = BootSimulator(scenario_slug="sim-rhel-initramfs-dracut")
-        boot.boot.apply_issue("sim-rhel-initramfs-dracut")
-        out = boot.handle("dracut -f")
+        boot = UnifiedSimulationEngine(scenario_slug="sim-rhel-initramfs-dracut", simulation_type="rhel")
+        out = boot._handle_boot("dracut -f")
         self.assertIn("initramfs", out.lower())
         self.assertTrue(boot.boot.initramfs_fixed)
 
     def test_patching_dnf(self):
-        boot = BootSimulator(scenario_slug="sim-rhel-patching")
-        boot.boot.apply_issue("sim-rhel-patching")
-        boot.handle("boot")
-        boot.handle("root")
-        boot.handle("pass")
-        out = boot.handle("dnf update -y")
+        boot = UnifiedSimulationEngine(scenario_slug="sim-rhel-patching", simulation_type="rhel")
+        boot._handle_boot("boot")
+        boot._handle_boot("root")
+        boot._handle_boot("pass")
+        out = boot._handle_boot("dnf update -y")
         self.assertIn("Complete", out)
 
     def test_mbr_issue_on_reboot(self):

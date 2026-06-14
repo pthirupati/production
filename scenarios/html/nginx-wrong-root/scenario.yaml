@@ -21,7 +21,7 @@ objectives:
 - 'Apply fix: nginx -t'
 - Verify validation passes
 requires_companion_hosts: false
-simulation_type: html
+simulation_type: rhel
 slug: sim-html-nginx-root
 time_limit: 900
 title: Nginx Wrong Document Root

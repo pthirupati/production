@@ -16,25 +16,28 @@ const INFRA_TYPES = [
 ]
 
 const SIMULATION_TYPES = [
-  { value: 'none', label: 'Generic RHEL' },
-  { value: 'generic', label: 'Generic RHEL OS' },
-  { value: 'boot', label: 'Boot / GRUB / Initramfs' },
-  { value: 'patching', label: 'OS Patching (dnf/yum)' },
-  { value: 'gpu', label: 'GPU (NVIDIA/AMD)' },
-  { value: 'ansible', label: 'Ansible multi-host' },
-  { value: 'baremetal', label: 'Bare metal / IPMI' },
-  { value: 'vmware', label: 'VMware / Virtualization' },
-  { value: 'database', label: 'Database (MySQL/PostgreSQL)' },
-  { value: 'docker', label: 'Docker containers' },
-  { value: 'kubernetes', label: 'Kubernetes' },
-  { value: 'python', label: 'Python development' },
-  { value: 'html', label: 'HTML / Web servers' },
-  { value: 'shell_script', label: 'Shell scripting' },
+  { value: 'generic', label: 'Normal Simulation (full RHEL — all tech)' },
+  { value: 'rhel', label: 'RHEL Linux Simulation' },
+  { value: 'kubernetes', label: 'Kubernetes Simulation' },
+  { value: 'gpu', label: 'GPU / NVIDIA Simulation' },
+  { value: 'baremetal', label: 'Bare Metal / IPMI / VMware' },
+  { value: 'database', label: 'Database Simulation' },
+  { value: 'ansible', label: 'Ansible Simulation' },
+  { value: 'python', label: 'Python Simulation' },
 ]
+
+/** Map legacy DB values to unified admin options */
+const normalizeSimType = (t) => {
+  const map = {
+    none: 'generic', boot: 'rhel', patching: 'rhel', html: 'rhel', shell_script: 'rhel',
+    docker: 'generic', vmware: 'baremetal', k8s: 'kubernetes',
+  }
+  return map[t] || t || 'generic'
+}
 
 const LAB_MODES = [
   { value: 'docker', label: 'Docker Container' },
-  { value: 'simulation', label: 'Simulation' },
+  { value: 'simulation', label: 'Simulation (unified RHEL engine)' },
 ]
 
 export default function AdminScenarios() {
@@ -53,9 +56,11 @@ export default function AdminScenarios() {
     max_score: 100, is_active: true, is_free: true, solution_explanation: '',
     jira_priority: 'Medium', jira_issue_template: '',
     requires_companion_hosts: false, dual_terminal: false,
-    lab_mode: 'docker', simulation_type: 'none', docker_privileged: false,
+    lab_mode: 'docker', simulation_type: 'generic', docker_privileged: false,
   })
   const [newBlockedCmd, setNewBlockedCmd] = useState('')
+  const [hints, setHints] = useState([])
+  const [newHint, setNewHint] = useState({ content: '', penalty: 10 })
 
   useEffect(() => { loadData() }, [search])
 
@@ -92,6 +97,7 @@ export default function AdminScenarios() {
       }
       setShowForm(false)
       setEditingId(null)
+      setHints([])
       resetForm()
       loadData()
     } catch (err) {
@@ -129,10 +135,11 @@ export default function AdminScenarios() {
         requires_companion_hosts: s.requires_companion_hosts || false,
         dual_terminal: s.dual_terminal || false,
         lab_mode: s.lab_mode || 'docker',
-        simulation_type: s.simulation_type || 'none',
+        simulation_type: normalizeSimType(s.simulation_type),
         docker_privileged: s.docker_privileged || false,
       })
       setEditingId(scenario.id)
+      setHints(s.hints || [])
       setShowForm(true)
     } catch {
       toast.error('Failed to load scenario details')
@@ -148,6 +155,28 @@ export default function AdminScenarios() {
     } catch { toast.error('Delete failed') }
   }
 
+  const handleAddHint = async () => {
+    if (!editingId || !newHint.content.trim()) return
+    try {
+      const hint = await adminApi.addHint(editingId, newHint)
+      setHints(h => [...h, hint])
+      setNewHint({ content: '', penalty: 10 })
+      toast.success('Hint added')
+    } catch {
+      toast.error('Failed to add hint')
+    }
+  }
+
+  const handleDeleteHint = async (id) => {
+    try {
+      await adminApi.deleteHint(id)
+      setHints(h => h.filter(x => x.id !== id))
+      toast.success('Hint removed')
+    } catch {
+      toast.error('Failed to delete hint')
+    }
+  }
+
   const resetForm = () => {
     setForm({
       title: '', slug: '', subtitle: '', description: '', objectives: '',
@@ -157,7 +186,7 @@ export default function AdminScenarios() {
     max_score: 100, is_active: true, is_free: true, solution_explanation: '',
     jira_priority: 'Medium', jira_issue_template: '',
     requires_companion_hosts: false, dual_terminal: false,
-    lab_mode: 'docker', simulation_type: 'none', docker_privileged: false,
+    lab_mode: 'docker', simulation_type: 'generic', docker_privileged: false,
   })
     setNewBlockedCmd('')
   }
@@ -242,15 +271,20 @@ export default function AdminScenarios() {
               </div>
               <div>
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Lab mode</label>
-                <select value={form.lab_mode} onChange={(e) => setForm(f => ({ ...f, lab_mode: e.target.value }))} className="input-field">
+                <select value={form.lab_mode} onChange={(e) => setForm(f => ({
+                  ...f,
+                  lab_mode: e.target.value,
+                  simulation_type: e.target.value === 'simulation' ? (f.simulation_type || 'generic') : f.simulation_type,
+                }))} className="input-field">
                   {LAB_MODES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Simulation type</label>
-                <select value={form.simulation_type} onChange={(e) => setForm(f => ({ ...f, simulation_type: e.target.value }))} className="input-field" disabled={form.lab_mode !== 'simulation'}>
+                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Simulation persona</label>
+                <select value={form.simulation_type} onChange={(e) => setForm(f => ({ ...f, lab_mode: 'simulation', simulation_type: e.target.value }))} className="input-field" disabled={form.lab_mode !== 'simulation'}>
                   {SIMULATION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
+                <p className="text-xs text-surface-500 mt-1">One engine — scenario YAML + slug define the broken state</p>
               </div>
               <div className="col-span-3 flex flex-wrap gap-4 pt-1">
                 <label className="flex items-center gap-2 text-sm text-surface-300">
@@ -404,6 +438,29 @@ export default function AdminScenarios() {
                   <p className="text-xs text-surface-600 italic">No commands blocked — users can run anything.</p>
                 )}
               </div>
+
+              {editingId && (
+                <div className="col-span-3 border-t border-surface-800 pt-4 mt-2">
+                  <label className="block text-xs text-surface-400 mb-2 uppercase tracking-wider">Hints ({hints.length})</label>
+                  <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                    {hints.map(h => (
+                      <div key={h.id} className="flex items-start gap-2 p-2 rounded-lg bg-surface-800/40 text-sm">
+                        <span className="text-accent-amber text-xs font-mono shrink-0">-{h.penalty}pts</span>
+                        <span className="text-surface-300 flex-1">{h.content}</span>
+                        <button type="button" onClick={() => handleDeleteHint(h.id)} className="text-surface-500 hover:text-red-400"><Trash2 size={14} /></button>
+                      </div>
+                    ))}
+                    {hints.length === 0 && <p className="text-xs text-surface-600">No hints — add one below or re-seed from YAML.</p>}
+                  </div>
+                  <div className="flex gap-2">
+                    <input value={newHint.content} onChange={e => setNewHint(h => ({ ...h, content: e.target.value }))}
+                      className="input-field flex-1 text-sm" placeholder="Hint text..." />
+                    <input type="number" value={newHint.penalty} onChange={e => setNewHint(h => ({ ...h, penalty: Number(e.target.value) }))}
+                      className="input-field w-20 text-sm" min={0} title="Score penalty" />
+                    <button type="button" onClick={handleAddHint} className="btn-secondary px-3 text-xs">Add Hint</button>
+                  </div>
+                </div>
+              )}
 
               <div className="col-span-3 flex items-center gap-6">
                 <label className="flex items-center gap-2 text-sm text-surface-300 cursor-pointer">
