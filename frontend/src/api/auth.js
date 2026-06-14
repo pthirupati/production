@@ -88,6 +88,13 @@ export const authApi = {
     return data
   },
 
+  async socialLink(provider, code, redirectUri) {
+    const { data } = await api.post(`/auth/social/link/${provider}/`, {
+      code, redirect_uri: redirectUri,
+    })
+    return data
+  },
+
   async getLabHistory() {
     const { data } = await api.get('/labs/history/')
     return data

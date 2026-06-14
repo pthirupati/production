@@ -1196,18 +1196,21 @@ class AchievementsCertificateView(APIView):
         # Send certificate email
         try:
             from apps.notifications.tasks import send_notification_email
+            from django.conf import settings as dj_settings
+
+            verify_url = f"{dj_settings.FRONTEND_URL}/verify-certificate"
             send_notification_email.delay(
-                subject=f"FixitLab Certificate - {tech.name} Completed!",
+                subject=f"FixitLab Certificate — {tech.name} Completed!",
                 to_email=user.email,
-                template="emails/subscription_confirmation.html",
+                template="emails/certificate_issued.html",
                 context={
                     "username": user.get_full_name() or user.username,
                     "technology": tech.name,
-                    "plan_name": "Certificate of Completion",
-                    "amount": f"Certificate ID: {cert_record.certificate_id}",
-                    "expiry_date": expires_at.strftime("%B %d, %Y"),
-                    "subscription_id": cert_record.certificate_id,
-                    "payment_method": f"Completed {completed}/{total_scenarios} scenarios with total score {total_score}",
+                    "certificate_id": cert_record.certificate_id,
+                    "scenarios_completed": completed,
+                    "total_score": total_score,
+                    "expires_at": expires_at.strftime("%B %d, %Y"),
+                    "verify_url": verify_url,
                 },
             )
         except Exception as e:

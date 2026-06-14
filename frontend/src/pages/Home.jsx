@@ -59,7 +59,12 @@ export default function Home() {
   useEffect(() => {
     scenarioApi.getTechnologies().then(setTechnologies).catch(() => {})
     scenarioApi.getPlatformStats().then(setStats).catch(() => {})
-    api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
+    api.get('/config/').then(res => {
+      setPlatformConfig(res.data)
+      if (res.data?.platform_stats) {
+        setStats(prev => ({ ...res.data.platform_stats, ...prev }))
+      }
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {

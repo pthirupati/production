@@ -158,3 +158,39 @@ class ThreadVote(models.Model):
     def __str__(self):
         target = self.thread or self.reply
         return f"{self.user} {self.vote_type} on {target}"
+
+
+class ThreadReport(models.Model):
+    """User report for moderation."""
+    REASON_CHOICES = [
+        ("spam", "Spam"),
+        ("abuse", "Abuse or harassment"),
+        ("off_topic", "Off topic"),
+        ("other", "Other"),
+    ]
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("reviewed", "Reviewed"),
+        ("dismissed", "Dismissed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    thread = models.ForeignKey(Thread, on_delete=models.CASCADE, related_name="reports")
+    reporter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="thread_reports",
+    )
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES, default="other")
+    details = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["thread", "reporter"],
+                name="unique_thread_report_per_user",
+            ),
+        ]

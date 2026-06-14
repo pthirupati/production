@@ -40,6 +40,7 @@ from .views import (
     AdminOrganizationsView,
     AdminOrganizationDetailView,
     AdminSecurityMetricsView,
+    AdminTestEmailView,
 )
 
 urlpatterns = [
@@ -56,6 +57,7 @@ urlpatterns = [
     path("organizations/", AdminOrganizationsView.as_view()),
     path("organizations/<uuid:org_id>/", AdminOrganizationDetailView.as_view()),
     path("security/", AdminSecurityMetricsView.as_view()),
+    path("email/test/", AdminTestEmailView.as_view()),
 
     # Maintenance Mode
     path("maintenance/", AdminMaintenanceModeView.as_view()),

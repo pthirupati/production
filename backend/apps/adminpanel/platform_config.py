@@ -85,7 +85,30 @@ def public_config_payload() -> dict:
         },
         "promo_banners": promos,
         "theme_colors": row.theme_colors or {},
+        "changelog": row.changelog or [],
+        "platform_stats": _platform_stats(),
     }
+
+
+def _platform_stats() -> dict:
+    from django.contrib.auth import get_user_model
+    from django.core.cache import cache
+
+    from apps.progress.models import UserScenarioProgress
+    from apps.question_bank.models import Scenario, Technology
+
+    cached = cache.get("public_platform_stats")
+    if cached is not None:
+        return cached
+    User = get_user_model()
+    data = {
+        "total_scenarios": Scenario.objects.filter(is_active=True).count(),
+        "total_users": User.objects.filter(is_active=True).count(),
+        "total_completions": UserScenarioProgress.objects.filter(completed=True).count(),
+        "total_technologies": Technology.objects.filter(is_active=True).count(),
+    }
+    cache.set("public_platform_stats", data, 120)
+    return data
 
 
 def admin_config_payload() -> dict:
@@ -107,6 +130,7 @@ def admin_config_payload() -> dict:
         "promo_banners_enabled": row.promo_banners_enabled,
         "maintenance_banner_enabled": row.maintenance_banner_enabled,
         "theme_colors": row.theme_colors or {},
+        "changelog": row.changelog or [],
         "lab_provider": settings.LAB_PROVIDER,
         "max_lab_duration": settings.LAB_MAX_DURATION_MINUTES,
     }

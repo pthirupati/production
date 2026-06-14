@@ -24,8 +24,15 @@ export default function OAuthCallback() {
     const exchange = async () => {
       try {
         const redirectUri = `${window.location.origin}/auth/callback/${provider}`
-        const intent = sessionStorage.getItem('oauth_intent') || 'login'
+        const intent = sessionStorage.getItem('oauth_intent') || searchParams.get('intent') || 'login'
         sessionStorage.removeItem('oauth_intent')
+        if (intent === 'link') {
+          await authApi.socialLink(provider, code, redirectUri)
+          setStatus('success')
+          toast.success(`${provider === 'github' ? 'GitHub' : 'Google'} linked to your profile`)
+          setTimeout(() => navigate('/profile', { replace: true }), 800)
+          return
+        }
         await authApi.socialLogin(provider, code, redirectUri, intent)
         setStatus('success')
         toast.success(

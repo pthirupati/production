@@ -124,7 +124,7 @@ class SimulationProvisioner:
         slug = scenario_slug or (entry.get("state", {}).get("scenario_slug", "") if entry else "")
         script = resolve_simulation_validation_script(slug, validation_script or "")
         if engine and hasattr(engine, "state"):
-            return validate_simulation_state(engine.state, script)
+            return validate_simulation_state(engine.state, script, engine=engine)
         if not script or is_trivial_validation_script(script):
             return False, "NO_VALIDATION_SCRIPT"
         return False, "Simulation session not found"

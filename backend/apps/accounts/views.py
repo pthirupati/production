@@ -356,6 +356,9 @@ class UserProfileView(APIView):
     def get(self, request):
         user = request.user
         profile = Profile.objects.filter(user=user).first()
+        social = list(
+            SocialAccount.objects.filter(user=user).values("provider", "provider_uid", "created_at")
+        )
         return Response({
             "id": user.id,
             "email": user.email,
@@ -366,6 +369,13 @@ class UserProfileView(APIView):
             "country": profile.country if profile else "",
             "is_staff": user.is_staff,
             "date_joined": user.date_joined.isoformat(),
+            "social_accounts": [
+                {
+                    "provider": s["provider"],
+                    "linked_at": s["created_at"].isoformat() if s.get("created_at") else None,
+                }
+                for s in social
+            ],
         })
 
     def put(self, request):
@@ -791,6 +801,124 @@ class GoogleCallbackView(APIView):
                 "is_staff": user.is_staff,
             },
         })
+
+
+def _link_social_account(user, provider: str, provider_uid: str, display_name: str = ""):
+    """Link OAuth provider to an authenticated user."""
+    conflict = SocialAccount.objects.filter(provider=provider, provider_uid=provider_uid).exclude(user=user).first()
+    if conflict:
+        return Response(
+            {"error": f"This {provider.title()} account is already linked to another FixitLab user."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    existing = SocialAccount.objects.filter(user=user, provider=provider).first()
+    if existing and existing.provider_uid != provider_uid:
+        return Response(
+            {"error": f"You already linked a different {provider.title()} account."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    SocialAccount.objects.update_or_create(
+        provider=provider,
+        provider_uid=provider_uid,
+        defaults={"user": user, "extra_data": {"display_name": display_name}},
+    )
+    return None
+
+
+class GitHubLinkView(APIView):
+    """Link GitHub to the currently authenticated user."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        code = request.data.get("code", "").strip()
+        redirect_uri = request.data.get("redirect_uri", "").strip()
+        if not code:
+            return Response({"error": "Authorization code is required."}, status=400)
+        if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
+            return Response({"error": "GitHub login is not configured."}, status=501)
+
+        import requests as http_requests
+
+        if not redirect_uri:
+            redirect_uri = f"{settings.FRONTEND_URL}/auth/callback/github"
+        try:
+            token_resp = http_requests.post(
+                "https://github.com/login/oauth/access_token",
+                json={
+                    "client_id": settings.GITHUB_CLIENT_ID,
+                    "client_secret": settings.GITHUB_CLIENT_SECRET,
+                    "code": code,
+                    "redirect_uri": redirect_uri.split("?")[0],
+                },
+                headers={"Accept": "application/json"},
+                timeout=15,
+            )
+            access_token = token_resp.json().get("access_token")
+            if not access_token:
+                return Response({"error": "GitHub authentication failed."}, status=400)
+            gh_user = http_requests.get(
+                "https://api.github.com/user",
+                headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+                timeout=10,
+            ).json()
+            gh_id = str(gh_user.get("id", ""))
+            gh_name = gh_user.get("name", "") or gh_user.get("login", "")
+        except Exception as exc:
+            logger.error("GitHub link error: %s", exc)
+            return Response({"error": "Unable to reach GitHub."}, status=502)
+
+        err = _link_social_account(request.user, "github", gh_id, gh_name)
+        if err:
+            return err
+        return Response({"linked": True, "provider": "github"})
+
+
+class GoogleLinkView(APIView):
+    """Link Google to the currently authenticated user."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        code = request.data.get("code", "").strip()
+        redirect_uri = request.data.get("redirect_uri", "").strip()
+        if not code:
+            return Response({"error": "Authorization code is required."}, status=400)
+        if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+            return Response({"error": "Google login is not configured."}, status=501)
+
+        import requests as http_requests
+
+        if not redirect_uri:
+            redirect_uri = f"{settings.FRONTEND_URL}/auth/callback/google"
+        try:
+            token_resp = http_requests.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": redirect_uri.split("?")[0],
+                    "grant_type": "authorization_code",
+                },
+                timeout=15,
+            )
+            access_token = token_resp.json().get("access_token")
+            if not access_token:
+                return Response({"error": "Google authentication failed."}, status=400)
+            ginfo = http_requests.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10,
+            ).json()
+            google_id = str(ginfo.get("sub", ""))
+            name = ginfo.get("name", "")
+        except Exception as exc:
+            logger.error("Google link error: %s", exc)
+            return Response({"error": "Unable to reach Google."}, status=502)
+
+        err = _link_social_account(request.user, "google", google_id, name)
+        if err:
+            return err
+        return Response({"linked": True, "provider": "google"})
 
 
 class LabHistoryView(APIView):

@@ -349,3 +349,34 @@ class ReplyReactionView(APIView):
 
         reply.refresh_from_db()
         return Response(ReplySerializer(reply, context={"request": request}).data)
+
+
+class ThreadReportView(APIView):
+    """Report a community thread for moderation."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, thread_id):
+        from .models import ThreadReport
+
+        try:
+            thread = Thread.objects.get(id=thread_id, is_deleted=False)
+        except Thread.DoesNotExist:
+            return Response({"error": "Thread not found"}, status=http_status.HTTP_404_NOT_FOUND)
+
+        reason = (request.data.get("reason") or "other").strip()
+        valid = {c[0] for c in ThreadReport.REASON_CHOICES}
+        if reason not in valid:
+            return Response({"error": "Invalid reason"}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        details = (request.data.get("details") or "").strip()[:2000]
+        report, created = ThreadReport.objects.get_or_create(
+            thread=thread,
+            reporter=request.user,
+            defaults={"reason": reason, "details": details},
+        )
+        if not created:
+            return Response({"error": "You already reported this thread"}, status=http_status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"reported": True, "id": str(report.id), "status": report.status},
+            status=http_status.HTTP_201_CREATED,
+        )

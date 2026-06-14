@@ -68,4 +68,9 @@ export const communityApi = {
     const { data } = await api.post(`/community/replies/${replyId}/react/`, { emoji })
     return data
   },
+
+  async reportThread(threadId, reason = 'other', details = '') {
+    const { data } = await api.post(`/community/threads/${threadId}/report/`, { reason, details })
+    return data
+  },
 }

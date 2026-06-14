@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   MessageSquare, Plus, Search, ChevronUp, ChevronDown,
-  Send, Edit3, Trash2, Pin, Lock, Filter, X, Clock, ImagePlus
+  Send, Edit3, Trash2, Pin, Lock, Filter, X, Clock, ImagePlus, Flag
 } from 'lucide-react'
 import { communityApi } from '../api/community'
 import { scenarioApi } from '../api/scenarios'
@@ -157,6 +157,17 @@ export default function Community() {
       fetchThreads()
     } catch {
       toast.error('Failed to delete')
+    }
+  }
+
+  const handleReportThread = async (threadId) => {
+    const reason = window.prompt('Report reason: spam, abuse, off_topic, or other', 'other')
+    if (!reason) return
+    try {
+      await communityApi.reportThread(threadId, reason.trim().toLowerCase())
+      toast.success('Report submitted — our moderators will review it.')
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not submit report')
     }
   }
 
@@ -421,6 +432,15 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
                   >
                     <ChevronUp size={16} /> {selectedThread.upvotes || 0}
                   </button>
+                  {user && selectedThread.author?.id !== user.id && (
+                    <button
+                      onClick={() => handleReportThread(selectedThread.id)}
+                      className="text-surface-400 hover:text-amber-400"
+                      title="Report thread"
+                    >
+                      <Flag size={16} />
+                    </button>
+                  )}
                   {(selectedThread.author?.id === user?.id || isAdmin) && (
                     <button
                       onClick={() => handleDeleteThread(selectedThread.id)}

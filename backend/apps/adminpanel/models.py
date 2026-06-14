@@ -28,6 +28,11 @@ class PlatformSettings(models.Model):
         blank=True,
         help_text="Admin-editable accent colors: cyan, purple, amber, green, etc.",
     )
+    changelog = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Platform changelog entries shown on About page",
+    )
 
     updated_at = models.DateTimeField(auto_now=True)
 

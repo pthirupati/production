@@ -262,6 +262,20 @@ export default function AdminSettings() {
         <button onClick={handleSaveEmails} disabled={saving} className="btn-primary text-sm flex items-center gap-1">
           <Save size={14} /> Save emails & currency
         </button>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const result = await adminApi.sendTestEmail()
+              toast.success(result.sent ? `Test email sent to ${result.to_email}` : 'Send failed')
+            } catch (err) {
+              toast.error(err.response?.data?.error || 'Test email failed')
+            }
+          }}
+          className="btn-secondary text-sm flex items-center gap-1"
+        >
+          <Mail size={14} /> Send test email
+        </button>
       </div>
 
       {/* Theme / accent colors */}

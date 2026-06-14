@@ -203,6 +203,28 @@ export default function Technologies() {
                 </div>
               </div>
 
+              {techDetail.technology.learning_path?.length > 0 && (
+                <div className="px-6 py-4 border-b border-surface-800/50 bg-surface-900/30">
+                  <h3 className="text-sm font-semibold text-white mb-3">Recommended learning path</h3>
+                  <ol className="space-y-2">
+                    {techDetail.technology.learning_path.map((step, i) => (
+                      <li key={i} className="flex items-start gap-3 text-sm">
+                        <span className="w-6 h-6 rounded-full bg-accent-cyan/10 text-accent-cyan flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span>
+                        <div>
+                          <p className="text-white font-medium">{step.title || step.scenario_slug}</p>
+                          {step.description && <p className="text-surface-500 text-xs mt-0.5">{step.description}</p>}
+                          {step.scenario_slug && (
+                            <Link to={`/scenarios/${step.scenario_slug}`} className="text-accent-cyan text-xs hover:underline mt-1 inline-block">
+                              Open scenario →
+                            </Link>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
               {/* Scenarios list grouped by difficulty */}
               <div className="divide-y divide-surface-800/30">
                 {['easy', 'medium', 'hard'].map(difficulty => {

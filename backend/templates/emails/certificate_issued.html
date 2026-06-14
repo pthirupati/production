@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>FixitLab Certificate</title></head>
+<body style="margin:0;padding:0;background-color:#0a0e1a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0e1a;padding:32px 16px;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+  <tr><td style="text-align:center;padding:24px 0 20px;">
+    <span style="color:#ffffff;font-size:22px;font-weight:700;">FixitLab</span>
+  </td></tr>
+  <tr><td style="background:#141b2d;border-radius:16px;border:1px solid #1e293b;padding:40px;">
+    <div style="text-align:center;margin-bottom:24px;"><span style="font-size:48px;">&#127942;</span></div>
+    <h1 style="color:#ffffff;font-size:24px;text-align:center;margin:0 0 12px;">Certificate of Completion</h1>
+    <p style="color:#94a3b8;font-size:15px;line-height:1.6;text-align:center;margin:0 0 24px;">
+      Congratulations {{ username }}! You completed all {{ scenarios_completed }} scenarios in <strong style="color:#06b6d4;">{{ technology }}</strong>.
+    </p>
+    <table width="100%" style="background:#0f172a;border-radius:12px;border:1px solid #1e293b;">
+      <tr><td style="padding:14px 20px;color:#94a3b8;font-size:13px;">Certificate ID</td>
+          <td style="padding:14px 20px;color:#f59e0b;font-size:14px;font-weight:700;text-align:right;">{{ certificate_id }}</td></tr>
+      <tr><td style="padding:14px 20px;color:#94a3b8;font-size:13px;border-top:1px solid #1e293b;">Total score</td>
+          <td style="padding:14px 20px;color:#10b981;font-size:14px;font-weight:700;text-align:right;">{{ total_score }}</td></tr>
+      <tr><td style="padding:14px 20px;color:#94a3b8;font-size:13px;border-top:1px solid #1e293b;">Valid until</td>
+          <td style="padding:14px 20px;color:#e2e8f0;font-size:14px;text-align:right;">{{ expires_at }}</td></tr>
+    </table>
+    <p style="color:#64748b;font-size:13px;text-align:center;margin:24px 0 0;">
+      Verify at {{ verify_url }} using certificate ID <strong>{{ certificate_id }}</strong>.
+    </p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body>
+</html>

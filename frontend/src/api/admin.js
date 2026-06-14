@@ -12,6 +12,11 @@ export const adminApi = {
     return data
   },
 
+  async sendTestEmail(toEmail) {
+    const { data } = await api.post('/admin/email/test/', toEmail ? { to_email: toEmail } : {})
+    return data
+  },
+
   async getAnalytics(days = 30) {
     const { data } = await api.get(`/admin/analytics/?days=${days}`)
     return data

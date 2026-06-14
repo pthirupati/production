@@ -1930,8 +1930,11 @@ class AdminConfigView(APIView):
             row.maintenance_banner_enabled = bool(request.data.get("maintenance_banner_enabled"))
         if "theme_colors" in request.data:
             row.theme_colors = request.data.get("theme_colors") or {}
+        if "changelog" in request.data:
+            row.changelog = request.data.get("changelog") or []
         row.save()
         persist_config_snapshot(row)
+        cache.delete("public_platform_stats")
         if row.primary_email:
             settings.PRIMARY_EMAIL = row.primary_email
         if row.payment_email:
@@ -2385,4 +2388,26 @@ class AdminSecurityMetricsView(APIView):
             "suspicious_ips": suspicious_ips,
             "recent_events": recent_events,
         })
+
+
+class AdminTestEmailView(APIView):
+    """Send a test email to verify Gmail/SMTP delivery."""
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        from apps.notifications.email_dispatch import send_email_now
+
+        to_email = (request.data.get("to_email") or request.user.email or "").strip()
+        if not to_email:
+            return Response({"error": "to_email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        ok = send_email_now(
+            "FixitLab test email",
+            to_email,
+            "emails/welcome.html",
+            {"username": request.user.get_full_name() or request.user.username},
+        )
+        if ok:
+            return Response({"sent": True, "to_email": to_email})
+        return Response({"sent": False, "error": "Email delivery failed — check Gmail OAuth or SMTP settings."}, status=502)
 

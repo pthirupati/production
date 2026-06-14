@@ -5,7 +5,7 @@ import { authApi } from '../api/auth'
 import { labApi } from '../api/labs'
 import { subscriptionApi } from '../api/subscriptions'
 import api from '../api/client'
-import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download } from 'lucide-react'
+import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download, Github } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { validators } from '../utils/validators'
 import { SkeletonCard } from '../components/Skeleton'
@@ -27,9 +27,12 @@ export default function Profile() {
   const [techSubscriptions, setTechSubscriptions] = useState([])
   const [complimentaryAccess, setComplimentaryAccess] = useState(false)
   const [invoices, setInvoices] = useState([])
+  const [socialAccounts, setSocialAccounts] = useState([])
+  const [socialConfig, setSocialConfig] = useState(null)
 
   // Load full profile data including phone number
   useEffect(() => {
+    authApi.getSocialConfig().then(setSocialConfig).catch(() => {})
     Promise.all([
       authApi.getProfile(),
       labApi.getUserPlan().catch(() => null),
@@ -47,6 +50,7 @@ export default function Profile() {
       setTechSubscriptions(subsData?.subscriptions || [])
       setComplimentaryAccess(subsData?.complimentary_access || false)
       setInvoices(invData?.invoices || [])
+      setSocialAccounts(profileData.social_accounts || [])
     }).catch(console.error)
       .finally(() => setLoading(false))
   }, [])
@@ -98,6 +102,21 @@ export default function Profile() {
   }
 
   const pwStrength = validators.passwordStrength(newPassword)
+
+  const handleSocialLink = (provider) => {
+    if (!socialConfig?.[provider]?.enabled) {
+      toast.error(`${provider === 'github' ? 'GitHub' : 'Google'} is not configured on this server.`)
+      return
+    }
+    sessionStorage.setItem('oauth_intent', 'link')
+    const cfg = socialConfig[provider]
+    const redirectUri = `${window.location.origin}/auth/callback/${provider}`
+    const scopes = provider === 'github' ? 'user:email' : 'openid email profile'
+    const url = provider === 'github'
+      ? `${cfg.authorize_url}?client_id=${cfg.client_id}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`
+      : `${cfg.authorize_url}?client_id=${cfg.client_id}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&access_type=offline&prompt=consent`
+    window.location.href = url
+  }
 
   const downloadInvoice = async (inv) => {
     try {
@@ -265,6 +284,32 @@ export default function Profile() {
         </div>
       </div>
 
+      {/* Linked accounts */}
+      <div className="glass-card p-6">
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Github size={18} className="text-accent-cyan" /> Linked Accounts
+        </h2>
+        <p className="text-sm text-surface-400 mb-4">Connect GitHub or Google for faster sign-in after OTP registration.</p>
+        <div className="space-y-3">
+          {['github', 'google'].map(provider => {
+            const linked = socialAccounts.some(s => s.provider === provider)
+            const label = provider === 'github' ? 'GitHub' : 'Google'
+            return (
+              <div key={provider} className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50">
+                <span className="text-white font-medium">{label}</span>
+                {linked ? (
+                  <span className="text-xs text-accent-green px-2 py-1 rounded-full bg-accent-green/10">Linked</span>
+                ) : (
+                  <button type="button" onClick={() => handleSocialLink(provider)} className="btn-secondary text-xs px-3 py-1.5">
+                    Link {label}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
       {/* Notification Preferences */}
       {notifPrefs && (
         <div className="glass-card p-6">
@@ -359,6 +404,7 @@ export default function Profile() {
         ) : techSubscriptions.filter(s => s.is_active).length === 0 ? (
           <div className="text-center py-6">
             <p className="text-surface-400 text-sm mb-3">No active technology subscriptions</p>
+            <p className="text-xs text-surface-500 mb-3">Pay securely with Razorpay/Stripe at checkout — invoices appear below.</p>
             <Link to="/pricing" className="btn-primary text-sm inline-flex items-center gap-1.5">
               <Zap size={14} /> View Pricing
             </Link>

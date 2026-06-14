@@ -7,7 +7,11 @@ from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
 from apps.labs.provisioner.simulation.rhel_os import RHELOSState
 from apps.labs.provisioner.simulation.rhel_shell import RHELShell
 from apps.labs.provisioner.simulation.scenario_presets import apply_scenario_preset
-from apps.labs.provisioner.simulation.validation import validate_simulation_state
+from apps.labs.provisioner.simulation.validation import (
+    validate_simulation_state,
+    resolve_simulation_validation_script,
+    is_trivial_validation_script,
+)
 from apps.labs.provisioner.simulation_provisioner import SimulationProvisioner
 
 
@@ -105,6 +109,12 @@ exit 0
         sim.shell.run("useradd -m appuser")
         passed, msg = validate_simulation_state(sim.state, self.USERADD_CHECK)
         self.assertTrue(passed, msg)
+
+    def test_stub_scripts_resolved_by_slug(self):
+        self.assertIn("nginx -t", resolve_simulation_validation_script("sim-rhel-broken-nginx", "true\nexit 0"))
+        self.assertIn("mysqladmin", resolve_simulation_validation_script("sim-mysql-wont-start", "true\nexit 0"))
+        self.assertIn("kubectl", resolve_simulation_validation_script("pod-crashloop", "true\nexit 0"))
+        self.assertFalse(is_trivial_validation_script(resolve_simulation_validation_script("gpu-fallen-off", "true")))
 
 
 class EngineTests(SimpleTestCase):

@@ -15,6 +15,11 @@ class Technology(models.Model):
         default=False,
         help_text="Show as coming soon — visible but not openable until disabled",
     )
+    learning_path = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Ordered learning path steps: [{title, scenario_slug, description}]",
+    )
     order = models.PositiveIntegerField(default=0, help_text="Display order")
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -159,6 +164,10 @@ class Scenario(models.Model):
     definition_path = models.CharField(max_length=255, blank=True)
     is_free = models.BooleanField(default=False, help_text="Available without login")
     is_active = models.BooleanField(default=True)
+    interview_mode = models.BooleanField(
+        default=False,
+        help_text="Timed interview-style scenario with stricter hints",
+    )
     attempts_count = models.PositiveIntegerField(default=0, help_text="Cached total attempts")
     completions_count = models.PositiveIntegerField(default=0, help_text="Cached total completions")
     avg_completion_time = models.PositiveIntegerField(default=0, help_text="Average solve time in seconds")

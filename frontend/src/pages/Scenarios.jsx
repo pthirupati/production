@@ -320,6 +320,18 @@ export default function Scenarios() {
                           {typeConfig[scenario.scenario_type]?.label || 'Fix'}
                         </span>
 
+                        {scenario.interview_mode && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-accent-purple/10 text-accent-purple border border-accent-purple/20">
+                            Interview
+                          </span>
+                        )}
+
+                        {scenario.completion_rate > 0 && (
+                          <span className="text-[10px] text-surface-500 w-14 text-right" title="Global success rate">
+                            {scenario.completion_rate}% pass
+                          </span>
+                        )}
+
                         {/* Tags */}
                         <div className="hidden md:flex gap-1 w-32">
                           {(scenario.tags || []).slice(0, 2).map(tag => (

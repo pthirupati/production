@@ -1,17 +1,19 @@
 # FixitLab Gap Analysis
 
-Last updated: June 2026 (post OAuth, email prefs, org UI, simulation Jira)
+Last updated: June 2026 (post gap-closure batch)
 
 ## Recently implemented
 
-- OAuth login-only: GitHub/Google login existing accounts; new users must register via OTP first
-- Simulation-only Jira in production (`JIRA_SIMULATION_MODE=True`)
-- Notification email preferences wired for subscription, lab completed/expired, achievements
-- Lab completed/expired email templates connected
-- Team self-service: `/team` page + `/api/org/` for members and owner/admin invites
-- `/support` redirects to `/contact`
-- Home page uses DB `coming_soon` flag for technologies
-- Payment error email links fixed
+- **Email delivery:** Critical OTP sends in-process via daemon thread; admin test email endpoint (`POST /api/admin/email/test/`)
+- **OAuth:** Register + login flows; **Profile → Link GitHub/Google** for OTP users (`/api/auth/social/link/*`)
+- **Simulation validation:** Stub `check.sh` files resolved via slug-aware canonical scripts (nginx, mysql, k8s, docker, gpu, ansible, grub, etc.)
+- **Certificate email:** Dedicated `emails/certificate_issued.html` template
+- **Community:** Thread report flow (`POST /api/community/threads/{id}/report/`)
+- **Platform stats:** Live counts on Home via `/api/stats/` and `/api/config/` `platform_stats`
+- **Scenario sync:** `python manage.py sync_scenarios` (wraps `seed_scenarios`)
+- **Technologies:** `learning_path` JSON on Technology model; UI on Technologies page
+- **Scenarios:** `interview_mode` flag; global success rate on scenario cards
+- **Admin:** Changelog JSON on PlatformSettings; promo banner delete; AWS/DO lab modes; expanded Teams/Security
 
 ---
 
@@ -19,23 +21,20 @@ Last updated: June 2026 (post OAuth, email prefs, org UI, simulation Jira)
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Email delivery in production | **Open** | EmailLog showed 0 sent / 3700+ failed. Fix Gmail OAuth on `celery_worker`, verify `GMAIL_OAUTH_*` in `.env.production` |
-| Full E2E on every deploy | **Partial** | OTP/concurrent pass; scenario E2E still gates deploy. Run with `RUN_FULL_E2E=1` |
-| Celery `notifications` queue health | **Open** | Monitor worker logs; add alert when EmailLog failure rate > 0 |
+| Email delivery in production | **Verify** | Code path improved; confirm Gmail OAuth on workers + run admin test email in prod |
+| Full E2E on every deploy | **Partial** | OTP/concurrent pass; scenario E2E gates deploy. `RUN_FULL_E2E=1` optional |
+| Celery `notifications` queue health | **Monitor** | Critical mail bypasses queue; bulk mail still uses Celery |
 
 ---
 
-## High priority
+## High priority (remaining)
 
 | Item | Status | Action |
 |------|--------|--------|
-| Unified billing UX | **Open** | Profile still shows legacy Plan + tech subscriptions. Consolidate to technology subscriptions only |
-| Org billing / invoices for teams | **Open** | Org model exists; no org-level checkout or billing portal |
-| Stripe pro/enterprise UI | **Open** | Backend supports Stripe; no frontend checkout |
-| Frontend automated tests | **Open** | No Playwright in CI; add smoke tests for login, register OTP, lab start |
-| Coupon test coverage | **Open** | Validate + redeem flows need dedicated tests |
-| Community API tests | **Open** | Threads/replies untested in CI |
-| Certificate email template | **Open** | Reuses subscription template; needs dedicated design |
+| Org-level Stripe/Razorpay checkout | **Open** | Team billing portal for seat-based orgs |
+| Frontend Playwright CI | **Open** | Smoke tests for login, register OTP, lab start |
+| Coupon + community API tests | **Open** | Dedicated pytest coverage |
+| Blog CMS | **Static** | Posts still in `Blog.jsx`; wire to admin or headless CMS |
 
 ---
 
@@ -43,55 +42,32 @@ Last updated: June 2026 (post OAuth, email prefs, org UI, simulation Jira)
 
 | Item | Status | Action |
 |------|--------|--------|
-| `ScenarioVersion` model | **Orphan** | Integrate versioning in admin + lab routing, or remove app |
-| `email_marketing` preference | **Unused** | No sender uses it; wire or remove toggle |
-| Blog CMS | **Static** | Hardcoded posts in `Blog.jsx`; admin-managed content |
-| API documentation | **Missing** | OpenAPI/Swagger for integrators |
-| Dev/prod RabbitMQ parity | **Open** | Dev compose lacks RabbitMQ auth defaults |
-| Documentation index drift | **Open** | `DOCUMENTATION_INDEX.txt` references missing Jira docs |
-| Admin payment transaction UI | **Partial** | Security metrics only; no failed payment dashboard |
-| Register → link OAuth after signup | **Nice** | After OTP register, offer "Link GitHub/Google" on profile |
+| `ScenarioVersion` model | **Orphan** | Integrate or remove |
+| OpenAPI/Swagger | **Missing** | Document public API |
+| Admin payment failure dashboard | **Partial** | Security metrics exist; dedicated payment retry UI |
+| SSO / 2FA for enterprises | **Open** | SAML/OIDC + TOTP |
 
 ---
 
 ## Nice-to-have
 
-- OAuth on register page (currently login-only by design)
 - Mobile-optimized lab terminal
-- Technology-level ratings moderation in admin
-- Session replay polish and sharing
-- Real AWS/K8s lab scenarios in production (provisioners exist; env optional)
-- Marketing stats on Home/Register (hardcoded numbers)
-- Remove duplicate `question_bank` admin API vs `/api/admin/*`
-- Frontend i18n / multi-language
+- Technology ratings moderation in admin
+- Real AWS/K8s production scenarios (provisioners exist)
+- Frontend i18n
 
 ---
 
 ## Feature inventory (what exists today)
 
-**Auth:** OTP register (2 min), login, forgot/reset password, GitHub/Google login (existing accounts only), profile
+**Auth:** OTP register (2 min), login, forgot/reset password, GitHub/Google login + register + profile link, profile
 
-**Labs:** Docker, simulation (unified engine), AWS/DO provisioners, WebSocket terminal, hints, validation, replay, dual terminal
+**Labs:** Docker, simulation (unified engine + real validation), AWS/DO provisioners, WebSocket terminal, hints, validation, replay, dual terminal, 15 min auto-expiry
 
 **Billing:** Razorpay per-technology, coupons, invoices, certificates, demo mode (dev only)
 
-**Admin:** 16 pages including scenarios, users, labs, monitoring, coupons, analytics, teams, security
+**Admin:** Overview, scenarios, users, labs, monitoring, coupons, analytics, teams, security, test email, changelog
 
-**Jira:** Simulation-only (`KAN-*` tickets), ticket UI, auto ticket on lab start
+**Community:** Threads, replies, votes, reactions, attachments, reports
 
-**Community:** Threads, replies, votes, attachments
-
-**Engagement:** Achievements, leaderboard, bookmarks, ratings, notifications (in-app + email)
-
-**Enterprise:** Org models, admin team management, member `/team` portal, technology grants
-
----
-
-## Recommended next PRs (ordered)
-
-1. Fix production Gmail OAuth + EmailLog monitoring
-2. Unify Profile/Pricing billing UX (deprecate legacy Plan display)
-3. Playwright smoke tests in CI
-4. Org-level billing and invite-by-email before registration (optional pre-register invite queue)
-5. Certificate + marketing email templates
-6. Full scenario E2E stabilization
+**Deploy:** `sync_scenarios` after pull; CI skips simulation Docker image validation

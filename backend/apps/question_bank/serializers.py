@@ -16,7 +16,8 @@ class TechnologySerializer(serializers.ModelSerializer):
         model = Technology
         fields = [
             "id", "name", "slug", "icon", "color", "description",
-            "price", "is_active", "coming_soon", "order", "scenario_count", "created_at",
+            "price", "is_active", "coming_soon", "order", "scenario_count",
+            "learning_path", "created_at",
         ]
 
 
@@ -35,7 +36,7 @@ class ScenarioListSerializer(serializers.ModelSerializer):
             "is_free", "attempts_count", "completions_count", "completion_rate",
             "is_bookmarked", "blocked_commands",
             "lab_mode", "simulation_type", "dual_terminal", "requires_companion_hosts",
-            "created_at",
+            "interview_mode", "created_at",
         ]
 
 
@@ -57,7 +58,7 @@ class ScenarioDetailSerializer(serializers.ModelSerializer):
             "avg_completion_time", "hints_count", "is_bookmarked",
             "blocked_commands", "infrastructure_type",
             "lab_mode", "simulation_type", "dual_terminal", "requires_companion_hosts",
-            "created_at", "updated_at",
+            "interview_mode", "created_at", "updated_at",
         ]
 
     def get_objectives(self, scenario):
@@ -88,7 +89,7 @@ class ScenarioAdminSerializer(serializers.ModelSerializer):
             "requires_companion_hosts", "dual_terminal", "lab_mode", "simulation_type",
             "docker_privileged",
             "time_limit", "max_score",
-            "definition_path", "is_free", "is_active",
+            "definition_path", "is_free", "is_active", "interview_mode",
             "attempts_count", "completions_count", "avg_completion_time",
             "created_at", "updated_at",
         ]
