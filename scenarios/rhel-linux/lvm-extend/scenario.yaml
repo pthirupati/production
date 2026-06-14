@@ -1,0 +1,15 @@
+category: rhel-linux
+description: Add /dev/sdb to rhel VG and extend root LV.
+difficulty: medium
+hints:
+- content: vgextend rhel /dev/sdb
+  cost: 10
+  order: 1
+initial_state: Add /dev/sdb to rhel VG and extend root LV.
+is_free: false
+lab_mode: simulation
+objectives:
+- vgextend rhel /dev/sdb
+simulation_type: generic
+slug: sim-rhel-lvm-extend
+title: Extend LVM Volume Group

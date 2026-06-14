@@ -147,9 +147,20 @@ class RHELShell:
             "grub-install": self._cmd_grub2_install,
             "bash": self._cmd_bash,
             "sh": self._cmd_bash,
-            "vi": self._cmd_vi,
-            "vim": self._cmd_vi,
-            "nano": self._cmd_vi,
+            "vi": self._cmd_nano,
+            "vim": self._cmd_nano,
+            "nano": self._cmd_nano,
+            "pvs": self._cmd_pvs,
+            "vgs": self._cmd_vgs,
+            "lvs": self._cmd_lvs,
+            "pvcreate": self._cmd_pvcreate,
+            "vgcreate": self._cmd_vgcreate,
+            "vgextend": self._cmd_vgextend,
+            "lvextend": self._cmd_lvextend,
+            "lvdisplay": self._cmd_lvdisplay,
+            "pvdisplay": self._cmd_pvdisplay,
+            "vgdisplay": self._cmd_vgdisplay,
+            "lvresize": self._cmd_lvextend,
             "less": self._cmd_cat,
             "more": self._cmd_cat,
             "netstat": self._cmd_netstat,
@@ -608,6 +619,11 @@ class RHELShell:
         if "localhost" in url or "127.0.0.1" in url:
             nginx = self.state.services.get("nginx")
             if nginx and nginx.active == "active":
+                if not self.state.firewall.is_port_open(80):
+                    return "curl: (7) Failed to connect to localhost port 80: Connection refused"
+                sites = self.state.read_file("/etc/nginx/sites-enabled/default") or ""
+                if "listn" in sites:
+                    return "curl: (52) Empty reply from server"
                 return "<html><body><h1>Welcome to nginx!</h1></body></html>"
             return "curl: (7) Failed to connect to localhost port 80: Connection refused"
         return f"curl: (6) Could not resolve host: {url}"
@@ -779,11 +795,33 @@ class RHELShell:
         return "crontab: installing new crontab"
 
     def _cmd_firewall(self, p: list[str]) -> str:
-        if "--list-all" in p:
-            return "public (active)\n  services: ssh dhcpv6-client\n  ports: 80/tcp 443/tcp"
-        if "--add-port" in p or "--add-service" in p:
-            return "success"
-        return "firewall-cmd: OK"
+        line = " ".join(p)
+        fw = self.state.firewall
+        permanent = "--permanent" in line
+        if "--list-all" in line:
+            return fw.list_all(permanent=permanent)
+        if "--reload" in line:
+            return fw.reload()
+        if "--add-port" in line:
+            port_tok = None
+            for tok in p:
+                if tok.startswith("--add-port="):
+                    port_tok = tok.split("=", 1)[1]
+                elif "/" in tok and tok[0].isdigit():
+                    port_tok = tok
+            if port_tok:
+                fw.add_port(port_tok, permanent=permanent)
+                if not permanent:
+                    return "success"
+                return "success"
+        if "--add-service" in line:
+            for tok in p:
+                if tok not in ("firewall-cmd", "--add-service", "--permanent", "--zone=public"):
+                    fw.add_service(tok, permanent=permanent)
+                    return "success"
+        if "--get-active-zones" in line:
+            return f"public\n  interfaces: eth0"
+        return "success"
 
     def _cmd_nmcli(self, p: list[str]) -> str:
         if "connection" in p and "show" in p:
@@ -816,10 +854,71 @@ class RHELShell:
             return f"bash: {p[1]}: No such file or directory"
         return ""
 
-    def _cmd_vi(self, p: list[str]) -> str:
-        if len(p) > 1:
-            return f"(Use sed/echo to edit files in simulation — vi {p[1]} opened read-only view)\n" + (self.state.read_file(p[1]) or "")
-        return "vi: missing filename"
+    def _cmd_nano(self, p: list[str]) -> str:
+        if len(p) < 2:
+            return "nano: missing filename"
+        path = p[1]
+        editor_type = "vi" if p[0] in ("vi", "vim") else "nano"
+        content = self.state.read_file(path) or ""
+        from .editor_mode import EditorSession
+        self.state.editor = EditorSession(path, content, editor_type)
+        return "__EDITOR__"
+
+    def _cmd_pvs(self, p: list[str]) -> str:
+        return self.state.lvm.format_pvs()
+
+    def _cmd_vgs(self, p: list[str]) -> str:
+        return self.state.lvm.format_vgs()
+
+    def _cmd_lvs(self, p: list[str]) -> str:
+        return self.state.lvm.format_lvs()
+
+    def _cmd_pvcreate(self, p: list[str]) -> str:
+        dev = p[-1] if len(p) > 1 else ""
+        ok, msg = self.state.lvm.pvcreate(dev)
+        return msg if ok else f"  {msg}"
+
+    def _cmd_vgcreate(self, p: list[str]) -> str:
+        if len(p) < 3:
+            return "vgcreate: missing argument"
+        from .lvm_state import SimVG
+        vg, pv = p[1], p[2]
+        self.state.lvm.vgs[vg] = SimVG(vg, "50.00g", "50.00g", [pv])
+        if pv in self.state.lvm.pvs:
+            self.state.lvm.pvs[pv].vg = vg
+        return f'  Volume group "{vg}" successfully created'
+
+    def _cmd_vgextend(self, p: list[str]) -> str:
+        if len(p) < 3:
+            return "vgextend: missing argument"
+        ok, msg = self.state.lvm.vgextend(p[1], p[2])
+        return msg
+
+    def _cmd_lvextend(self, p: list[str]) -> str:
+        if len(p) < 2:
+            return "lvextend: missing argument"
+        lv = p[1]
+        size = p[-1] if p[-1].startswith("+") or p[-1].endswith("G") else ""
+        ok, msg = self.state.lvm.lvextend(lv, size)
+        return msg
+
+    def _cmd_lvdisplay(self, p: list[str]) -> str:
+        lines = []
+        for lv in self.state.lvm.lvs.values():
+            lines.append(f"  --- Logical volume ---\n  LV Path                {lv.lv_path}\n  LV Size                {lv.size}")
+        return "\n".join(lines)
+
+    def _cmd_pvdisplay(self, p: list[str]) -> str:
+        lines = []
+        for pv in self.state.lvm.pvs.values():
+            lines.append(f"  --- Physical volume ---\n  PV Name               {pv.device}\n  VG Name               {pv.vg or ''}\n  PV Size               {pv.size}")
+        return "\n".join(lines)
+
+    def _cmd_vgdisplay(self, p: list[str]) -> str:
+        lines = []
+        for vg in self.state.lvm.vgs.values():
+            lines.append(f"  --- Volume group ---\n  VG Name               {vg.name}\n  VG Size               {vg.size}\n  Free  PE / Size       {vg.free}")
+        return "\n".join(lines)
 
     def _cmd_netstat(self, p: list[str]) -> str:
         return "Active Internet connections\nProto Recv-Q Send-Q Local Address           Foreign Address         State\ntcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN\ntcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN"

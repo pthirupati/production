@@ -1,0 +1,15 @@
+category: kubernetes
+description: Service has no endpoints due to selector mismatch.
+difficulty: hard
+hints:
+- content: kubectl get endpoints
+  cost: 10
+  order: 1
+initial_state: Service has no endpoints due to selector mismatch.
+is_free: false
+lab_mode: simulation
+objectives:
+- kubectl get endpoints
+simulation_type: kubernetes
+slug: sim-k8s-endpoints-fix
+title: Fix Kubernetes Service Endpoints

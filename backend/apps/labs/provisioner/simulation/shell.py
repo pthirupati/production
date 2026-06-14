@@ -19,11 +19,18 @@ class SimulationStreamHolder:
         *,
         prompt: str = "root@lab:~# ",
         dynamic_prompt: Callable[[], str] | None = None,
+        get_editor_state: Callable[[], object | None] | None = None,
+        save_editor: Callable[[str, str], None] | None = None,
+        clear_editor: Callable[[], None] | None = None,
     ):
         self._handler = handler
         self._prompt = prompt
         self._dynamic_prompt = dynamic_prompt
+        self._get_editor = get_editor_state
+        self._save_editor = save_editor
+        self._clear_editor = clear_editor
         self._editor = TerminalLineEditor()
+        self._vi_cmd_buf = ""
         self._out_q: queue.Queue[bytes] = queue.Queue()
         self._closed = False
         self._timeout = 60.0
@@ -51,12 +58,47 @@ class SimulationStreamHolder:
     def _redraw_line(self, buffer: str) -> None:
         self._emit("\r")
         self._emit(self.prompt + buffer)
-        # Clear tail if line got shorter
         pad = max(0, 80 - len(self.prompt) - len(buffer))
         self._emit(" " * pad + "\r")
         self._emit(self.prompt + buffer)
         if buffer:
             self._emit(f"\x1b[{len(self.prompt) + len(buffer)}G")
+
+    def _handle_editor_input(self, chunk: str) -> None:
+        session = self._get_editor() if self._get_editor else None
+        if not session:
+            return
+        if session.editor_type == "vi" and chunk == ":":
+            self._vi_cmd_buf = ":"
+            self._emit(":")
+            return
+        if self._vi_cmd_buf.startswith(":"):
+            self._vi_cmd_buf += chunk
+            if "\r" in self._vi_cmd_buf or "\n" in self._vi_cmd_buf:
+                cmd = self._vi_cmd_buf.strip()
+                self._vi_cmd_buf = ""
+                out, closed = session.process_vi_command(cmd)
+                if out:
+                    self._emit(out)
+                if closed:
+                    if cmd in (":wq", ":x", "ZZ") and self._save_editor:
+                        self._save_editor(session.path, session.content())
+                    elif self._clear_editor:
+                        self._clear_editor()
+                    self._emit("\x1b[2J\x1b[H")
+                    self._emit_prompt()
+                else:
+                    self._emit(session.render())
+            return
+        out, closed = session.process(chunk)
+        self._emit("\x1b[2J\x1b[H")
+        self._emit(out)
+        if closed:
+            if session.modified and self._save_editor:
+                self._save_editor(session.path, session.content())
+            elif self._clear_editor:
+                self._clear_editor()
+            self._emit_prompt()
 
     def send(self, data: bytes) -> None:
         if self._closed:
@@ -64,6 +106,10 @@ class SimulationStreamHolder:
         try:
             chunk = data.decode("utf-8", errors="replace")
         except Exception:
+            return
+
+        if self._get_editor and self._get_editor():
+            self._handle_editor_input(chunk)
             return
 
         for action, payload in self._editor.process(chunk):
@@ -94,9 +140,14 @@ class SimulationStreamHolder:
                         self._editor.reset()
                         self._emit_prompt()
                         continue
+                    if out == "__EDITOR__":
+                        session = self._get_editor() if self._get_editor else None
+                        if session:
+                            self._emit("\x1b[2J\x1b[H")
+                            self._emit(session.render())
+                        continue
                     if out:
                         self._emit(out if out.endswith("\r\n") else out + "\r\n")
-                    # Handler may change prompt (boot phases)
                     if out and "login:" in out.lower():
                         self.set_prompt("")
                     elif out and "grub rescue" in out.lower():
@@ -123,7 +174,6 @@ class SimulationStreamHolder:
         pass
 
 
-# Session registry: session_id -> {resource_id, sim_type, state, streams}
 _SIM_SESSIONS: dict[str, dict] = {}
 _SIM_LOCK = threading.Lock()
 

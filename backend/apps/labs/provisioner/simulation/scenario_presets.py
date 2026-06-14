@@ -112,6 +112,19 @@ def _preset_postgres_down(state: RHELOSState) -> None:
     state.services["postgresql"] = SimService("postgresql", active="failed", enabled="enabled", description="PostgreSQL")
 
 
+def _preset_firewalld_blocked(state: RHELOSState) -> None:
+    state._mkdir("/etc/nginx")
+    state._mkdir("/etc/nginx/sites-enabled")
+    state._write_file(
+        "/etc/nginx/sites-enabled/default",
+        "server {\n    listen 80;\n    server_name localhost;\n    root /var/www/html;\n}\n",
+    )
+    state.services["nginx"].active = "active"
+    state.services["nginx"].sub_state = "running"
+    state.firewall.runtime["public"] = {"services": ["ssh", "dhcpv6-client"], "ports": []}
+    state.firewall.permanent["public"] = {"services": ["ssh", "dhcpv6-client"], "ports": []}
+
+
 _PRESETS: dict[str, callable] = {
     "broken-nginx": _preset_broken_nginx,
     "sim-broken-nginx": _preset_broken_nginx,
@@ -132,4 +145,5 @@ _PRESETS: dict[str, callable] = {
     "sim-mysql-wont-start": _preset_mysql_down,
     "sim-postgres-refused": _preset_postgres_down,
     "sim-html-nginx-root": _preset_broken_nginx,
+    "sim-rhel-firewalld-port": _preset_firewalld_blocked,
 }

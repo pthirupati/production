@@ -63,6 +63,17 @@ def validate_simulation_state(state: RHELOSState, script: str) -> tuple[bool, st
             if not getattr(state, "gpu_healthy", True):
                 failures.append("GPU still unhealthy")
             continue
+        if "kubectl get pods" in stripped and "Running" in stripped:
+            continue
+        if "firewall-cmd --list-ports" in stripped or "80/tcp" in stripped:
+            if not state.firewall.is_port_open(80):
+                failures.append("port 80 not open in firewall")
+            continue
+        if "lvextend" in stripped or "pvs" in stripped and "sdb" in stripped:
+            pv = state.lvm.pvs.get("/dev/sdb")
+            if pv and not pv.vg:
+                failures.append("PV /dev/sdb not in volume group")
+            continue
         if "sim-valid" in stripped or stripped == "true":
             continue
 
@@ -74,6 +85,8 @@ def validate_simulation_state(state: RHELOSState, script: str) -> tuple[bool, st
 def _curl_http_code(state: RHELOSState) -> str:
     nginx = state.services.get("nginx")
     if nginx and nginx.active == "active":
+        if not state.firewall.is_port_open(80):
+            return "000"
         sites = state.read_file("/etc/nginx/sites-enabled/default") or ""
         if "listn" in sites:
             return "502"

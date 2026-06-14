@@ -72,6 +72,11 @@ class RHELOSState:
         self.mbr_fixed: bool = False
         self.kernel_fixed: bool = False
         self.patching_done: bool = False
+        self.editor = None  # EditorSession when nano/vi active
+        from .lvm_state import LVMState
+        from .firewall_state import FirewallState
+        self.lvm = LVMState()
+        self.firewall = FirewallState()
         self._init_base_system()
 
     def _init_base_system(self) -> None:
@@ -233,6 +238,9 @@ class RHELOSState:
         other.dmesg_extra = list(self.dmesg_extra)
         other.uid_counter = self.uid_counter
         other.pid_counter = self.pid_counter
+        other.lvm = copy.deepcopy(self.lvm)
+        other.firewall = copy.deepcopy(self.firewall)
+        other.editor = None
         other._write_file("/etc/hostname", hostname + "\n")
         other.env["HOSTNAME"] = hostname
         return other

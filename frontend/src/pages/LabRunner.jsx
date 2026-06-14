@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import { ConfirmDialog } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
 import JiraTicketLink from '../components/JiraTicketLink'
+import LabTerminal from '../components/LabTerminal'
 import useLabShortcuts from '../hooks/useLabShortcuts'
 import { useIsMobile } from '../hooks/useMediaQuery'
 
@@ -351,9 +352,11 @@ export default function LabRunner() {
     }
   }, [sessionId])
 
-  // Initialize xterm.js and WebSocket (once per session when RUNNING)
+  // Initialize xterm.js and WebSocket (single-pane mode only)
   useEffect(() => {
     if (!session || session.status !== 'RUNNING' || !terminalRef.current) return
+    const dualPane = session.scenario?.dual_terminal && (session.lab_hosts?.length >= 2)
+    if (dualPane) return
     const hasResource = session.container_id || session.instance_id
     if (!hasResource) return
     if (terminalSessionRef.current === `${sessionId}:${terminalHost}`) return
@@ -887,8 +890,11 @@ export default function LabRunner() {
     </div>
   )}
 
-  const scenario = session?.scenario_detail || {}
+  const scenario = session?.scenario_detail || session?.scenario || {}
   const labHosts = session?.lab_hosts || []
+  const useDualPane = Boolean(scenario.dual_terminal && labHosts.length >= 2)
+  const dualHosts = useDualPane ? labHosts.slice(0, 2) : []
+  const blockedCmds = scenario.blocked_commands || []
   const sshTargets = labHosts.filter(h => h.ip)
   const insertSshCommand = (host) => {
     const user = host.ssh_user || session?.ssh_user || 'root'
@@ -1237,10 +1243,13 @@ export default function LabRunner() {
 
         {/* Terminal toolbar + SSH / dual-host */}
         <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-1 sm:py-1.5 bg-surface-900/80 border-b border-surface-800 text-[10px] sm:text-xs overflow-x-auto">
-          {(scenario.dual_terminal || labHosts.length > 1) && (
+          {useDualPane && (
+            <span className="text-accent-purple font-medium mr-2">Dual terminal — side by side</span>
+          )}
+          {!useDualPane && (scenario.dual_terminal || labHosts.length > 1) && (
             <span className="text-surface-500 mr-1 hidden sm:inline">Hosts:</span>
           )}
-          {(labHosts.length > 0 ? labHosts : [{ name: 'primary', role: 'Primary' }]).map(h => (
+          {!useDualPane && (labHosts.length > 0 ? labHosts : [{ name: 'primary', role: 'Primary' }]).map(h => (
             <button
               key={h.name}
               type="button"
@@ -1269,7 +1278,24 @@ export default function LabRunner() {
         </div>
         {/* Terminal */}
         <div className="flex-1 bg-surface-950 relative min-h-0 overflow-hidden pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
-          <div ref={terminalRef} className="absolute inset-0 p-0.5 sm:p-1 touch-manipulation" />
+          {useDualPane ? (
+            <div className="absolute inset-0 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-surface-800">
+              {dualHosts.map(h => (
+                <LabTerminal
+                  key={h.name}
+                  sessionId={sessionId}
+                  session={session}
+                  hostKey={h.name}
+                  label={`${h.role || h.name} (${h.ip || 'sim'})`}
+                  isMobile={isMobile}
+                  blockedCommands={blockedCmds}
+                  className="h-full"
+                />
+              ))}
+            </div>
+          ) : (
+            <div ref={terminalRef} className="absolute inset-0 p-0.5 sm:p-1 touch-manipulation" />
+          )}
         </div>
       </div>
 

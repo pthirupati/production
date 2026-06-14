@@ -116,7 +116,25 @@ class SimulationProvisioner:
             )
             if hasattr(engine, "_register_extras_on"):
                 engine._register_extras_on(shell)
-            holder = SimulationStreamHolder(shell.run, prompt=shell.prompt)
+
+            def get_ed():
+                return shell.state.editor
+
+            def save_ed(path, content):
+                shell.state.write_file(path, content)
+                shell.state.editor = None
+
+            def clear_ed():
+                shell.state.editor = None
+
+            holder = SimulationStreamHolder(
+                shell.run,
+                prompt=shell.prompt,
+                dynamic_prompt=lambda: shell.prompt,
+                get_editor_state=get_ed,
+                save_editor=save_ed,
+                clear_editor=clear_ed,
+            )
         else:
             holder = engine.create_stream()
 

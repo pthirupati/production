@@ -24,16 +24,44 @@ class BaseRHELSimulator:
         """Override to add scenario-specific command handlers."""
         pass
 
-    def create_stream(self) -> SimulationStreamHandler:
+    def _stream_callbacks(self, shell: RHELShell | None = None):
+        sh = shell or self.shell
+
+        def get_editor():
+            return sh.state.editor
+
+        def save_editor(path: str, content: str) -> None:
+            sh.state.write_file(path, content)
+            sh.state.editor = None
+
+        def clear_editor() -> None:
+            sh.state.editor = None
+
+        return get_editor, save_editor, clear_editor
+
+    def create_stream(self) -> SimulationStreamHolder:
+        get_ed, save_ed, clear_ed = self._stream_callbacks()
         return SimulationStreamHolder(
             self.shell.run,
             prompt=self.shell.prompt,
+            dynamic_prompt=lambda: self.shell.prompt,
+            get_editor_state=get_ed,
+            save_editor=save_ed,
+            clear_editor=clear_ed,
         )
 
     def create_stream_for_state(self, state: RHELOSState) -> SimulationStreamHolder:
         shell = RHELShell(state=state, scenario_slug=state.scenario_slug, hostname=state.hostname)
         self._register_extras_on(shell)
-        return SimulationStreamHolder(shell.run, prompt=shell.prompt)
+        get_ed, save_ed, clear_ed = self._stream_callbacks(shell)
+        return SimulationStreamHolder(
+            shell.run,
+            prompt=shell.prompt,
+            dynamic_prompt=lambda: shell.prompt,
+            get_editor_state=get_ed,
+            save_editor=save_ed,
+            clear_editor=clear_ed,
+        )
 
     def _register_extras_on(self, shell: RHELShell) -> None:
         """Re-attach extra handlers to another shell instance."""
@@ -44,5 +72,4 @@ class BaseRHELSimulator:
         return self.shell.state
 
 
-# Typo fix alias for type hints
 SimulationStreamHandler = SimulationStreamHolder

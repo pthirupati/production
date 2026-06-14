@@ -1,0 +1,175 @@
+import { useEffect, useRef } from 'react'
+import { useAuthStore } from '../store/authStore'
+
+const WS_NO_RECONNECT = new Set([1000, 4001, 4003, 4004, 4005, 4008, 4500])
+
+/**
+ * Single xterm + WebSocket pane for a lab host (primary or companion).
+ */
+export default function LabTerminal({
+  sessionId,
+  session,
+  hostKey = 'primary',
+  label = '',
+  isMobile = false,
+  blockedCommands = [],
+  className = '',
+  onReady,
+}) {
+  const terminalRef = useRef(null)
+  const xtermRef = useRef(null)
+  const wsRef = useRef(null)
+  const fitAddonRef = useRef(null)
+  const reconnectAttempts = useRef(0)
+  const inputBufferRef = useRef('')
+  const sessionKeyRef = useRef(null)
+  const maxReconnectAttempts = 10
+
+  useEffect(() => {
+    if (!session || session.status !== 'RUNNING' || !terminalRef.current) return
+    if (!session.container_id && !session.instance_id) return
+    const sk = `${sessionId}:${hostKey}`
+    if (sessionKeyRef.current === sk) return
+
+    let disposed = false
+    let cleanup = () => {}
+
+    const init = async () => {
+      const { Terminal } = await import('@xterm/xterm')
+      const { FitAddon } = await import('@xterm/addon-fit')
+      const { WebLinksAddon } = await import('@xterm/addon-web-links')
+      await import('@xterm/xterm/css/xterm.css')
+      if (disposed) return
+
+      sessionKeyRef.current = sk
+      reconnectAttempts.current = 0
+
+      const term = new Terminal({
+        cursorBlink: true,
+        cursorStyle: 'bar',
+        fontSize: isMobile ? 10 : 13,
+        lineHeight: 1.2,
+        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+        theme: {
+          background: '#020617',
+          foreground: '#e2e8f0',
+          cursor: '#06b6d4',
+          selectionBackground: '#334155',
+        },
+      })
+      const fitAddon = new FitAddon()
+      term.loadAddon(fitAddon)
+      term.loadAddon(new WebLinksAddon())
+      term.open(terminalRef.current)
+      fitAddon.fit()
+      xtermRef.current = term
+      fitAddonRef.current = fitAddon
+
+      const blockedPatterns = (blockedCommands || []).map(entry => {
+        if (!entry || typeof entry !== 'string') return null
+        const raw = entry.trim()
+        if (!raw) return null
+        try {
+          if (raw.startsWith('^')) return { pattern: new RegExp(raw, 'i'), label: raw }
+          const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          return { pattern: new RegExp(`(?:^|[;&|]\\s*)${escaped}`, 'i'), label: raw }
+        } catch { return null }
+      }).filter(Boolean)
+
+      const buildWsUrl = () => {
+        const token = useAuthStore.getState().accessToken
+        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+        const hostQ = hostKey && hostKey !== 'primary' ? `&host=${encodeURIComponent(hostKey)}` : ''
+        return `${protocol}://${window.location.host}/ws/terminal/${sessionId}/?token=${token}${hostQ}`
+      }
+
+      const connectWs = () => {
+        if (disposed) return
+        if (wsRef.current) {
+          wsRef.current.onclose = null
+          wsRef.current.close(1000)
+        }
+        const ws = new WebSocket(buildWsUrl())
+        wsRef.current = ws
+        ws.onopen = () => { reconnectAttempts.current = 0; onReady?.() }
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            if (data.type === 'ping') return
+            if (data.output) term.write(data.output)
+          } catch { term.write(event.data) }
+        }
+        ws.onclose = (e) => {
+          if (disposed || e.code === 1000) return
+          if (WS_NO_RECONNECT.has(e.code)) {
+            term.write('\r\n\x1b[1;31mConnection closed.\x1b[0m\r\n')
+            return
+          }
+          if (reconnectAttempts.current < maxReconnectAttempts) {
+            reconnectAttempts.current++
+            setTimeout(connectWs, 2000)
+          }
+        }
+      }
+      connectWs()
+
+      term.onData((data) => {
+        if (wsRef.current?.readyState !== WebSocket.OPEN) return
+        if (data === '\r' || data === '\n') {
+          const cmd = inputBufferRef.current.trim()
+          inputBufferRef.current = ''
+          if (cmd && blockedPatterns.length) {
+            for (const part of cmd.split(/\s*(?:;|&&|\|\||\|)\s*/)) {
+              for (const { pattern, label: lbl } of blockedPatterns) {
+                if (pattern.test(part.trim())) {
+                  term.write(`\r\n\x1b[1;31m⛔ Command blocked: ${lbl}\x1b[0m\r\n`)
+                  wsRef.current.send(JSON.stringify({ input: '\x03' }))
+                  return
+                }
+              }
+            }
+          }
+          wsRef.current.send(JSON.stringify({ input: data }))
+        } else if (data === '\x7f' || data === '\b') {
+          inputBufferRef.current = inputBufferRef.current.slice(0, -1)
+          wsRef.current.send(JSON.stringify({ input: data }))
+        } else if (data === '\x03' || data === '\x15') {
+          inputBufferRef.current = ''
+          wsRef.current.send(JSON.stringify({ input: data }))
+        } else {
+          inputBufferRef.current += data
+          wsRef.current.send(JSON.stringify({ input: data }))
+        }
+      })
+
+      const ro = typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => { if (!disposed) fitAddon.fit() })
+        : null
+      ro?.observe(terminalRef.current)
+
+      cleanup = () => {
+        disposed = true
+        ro?.disconnect()
+        wsRef.current?.close(1000)
+        wsRef.current = null
+        term.dispose()
+        xtermRef.current = null
+        if (sessionKeyRef.current === sk) sessionKeyRef.current = null
+      }
+    }
+
+    init()
+    return () => cleanup()
+  }, [sessionId, session?.status, session?.container_id, session?.instance_id, hostKey, isMobile, blockedCommands])
+
+  return (
+    <div className={`flex flex-col min-h-0 min-w-0 ${className}`}>
+      {label && (
+        <div className="shrink-0 px-2 py-1 text-[10px] sm:text-xs font-medium text-accent-cyan border-b border-surface-800 bg-surface-900/90">
+          {label}
+        </div>
+      )}
+      <div ref={terminalRef} className="flex-1 min-h-0 p-0.5 touch-manipulation" />
+    </div>
+  )
+}

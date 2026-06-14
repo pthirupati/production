@@ -15,8 +15,12 @@ class BootSimulator(BaseRHELSimulator):
         self.boot = BootState()
         self.boot.apply_issue(scenario_slug)
 
+    def _stream_callbacks(self, shell=None):
+        return super()._stream_callbacks(shell or self.shell)
+
     def create_stream(self) -> SimulationStreamHolder:
         state = self
+        get_ed, save_ed, clear_ed = self._stream_callbacks()
 
         def handler(line: str) -> str:
             return state.handle(line)
@@ -36,7 +40,14 @@ class BootSimulator(BaseRHELSimulator):
                 return "(boot)> "
             return state.shell.prompt
 
-        holder = SimulationStreamHolder(handler, prompt="grub> ", dynamic_prompt=dyn_prompt)
+        holder = SimulationStreamHolder(
+            handler,
+            prompt="grub> ",
+            dynamic_prompt=dyn_prompt,
+            get_editor_state=get_ed,
+            save_editor=save_ed,
+            clear_editor=clear_ed,
+        )
         if not state.boot.grub_shown:
             if state.boot.phase == "mbr":
                 from .boot_sequence import MBR_CORRUPT
