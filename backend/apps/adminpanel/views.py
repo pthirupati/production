@@ -2449,3 +2449,80 @@ class AdminSyncScenariosView(APIView):
             "output_tail": output[-4000:] if output else "",
         })
 
+
+class AdminBlogPostsView(APIView):
+    """CRUD list/create for blog posts."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.adminpanel.models import BlogPost
+
+        posts = BlogPost.objects.all().order_by("-published_at", "-created_at")
+        return Response([
+            {
+                "id": str(p.id),
+                "slug": p.slug,
+                "title": p.title,
+                "excerpt": p.excerpt,
+                "category": p.category,
+                "author_name": p.author_name,
+                "read_minutes": p.read_minutes,
+                "is_published": p.is_published,
+                "published_at": p.published_at.isoformat() if p.published_at else None,
+            }
+            for p in posts
+        ])
+
+    def post(self, request):
+        from apps.adminpanel.models import BlogPost
+        from django.utils.text import slugify
+
+        title = (request.data.get("title") or "").strip()
+        if not title:
+            return Response({"error": "title is required"}, status=status.HTTP_400_BAD_REQUEST)
+        slug = (request.data.get("slug") or slugify(title))[:120]
+        post = BlogPost.objects.create(
+            slug=slug,
+            title=title,
+            excerpt=request.data.get("excerpt") or "",
+            content=request.data.get("content") or "",
+            author_name=request.data.get("author_name") or "FixitLab Team",
+            category=request.data.get("category") or "Product",
+            read_minutes=int(request.data.get("read_minutes") or 5),
+            is_published=bool(request.data.get("is_published", True)),
+            published_at=timezone.now() if request.data.get("is_published", True) else None,
+        )
+        return Response({"id": str(post.id), "slug": post.slug}, status=status.HTTP_201_CREATED)
+
+
+class AdminBlogPostDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def patch(self, request, post_id):
+        from apps.adminpanel.models import BlogPost
+
+        try:
+            post = BlogPost.objects.get(pk=post_id)
+        except BlogPost.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        for field in ("title", "excerpt", "content", "author_name", "category", "slug"):
+            if field in request.data:
+                setattr(post, field, request.data[field])
+        if "read_minutes" in request.data:
+            post.read_minutes = int(request.data["read_minutes"])
+        if "is_published" in request.data:
+            post.is_published = bool(request.data["is_published"])
+            if post.is_published and not post.published_at:
+                post.published_at = timezone.now()
+        post.save()
+        return Response({"updated": True, "slug": post.slug})
+
+    def delete(self, request, post_id):
+        from apps.adminpanel.models import BlogPost
+
+        deleted, _ = BlogPost.objects.filter(pk=post_id).delete()
+        if not deleted:
+            return Response({"error": "Not found"}, status=404)
+        return Response({"deleted": True})
+

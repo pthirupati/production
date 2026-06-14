@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenRefreshView
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.accounts.views import (
     RegisterView, LoginView, UserProfileView, ChangePasswordView,
@@ -74,6 +75,10 @@ urlpatterns = [
 
     # Jira integration (webhooks + ticket status)
     path("api/jira/", include("apps.jira_integration.urls")),
+
+    # OpenAPI schema + Swagger UI
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
 ]
 
 if settings.DEBUG or getattr(settings, "SERVE_MEDIA", False):

@@ -1,6 +1,7 @@
 import logging
 from django.contrib.auth import authenticate, get_user_model
 from django.conf import settings
+from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -202,6 +203,20 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+
+        # Accept pending org invites for this email
+        from .models import PendingOrgInvite, OrganizationMember
+        for invite in PendingOrgInvite.objects.filter(
+            email__iexact=user.email, accepted_at__isnull=True, expires_at__gt=timezone.now(),
+        ).select_related("organization"):
+            if invite.organization.member_count < invite.organization.seat_limit:
+                OrganizationMember.objects.get_or_create(
+                    organization=invite.organization,
+                    user=user,
+                    defaults={"role": invite.role, "invited_email": user.email},
+                )
+            invite.accepted_at = timezone.now()
+            invite.save(update_fields=["accepted_at"])
 
         # Send welcome email asynchronously
         try:

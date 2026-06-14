@@ -71,6 +71,8 @@ export default function Pricing() {
   const [couponCode, setCouponCode] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState(null)
   const [couponLoading, setCouponLoading] = useState(false)
+  const [batchProcessing, setBatchProcessing] = useState(false)
+  const [stripeConfigured, setStripeConfigured] = useState(false)
 
   useEffect(() => {
     api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
@@ -126,7 +128,8 @@ export default function Pricing() {
   useEffect(() => {
     subscriptionApi.getGatewayStatus()
       .then((data) => {
-        setGatewayDown(!data?.razorpay_configured)
+        setStripeConfigured(!!data?.stripe_configured)
+        setGatewayDown(!data?.available)
         setGatewayMessage(data?.banner_message || '')
       })
       .catch(() => setGatewayDown(true))
@@ -181,6 +184,18 @@ export default function Pricing() {
     setSubscribing(tech.id)
 
     try {
+      if (currency === 'USD' && stripeConfigured) {
+        const checkout = await subscriptionApi.createStripeTechCheckout(
+          tech.id,
+          'USD',
+          appliedCoupon?.code || couponCode.trim(),
+        )
+        if (checkout.checkout_url) {
+          window.location.href = checkout.checkout_url
+          return
+        }
+      }
+
       const orderData = await subscriptionApi.createRazorpayOrder(tech.id, appliedCoupon?.code || couponCode.trim())
       const params = new URLSearchParams({
         token: orderData.payment_token || orderData.order_id || '',

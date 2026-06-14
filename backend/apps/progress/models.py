@@ -64,3 +64,25 @@ class UserAchievement(models.Model):
     def __str__(self):
         return f"{self.user} - {self.achievement}"
 
+
+class LearningPathProgress(models.Model):
+    """Tracks which learning-path scenario slugs a user completed per technology."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="learning_path_progress",
+    )
+    technology = models.ForeignKey(
+        "question_bank.Technology",
+        on_delete=models.CASCADE,
+        related_name="learning_path_progress",
+    )
+    completed_slugs = models.JSONField(default=list, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "technology")
+
+    def __str__(self):
+        return f"{self.user} — {self.technology.slug} ({len(self.completed_slugs)} steps)"
+

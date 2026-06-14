@@ -1,5 +1,7 @@
 """Persistent platform configuration (emails, maintenance, promos)."""
 
+import uuid
+
 from django.db import models
 
 
@@ -42,3 +44,25 @@ class PlatformSettings(models.Model):
 
     def __str__(self):
         return "Platform settings"
+
+
+class BlogPost(models.Model):
+    """Admin-managed blog content (replaces hardcoded Blog.jsx)."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    slug = models.SlugField(unique=True, max_length=120)
+    title = models.CharField(max_length=300)
+    excerpt = models.TextField(blank=True, default="")
+    content = models.TextField(help_text="Markdown or plain text body")
+    author_name = models.CharField(max_length=120, blank=True, default="FixitLab Team")
+    category = models.CharField(max_length=80, blank=True, default="Product")
+    read_minutes = models.PositiveIntegerField(default=5)
+    is_published = models.BooleanField(default=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-published_at", "-created_at"]
+
+    def __str__(self):
+        return self.title

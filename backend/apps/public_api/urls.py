@@ -14,6 +14,7 @@ from .views import (
     ActiveLabsView,
     LabSessionStatusView,
     LabHintsView,
+    LabAiHintView,
     UserProgressView,
     UserAchievementsView,
     LeaderboardView,
@@ -24,6 +25,8 @@ from .views import (
     ExpiredSessionSolutionView,
     AchievementsCertificateView,
     CertificateVerifyView,
+    BlogListView,
+    BlogDetailView,
 )
 
 urlpatterns = [
@@ -47,6 +50,7 @@ urlpatterns = [
     path("labs/<uuid:session_id>/stop/", StopLabView.as_view()),
     path("labs/<uuid:session_id>/validate/", ValidateLabView.as_view()),
     path("labs/<uuid:session_id>/hints/", LabHintsView.as_view()),
+    path("labs/<uuid:session_id>/ai-hint/", LabAiHintView.as_view()),
     path("labs/<uuid:session_id>/commands/", CommandHistoryView.as_view()),
     path("labs/<uuid:session_id>/replay/", SessionReplayView.as_view()),
     path("labs/<uuid:session_id>/solution/", ExpiredSessionSolutionView.as_view()),
@@ -62,4 +66,8 @@ urlpatterns = [
 
     # Plan
     path("plan/", UserPlanView.as_view()),
+
+    # Blog CMS (public)
+    path("blog/", BlogListView.as_view()),
+    path("blog/<slug:slug>/", BlogDetailView.as_view()),
 ]

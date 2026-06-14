@@ -46,6 +46,9 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "django_filters",
 
+    # API docs
+    "drf_spectacular",
+
     # Local Django apps
     "apps.accounts",
     "apps.question_bank",
@@ -205,6 +208,14 @@ REST_FRAMEWORK = {
         "auth": "10/minute",  # Strict limit on auth endpoints
         "lab_start": "60/hour",  # Limit lab provisioning (DoS protection)
     },
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "FixitLab API",
+    "DESCRIPTION": "Public REST API for scenarios, labs, billing, and progress.",
+    "VERSION": "2.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 SIMPLE_JWT = {

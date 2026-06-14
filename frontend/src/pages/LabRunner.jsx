@@ -29,7 +29,8 @@ export default function LabRunner() {
   const [isCloudLab, setIsCloudLab] = useState(false)
   const [validating, setValidating] = useState(false)
   const [validationResult, setValidationResult] = useState(null)
-  const [hints, setHints] = useState({ revealed: [], next_available: false, total_hints: 0, hints_used: 0 })
+  const [hints, setHints] = useState({ revealed: [], next_available: false, total_hints: 0, hints_used: 0, interview_mode: false })
+  const [interviewMode, setInterviewMode] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isMobile = useIsMobile()
   const [sidebarTab, setSidebarTab] = useState('instructions') // instructions | hints | result
@@ -343,7 +344,10 @@ export default function LabRunner() {
     }
 
     loadSession()
-    labApi.getHints(sessionId).then(setHints).catch(console.error)
+    labApi.getHints(sessionId).then((data) => {
+      setHints(data)
+      setInterviewMode(!!data.interview_mode)
+    }).catch(console.error)
 
     return () => {
       cancelled = true
@@ -767,14 +771,25 @@ export default function LabRunner() {
 
   const handleRevealHint = async () => {
     try {
-      const result = await labApi.revealHint(sessionId)
+      const result = interviewMode || hints.interview_mode
+        ? await labApi.revealAiHint(sessionId)
+        : await labApi.revealHint(sessionId)
       setHints(prev => ({
         ...prev,
         revealed: [...prev.revealed, result.hint],
         hints_used: result.hints_used,
-        next_available: result.hints_used < result.total_hints,
+        next_available: result.hints_used < (result.total_hints ?? prev.total_hints),
+        total_hints: result.total_hints ?? prev.total_hints,
       }))
-    } catch (err) { toast.error(err.response?.data?.error || 'No more hints') }
+    } catch (err) {
+      const code = err.response?.data?.code
+      if (code === 'INTERVIEW_MODE') {
+        setInterviewMode(true)
+        toast('Use AI coaching hints in interview mode', { icon: '🎯' })
+      } else {
+        toast.error(err.response?.data?.error || 'No more hints')
+      }
+    }
   }
 
   const handleStop = async () => {
@@ -1074,6 +1089,16 @@ export default function LabRunner() {
               {/* Hints tab */}
               {sidebarTab === 'hints' && (
                 <>
+                  {interviewMode && (
+                    <div className="mb-4 p-3 rounded-lg bg-accent-purple/10 border border-accent-purple/20">
+                      <p className="text-xs font-semibold text-accent-purple flex items-center gap-1.5">
+                        <Sparkles size={12} /> Interview mode
+                      </p>
+                      <p className="text-[11px] text-surface-400 mt-1">
+                        Standard hints are disabled. AI coaching gives directional guidance without spoilers.
+                      </p>
+                    </div>
+                  )}
                   {hints.revealed.length > 0 ? (
                     <div className="space-y-3">
                       {hints.revealed.map((hint) => (
@@ -1095,16 +1120,16 @@ export default function LabRunner() {
                     </div>
                   )}
 
-                  {hints.next_available && (
+                  {(hints.next_available || interviewMode) && hints.hints_used < (hints.total_hints || 5) && (
                     <button
                       onClick={handleRevealHint}
                       className="w-full py-2.5 rounded-lg text-sm font-medium bg-accent-amber/10 text-accent-amber border border-accent-amber/20 hover:bg-accent-amber/20 transition-all"
                     >
-                      Reveal Next Hint
+                      {interviewMode ? 'Get AI Coaching Hint' : 'Reveal Next Hint'}
                     </button>
                   )}
 
-                  {!hints.next_available && hints.total_hints > 0 && (
+                  {!hints.next_available && !interviewMode && hints.total_hints > 0 && (
                     <p className="text-xs text-surface-600 text-center">All hints revealed</p>
                   )}
                 </>

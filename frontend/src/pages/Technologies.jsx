@@ -205,11 +205,23 @@ export default function Technologies() {
 
               {techDetail.technology.learning_path?.length > 0 && (
                 <div className="px-6 py-4 border-b border-surface-800/50 bg-surface-900/30">
-                  <h3 className="text-sm font-semibold text-white mb-3">Recommended learning path</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-white">Recommended learning path</h3>
+                    {techDetail.technology.learning_path_progress?.steps_total > 0 && (
+                      <span className="text-xs text-accent-cyan">
+                        {techDetail.technology.learning_path_progress.steps_completed}/
+                        {techDetail.technology.learning_path_progress.steps_total} complete
+                      </span>
+                    )}
+                  </div>
                   <ol className="space-y-2">
-                    {techDetail.technology.learning_path.map((step, i) => (
+                    {techDetail.technology.learning_path.map((step, i) => {
+                      const done = techDetail.technology.learning_path_progress?.completed_slugs?.includes(step.scenario_slug)
+                      return (
                       <li key={i} className="flex items-start gap-3 text-sm">
-                        <span className="w-6 h-6 rounded-full bg-accent-cyan/10 text-accent-cyan flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span>
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                          done ? 'bg-accent-green/20 text-accent-green' : 'bg-accent-cyan/10 text-accent-cyan'
+                        }`}>{done ? '✓' : i + 1}</span>
                         <div>
                           <p className="text-white font-medium">{step.title || step.scenario_slug}</p>
                           {step.description && <p className="text-surface-500 text-xs mt-0.5">{step.description}</p>}
@@ -220,7 +232,8 @@ export default function Technologies() {
                           )}
                         </div>
                       </li>
-                    ))}
+                      )
+                    })}
                   </ol>
                 </div>
               )}

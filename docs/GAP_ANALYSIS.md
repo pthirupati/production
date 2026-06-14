@@ -1,19 +1,23 @@
 # FixitLab Gap Analysis
 
-Last updated: June 2026 (post gap-closure batch)
+Last updated: June 2026 (Phase 2+ completion)
 
-## Recently implemented
+## Recently implemented (Phase 2+)
 
-- **Email delivery:** Critical OTP sends in-process via daemon thread; admin test email endpoint (`POST /api/admin/email/test/`)
-- **OAuth:** Register + login flows; **Profile → Link GitHub/Google** for OTP users (`/api/auth/social/link/*`)
-- **Simulation validation:** Stub `check.sh` files resolved via slug-aware canonical scripts (nginx, mysql, k8s, docker, gpu, ansible, grub, etc.)
-- **Certificate email:** Dedicated `emails/certificate_issued.html` template
-- **Community:** Thread report flow (`POST /api/community/threads/{id}/report/`)
-- **Platform stats:** Live counts on Home via `/api/stats/` and `/api/config/` `platform_stats`
-- **Scenario sync:** `python manage.py sync_scenarios` (wraps `seed_scenarios`)
-- **Technologies:** `learning_path` JSON on Technology model; UI on Technologies page
-- **Scenarios:** `interview_mode` flag; global success rate on scenario cards
-- **Admin:** Changelog JSON on PlatformSettings; promo banner delete; AWS/DO lab modes; expanded Teams/Security
+- **Unified billing:** `GET /api/billing/unified/` — plan, tech subs, orgs, gateway status for Profile/Pricing
+- **Stripe tech checkout:** `POST /api/billing/stripe/tech-checkout/` + webhook fulfillment for international USD/INR
+- **Org seat billing:** `POST /api/billing/org/<slug>/checkout/` + `POST /api/org/<slug>/verify-payment/`
+- **Org analytics:** `GET /api/org/<slug>/analytics/` + Team page dashboard
+- **Invite-before-register:** `PendingOrgInvite` model; auto-accept on `RegisterView`
+- **Blog CMS:** `BlogPost` model, admin CRUD, public `/api/blog/`, frontend fetch with static fallback
+- **Learning path progress:** `LearningPathProgress` model + progress on Technologies page
+- **Interview mode:** Standard hints blocked; AI coaching hints at `/api/labs/<id>/ai-hint/`
+- **OpenAPI:** Swagger UI at `/api/docs/`, schema at `/api/schema/` (drf-spectacular)
+- **Changelog modal:** In-app modal from PlatformSettings changelog JSON
+
+## Previously shipped (Phase 1)
+
+- Email dispatch thread, OAuth register/link, simulation validation, certificate email, community reports, platform stats, sync_scenarios, admin teams/security
 
 ---
 
@@ -21,9 +25,9 @@ Last updated: June 2026 (post gap-closure batch)
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Email delivery in production | **Verify** | Code path improved; confirm Gmail OAuth on workers + run admin test email in prod |
-| Full E2E on every deploy | **Partial** | OTP/concurrent pass; scenario E2E gates deploy. `RUN_FULL_E2E=1` optional |
-| Celery `notifications` queue health | **Monitor** | Critical mail bypasses queue; bulk mail still uses Celery |
+| Email delivery in production | **Verify** | Run admin test email in prod |
+| Full E2E on every deploy | **Partial** | `RUN_FULL_E2E=1` optional |
+| Celery `notifications` queue health | **Monitor** | Critical mail bypasses queue |
 
 ---
 
@@ -31,10 +35,9 @@ Last updated: June 2026 (post gap-closure batch)
 
 | Item | Status | Action |
 |------|--------|--------|
-| Org-level Stripe/Razorpay checkout | **Open** | Team billing portal for seat-based orgs |
 | Frontend Playwright CI | **Open** | Smoke tests for login, register OTP, lab start |
-| Coupon + community API tests | **Open** | Dedicated pytest coverage |
-| Blog CMS | **Static** | Posts still in `Blog.jsx`; wire to admin or headless CMS |
+| Stripe org checkout (USD) | **Open** | Razorpay org seats done; Stripe for orgs optional |
+| Admin blog editor UI | **Partial** | API CRUD exists; dedicated admin React page optional |
 
 ---
 
@@ -43,9 +46,9 @@ Last updated: June 2026 (post gap-closure batch)
 | Item | Status | Action |
 |------|--------|--------|
 | `ScenarioVersion` model | **Orphan** | Integrate or remove |
-| OpenAPI/Swagger | **Missing** | Document public API |
-| Admin payment failure dashboard | **Partial** | Security metrics exist; dedicated payment retry UI |
-| SSO / 2FA for enterprises | **Open** | SAML/OIDC + TOTP |
+| Admin payment failure dashboard | **Partial** | Security metrics exist |
+| SSO / SAML / OIDC | **Open** | Enterprise SAML — contact sales workflow |
+| 2FA (TOTP) | **Open** | Optional enterprise add-on |
 
 ---
 
@@ -58,16 +61,16 @@ Last updated: June 2026 (post gap-closure batch)
 
 ---
 
-## Feature inventory (what exists today)
+## Feature inventory
 
-**Auth:** OTP register (2 min), login, forgot/reset password, GitHub/Google login + register + profile link, profile
+**Auth:** OTP register, OAuth login/register/link, pending org invites on signup
 
-**Labs:** Docker, simulation (unified engine + real validation), AWS/DO provisioners, WebSocket terminal, hints, validation, replay, dual terminal, 15 min auto-expiry
+**Labs:** Docker, simulation, AWS/DO, interview mode + AI hints, WebSocket terminal
 
-**Billing:** Razorpay per-technology, coupons, invoices, certificates, demo mode (dev only)
+**Billing:** Razorpay + Stripe per-technology, unified billing API, org seat checkout, coupons, invoices, certificates
 
-**Admin:** Overview, scenarios, users, labs, monitoring, coupons, analytics, teams, security, test email, changelog
+**Admin:** Overview, scenarios, users, labs, blog CMS API, teams, security, changelog, test email
 
-**Community:** Threads, replies, votes, reactions, attachments, reports
+**Community:** Threads, replies, votes, attachments, reports
 
-platform-start.sh already runs `seed_scenarios` on deploy. Manual resync: Admin → Scenarios → **Sync from repo** or `python manage.py sync_scenarios`.
+platform-start.sh runs `seed_scenarios` on deploy. Resync: Admin → Scenarios → **Sync from repo** or `python manage.py sync_scenarios`.

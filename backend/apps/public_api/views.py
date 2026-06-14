@@ -127,6 +127,10 @@ class TechnologyDetailView(APIView):
             scenarios.values_list("category", flat=True).distinct().order_by("category")
         )
 
+        if request.user.is_authenticated:
+            from apps.progress.learning_path import get_learning_path_progress
+            tech_data["learning_path_progress"] = get_learning_path_progress(request.user, tech)
+
         scenario_data = ScenarioListSerializer(scenarios, many=True).data
 
         # Overlay progress
@@ -670,6 +674,9 @@ class ValidateLabView(APIView):
 
                 terminate_lab_session(provisioner, session)
 
+                from apps.progress.learning_path import sync_learning_path_on_completion
+                sync_learning_path_on_completion(request.user, session.scenario)
+
                 return Response({
                     "passed": True,
                     "score": score,
@@ -759,6 +766,7 @@ class LabSessionStatusView(APIView):
             "hints_used": session.hints_used,
             "validation_passed": session.validation_passed,
             "is_expired": session.is_expired,
+            "interview_mode": bool(getattr(session.scenario, "interview_mode", False)),
             "jira_issue_key": session.jira_issue_key or "",
             "jira_issue_url": resolve_jira_issue_url(
                 session.jira_issue_key or "",
@@ -773,7 +781,19 @@ class LabHintsView(APIView):
 
     def get(self, request, session_id):
         session = get_object_or_404(LabSession, pk=session_id, user=request.user)
+        interview_mode = bool(getattr(session.scenario, "interview_mode", False))
         hints = Hint.objects.filter(scenario=session.scenario, is_active=True).order_by("order")
+
+        if interview_mode:
+            return Response({
+                "revealed": [],
+                "next_available": False,
+                "total_hints": hints.count(),
+                "hints_used": session.hints_used,
+                "interview_mode": True,
+                "ai_hints_available": True,
+                "message": "Interview mode: standard hints are disabled. Use AI coaching hints instead.",
+            })
 
         revealed = hints[:session.hints_used]
         return Response({
@@ -784,12 +804,24 @@ class LabHintsView(APIView):
             "next_available": hints.count() > session.hints_used,
             "total_hints": hints.count(),
             "hints_used": session.hints_used,
+            "interview_mode": False,
         })
 
     def post(self, request, session_id):
         session = get_object_or_404(
             LabSession, pk=session_id, user=request.user, status="RUNNING"
         )
+        if getattr(session.scenario, "interview_mode", False):
+            return Response(
+                {
+                    "error": "Standard hints are disabled in interview mode.",
+                    "code": "INTERVIEW_MODE",
+                    "interview_mode": True,
+                    "ai_hint_url": f"/api/labs/{session_id}/ai-hint/",
+                },
+                status=403,
+            )
+
         hints = Hint.objects.filter(
             scenario=session.scenario, is_active=True
         ).order_by("order")
@@ -805,6 +837,51 @@ class LabHintsView(APIView):
             "hint": {"order": next_hint.order, "content": next_hint.content, "penalty": next_hint.penalty},
             "hints_used": session.hints_used,
             "total_hints": hints.count(),
+        })
+
+
+class LabAiHintView(APIView):
+    """Coaching-style hints for interview mode (no stored hint spoilers)."""
+    permission_classes = [IsAuthenticated]
+
+    MAX_AI_HINTS = 5
+
+    def post(self, request, session_id):
+        session = get_object_or_404(
+            LabSession, pk=session_id, user=request.user, status="RUNNING"
+        )
+        scenario = session.scenario
+        if not getattr(scenario, "interview_mode", False):
+            return Response({"error": "AI hints are only available in interview mode."}, status=400)
+
+        if session.hints_used >= self.MAX_AI_HINTS:
+            return Response({"error": "Maximum AI coaching hints reached for this session."}, status=400)
+
+        session.hints_used += 1
+        session.save(update_fields=["hints_used"])
+
+        title = scenario.title or "this scenario"
+        category = scenario.category or scenario.technology.name
+        order = session.hints_used
+        prompts = [
+            f"Start by checking service status and recent logs related to {category}. What failed last?",
+            f"Validate configuration syntax before restarting services for «{title}».",
+            f"Trace the request path: listeners, upstreams, and DNS resolution for {category}.",
+            f"Compare expected vs actual state — use read-only inspection commands first.",
+            f"Summarize root cause in one sentence, then apply the smallest fix that restores health.",
+        ]
+        content = prompts[min(order - 1, len(prompts) - 1)]
+
+        return Response({
+            "hint": {
+                "order": order,
+                "content": content,
+                "penalty": 15,
+                "ai_generated": True,
+            },
+            "hints_used": session.hints_used,
+            "total_hints": self.MAX_AI_HINTS,
+            "interview_mode": True,
         })
 
 
@@ -1356,3 +1433,46 @@ class CertificateVerifyView(APIView):
 
         except (ValueError, IndexError):
             return Response({"valid": False, "error": "Invalid certificate ID format"})
+
+
+# ─── Blog (public CMS) ───────────────────────────────────────────────
+
+class BlogListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from apps.adminpanel.models import BlogPost
+
+        posts = BlogPost.objects.filter(is_published=True).order_by("-published_at", "-created_at")[:50]
+        return Response([
+            {
+                "slug": p.slug,
+                "title": p.title,
+                "excerpt": p.excerpt,
+                "category": p.category,
+                "author": p.author_name,
+                "date": (p.published_at or p.created_at).strftime("%B %d, %Y"),
+                "readTime": f"{p.read_minutes} min read",
+                "featured": i == 0,
+            }
+            for i, p in enumerate(posts)
+        ])
+
+
+class BlogDetailView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        from apps.adminpanel.models import BlogPost
+
+        post = get_object_or_404(BlogPost, slug=slug, is_published=True)
+        return Response({
+            "slug": post.slug,
+            "title": post.title,
+            "excerpt": post.excerpt,
+            "content": post.content,
+            "category": post.category,
+            "author": post.author_name,
+            "date": (post.published_at or post.created_at).strftime("%B %d, %Y"),
+            "readTime": f"{post.read_minutes} min read",
+        })

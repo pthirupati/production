@@ -179,8 +179,13 @@ class StripeWebhookView(APIView):
         return Response({"status": "ok"})
 
     def _handle_checkout_completed(self, session):
-        """Upgrade user to the purchased plan."""
-        metadata = session.get("metadata", {})
+        """Upgrade plan or fulfill technology subscription."""
+        metadata = session.get("metadata", {}) or {}
+        if metadata.get("checkout_type") == "technology":
+            from .extended_views import fulfill_stripe_technology_checkout
+            fulfill_stripe_technology_checkout(session)
+            return
+
         user_id = metadata.get("fixitlab_user_id")
         plan_code = metadata.get("plan_code")
         stripe_subscription_id = session.get("subscription", "")
@@ -259,20 +264,27 @@ class PaymentGatewayStatusView(APIView):
 
     def get(self, request):
         razorpay_configured = bool(settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET)
+        stripe_configured = bool(settings.STRIPE_SECRET_KEY)
         razorpay_ready = "ready" if razorpay_configured else "down"
-        
+        stripe_ready = "ready" if stripe_configured else "down"
+
         banner_message = None
-        if not razorpay_configured:
+        if not razorpay_configured and not stripe_configured:
             banner_message = (
                 "Payment gateway is currently unavailable. "
-                "Free scenarios still work. Paid subscriptions will open once Razorpay is configured."
+                "Free scenarios still work. Paid subscriptions will open once billing is configured."
             )
-        
+        elif not razorpay_configured:
+            banner_message = "Razorpay unavailable — international card payments via Stripe are available."
+
         return Response({
             "razorpay_configured": razorpay_configured,
+            "stripe_configured": stripe_configured,
             "razorpay_key_id": settings.RAZORPAY_KEY_ID if razorpay_configured else None,
-            "status": razorpay_ready,
-            "available": razorpay_configured,
+            "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY if stripe_configured else None,
+            "status": razorpay_ready if razorpay_configured else stripe_ready,
+            "available": razorpay_configured or stripe_configured,
+            "recommended_gateway": "razorpay" if razorpay_configured else ("stripe" if stripe_configured else None),
             "banner_message": banner_message,
             "banner_type": "warning" if banner_message else None,
         })

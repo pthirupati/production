@@ -119,6 +119,7 @@ export default function PaymentPage() {
   const techIdParam = searchParams.get('tech_id')
   const renewSlug = searchParams.get('technology')
   const isRenewFlow = searchParams.get('renew') === '1' && !!renewSlug
+  const orgSlug = searchParams.get('org_slug')
   const existingOrderId = searchParams.get('order_id')
   const existingRazorpayKey = searchParams.get('razorpay_key')
   const displayCurrency = searchParams.get('display_currency') || 'INR'
@@ -148,6 +149,7 @@ export default function PaymentPage() {
   const [couponCode, setCouponCode] = useState(searchParams.get('coupon') || '')
   const [appliedCoupon, setAppliedCoupon] = useState(null)
   const [couponLoading, setCouponLoading] = useState(false)
+  const [hoveredMethod, setHoveredMethod] = useState(null)
   const cardRef = useRef(null)
 
   // Display amounts (coupon may override URL amount)
@@ -244,7 +246,7 @@ export default function PaymentPage() {
   useEffect(() => {
     subscriptionApi.getGatewayStatus()
       .then((data) => {
-        const down = !data?.razorpay_configured && !orderIdResolved
+        const down = !data?.available && !orderIdResolved
         setGatewayDown(down)
         if (down) setStep('gateway_down')
       })
@@ -381,15 +383,20 @@ export default function PaymentPage() {
         handler: async (response) => {
           setStep('processing')
           try {
-            const verifyResult = await subscriptionApi.verifyRazorpayPayment({
+            const verifyPayload = {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              technology_id: parseInt(techId),
-            })
+            }
+            const verifyResult = orgSlug
+              ? await subscriptionApi.verifyOrgPayment(orgSlug, verifyPayload)
+              : await subscriptionApi.verifyRazorpayPayment({
+                  ...verifyPayload,
+                  technology_id: parseInt(techId),
+                })
             setPaymentResult(verifyResult)
             setStep('success')
-            toast.success('Payment verified successfully!')
+            toast.success(orgSlug ? 'Organization seats updated!' : 'Payment verified successfully!')
           } catch (err) {
             setError(err?.response?.data?.error || 'Payment verification failed. Contact support.')
             setStep('failed')

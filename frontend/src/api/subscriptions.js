@@ -66,6 +66,31 @@ export const subscriptionApi = {
     return data
   },
 
+  async getUnifiedBilling() {
+    const { data } = await api.get('/billing/unified/')
+    return data
+  },
+
+  async createStripeTechCheckout(technologyId, currency = 'USD', couponCode = '') {
+    const payload = { technology_id: technologyId, currency }
+    if (couponCode) payload.coupon_code = couponCode
+    const { data } = await api.post('/billing/stripe/tech-checkout/', payload)
+    return data
+  },
+
+  async createOrgCheckout(orgSlug, seats, technologyIds = []) {
+    const { data } = await api.post(`/billing/org/${orgSlug}/checkout/`, {
+      seats,
+      technology_ids: technologyIds,
+    })
+    return data
+  },
+
+  async verifyOrgPayment(orgSlug, paymentData) {
+    const { data } = await api.post(`/org/${orgSlug}/verify-payment/`, paymentData)
+    return data
+  },
+
   async getMyInvoices() {
     const { data } = await api.get('/billing/invoices/')
     return data

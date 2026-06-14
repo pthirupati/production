@@ -1,5 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { Terminal, Clock, ArrowLeft, Tag, User, Calendar, ChevronRight } from 'lucide-react'
+import api from '../api/client'
 
 const blogContent = {
   'why-hands-on-learning-works': {
@@ -576,7 +578,24 @@ Our **DNS Resolution Broken** scenario gives you a server where DNS is broken in
 
 export default function BlogPost() {
   const { slug } = useParams()
-  const post = blogContent[slug]
+  const [post, setPost] = useState(blogContent[slug] || null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    api.get(`/blog/${slug}/`)
+      .then(res => setPost({ ...res.data, color: 'accent-cyan' }))
+      .catch(() => setPost(blogContent[slug] || null))
+      .finally(() => setLoading(false))
+  }, [slug])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-surface-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   if (!post) {
     return (

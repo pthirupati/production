@@ -5,6 +5,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import OfflineBanner from './components/OfflineBanner'
 import ScrollToTop from './components/ScrollToTop'
 import AppRouter from './router/AppRouter'
+import ChangelogModal from './components/ChangelogModal'
 import useSessionTimeout from './hooks/useSessionTimeout'
 import { useThemeStore } from './store/themeStore'
 
@@ -39,6 +40,7 @@ export default function App() {
             },
           }}
         />
+        <ChangelogModal />
         <AppRouter />
       </BrowserRouter>
     </ErrorBoundary>

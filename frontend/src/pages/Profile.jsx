@@ -5,7 +5,7 @@ import { authApi } from '../api/auth'
 import { labApi } from '../api/labs'
 import { subscriptionApi } from '../api/subscriptions'
 import api from '../api/client'
-import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download, Github } from 'lucide-react'
+import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download, Github, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { validators } from '../utils/validators'
 import { SkeletonCard } from '../components/Skeleton'
@@ -27,6 +27,7 @@ export default function Profile() {
   const [techSubscriptions, setTechSubscriptions] = useState([])
   const [complimentaryAccess, setComplimentaryAccess] = useState(false)
   const [invoices, setInvoices] = useState([])
+  const [organizations, setOrganizations] = useState([])
   const [socialAccounts, setSocialAccounts] = useState([])
   const [socialConfig, setSocialConfig] = useState(null)
 
@@ -39,7 +40,8 @@ export default function Profile() {
       api.get('/notifications/preferences/').then(r => r.data).catch(() => null),
       subscriptionApi.getMySubscriptions().catch(() => ({ subscriptions: [] })),
       subscriptionApi.getMyInvoices().catch(() => ({ invoices: [] })),
-    ]).then(([profileData, plan, prefs, subsData, invData]) => {
+      subscriptionApi.getUnifiedBilling().catch(() => null),
+    ]).then(([profileData, plan, prefs, subsData, invData, unified]) => {
       setUsername(profileData.username || '')
       setFirstName(profileData.first_name || '')
       setLastName(profileData.last_name || '')
@@ -51,6 +53,7 @@ export default function Profile() {
       setComplimentaryAccess(subsData?.complimentary_access || false)
       setInvoices(invData?.invoices || [])
       setSocialAccounts(profileData.social_accounts || [])
+      setOrganizations(unified?.organizations || [])
     }).catch(console.error)
       .finally(() => setLoading(false))
   }, [])
@@ -444,6 +447,23 @@ export default function Profile() {
           </div>
         )}
       </div>
+
+      {organizations.length > 0 && (
+        <div className="glass-card p-6">
+          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Users size={18} className="text-accent-cyan" /> Organizations
+          </h2>
+          <ul className="space-y-2 text-sm">
+            {organizations.map(org => (
+              <li key={org.slug} className="flex justify-between border-b border-surface-800 py-2">
+                <span className="text-white">{org.name}</span>
+                <span className="text-surface-500 capitalize">{org.role} · {org.seat_limit} seats</span>
+              </li>
+            ))}
+          </ul>
+          <Link to="/team" className="text-accent-cyan text-sm mt-3 inline-block hover:underline">Manage team →</Link>
+        </div>
+      )}
 
       {/* Payment Invoices */}
       <div className="glass-card p-6">

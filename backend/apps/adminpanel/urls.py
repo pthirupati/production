@@ -42,6 +42,8 @@ from .views import (
     AdminSecurityMetricsView,
     AdminTestEmailView,
     AdminSyncScenariosView,
+    AdminBlogPostsView,
+    AdminBlogPostDetailView,
 )
 
 urlpatterns = [
@@ -75,6 +77,10 @@ urlpatterns = [
     path("scenarios/", AdminScenariosView.as_view()),
     path("scenarios/sync/", AdminSyncScenariosView.as_view()),
     path("scenarios/<int:pk>/", AdminScenarioDetailView.as_view()),
+
+    # Blog CMS
+    path("blog/", AdminBlogPostsView.as_view()),
+    path("blog/<uuid:post_id>/", AdminBlogPostDetailView.as_view()),
 
     # Hints CRUD
     path("scenarios/<int:scenario_id>/hints/", AdminHintsView.as_view()),

@@ -199,6 +199,7 @@ class Organization(models.Model):
     seat_limit = models.PositiveIntegerField(default=10)
     is_active = models.BooleanField(default=True)
     billing_email = models.EmailField(blank=True, default="")
+    stripe_customer_id = models.CharField(max_length=100, blank=True, default="")
     notes = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -255,4 +256,26 @@ class OrganizationTechnologyGrant(models.Model):
         if self.expires_at and timezone.now() > self.expires_at:
             return False
         return True
+
+
+class PendingOrgInvite(models.Model):
+    """Invite sent before user registers — auto-join on OTP signup with matching email."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="pending_invites")
+    email = models.EmailField(db_index=True)
+    role = models.CharField(max_length=20, choices=OrganizationMember.ROLE_CHOICES, default="member")
+    invited_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="sent_org_invites",
+    )
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("organization", "email")]
+        ordering = ["-created_at"]
+
+    def is_valid(self) -> bool:
+        return self.accepted_at is None and timezone.now() < self.expires_at
 

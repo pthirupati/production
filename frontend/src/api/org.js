@@ -13,4 +13,8 @@ export const orgApi = {
     const { data } = await api.post(`/org/${slug}/`, { email, role })
     return data
   },
+  async getAnalytics(slug) {
+    const { data } = await api.get(`/org/${slug}/analytics/`)
+    return data
+  },
 }

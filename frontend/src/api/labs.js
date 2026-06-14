@@ -26,6 +26,11 @@ export const labApi = {
     return data
   },
 
+  async revealAiHint(sessionId) {
+    const { data } = await api.post(`/labs/${sessionId}/ai-hint/`)
+    return data
+  },
+
   async getCommandHistory(sessionId) {
     const { data } = await api.get(`/labs/${sessionId}/commands/`)
     return data
