@@ -1,4 +1,4 @@
-"""Email dispatch — Celery worker first (Gmail API), sync fallback in-process."""
+"""Email dispatch — Celery worker first (Gmail API), sync fallback if queue unavailable."""
 
 from __future__ import annotations
 
@@ -28,11 +28,11 @@ def dispatch_notification_email(
     critical: bool = False,
 ) -> bool:
     """
-    Deliver email the same way as subscription/invoice mail:
-    1. Celery worker (Gmail API / SendGrid — works when SMTP ports are blocked)
-    2. In-process sync fallback if the queue is unavailable
+    Same delivery path as subscription/invoice emails:
+    1. Queue on Celery worker (Gmail API / SendGrid — non-blocking)
+    2. If Redis/Celery unavailable and critical=True, send in-process immediately
 
-    critical=True waits for worker delivery before returning (OTP, password reset).
+    Does NOT block the HTTP request waiting for delivery (avoids 504 gateway timeouts).
     """
     context = context or {}
     kwargs = {
@@ -45,25 +45,21 @@ def dispatch_notification_email(
     try:
         from .tasks import send_notification_email
 
-        if critical:
-            result = send_notification_email.apply_async(kwargs=kwargs)
-            ok = result.get(timeout=60)
-            if not ok:
-                raise RuntimeError(f"Worker reported email delivery failed for {to_email}")
-            logger.info("Email delivered via Celery worker to %s", to_email)
-            return True
-
         send_notification_email.delay(**kwargs)
+        logger.info("Email queued via Celery for %s", to_email)
         return True
     except Exception as exc:
         logger.warning(
-            "Celery email dispatch failed for %s (%s) — trying in-process send",
+            "Celery email queue failed for %s (%s)",
             to_email,
             exc,
         )
+        if not critical:
+            return False
         ok = send_email_now(subject, to_email, template, context)
-        if critical and not ok:
+        if not ok:
             raise RuntimeError(
                 "Email could not be delivered. Check Gmail API, SendGrid, or SMTP settings."
             ) from exc
-        return ok
+        logger.info("Email delivered in-process (queue fallback) to %s", to_email)
+        return True
