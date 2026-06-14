@@ -221,4 +221,6 @@ class JiraIssueCommentView(APIView):
             return Response({"error": "text is required"}, status=400)
 
         add_comment(ticket, request.user, text, session=ticket.last_session)
+        from .simulated import add_customer_reply
+        add_customer_reply(ticket, text, session=ticket.last_session)
         return Response(ticket_detail_payload(ticket))

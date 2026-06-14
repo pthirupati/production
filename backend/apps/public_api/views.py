@@ -31,7 +31,7 @@ from apps.billing.services import can_start_lab
 from apps.billing.models import TechnologySubscription
 from apps.notifications.tasks import notify_lab_completed, notify_achievement_earned
 from apps.jira_integration.sync import (
-    sync_lab_started, sync_lab_completed, sync_lab_stopped, sync_lab_in_progress,
+    sync_lab_started, sync_lab_completed, sync_lab_stopped, sync_lab_in_progress, sync_lab_expired,
     mask_jira_url_for_user,
 )
 from apps.jira_integration.helpers import resolve_jira_issue_url
@@ -240,7 +240,10 @@ class ScenarioDetailView(APIView):
 
         # Check subscription access
         subscribed = _get_subscribed_tech_ids(request.user if request.user.is_authenticated else None)
-        if subscribed is None:
+        if getattr(scenario.technology, "coming_soon", False):
+            data["is_accessible"] = False
+            data["coming_soon"] = True
+        elif subscribed is None:
             data["is_accessible"] = True
         elif scenario.is_free:
             data["is_accessible"] = True
@@ -352,6 +355,12 @@ class StartLabView(APIView):
     def post(self, request, scenario_id):
         scenario = get_object_or_404(Scenario, pk=scenario_id, is_active=True)
 
+        if getattr(scenario.technology, "coming_soon", False):
+            return Response(
+                {"error": "Technology coming soon", "message": f"{scenario.technology.name} is not available yet."},
+                status=403,
+            )
+
         # Check subscription access for paid scenarios
         from apps.billing.subscription_utils import (
             user_has_complimentary_access,
@@ -448,7 +457,11 @@ class StartLabView(APIView):
                 logger.info(f"Auto-terminated session {existing.id} for new lab start")
 
             # Determine infrastructure type from scenario
-            infra_type = getattr(scenario, "infrastructure_type", "docker") or "docker"
+            lab_mode = getattr(scenario, "lab_mode", "docker") or "docker"
+            if lab_mode == "simulation":
+                infra_type = "simulation"
+            else:
+                infra_type = getattr(scenario, "infrastructure_type", "docker") or "docker"
 
             # Create a fresh session — always, regardless of prior completion
             session = LabSession.objects.create(
@@ -462,7 +475,7 @@ class StartLabView(APIView):
         try:
             provisioner = get_provisioner(infra_type)
 
-            if infra_type != "docker":
+            if infra_type != "docker" and infra_type != "simulation":
                 # Cloud labs (AWS EC2, DigitalOcean): provision asynchronously
                 # Return PROVISIONING status immediately — frontend polls until RUNNING
                 from celery_app.tasks import provision_cloud_lab
@@ -486,7 +499,7 @@ class StartLabView(APIView):
                 response_data = {**serializer.data, **jira_info}
                 return Response(response_data, status=status.HTTP_201_CREATED)
 
-            # Docker labs: provision synchronously (instant)
+            # Docker and simulation labs: provision synchronously (instant)
             resource_id, resource_name = provisioner.provision(session)
 
             session.container_id = resource_id
@@ -615,36 +628,31 @@ class ValidateLabView(APIView):
                 hint_penalty = session.hints_used * 10
                 score = max(10, 100 + time_bonus - hint_penalty)
 
-                session.mark_completed(score=score)
+                session.validation_passed = True
+                session.score = score
+                session.status = "COMPLETED"
+                session.ended_at = timezone.now()
+                session.save(update_fields=["validation_passed", "score", "status", "ended_at"])
+
                 sync_lab_completed(session, score=score, time_taken=int(elapsed))
 
-                # Update progress and check achievements using centralized service
-                from apps.progress.services import record_attempt
-                record_attempt(
-                    user=request.user,
-                    scenario=session.scenario,
-                    score=score,
-                    completed=True,
-                    time_seconds=int(elapsed),
-                    hints_used=session.hints_used,
-                )
+                from apps.jira_integration.helpers import is_jira_closed
+                from apps.jira_integration.models import UserScenarioJiraTicket
 
-                # Update scenario stats
-                Scenario.objects.filter(pk=session.scenario.pk).update(
-                    completions_count=F("completions_count") + 1
-                )
+                ticket = UserScenarioJiraTicket.objects.filter(
+                    user=request.user, issue_key=session.jira_issue_key
+                ).first()
+                jira_closed = ticket and is_jira_closed(ticket.jira_status or "")
 
-                # Send completion notification (async)
-                try:
-                    notify_lab_completed.delay(
-                        user_id=request.user.id,
-                        scenario_title=session.scenario.title,
-                        score=score,
-                        time_taken=int(elapsed),
-                        hints_used=session.hints_used,
+                if jira_closed:
+                    from apps.jira_integration.completion import finalize_lab_completion_if_ready
+                    finalize_lab_completion_if_ready(session)
+                    completion_message = "Congratulations! Challenge solved and Jira ticket closed!"
+                else:
+                    completion_message = (
+                        "Validation passed! Update the Jira ticket status and close it "
+                        "to mark this scenario complete."
                     )
-                except Exception:
-                    pass  # Don't block validation response
 
                 # Terminate resource
                 terminate_lab_session(provisioner, session)
@@ -654,7 +662,9 @@ class ValidateLabView(APIView):
                     "score": score,
                     "output": output,
                     "time_taken": int(elapsed),
-                    "message": "Congratulations! Challenge solved!",
+                    "message": completion_message,
+                    "jira_pending_close": not jira_closed,
+                    "scenario_completed": jira_closed or session.completion_finalized,
                     "solution": session.scenario.solution_explanation or None,
                 })
             else:
@@ -1141,16 +1151,32 @@ class AchievementsCertificateView(APIView):
         ).aggregate(total=Sum("best_score"))["total"] or 0
 
         cert_id = f"FIXIT-{tech.slug.upper()}-{user.id}-{timezone.now().strftime('%Y%m%d')}"
+        issued_at = timezone.now()
+        expires_at = issued_at + timezone.timedelta(days=365)
+
+        from apps.billing.models import UserCertificate
+
+        cert_record, _ = UserCertificate.objects.update_or_create(
+            user=user,
+            technology=tech,
+            defaults={
+                "certificate_id": cert_id,
+                "issued_at": issued_at,
+                "expires_at": expires_at,
+            },
+        )
 
         cert_data = {
-            "certificate_id": cert_id,
+            "certificate_id": cert_record.certificate_id,
             "username": user.get_full_name() or user.username,
             "email": user.email,
             "technology": tech.name,
             "scenarios_completed": completed,
             "total_scenarios": total_scenarios,
             "total_score": total_score,
-            "generated_at": timezone.now().isoformat(),
+            "generated_at": issued_at.isoformat(),
+            "issued_at": issued_at.isoformat(),
+            "expires_at": expires_at.isoformat(),
             "completion_percentage": round((completed / total_scenarios) * 100) if total_scenarios > 0 else 0,
         }
 
@@ -1165,9 +1191,9 @@ class AchievementsCertificateView(APIView):
                     "username": user.get_full_name() or user.username,
                     "technology": tech.name,
                     "plan_name": "Certificate of Completion",
-                    "amount": f"Certificate ID: {cert_id}",
-                    "expiry_date": "Lifetime Achievement",
-                    "subscription_id": cert_id,
+                    "amount": f"Certificate ID: {cert_record.certificate_id}",
+                    "expiry_date": expires_at.strftime("%B %d, %Y"),
+                    "subscription_id": cert_record.certificate_id,
                     "payment_method": f"Completed {completed}/{total_scenarios} scenarios with total score {total_score}",
                 },
             )
@@ -1252,6 +1278,50 @@ class CertificateVerifyView(APIView):
 
             is_valid = completed >= total_scenarios and total_scenarios > 0 and has_sub
 
+            from apps.billing.models import UserCertificate
+            from datetime import timedelta
+
+            cert_record = UserCertificate.objects.filter(
+                user=user, technology=tech, certificate_id=cert_id
+            ).first()
+            issued_date = None
+            expires_date = None
+            if cert_record:
+                issued_date = cert_record.issued_at.strftime("%Y-%m-%d")
+                expires_date = cert_record.expires_at.strftime("%Y-%m-%d")
+                if cert_record.is_expired:
+                    return Response({
+                        "valid": False,
+                        "certificate_id": cert_id,
+                        "holder_name": user.get_full_name() or user.username,
+                        "technology": tech.name,
+                        "error": "Certificate is out of date. Please renew your certification with the latest scenarios and technologies.",
+                        "issued_date": issued_date,
+                        "expires_date": expires_date,
+                        "is_expired": True,
+                    })
+            elif len(date_str) == 8:
+                from datetime import datetime
+                try:
+                    issued_dt = datetime.strptime(date_str, "%Y%m%d")
+                    issued_dt = timezone.make_aware(issued_dt) if timezone.is_naive(issued_dt) else issued_dt
+                    expiry_dt = issued_dt + timedelta(days=365)
+                    issued_date = issued_dt.strftime("%Y-%m-%d")
+                    expires_date = expiry_dt.strftime("%Y-%m-%d")
+                    if timezone.now() > expiry_dt:
+                        return Response({
+                            "valid": False,
+                            "certificate_id": cert_id,
+                            "holder_name": user.get_full_name() or user.username,
+                            "technology": tech.name,
+                            "error": "Certificate is out of date. Please renew your certification with the latest scenarios and technologies.",
+                            "issued_date": issued_date,
+                            "expires_date": expires_date,
+                            "is_expired": True,
+                        })
+                except ValueError:
+                    pass
+
             total_score = UserScenarioProgress.objects.filter(
                 user=user, scenario__technology=tech, completed=True
             ).aggregate(total=Sum("best_score"))["total"] or 0
@@ -1264,7 +1334,8 @@ class CertificateVerifyView(APIView):
                 "scenarios_completed": completed,
                 "total_scenarios": total_scenarios,
                 "total_score": total_score,
-                "issued_date": f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}" if len(date_str) == 8 else date_str,
+                "issued_date": issued_date or (f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}" if len(date_str) == 8 else date_str),
+                "expires_date": expires_date,
             })
 
         except (ValueError, IndexError):

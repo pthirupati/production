@@ -48,8 +48,16 @@ def get_provisioner(provider="docker"):
                     _cloud_provisioners["digitalocean"] = DOProvisioner()
         return _cloud_provisioners["digitalocean"]
 
+    elif provider == "simulation":
+        if "simulation" not in _cloud_provisioners:
+            with _provisioner_lock:
+                if "simulation" not in _cloud_provisioners:
+                    from .simulation_provisioner import SimulationProvisioner
+                    _cloud_provisioners["simulation"] = SimulationProvisioner()
+        return _cloud_provisioners["simulation"]
+
     else:
-        raise ValueError(f"Unknown provider: {provider}. Use 'docker', 'aws_ec2', or 'digitalocean'.")
+        raise ValueError(f"Unknown provider: {provider}. Use 'docker', 'aws_ec2', 'digitalocean', or 'simulation'.")
 
 
 def terminate_lab_session(provisioner, session):

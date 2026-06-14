@@ -1,0 +1,27 @@
+title: "RHEL Simulation: IPMI Power Control"
+slug: sim-rhel-baremetal-ipmi
+technology: Simulation
+category: Bare Metal
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: baremetal
+infrastructure_type: simulation
+jira_priority: Low
+is_free: true
+description: |
+  Use ipmitool on a simulated bare-metal host to check chassis power and cycle the server.
+objectives:
+  - Check chassis power status with ipmitool
+  - Perform a power cycle
+  - Verify power is on after cycle
+initial_state: |
+  Simulated HPE DL380 with IPMI tools available on RHEL.
+hints:
+  - order: 1
+    cost: 10
+    content: Run `ipmitool power status` to see current state.
+  - order: 2
+    cost: 15
+    content: Use `ipmitool power cycle` to reset the chassis.

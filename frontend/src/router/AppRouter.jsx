@@ -47,7 +47,8 @@ const AdminLabs = lazy(() => import('../pages/admin/AdminLabs'))
 const AdminSubscriptions = lazy(() => import('../pages/admin/AdminSubscriptions'))
 const AdminThreads = lazy(() => import('../pages/admin/AdminThreads'))
 const AdminJira = lazy(() => import('../pages/admin/AdminJira'))
-const AdminSettings = lazy(() => import('../pages/admin/AdminSettings'))
+const AdminCoupons = lazy(() => import('../pages/admin/AdminCoupons'))
+const AdminSecurity = lazy(() => import('../pages/admin/AdminSecurity'))
 const AdminAuditLogs = lazy(() => import('../pages/admin/AdminAuditLogs'))
 const AdminInvoices = lazy(() => import('../pages/admin/AdminInvoices'))
 const AdminMonitoring = lazy(() => import('../pages/admin/AdminMonitoring'))
@@ -128,6 +129,8 @@ export default function AppRouter() {
           <Route path="/admin/jira" element={<AdminJira />} />
           <Route path="/admin/threads" element={<AdminThreads />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
+          <Route path="/admin/coupons" element={<AdminCoupons />} />
+          <Route path="/admin/security" element={<AdminSecurity />} />
           <Route path="/admin/audit-logs" element={<AdminAuditLogs />} />
         </Route>
 

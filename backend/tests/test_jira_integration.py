@@ -151,19 +151,20 @@ class JiraSyncEnabledTests(TestCase):
         mock_client.transition_issue.assert_any_call("FIXIT-101", "In Progress")
 
     @patch("apps.jira_integration.sync.JiraClient")
-    def test_sync_lab_completed_transitions_to_done(self, mock_client_cls):
+    def test_sync_lab_completed_adds_comment_only(self, mock_client_cls):
         self.session.jira_issue_key = "FIXIT-101"
         self.session.jira_issue_url = "https://example.atlassian.net/browse/FIXIT-101"
         self.session.save()
 
         mock_client = MagicMock()
         mock_client.enabled = True
-        mock_client.get_issue_status.return_value = "Done"
+        mock_client.get_issue_status.return_value = "In Progress"
         mock_client_cls.return_value = mock_client
 
         result = sync_lab_completed(self.session, score=95, time_taken=600)
         self.assertTrue(result["jira_enabled"])
-        mock_client.transition_issue.assert_called_with("FIXIT-101", "Done")
+        mock_client.add_comment.assert_called()
+        mock_client.transition_issue.assert_not_called()
 
     @patch("apps.jira_integration.sync.JiraClient")
     def test_sync_lab_stopped_resets_to_todo(self, mock_client_cls):
@@ -177,7 +178,8 @@ class JiraSyncEnabledTests(TestCase):
         mock_client_cls.return_value = mock_client
 
         sync_lab_stopped(self.session, reason="User stopped")
-        mock_client.transition_issue.assert_called_with("FIXIT-101", "To Do")
+        mock_client.add_comment.assert_called()
+        mock_client.transition_issue.assert_not_called()
 
     @patch("apps.jira_integration.sync.JiraClient")
     def test_ensure_scenario_ticket_creates_without_session(self, mock_client_cls):

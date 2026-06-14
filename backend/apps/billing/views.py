@@ -314,6 +314,16 @@ class CreateRazorpayOrderView(APIView):
 
         # Get server-side price (never trust client)
         amount = int(getattr(technology, 'price', 0) or 0)
+        coupon_code = (request.data.get("coupon_code") or "").strip()
+        coupon_applied = None
+        original_amount = amount
+        if coupon_code:
+            from .coupon_service import apply_coupon_to_amount, CouponError
+            try:
+                amount, coupon_applied = apply_coupon_to_amount(coupon_code, amount)
+            except CouponError as exc:
+                return Response({"error": str(exc)}, status=http_status.HTTP_400_BAD_REQUEST)
+
         if amount <= 0:
             return Response(
                 {"error": "Price not configured for this technology"},
@@ -347,6 +357,8 @@ class CreateRazorpayOrderView(APIView):
                     "technology_name": technology.name,
                     "user_id": str(request.user.id),
                     "username": request.user.username,
+                    "coupon_code": coupon_applied.code if coupon_applied else "",
+                    "original_amount": str(original_amount),
                 },
             }
 
@@ -355,6 +367,7 @@ class CreateRazorpayOrderView(APIView):
             return Response({
                 "order_id": order["id"],
                 "amount": amount,
+                "original_amount": original_amount,
                 "amount_paise": amount_paise,
                 "currency": "INR",
                 "razorpay_key_id": settings.RAZORPAY_KEY_ID,
@@ -362,6 +375,8 @@ class CreateRazorpayOrderView(APIView):
                 "technology_id": technology.id,
                 "user_email": request.user.email,
                 "user_name": request.user.get_full_name() or request.user.username,
+                "coupon_applied": coupon_applied.code if coupon_applied else None,
+                "discount_saved": original_amount - amount if coupon_applied else 0,
             })
 
         except Exception as e:

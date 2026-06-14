@@ -304,6 +304,31 @@ export const adminApi = {
     const { data } = await api.post(`/admin/threads/${threadId}/`, { body })
     return data
   },
+
+  async getCoupons() {
+    const { data } = await api.get('/admin/coupons/')
+    return data
+  },
+
+  async createCoupon(payload) {
+    const { data } = await api.post('/admin/coupons/', payload)
+    return data
+  },
+
+  async updateCoupon(id, payload) {
+    const { data } = await api.put(`/admin/coupons/${id}/`, payload)
+    return data
+  },
+
+  async deleteCoupon(id) {
+    const { data } = await api.delete(`/admin/coupons/${id}/`)
+    return data
+  },
+
+  async getSecurityMetrics(days = 7) {
+    const { data } = await api.get(`/admin/security/?days=${days}`)
+    return data
+  },
 }
 
 /** Trigger a browser download for a Blob */

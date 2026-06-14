@@ -290,7 +290,7 @@ def sync_lab_in_progress(session) -> dict:
 
 
 def sync_lab_completed(session, score=0, time_taken=0) -> dict:
-    """Mark Jira ticket as Done when lab validation passes."""
+    """Add resolution comment when lab validation passes — no auto status change."""
     from .simulated import sync_lab_completed as sim_completed
     from .simulated import use_simulated_jira
 
@@ -308,14 +308,14 @@ def sync_lab_completed(session, score=0, time_taken=0) -> dict:
 
         client.add_comment(
             issue_key,
-            f"Lab completed successfully.\n"
+            f"Lab validation passed.\n"
             f"Score: {score}/100\n"
             f"Time: {minutes} min\n"
-            f"Session: {session.id}",
+            f"Session: {session.id}\n\n"
+            f"Please update the ticket status and close it when resolved.",
         )
-        client.transition_issue(issue_key, settings.JIRA_TRANSITION_DONE)
         status_name = client.get_issue_status(issue_key)
-        _log_action(session, issue_key, issue_url, "completed", jira_status=status_name, details={"score": score})
+        _log_action(session, issue_key, issue_url, "validated", jira_status=status_name, details={"score": score})
 
         return {"jira_issue_key": issue_key, "jira_issue_url": issue_url, "jira_enabled": True}
     except JiraClientError as exc:
@@ -323,8 +323,40 @@ def sync_lab_completed(session, score=0, time_taken=0) -> dict:
         return _empty_response()
 
 
+def sync_lab_expired(session) -> dict:
+    """Auto-close Jira ticket when lab session expires."""
+    from .simulated import sync_lab_expired as sim_expired
+    from .simulated import use_simulated_jira
+
+    if use_simulated_jira():
+        return sim_expired(session)
+
+    client = _client()
+    if not client or not session.jira_issue_key:
+        return _empty_response()
+
+    try:
+        issue_key = session.jira_issue_key
+        issue_url = session.jira_issue_url
+        minutes = session.duration_limit // 60 if session.duration_limit else 0
+        client.add_comment(
+            issue_key,
+            f"Lab session auto-expired after {minutes} minutes.\n"
+            f"Session: {session.id}\nClosing ticket due to lab timeout.",
+        )
+        client.transition_issue(issue_key, settings.JIRA_TRANSITION_DONE)
+        status_name = client.get_issue_status(issue_key)
+        _log_action(session, issue_key, issue_url, "expired", jira_status=status_name)
+        from .completion import finalize_lab_completion_if_ready
+        finalize_lab_completion_if_ready(session)
+        return {"jira_issue_key": issue_key, "jira_issue_url": issue_url, "jira_enabled": True}
+    except JiraClientError as exc:
+        logger.error("Jira sync_lab_expired failed: %s", exc)
+        return _empty_response()
+
+
 def sync_lab_stopped(session, reason="Lab stopped") -> dict:
-    """Reset Jira ticket to To Do when user stops lab without completing."""
+    """Log lab stop — Jira status remains under engineer control."""
     from .simulated import sync_lab_stopped as sim_stopped
     from .simulated import use_simulated_jira
 
@@ -339,10 +371,9 @@ def sync_lab_stopped(session, reason="Lab stopped") -> dict:
         issue_key = session.jira_issue_key
         issue_url = session.jira_issue_url
 
-        client.add_comment(issue_key, f"Lab stopped: {reason}. Session: {session.id}")
-        client.transition_issue(issue_key, settings.JIRA_TRANSITION_TODO)
+        client.add_comment(issue_key, f"Lab session ended: {reason}. Session: {session.id}.")
         status_name = client.get_issue_status(issue_key)
-        _log_action(session, issue_key, issue_url, "cancelled", jira_status=status_name, details={"reason": reason})
+        _log_action(session, issue_key, issue_url, "lab_stopped", jira_status=status_name, details={"reason": reason})
 
         return {"jira_issue_key": issue_key, "jira_issue_url": issue_url, "jira_enabled": True}
     except JiraClientError as exc:

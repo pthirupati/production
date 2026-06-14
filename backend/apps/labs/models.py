@@ -106,6 +106,10 @@ class LabSession(models.Model):
     score = models.PositiveIntegerField(default=0)
     hints_used = models.PositiveIntegerField(default=0)
     validation_passed = models.BooleanField(default=False)
+    completion_finalized = models.BooleanField(
+        default=False,
+        help_text="True once scenario progress was recorded (after Jira ticket closed)",
+    )
 
     # Multi-host labs (companion containers on same session network)
     lab_hosts = models.JSONField(

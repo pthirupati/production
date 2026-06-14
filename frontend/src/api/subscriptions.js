@@ -9,10 +9,10 @@ export const subscriptionApi = {
     return data
   },
 
-  async createRazorpayOrder(technologyId) {
-    const { data } = await api.post('/billing/razorpay/order/', {
-      technology_id: technologyId,
-    })
+  async createRazorpayOrder(technologyId, couponCode = '') {
+    const payload = { technology_id: technologyId }
+    if (couponCode) payload.coupon_code = couponCode
+    const { data } = await api.post('/billing/razorpay/order/', payload)
     return data
   },
 

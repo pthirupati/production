@@ -227,3 +227,82 @@ class SubscriptionInvoice(models.Model):
         return self.invoice_number
 
 
+class CouponCode(models.Model):
+    """Admin-managed promo / discount codes."""
+
+    DISCOUNT_TYPE_CHOICES = [
+        ("percent", "Percentage"),
+        ("fixed", "Fixed amount (INR)"),
+    ]
+
+    code = models.CharField(max_length=50, unique=True)
+    description = models.CharField(max_length=255, blank=True)
+    discount_type = models.CharField(max_length=10, choices=DISCOUNT_TYPE_CHOICES, default="percent")
+    discount_value = models.DecimalField(max_digits=8, decimal_places=2, help_text="Percent or INR amount")
+    is_active = models.BooleanField(default=True)
+    max_uses = models.PositiveIntegerField(null=True, blank=True, help_text="Leave blank for unlimited")
+    used_count = models.PositiveIntegerField(default=0)
+    valid_from = models.DateTimeField(null=True, blank=True)
+    valid_until = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.code
+
+    def is_valid_now(self) -> bool:
+        if not self.is_active:
+            return False
+        now = timezone.now()
+        if self.valid_from and now < self.valid_from:
+            return False
+        if self.valid_until and now > self.valid_until:
+            return False
+        if self.max_uses is not None and self.used_count >= self.max_uses:
+            return False
+        return True
+
+    def apply_to_amount(self, amount_inr: int) -> int:
+        """Return discounted amount in INR (integer)."""
+        from decimal import Decimal
+        amount = Decimal(amount_inr)
+        if self.discount_type == "percent":
+            discount = amount * (self.discount_value / Decimal("100"))
+        else:
+            discount = self.discount_value
+        result = max(Decimal("1"), amount - discount)
+        return int(result)
+
+
+class UserCertificate(models.Model):
+    """Stored certificate with issue and expiry dates."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="certificates",
+    )
+    technology = models.ForeignKey(
+        "question_bank.Technology",
+        on_delete=models.CASCADE,
+        related_name="certificates",
+    )
+    certificate_id = models.CharField(max_length=120, unique=True)
+    issued_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "technology")
+        ordering = ["-issued_at"]
+
+    def __str__(self):
+        return self.certificate_id
+
+    @property
+    def is_expired(self) -> bool:
+        return timezone.now() > self.expires_at
+

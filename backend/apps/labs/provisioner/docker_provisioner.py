@@ -170,6 +170,10 @@ class DockerProvisioner:
         """Start additional containers on the same session network (SSH/SCP/NFS labs)."""
         yaml_data = self._load_scenario_yaml(lab_session.scenario)
         companions = yaml_data.get("companion_hosts") or []
+        if not companions and getattr(lab_session.scenario, "requires_companion_hosts", False):
+            companions = [
+                {"name": "companion", "role": "remote", "hostname": "companion"},
+            ]
         if not companions:
             return []
 

@@ -11,6 +11,10 @@ class Technology(models.Model):
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=8, decimal_places=2, default=499, help_text="Price in INR for technology subscription")
     is_active = models.BooleanField(default=True)
+    coming_soon = models.BooleanField(
+        default=False,
+        help_text="Show as coming soon — visible but not openable until disabled",
+    )
     order = models.PositiveIntegerField(default=0, help_text="Display order")
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -113,6 +117,40 @@ class Scenario(models.Model):
         blank=True,
         help_text="Optional custom Jira ticket body override (plain text)",
     )
+
+    LAB_MODE_CHOICES = [
+        ("docker", "Docker Container"),
+        ("simulation", "Simulation (no real container)"),
+    ]
+    SIMULATION_TYPE_CHOICES = [
+        ("none", "None"),
+        ("boot", "Boot / IPMI / GRUB"),
+        ("gpu", "GPU (NVIDIA/AMD)"),
+        ("ansible", "Ansible multi-host"),
+        ("baremetal", "Bare metal"),
+    ]
+
+    requires_companion_hosts = models.BooleanField(
+        default=False,
+        help_text="Provision dual Docker containers (NFS/SCP/SSH/network scenarios)",
+    )
+    dual_terminal = models.BooleanField(
+        default=False,
+        help_text="Show two terminal panels in the lab UI",
+    )
+    lab_mode = models.CharField(
+        max_length=20,
+        choices=LAB_MODE_CHOICES,
+        default="docker",
+        help_text="Docker container or simulated environment",
+    )
+    simulation_type = models.CharField(
+        max_length=20,
+        choices=SIMULATION_TYPE_CHOICES,
+        default="none",
+        help_text="Simulation engine when lab_mode=simulation",
+    )
+
     time_limit = models.PositiveIntegerField(default=900, help_text="Time limit in seconds")
     max_score = models.PositiveIntegerField(default=100)
     definition_path = models.CharField(max_length=255, blank=True)

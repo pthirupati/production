@@ -84,6 +84,7 @@ def public_config_payload() -> dict:
             "scheduled_end": row.maintenance_scheduled_end.isoformat() if row.maintenance_scheduled_end else None,
         },
         "promo_banners": promos,
+        "theme_colors": row.theme_colors or {},
     }
 
 
@@ -105,6 +106,7 @@ def admin_config_payload() -> dict:
         "promo_banners": row.promo_banners or [],
         "promo_banners_enabled": row.promo_banners_enabled,
         "maintenance_banner_enabled": row.maintenance_banner_enabled,
+        "theme_colors": row.theme_colors or {},
         "lab_provider": settings.LAB_PROVIDER,
         "max_lab_duration": settings.LAB_MAX_DURATION_MINUTES,
     }

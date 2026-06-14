@@ -45,6 +45,12 @@ def cleanup_expired_labs():
             session.save()
             terminated += 1
 
+            try:
+                from apps.jira_integration.sync import sync_lab_expired
+                sync_lab_expired(session)
+            except Exception as e:
+                logger.warning(f"Jira sync on lab expiry failed: {e}")
+
             # In-app notification only (no expiry email — avoids spam)
             try:
                 from apps.notifications.tasks import create_in_app_notification

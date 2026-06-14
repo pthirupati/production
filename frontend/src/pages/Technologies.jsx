@@ -75,9 +75,8 @@ export default function Technologies() {
     </div>
   )
 
-  const comingSoon = ['AWS', 'Kubernetes', 'Security'].filter(
-    n => !technologies.find(t => t.name === n)
-  )
+  const comingSoonTechs = technologies.filter(t => t.coming_soon)
+  const availableTechs = technologies.filter(t => !t.coming_soon)
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
@@ -103,7 +102,7 @@ export default function Technologies() {
 
       {/* Technology cards grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {technologies.map(tech => {
+        {availableTechs.map(tech => {
           const Icon = techIcons[tech.name] || Server
           const colorClass = techColors[tech.color] || techColors.cyan
           const isSelected = selectedTech === tech.slug
@@ -132,12 +131,12 @@ export default function Technologies() {
         })}
 
         {/* Coming soon placeholders */}
-        {comingSoon.map(name => {
-          const Icon = techIcons[name] || Server
+        {comingSoonTechs.map(tech => {
+          const Icon = techIcons[tech.name] || Server
           return (
-            <div key={name} className="p-5 rounded-xl border border-dashed border-surface-700/50 bg-surface-900/30 opacity-50">
+            <div key={tech.id} className="p-5 rounded-xl border border-dashed border-surface-700/50 bg-surface-900/30 opacity-50 cursor-not-allowed">
               <Icon size={28} className="mb-3 text-surface-600" />
-              <h3 className="text-base font-semibold text-surface-500 mb-1">{name}</h3>
+              <h3 className="text-base font-semibold text-surface-500 mb-1">{tech.name}</h3>
               <span className="text-xs text-surface-600">Coming soon</span>
             </div>
           )

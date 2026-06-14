@@ -90,13 +90,17 @@ class Command(BaseCommand):
                         "max_score": data.get("max_score", 100),
                         "is_active": True,
                         "is_free": data.get("is_free", False),
-                        "infrastructure_type": "docker",
+                        "infrastructure_type": data.get("infrastructure_type", "docker"),
                         "docker_privileged": data.get("docker_privileged", False),
                         "cloud_setup_script": data.get("cloud_setup_script", cloud_setup),
                         "cloud_image": data.get("cloud_image", "ubuntu-22-04-x64"),
                         "jira_priority": data.get("jira_priority", "Medium"),
                         "jira_issue_template": data.get("jira_issue_template", ""),
                         "blocked_commands": data.get("blocked_commands", []),
+                        "lab_mode": data.get("lab_mode", "docker"),
+                        "simulation_type": data.get("simulation_type", "none"),
+                        "requires_companion_hosts": data.get("requires_companion_hosts", False),
+                        "dual_terminal": data.get("dual_terminal", False),
                     },
                 )
 
@@ -111,7 +115,8 @@ class Command(BaseCommand):
                     )
 
                 action = "Created" if created else "Updated"
-                self.stdout.write(f"  {action}: {data['title']} ({scenario.infrastructure_type})")
+                mode = data.get("lab_mode", "docker")
+                self.stdout.write(f"  {action}: {data['title']} ({mode}/{scenario.infrastructure_type})")
                 count += 1
 
         self.stdout.write(self.style.SUCCESS(f"\nSeeded {count} scenarios successfully."))

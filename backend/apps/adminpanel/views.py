@@ -1918,6 +1918,8 @@ class AdminConfigView(APIView):
             row.promo_banners_enabled = bool(request.data.get("promo_banners_enabled"))
         if "maintenance_banner_enabled" in request.data:
             row.maintenance_banner_enabled = bool(request.data.get("maintenance_banner_enabled"))
+        if "theme_colors" in request.data:
+            row.theme_colors = request.data.get("theme_colors") or {}
         row.save()
         persist_config_snapshot(row)
         if row.primary_email:
@@ -2096,3 +2098,134 @@ class AdminMonitoringContainerLogsView(APIView):
             })
         except Exception as exc:
             return Response({"error": str(exc), "lines": []}, status=404)
+
+
+# ─── Coupon Management ────────────────────────────────────────────────
+
+class AdminCouponsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.billing.models import CouponCode
+
+        coupons = CouponCode.objects.all().order_by("-created_at")
+        data = [
+            {
+                "id": c.id,
+                "code": c.code,
+                "description": c.description,
+                "discount_type": c.discount_type,
+                "discount_value": str(c.discount_value),
+                "is_active": c.is_active,
+                "max_uses": c.max_uses,
+                "used_count": c.used_count,
+                "valid_from": c.valid_from.isoformat() if c.valid_from else None,
+                "valid_until": c.valid_until.isoformat() if c.valid_until else None,
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in coupons
+        ]
+        return Response({"coupons": data})
+
+    def post(self, request):
+        from apps.billing.models import CouponCode
+        from apps.billing.coupon_service import normalize_coupon_code
+
+        code = normalize_coupon_code(request.data.get("code", ""))
+        if not code:
+            return Response({"error": "code is required"}, status=400)
+        if CouponCode.objects.filter(code__iexact=code).exists():
+            return Response({"error": "Coupon code already exists"}, status=400)
+
+        coupon = CouponCode.objects.create(
+            code=code,
+            description=request.data.get("description", ""),
+            discount_type=request.data.get("discount_type", "percent"),
+            discount_value=request.data.get("discount_value", 0),
+            is_active=request.data.get("is_active", True),
+            max_uses=request.data.get("max_uses") or None,
+            valid_from=request.data.get("valid_from") or None,
+            valid_until=request.data.get("valid_until") or None,
+        )
+        return Response({"id": coupon.id, "code": coupon.code}, status=201)
+
+
+class AdminCouponDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def put(self, request, pk):
+        from apps.billing.models import CouponCode
+
+        try:
+            coupon = CouponCode.objects.get(pk=pk)
+        except CouponCode.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        for field in ("description", "discount_type", "discount_value", "is_active", "max_uses", "valid_from", "valid_until"):
+            if field in request.data:
+                setattr(coupon, field, request.data[field])
+        coupon.save()
+        return Response({"message": "Updated"})
+
+    def delete(self, request, pk):
+        from apps.billing.models import CouponCode
+
+        CouponCode.objects.filter(pk=pk).delete()
+        return Response({"message": "Deleted"})
+
+
+# ─── Security Metrics ─────────────────────────────────────────────────
+
+class AdminSecurityMetricsView(APIView):
+    """Aggregate security-related audit events for admin dashboard."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from datetime import timedelta
+        from django.db.models import Count
+        from apps.audit.models import AuditLog
+        from apps.billing.models import PaymentTransaction
+
+        days = int(request.query_params.get("days", 7))
+        since = timezone.now() - timedelta(days=days)
+
+        login_failed = AuditLog.objects.filter(action="login_failed", created_at__gte=since).count()
+        login_success = AuditLog.objects.filter(action="login", created_at__gte=since).count()
+        lab_resets = AuditLog.objects.filter(action="lab_reset", created_at__gte=since).count()
+        payment_failed = AuditLog.objects.filter(action="payment_failed", created_at__gte=since).count()
+        security_alerts = AuditLog.objects.filter(action="security_alert", created_at__gte=since).count()
+
+        failed_payments = PaymentTransaction.objects.filter(status="failed", created_at__gte=since).count()
+
+        # Brute-force heuristic: IPs with 5+ failed logins in window
+        from django.db.models.functions import TruncDate
+
+        suspicious_ips = list(
+            AuditLog.objects.filter(action="login_failed", created_at__gte=since, ip_address__isnull=False)
+            .values("ip_address")
+            .annotate(count=Count("id"))
+            .filter(count__gte=5)
+            .order_by("-count")[:20]
+        )
+
+        recent_events = list(
+            AuditLog.objects.filter(
+                action__in=["login_failed", "payment_failed", "security_alert", "lab_reset"],
+                created_at__gte=since,
+            )
+            .select_related("user")
+            .order_by("-created_at")[:50]
+            .values("action", "resource", "ip_address", "metadata", "created_at", "user__username")
+        )
+
+        return Response({
+            "period_days": days,
+            "login_failed": login_failed,
+            "login_success": login_success,
+            "lab_resets": lab_resets,
+            "payment_failed": payment_failed + failed_payments,
+            "security_alerts": security_alerts,
+            "suspicious_ips": suspicious_ips,
+            "recent_events": recent_events,
+        })
+

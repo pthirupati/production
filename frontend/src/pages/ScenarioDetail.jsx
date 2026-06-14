@@ -507,8 +507,31 @@ export default function ScenarioDetail() {
           ticket={jiraTicket}
           comments={jiraComments}
           activity={jiraActivity}
+          labInfoMode={!!activeLabSession || starting}
           hideHistory={!!activeLabSession || starting}
           hideComments={!!activeLabSession || starting}
+          hideStatus={!!activeLabSession || starting}
+          onTransition={!(activeLabSession || starting) ? async (status) => {
+            try {
+              const res = await jiraApi.transitionIssue(jiraTicket.issue_key, status)
+              setJiraTicket(res.data)
+              setJiraComments(res.data?.comments || [])
+              setJiraActivity(res.data?.activity || [])
+              toast.success(`Ticket moved to ${status}`)
+            } catch (err) {
+              toast.error(err.response?.data?.error || 'Failed to update ticket')
+            }
+          } : undefined}
+          onComment={!(activeLabSession || starting) ? async (text) => {
+            try {
+              const res = await jiraApi.addComment(jiraTicket.issue_key, text)
+              setJiraTicket(res.data)
+              setJiraComments(res.data?.comments || [])
+              toast.success('Customer replied')
+            } catch (err) {
+              toast.error(err.response?.data?.error || 'Failed to post comment')
+            }
+          } : undefined}
         />
       )}
 

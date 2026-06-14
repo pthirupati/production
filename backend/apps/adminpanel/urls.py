@@ -35,6 +35,9 @@ from .views import (
     AdminJiraCreateView,
     AdminConfigView,
     AdminUploadView,
+    AdminCouponsView,
+    AdminCouponDetailView,
+    AdminSecurityMetricsView,
 )
 
 urlpatterns = [
@@ -46,6 +49,9 @@ urlpatterns = [
     path("audit-logs/", AdminAuditLogView.as_view()),
     path("config/", AdminConfigView.as_view()),
     path("upload/", AdminUploadView.as_view()),
+    path("coupons/", AdminCouponsView.as_view()),
+    path("coupons/<int:pk>/", AdminCouponDetailView.as_view()),
+    path("security/", AdminSecurityMetricsView.as_view()),
 
     # Maintenance Mode
     path("maintenance/", AdminMaintenanceModeView.as_view()),

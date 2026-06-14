@@ -15,6 +15,19 @@ const INFRA_TYPES = [
   { value: 'digitalocean', label: 'DigitalOcean Droplet' },
 ]
 
+const SIMULATION_TYPES = [
+  { value: 'none', label: 'None' },
+  { value: 'boot', label: 'Boot / IPMI / GRUB' },
+  { value: 'gpu', label: 'GPU (NVIDIA/AMD)' },
+  { value: 'ansible', label: 'Ansible multi-host' },
+  { value: 'baremetal', label: 'Bare metal' },
+]
+
+const LAB_MODES = [
+  { value: 'docker', label: 'Docker Container' },
+  { value: 'simulation', label: 'Simulation' },
+]
+
 export default function AdminScenarios() {
   const [scenarios, setScenarios] = useState([])
   const [technologies, setTechnologies] = useState([])
@@ -30,6 +43,8 @@ export default function AdminScenarios() {
     cloud_setup_script: '', blocked_commands: [], tag_ids: [], time_limit: 900,
     max_score: 100, is_active: true, is_free: true, solution_explanation: '',
     jira_priority: 'Medium', jira_issue_template: '',
+    requires_companion_hosts: false, dual_terminal: false,
+    lab_mode: 'docker', simulation_type: 'none', docker_privileged: false,
   })
   const [newBlockedCmd, setNewBlockedCmd] = useState('')
 
@@ -99,6 +114,11 @@ export default function AdminScenarios() {
       solution_explanation: scenario.solution_explanation || '',
       jira_priority: scenario.jira_priority || 'Medium',
       jira_issue_template: scenario.jira_issue_template || '',
+      requires_companion_hosts: scenario.requires_companion_hosts || false,
+      dual_terminal: scenario.dual_terminal || false,
+      lab_mode: scenario.lab_mode || 'docker',
+      simulation_type: scenario.simulation_type || 'none',
+      docker_privileged: scenario.docker_privileged || false,
     })
     setEditingId(scenario.id)
     setShowForm(true)
@@ -121,6 +141,8 @@ export default function AdminScenarios() {
       cloud_setup_script: '', blocked_commands: [], tag_ids: [], time_limit: 900,
     max_score: 100, is_active: true, is_free: true, solution_explanation: '',
     jira_priority: 'Medium', jira_issue_template: '',
+    requires_companion_hosts: false, dual_terminal: false,
+    lab_mode: 'docker', simulation_type: 'none', docker_privileged: false,
   })
     setNewBlockedCmd('')
   }
@@ -198,6 +220,32 @@ export default function AdminScenarios() {
                 <select value={form.infrastructure_type} onChange={(e) => setForm(f => ({ ...f, infrastructure_type: e.target.value }))} className="input-field">
                   {INFRA_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Lab mode</label>
+                <select value={form.lab_mode} onChange={(e) => setForm(f => ({ ...f, lab_mode: e.target.value }))} className="input-field">
+                  {LAB_MODES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Simulation type</label>
+                <select value={form.simulation_type} onChange={(e) => setForm(f => ({ ...f, simulation_type: e.target.value }))} className="input-field" disabled={form.lab_mode !== 'simulation'}>
+                  {SIMULATION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div className="col-span-3 flex flex-wrap gap-4 pt-1">
+                <label className="flex items-center gap-2 text-sm text-surface-300">
+                  <input type="checkbox" checked={form.requires_companion_hosts} onChange={(e) => setForm(f => ({ ...f, requires_companion_hosts: e.target.checked }))} />
+                  Dual Docker containers (NFS/SCP/SSH/network)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-surface-300">
+                  <input type="checkbox" checked={form.dual_terminal} onChange={(e) => setForm(f => ({ ...f, dual_terminal: e.target.checked }))} />
+                  Dual terminal panels
+                </label>
+                <label className="flex items-center gap-2 text-sm text-surface-300">
+                  <input type="checkbox" checked={form.docker_privileged} onChange={(e) => setForm(f => ({ ...f, docker_privileged: e.target.checked }))} />
+                  Privileged container
+                </label>
               </div>
               <div>
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Category</label>

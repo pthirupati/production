@@ -26,6 +26,7 @@ from apps.labs.provisioner.exec_stream import (
     open_docker_exec,
     release_holder,
 )
+from apps.labs.provisioner.simulation.shell import SimulationStreamHolder
 from apps.labs.provisioner.exec_socket import stream_chunk_to_text
 
 logger = logging.getLogger(__name__)
@@ -163,7 +164,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         self._recording_events = []
 
         # For cloud labs, show a connecting message since SSH may take a moment
-        is_cloud = self.provider_type != "docker"
+        is_cloud = self.provider_type not in ("docker", "simulation")
+        is_simulation = self.provider_type == "simulation"
         if is_cloud:
             await self.send(text_data=json.dumps({
                 "output": (
@@ -188,13 +190,21 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                             resource_id,
                             ssh_user,
                         )
+                    elif is_simulation:
+                        host_key = getattr(self, "_terminal_host", "primary")
+                        self.exec_id, self.raw_socket = await asyncio.to_thread(
+                            self.provisioner.create_exec_stream,
+                            resource_id,
+                            str(self.lab_session.id),
+                            host_key,
+                        )
                     else:
                         self.exec_id, self.raw_socket = await asyncio.to_thread(
                             self.provisioner.create_exec_stream,
                             resource_id,
                             str(self.lab_session.id),
                         )
-                    if isinstance(self.raw_socket, ExecStreamHolder):
+                    if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
                         await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
                     exec_error = None
                     break
@@ -207,6 +217,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
             provider_label = {
                 "docker": "Docker Container",
+                "simulation": "FixitLab Simulation",
                 "aws_ec2": "AWS EC2 Instance",
                 "digitalocean": "DigitalOcean Droplet",
             }.get(self.provider_type, "Lab Environment")
@@ -353,6 +364,14 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 resource_id,
                 str(self.lab_session.id),
             )
+        elif self.provider_type == "simulation":
+            host_key = getattr(self, "_terminal_host", "primary")
+            self.exec_id, self.raw_socket = await asyncio.to_thread(
+                self.provisioner.create_exec_stream,
+                resource_id,
+                str(self.lab_session.id),
+                host_key,
+            )
         else:
             ssh_user = self.lab_session.ssh_user or "ec2-user"
             self.exec_id, self.raw_socket = await asyncio.to_thread(
@@ -426,6 +445,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             while True:
                 try:
                     if isinstance(self.raw_socket, ExecStreamHolder):
+                        data = await asyncio.to_thread(self.raw_socket.recv, 4096)
+                    elif hasattr(self.raw_socket, "recv"):
                         data = await asyncio.to_thread(self.raw_socket.recv, 4096)
                     else:
                         data = await asyncio.to_thread(self.raw_socket.recv, 4096)
@@ -521,6 +542,12 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
         if self.lab_session and isinstance(self.raw_socket, ExecStreamHolder):
             release_holder(str(self.lab_session.id), self.raw_socket)
+            self.raw_socket = None
+        elif self.raw_socket and isinstance(self.raw_socket, SimulationStreamHolder):
+            try:
+                self.raw_socket.close()
+            except Exception:
+                pass
             self.raw_socket = None
         elif self.raw_socket:
             try:

@@ -172,6 +172,7 @@ def sync_lab_started(session) -> dict:
 
 
 def sync_lab_completed(session, score=0, time_taken=0) -> dict:
+    """Add resolution comment only — ticket status must be updated manually by the engineer."""
     if not session.jira_issue_key:
         return {}
     ticket = UserScenarioJiraTicket.objects.filter(
@@ -183,15 +184,21 @@ def sync_lab_completed(session, score=0, time_taken=0) -> dict:
     add_comment(
         ticket,
         session.user,
-        f"Lab completed successfully.\nScore: {score}/100\nTime: {minutes} min\nSession: {session.id}",
+        (
+            f"Lab validation passed.\n"
+            f"Score: {score}/100\n"
+            f"Time: {minutes} min\n"
+            f"Session: {session.id}\n\n"
+            f"Please update the ticket status and close it when the incident is resolved."
+        ),
         session=session,
     )
-    transition_ticket(ticket, session.user, "Done", session=session)
-    _log(session, ticket.issue_key, ticket.issue_url, "completed", "Done", {"score": score})
+    _log(session, ticket.issue_key, ticket.issue_url, "validated", ticket.jira_status, {"score": score})
     return {"jira_issue_key": ticket.issue_key, "jira_issue_url": ticket.issue_url, "jira_enabled": True}
 
 
 def sync_lab_stopped(session, reason="Lab stopped") -> dict:
+    """Lab stopped — log only; Jira status stays under engineer control."""
     if not session.jira_issue_key:
         return {}
     ticket = UserScenarioJiraTicket.objects.filter(
@@ -199,9 +206,45 @@ def sync_lab_stopped(session, reason="Lab stopped") -> dict:
     ).first()
     if not ticket:
         return {}
-    add_comment(ticket, session.user, f"Lab stopped: {reason}. Session: {session.id}.", session=session)
-    transition_ticket(ticket, session.user, "To Do", session=session)
-    _log(session, ticket.issue_key, ticket.issue_url, "cancelled", "To Do", {"reason": reason})
+    add_comment(
+        ticket,
+        session.user,
+        f"Lab session ended: {reason}. Session: {session.id}.",
+        session=session,
+    )
+    _log(session, ticket.issue_key, ticket.issue_url, "lab_stopped", ticket.jira_status, {"reason": reason})
+    return {"jira_issue_key": ticket.issue_key, "jira_issue_url": ticket.issue_url, "jira_enabled": True}
+
+
+def sync_lab_expired(session) -> dict:
+    """Auto-close Jira ticket when lab session times out."""
+    if not session.jira_issue_key:
+        return {}
+    ticket = UserScenarioJiraTicket.objects.filter(
+        user=session.user, issue_key=session.jira_issue_key
+    ).first()
+    if not ticket:
+        return {}
+    minutes = session.duration_limit // 60 if session.duration_limit else 0
+    add_comment(
+        ticket,
+        session.user,
+        (
+            f"Lab session auto-expired after {minutes} minutes.\n"
+            f"Session: {session.id}\n"
+            f"Closing ticket due to lab timeout."
+        ),
+        session=session,
+    )
+    close_status = "Closed" if "Closed" in ALLOWED_TRANSITIONS.get(ticket.jira_status or "In Progress", set()) else "Done"
+    try:
+        transition_ticket(ticket, session.user, close_status, session=session)
+    except ValueError:
+        ticket.jira_status = "Closed"
+        ticket.save(update_fields=["jira_status", "updated_at"])
+        from .completion import finalize_lab_completion_if_ready
+        finalize_lab_completion_if_ready(session)
+    _log(session, ticket.issue_key, ticket.issue_url, "expired", ticket.jira_status, {})
     return {"jira_issue_key": ticket.issue_key, "jira_issue_url": ticket.issue_url, "jira_enabled": True}
 
 
@@ -266,6 +309,48 @@ def ticket_detail_payload(ticket: UserScenarioJiraTicket) -> dict:
     }
 
 
+CUSTOMER_AUTHOR = "Customer (Reporter)"
+
+
+def _customer_persona_name(scenario) -> str:
+    return getattr(scenario, "subtitle", None) or scenario.title.split("—")[0].strip() or "End User"
+
+
+def generate_customer_bot_reply(ticket, user_text: str) -> str:
+    """Simulated end-user reply — acts as the customer who reported the incident."""
+    scenario = ticket.scenario
+    text = (user_text or "").lower()
+    created = ticket.created_at.strftime("%B %d, %Y at %H:%M UTC")
+    impact = (scenario.description or "")[:400]
+    error_detail = (scenario.initial_state or scenario.description or "The service is not working as expected.")[:500]
+    persona = _customer_persona_name(scenario)
+
+    if any(w in text for w in ("when", "created", "raised", "reported", "opened")):
+        return (
+            f"Hi, this was reported on {created}. "
+            f"I noticed the problem during our morning checks and raised it immediately.\n\n— {persona}"
+        )
+    if any(w in text for w in ("impact", "affect", "business", "users", "severity")):
+        return (
+            f"The impact is significant — {impact}\n\n"
+            f"Our team is blocked until this is resolved. Please treat this as urgent.\n\n— {persona}"
+        )
+    if any(w in text for w in ("error", "symptom", "issue", "problem", "detail", "describe", "log")):
+        return (
+            f"Here is what we are seeing:\n\n{error_detail}\n\n"
+            f"Let me know if you need more logs or screenshots.\n\n— {persona}"
+        )
+    if any(w in text for w in ("hold", "waiting", "customer", "update")):
+        return (
+            f"We are waiting on your update. The issue is still affecting us. "
+            f"Can you share an ETA?\n\n— {persona}"
+        )
+    return (
+        f"Thanks for looking into this. To recap: {error_detail[:300]}\n\n"
+        f"Please keep me posted on progress.\n\n— {persona}"
+    )
+
+
 def transition_ticket(ticket, user, new_status: str, session=None) -> UserScenarioJiraTicket:
     current = ticket.jira_status or "To Do"
     allowed = ALLOWED_TRANSITIONS.get(current, set())
@@ -275,16 +360,34 @@ def transition_ticket(ticket, user, new_status: str, session=None) -> UserScenar
     ticket.jira_status = new_status
     ticket.save(update_fields=["jira_status", "updated_at"])
     _log(session or ticket.last_session, ticket.issue_key, ticket.issue_url, "webhook", new_status, {"by": user.username})
+
+    if is_jira_closed(new_status):
+        from .completion import finalize_lab_completion_if_ready
+        target_session = session or ticket.last_session
+        if target_session:
+            finalize_lab_completion_if_ready(target_session)
+
     return ticket
 
 
-def add_comment(ticket, user, text: str, session=None) -> JiraCommentLog:
+def add_comment(ticket, user, text: str, session=None, author: str | None = None) -> JiraCommentLog:
     comment_id = f"sim-{ticket.issue_key}-{int(timezone.now().timestamp() * 1000)}"
+    if author:
+        author_name = author
+    elif user is None:
+        author_name = CUSTOMER_AUTHOR
+    else:
+        author_name = user.get_full_name() or user.username
     return JiraCommentLog.objects.create(
         session=session or ticket.last_session,
         issue_key=ticket.issue_key,
         jira_comment_id=comment_id,
-        author=user.get_full_name() or user.username,
+        author=author_name,
         text=text[:8000],
         created_at=timezone.now(),
     )
+
+
+def add_customer_reply(ticket, user_text: str, session=None) -> JiraCommentLog:
+    reply = generate_customer_bot_reply(ticket, user_text)
+    return add_comment(ticket, None, reply, session=session, author=CUSTOMER_AUTHOR)

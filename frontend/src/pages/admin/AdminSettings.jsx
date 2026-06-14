@@ -7,6 +7,7 @@ export default function AdminSettings() {
   const [maintenance, setMaintenance] = useState({ maintenance_mode: false, maintenance_message: '' })
   const [config, setConfig] = useState(null)
   const [emailForm, setEmailForm] = useState({ primary_email: '', payment_email: '', support_email: '', admin_display_currency: 'INR' })
+  const [themeColors, setThemeColors] = useState({ cyan: '#06b6d4', purple: '#a855f7', amber: '#f59e0b', green: '#22c55e' })
   const [promoDraft, setPromoDraft] = useState({ title: '', text: '', link: '/pricing', bg_color: 'linear-gradient(90deg,#1e3a5f,#0f766e)', active: true })
   const [inactiveUsers, setInactiveUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -31,6 +32,9 @@ export default function AdminSettings() {
         support_email: configData?.support_email || '',
         admin_display_currency: configData?.admin_display_currency || 'INR',
       })
+      if (configData?.theme_colors) {
+        setThemeColors(prev => ({ ...prev, ...configData.theme_colors }))
+      }
     } catch {
       toast.error('Failed to load settings')
     } finally {
@@ -242,6 +246,44 @@ export default function AdminSettings() {
         </div>
         <button onClick={handleSaveEmails} disabled={saving} className="btn-primary text-sm flex items-center gap-1">
           <Save size={14} /> Save emails & currency
+        </button>
+      </div>
+
+      {/* Theme / accent colors */}
+      <div className="glass-card p-6 space-y-4">
+        <h2 className="font-semibold text-lg">Application theme colors</h2>
+        <p className="text-sm text-surface-400">Override accent colors shown across the platform (CSS variables).</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Object.entries(themeColors).map(([key, value]) => (
+            <label key={key} className="text-sm capitalize">
+              {key}
+              <div className="flex gap-2 mt-1 items-center">
+                <input type="color" value={value} onChange={e => setThemeColors(c => ({ ...c, [key]: e.target.value }))} className="h-9 w-12 rounded cursor-pointer" />
+                <input type="text" className="input-field flex-1 font-mono text-xs" value={value} onChange={e => setThemeColors(c => ({ ...c, [key]: e.target.value }))} />
+              </div>
+            </label>
+          ))}
+        </div>
+        <button
+          disabled={saving}
+          onClick={async () => {
+            setSaving(true)
+            try {
+              const result = await adminApi.updateConfig({ ...emailForm, theme_colors: themeColors })
+              setConfig(result)
+              Object.entries(themeColors).forEach(([k, v]) => {
+                document.documentElement.style.setProperty(`--a-${k}`, v.replace('#', '').match(/.{2}/g).map(x => parseInt(x, 16)).join(', '))
+              })
+              toast.success('Theme colors saved')
+            } catch {
+              toast.error('Failed to save theme')
+            } finally {
+              setSaving(false)
+            }
+          }}
+          className="btn-primary text-sm flex items-center gap-1"
+        >
+          <Save size={14} /> Save theme colors
         </button>
       </div>
 

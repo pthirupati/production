@@ -204,6 +204,17 @@ class LoginView(APIView):
                 ip=request.client_ip if hasattr(request, 'client_ip') else '',
                 tags=["auth", "security"]
             )
+            try:
+                from apps.audit.models import AuditLog
+                AuditLog.objects.create(
+                    action="login_failed",
+                    resource=email,
+                    metadata={"reason": "unknown_email"},
+                    ip_address=getattr(request, "client_ip", None) or None,
+                    user_agent=getattr(request, "user_agent", "") or "",
+                )
+            except Exception:
+                pass
             return Response({"error": "Invalid credentials"}, status=401)
 
         user = authenticate(username=user_obj.username, password=password)
@@ -216,6 +227,18 @@ class LoginView(APIView):
                 ip=request.client_ip if hasattr(request, 'client_ip') else '',
                 tags=["auth", "security"]
             )
+            try:
+                from apps.audit.models import AuditLog
+                AuditLog.objects.create(
+                    user=user_obj,
+                    action="login_failed",
+                    resource=email,
+                    metadata={"reason": "bad_password"},
+                    ip_address=getattr(request, "client_ip", None) or None,
+                    user_agent=getattr(request, "user_agent", "") or "",
+                )
+            except Exception:
+                pass
             return Response({"error": "Invalid credentials"}, status=401)
 
         if not user.is_active:

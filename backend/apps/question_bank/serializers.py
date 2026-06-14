@@ -16,7 +16,7 @@ class TechnologySerializer(serializers.ModelSerializer):
         model = Technology
         fields = [
             "id", "name", "slug", "icon", "color", "description",
-            "price", "is_active", "order", "scenario_count", "created_at",
+            "price", "is_active", "coming_soon", "order", "scenario_count", "created_at",
         ]
 
 
@@ -33,7 +33,9 @@ class ScenarioListSerializer(serializers.ModelSerializer):
             "id", "slug", "title", "subtitle", "category", "difficulty",
             "scenario_type", "technology", "tags", "time_limit", "max_score",
             "is_free", "attempts_count", "completions_count", "completion_rate",
-            "is_bookmarked", "blocked_commands", "created_at",
+            "is_bookmarked", "blocked_commands",
+            "lab_mode", "simulation_type", "dual_terminal", "requires_companion_hosts",
+            "created_at",
         ]
 
 
@@ -53,7 +55,9 @@ class ScenarioDetailSerializer(serializers.ModelSerializer):
             "initial_state", "time_limit", "max_score",
             "is_free", "attempts_count", "completions_count",
             "avg_completion_time", "hints_count", "is_bookmarked",
-            "blocked_commands", "infrastructure_type", "created_at", "updated_at",
+            "blocked_commands", "infrastructure_type",
+            "lab_mode", "simulation_type", "dual_terminal", "requires_companion_hosts",
+            "created_at", "updated_at",
         ]
 
     def get_objectives(self, scenario):
@@ -81,6 +85,8 @@ class ScenarioAdminSerializer(serializers.ModelSerializer):
             "infrastructure_type", "cloud_setup_script", "cloud_ami", "cloud_image",
             "blocked_commands",
             "jira_priority", "jira_issue_template",
+            "requires_companion_hosts", "dual_terminal", "lab_mode", "simulation_type",
+            "docker_privileged",
             "time_limit", "max_score",
             "definition_path", "is_free", "is_active",
             "attempts_count", "completions_count", "avg_completion_time",

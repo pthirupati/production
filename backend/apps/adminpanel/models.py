@@ -23,6 +23,12 @@ class PlatformSettings(models.Model):
     promo_banners_enabled = models.BooleanField(default=True)
     maintenance_banner_enabled = models.BooleanField(default=True)
 
+    theme_colors = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Admin-editable accent colors: cyan, purple, amber, green, etc.",
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

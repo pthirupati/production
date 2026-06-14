@@ -36,7 +36,7 @@ def create_invoice_for_transaction(transaction: PaymentTransaction) -> Subscript
 
     period_start = transaction.verified_at or transaction.created_at
 
-    return SubscriptionInvoice.objects.create(
+    invoice = SubscriptionInvoice.objects.create(
         invoice_number=_invoice_number(transaction),
         user=transaction.user,
         payment_transaction=transaction,
@@ -50,6 +50,31 @@ def create_invoice_for_transaction(transaction: PaymentTransaction) -> Subscript
         period_start=period_start,
         period_end=period_end,
     )
+    send_invoice_email(invoice)
+    return invoice
+
+
+def send_invoice_email(invoice: SubscriptionInvoice) -> None:
+    """Email invoice HTML to the user."""
+    try:
+        from apps.notifications.tasks import send_notification_email
+
+        user = invoice.user
+        html_body = render_invoice_html(invoice)
+        ctx = invoice_context(invoice)
+        send_notification_email.delay(
+            subject=f"FixitLab Invoice {invoice.invoice_number}",
+            to_email=user.email,
+            template="emails/subscription_confirmation.html",
+            context={
+                **ctx,
+                "invoice_html": html_body,
+                "message": f"Your payment invoice {invoice.invoice_number} is attached below.",
+            },
+        )
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Failed to send invoice email: %s", exc)
 
 
 def backfill_invoices_for_user(user):

@@ -1,0 +1,28 @@
+title: "RHEL Simulation: GPU Fallen Off Bus"
+slug: sim-rhel-gpu-fallen-off
+technology: Simulation
+category: GPU / NVIDIA
+difficulty: hard
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: gpu
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  nvidia-smi fails on a simulated GPU node. Use dmesg and modprobe to recover the driver.
+objectives:
+  - Confirm GPU driver failure with nvidia-smi
+  - Inspect dmesg for NVRM errors
+  - Reload the nvidia kernel module
+  - Verify nvidia-smi shows GPUs again
+initial_state: |
+  Simulated RHEL GPU node. NVIDIA driver loaded but GPU has fallen off the bus.
+hints:
+  - order: 1
+    cost: 10
+    content: Run `dmesg | grep -i nvrm` for bus errors.
+  - order: 2
+    cost: 20
+    content: Try `modprobe nvidia` to reinitialize the driver.

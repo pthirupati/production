@@ -19,7 +19,7 @@ export default function AdminTechnologies() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [activeTab, setActiveTab] = useState('technologies') // technologies | tags
-  const [form, setForm] = useState({ name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, order: 0, is_active: true })
+  const [form, setForm] = useState({ name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, order: 0, is_active: true, coming_soon: false })
   const [tagForm, setTagForm] = useState({ name: '' })
   const [showTagForm, setShowTagForm] = useState(false)
   const [editingTagId, setEditingTagId] = useState(null)
@@ -49,13 +49,13 @@ export default function AdminTechnologies() {
         toast.success('Technology created')
       }
       setShowForm(false); setEditingId(null)
-      setForm({ name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, order: 0, is_active: true })
+      setForm({ name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, order: 0, is_active: true, coming_soon: false })
       loadData()
     } catch (err) { toast.error(err.response?.data?.name?.[0] || 'Save failed') }
   }
 
   const handleEdit = (tech) => {
-    setForm({ name: tech.name, slug: tech.slug || '', icon: tech.icon, description: tech.description, color: tech.color || 'cyan', price: tech.price || 499, order: tech.order || 0, is_active: tech.is_active })
+    setForm({ name: tech.name, slug: tech.slug || '', icon: tech.icon, description: tech.description, color: tech.color || 'cyan', price: tech.price || 499, order: tech.order || 0, is_active: tech.is_active, coming_soon: tech.coming_soon || false })
     setEditingId(tech.id); setShowForm(true)
   }
 
@@ -110,7 +110,7 @@ export default function AdminTechnologies() {
       {activeTab === 'technologies' && (
         <>
           <div className="flex justify-end">
-            <button onClick={() => { setForm({ name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, order: 0, is_active: true }); setEditingId(null); setShowForm(true) }}
+            <button onClick={() => { setForm({ name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, order: 0, is_active: true, coming_soon: false }); setEditingId(null); setShowForm(true) }}
               className="btn-primary flex items-center gap-2">
               <Plus size={16} /> Add Technology
             </button>
@@ -168,6 +168,9 @@ export default function AdminTechnologies() {
                   <label className="flex items-center gap-2 text-sm text-surface-300 cursor-pointer">
                     <input type="checkbox" checked={form.is_active} onChange={(e) => setForm(f => ({ ...f, is_active: e.target.checked }))} /> Active
                   </label>
+                  <label className="flex items-center gap-2 text-sm text-surface-300 cursor-pointer">
+                    <input type="checkbox" checked={form.coming_soon} onChange={(e) => setForm(f => ({ ...f, coming_soon: e.target.checked }))} /> Coming soon (visible but locked)
+                  </label>
                 </div>
                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-surface-800">
                   <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
@@ -203,7 +206,12 @@ export default function AdminTechnologies() {
                   </div>
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-surface-700/50">
                     <span className="text-xs text-surface-500">{tech.scenario_count} scenarios ({tech.active_scenarios} active)</span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${tech.is_active ? 'bg-accent-green/10 text-accent-green' : 'bg-surface-700 text-surface-400'}`}>{tech.is_active ? 'Active' : 'Inactive'}</span>
+                    <div className="flex gap-1">
+                      {tech.coming_soon && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">Coming soon</span>
+                      )}
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${tech.is_active ? 'bg-accent-green/10 text-accent-green' : 'bg-surface-700 text-surface-400'}`}>{tech.is_active ? 'Active' : 'Inactive'}</span>
+                    </div>
                   </div>
                 </div>
               ))}

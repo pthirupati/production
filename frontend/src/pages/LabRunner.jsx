@@ -244,6 +244,7 @@ export default function LabRunner() {
             scenario_detail: lab.scenario,
             jira_issue_key: lab.jira_issue_key || '',
             jira_issue_url: lab.jira_issue_url || '',
+            lab_hosts: lab.lab_hosts || [],
           }
           setSession(sessionData)
 
@@ -679,11 +680,29 @@ export default function LabRunner() {
       const { jiraApi } = await import('../api/jira')
       const res = await jiraApi.transitionIssue(session.jira_issue_key, status)
       setJiraTicket(res.data)
+      setJiraComments(res.data?.comments || [])
+      setJiraActivity(res.data?.activity || [])
       toast.success(`Ticket moved to ${status}`)
+      if (res.data?.is_closed && validationResult?.passed) {
+        toast.success('Scenario marked complete — Jira ticket closed!', { duration: 6000 })
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to update ticket')
     } finally {
       setJiraTransitioning(false)
+    }
+  }
+
+  const handleJiraComment = async (text) => {
+    if (!session?.jira_issue_key) return
+    try {
+      const { jiraApi } = await import('../api/jira')
+      const res = await jiraApi.addComment(session.jira_issue_key, text)
+      setJiraTicket(res.data)
+      setJiraComments(res.data?.comments || [])
+      toast.success('Customer replied')
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to post comment')
     }
   }
 
@@ -695,7 +714,7 @@ export default function LabRunner() {
       setSidebarTab('result')
       setSidebarOpen(true)
       if (result.passed) {
-        toast.success(`Challenge solved! Score: ${result.score}`, { duration: 5000 })
+        toast.success(result.message || `Challenge solved! Score: ${result.score}`, { duration: 6000 })
         stopTimer()
         if (labChannelRef.current) {
           labChannelRef.current.postMessage({
@@ -1014,15 +1033,15 @@ export default function LabRunner() {
                   {session?.jira_issue_key && (
                     <JiraTicketPanel
                       compact
+                      labInfoMode
+                      hideHistory
+                      hideComments
+                      hideStatus
                       ticket={jiraTicket || {
                         issue_key: session.jira_issue_key,
                         issue_url: session.jira_issue_url,
                         run_count: session.jira_run_count || 1,
                       }}
-                      comments={jiraComments}
-                      activity={jiraActivity}
-                      onTransition={handleJiraTransition}
-                      transitioning={jiraTransitioning}
                     />
                   )}
                   <div>
@@ -1154,6 +1173,19 @@ export default function LabRunner() {
                         </div>
                       )}
 
+                      {validationResult.jira_pending_close && session?.jira_issue_key && (
+                        <div className="border-t border-surface-800 pt-4">
+                          <JiraTicketPanel
+                            compact
+                            ticket={jiraTicket || { issue_key: session.jira_issue_key, issue_url: session.jira_issue_url }}
+                            comments={jiraComments}
+                            onTransition={handleJiraTransition}
+                            onComment={handleJiraComment}
+                            transitioning={jiraTransitioning}
+                          />
+                        </div>
+                      )}
+
                       {validationResult.solution && (
                         <div className="border-t border-surface-800 pt-4">
                           <h4 className="text-xs font-semibold text-accent-green uppercase mb-2 flex items-center gap-1">
@@ -1203,9 +1235,12 @@ export default function LabRunner() {
           </div>
         </div>
 
-        {/* Terminal toolbar + SSH */}
+        {/* Terminal toolbar + SSH / dual-host */}
         <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-1 sm:py-1.5 bg-surface-900/80 border-b border-surface-800 text-[10px] sm:text-xs overflow-x-auto">
-          {labHosts.length > 1 && labHosts.map(h => (
+          {(scenario.dual_terminal || labHosts.length > 1) && (
+            <span className="text-surface-500 mr-1 hidden sm:inline">Hosts:</span>
+          )}
+          {(labHosts.length > 0 ? labHosts : [{ name: 'primary', role: 'Primary' }]).map(h => (
             <button
               key={h.name}
               type="button"

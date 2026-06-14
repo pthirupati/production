@@ -1,0 +1,27 @@
+title: "RHEL Simulation: GRUB Boot & Rescue"
+slug: sim-rhel-boot-grub
+technology: Simulation
+category: Boot / GRUB
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: boot
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: true
+description: |
+  Practice booting a simulated RHEL system through GRUB, login, and maintenance shell.
+objectives:
+  - Boot the default RHEL entry from GRUB
+  - Log in as root
+  - Run systemctl status sshd in the full shell
+initial_state: |
+  You start at the GRUB menu. Press Enter to boot, then log in as root.
+hints:
+  - order: 1
+    cost: 10
+    content: At grub>, press Enter or type `boot` to start the default entry.
+  - order: 2
+    cost: 15
+    content: Login as root (any password works in simulation).
