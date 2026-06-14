@@ -41,6 +41,7 @@ from .views import (
     AdminOrganizationDetailView,
     AdminSecurityMetricsView,
     AdminTestEmailView,
+    AdminSyncScenariosView,
 )
 
 urlpatterns = [
@@ -72,6 +73,7 @@ urlpatterns = [
 
     # Scenarios CRUD
     path("scenarios/", AdminScenariosView.as_view()),
+    path("scenarios/sync/", AdminSyncScenariosView.as_view()),
     path("scenarios/<int:pk>/", AdminScenarioDetailView.as_view()),
 
     # Hints CRUD

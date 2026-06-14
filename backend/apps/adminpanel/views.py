@@ -951,6 +951,12 @@ class AdminSystemHealthView(APIView):
 
         # Email statistics
         health["email_stats"] = self._get_email_stats()
+        try:
+            from apps.notifications.email_health import email_delivery_health
+
+            health["email_delivery_alert"] = email_delivery_health(window_minutes=15)
+        except Exception:
+            health["email_delivery_alert"] = {"alert": False}
 
         # Cloud lab usage
         health["cloud_labs"] = self._get_cloud_lab_stats()
@@ -2371,6 +2377,12 @@ class AdminSecurityMetricsView(APIView):
             ).verify_gmail_credentials()
             email_stats["gmail_ok"] = ok
             email_stats["gmail_message"] = msg[:200] if msg else ""
+            from apps.notifications.email_health import email_delivery_health
+
+            health = email_delivery_health(window_minutes=15)
+            email_stats["delivery_health"] = health
+            if health.get("alert"):
+                security_alerts += 1
         except Exception:
             email_stats = {"sent": 0, "failed": 0, "gmail_configured": False, "gmail_ok": False}
 
@@ -2410,4 +2422,30 @@ class AdminTestEmailView(APIView):
         if ok:
             return Response({"sent": True, "to_email": to_email})
         return Response({"sent": False, "error": "Email delivery failed — check Gmail OAuth or SMTP settings."}, status=502)
+
+
+class AdminSyncScenariosView(APIView):
+    """Reload scenario YAML/check.sh from repo into the database."""
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        from io import StringIO
+
+        from django.core.cache import cache
+        from django.core.management import call_command
+
+        buf = StringIO()
+        try:
+            call_command("sync_scenarios", stdout=buf)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        cache.delete("platform_stats")
+        cache.delete("public_platform_stats")
+        output = buf.getvalue()
+        return Response({
+            "synced": True,
+            "message": "Scenarios synced from repository",
+            "output_tail": output[-4000:] if output else "",
+        })
 

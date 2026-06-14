@@ -64,7 +64,13 @@ export default function AdminSecurity() {
             ? (email.gmail_ok ? 'Connected' : `Error — ${email.gmail_message || 'refresh failed'}`)
             : 'Not configured'}
         </span>
-        {email.failed > 0 && email.sent === 0 && (
+        {email.delivery_health?.alert && (
+          <span className="flex items-center gap-1 text-accent-red text-xs font-medium">
+            <AlertTriangle size={14} />
+            {email.delivery_health.message}
+          </span>
+        )}
+        {email.failed > 0 && email.sent === 0 && !email.delivery_health?.alert && (
           <span className="text-accent-amber text-xs">
             Check GMAIL_OAUTH_* in .env.production and re-run scripts/setup-gmail-oauth.py
           </span>

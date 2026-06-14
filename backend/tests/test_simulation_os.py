@@ -116,6 +116,29 @@ exit 0
         self.assertIn("kubectl", resolve_simulation_validation_script("pod-crashloop", "true\nexit 0"))
         self.assertFalse(is_trivial_validation_script(resolve_simulation_validation_script("gpu-fallen-off", "true")))
 
+    def test_stub_scenarios_fail_without_fix(self):
+        from apps.labs.provisioner.simulation_provisioner import SimulationProvisioner
+        from unittest.mock import MagicMock
+
+        prov = SimulationProvisioner()
+        stubs = [
+            ("sim-mysql-wont-start", "database"),
+            ("pod-crashloop", "kubernetes"),
+            ("sim-rhel-gpu-fallen-off", "gpu"),
+            ("sim-rhel-ansible-ssh", "ansible"),
+        ]
+        for slug, sim_type in stubs:
+            session = MagicMock()
+            session.id = f"stub-{slug}"
+            session.scenario.slug = slug
+            session.scenario.simulation_type = sim_type
+            session.scenario.validation_script = "true\nexit 0\n"
+            session.scenario.requires_companion_hosts = False
+            resource_id, _ = prov.provision(session)
+            passed, _ = prov.run_validation(resource_id, session.scenario.validation_script, slug)
+            self.assertFalse(passed, f"{slug} should not pass before fix")
+            prov.terminate(resource_id, session_id=str(session.id))
+
 
 class EngineTests(SimpleTestCase):
     def test_gpu_modprobe_recovery(self):

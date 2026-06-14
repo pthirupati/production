@@ -209,10 +209,27 @@ export default function AdminScenarios() {
           <h1 className="text-2xl font-bold text-white">Scenarios</h1>
           <p className="text-surface-400 mt-1">Manage challenge scenarios</p>
         </div>
+        <div className="flex items-center gap-2">
         <button onClick={() => { resetForm(); setEditingId(null); setShowForm(true) }}
           className="btn-primary flex items-center gap-2">
           <Plus size={16} /> Add Scenario
         </button>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const result = await adminApi.syncScenarios()
+              toast.success(result.message || 'Scenarios synced from repo')
+              loadData()
+            } catch (err) {
+              toast.error(err.response?.data?.error || 'Sync failed')
+            }
+          }}
+          className="btn-secondary flex items-center gap-2"
+        >
+          Sync from repo
+        </button>
+        </div>
       </div>
 
       {/* Search */}

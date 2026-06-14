@@ -17,6 +17,11 @@ export const adminApi = {
     return data
   },
 
+  async syncScenarios() {
+    const { data } = await api.post('/admin/scenarios/sync/')
+    return data
+  },
+
   async getAnalytics(days = 30) {
     const { data } = await api.get(`/admin/analytics/?days=${days}`)
     return data

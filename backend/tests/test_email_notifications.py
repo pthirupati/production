@@ -18,7 +18,7 @@ User = get_user_model()
 class EmailDispatchTest(APITestCase):
     @patch("apps.notifications.tasks.send_notification_email")
     def test_dispatch_queues_celery_task(self, mock_task):
-        mock_task.delay = MagicMock(return_value=MagicMock(id="task-1"))
+        mock_task.apply_async = MagicMock(return_value=MagicMock(id="task-1"))
         from apps.notifications.email_dispatch import dispatch_notification_email
 
         ok = dispatch_notification_email(
@@ -28,7 +28,27 @@ class EmailDispatchTest(APITestCase):
             context={"otp_code": "123456"},
         )
         self.assertTrue(ok)
-        mock_task.delay.assert_called_once()
+        mock_task.apply_async.assert_called_once()
+        _args, kwargs = mock_task.apply_async.call_args
+        self.assertEqual(kwargs.get("queue"), "notifications")
+        self.assertEqual(kwargs.get("kwargs", {}).get("to_email"), "user@test.com")
+
+    @patch("apps.notifications.email_dispatch.threading.Thread")
+    @patch("apps.notifications.email._deliver", return_value="smtp")
+    def test_dispatch_critical_uses_background_thread(self, _mock_deliver, mock_thread):
+        mock_thread.return_value.start = MagicMock()
+        from apps.notifications.email_dispatch import dispatch_notification_email
+
+        ok = dispatch_notification_email(
+            subject="OTP",
+            to_email="user@test.com",
+            template="emails/otp_verification.html",
+            context={"otp_code": "123456"},
+            critical=True,
+        )
+        self.assertTrue(ok)
+        mock_thread.assert_called_once()
+        mock_thread.return_value.start.assert_called_once()
 
     @patch("apps.notifications.email._deliver", return_value="smtp")
     def test_send_email_logs_success(self, mock_deliver):
@@ -215,6 +235,10 @@ class SocialLoginAPITest(APITestCase):
         self.assertEqual(resolved.id, user.id)
         self.assertTrue(user.social_accounts.filter(provider="google").exists())
 
+    def test_github_link_requires_auth(self):
+        resp = self.client.post("/api/auth/social/link/github/", {"code": "fake"})
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
     def test_resolve_social_login_existing_social_account(self):
         user = User.objects.create_user(username="soc@test.com", email="soc@test.com", password="Test123!@")
         from apps.accounts.models import SocialAccount
@@ -224,3 +248,27 @@ class SocialLoginAPITest(APITestCase):
         )
         self.assertIsNone(err)
         self.assertEqual(resolved.id, user.id)
+
+
+class EmailHealthTest(APITestCase):
+    def test_email_delivery_health_no_alert_when_empty(self):
+        from apps.notifications.email_health import email_delivery_health
+
+        health = email_delivery_health(window_minutes=15)
+        self.assertFalse(health["alert"])
+        self.assertEqual(health["sent"], 0)
+        self.assertEqual(health["failed"], 0)
+
+    def test_email_delivery_health_alerts_on_failures_only(self):
+        from apps.notifications.email_health import email_delivery_health
+        from apps.notifications.models import EmailLog
+
+        EmailLog.objects.create(
+            subject="Fail",
+            to_email="x@test.com",
+            template="emails/welcome.html",
+            status="failed",
+        )
+        health = email_delivery_health(window_minutes=15)
+        self.assertTrue(health["alert"])
+        self.assertIn("GMAIL_OAUTH", health["message"])

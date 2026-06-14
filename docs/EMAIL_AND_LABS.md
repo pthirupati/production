@@ -1,5 +1,12 @@
 # Email on FixitLab (production)
 
+## Quick checklist (production)
+
+1. Set `GMAIL_OAUTH_*` in `.env.production` on the **backend** and ensure the same file is loaded by **celery_worker**.
+2. Admin → Settings → **Send test email** (or `POST /api/admin/email/test/`).
+3. Admin → Security → confirm **Gmail API: Connected** and no 15-minute delivery alert.
+4. After each deploy, scenarios sync automatically via `platform-start.sh` (`seed_scenarios`). Manual: Admin → Scenarios → **Sync from repo**.
+
 ## Why Gmail SMTP in `.env` does not work on your server
 
 | What you configured | What happens |
@@ -76,7 +83,42 @@ Check logs:
 
 ```bash
 docker compose logs celery_worker --tail 20 | grep -i email
+docker compose logs backend --tail 50 | grep -i email
 ```
+
+## Refresh token runbook (when Gmail stops sending)
+
+Symptoms: Admin Security shows **Gmail API: Error**, EmailLog has failures, OTP emails not arriving.
+
+1. On your laptop (not the blocked SMTP VPS):
+
+```bash
+cd fixitlab
+pip install google-auth-oauthlib google-api-python-client
+export GMAIL_OAUTH_CLIENT_ID=xxx.apps.googleusercontent.com
+export GMAIL_OAUTH_CLIENT_SECRET=xxx
+python scripts/setup-gmail-oauth.py
+```
+
+2. Copy the new `GMAIL_OAUTH_REFRESH_TOKEN` into `.env.production` on the server.
+3. Restart **both** services:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d backend celery_worker
+```
+
+4. Send admin test email and register a test user to confirm OTP delivery.
+
+**Note:** Refresh tokens can expire if revoked in Google Account → Security, or if OAuth consent app is deleted.
+
+## Delivery alerts (15-minute window)
+
+Admin Security and `/api/admin/health/` expose `email_delivery_alert` when:
+
+- Any failures with zero successes in the last 15 minutes, or
+- Failure rate ≥ 50% with at least 3 attempts.
+
+Fix Gmail OAuth on workers before scaling user traffic.
 
 ## Limits (honest expectations)
 

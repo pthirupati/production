@@ -70,4 +70,4 @@ Last updated: June 2026 (post gap-closure batch)
 
 **Community:** Threads, replies, votes, reactions, attachments, reports
 
-**Deploy:** `sync_scenarios` after pull; CI skips simulation Docker image validation
+platform-start.sh already runs `seed_scenarios` on deploy. Manual resync: Admin → Scenarios → **Sync from repo** or `python manage.py sync_scenarios`.
