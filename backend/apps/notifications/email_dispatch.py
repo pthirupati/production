@@ -1,8 +1,9 @@
-"""Email dispatch — Celery worker first (Gmail API), sync fallback if queue unavailable."""
+"""Email dispatch — Celery worker for bulk mail; in-process thread for critical OTP."""
 
 from __future__ import annotations
 
 import logging
+import threading
 
 from .email import send_email
 
@@ -19,6 +20,31 @@ def send_email_now(subject: str, to_email: str, template: str, context=None) -> 
     )
 
 
+def _celery_notifications_worker_alive() -> bool:
+    """Return True if at least one Celery worker responds to ping."""
+    try:
+        from celery_app.celery import app
+
+        inspect = app.control.inspect(timeout=2.0)
+        ping = inspect.ping() or {}
+        return bool(ping)
+    except Exception as exc:
+        logger.debug("Celery worker ping failed: %s", exc)
+        return False
+
+
+def _deliver_in_background(subject: str, to_email: str, template: str, context: dict) -> None:
+    """Fire-and-forget delivery from the web process (avoids HTTP blocking)."""
+    try:
+        ok = send_email_now(subject, to_email, template, context)
+        if ok:
+            logger.info("Critical email delivered in-process to %s", to_email)
+        else:
+            logger.error("Critical email delivery failed for %s (template=%s)", to_email, template)
+    except Exception:
+        logger.exception("Critical email thread failed for %s", to_email)
+
+
 def dispatch_notification_email(
     subject: str,
     to_email: str,
@@ -28,11 +54,10 @@ def dispatch_notification_email(
     critical: bool = False,
 ) -> bool:
     """
-    Same delivery path as subscription/invoice emails:
-    1. Queue on Celery worker (Gmail API / SendGrid — non-blocking)
-    2. If Redis/Celery unavailable and critical=True, send in-process immediately
-
-    Does NOT block the HTTP request waiting for delivery (avoids 504 gateway timeouts).
+    Delivery paths:
+    - critical=True (OTP, password reset): send from web process in a daemon thread
+      so delivery does not depend on Celery and the HTTP request is not blocked.
+    - critical=False: queue on Celery notifications worker; sync fallback if queue down.
     """
     context = context or {}
     kwargs = {
@@ -42,24 +67,25 @@ def dispatch_notification_email(
         "context": context,
     }
 
+    if critical:
+        threading.Thread(
+            target=_deliver_in_background,
+            args=(subject, to_email, template, context),
+            daemon=True,
+        ).start()
+        return True
+
     try:
         from .tasks import send_notification_email
 
-        send_notification_email.delay(**kwargs)
+        send_notification_email.apply_async(kwargs=kwargs, queue="notifications")
         logger.info("Email queued via Celery for %s", to_email)
         return True
     except Exception as exc:
-        logger.warning(
-            "Celery email queue failed for %s (%s)",
-            to_email,
-            exc,
-        )
-        if not critical:
-            return False
-        ok = send_email_now(subject, to_email, template, context)
-        if not ok:
-            raise RuntimeError(
-                "Email could not be delivered. Check Gmail API, SendGrid, or SMTP settings."
-            ) from exc
-        logger.info("Email delivered in-process (queue fallback) to %s", to_email)
-        return True
+        logger.warning("Celery email queue failed for %s (%s)", to_email, exc)
+        if not _celery_notifications_worker_alive():
+            ok = send_email_now(subject, to_email, template, context)
+            if ok:
+                logger.info("Email delivered in-process (queue fallback) to %s", to_email)
+                return True
+        return False

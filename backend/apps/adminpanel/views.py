@@ -2197,6 +2197,11 @@ class AdminOrganizationsView(APIView):
         data = []
         for org in orgs:
             grants = OrganizationTechnologyGrant.objects.filter(organization=org, is_active=True).select_related("technology")
+            members = list(
+                OrganizationMember.objects.filter(organization=org)
+                .select_related("user")
+                .values("user__username", "user__email", "role")
+            )
             data.append({
                 "id": str(org.id),
                 "name": org.name,
@@ -2205,6 +2210,7 @@ class AdminOrganizationsView(APIView):
                 "owner_email": org.owner.email,
                 "seat_limit": org.seat_limit,
                 "member_count": org.members.count(),
+                "members": members,
                 "is_active": org.is_active,
                 "billing_email": org.billing_email,
                 "technologies": [g.technology.name for g in grants if g.is_valid_now()],
@@ -2344,6 +2350,29 @@ class AdminSecurityMetricsView(APIView):
             .values("action", "resource", "ip_address", "metadata", "created_at", "user__username")
         )
 
+        email_stats = {}
+        try:
+            from apps.notifications.models import EmailLog
+            from datetime import timedelta as td
+
+            email_since = timezone.now() - td(days=days)
+            email_stats = {
+                "sent": EmailLog.objects.filter(status="sent", created_at__gte=email_since).count(),
+                "failed": EmailLog.objects.filter(status="failed", created_at__gte=email_since).count(),
+                "gmail_configured": __import__(
+                    "apps.notifications.gmail_api", fromlist=["is_gmail_api_configured"]
+                ).is_gmail_api_configured(),
+            }
+            ok, msg = __import__(
+                "apps.notifications.gmail_api", fromlist=["verify_gmail_credentials"]
+            ).verify_gmail_credentials()
+            email_stats["gmail_ok"] = ok
+            email_stats["gmail_message"] = msg[:200] if msg else ""
+        except Exception:
+            email_stats = {"sent": 0, "failed": 0, "gmail_configured": False, "gmail_ok": False}
+
+        otp_failed = AuditLog.objects.filter(action="otp_failed", created_at__gte=since).count()
+
         return Response({
             "period_days": days,
             "login_failed": login_failed,
@@ -2351,6 +2380,8 @@ class AdminSecurityMetricsView(APIView):
             "lab_resets": lab_resets,
             "payment_failed": payment_failed + failed_payments,
             "security_alerts": security_alerts,
+            "otp_failed": otp_failed,
+            "email_stats": email_stats,
             "suspicious_ips": suspicious_ips,
             "recent_events": recent_events,
         })

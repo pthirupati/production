@@ -24,9 +24,15 @@ export default function OAuthCallback() {
     const exchange = async () => {
       try {
         const redirectUri = `${window.location.origin}/auth/callback/${provider}`
-        await authApi.socialLogin(provider, code, redirectUri)
+        const intent = sessionStorage.getItem('oauth_intent') || 'login'
+        sessionStorage.removeItem('oauth_intent')
+        await authApi.socialLogin(provider, code, redirectUri, intent)
         setStatus('success')
-        toast.success(`Signed in with ${provider === 'github' ? 'GitHub' : 'Google'}!`)
+        toast.success(
+          intent === 'register'
+            ? `Account created with ${provider === 'github' ? 'GitHub' : 'Google'}!`
+            : `Signed in with ${provider === 'github' ? 'GitHub' : 'Google'}!`
+        )
         setTimeout(() => navigate('/dashboard', { replace: true }), 800)
       } catch (err) {
         setStatus('error')

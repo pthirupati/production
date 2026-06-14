@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { Wrench, AlertTriangle, Save, ToggleLeft, ToggleRight, Mail, Settings } from 'lucide-react'
+import { Wrench, AlertTriangle, Save, ToggleLeft, ToggleRight, Mail, Settings, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AdminSettings() {
@@ -83,6 +83,21 @@ export default function AdminSettings() {
       toast.success('Promo banner added')
     } catch {
       toast.error('Failed to add promo')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeletePromo = async (bannerId) => {
+    if (!confirm('Delete this promo banner?')) return
+    const banners = (config?.promo_banners || []).filter(b => (b.id || b.title) !== bannerId)
+    setSaving(true)
+    try {
+      const result = await adminApi.updateConfig({ ...emailForm, promo_banners: banners })
+      setConfig(result)
+      toast.success('Promo banner removed')
+    } catch {
+      toast.error('Failed to delete promo')
     } finally {
       setSaving(false)
     }
@@ -320,11 +335,22 @@ export default function AdminSettings() {
         </div>
         <button onClick={handleAddPromo} disabled={saving} className="btn-secondary text-sm">Add promo banner</button>
         {(config?.promo_banners || []).length > 0 && (
-          <ul className="text-sm text-surface-300 space-y-1">
+          <ul className="text-sm text-surface-300 space-y-2">
             {config.promo_banners.map(b => (
-              <li key={b.id || b.title} className="flex justify-between gap-2 border-b border-surface-800 py-1">
-                <span>{b.title}</span>
-                <span className="text-surface-500 truncate">{b.text}</span>
+              <li key={b.id || b.title} className="flex items-center justify-between gap-2 border border-surface-800 rounded-lg px-3 py-2">
+                <div className="min-w-0">
+                  <span className="font-medium text-white">{b.title}</span>
+                  <span className="text-surface-500 truncate block text-xs">{b.text}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeletePromo(b.id || b.title)}
+                  disabled={saving}
+                  className="shrink-0 p-1.5 text-surface-400 hover:text-red-400 rounded transition-colors"
+                  title="Delete banner"
+                >
+                  <Trash2 size={16} />
+                </button>
               </li>
             ))}
           </ul>

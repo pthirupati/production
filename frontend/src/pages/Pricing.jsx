@@ -31,18 +31,21 @@ const defaultColor = { from: 'from-accent-cyan', to: 'to-accent-blue', bg: 'bg-a
 
 const freeFeatures = [
   'Demo scenarios for every technology',
-  'Community forum access',
-  'Global leaderboard',
+  'Community forum with screenshot attachments',
+  'Global leaderboard & achievements',
   'Basic hints system',
-  'Progress tracking',
+  'Progress tracking & lab history',
+  'GitHub / Google sign-in',
 ]
 
 const paidFeatures = [
   'All scenarios for the subscribed technology',
+  'Docker, AWS EC2, and DigitalOcean lab modes',
   'Full hint system with detailed explanations',
   'Certificate upon completion',
   'Priority leaderboard ranking',
-  'Subscription email confirmation',
+  'Coupon codes at checkout',
+  'Team / enterprise seat licensing (contact sales)',
 ]
 
 export default function Pricing() {

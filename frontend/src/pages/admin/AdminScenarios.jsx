@@ -36,8 +36,10 @@ const normalizeSimType = (t) => {
 }
 
 const LAB_MODES = [
-  { value: 'docker', label: 'Docker Container' },
-  { value: 'simulation', label: 'Simulation (unified RHEL engine)' },
+  { value: 'docker', label: 'Docker Container', infra: 'docker' },
+  { value: 'simulation', label: 'Simulation (unified RHEL engine)', infra: null },
+  { value: 'aws_ec2', label: 'AWS EC2 Instance', infra: 'aws_ec2' },
+  { value: 'digitalocean', label: 'DigitalOcean Droplet', infra: 'digitalocean' },
 ]
 
 export default function AdminScenarios() {
@@ -262,7 +264,7 @@ export default function AdminScenarios() {
               <div>
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Infrastructure</label>
                 <select value={form.infrastructure_type} disabled={form.lab_mode === 'simulation'}
-                  onChange={(e) => setForm(f => ({ ...f, infrastructure_type: e.target.value }))} className="input-field disabled:opacity-50">
+                  onChange={(e) => setForm(f => ({ ...f, infrastructure_type: e.target.value, lab_mode: e.target.value }))} className="input-field disabled:opacity-50">
                   {INFRA_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
                 {form.lab_mode === 'simulation' && (
@@ -271,13 +273,24 @@ export default function AdminScenarios() {
               </div>
               <div>
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Lab mode</label>
-                <select value={form.lab_mode} onChange={(e) => setForm(f => ({
-                  ...f,
-                  lab_mode: e.target.value,
-                  simulation_type: e.target.value === 'simulation' ? (f.simulation_type || 'generic') : f.simulation_type,
-                }))} className="input-field">
+                <select value={form.lab_mode} onChange={(e) => {
+                  const mode = e.target.value
+                  const meta = LAB_MODES.find(m => m.value === mode)
+                  setForm(f => ({
+                    ...f,
+                    lab_mode: mode,
+                    infrastructure_type: meta?.infra ?? f.infrastructure_type,
+                    simulation_type: mode === 'simulation' ? (f.simulation_type || 'generic') : f.simulation_type,
+                  }))
+                }} className="input-field">
                   {LAB_MODES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
+                {form.lab_mode === 'aws_ec2' && (
+                  <p className="text-xs text-accent-amber mt-1">Labs launch real EC2 instances via Celery provisioning queue</p>
+                )}
+                {form.lab_mode === 'digitalocean' && (
+                  <p className="text-xs text-accent-amber mt-1">Labs launch DigitalOcean droplets via Celery provisioning queue</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Simulation persona</label>
@@ -315,6 +328,7 @@ export default function AdminScenarios() {
               <div>
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Time Limit (sec)</label>
                 <input type="number" value={form.time_limit} onChange={(e) => setForm(f => ({ ...f, time_limit: Number(e.target.value) }))} className="input-field" />
+                <p className="text-xs text-surface-500 mt-1">Default 900s (15 min). Labs auto-expire via Celery beat every 5 min.</p>
               </div>
               <div>
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Max Score</label>

@@ -80,9 +80,9 @@ export const authApi = {
     return data
   },
 
-  async socialLogin(provider, code, redirectUri) {
+  async socialLogin(provider, code, redirectUri, intent = 'login') {
     const { data } = await api.post(`/auth/social/${provider}/`, {
-      code, redirect_uri: redirectUri,
+      code, redirect_uri: redirectUri, intent,
     })
     useAuthStore.getState().setAuth(data.user, data.access, data.refresh)
     return data

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { Building2, Plus, Users, Loader2, Trash2 } from 'lucide-react'
+import { Building2, Plus, Users, Loader2, Trash2, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AdminTeams() {
@@ -64,6 +64,17 @@ export default function AdminTeams() {
     }
   }
 
+  const handleDeactivate = async (orgId, name) => {
+    if (!confirm(`Deactivate team "${name}"? Members lose org technology grants.`)) return
+    try {
+      await adminApi.deactivateOrganization(orgId)
+      toast.success('Team deactivated')
+      load()
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Deactivate failed')
+    }
+  }
+
   const toggleTech = (id) => {
     setForm(f => ({
       ...f,
@@ -84,11 +95,28 @@ export default function AdminTeams() {
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Building2 size={24} className="text-accent-purple" /> Teams & Enterprise
           </h1>
-          <p className="text-surface-400 text-sm mt-1">Shared technology access for organizations</p>
+          <p className="text-surface-400 text-sm mt-1">
+            Shared technology access, seat limits, and billing for organizations. Members use the self-service portal at /team.
+          </p>
         </div>
         <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2 text-sm">
           <Plus size={16} /> New Team
         </button>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-4">
+        <div className="glass-card p-4">
+          <p className="text-2xl font-bold text-white">{orgs.filter(o => o.is_active).length}</p>
+          <p className="text-xs text-surface-400">Active teams</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-2xl font-bold text-white">{orgs.reduce((n, o) => n + (o.member_count || 0), 0)}</p>
+          <p className="text-xs text-surface-400">Total seats used</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-2xl font-bold text-white">{technologies.length}</p>
+          <p className="text-xs text-surface-400">Technologies grantable</p>
+        </div>
       </div>
 
       {showForm && (
@@ -123,30 +151,55 @@ export default function AdminTeams() {
 
       <div className="space-y-4">
         {orgs.map(org => (
-          <div key={org.id} className="glass-card p-5">
-            <div className="flex items-start justify-between mb-3">
+          <div key={org.id} className={`glass-card p-5 ${!org.is_active ? 'opacity-60' : ''}`}>
+            <div className="flex items-start justify-between mb-3 gap-3">
               <div>
                 <h3 className="font-bold text-white">{org.name}</h3>
-                <p className="text-xs text-surface-500">Owner: {org.owner} · {org.member_count}/{org.seat_limit} seats</p>
+                <p className="text-xs text-surface-500">
+                  Owner: {org.owner} ({org.owner_email}) · {org.member_count}/{org.seat_limit} seats
+                </p>
+                {org.billing_email && (
+                  <p className="text-xs text-surface-500 flex items-center gap-1 mt-0.5">
+                    <Mail size={12} /> {org.billing_email}
+                  </p>
+                )}
               </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${org.is_active ? 'bg-accent-green/10 text-accent-green' : 'bg-surface-700 text-surface-400'}`}>
-                {org.is_active ? 'Active' : 'Inactive'}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={`text-xs px-2 py-0.5 rounded-full ${org.is_active ? 'bg-accent-green/10 text-accent-green' : 'bg-surface-700 text-surface-400'}`}>
+                  {org.is_active ? 'Active' : 'Inactive'}
+                </span>
+                {org.is_active && (
+                  <button onClick={() => handleDeactivate(org.id, org.name)} className="p-1.5 text-surface-400 hover:text-red-400" title="Deactivate team">
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
             </div>
             {org.technologies?.length > 0 && (
               <p className="text-sm text-surface-400 mb-3">Access: {org.technologies.join(', ')}</p>
             )}
-            <div className="flex gap-2">
-              <input
-                className="input-field flex-1 text-sm py-2"
-                placeholder="Add member by email"
-                value={inviteEmail[org.id] || ''}
-                onChange={e => setInviteEmail(i => ({ ...i, [org.id]: e.target.value }))}
-              />
-              <button onClick={() => handleInvite(org.id)} className="btn-secondary text-xs flex items-center gap-1">
-                <Users size={14} /> Add
-              </button>
-            </div>
+            {org.members?.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {org.members.map((m, i) => (
+                  <span key={i} className="text-xs px-2 py-0.5 rounded bg-surface-800 text-surface-300">
+                    {m.user__username || m.user__email} · {m.role}
+                  </span>
+                ))}
+              </div>
+            )}
+            {org.is_active && (
+              <div className="flex gap-2">
+                <input
+                  className="input-field flex-1 text-sm py-2"
+                  placeholder="Add member by email (must be registered)"
+                  value={inviteEmail[org.id] || ''}
+                  onChange={e => setInviteEmail(i => ({ ...i, [org.id]: e.target.value }))}
+                />
+                <button onClick={() => handleInvite(org.id)} className="btn-secondary text-xs flex items-center gap-1">
+                  <Users size={14} /> Add
+                </button>
+              </div>
+            )}
           </div>
         ))}
         {orgs.length === 0 && (

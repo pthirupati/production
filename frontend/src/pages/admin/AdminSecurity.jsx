@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { Shield, AlertTriangle, Lock, CreditCard, RotateCcw } from 'lucide-react'
+import { Shield, AlertTriangle, Lock, CreditCard, RotateCcw, Mail, KeyRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AdminSecurity() {
@@ -30,9 +30,14 @@ export default function AdminSecurity() {
     )
   }
 
+  const email = metrics.email_stats || {}
+
   const cards = [
     { label: 'Failed logins', value: metrics.login_failed, icon: Lock, color: 'text-red-400' },
     { label: 'Successful logins', value: metrics.login_success, icon: Shield, color: 'text-green-400' },
+    { label: 'OTP failures', value: metrics.otp_failed || 0, icon: KeyRound, color: 'text-orange-400' },
+    { label: 'Emails failed', value: email.failed ?? 0, icon: Mail, color: 'text-red-400' },
+    { label: 'Emails sent', value: email.sent ?? 0, icon: Mail, color: 'text-green-400' },
     { label: 'Lab resets', value: metrics.lab_resets, icon: RotateCcw, color: 'text-amber-400' },
     { label: 'Payment failures', value: metrics.payment_failed, icon: CreditCard, color: 'text-orange-400' },
     { label: 'Security alerts', value: metrics.security_alerts, icon: AlertTriangle, color: 'text-purple-400' },
@@ -42,8 +47,8 @@ export default function AdminSecurity() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Security Metrics</h1>
-          <p className="text-surface-400 mt-1">Login failures, brute-force signals, payment anomalies</p>
+          <h1 className="text-2xl font-bold text-white">Security & Delivery</h1>
+          <p className="text-surface-400 mt-1">Login failures, email delivery, brute-force signals, payment anomalies</p>
         </div>
         <select className="input-field" value={days} onChange={e => setDays(Number(e.target.value))}>
           <option value={1}>Last 24 hours</option>
@@ -52,7 +57,21 @@ export default function AdminSecurity() {
         </select>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="glass-card p-4 flex flex-wrap items-center gap-4 text-sm">
+        <span className="text-surface-400">Gmail API:</span>
+        <span className={email.gmail_ok ? 'text-accent-green' : 'text-accent-red'}>
+          {email.gmail_configured
+            ? (email.gmail_ok ? 'Connected' : `Error — ${email.gmail_message || 'refresh failed'}`)
+            : 'Not configured'}
+        </span>
+        {email.failed > 0 && email.sent === 0 && (
+          <span className="text-accent-amber text-xs">
+            Check GMAIL_OAUTH_* in .env.production and re-run scripts/setup-gmail-oauth.py
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {cards.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="glass-card p-4">
             <Icon size={20} className={`${color} mb-2`} />

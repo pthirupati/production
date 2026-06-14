@@ -628,7 +628,10 @@ class GitHubCallbackView(APIView):
             logger.error(f"GitHub user info error: {e}")
             return Response({"error": "Failed to get user info from GitHub."}, status=502)
 
-        user, error = self._resolve_social_login("github", gh_id, primary_email, gh_name)
+        allow_registration = request.data.get("intent") == "register"
+        user, error = self._resolve_social_login(
+            "github", gh_id, primary_email, gh_name, allow_registration=allow_registration,
+        )
         if error:
             return error
         refresh = RefreshToken.for_user(user)
@@ -644,12 +647,13 @@ class GitHubCallbackView(APIView):
         })
 
     @staticmethod
-    def _resolve_social_login(provider, provider_uid, email, display_name):
+    def _resolve_social_login(provider, provider_uid, email, display_name, *, allow_registration=False):
         """
-        Login-only social auth:
+        Social auth:
         - Existing social link → login
         - Existing email account → link social + login
-        - No account → require registration first
+        - No account + allow_registration → create account + link social
+        - No account + login intent → require registration first
         """
         try:
             sa = SocialAccount.objects.select_related("user").get(
@@ -662,18 +666,45 @@ class GitHubCallbackView(APIView):
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            return None, Response(
-                {
-                    "error": (
-                        "No FixitLab account found for this email. "
-                        "Please register first, then sign in with GitHub or Google."
-                    ),
-                    "error_code": "registration_required",
-                    "email": email,
-                    "provider": provider,
-                },
-                status=403,
+            if not allow_registration:
+                return None, Response(
+                    {
+                        "error": (
+                            "No FixitLab account found for this email. "
+                            "Please register first, then sign in with GitHub or Google."
+                        ),
+                        "error_code": "registration_required",
+                        "email": email,
+                        "provider": provider,
+                    },
+                    status=403,
+                )
+            import secrets
+            from django.utils.text import slugify
+
+            base = slugify(email.split("@")[0])[:24] or "user"
+            username = base
+            n = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base}{n}"
+                n += 1
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=secrets.token_urlsafe(32),
             )
+            parts = (display_name or "").split(None, 1)
+            user.first_name = parts[0] if parts else ""
+            user.last_name = parts[1] if len(parts) > 1 else ""
+            user.save(update_fields=["first_name", "last_name"])
+            Profile.objects.get_or_create(user=user)
+            SocialAccount.objects.create(
+                user=user,
+                provider=provider,
+                provider_uid=provider_uid,
+                extra_data={"display_name": display_name},
+            )
+            return user, None
 
         SocialAccount.objects.create(
             user=user,
@@ -743,7 +774,10 @@ class GoogleCallbackView(APIView):
             logger.error(f"Google userinfo error: {e}")
             return Response({"error": "Failed to get user info from Google."}, status=502)
 
-        user, error = GitHubCallbackView._resolve_social_login("google", google_id, email, name)
+        allow_registration = request.data.get("intent") == "register"
+        user, error = GitHubCallbackView._resolve_social_login(
+            "google", google_id, email, name, allow_registration=allow_registration,
+        )
         if error:
             return error
         refresh = RefreshToken.for_user(user)

@@ -3,6 +3,17 @@ import { Terminal, Clock, ArrowRight, Tag, User, ChevronRight } from 'lucide-rea
 
 const posts = [
   {
+    slug: 'teams-coupons-and-security',
+    title: 'Teams, Coupons, and Platform Security — What\'s New',
+    excerpt: 'Enterprise seat licensing, checkout coupon codes, admin security dashboards, and community threads with screenshot attachments.',
+    category: 'Product',
+    author: 'Platform Team',
+    date: 'June 5, 2026',
+    readTime: '4 min read',
+    color: 'accent-green',
+    featured: false,
+  },
+  {
     slug: 'why-hands-on-learning-works',
     title: 'Why Hands-On Learning Works Better Than Reading Docs',
     excerpt: 'Studies show engineers retain 75% of what they practice compared to 10% of what they read. Here is how FixitLab applies this to hands-on technology training.',

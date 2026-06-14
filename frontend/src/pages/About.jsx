@@ -41,10 +41,10 @@ const milestones = [
 
 const values = [
   { icon: Terminal, title: 'Learn by Doing', desc: 'We believe the best way to learn is by breaking things and fixing them — not reading docs.' },
-  { icon: Shield, title: 'Safe to Fail', desc: 'Every lab is an isolated sandbox. Break anything — the container is destroyed afterwards.' },
-  { icon: Heart, title: 'Accessible', desc: 'Free tier for everyone. No credit card required. Start troubleshooting in 30 seconds.' },
-  { icon: Globe, title: 'Global Community', desc: 'Engineers from 50+ countries compete on the leaderboard and share knowledge.' },
-  { icon: Code, title: 'Real Environments', desc: 'Not simulations — actual Linux servers with real services, real configs, real problems.' },
+  { icon: Shield, title: 'Safe to Fail', desc: 'Every lab is an isolated sandbox (Docker, EC2, or DO). Sessions auto-expire in 15 minutes by default.' },
+  { icon: Heart, title: 'Accessible', desc: 'Free tier for everyone. Promo coupons, teams for enterprise, and OAuth sign-up.' },
+  { icon: Globe, title: 'Global Community', desc: 'Engineers share threads with screenshots, vote on solutions, and compete on leaderboards.' },
+  { icon: Code, title: 'Real Environments', desc: 'Docker containers, AWS EC2, and DigitalOcean droplets — plus unified RHEL simulations.' },
   { icon: Zap, title: 'Instant Feedback', desc: 'Auto-validation checks your fix inside the environment. Know if you solved it immediately.' },
 ]
 

@@ -15,14 +15,14 @@ import {
 } from 'lucide-react'
 
 const features = [
-  { icon: Terminal, title: 'Real Terminal', desc: 'Full interactive bash shell in your browser \u2014 connected to a real Linux environment via WebSocket', color: 'cyan' },
-  { icon: Shield, title: 'Isolated Sandbox', desc: 'Every challenge runs in its own Docker container with security constraints. Break anything safely.', color: 'purple' },
-  { icon: Clock, title: 'Timed Challenges', desc: 'Race against the clock. Faster solves earn bonus points \u2014 just like real incident response.', color: 'amber' },
+  { icon: Terminal, title: 'Real Terminal', desc: 'Full interactive bash shell in your browser — connected to a real Linux environment via WebSocket', color: 'cyan' },
+  { icon: Shield, title: 'Isolated Sandbox', desc: 'Docker, AWS EC2, or DigitalOcean labs — each session is isolated and auto-expires after 15 minutes.', color: 'purple' },
+  { icon: Clock, title: 'Timed Challenges', desc: 'Race against the clock. Faster solves earn bonus points — just like real incident response.', color: 'amber' },
   { icon: Trophy, title: 'Leaderboard & Scoring', desc: 'Compete globally, track rankings per technology, and earn achievements for milestones.', color: 'green' },
-  { icon: Zap, title: 'Auto-Validation', desc: 'Click "Check Solution" and our validation engine runs inside your container to verify the fix.', color: 'cyan' },
-  { icon: Lock, title: 'Progressive Hints', desc: 'Stuck? Reveal hints one by one with transparent score penalties. Learn without the frustration.', color: 'purple' },
-  { icon: Award, title: 'Achievements & Badges', desc: 'Earn badges for speed, streaks, perfect scores, and solving without hints.', color: 'amber' },
-  { icon: BookOpen, title: 'Solution Explanations', desc: 'After solving, review the detailed explanation to deepen your understanding.', color: 'green' },
+  { icon: Zap, title: 'Auto-Validation', desc: 'Click "Check Solution" and our validation engine runs inside your environment to verify the fix.', color: 'cyan' },
+  { icon: Users, title: 'Community Threads', desc: 'Discuss scenarios, attach error screenshots, vote, and react — learn from peers in context.', color: 'purple' },
+  { icon: Award, title: 'Teams & Coupons', desc: 'Enterprise seat-based access, org billing, and promo codes at checkout on Pricing.', color: 'amber' },
+  { icon: Lock, title: 'Security First', desc: 'OTP verification, OAuth login, audit logs, and admin security dashboards for platform operators.', color: 'green' },
 ]
 
 const scenarioTypes = [

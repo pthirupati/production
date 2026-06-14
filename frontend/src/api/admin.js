@@ -340,6 +340,11 @@ export const adminApi = {
     return data
   },
 
+  async deactivateOrganization(orgId) {
+    const { data } = await api.delete(`/admin/organizations/${orgId}/`)
+    return data
+  },
+
   async getSecurityMetrics(days = 7) {
     const { data } = await api.get(`/admin/security/?days=${days}`)
     return data

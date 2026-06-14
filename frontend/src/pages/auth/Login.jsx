@@ -99,6 +99,7 @@ export default function Login() {
       toast.error(`${provider === 'github' ? 'GitHub' : 'Google'} login is not configured. Add ${provider.toUpperCase()}_CLIENT_ID and ${provider.toUpperCase()}_CLIENT_SECRET to your .env file.`, { duration: 5000 })
       return
     }
+    sessionStorage.setItem('oauth_intent', 'login')
     const cfg = socialConfig[provider]
     const redirectUri = `${window.location.origin}/auth/callback/${provider}`
     const scopes = provider === 'github' ? 'user:email' : 'openid email profile'

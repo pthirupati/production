@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   MessageSquare, Plus, Search, ChevronUp, ChevronDown,
-  Send, Edit3, Trash2, Pin, Lock, Filter, X, Clock
+  Send, Edit3, Trash2, Pin, Lock, Filter, X, Clock, ImagePlus
 } from 'lucide-react'
 import { communityApi } from '../api/community'
 import { scenarioApi } from '../api/scenarios'
@@ -37,6 +37,7 @@ export default function Community() {
   // New thread form
   const [newTitle, setNewTitle] = useState('')
   const [newBody, setNewBody] = useState('')
+  const [newThreadFile, setNewThreadFile] = useState(null)
   const [newTech, setNewTech] = useState('')
 
   // Reply form
@@ -104,16 +105,20 @@ export default function Community() {
     e.preventDefault()
     if (!newTitle.trim() || !newBody.trim()) return
     try {
-      await communityApi.createThread({
+      const thread = await communityApi.createThread({
         title: newTitle,
         body: newBody,
         technology: newTech || null,
       })
+      if (newThreadFile && thread?.id) {
+        await communityApi.uploadAttachment(thread.id, newThreadFile)
+      }
       toast.success('Thread created!')
       setShowNewThread(false)
       setNewTitle('')
       setNewBody('')
       setNewTech('')
+      setNewThreadFile(null)
       fetchThreads()
     } catch {
       toast.error('Failed to create thread')
@@ -458,8 +463,8 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
                     value={replyBody}
                     onChange={(e) => setReplyBody(e.target.value)}
                   />
-                  <label className="btn-secondary text-xs px-3 py-2 cursor-pointer">
-                    📎 Screenshot
+                  <label className="btn-secondary text-xs px-3 py-2 cursor-pointer flex items-center gap-1">
+                    <ImagePlus size={14} /> Attach screenshot
                     <input type="file" accept="image/*" className="hidden" onChange={e => handleAttachment(e.target.files?.[0])} />
                   </label>
                   <button type="submit" className="btn-primary flex items-center gap-1">
@@ -502,12 +507,29 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
                 required
               />
               <textarea
-                placeholder="What's on your mind?"
+                placeholder="Describe the issue — include error messages, what you tried, and expected behavior"
                 className="input-field w-full h-32 resize-none"
                 value={newBody}
                 onChange={(e) => setNewBody(e.target.value)}
                 required
               />
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="btn-secondary text-sm px-3 py-2 cursor-pointer flex items-center gap-2">
+                  <ImagePlus size={16} />
+                  {newThreadFile ? newThreadFile.name : 'Attach error screenshot'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp"
+                    className="hidden"
+                    onChange={e => setNewThreadFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+                {newThreadFile && (
+                  <button type="button" onClick={() => setNewThreadFile(null)} className="text-xs text-surface-400 hover:text-red-400">
+                    Remove
+                  </button>
+                )}
+              </div>
               <select
                 className="input-field w-full"
                 value={newTech}

@@ -460,6 +460,8 @@ class StartLabView(APIView):
             lab_mode = getattr(scenario, "lab_mode", "docker") or "docker"
             if lab_mode == "simulation":
                 infra_type = "simulation"
+            elif lab_mode in ("aws_ec2", "digitalocean"):
+                infra_type = lab_mode
             else:
                 infra_type = getattr(scenario, "infrastructure_type", "docker") or "docker"
 
