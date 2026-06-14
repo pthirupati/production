@@ -8,15 +8,18 @@ logger = logging.getLogger(__name__)
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=10, retry_kwargs={"max_retries": 3})
 def send_notification_email(self, subject, to_email, template, context=None):
     """
-    Async email sender via Celery.
-    Falls back gracefully — never blocks user-facing operations.
+    Async email sender via Celery (same path as subscription/invoice emails).
+    Uses Gmail API → SendGrid → SMTP via notifications.email.send_email.
     """
-    send_email(
+    ok = send_email(
         subject=subject,
         to_email=to_email,
         template=template,
         context=context,
     )
+    if not ok:
+        raise RuntimeError(f"Email delivery failed for {to_email} (template={template})")
+    return True
 
 
 @shared_task

@@ -72,7 +72,7 @@ class SendOTPView(APIView):
                 {
                     "error": (
                         "Could not send verification email. "
-                        "Please check your address or try again in a few minutes."
+                        "Please try again in a few minutes."
                     ),
                 },
                 status=503,
