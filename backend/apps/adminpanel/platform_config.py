@@ -9,6 +9,8 @@ from pathlib import Path
 from django.conf import settings
 from django.utils import timezone
 
+from common.media_utils import image_specs_for_api
+
 logger = logging.getLogger(__name__)
 
 CONFIG_FILE = Path(getattr(settings, "PLATFORM_CONFIG_FILE", settings.BASE_DIR / "data" / "platform_config.json"))
@@ -66,11 +68,20 @@ def active_promo_banners(row=None) -> list:
     return active
 
 
+def _normalize_banner_image(url: str) -> str:
+    from common.media_utils import public_media_url
+    return public_media_url(url or "")
+
+
 def public_config_payload() -> dict:
     row = get_settings_row()
     maintenance = is_maintenance_active(row)
     message = row.maintenance_message or getattr(settings, "MAINTENANCE_MESSAGE", "")
     promos = active_promo_banners(row) if row.promo_banners_enabled else []
+    promos = [
+        {**b, "image_url": _normalize_banner_image(b.get("image_url", ""))} if b.get("image_url") else b
+        for b in promos
+    ]
     return {
         "primary_email": row.primary_email or settings.PRIMARY_EMAIL,
         "support_email": row.support_email or settings.SUPPORT_EMAIL,
@@ -79,7 +90,7 @@ def public_config_payload() -> dict:
         "maintenance_banner_enabled": row.maintenance_banner_enabled,
         "promo_banners_enabled": row.promo_banners_enabled,
         "maintenance_banner": {
-            "image_url": row.maintenance_banner_image if row.maintenance_banner_enabled else "",
+            "image_url": _normalize_banner_image(row.maintenance_banner_image) if row.maintenance_banner_enabled else "",
             "style": row.maintenance_banner_style or {},
             "scheduled_end": row.maintenance_scheduled_end.isoformat() if row.maintenance_scheduled_end else None,
         },
@@ -87,6 +98,7 @@ def public_config_payload() -> dict:
         "theme_colors": row.theme_colors or {},
         "changelog": row.changelog or [],
         "platform_stats": _platform_stats(),
+        "image_upload_specs": image_specs_for_api(),
     }
 
 
@@ -131,6 +143,7 @@ def admin_config_payload() -> dict:
         "maintenance_banner_enabled": row.maintenance_banner_enabled,
         "theme_colors": row.theme_colors or {},
         "changelog": row.changelog or [],
+        "image_upload_specs": image_specs_for_api(),
         "lab_provider": settings.LAB_PROVIDER,
         "max_lab_duration": settings.LAB_MAX_DURATION_MINUTES,
     }

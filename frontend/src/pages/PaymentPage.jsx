@@ -447,11 +447,11 @@ export default function PaymentPage() {
 
   return (
     <div className="min-h-screen bg-surface-950 relative overflow-hidden">
-      <PlatformBanners config={platformConfig} showMaintenance showPromo />
       <FloatingParticles />
 
+      <div className="sticky top-0 z-50 relative">
       {/* Header */}
-      <nav className="border-b border-surface-700/20 backdrop-blur-2xl sticky top-0 z-50 bg-surface-950/70">
+      <nav className="border-b border-surface-700/20 backdrop-blur-2xl bg-surface-950/90">
         <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/pricing" className="p-2 text-surface-400 hover:text-white transition-colors rounded-lg hover:bg-surface-800/50">
@@ -476,6 +476,8 @@ export default function PaymentPage() {
           </div>
         </div>
       </nav>
+      <PlatformBanners config={platformConfig} showMaintenance showPromo={false} />
+      </div>
 
       <div className="max-w-5xl mx-auto px-6 py-10 relative z-10">
 

@@ -40,12 +40,10 @@ class ThreadAttachmentSerializer(serializers.ModelSerializer):
         fields = ["id", "url", "original_name", "content_type", "uploader", "created_at"]
 
     def get_url(self, obj):
-        request = self.context.get("request")
+        from common.media_utils import public_media_url
         if not obj.file:
             return ""
-        if request:
-            return request.build_absolute_uri(obj.file.url)
-        return obj.file.url
+        return public_media_url(obj.file.url)
 
 
 class ReplySerializer(serializers.ModelSerializer):

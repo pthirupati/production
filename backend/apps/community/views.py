@@ -296,9 +296,15 @@ class ThreadAttachmentUploadView(APIView):
             return Response({"error": "No file"}, status=http_status.HTTP_400_BAD_REQUEST)
         if upload.size > self.MAX_BYTES:
             return Response({"error": "Max 5MB"}, status=http_status.HTTP_400_BAD_REQUEST)
-        allowed = ("image/png", "image/jpeg", "image/gif", "image/webp")
-        if upload.content_type not in allowed:
-            return Response({"error": "Images only"}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        from common.media_utils import validate_image_upload, image_specs_for_api
+        try:
+            validate_image_upload(upload, "community_screenshot")
+        except ValueError as exc:
+            return Response(
+                {"error": str(exc), "spec": image_specs_for_api().get("community_screenshot")},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
 
         reply_id = request.data.get("reply_id")
         reply = None

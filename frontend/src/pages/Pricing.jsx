@@ -271,7 +271,6 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-surface-950 relative overflow-hidden">
-      <PlatformBanners config={platformConfig} showMaintenance showPromo />
       {/* Animated background orbs */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-20 left-[10%] w-[500px] h-[500px] bg-accent-cyan/[0.03] rounded-full blur-[120px] animate-float" />
@@ -279,8 +278,9 @@ export default function Pricing() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/[0.02] rounded-full blur-[150px]" />
       </div>
 
-      {/* Navbar */}
-      <nav className="border-b border-surface-800/50 backdrop-blur-xl sticky top-0 z-50 bg-surface-950/80">
+      {/* Navbar + offer/maintenance banners */}
+      <div className="sticky top-0 z-50 relative">
+      <nav className="border-b border-surface-800/50 backdrop-blur-xl bg-surface-950/90">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-brand-600 flex items-center justify-center">
@@ -351,6 +351,8 @@ export default function Pricing() {
           </div>
         </div>
       </nav>
+      <PlatformBanners config={platformConfig} showMaintenance showPromo />
+      </div>
 
       <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
         {gatewayDown && (

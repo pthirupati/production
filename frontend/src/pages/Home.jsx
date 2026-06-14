@@ -78,9 +78,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-surface-950">
-      <PlatformBanners config={platformConfig} showMaintenance showPromo />
-      {/* Navbar */}
-      <nav className="border-b border-surface-700/30 backdrop-blur-2xl sticky top-0 z-50 bg-surface-950/80">
+      {/* Navbar — sticky; banners sit directly below */}
+      <div className="sticky top-0 z-50">
+        <nav className="border-b border-surface-700/30 backdrop-blur-2xl bg-surface-950/90">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 group">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center shadow-lg shadow-accent-cyan/25 group-hover:shadow-accent-cyan/40 transition-shadow">
@@ -128,6 +128,8 @@ export default function Home() {
           </div>
         )}
       </nav>
+        <PlatformBanners config={platformConfig} showMaintenance showPromo />
+      </div>
 
       {/* Hero */}
       <section className="relative overflow-hidden min-h-[90vh] flex items-center">

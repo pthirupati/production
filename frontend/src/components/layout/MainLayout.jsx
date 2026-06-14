@@ -28,7 +28,6 @@ export default function MainLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [maintenanceBanner, setMaintenanceBanner] = useState(null)
   const [platformConfig, setPlatformConfig] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState(null)
@@ -38,9 +37,6 @@ export default function MainLayout() {
   useEffect(() => {
     api.get('/config/').then(res => {
       setPlatformConfig(res.data)
-      if (res.data?.maintenance_mode) {
-        setMaintenanceBanner(res.data.maintenance_message || 'Platform is under maintenance.')
-      }
     }).catch(() => {})
   }, [])
 
@@ -195,15 +191,17 @@ export default function MainLayout() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen relative z-10">
-        {/* Mobile header */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-surface-700/50 bg-surface-900">
-          <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-surface-400" aria-label={mobileOpen ? 'Close menu' : 'Open menu'}>
-            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-          <span className="font-bold text-white">FixitLab</span>
-        </header>
+        <div className="sticky top-0 z-40">
+          {/* Mobile header */}
+          <header className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-surface-700/50 bg-surface-900/95 backdrop-blur-xl">
+            <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-surface-400" aria-label={mobileOpen ? 'Close menu' : 'Open menu'}>
+              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+            <span className="font-bold text-white">FixitLab</span>
+          </header>
 
-        <PlatformBanners config={platformConfig} showMaintenance={!isLabRoute} showPromo={false} />
+          <PlatformBanners config={platformConfig} showMaintenance={!isLabRoute} showPromo={false} />
+        </div>
 
         <main className={`flex-1 overflow-y-auto overflow-x-hidden ${isLabRoute ? 'p-0' : 'p-3 sm:p-6 lg:p-8'}`} role="main">
           {!isLabRoute && (

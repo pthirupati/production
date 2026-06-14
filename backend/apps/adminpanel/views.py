@@ -1952,9 +1952,15 @@ class AdminConfigView(APIView):
 
 
 class AdminUploadView(APIView):
-    """Upload banner/promo images (admin)."""
+    """Upload banner/promo images (admin) — images only, fixed dimensions per purpose."""
     permission_classes = [IsPlatformAdmin]
     MAX_BYTES = 5 * 1024 * 1024
+
+    PURPOSE_MAP = {
+        "platform": "promo_banner",
+        "promo": "promo_banner",
+        "maintenance": "maintenance_banner",
+    }
 
     def post(self, request):
         upload = request.FILES.get("file")
@@ -1962,16 +1968,21 @@ class AdminUploadView(APIView):
             return Response({"error": "No file uploaded"}, status=400)
         if upload.size > self.MAX_BYTES:
             return Response({"error": "File too large (max 5MB)"}, status=400)
-        if not (upload.content_type or "").startswith("image/"):
-            return Response({"error": "Only image uploads are allowed"}, status=400)
 
+        from common.media_utils import validate_image_upload, image_specs_for_api, public_media_url
         from django.core.files.storage import default_storage
 
         folder = request.data.get("folder", "platform")
+        purpose = request.data.get("purpose") or self.PURPOSE_MAP.get(folder, "promo_banner")
+        try:
+            width, height = validate_image_upload(upload, purpose)
+        except ValueError as exc:
+            return Response({"error": str(exc), "spec": image_specs_for_api().get(purpose)}, status=400)
+
         safe_name = upload.name.replace("..", "").replace("/", "_")[-120:]
         path = default_storage.save(f"{folder}/{safe_name}", upload)
-        url = request.build_absolute_uri(settings.MEDIA_URL + path)
-        return Response({"url": url, "path": path})
+        url = public_media_url(settings.MEDIA_URL + path)
+        return Response({"url": url, "path": path, "width": width, "height": height})
 
 
 # ─── Container Monitoring ─────────────────────────────────────────────

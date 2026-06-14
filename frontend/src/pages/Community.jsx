@@ -7,6 +7,7 @@ import { communityApi } from '../api/community'
 import { scenarioApi } from '../api/scenarios'
 import { useAuthStore } from '../store/authStore'
 import toast from 'react-hot-toast'
+import { resolveMediaUrl, IMAGE_UPLOAD_HINTS } from '../utils/mediaUrl'
 import Pagination from '../components/Pagination'
 
 function timeAgo(dateStr) {
@@ -211,8 +212,8 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
       await communityApi.uploadAttachment(selectedThread.id, file, replyId)
       loadThread(selectedThread.id)
       toast.success('Screenshot attached')
-    } catch {
-      toast.error('Upload failed')
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Upload failed')
     }
   }
 
@@ -243,8 +244,8 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
       {reply.attachments?.length > 0 && (
         <div className="flex flex-wrap gap-2 mt-2">
           {reply.attachments.map(att => (
-            <a key={att.id} href={att.url} target="_blank" rel="noreferrer" className="block">
-              <img src={att.url} alt={att.original_name || 'attachment'} className="max-h-32 rounded border border-surface-700" />
+            <a key={att.id} href={resolveMediaUrl(att.url)} target="_blank" rel="noreferrer" className="block">
+              <img src={resolveMediaUrl(att.url)} alt={att.original_name || 'attachment'} className="max-h-48 max-w-full rounded-lg border border-surface-700 object-contain bg-surface-900/50" onError={(e) => { e.currentTarget.classList.add('opacity-40') }} />
             </a>
           ))}
         </div>
@@ -458,8 +459,8 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
               {selectedThread.attachments?.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {selectedThread.attachments.map(att => (
-                    <a key={att.id} href={att.url} target="_blank" rel="noreferrer">
-                      <img src={att.url} alt="" className="max-h-40 rounded border border-surface-700" />
+                    <a key={att.id} href={resolveMediaUrl(att.url)} target="_blank" rel="noreferrer">
+                      <img src={resolveMediaUrl(att.url)} alt={att.original_name || 'Screenshot'} className="max-h-56 max-w-full rounded-lg border border-surface-700 object-contain bg-surface-900/50" onError={(e) => { e.currentTarget.classList.add('opacity-40') }} />
                     </a>
                   ))}
                 </div>
@@ -485,7 +486,7 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
                   />
                   <label className="btn-secondary text-xs px-3 py-2 cursor-pointer flex items-center gap-1">
                     <ImagePlus size={14} /> Attach screenshot
-                    <input type="file" accept="image/*" className="hidden" onChange={e => handleAttachment(e.target.files?.[0])} />
+                    <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" title={IMAGE_UPLOAD_HINTS.community_screenshot} onChange={e => handleAttachment(e.target.files?.[0])} />
                   </label>
                   <button type="submit" className="btn-primary flex items-center gap-1">
                     <Send size={14} /> Reply

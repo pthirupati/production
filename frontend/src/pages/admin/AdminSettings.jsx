@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
 import { Wrench, AlertTriangle, Save, ToggleLeft, ToggleRight, Mail, Settings, Trash2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { IMAGE_UPLOAD_HINTS } from '../../utils/mediaUrl'
 
 export default function AdminSettings() {
   const [maintenance, setMaintenance] = useState({ maintenance_mode: false, maintenance_message: '' })
@@ -217,19 +217,21 @@ export default function AdminSettings() {
           Show maintenance banner on site
         </label>
         <div className="flex flex-wrap gap-2 items-center">
-          <input type="file" accept="image/*" className="text-xs text-surface-400"
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="text-xs text-surface-400"
             onChange={async e => {
               const file = e.target.files?.[0]
               if (!file) return
               setSaving(true)
               try {
-                const { url } = await adminApi.uploadBanner(file, 'maintenance')
+                const { url } = await adminApi.uploadBanner(file, 'maintenance', 'maintenance_banner')
                 setMaintenance(m => ({ ...m, maintenance_banner_image: url }))
                 toast.success('Banner uploaded')
-              } catch { toast.error('Upload failed') }
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Upload failed')
+              }
               finally { setSaving(false); e.target.value = '' }
             }} />
-          <span className="text-xs text-surface-500">Upload maintenance banner image</span>
+          <span className="text-xs text-surface-500">Required size: {IMAGE_UPLOAD_HINTS.maintenance_banner}</span>
         </div>
         <input type="url" className="input-field w-full" placeholder="Banner image URL (optional)"
           value={maintenance.maintenance_banner_image || ''}
@@ -335,17 +337,20 @@ export default function AdminSettings() {
           <input className="input-field" placeholder="Link (/pricing)" value={promoDraft.link} onChange={e => setPromoDraft({ ...promoDraft, link: e.target.value })} />
           <input className="input-field sm:col-span-2" placeholder="Offer text" value={promoDraft.text} onChange={e => setPromoDraft({ ...promoDraft, text: e.target.value })} />
           <input className="input-field sm:col-span-2" placeholder="Image URL (optional)" value={promoDraft.image_url || ''} onChange={e => setPromoDraft({ ...promoDraft, image_url: e.target.value })} />
-          <input type="file" accept="image/*" className="text-xs text-surface-400 sm:col-span-2"
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="text-xs text-surface-400 sm:col-span-2"
             onChange={async e => {
               const file = e.target.files?.[0]
               if (!file) return
               try {
-                const { url } = await adminApi.uploadBanner(file, 'promo')
+                const { url } = await adminApi.uploadBanner(file, 'promo', 'promo_banner')
                 setPromoDraft(p => ({ ...p, image_url: url }))
                 toast.success('Promo image uploaded')
-              } catch { toast.error('Upload failed') }
+              } catch (err) {
+                toast.error(err.response?.data?.error || 'Upload failed')
+              }
               e.target.value = ''
             }} />
+          <p className="text-xs text-surface-500 sm:col-span-2">Banner image: {IMAGE_UPLOAD_HINTS.promo_banner}</p>
         </div>
         <button onClick={handleAddPromo} disabled={saving} className="btn-secondary text-sm">Add promo banner</button>
         {(config?.promo_banners || []).length > 0 && (

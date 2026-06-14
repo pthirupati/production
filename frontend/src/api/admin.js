@@ -265,10 +265,11 @@ export const adminApi = {
     return data
   },
 
-  async uploadBanner(file, folder = 'platform') {
+  async uploadBanner(file, folder = 'platform', purpose = null) {
     const form = new FormData()
     form.append('file', file)
     form.append('folder', folder)
+    if (purpose) form.append('purpose', purpose)
     const { data } = await api.post('/admin/upload/', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
