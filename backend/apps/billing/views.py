@@ -493,12 +493,13 @@ class CreateRazorpayOrderView(APIView):
 
     def _send_subscription_emails(self, user, technology, sub_id, amount):
         """Send subscription confirmation + admin + invoice emails."""
-        from apps.notifications.tasks import send_notification_email, create_in_app_notification
+        from apps.notifications.email_helpers import queue_user_email
+        from apps.notifications.tasks import send_notification_email
 
         try:
-            send_notification_email.delay(
+            queue_user_email(
+                user,
                 subject=f"FixitLab Subscription Confirmed - {technology.name}",
-                to_email=user.email,
                 template="emails/subscription_confirmation.html",
                 context={
                     "username": user.get_full_name() or user.username,
@@ -509,6 +510,7 @@ class CreateRazorpayOrderView(APIView):
                     "scenarios_url": f"{settings.FRONTEND_URL}/scenarios",
                     "subscription_id": sub_id,
                 },
+                email_type="subscription",
             )
         except Exception as e:
             logger.error(f"Failed to send user subscription email: {e}")
@@ -531,11 +533,11 @@ class CreateRazorpayOrderView(APIView):
         except Exception as e:
             logger.error(f"Failed to send admin subscription email: {e}")
 
-        # Invoice email
+        # Invoice email (respects subscription email preference)
         try:
-            send_notification_email.delay(
+            queue_user_email(
+                user,
                 subject=f"FixitLab Invoice — {technology.name} Subscription",
-                to_email=user.email,
                 template="emails/subscription_invoice.html",
                 context={
                     "username": user.get_full_name() or user.username,
@@ -550,12 +552,14 @@ class CreateRazorpayOrderView(APIView):
                     "billing_period": "Lifetime",
                     "scenarios_url": f"{settings.FRONTEND_URL}/scenarios",
                 },
+                email_type="subscription",
             )
         except Exception as e:
             logger.error(f"Failed to send invoice email: {e}")
 
         # In-app notification
         try:
+            from apps.notifications.tasks import create_in_app_notification
             create_in_app_notification.delay(
                 user_id=user.id,
                 notification_type="system",
@@ -1069,22 +1073,24 @@ class CancelTechSubscriptionView(APIView):
 
         # Send cancellation notification
         try:
-            from apps.notifications.tasks import create_in_app_notification, send_notification_email
+            from apps.notifications.tasks import create_in_app_notification
+            from apps.notifications.email_helpers import queue_user_email
             create_in_app_notification.delay(
                 user_id=request.user.id,
                 notification_type="system",
                 title=f"Subscription Cancelled — {sub.technology.name}",
                 message=f"Your subscription (ID: {sub_id}) has been cancelled. You can resubscribe anytime.",
             )
-            send_notification_email.delay(
+            queue_user_email(
+                request.user,
                 subject=f"FixitLab: Subscription Cancelled — {sub.technology.name}",
-                to_email=request.user.email,
                 template="emails/subscription_cancelled.html",
                 context={
                     "username": request.user.get_full_name() or request.user.username,
                     "technology": sub.technology.name,
                     "subscription_id": sub_id,
                 },
+                email_type="subscription",
             )
         except Exception as e:
             logger.warning(f"Failed to send cancellation notification: {e}")

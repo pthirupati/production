@@ -628,8 +628,9 @@ class GitHubCallbackView(APIView):
             logger.error(f"GitHub user info error: {e}")
             return Response({"error": "Failed to get user info from GitHub."}, status=502)
 
-        # 3. Find or create user
-        user = self._get_or_create_user("github", gh_id, primary_email, gh_name)
+        user, error = self._resolve_social_login("github", gh_id, primary_email, gh_name)
+        if error:
+            return error
         refresh = RefreshToken.for_user(user)
         return Response({
             "access": str(refresh.access_token),
@@ -643,52 +644,44 @@ class GitHubCallbackView(APIView):
         })
 
     @staticmethod
-    def _get_or_create_user(provider, provider_uid, email, display_name):
-        """Link social account to existing user or create new one."""
-        # Check if this social account already exists
+    def _resolve_social_login(provider, provider_uid, email, display_name):
+        """
+        Login-only social auth:
+        - Existing social link → login
+        - Existing email account → link social + login
+        - No account → require registration first
+        """
         try:
             sa = SocialAccount.objects.select_related("user").get(
                 provider=provider, provider_uid=provider_uid,
             )
-            return sa.user
+            return sa.user, None
         except SocialAccount.DoesNotExist:
             pass
 
-        # Check if a user with this email already exists
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            # Create new user
-            username = email.split("@")[0]
-            # Ensure username uniqueness
-            base = username
-            counter = 1
-            while User.objects.filter(username=username).exists():
-                username = f"{base}{counter}"
-                counter += 1
-            user = User.objects.create_user(
-                username=username, email=email,
-                password=None,  # No password for social accounts
+            return None, Response(
+                {
+                    "error": (
+                        "No FixitLab account found for this email. "
+                        "Please register first, then sign in with GitHub or Google."
+                    ),
+                    "error_code": "registration_required",
+                    "email": email,
+                    "provider": provider,
+                },
+                status=403,
             )
-            Profile.objects.get_or_create(user=user)
-            # Send welcome notification
-            try:
-                create_in_app_notification.delay(
-                    user_id=user.id,
-                    notification_type="welcome",
-                    title="Welcome to FixitLab!",
-                    message=f"You signed in with {provider.title()}. Start with an easy challenge!",
-                    metadata={"action_url": "/technologies"},
-                )
-            except Exception:
-                pass
 
-        # Link the social account
         SocialAccount.objects.create(
-            user=user, provider=provider, provider_uid=provider_uid,
+            user=user,
+            provider=provider,
+            provider_uid=provider_uid,
             extra_data={"display_name": display_name},
         )
-        return user
+        return user, None
 
 
 class GoogleCallbackView(APIView):
@@ -750,8 +743,9 @@ class GoogleCallbackView(APIView):
             logger.error(f"Google userinfo error: {e}")
             return Response({"error": "Failed to get user info from Google."}, status=502)
 
-        # 3. Find or create user (reuse GitHub helper)
-        user = GitHubCallbackView._get_or_create_user("google", google_id, email, name)
+        user, error = GitHubCallbackView._resolve_social_login("google", google_id, email, name)
+        if error:
+            return error
         refresh = RefreshToken.for_user(user)
         return Response({
             "access": str(refresh.access_token),

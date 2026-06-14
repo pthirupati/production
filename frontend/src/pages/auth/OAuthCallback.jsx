@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { authApi } from '../../api/auth'
 import { Terminal, AlertCircle, CheckCircle2 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -10,6 +10,8 @@ export default function OAuthCallback() {
   const navigate = useNavigate()
   const [status, setStatus] = useState('processing') // processing | success | error
   const [error, setError] = useState('')
+  const [registrationRequired, setRegistrationRequired] = useState(false)
+  const [providerEmail, setProviderEmail] = useState('')
 
   useEffect(() => {
     const code = searchParams.get('code')
@@ -28,8 +30,14 @@ export default function OAuthCallback() {
         setTimeout(() => navigate('/dashboard', { replace: true }), 800)
       } catch (err) {
         setStatus('error')
-        const msg = err.response?.data?.error || 'Authentication failed. Please try again.'
-        setError(msg)
+        const data = err.response?.data
+        if (data?.error_code === 'registration_required') {
+          setError(data.error)
+          setRegistrationRequired(true)
+          setProviderEmail(data.email || '')
+        } else {
+          setError(data?.error || 'Authentication failed. Please try again.')
+        }
       }
     }
 
@@ -67,14 +75,23 @@ export default function OAuthCallback() {
           {status === 'error' && (
             <div className="flex flex-col items-center gap-4 animate-slide-up">
               <AlertCircle size={40} className="text-accent-red" />
-              <h2 className="text-xl font-semibold text-white">Authentication Failed</h2>
+              <h2 className="text-xl font-semibold text-white">
+                {registrationRequired ? 'Register first' : 'Authentication Failed'}
+              </h2>
               <p className="text-surface-400 text-sm">{error}</p>
-              <button
-                onClick={() => navigate('/login')}
-                className="btn-primary px-6 mt-2"
-              >
-                Back to Login
-              </button>
+              <div className="flex flex-wrap gap-3 justify-center mt-2">
+                {registrationRequired ? (
+                  <>
+                    <Link to="/register" className="btn-primary px-6">Create account</Link>
+                    <button onClick={() => navigate('/login')} className="btn-secondary px-6">Back to Login</button>
+                  </>
+                ) : (
+                  <button onClick={() => navigate('/login')} className="btn-primary px-6">Back to Login</button>
+                )}
+              </div>
+              {registrationRequired && providerEmail && (
+                <p className="text-xs text-surface-500">Use the same email ({providerEmail}) when registering.</p>
+              )}
             </div>
           )}
         </div>

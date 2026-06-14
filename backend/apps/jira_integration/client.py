@@ -28,6 +28,10 @@ class JiraClient:
 
     @property
     def enabled(self) -> bool:
+        from .simulated import use_simulated_jira
+
+        if use_simulated_jira():
+            return False
         return bool(
             settings.JIRA_ENABLED
             and self.base_url

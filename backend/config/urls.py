@@ -42,6 +42,9 @@ urlpatterns = [
     # Lab history
     path("api/labs/history/", LabHistoryView.as_view(), name="lab_history"),
 
+    # Organization / team self-service
+    path("api/org/", include("apps.accounts.org_urls")),
+
     # Public health check (for load balancers / orchestrators)
     path("api/health/", include("apps.accounts.health")),
 

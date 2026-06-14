@@ -54,6 +54,7 @@ const AdminSecurity = lazy(() => import('../pages/admin/AdminSecurity'))
 const AdminAuditLogs = lazy(() => import('../pages/admin/AdminAuditLogs'))
 const AdminInvoices = lazy(() => import('../pages/admin/AdminInvoices'))
 const AdminMonitoring = lazy(() => import('../pages/admin/AdminMonitoring'))
+const Team = lazy(() => import('../pages/Team'))
 const AdminSettings = lazy(() => import('../pages/admin/AdminSettings'))
 
 function PageLoader() {
@@ -97,6 +98,7 @@ export default function AppRouter() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/support" element={<Navigate to="/contact" replace />} />
         <Route path="/faq" element={<FAQ />} />
         <Route path="/verify-certificate" element={<CertificateVerify />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
@@ -117,6 +119,7 @@ export default function AppRouter() {
           <Route path="/session-replay/:sessionId" element={<SessionReplay />} />
           <Route path="/community" element={<Community />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/team" element={<Team />} />
         </Route>
 
         {/* Admin routes */}

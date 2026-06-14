@@ -51,17 +51,41 @@ def cleanup_expired_labs():
             except Exception as e:
                 logger.warning(f"Jira sync on lab expiry failed: {e}")
 
-            # In-app notification only (no expiry email — avoids spam)
+            # Notify user about expired lab
             try:
                 from apps.notifications.tasks import create_in_app_notification
+                from apps.notifications.models import NotificationPreference
+                from apps.notifications.email_helpers import queue_user_email
+                from django.contrib.auth import get_user_model
 
-                create_in_app_notification.delay(
-                    user_id=session.user_id,
-                    notification_type="lab_expired",
-                    title=f"Lab Expired: {session.scenario.title}",
-                    message=f"Your lab session expired after {session.duration_limit // 60} minutes. You can try again anytime!",
-                    metadata={"scenario_slug": session.scenario.slug},
-                )
+                User = get_user_model()
+                user = User.objects.get(id=session.user_id)
+                prefs = NotificationPreference.get_for_user(user)
+
+                if prefs.should_notify_inapp("lab_expired"):
+                    create_in_app_notification.delay(
+                        user_id=session.user_id,
+                        notification_type="lab_expired",
+                        title=f"Lab Expired: {session.scenario.title}",
+                        message=f"Your lab session expired after {session.duration_limit // 60} minutes. You can try again anytime!",
+                        metadata={"scenario_slug": session.scenario.slug},
+                    )
+
+                if prefs.should_email("lab_expired"):
+                    from django.conf import settings as django_settings
+
+                    queue_user_email(
+                        user,
+                        subject=f"FixitLab: Lab Session Expired — {session.scenario.title}",
+                        template="emails/lab_expired.html",
+                        context={
+                            "username": user.username,
+                            "scenario_title": session.scenario.title,
+                            "duration_minutes": session.duration_limit // 60,
+                            "scenarios_url": f"{django_settings.FRONTEND_URL}/scenarios",
+                        },
+                        email_type="lab_expired",
+                    )
             except Exception as e:
                 logger.warning(f"Failed to notify user about expired lab: {e}")
 
@@ -416,9 +440,11 @@ def process_subscription_expiry():
                     "needs_renewal": True,
                 },
             )
-            send_notification_email.delay(
+            from apps.notifications.email_helpers import queue_user_email
+
+            queue_user_email(
+                sub.user,
                 subject=f"FixitLab: Renew your {sub.technology.name} subscription",
-                to_email=sub.user.email,
                 template="emails/subscription_renewal_reminder.html",
                 context={
                     "username": sub.user.get_full_name() or sub.user.username,
@@ -429,6 +455,7 @@ def process_subscription_expiry():
                     "renew_url": renew_url,
                     "profile_url": profile_url,
                 },
+                email_type="subscription",
             )
             sub.renewal_reminder_at = now
             sub.save(update_fields=["renewal_reminder_at"])

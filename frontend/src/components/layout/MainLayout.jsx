@@ -18,6 +18,7 @@ const navItems = [
   { path: '/bookmarks', icon: Bookmark, label: 'Bookmarks' },
   { path: '/community', icon: MessageSquare, label: 'Community' },
   { path: '/lab-history', icon: History, label: 'Lab History' },
+  { path: '/team', icon: Shield, label: 'My Team' },
   { path: '/profile', icon: User, label: 'Profile' },
 ]
 

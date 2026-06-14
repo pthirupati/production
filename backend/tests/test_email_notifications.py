@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import EmailVerificationOTP
+from apps.accounts.views import GitHubCallbackView
 from apps.notifications.models import EmailLog
 
 User = get_user_model()
@@ -193,3 +194,33 @@ class ForgotPasswordEmailTest(APITestCase):
         resp = self.client.post("/api/auth/forgot-password/", {"email": "reset@test.com"})
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         mock_dispatch.assert_called_once()
+
+
+class SocialLoginAPITest(APITestCase):
+    def test_resolve_social_login_no_account(self):
+        user, err = GitHubCallbackView._resolve_social_login(
+            "github", "999", "newoauth@test.com", "New User"
+        )
+        self.assertIsNone(user)
+        self.assertIsNotNone(err)
+        self.assertEqual(err.status_code, 403)
+        self.assertEqual(err.data["error_code"], "registration_required")
+
+    def test_resolve_social_login_links_existing_email(self):
+        user = User.objects.create_user(username="link@test.com", email="link@test.com", password="Test123!@")
+        resolved, err = GitHubCallbackView._resolve_social_login(
+            "google", "google-uid-1", "link@test.com", "Link User"
+        )
+        self.assertIsNone(err)
+        self.assertEqual(resolved.id, user.id)
+        self.assertTrue(user.social_accounts.filter(provider="google").exists())
+
+    def test_resolve_social_login_existing_social_account(self):
+        user = User.objects.create_user(username="soc@test.com", email="soc@test.com", password="Test123!@")
+        from apps.accounts.models import SocialAccount
+        SocialAccount.objects.create(user=user, provider="github", provider_uid="gh-123")
+        resolved, err = GitHubCallbackView._resolve_social_login(
+            "github", "gh-123", "soc@test.com", "Soc User"
+        )
+        self.assertIsNone(err)
+        self.assertEqual(resolved.id, user.id)

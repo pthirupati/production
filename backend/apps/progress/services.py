@@ -151,42 +151,13 @@ def _check_streaks(user):
 def _notify_achievements(user, achievement_types):
     """Send in-app + email notifications for new achievements."""
     try:
-        from apps.notifications.tasks import create_in_app_notification, send_notification_email
-        from django.conf import settings
+        from apps.notifications.tasks import notify_achievement_earned
 
-        ACHIEVEMENT_ICONS = {
-            "first_solve": "🎯", "speed_demon": "⚡", "no_hints": "🧠",
-            "perfect_score": "💯", "streak_3": "🔥", "streak_7": "🔥",
-            "streak_30": "🔥", "easy_master": "🥉", "medium_master": "🥈",
-            "hard_master": "🥇", "ten_solves": "🏅", "fifty_solves": "🏆",
-            "hundred_solves": "👑",
-        }
         ACHIEVEMENT_NAMES = dict(UserAchievement.ACHIEVEMENT_CHOICES)
 
         for ach_type in achievement_types:
             name = ACHIEVEMENT_NAMES.get(ach_type, ach_type.replace("_", " ").title())
-            icon = ACHIEVEMENT_ICONS.get(ach_type, "🏆")
-
-            create_in_app_notification.delay(
-                user_id=user.id,
-                notification_type="achievement",
-                title=f"Achievement Unlocked: {name}",
-                message=f"You earned the {name} badge!",
-                metadata={"achievement": ach_type, "icon": icon},
-            )
-
-            send_notification_email.delay(
-                subject=f"🏆 Achievement Unlocked: {name} — FixitLab",
-                to_email=user.email,
-                template="emails/achievement.html",
-                context={
-                    "username": user.username,
-                    "achievement_icon": icon,
-                    "achievement_name": name,
-                    "achievement_description": f"You earned this badge on FixitLab. Keep going!",
-                    "dashboard_url": f"{settings.FRONTEND_URL}/achievements",
-                },
-            )
+            notify_achievement_earned.delay(user.id, ach_type, name)
     except Exception as e:
         logger.warning(f"Failed to notify achievements: {e}")
 

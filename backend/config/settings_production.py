@@ -347,6 +347,10 @@ if not env("RAZORPAY_KEY_ID", default="") and not env("STRIPE_SECRET_KEY", defau
     import warnings
     warnings.warn("No payment gateway configured in production!", stacklevel=1)
 
+# Jira: simulation-only in production (KAN-* tickets, no live Atlassian API)
+JIRA_SIMULATION_MODE = True
+JIRA_ENABLED = env.bool("JIRA_ENABLED", default=True)
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 SERVE_MEDIA = True

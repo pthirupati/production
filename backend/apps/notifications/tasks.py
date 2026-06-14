@@ -52,7 +52,7 @@ def notify_lab_completed(user_id, scenario_title, score, time_taken, hints_used)
         user = User.objects.get(id=user_id)
         prefs = NotificationPreference.get_for_user(user)
 
-        # In-app notification only (no email — avoids spam)
+        # In-app notification
         if prefs.should_notify_inapp("system"):
             create_in_app_notification(
                 user_id=user_id,
@@ -61,6 +61,23 @@ def notify_lab_completed(user_id, scenario_title, score, time_taken, hints_used)
                 message=f"Score: {score} | Time: {time_taken}",
                 metadata={"score": score, "scenario": scenario_title},
             )
+
+        from .email_helpers import queue_user_email
+
+        queue_user_email(
+            user,
+            subject=f"FixitLab: Challenge Solved — {scenario_title}",
+            template="emails/lab_completed.html",
+            context={
+                "username": user.username,
+                "scenario_title": scenario_title,
+                "score": score,
+                "time_taken": time_taken,
+                "hints_used": hints_used,
+                "dashboard_url": f"{settings.FRONTEND_URL}/dashboard",
+            },
+            email_type="lab_completed",
+        )
     except Exception as e:
         logger.warning(f"Failed to send lab completion notification: {e}")
 
@@ -108,9 +125,11 @@ def notify_achievement_earned(user_id, achievement_key, achievement_name):
 
         # Email
         if prefs.should_email("achievement"):
-            send_email(
+            from .email_helpers import queue_user_email
+
+            queue_user_email(
+                user,
                 subject=f"FixitLab: Achievement Unlocked — {achievement_name}!",
-                to_email=user.email,
                 template="emails/achievement.html",
                 context={
                     "username": user.username,
@@ -119,6 +138,7 @@ def notify_achievement_earned(user_id, achievement_key, achievement_name):
                     "achievement_description": ACHIEVEMENT_DESCS.get(achievement_key, ""),
                     "dashboard_url": f"{settings.FRONTEND_URL}/achievements",
                 },
+                email_type="achievement",
             )
     except Exception as e:
         logger.warning(f"Failed to send achievement notification: {e}")
@@ -146,7 +166,7 @@ def send_payment_error_notification(user_id, email, technology_name, error_messa
                     "order_id": order_id or "N/A",
                     "timestamp": timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "support_email": settings.SUPPORT_EMAIL,
-                    "support_url": f"{settings.FRONTEND_URL}/support",
+                    "support_url": f"{settings.FRONTEND_URL}/contact",
                 },
             )
         except Exception as e:
@@ -167,7 +187,7 @@ def send_payment_error_notification(user_id, email, technology_name, error_messa
                         "error_message": error_message,
                         "order_id": order_id or "N/A",
                         "timestamp": timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "admin_url": f"{settings.FRONTEND_URL}/admin/payments",
+                        "admin_url": f"{settings.FRONTEND_URL}/admin/subscriptions",
                     },
                 )
         except Exception as e:

@@ -259,6 +259,10 @@ export default function Login() {
                 Google
               </button>
             </div>
+            <p className="text-xs text-surface-500 text-center mt-3">
+              GitHub and Google sign-in only work for existing accounts. New users must{' '}
+              <Link to="/register" className="text-accent-cyan hover:underline">register first</Link>.
+            </p>
           </div>
 
           <p className="text-center text-sm text-surface-500 mt-6">
