@@ -1,0 +1,27 @@
+category: Bare Metal & IPMI
+description: 'Server unresponsive. Use ipmitool to cycle power.
+
+  '
+difficulty: easy
+dual_terminal: false
+hints:
+- content: 'Try: ipmitool power status'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. Server unresponsive. Use ipmitool to cycle
+  power.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: ipmitool power status'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: baremetal
+slug: sim-baremetal-ipmi
+time_limit: 900
+title: IPMI Power Cycle

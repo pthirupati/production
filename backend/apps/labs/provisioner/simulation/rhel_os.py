@@ -66,6 +66,12 @@ class RHELOSState:
             "HOSTNAME": hostname,
         }
         self.dmesg_extra: list[str] = []
+        self.gpu_healthy: bool = True
+        self.initramfs_fixed: bool = False
+        self.grub_fixed: bool = False
+        self.mbr_fixed: bool = False
+        self.kernel_fixed: bool = False
+        self.patching_done: bool = False
         self._init_base_system()
 
     def _init_base_system(self) -> None:

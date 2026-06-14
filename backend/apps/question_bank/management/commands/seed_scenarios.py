@@ -10,6 +10,21 @@ from django.core.management.base import BaseCommand
 from apps.question_bank.models import Technology, Scenario
 from apps.hints.models import Hint
 
+TECH_META = {
+    "database": {"name": "Database Administration", "icon": "database", "color": "blue", "order": 10},
+    "docker": {"name": "Docker & Containers", "icon": "container", "color": "cyan", "order": 11},
+    "ansible": {"name": "Ansible Automation", "icon": "network", "color": "purple", "order": 12},
+    "kubernetes": {"name": "Kubernetes", "icon": "layers", "color": "indigo", "order": 13},
+    "baremetal": {"name": "Bare Metal & IPMI", "icon": "server", "color": "orange", "order": 14},
+    "gpu": {"name": "GPU & NVIDIA", "icon": "cpu", "color": "green", "order": 15},
+    "python": {"name": "Python Development", "icon": "code", "color": "yellow", "order": 16},
+    "html": {"name": "HTML & Web Servers", "icon": "globe", "color": "pink", "order": 17},
+    "shell-script": {"name": "Shell Scripting", "icon": "terminal", "color": "teal", "order": 18},
+    "rhel-linux": {"name": "RHEL Linux", "icon": "hard-drive", "color": "red", "order": 19},
+    "simulation": {"name": "Simulation Labs", "icon": "monitor", "color": "cyan", "order": 20},
+    "linux": {"name": "Linux Administration", "icon": "terminal", "color": "cyan", "order": 5},
+}
+
 
 class Command(BaseCommand):
     help = "Seed the database with scenario definitions from YAML files"
@@ -20,6 +35,36 @@ class Command(BaseCommand):
             default="/scenarios",
             help="Root directory containing scenario YAML files",
         )
+
+    def _load_technology(self, tech_dir: str, tech_path: str) -> Technology:
+        meta_path = os.path.join(tech_path, "technology.yaml")
+        meta = dict(TECH_META.get(tech_dir, {}))
+        if os.path.isfile(meta_path):
+            with open(meta_path) as f:
+                file_meta = yaml.safe_load(f) or {}
+                meta.update(file_meta)
+
+        name = meta.get("name") or tech_dir.replace("-", " ").title()
+        defaults = {
+            "icon": meta.get("icon", "terminal"),
+            "color": meta.get("color", "cyan"),
+            "description": meta.get("description", f"{name} hands-on simulation scenarios"),
+            "price": meta.get("price", 499),
+            "order": meta.get("order", 50),
+            "coming_soon": meta.get("coming_soon", False),
+            "is_active": meta.get("is_active", True),
+        }
+        if meta.get("slug"):
+            technology, _ = Technology.objects.update_or_create(
+                slug=meta["slug"],
+                defaults={**defaults, "name": name},
+            )
+        else:
+            technology, _ = Technology.objects.update_or_create(
+                name=name,
+                defaults=defaults,
+            )
+        return technology
 
     def handle(self, *args, **options):
         scenarios_dir = options["dir"]
@@ -41,10 +86,7 @@ class Command(BaseCommand):
             if not os.path.isdir(tech_path):
                 continue
 
-            technology, _ = Technology.objects.get_or_create(
-                name=tech_dir.replace("-", " ").title(),
-                defaults={"icon": "terminal", "description": f"{tech_dir.title()} troubleshooting scenarios"},
-            )
+            technology = self._load_technology(tech_dir, tech_path)
 
             for scenario_dir in sorted(os.listdir(tech_path)):
                 yaml_path = os.path.join(tech_path, scenario_dir, "scenario.yaml")
@@ -74,6 +116,15 @@ class Command(BaseCommand):
                     with open(service_path) as f:
                         cloud_setup = f.read()
 
+                lab_mode = data.get("lab_mode", "docker")
+                infra = data.get("infrastructure_type", "docker")
+                if lab_mode == "simulation":
+                    infra = "docker"  # valid choice; runtime uses lab_mode
+
+                sim_type = data.get("simulation_type", "none")
+                if sim_type == "generic":
+                    sim_type = "generic"
+
                 scenario, created = Scenario.objects.update_or_create(
                     slug=data.get("slug", scenario_dir),
                     defaults={
@@ -90,15 +141,15 @@ class Command(BaseCommand):
                         "max_score": data.get("max_score", 100),
                         "is_active": True,
                         "is_free": data.get("is_free", False),
-                        "infrastructure_type": data.get("infrastructure_type", "docker"),
+                        "infrastructure_type": infra,
                         "docker_privileged": data.get("docker_privileged", False),
                         "cloud_setup_script": data.get("cloud_setup_script", cloud_setup),
                         "cloud_image": data.get("cloud_image", "ubuntu-22-04-x64"),
                         "jira_priority": data.get("jira_priority", "Medium"),
                         "jira_issue_template": data.get("jira_issue_template", ""),
                         "blocked_commands": data.get("blocked_commands", []),
-                        "lab_mode": data.get("lab_mode", "docker"),
-                        "simulation_type": data.get("simulation_type", "none"),
+                        "lab_mode": lab_mode,
+                        "simulation_type": sim_type,
                         "requires_companion_hosts": data.get("requires_companion_hosts", False),
                         "dual_terminal": data.get("dual_terminal", False),
                     },
@@ -115,8 +166,7 @@ class Command(BaseCommand):
                     )
 
                 action = "Created" if created else "Updated"
-                mode = data.get("lab_mode", "docker")
-                self.stdout.write(f"  {action}: {data['title']} ({mode}/{scenario.infrastructure_type})")
+                self.stdout.write(f"  {action}: {data['title']} [{technology.name}] ({lab_mode}/{sim_type})")
                 count += 1
 
         self.stdout.write(self.style.SUCCESS(f"\nSeeded {count} scenarios successfully."))

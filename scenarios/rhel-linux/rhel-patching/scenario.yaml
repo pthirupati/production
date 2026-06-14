@@ -1,0 +1,26 @@
+category: RHEL Linux
+description: 'Apply security updates with dnf and reboot.
+
+  '
+difficulty: medium
+dual_terminal: false
+hints:
+- content: 'Try: dnf update -y'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. Apply security updates with dnf and reboot.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: dnf update -y'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: patching
+slug: sim-rhel-patching
+time_limit: 900
+title: RHEL System Patching

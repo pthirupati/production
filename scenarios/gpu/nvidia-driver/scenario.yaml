@@ -1,0 +1,27 @@
+category: GPU & NVIDIA
+description: 'Driver not loaded. Install and load nvidia module.
+
+  '
+difficulty: medium
+dual_terminal: false
+hints:
+- content: 'Try: lsmod | grep nvidia'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. Driver not loaded. Install and load nvidia
+  module.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: lsmod | grep nvidia'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: gpu
+slug: sim-nvidia-driver-missing
+time_limit: 900
+title: NVIDIA Driver Missing

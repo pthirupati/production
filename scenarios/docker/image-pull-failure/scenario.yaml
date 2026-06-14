@@ -1,0 +1,27 @@
+category: Docker & Containers
+description: 'Cannot pull image. Fix registry auth or image name.
+
+  '
+difficulty: medium
+dual_terminal: false
+hints:
+- content: 'Try: docker pull nginx:latest'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. Cannot pull image. Fix registry auth or image
+  name.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: docker pull nginx:latest'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: docker
+slug: sim-docker-image-pull
+time_limit: 900
+title: Docker Image Pull Failure

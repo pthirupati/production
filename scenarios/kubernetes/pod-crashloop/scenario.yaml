@@ -1,0 +1,27 @@
+category: Kubernetes
+description: 'nginx pod keeps crashing. Describe pod and fix image.
+
+  '
+difficulty: medium
+dual_terminal: false
+hints:
+- content: 'Try: kubectl get pods'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. nginx pod keeps crashing. Describe pod and
+  fix image.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: kubectl get pods'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: kubernetes
+slug: sim-k8s-crashloop
+time_limit: 900
+title: Pod CrashLoopBackOff

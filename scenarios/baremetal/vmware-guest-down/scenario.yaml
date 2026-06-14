@@ -1,0 +1,27 @@
+category: Bare Metal & IPMI
+description: 'VM guest is shut off. Use virsh to start it.
+
+  '
+difficulty: medium
+dual_terminal: false
+hints:
+- content: 'Try: virsh list --all'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. VM guest is shut off. Use virsh to start
+  it.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: virsh list --all'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: vmware
+slug: sim-vmware-guest-down
+time_limit: 900
+title: VMware Guest Powered Off

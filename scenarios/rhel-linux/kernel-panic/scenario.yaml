@@ -1,0 +1,27 @@
+category: RHEL Linux
+description: 'Kernel panic VFS unable to mount root. Fix fstab/initramfs.
+
+  '
+difficulty: hard
+dual_terminal: false
+hints:
+- content: 'Try: dracut -f'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. Kernel panic VFS unable to mount root. Fix
+  fstab/initramfs.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: dracut -f'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: boot
+slug: sim-rhel-kernel-panic
+time_limit: 900
+title: Kernel Panic on Boot

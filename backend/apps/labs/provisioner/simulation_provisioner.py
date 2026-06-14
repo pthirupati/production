@@ -18,6 +18,12 @@ from .simulation.shell import (
     get_sim_session_by_resource,
     register_sim_session,
 )
+from .simulation.database_sim import DatabaseSimulator
+from .simulation.docker_sim import DockerSimulator
+from .simulation.html_sim import HtmlSimulator
+from .simulation.kubernetes_sim import KubernetesSimulator
+from .simulation.python_sim import PythonSimulator
+from .simulation.shell_script_sim import ShellScriptSimulator
 from .simulation.validation import validate_simulation_state
 
 logger = logging.getLogger(__name__)
@@ -27,6 +33,14 @@ _ENGINE_MAP = {
     "gpu": GPUSimulator,
     "ansible": AnsibleSimulator,
     "baremetal": BaremetalSimulator,
+    "database": DatabaseSimulator,
+    "docker": DockerSimulator,
+    "kubernetes": KubernetesSimulator,
+    "python": PythonSimulator,
+    "html": HtmlSimulator,
+    "shell_script": ShellScriptSimulator,
+    "vmware": BaremetalSimulator,
+    "patching": BootSimulator,
     "none": BaseRHELSimulator,
     "generic": BaseRHELSimulator,
 }

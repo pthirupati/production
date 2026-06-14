@@ -1,0 +1,27 @@
+category: Shell Scripting
+description: 'backup.sh fails due to unset variable. Fix script.
+
+  '
+difficulty: easy
+dual_terminal: false
+hints:
+- content: 'Try: bash /opt/scripts/backup.sh'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. backup.sh fails due to unset variable. Fix
+  script.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: bash /opt/scripts/backup.sh'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: shell_script
+slug: sim-bash-unbound-var
+time_limit: 900
+title: Bash Unbound Variable

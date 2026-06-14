@@ -1,0 +1,26 @@
+category: Ansible Automation
+description: 'Playbook fails on web2. Fix service and re-run.
+
+  '
+difficulty: hard
+dual_terminal: false
+hints:
+- content: 'Try: ansible-playbook site.yml'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. Playbook fails on web2. Fix service and re-run.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: ansible-playbook site.yml'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: ansible
+slug: sim-ansible-playbook-fail
+time_limit: 900
+title: Ansible Playbook Failure

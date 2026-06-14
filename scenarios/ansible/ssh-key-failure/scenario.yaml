@@ -1,0 +1,26 @@
+category: Ansible Automation
+description: 'web2 unreachable via SSH. Fix key distribution.
+
+  '
+difficulty: medium
+dual_terminal: true
+hints:
+- content: 'Try: ansible webservers -m ping'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. web2 unreachable via SSH. Fix key distribution.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: ansible webservers -m ping'
+- Verify validation passes
+requires_companion_hosts: true
+simulation_type: ansible
+slug: sim-ansible-ssh-key
+time_limit: 900
+title: Ansible SSH Key Failure

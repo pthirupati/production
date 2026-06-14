@@ -1,31 +1,27 @@
-title: MySQL Won't Start
-slug: mysql-wont-start
-technology: Database
-category: MySQL
-difficulty: medium
-time_limit: 1200
-max_score: 100
-infrastructure_type: docker
-jira_priority: High
-description: 'MySQL fails to start after a config change. Error logs mention memory
-
-  settings. Fix mysqld.cnf and bring the database online.'
-objectives:
-- Read MySQL error log
-- Affected service behaves normally
-initial_state: 'Ubuntu with MySQL installed; invalid innodb_buffer_pool_size in config.
+category: Database Administration
+description: 'mysqld failed to start. Check logs and fix configuration.
 
   '
+difficulty: easy
+dual_terminal: false
 hints:
-- order: 1
+- content: 'Try: systemctl start mysqld'
   cost: 10
-  content: Check `/var/log/mysql/error.log`
-- order: 2
-  cost: 20
-  content: Set innodb_buffer_pool_size to 128M or remove the bad line.
-- order: 3
-  cost: 15
-  content: Fix invalid configuration in mysqld.cnf
-- order: 4
-  cost: 15
-  content: Start MySQL and verify with mysqladmin ping
+  order: 1
+initial_state: 'Simulated RHEL 9 server. mysqld failed to start. Check logs and fix
+  configuration.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: systemctl start mysqld'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: database
+slug: sim-mysql-wont-start
+time_limit: 900
+title: MySQL Service Won't Start

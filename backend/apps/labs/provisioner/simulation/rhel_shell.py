@@ -123,6 +123,42 @@ class RHELShell:
             "shutdown": self._cmd_shutdown,
             "exit": self._cmd_exit,
             "logout": self._cmd_exit,
+            "dnf": self._cmd_dnf,
+            "yum": self._cmd_dnf,
+            "rpm": self._cmd_rpm,
+            "docker": self._cmd_docker,
+            "kubectl": self._cmd_kubectl,
+            "mysql": self._cmd_mysql,
+            "psql": self._cmd_psql,
+            "python3": self._cmd_python3,
+            "python": self._cmd_python3,
+            "pip3": self._cmd_pip3,
+            "find": self._cmd_find,
+            "awk": self._cmd_awk,
+            "sort": self._cmd_sort,
+            "tar": self._cmd_tar,
+            "ln": self._cmd_ln,
+            "crontab": self._cmd_crontab,
+            "firewall-cmd": self._cmd_firewall,
+            "nmcli": self._cmd_nmcli,
+            "dracut": self._cmd_dracut,
+            "grub2-mkconfig": self._cmd_grub2_mkconfig,
+            "grub2-install": self._cmd_grub2_install,
+            "grub-install": self._cmd_grub2_install,
+            "bash": self._cmd_bash,
+            "sh": self._cmd_bash,
+            "vi": self._cmd_vi,
+            "vim": self._cmd_vi,
+            "nano": self._cmd_vi,
+            "less": self._cmd_cat,
+            "more": self._cmd_cat,
+            "netstat": self._cmd_netstat,
+            "lsof": self._cmd_lsof,
+            "mount": self._cmd_mount,
+            "fdisk": self._cmd_fdisk,
+            "virsh": self._cmd_virsh,
+            "esxcli": self._cmd_esxcli,
+            "vmware-toolbox-cmd": self._cmd_vmware,
         }
 
         fn = dispatch.get(cmd)
@@ -609,9 +645,206 @@ class RHELShell:
 
     def _cmd_help(self, p: list[str]) -> str:
         return (
-            "FixitLab RHEL 9 Simulation — supported: ls, cd, cat, systemctl, useradd, passwd,\n"
-            "ps, grep, journalctl, chmod, chown, nginx -t, ip, curl, and more. Type commands as on a real server."
+            "FixitLab RHEL 9 Simulation — full Linux command set:\n"
+            "  files: ls cd cat cp mv rm mkdir touch sed grep find tar chmod chown\n"
+            "  users: useradd passwd pwck getent su sudo\n"
+            "  services: systemctl service journalctl nginx curl\n"
+            "  packages: dnf yum rpm dracut (patching)\n"
+            "  boot: grub2-mkconfig grub2-install reboot\n"
+            "  docker kubectl mysql psql python3 firewall-cmd nmcli virsh\n"
+            "  Arrow keys, Home/End, and command history supported in terminal."
         )
+
+    def _cmd_dnf(self, p: list[str]) -> str:
+        line = " ".join(p)
+        if any(x in line for x in ("update", "upgrade", "install")):
+            if getattr(self.state, "patching_done", False):
+                return "Nothing to do. Complete!"
+            self.state.patching_done = True
+            from .boot_sequence import PATCHING_OUTPUT
+            return PATCHING_OUTPUT
+        if "repolist" in line:
+            return "repo id                    status\nrhel-9-base                enabled"
+        return "dnf: command completed (simulation)"
+
+    def _cmd_rpm(self, p: list[str]) -> str:
+        if "-qa" in p or "-q" in p:
+            return "kernel-5.14.0-362.el9.x86_64\nglibc-2.34-100.el9.x86_64\nsystemd-252-13.el9.x86_64"
+        return "rpm: OK"
+
+    def _cmd_docker(self, p: list[str]) -> str:
+        if len(p) < 2:
+            return "docker: missing command"
+        sub = p[1]
+        if sub == "ps":
+            return "CONTAINER ID   IMAGE          STATUS         NAMES\nabc123         nginx:latest   Up 2 hours     web"
+        if sub == "images":
+            return "REPOSITORY   TAG       IMAGE ID       CREATED        SIZE\nnginx        latest    abcdef123456   2 weeks ago    142MB"
+        if sub == "run":
+            return "abc123def456789"
+        if sub == "logs":
+            return "2026-06-14T10:00:00 nginx started"
+        if sub == "inspect":
+            return '{"State":{"Status":"running"},"Config":{"Image":"nginx:latest"}}'
+        if sub == "exec":
+            return "OCI runtime exec failed: container not running (simulation — start container first)"
+        return f"docker {sub}: OK (simulation)"
+
+    def _cmd_kubectl(self, p: list[str]) -> str:
+        if len(p) < 2:
+            return "kubectl: missing command"
+        sub = p[1]
+        if sub == "get" and "pods" in p:
+            return "NAME                     READY   STATUS             RESTARTS   AGE\nnginx-7d4b8c9f-xk2m1      0/1     CrashLoopBackOff   5          10m\napi-5f8c7d6b-abc12        1/1     Running            0          1h"
+        if sub == "get" and "nodes" in p:
+            return "NAME       STATUS   ROLES           AGE   VERSION\nmaster-1   Ready    control-plane   30d   v1.28.2\nworker-1   Ready    <none>          30d   v1.28.2"
+        if sub == "describe" and "pod" in p:
+            return "Events:\n  Warning  Failed     kubelet  Error: ImagePullBackOff"
+        if sub == "logs":
+            return "Error from server: container not found (CrashLoopBackOff)"
+        if sub == "apply":
+            return "deployment.apps/api configured"
+        return f"kubectl {' '.join(p[1:])}: OK (simulation)"
+
+    def _cmd_mysql(self, p: list[str]) -> str:
+        if "-e" in p:
+            idx = p.index("-e")
+            query = p[idx + 1] if idx + 1 < len(p) else "SELECT 1"
+            if "ERROR" in query.upper():
+                return "ERROR 2002 (HY000): Can't connect to local MySQL server"
+            return "1\n1"
+        svc = self.state.services.get("mysqld") or self.state.services.get("mysql")
+        if svc and svc.active != "active":
+            return "ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/var/lib/mysql/mysql.sock'"
+        return "Welcome to the MySQL monitor. Type 'help;' for help.\nmysql>"
+
+    def _cmd_psql(self, p: list[str]) -> str:
+        svc = self.state.services.get("postgresql")
+        if svc and svc.active != "active":
+            return "psql: error: connection to server on socket \"/var/run/postgresql/.s.PGSQL.5432\" failed"
+        return "psql (15.3)\nType \"help\" for help.\n\npostgres=#"
+
+    def _cmd_python3(self, p: list[str]) -> str:
+        if "-c" in p:
+            idx = p.index("-c")
+            code = p[idx + 1] if idx + 1 < len(p) else "print(1)"
+            if "SyntaxError" in code or "syntax" in code.lower():
+                return '  File "<string>", line 1\n    print("hello"\n               ^\nSyntaxError: unexpected EOF while parsing'
+            if "print" in code:
+                m = re.search(r"print\(['\"](.+?)['\"]\)", code)
+                return m.group(1) if m else "None"
+            return ""
+        if len(p) > 1 and not p[1].startswith("-"):
+            content = self.state.read_file(p[1])
+            if content and "SyntaxError" in content:
+                return content
+            return f"python3: running {p[1]} (simulation OK)"
+        return "Python 3.11.6 (main, Oct 2023) [GCC 11.4.1] on linux"
+
+    def _cmd_pip3(self, p: list[str]) -> str:
+        if "install" in p:
+            return "Successfully installed package (simulation)"
+        return "pip 23.2.1 from /usr/lib/python3.11/site-packages/pip"
+
+    def _cmd_find(self, p: list[str]) -> str:
+        path = p[-1] if len(p) > 1 else "."
+        ap = self.state.resolve_path(path)
+        results = []
+        for fp in sorted(self.state.vfs):
+            if fp.startswith(ap.rstrip("/")) or ap == "/":
+                results.append(fp)
+        return "\n".join(results[:50])
+
+    def _cmd_awk(self, p: list[str]) -> str:
+        return "awk: processed (simulation)"
+
+    def _cmd_sort(self, p: list[str]) -> str:
+        f = p[-1] if len(p) > 1 and not p[-1].startswith("-") else None
+        if f:
+            content = self.state.read_file(f) or ""
+            return "\n".join(sorted(content.splitlines()))
+        return ""
+
+    def _cmd_tar(self, p: list[str]) -> str:
+        return "tar: archive operation complete (simulation)"
+
+    def _cmd_ln(self, p: list[str]) -> str:
+        if len(p) >= 3:
+            self.state.write_file(p[-1], self.state.read_file(p[-2]) or "")
+        return ""
+
+    def _cmd_crontab(self, p: list[str]) -> str:
+        if "-l" in p:
+            return self.state.read_file(f"/var/spool/cron/{self.state.current_user}") or "no crontab for user"
+        return "crontab: installing new crontab"
+
+    def _cmd_firewall(self, p: list[str]) -> str:
+        if "--list-all" in p:
+            return "public (active)\n  services: ssh dhcpv6-client\n  ports: 80/tcp 443/tcp"
+        if "--add-port" in p or "--add-service" in p:
+            return "success"
+        return "firewall-cmd: OK"
+
+    def _cmd_nmcli(self, p: list[str]) -> str:
+        if "connection" in p and "show" in p:
+            return "NAME    UUID                                  TYPE      DEVICE\neth0    abc-123                               ethernet  eth0"
+        return "nmcli: OK"
+
+    def _cmd_dracut(self, p: list[str]) -> str:
+        self.state.initramfs_fixed = True
+        return "dracut: Generating initramfs for kernel 5.14.0-362.el9.x86_64...\ndracut: initramfs generation complete"
+
+    def _cmd_grub2_mkconfig(self, p: list[str]) -> str:
+        self.state.grub_fixed = True
+        return "Generating grub configuration file ... done"
+
+    def _cmd_grub2_install(self, p: list[str]) -> str:
+        self.state.mbr_fixed = True
+        self.state.grub_fixed = True
+        return "Installation finished. No error reported."
+
+    def _cmd_bash(self, p: list[str]) -> str:
+        if len(p) > 1 and not p[1].startswith("-"):
+            script = self.state.read_file(p[1])
+            if script:
+                for line in script.splitlines():
+                    if line.strip() and not line.strip().startswith("#"):
+                        out = self.run(line.strip())
+                        if out:
+                            return out
+                return ""
+            return f"bash: {p[1]}: No such file or directory"
+        return ""
+
+    def _cmd_vi(self, p: list[str]) -> str:
+        if len(p) > 1:
+            return f"(Use sed/echo to edit files in simulation — vi {p[1]} opened read-only view)\n" + (self.state.read_file(p[1]) or "")
+        return "vi: missing filename"
+
+    def _cmd_netstat(self, p: list[str]) -> str:
+        return "Active Internet connections\nProto Recv-Q Send-Q Local Address           Foreign Address         State\ntcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN\ntcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN"
+
+    def _cmd_lsof(self, p: list[str]) -> str:
+        return "COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME\nsshd      412 root    3u  IPv4  12345      0t0  TCP *:22 (LISTEN)"
+
+    def _cmd_mount(self, p: list[str]) -> str:
+        return "/dev/sda1 on / type xfs (rw,relatime)\n/dev/sda2 on /boot type xfs (rw,relatime)"
+
+    def _cmd_fdisk(self, p: list[str]) -> str:
+        return "Disk /dev/sda: 50 GiB\nDevice     Boot   Start      End  Sectors  Size Id Type\n/dev/sda1  *       2048 104857566 104855519   50G 83 Linux"
+
+    def _cmd_virsh(self, p: list[str]) -> str:
+        if len(p) > 1 and p[1] == "list":
+            return " Id   Name       State\n-------------------------\n 1    rhel-guest running\n 2    win-guest  shut off"
+        if "console" in p:
+            return "Connected to domain rhel-guest\nEscape character is ^]\nrhel-guest login:"
+        return "virsh: OK (simulation)"
+
+    def _cmd_esxcli(self, p: list[str]) -> str:
+        return "Host CPU: Intel Xeon Gold 6248R\n  32 logical CPUs\nMemory: 256 GB"
+
+    def _cmd_vmware(self, p: list[str]) -> str:
+        return "VMware Tools version: 12.3.5"
 
     def _cmd_reboot(self, p: list[str]) -> str:
         return "__REBOOT__"

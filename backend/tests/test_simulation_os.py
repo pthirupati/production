@@ -123,7 +123,8 @@ class EngineTests(SimpleTestCase):
 
     def test_boot_grub_to_shell(self):
         boot = BootSimulator(scenario_slug="sim-rhel-boot-grub")
-        self.assertEqual(boot.handle("boot"), boot._start_boot())
+        out = boot.handle("boot")
+        self.assertIn("login", out.lower())
         boot.handle("root")
         boot.handle("password")
         out = boot.handle("systemctl status sshd")

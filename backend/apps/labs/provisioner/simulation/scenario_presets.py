@@ -86,6 +86,32 @@ def _preset_dual_host_db(state: RHELOSState) -> None:
     state._write_file("/etc/my.cnf", "[mysqld]\nbind-address=127.0.0.1\n")
 
 
+def _preset_initramfs(state: RHELOSState) -> None:
+    state.initramfs_fixed = False
+    state._write_file("/etc/fstab", "UUID=bad-uuid / xfs defaults 0 0\n")
+
+
+def _preset_mbr(state: RHELOSState) -> None:
+    state.mbr_fixed = False
+    state.grub_fixed = False
+
+
+def _preset_kernel_panic(state: RHELOSState) -> None:
+    state.kernel_fixed = False
+    state._write_file("/etc/fstab", "UUID=missing / xfs defaults 0 0\n")
+
+
+def _preset_mysql_down(state: RHELOSState) -> None:
+    from .rhel_os import SimService
+    state.services["mysqld"] = SimService("mysqld", active="failed", enabled="enabled", description="MySQL")
+    state._write_file("/etc/my.cnf", "[mysqld]\nsocket=/var/lib/mysql/mysql.sock\n")
+
+
+def _preset_postgres_down(state: RHELOSState) -> None:
+    from .rhel_os import SimService
+    state.services["postgresql"] = SimService("postgresql", active="failed", enabled="enabled", description="PostgreSQL")
+
+
 _PRESETS: dict[str, callable] = {
     "broken-nginx": _preset_broken_nginx,
     "sim-broken-nginx": _preset_broken_nginx,
@@ -99,4 +125,11 @@ _PRESETS: dict[str, callable] = {
     "ansible-ssh-key-failure": _preset_ansible_control,
     "sim-rhel-ansible-ssh": _preset_ansible_control,
     "sim-rhel-dual-host-mysql": _preset_dual_host_db,
+    "sim-rhel-grub-rescue": _preset_boot_issue,
+    "sim-rhel-initramfs-dracut": _preset_initramfs,
+    "sim-rhel-mbr-corrupt": _preset_mbr,
+    "sim-rhel-kernel-panic": _preset_kernel_panic,
+    "sim-mysql-wont-start": _preset_mysql_down,
+    "sim-postgres-refused": _preset_postgres_down,
+    "sim-html-nginx-root": _preset_broken_nginx,
 }

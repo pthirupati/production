@@ -16,11 +16,20 @@ const INFRA_TYPES = [
 ]
 
 const SIMULATION_TYPES = [
-  { value: 'none', label: 'None' },
-  { value: 'boot', label: 'Boot / IPMI / GRUB' },
+  { value: 'none', label: 'Generic RHEL' },
+  { value: 'generic', label: 'Generic RHEL OS' },
+  { value: 'boot', label: 'Boot / GRUB / Initramfs' },
+  { value: 'patching', label: 'OS Patching (dnf/yum)' },
   { value: 'gpu', label: 'GPU (NVIDIA/AMD)' },
   { value: 'ansible', label: 'Ansible multi-host' },
-  { value: 'baremetal', label: 'Bare metal' },
+  { value: 'baremetal', label: 'Bare metal / IPMI' },
+  { value: 'vmware', label: 'VMware / Virtualization' },
+  { value: 'database', label: 'Database (MySQL/PostgreSQL)' },
+  { value: 'docker', label: 'Docker containers' },
+  { value: 'kubernetes', label: 'Kubernetes' },
+  { value: 'python', label: 'Python development' },
+  { value: 'html', label: 'HTML / Web servers' },
+  { value: 'shell_script', label: 'Shell scripting' },
 ]
 
 const LAB_MODES = [
@@ -90,38 +99,44 @@ export default function AdminScenarios() {
     }
   }
 
-  const handleEdit = (scenario) => {
-    setForm({
-      title: scenario.title,
-      slug: scenario.slug,
-      subtitle: scenario.subtitle || '',
-      description: scenario.description,
-      objectives: Array.isArray(scenario.objectives) ? scenario.objectives.join('\n') : (scenario.objectives || ''),
-      initial_state: scenario.initial_state || '',
-      validation_script: scenario.validation_script || '',
-      category: scenario.category,
-      difficulty: scenario.difficulty,
-      technology_id: scenario.technology?.id || '',
-      scenario_type: scenario.scenario_type || 'fix',
-      infrastructure_type: scenario.infrastructure_type || 'docker',
-      cloud_setup_script: scenario.cloud_setup_script || '',
-      blocked_commands: Array.isArray(scenario.blocked_commands) ? scenario.blocked_commands : [],
-      tag_ids: scenario.tags?.map(t => t.id) || [],
-      time_limit: scenario.time_limit || 900,
-      max_score: scenario.max_score || 100,
-      is_active: scenario.is_active,
-      is_free: scenario.is_free ?? true,
-      solution_explanation: scenario.solution_explanation || '',
-      jira_priority: scenario.jira_priority || 'Medium',
-      jira_issue_template: scenario.jira_issue_template || '',
-      requires_companion_hosts: scenario.requires_companion_hosts || false,
-      dual_terminal: scenario.dual_terminal || false,
-      lab_mode: scenario.lab_mode || 'docker',
-      simulation_type: scenario.simulation_type || 'none',
-      docker_privileged: scenario.docker_privileged || false,
-    })
-    setEditingId(scenario.id)
-    setShowForm(true)
+  const handleEdit = async (scenario) => {
+    try {
+      const detail = await adminApi.getScenarioDetail(scenario.id)
+      const s = detail
+      setForm({
+        title: s.title,
+        slug: s.slug,
+        subtitle: s.subtitle || '',
+        description: s.description,
+        objectives: Array.isArray(s.objectives) ? s.objectives.join('\n') : (s.objectives || ''),
+        initial_state: s.initial_state || '',
+        validation_script: s.validation_script || '',
+        category: s.category,
+        difficulty: s.difficulty,
+        technology_id: s.technology?.id || '',
+        scenario_type: s.scenario_type || 'fix',
+        infrastructure_type: s.infrastructure_type || 'docker',
+        cloud_setup_script: s.cloud_setup_script || '',
+        blocked_commands: Array.isArray(s.blocked_commands) ? s.blocked_commands : [],
+        tag_ids: s.tags?.map(t => t.id) || [],
+        time_limit: s.time_limit || 900,
+        max_score: s.max_score || 100,
+        is_active: s.is_active,
+        is_free: s.is_free ?? false,
+        solution_explanation: s.solution_explanation || '',
+        jira_priority: s.jira_priority || 'Medium',
+        jira_issue_template: s.jira_issue_template || '',
+        requires_companion_hosts: s.requires_companion_hosts || false,
+        dual_terminal: s.dual_terminal || false,
+        lab_mode: s.lab_mode || 'docker',
+        simulation_type: s.simulation_type || 'none',
+        docker_privileged: s.docker_privileged || false,
+      })
+      setEditingId(scenario.id)
+      setShowForm(true)
+    } catch {
+      toast.error('Failed to load scenario details')
+    }
   }
 
   const handleDelete = async (id) => {
@@ -217,9 +232,13 @@ export default function AdminScenarios() {
               </div>
               <div>
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Infrastructure</label>
-                <select value={form.infrastructure_type} onChange={(e) => setForm(f => ({ ...f, infrastructure_type: e.target.value }))} className="input-field">
+                <select value={form.infrastructure_type} disabled={form.lab_mode === 'simulation'}
+                  onChange={(e) => setForm(f => ({ ...f, infrastructure_type: e.target.value }))} className="input-field disabled:opacity-50">
                   {INFRA_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
+                {form.lab_mode === 'simulation' && (
+                  <p className="text-xs text-accent-cyan mt-1">Simulation mode — no Docker/AWS/DO required</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Lab mode</label>
@@ -445,10 +464,12 @@ export default function AdminScenarios() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      s.lab_mode === 'simulation' ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' :
                       s.infrastructure_type === 'aws_ec2' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
                       s.infrastructure_type === 'digitalocean' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
                       'bg-surface-700 text-surface-400'
                     }`}>{
+                      s.lab_mode === 'simulation' ? `Sim/${s.simulation_type || 'generic'}` :
                       s.infrastructure_type === 'aws_ec2' ? 'EC2' :
                       s.infrastructure_type === 'digitalocean' ? 'DO' : 'Docker'
                     }</span>

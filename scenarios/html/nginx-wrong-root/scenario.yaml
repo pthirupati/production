@@ -1,0 +1,27 @@
+category: HTML & Web Servers
+description: 'Site shows wrong content. Fix nginx root path.
+
+  '
+difficulty: easy
+dual_terminal: false
+hints:
+- content: 'Try: nginx -t'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. Site shows wrong content. Fix nginx root
+  path.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: nginx -t'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: html
+slug: sim-html-nginx-root
+time_limit: 900
+title: Nginx Wrong Document Root

@@ -1,0 +1,26 @@
+category: Python Development
+description: 'ImportError for requests. Install with pip.
+
+  '
+difficulty: easy
+dual_terminal: false
+hints:
+- content: 'Try: pip3 install requests'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. ImportError for requests. Install with pip.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: pip3 install requests'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: python
+slug: sim-python-pip-missing
+time_limit: 900
+title: Missing Python Package

@@ -1,0 +1,26 @@
+category: Python Development
+description: 'app.py has a syntax error. Fix and run.
+
+  '
+difficulty: easy
+dual_terminal: false
+hints:
+- content: 'Try: python3 app.py'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. app.py has a syntax error. Fix and run.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: python3 app.py'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: python
+slug: sim-python-syntax-error
+time_limit: 900
+title: Fix Python Syntax Error
