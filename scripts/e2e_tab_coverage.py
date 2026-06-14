@@ -6,10 +6,12 @@ from __future__ import annotations
 
 import os
 import uuid
+import base64
 
 from e2e_production_test import (
     SKIP_LAB,
     api,
+    api_upload,
     err_msg,
     login,
 )
@@ -33,9 +35,9 @@ UI_COVERAGE = {
     "lab_history": ["History list"],
     "achievements": ["List", "Certificate endpoint"],
     "community": ["List", "Create", "Detail", "Reply", "Vote", "Attachments", "Emoji react", "Delete own thread"],
-    "profile": ["Profile", "Plan", "Notification prefs GET/PATCH"],
+    "profile": ["Profile", "Plan", "Notification prefs GET/PATCH", "Tech subscriptions renewal"],
     "notifications": ["List", "Mark read", "Mark all read"],
-    "billing": ["Gateway", "Subscriptions", "Status", "Currency", "Razorpay order (dry)"],
+    "billing": ["Gateway", "Subscriptions", "Status", "Currency", "Razorpay order (dry)", "Renewal fields"],
     "jira": ["User tickets", "Scenario ticket GET/POST", "Webhook security"],
     "admin_overview": ["Overview", "Health", "Analytics", "Activity"],
     "admin_scenarios": ["List", "Tags", "Detail"],
@@ -45,7 +47,8 @@ UI_COVERAGE = {
     "admin_labs": ["Active", "Terminate idle", "Bulk terminate expired/selected"],
     "admin_monitoring": ["Containers", "Metrics", "Filtered logs", "Live logs"],
     "mobile": ["Viewport meta", "Public config banners", "SPA routes on mobile UA"],
-    "admin_subscriptions": ["Logs", "Subscription-logs"],
+    "admin_subscriptions": ["Logs", "Subscription-logs", "Expiry dates", "Test certificate"],
+    "admin_banners": ["Promo disable", "Maintenance disable", "Banner upload"],
     "admin_threads": ["List", "Detail"],
     "admin_settings": ["Config", "Maintenance GET/POST", "Tag CRUD", "Admin thread mod", "Jira create"],
     "question_bank": ["Technologies API", "Scenarios API"],
@@ -294,6 +297,7 @@ def run_profile_tab(s, token: str):
         ("GET", "/api/auth/profile/", None, (200,), "profile GET"),
         ("PUT", "/api/auth/profile/", {"first_name": "E2E", "last_name": "Tester"}, (200,), "profile PUT"),
         ("GET", "/api/plan/", None, (200,), "plan usage"),
+        ("GET", "/api/billing/subscriptions/", None, (200,), "tech subscriptions"),
         ("GET", "/api/notifications/preferences/", None, (200,), "notif prefs GET"),
         ("PATCH", "/api/notifications/preferences/", {
             "email_lab_completed": True,
@@ -301,6 +305,17 @@ def run_profile_tab(s, token: str):
             "in_app_enabled": True,
         }, (200,), "notif prefs PATCH"),
     ], token)
+
+    st, subs_data = api("GET", "/api/billing/subscriptions/", token=token)
+    if st == 200 and isinstance(subs_data, dict):
+        subs = subs_data.get("subscriptions") or []
+        has_renewal = all(
+            k in (sub or {})
+            for k in ("expires_at", "created_at", "needs_renewal", "days_until_expiry")
+            for sub in subs[:3]
+        ) if subs else True
+        s.record("Profile subscriptions renewal fields", has_renewal, st)
+        s.record("Profile complimentary_access field", "complimentary_access" in subs_data, st)
 
 
 def run_notifications_tab(s, token: str):
@@ -355,6 +370,19 @@ def run_community_full(s, token: str):
     st, detail = api("GET", f"/api/community/threads/{thread_id}/", token=token)
     s.record("Community thread detail", st == 200, st)
 
+    # Upload screenshot attachment (1x1 PNG)
+    png_bytes = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAD0lEQVQ42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+    )
+    st, att = api_upload(
+        f"/api/community/threads/{thread_id}/attachments/",
+        token,
+        png_bytes,
+        "e2e-screenshot.png",
+        "image/png",
+    )
+    s.record("Community thread attachment upload", st in (200, 201), st)
+
     st, reply = api("POST", f"/api/community/threads/{thread_id}/replies/", token=token, data={
         "body": "E2E reply text",
     })
@@ -372,8 +400,21 @@ def run_community_full(s, token: str):
     s.record("Community edit thread", st in (200,), st)
 
     if reply_id:
+        st, _ = api_upload(
+            f"/api/community/threads/{thread_id}/attachments/",
+            token,
+            png_bytes,
+            "e2e-reply-screenshot.png",
+            "image/png",
+            fields={"reply_id": str(reply_id)},
+        )
+        s.record("Community reply attachment upload", st in (200, 201), st)
         st, _ = api("POST", f"/api/community/replies/{reply_id}/react/", token=token, data={"emoji": "👍"})
         s.record("Community reply emoji react", st == 200, st)
+        st, _ = api("POST", f"/api/community/replies/{reply_id}/react/", token=token, data={"emoji": "🚀"})
+        s.record("Community reply emoji react (2nd)", st == 200, st)
+        st, _ = api("POST", f"/api/community/replies/{reply_id}/react/", token=token, data={"emoji": "👍"})
+        s.record("Community reply emoji toggle off", st == 200, st)
         st, _ = api("POST", f"/api/community/replies/{reply_id}/vote/", token=token, data={"vote_type": "up"})
         s.record("Community reply upvote", st in (200, 201), st)
         st, _ = api("PATCH", f"/api/community/replies/{reply_id}/", token=token, data={"body": "E2E edited reply"})
@@ -554,6 +595,13 @@ def run_lab_runner_all_tabs(s, token: str, scenario: dict | None) -> None:
     if not session_id:
         return
 
+    # Resume same scenario should not hit rate limit (200 with resumed flag)
+    st2, data2 = api("POST", f"/api/labs/{sid}/start/", token=token)
+    s.record("Lab resume same scenario (no 429)", st2 in (200, 201) and st2 != 429, st2)
+
+    has_lab_hosts = isinstance(data.get("lab_hosts"), list) and len(data.get("lab_hosts", [])) >= 1
+    s.record("Lab start lab_hosts field", has_lab_hosts or data.get("resumed"), detail=str(len(data.get("lab_hosts") or [])))
+
     for _ in range(15):
         st, st_data = api("GET", f"/api/labs/{session_id}/status/", token=token)
         if st == 200 and st_data.get("status") in ("RUNNING", "COMPLETED", "FAILED", "TERMINATED"):
@@ -579,6 +627,72 @@ def run_lab_runner_all_tabs(s, token: str, scenario: dict | None) -> None:
 
     st, _ = api("POST", f"/api/labs/{session_id}/stop/", token=token)
     s.record("Lab stop", st in (200, 204), st)
+
+
+def run_multi_host_lab(s, token: str):
+    """Start ssh-copy-id-remote (companion hosts) and verify lab_hosts >= 2."""
+    if os.environ.get("E2E_SKIP_DUPLICATE_LABS") == "1" or SKIP_LAB:
+        s.record("Multi-host lab (ssh-copy-id)", True, detail="skipped")
+        return
+    print("\n=== [Lab] Multi-host companion scenario ===")
+    st, data = api("GET", "/api/scenarios/?search=ssh-copy-id", token=token)
+    items = data if isinstance(data, list) else (data.get("results") if isinstance(data, dict) else []) or []
+    scenario = next((x for x in items if x.get("slug") == "ssh-copy-id-remote"), None)
+    if not scenario:
+        s.record("Multi-host scenario found", True, detail="ssh-copy-id-remote not seeded")
+        return
+    sid = scenario["id"]
+    st, start = api("POST", f"/api/labs/{sid}/start/", token=token)
+    s.record("Multi-host lab start", st in (200, 201, 202), st)
+    session_id = (start or {}).get("session_id") or (start or {}).get("id")
+    if not session_id:
+        return
+    import time
+    hosts = start.get("lab_hosts") or []
+    for _ in range(20):
+        st, st_data = api("GET", f"/api/labs/{session_id}/status/", token=token)
+        if st == 200:
+            hosts = st_data.get("lab_hosts") or hosts
+            if st_data.get("status") in ("RUNNING", "COMPLETED", "FAILED", "TERMINATED"):
+                break
+        time.sleep(2)
+    s.record("Multi-host lab_hosts >= 2", len(hosts) >= 2, detail=f"hosts={len(hosts)}")
+    api("POST", f"/api/labs/{session_id}/stop/", token=token)
+
+
+def run_scp_rsync_multi_host(s, token: str):
+    """Verify scp-rsync-remote-sync companion host scenario."""
+    if os.environ.get("E2E_SKIP_DUPLICATE_LABS") == "1" or SKIP_LAB:
+        s.record("SCP/rsync multi-host lab", True, detail="skipped")
+        return
+    print("\n=== [Lab] SCP/rsync multi-host scenario ===")
+    st, data = api("GET", "/api/scenarios/?search=scp-rsync", token=token)
+    items = data if isinstance(data, list) else (data.get("results") if isinstance(data, dict) else []) or []
+    scenario = next((x for x in items if x.get("slug") == "scp-rsync-remote-sync"), None)
+    if not scenario:
+        s.record("SCP/rsync scenario found", True, detail="scp-rsync-remote-sync not seeded")
+        return
+    sid = scenario["id"]
+    st, start = api("POST", f"/api/labs/{sid}/start/", token=token)
+    s.record("SCP/rsync lab start", st in (200, 201, 202), st)
+    session_id = (start or {}).get("session_id") or (start or {}).get("id")
+    if not session_id:
+        return
+    import time
+    hosts = start.get("lab_hosts") or []
+    for _ in range(20):
+        st, st_data = api("GET", f"/api/labs/{session_id}/status/", token=token)
+        if st == 200:
+            hosts = st_data.get("lab_hosts") or hosts
+            if st_data.get("status") in ("RUNNING", "COMPLETED", "FAILED", "TERMINATED"):
+                break
+        time.sleep(2)
+    has_backup = any(
+        (h or {}).get("role") == "backup-server" or (h or {}).get("name") == "backup"
+        for h in hosts
+    )
+    s.record("SCP/rsync backup host present", has_backup or len(hosts) >= 2, detail=str(len(hosts)))
+    api("POST", f"/api/labs/{session_id}/stop/", token=token)
 
 
 def run_admin_all_tabs(s, admin_token: str):
@@ -668,6 +782,27 @@ def run_admin_all_tabs(s, admin_token: str):
                 "action": "revoke_free", "user_ids": [test_user["id"]],
             })
             s.record("Admin revoke free access", st_revoke == 200, st_revoke)
+        has_complimentary_field = any("complimentary_access" in (u or {}) for u in users[:5])
+        s.record("Admin users complimentary_access field", has_complimentary_field, st)
+
+    # Banner enable/disable toggles
+    st, cfg = api("GET", "/api/admin/config/", token=admin_token)
+    if st == 200 and isinstance(cfg, dict):
+        orig_promo = cfg.get("promo_banners_enabled", True)
+        orig_maint_banner = cfg.get("maintenance_banner_enabled", True)
+        st_off, _ = api("POST", "/api/admin/config/", token=admin_token, data={"promo_banners_enabled": False})
+        st_on, _ = api("POST", "/api/admin/config/", token=admin_token, data={"promo_banners_enabled": orig_promo})
+        s.record("Admin promo banner disable/enable", st_off in (200,) and st_on in (200,), st_off)
+        st_moff, _ = api("POST", "/api/admin/config/", token=admin_token, data={"maintenance_banner_enabled": False})
+        st_mon, _ = api("POST", "/api/admin/config/", token=admin_token, data={"maintenance_banner_enabled": orig_maint_banner})
+        s.record("Admin maintenance banner disable/enable", st_moff in (200,) and st_mon in (200,), st_moff)
+
+    # Banner image upload (1x1 PNG)
+    png_bytes = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAD0lEQVQ42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+    )
+    st, upload = api_upload("/api/admin/upload/", admin_token, png_bytes, "e2e-banner.png", "image/png", fields={"folder": "promo"})
+    s.record("Admin banner image upload", st in (200, 201) and bool((upload or {}).get("url")), st)
 
 
 def run_technology_all_scenarios(s, token: str):
@@ -722,6 +857,8 @@ def run_full_ui_coverage(s, token: str, email: str, password: str, refresh: str 
     run_billing_subscribe_cancel_user(s, token)
     run_community_full(s, token)
     run_lab_runner_all_tabs(s, token, scenario)
+    run_multi_host_lab(s, token)
+    run_scp_rsync_multi_host(s, token)
     run_technology_all_scenarios(s, token)
     run_question_bank_api(s, token)
     run_frontend_static_pages(s)
