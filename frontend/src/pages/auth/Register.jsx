@@ -188,11 +188,27 @@ export default function Register() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [emailExists, setEmailExists] = useState(false)
   const [resendTimer, setResendTimer] = useState(0)
   const [otpExpiryTimer, setOtpExpiryTimer] = useState(0)
   const navigate = useNavigate()
 
+  const OTP_EXPIRY_SECONDS = 120
+
   const passwordsMatch = confirm.length > 0 && password === confirm
+
+  const syncExpiryFromResponse = (res) => {
+    if (res?.expires_in_seconds) {
+      setOtpExpiryTimer(res.expires_in_seconds)
+    } else if (res?.expires_at) {
+      const remaining = Math.max(0, Math.floor((new Date(res.expires_at) - Date.now()) / 1000))
+      setOtpExpiryTimer(remaining)
+    } else {
+      setOtpExpiryTimer(OTP_EXPIRY_SECONDS)
+    }
+  }
+
+  const otpExpired = otpExpiryTimer <= 0 && step === 'otp'
 
   // Resend countdown timer
   useEffect(() => {
@@ -202,7 +218,7 @@ export default function Register() {
     }
   }, [resendTimer])
 
-  // OTP expiry countdown (10 minutes)
+  // OTP expiry countdown (2 minutes)
   useEffect(() => {
     if (otpExpiryTimer > 0) {
       const t = setTimeout(() => setOtpExpiryTimer(otpExpiryTimer - 1), 1000)
@@ -216,6 +232,7 @@ export default function Register() {
   const handleSendOTP = async (e) => {
     e?.preventDefault()
     setError('')
+    setEmailExists(false)
     if (!email.trim()) { setError('Email is required'); return }
     setLoading(true)
     try {
@@ -223,17 +240,26 @@ export default function Register() {
       setSessionToken(res.session_token)
       setStep('otp')
       setResendTimer(60)
-      setOtpExpiryTimer(600) // 10 minutes
+      syncExpiryFromResponse(res)
       toast.success('Verification code sent!')
     } catch (err) {
-      const msg = err.response?.data?.error || 'Failed to send verification code'
-      setError(msg)
+      const data = err.response?.data
+      if (data?.error_code === 'email_exists') {
+        setEmailExists(true)
+        setError('')
+      } else {
+        setError(data?.error || 'Failed to send verification code')
+      }
     } finally { setLoading(false) }
   }
 
   const handleVerifyOTP = async (e) => {
     e?.preventDefault()
     setError('')
+    if (otpExpiryTimer <= 0) {
+      setError('OTP expired. Please request a new verification code.')
+      return
+    }
     if (otpCode.length !== 6) { setError('Please enter the 6-digit code'); return }
     setLoading(true)
     try {
@@ -241,8 +267,12 @@ export default function Register() {
       setStep('details')
       toast.success('Email verified!')
     } catch (err) {
-      const msg = err.response?.data?.error || 'Invalid verification code'
+      const data = err.response?.data
+      const msg = data?.error || 'Invalid verification code. Please check the OTP and try again.'
       setError(msg)
+      if (data?.error_code === 'otp_expired') {
+        setOtpExpiryTimer(0)
+      }
     } finally { setLoading(false) }
   }
 
@@ -254,7 +284,7 @@ export default function Register() {
       const res = await authApi.sendOTP(email.trim())
       setSessionToken(res.session_token)
       setResendTimer(60)
-      setOtpExpiryTimer(600) // 10 minutes fresh
+      syncExpiryFromResponse(res)
       toast.success('New code sent!')
     } catch (err) {
       const msg = err.response?.data?.error || 'Failed to resend code'
@@ -365,6 +395,16 @@ export default function Register() {
             </div>
           )}
 
+          {emailExists && step === 'email' && (
+            <div className="bg-accent-amber/10 border border-accent-amber/20 text-accent-amber text-sm p-4 rounded-lg mb-6 space-y-3 animate-slide-up">
+              <p>This email is already registered. Please sign in or reset your password.</p>
+              <div className="flex flex-wrap gap-3">
+                <Link to="/login" className="btn-primary text-sm py-2 px-4">Sign in</Link>
+                <Link to="/forgot-password" className="btn-secondary text-sm py-2 px-4">Forgot password</Link>
+              </div>
+            </div>
+          )}
+
           {/* Step 1: Email */}
           {step === 'email' && (
             <form onSubmit={handleSendOTP} className="space-y-5">
@@ -372,10 +412,10 @@ export default function Register() {
                 <label className="block text-sm font-medium text-surface-300 mb-1.5">Email Address</label>
                 <div className="relative">
                   <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500" />
-                  <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError('') }}
+                  <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); setEmailExists(false) }}
                     className="input-field pl-10" placeholder="you@example.com" required autoComplete="email" autoFocus />
                 </div>
-                <p className="text-xs text-surface-500 mt-2">We'll send a 6-digit verification code to this email.</p>
+                <p className="text-xs text-surface-500 mt-2">We'll send a 6-digit code valid for 2 minutes.</p>
               </div>
               <button type="submit" disabled={loading}
                 className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -400,11 +440,13 @@ export default function Register() {
                 </p>
                 <p className="text-sm font-semibold text-white mt-1">{email}</p>
                 {otpExpiryTimer > 0 ? (
-                  <p className={`text-xs mt-2 ${otpExpiryTimer <= 60 ? 'text-accent-amber' : 'text-surface-500'}`}>
+                  <p className={`text-xs mt-2 font-medium ${otpExpiryTimer <= 30 ? 'text-accent-amber' : 'text-surface-400'}`}>
                     Code expires in {otpExpiryMinutes}:{otpExpirySeconds.toString().padStart(2, '0')}
                   </p>
                 ) : (
-                  <p className="text-xs mt-2 text-accent-red">Code expired. Please request a new one.</p>
+                  <p className="text-sm mt-3 font-semibold text-accent-red">
+                    OTP expired — regenerate if needed
+                  </p>
                 )}
               </div>
 

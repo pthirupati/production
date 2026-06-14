@@ -54,6 +54,7 @@ const AdminSecurity = lazy(() => import('../pages/admin/AdminSecurity'))
 const AdminAuditLogs = lazy(() => import('../pages/admin/AdminAuditLogs'))
 const AdminInvoices = lazy(() => import('../pages/admin/AdminInvoices'))
 const AdminMonitoring = lazy(() => import('../pages/admin/AdminMonitoring'))
+const AdminSettings = lazy(() => import('../pages/admin/AdminSettings'))
 
 function PageLoader() {
   return (

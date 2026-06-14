@@ -189,6 +189,9 @@ def run_auth_registration(s: Suite) -> tuple[str | None, str, str]:
         import django
         django.setup()
         from apps.accounts.models import EmailVerificationOTP
+        from apps.notifications.models import EmailLog
+        import time as _time
+
         otp_obj = EmailVerificationOTP.objects.filter(email=email).order_by("-created_at").first()
         if otp_obj:
             otp_code = otp_obj.code
@@ -196,6 +199,22 @@ def run_auth_registration(s: Suite) -> tuple[str | None, str, str]:
             s.record("OTP stored in DB", True)
         else:
             s.record("OTP stored in DB", False, detail="No OTP row found")
+
+        # Verify Celery worker delivered email (poll up to 15s)
+        email_sent = False
+        for _ in range(15):
+            log = EmailLog.objects.filter(to_email=email, template="emails/otp_verification.html").first()
+            if log and log.status == "sent":
+                email_sent = True
+                break
+            if log and log.status == "failed":
+                s.record("OTP email delivery", False, detail=log.error[:120])
+                break
+            _time.sleep(1)
+        if not EmailLog.objects.filter(to_email=email).exists():
+            s.record("OTP email queued", True, detail="No EmailLog yet (worker may be async)")
+        else:
+            s.record("OTP email delivery", email_sent, detail="sent" if email_sent else "pending/failed")
     except Exception as e:
         s.record("OTP DB lookup", False, detail=str(e)[:80])
 

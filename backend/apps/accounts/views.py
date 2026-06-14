@@ -50,10 +50,46 @@ class SendOTPView(APIView):
 
         # Check if email already registered
         if User.objects.filter(email=email).exists():
-            return Response({"error": "Email already registered."}, status=400)
+            return Response(
+                {
+                    "error": (
+                        "This email is already registered. "
+                        "Please sign in or use forgot password to recover your account."
+                    ),
+                    "error_code": "email_exists",
+                },
+                status=400,
+            )
 
+        from apps.notifications.gmail_api import is_gmail_api_configured
+        from django.conf import settings as django_settings
+
+        email_configured = (
+            is_gmail_api_configured()
+            or getattr(django_settings, "SENDGRID_API_KEY", "")
+            or (
+                getattr(django_settings, "EMAIL_HOST_USER", "")
+                and django_settings.EMAIL_HOST not in ("mailhog", "localhost", "127.0.0.1")
+            )
+        )
+        if not email_configured:
+            logger.error("OTP requested but no email delivery method is configured")
+            return Response(
+                {
+                    "error": (
+                        "Email service is temporarily unavailable. "
+                        "Please try again in a few minutes."
+                    ),
+                    "error_code": "email_unavailable",
+                },
+                status=503,
+            )
+
+        otp_expiry_minutes = 2
         try:
-            otp_obj, code, session_token = EmailVerificationOTP.generate(email, minutes=10)
+            otp_obj, code, session_token = EmailVerificationOTP.generate(
+                email, minutes=otp_expiry_minutes
+            )
 
             dispatch_notification_email(
                 subject="FixitLab - Verify Your Email",
@@ -61,11 +97,11 @@ class SendOTPView(APIView):
                 template="emails/otp_verification.html",
                 context={
                     "otp_code": code,
-                    "expires_minutes": 10,
+                    "expires_minutes": otp_expiry_minutes,
                 },
                 critical=True,
             )
-            logger.info(f"OTP delivered to {email}")
+            logger.info(f"OTP queued for {email}")
         except Exception as e:
             logger.error(f"Failed to send OTP to {email}: {e}")
             return Response(
@@ -74,6 +110,7 @@ class SendOTPView(APIView):
                         "Could not send verification email. "
                         "Please try again in a few minutes."
                     ),
+                    "error_code": "email_send_failed",
                 },
                 status=503,
             )
@@ -81,6 +118,8 @@ class SendOTPView(APIView):
         return Response({
             "message": "Verification code sent to your email.",
             "session_token": session_token,
+            "expires_at": otp_obj.expires_at.isoformat(),
+            "expires_in_seconds": otp_expiry_minutes * 60,
         })
 
 
@@ -98,7 +137,14 @@ class VerifyOTPView(APIView):
 
         otp_obj, error = EmailVerificationOTP.verify(session_token, code)
         if error:
-            return Response({"error": error}, status=400)
+            error_lower = error.lower()
+            if "too many failed attempts" in error_lower:
+                error_code = "otp_max_attempts"
+            elif "expired" in error_lower:
+                error_code = "otp_expired"
+            else:
+                error_code = "otp_invalid"
+            return Response({"error": error, "error_code": error_code}, status=400)
 
         return Response({
             "message": "Email verified successfully.",
@@ -140,6 +186,18 @@ class RegisterView(APIView):
         # Force the email from the verified OTP
         data = request.data.copy()
         data["email"] = otp_obj.email
+
+        if User.objects.filter(email=otp_obj.email).exists():
+            return Response(
+                {
+                    "error": (
+                        "This email is already registered. "
+                        "Please sign in or use forgot password to recover your account."
+                    ),
+                    "error_code": "email_exists",
+                },
+                status=400,
+            )
 
         serializer = RegisterSerializer(data=data)
         serializer.is_valid(raise_exception=True)

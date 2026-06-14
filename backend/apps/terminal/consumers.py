@@ -96,6 +96,19 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         self._resize_pending = None
         self._ping_task = None
         self._respawn_in_progress = False
+        self._ws_connected = False
+
+    async def _safe_send(self, text_data: str) -> bool:
+        """Send on WebSocket; return False if client already disconnected."""
+        if not self._ws_connected:
+            return False
+        try:
+            await self.send(text_data=text_data)
+            return True
+        except Exception as exc:
+            if "closed protocol" in str(exc).lower():
+                self._ws_connected = False
+            return False
 
     def _release_connection_slot(self) -> None:
         """Decrement per-user WS counter (safe if called more than once)."""
@@ -158,6 +171,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         self._blocked_patterns = await self._load_blocked_patterns()
 
         await self.accept()
+        self._ws_connected = True
 
         # Initialize recording
         self._session_start_time = time.time()
@@ -348,9 +362,10 @@ class TerminalConsumer(AsyncWebsocketConsumer):
     async def _ping_loop(self):
         """Keep the Channels websocket alive through proxies."""
         try:
-            while True:
+            while self._ws_connected:
                 await asyncio.sleep(25)
-                await self.send(text_data=json.dumps({"type": "ping"}))
+                if not await self._safe_send(json.dumps({"type": "ping"})):
+                    break
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -383,7 +398,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
     async def _respawn_shell(self, reason: str = "") -> bool:
         """Re-attach to shell without closing the WebSocket (avoids client reconnect loops)."""
-        if self._respawn_in_progress or not self.lab_session:
+        if self._respawn_in_progress or not self.lab_session or not self._ws_connected:
             return False
         self._respawn_in_progress = True
         try:
@@ -402,10 +417,11 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             self.raw_socket = None
             self._shell_ready = False
 
-            await self.send(text_data=json.dumps({
+            if not await self._safe_send(json.dumps({
                 "type": "shell_respawn",
                 "output": "\r\n\x1b[1;33mRestoring shell connection...\x1b[0m\r\n",
-            }))
+            })):
+                return False
 
             await self._open_shell(resource_id)
             if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
@@ -443,6 +459,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
                 await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
             while True:
+                if not self._ws_connected:
+                    break
                 try:
                     if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
                         data = await asyncio.to_thread(self.raw_socket.recv, 4096)
@@ -460,13 +478,11 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                             self.lab_session.id,
                         )
                         if not await self._respawn_shell("eof"):
-                            try:
-                                await self.send(text_data=json.dumps({
-                                    "output": "\r\n\x1b[1;31mLab shell unavailable.\x1b[0m\r\n",
-                                }))
-                            except Exception:
-                                pass
-                            await self.close(code=4500)
+                            await self._safe_send(json.dumps({
+                                "output": "\r\n\x1b[1;31mLab shell unavailable.\x1b[0m\r\n",
+                            }))
+                            if self._ws_connected:
+                                await self.close(code=4500)
                             break
                         empty_reads = 0
                         if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
@@ -482,7 +498,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                         await self._apply_resize(self._resize_pending)
                         self._resize_pending = None
                     try:
-                        await self.send(text_data=json.dumps({"type": "shell_ready"}))
+                        await self._safe_send(json.dumps({"type": "shell_ready"}))
                     except Exception:
                         pass
 
@@ -493,35 +509,37 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     elapsed = time.time() - self._session_start_time
                     self._recording_events.append([elapsed, "o", output])
 
-                await self.send(text_data=json.dumps({"output": output}))
+                if not await self._safe_send(json.dumps({"output": output})):
+                    break
         except asyncio.CancelledError:
             pass
         except (ConnectionResetError, OSError) as exc:
             logger.info("Terminal stream reset for session %s: %s", self.lab_session.id, exc)
-            if not await self._respawn_shell("reset"):
-                try:
-                    await self.send(text_data=json.dumps({
-                        "output": "\r\n\x1b[1;33mSession ended\x1b[0m\r\n"
-                    }))
-                except Exception:
-                    pass
+            if self._ws_connected and not await self._respawn_shell("reset"):
+                await self._safe_send(json.dumps({
+                    "output": "\r\n\x1b[1;33mSession ended\x1b[0m\r\n"
+                }))
         except Exception as e:
+            if "closed protocol" in str(e).lower():
+                logger.debug(
+                    "Terminal client disconnected during read for session %s",
+                    getattr(self.lab_session, "id", "?"),
+                )
+                return
             logger.error(
                 "Error reading terminal output for session %s: %s",
                 getattr(self.lab_session, "id", "?"),
                 e,
                 exc_info=True,
             )
-            if not await self._respawn_shell("error"):
-                try:
-                    await self.send(text_data=json.dumps({
-                        "output": "\r\n\x1b[1;31mConnection lost\x1b[0m\r\n"
-                    }))
-                except Exception:
-                    pass
+            if self._ws_connected and not await self._respawn_shell("error"):
+                await self._safe_send(json.dumps({
+                    "output": "\r\n\x1b[1;31mConnection lost\x1b[0m\r\n"
+                }))
 
     async def disconnect(self, close_code):
         """Cleanup on disconnect and save recording."""
+        self._ws_connected = False
         self._release_connection_slot()
         if self.lab_session and self._recording_events:
             await self._save_recording()
