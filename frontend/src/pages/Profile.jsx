@@ -5,7 +5,7 @@ import { authApi } from '../api/auth'
 import { labApi } from '../api/labs'
 import { subscriptionApi } from '../api/subscriptions'
 import api from '../api/client'
-import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle } from 'lucide-react'
+import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { validators } from '../utils/validators'
 import { SkeletonCard } from '../components/Skeleton'
@@ -26,6 +26,7 @@ export default function Profile() {
   const [notifPrefs, setNotifPrefs] = useState(null)
   const [techSubscriptions, setTechSubscriptions] = useState([])
   const [complimentaryAccess, setComplimentaryAccess] = useState(false)
+  const [invoices, setInvoices] = useState([])
 
   // Load full profile data including phone number
   useEffect(() => {
@@ -34,7 +35,8 @@ export default function Profile() {
       labApi.getUserPlan().catch(() => null),
       api.get('/notifications/preferences/').then(r => r.data).catch(() => null),
       subscriptionApi.getMySubscriptions().catch(() => ({ subscriptions: [] })),
-    ]).then(([profileData, plan, prefs, subsData]) => {
+      subscriptionApi.getMyInvoices().catch(() => ({ invoices: [] })),
+    ]).then(([profileData, plan, prefs, subsData, invData]) => {
       setUsername(profileData.username || '')
       setFirstName(profileData.first_name || '')
       setLastName(profileData.last_name || '')
@@ -44,6 +46,7 @@ export default function Profile() {
       if (prefs) setNotifPrefs(prefs)
       setTechSubscriptions(subsData?.subscriptions || [])
       setComplimentaryAccess(subsData?.complimentary_access || false)
+      setInvoices(invData?.invoices || [])
     }).catch(console.error)
       .finally(() => setLoading(false))
   }, [])
@@ -95,6 +98,22 @@ export default function Profile() {
   }
 
   const pwStrength = validators.passwordStrength(newPassword)
+
+  const downloadInvoice = async (inv) => {
+    try {
+      const res = await subscriptionApi.downloadInvoice(inv.id)
+      const blob = new Blob([res.data], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${inv.invoice_number}.html`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Invoice downloaded')
+    } catch {
+      toast.error('Failed to download invoice')
+    }
+  }
 
   if (loading) return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -258,8 +277,8 @@ export default function Profile() {
               <div className="space-y-3">
                 {[
                   { key: 'email_achievements', label: 'Achievement unlocked', desc: 'Get notified when you earn badges' },
-                  { key: 'email_lab_completed', label: 'Lab completed', desc: 'Receive a summary after solving a challenge' },
-                  { key: 'email_lab_expired', label: 'Lab expired', desc: 'Know when a session times out' },
+                  { key: 'email_lab_completed', label: 'Lab completed', desc: 'Off by default — use in-app notifications instead' },
+                  { key: 'email_lab_expired', label: 'Lab expired', desc: 'Off by default — use in-app notifications instead' },
                   { key: 'email_subscription', label: 'Subscription updates', desc: 'Confirmation and billing emails' },
                   { key: 'email_marketing', label: 'Product updates', desc: 'New features, scenarios, and tips' },
                 ].map(({ key, label, desc }) => (
@@ -374,6 +393,37 @@ export default function Profile() {
                     <CreditCard size={14} /> {sub.in_grace_period ? 'Renew to restore lab access' : `Renew for ₹${sub.amount}`}
                   </Link>
                 )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Payment Invoices */}
+      <div className="glass-card p-6">
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <FileText size={18} className="text-accent-cyan" /> Payment Invoices
+        </h2>
+        {invoices.length === 0 ? (
+          <p className="text-sm text-surface-400">No payment invoices yet. Invoices appear here after a successful subscription purchase.</p>
+        ) : (
+          <div className="space-y-2">
+            {invoices.map(inv => (
+              <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 border border-surface-700/40 gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{inv.technology}</p>
+                  <p className="text-xs text-surface-500 font-mono">{inv.invoice_number}</p>
+                  <p className="text-xs text-surface-500">
+                    {new Date(inv.created_at).toLocaleDateString()} · ₹{inv.amount} · {inv.payment_method}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => downloadInvoice(inv)}
+                  className="btn-secondary text-xs px-3 py-1.5 shrink-0 flex items-center gap-1"
+                >
+                  <Download size={12} /> Download
+                </button>
               </div>
             ))}
           </div>

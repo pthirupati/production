@@ -45,10 +45,9 @@ def cleanup_expired_labs():
             session.save()
             terminated += 1
 
-            # Notify user that their lab expired
+            # In-app notification only (no expiry email — avoids spam)
             try:
-                from apps.notifications.tasks import create_in_app_notification, send_notification_email
-                from django.conf import settings
+                from apps.notifications.tasks import create_in_app_notification
 
                 create_in_app_notification.delay(
                     user_id=session.user_id,
@@ -56,17 +55,6 @@ def cleanup_expired_labs():
                     title=f"Lab Expired: {session.scenario.title}",
                     message=f"Your lab session expired after {session.duration_limit // 60} minutes. You can try again anytime!",
                     metadata={"scenario_slug": session.scenario.slug},
-                )
-                send_notification_email.delay(
-                    subject=f"FixitLab: Lab session expired — {session.scenario.title}",
-                    to_email=session.user.email,
-                    template="emails/lab_expired.html",
-                    context={
-                        "username": session.user.username,
-                        "scenario_title": session.scenario.title,
-                        "duration_minutes": session.duration_limit // 60,
-                        "scenario_url": f"{settings.FRONTEND_URL}/scenarios/{session.scenario.slug}",
-                    },
                 )
             except Exception as e:
                 logger.warning(f"Failed to notify user about expired lab: {e}")

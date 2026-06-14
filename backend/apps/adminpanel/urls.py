@@ -29,6 +29,7 @@ from .views import (
     AdminMaintenanceModeView,
     AdminInactiveUsersView,
     AdminSubscriptionLogsView,
+    AdminInvoicesView,
     AdminThreadModerationView,
     AdminJiraTicketsView,
     AdminJiraCreateView,
@@ -84,6 +85,7 @@ urlpatterns = [
 
     # Subscription Logs
     path("subscriptions/", AdminSubscriptionLogsView.as_view()),
+    path("invoices/", AdminInvoicesView.as_view()),
 
     # Thread Moderation
     path("threads/", AdminThreadModerationView.as_view()),

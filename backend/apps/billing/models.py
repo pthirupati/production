@@ -182,3 +182,48 @@ class PaymentTransaction(models.Model):
         self.save(update_fields=["status", "error_message"])
 
 
+class SubscriptionInvoice(models.Model):
+    """Downloadable invoice for successful subscription payments."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    invoice_number = models.CharField(max_length=64, unique=True, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="subscription_invoices",
+    )
+    payment_transaction = models.OneToOneField(
+        PaymentTransaction,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invoice",
+    )
+    tech_subscription = models.ForeignKey(
+        TechnologySubscription,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invoices",
+    )
+    technology_name = models.CharField(max_length=200)
+    subscription_id = models.CharField(max_length=200, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default="INR")
+    payment_method = models.CharField(max_length=50, blank=True)
+    gateway_payment_id = models.CharField(max_length=200, blank=True)
+    period_start = models.DateTimeField(null=True, blank=True)
+    period_end = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "-created_at"]),
+            models.Index(fields=["invoice_number"]),
+        ]
+
+    def __str__(self):
+        return self.invoice_number
+
+

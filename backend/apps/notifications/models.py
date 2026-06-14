@@ -37,8 +37,8 @@ class NotificationPreference(models.Model):
 
     # Email preferences
     email_achievements = models.BooleanField(default=True, help_text="Email when earning achievements")
-    email_lab_completed = models.BooleanField(default=True, help_text="Email when completing a lab")
-    email_lab_expired = models.BooleanField(default=True, help_text="Email when a lab session expires")
+    email_lab_completed = models.BooleanField(default=False, help_text="Email when completing a lab")
+    email_lab_expired = models.BooleanField(default=False, help_text="Email when a lab session expires")
     email_subscription = models.BooleanField(default=True, help_text="Email for subscription confirmations")
     email_marketing = models.BooleanField(default=False, help_text="Marketing and product update emails")
 

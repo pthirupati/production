@@ -49,7 +49,7 @@ def notify_lab_completed(user_id, scenario_title, score, time_taken, hints_used)
         user = User.objects.get(id=user_id)
         prefs = NotificationPreference.get_for_user(user)
 
-        # In-app notification
+        # In-app notification only (no email — avoids spam)
         if prefs.should_notify_inapp("system"):
             create_in_app_notification(
                 user_id=user_id,
@@ -57,23 +57,6 @@ def notify_lab_completed(user_id, scenario_title, score, time_taken, hints_used)
                 title=f"Challenge Solved: {scenario_title}",
                 message=f"Score: {score} | Time: {time_taken}",
                 metadata={"score": score, "scenario": scenario_title},
-            )
-
-        # Email notification
-        if prefs.should_email("lab_completed"):
-            time_str = f"{time_taken // 60}m {time_taken % 60}s" if time_taken else "N/A"
-            send_email(
-                subject=f"FixitLab: You solved {scenario_title}!",
-                to_email=user.email,
-                template="emails/lab_completed.html",
-                context={
-                    "username": user.username,
-                    "scenario_title": scenario_title,
-                    "score": score,
-                    "time_taken": time_str,
-                    "hints_used": hints_used,
-                    "scenarios_url": f"{settings.FRONTEND_URL}/scenarios",
-                },
             )
     except Exception as e:
         logger.warning(f"Failed to send lab completion notification: {e}")

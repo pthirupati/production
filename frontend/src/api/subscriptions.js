@@ -58,6 +58,16 @@ export const subscriptionApi = {
     return data
   },
 
+  async getMyInvoices() {
+    const { data } = await api.get('/billing/invoices/')
+    return data
+  },
+
+  async downloadInvoice(invoiceId) {
+    const response = await api.get(`/billing/invoices/${invoiceId}/download/`, { responseType: 'blob' })
+    return response
+  },
+
   async createBatchOrders(technologyIds) {
     const results = []
     for (const techId of technologyIds) {

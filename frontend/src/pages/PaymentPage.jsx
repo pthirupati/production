@@ -908,7 +908,7 @@ export default function PaymentPage() {
             </div>
 
             <p className="text-xs text-surface-500 mt-6 text-center">
-              A confirmation email and invoice have been sent to {user?.email}
+              Your invoice is available in Profile → Payment Invoices. A confirmation email was sent to {user?.email}
             </p>
           </div>
         )}

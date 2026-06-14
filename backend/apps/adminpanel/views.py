@@ -1641,6 +1641,52 @@ class AdminSubscriptionLogsView(APIView):
         })
 
 
+class AdminInvoicesView(APIView):
+    """Admin: list all payment invoices with filters."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.billing.models import SubscriptionInvoice, PaymentTransaction
+        from apps.billing.invoice_service import create_invoice_for_transaction, invoice_list_payload
+        from django.db.models import Q
+
+        user_filter = request.query_params.get("user", "").strip()
+        qs = SubscriptionInvoice.objects.select_related("user", "payment_transaction").order_by("-created_at")
+
+        if user_filter:
+            qs = qs.filter(
+                Q(user__email__icontains=user_filter) |
+                Q(user__username__icontains=user_filter) |
+                Q(invoice_number__icontains=user_filter)
+            )
+
+        # Backfill missing invoices from successful payments
+        if qs.count() < 50:
+            missing = PaymentTransaction.objects.filter(status="success", invoice__isnull=True).select_related(
+                "user", "tech_subscription", "tech_subscription__technology", "plan"
+            )[:200]
+            for tx in missing:
+                create_invoice_for_transaction(tx)
+
+        invoices = qs[:500]
+        data = []
+        for inv in invoices:
+            row = invoice_list_payload(inv)
+            row["user"] = {
+                "id": inv.user_id,
+                "username": inv.user.username,
+                "email": inv.user.email,
+            }
+            data.append(row)
+
+        total_inr = sum(float(i.amount) for i in invoices if i.currency == "INR")
+        return Response({
+            "invoices": data,
+            "total_count": len(data),
+            "total_revenue_inr": total_inr,
+        })
+
+
 class AdminThreadModerationView(APIView):
     """Moderate community threads — delete inappropriate content."""
     permission_classes = [IsPlatformAdmin]

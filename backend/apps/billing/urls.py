@@ -19,4 +19,6 @@ urlpatterns = [
     path("subscriptions/", views.UserTechSubscriptionsView.as_view(), name="user_subscriptions"),
     path("subscription-logs/", views.SubscriptionLogsView.as_view(), name="subscription_logs"),
     path("currency-rate/", views.CurrencyRateView.as_view(), name="currency_rate"),
+    path("invoices/", views.UserInvoicesView.as_view(), name="user_invoices"),
+    path("invoices/<uuid:invoice_id>/download/", views.InvoiceDownloadView.as_view(), name="invoice_download"),
 ]

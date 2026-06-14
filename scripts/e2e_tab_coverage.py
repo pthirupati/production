@@ -298,6 +298,7 @@ def run_profile_tab(s, token: str):
         ("PUT", "/api/auth/profile/", {"first_name": "E2E", "last_name": "Tester"}, (200,), "profile PUT"),
         ("GET", "/api/plan/", None, (200,), "plan usage"),
         ("GET", "/api/billing/subscriptions/", None, (200,), "tech subscriptions"),
+        ("GET", "/api/billing/invoices/", None, (200,), "payment invoices"),
         ("GET", "/api/notifications/preferences/", None, (200,), "notif prefs GET"),
         ("PATCH", "/api/notifications/preferences/", {
             "email_lab_completed": True,
@@ -806,6 +807,9 @@ def run_admin_all_tabs(s, admin_token: str):
 
     st, audit = api("GET", "/api/admin/audit-logs/?days=7", token=admin_token)
     s.record("Admin audit logs API", st == 200 and isinstance((audit or {}).get("logs"), list), st)
+
+    st, inv = api("GET", "/api/admin/invoices/", token=admin_token)
+    s.record("Admin invoices list", st == 200 and isinstance((inv or {}).get("invoices"), list), st)
 
 
 def run_technology_all_scenarios(s, token: str):

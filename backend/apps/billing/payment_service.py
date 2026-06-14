@@ -246,6 +246,12 @@ class PaymentService:
             subscription.save(update_fields=["plan", "is_active", "started_at", "expires_at"])
             logger.info(f"Upgraded user {self.user.id} to plan {transaction.plan.code}")
 
+        try:
+            from .invoice_service import create_invoice_for_transaction
+            create_invoice_for_transaction(transaction)
+        except Exception as e:
+            logger.warning(f"Invoice creation failed for tx {transaction.id}: {e}")
+
     def check_gateway_configured(self):
         """Check if any payment gateway is configured."""
         razorpay_ok = bool(settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET)

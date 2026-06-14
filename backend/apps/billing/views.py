@@ -1225,3 +1225,43 @@ class CurrencyRateView(APIView):
             result["conversion"] = get_price_in_currency(amount, currency)
 
         return Response(result)
+
+
+class UserInvoicesView(APIView):
+    """List downloadable invoices for the current user."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .invoice_service import backfill_invoices_for_user, invoice_list_payload
+
+        backfill_invoices_for_user(request.user)
+        invoices = (
+            request.user.subscription_invoices.all()
+            .select_related("payment_transaction")
+            .order_by("-created_at")[:100]
+        )
+        return Response({"invoices": [invoice_list_payload(inv) for inv in invoices]})
+
+
+class InvoiceDownloadView(APIView):
+    """Download invoice HTML (user owns invoice or admin)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, invoice_id):
+        from django.http import HttpResponse
+        from .models import SubscriptionInvoice
+        from .invoice_service import render_invoice_html
+
+        try:
+            invoice = SubscriptionInvoice.objects.select_related("user").get(pk=invoice_id)
+        except SubscriptionInvoice.DoesNotExist:
+            return Response({"error": "Invoice not found"}, status=http_status.HTTP_404_NOT_FOUND)
+
+        if invoice.user_id != request.user.id and not request.user.is_staff:
+            return Response({"error": "Forbidden"}, status=http_status.HTTP_403_FORBIDDEN)
+
+        html = render_invoice_html(invoice)
+        filename = f"{invoice.invoice_number}.html"
+        response = HttpResponse(html, content_type="text/html; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response

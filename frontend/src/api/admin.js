@@ -212,6 +212,17 @@ export const adminApi = {
     return data
   },
 
+  async getInvoices(filters = {}) {
+    const params = new URLSearchParams(filters)
+    const qs = params.toString()
+    const { data } = await api.get(`/admin/invoices/${qs ? '?' + qs : ''}`)
+    return data
+  },
+
+  async downloadInvoice(invoiceId) {
+    return api.get(`/billing/invoices/${invoiceId}/download/`, { responseType: 'blob' })
+  },
+
   async getThreads() {
     const { data } = await api.get('/admin/threads/')
     return data
