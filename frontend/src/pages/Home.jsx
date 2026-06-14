@@ -74,7 +74,7 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [])
 
-  const techIcons = { Linux: Server, AWS: Cloud, Kubernetes: Cpu, Docker: Monitor, Networking: Globe }
+  const techIcons = { Linux: Server, AWS: Cloud, Kubernetes: Cpu, Docker: Monitor, Networking: Globe, 'GPU & NVIDIA': Cpu }
 
   return (
     <div className="min-h-screen bg-surface-950">

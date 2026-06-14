@@ -21,17 +21,42 @@ echo "Host: ${PROD_HOST:-unknown} | Site: $SITE_URL | E2E: $RUN_E2E"
 
 fail=0
 
+_run_cleanup() {
+  if [ "${E2E_SKIP_CLEANUP:-0}" = "1" ]; then
+    echo "  Skipped (E2E_SKIP_CLEANUP=1)"
+    return 0
+  fi
+  echo ""
+  echo ">>> [cleanup] Test data cleanup (always runs)"
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    python /scripts/cleanup-test-data.py || echo "WARN: cleanup failed"
+}
+trap _run_cleanup EXIT
+
 # ── 1. Container status ──
 echo ""
-echo ">>> [1/6] Docker container status"
+echo ">>> [1/7] Docker container status"
 if ! docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps | tee /tmp/fixitlab-ps.txt; then
   echo "ERROR: docker compose ps failed"
   fail=1
 fi
 
+# ── 1b. Vault metrics (when Vault is enabled) ──
+echo ""
+echo ">>> [1b/7] Vault metrics"
+if [ -x "$ROOT/scripts/vault/check-metrics.sh" ]; then
+  if bash "$ROOT/scripts/vault/check-metrics.sh"; then
+    echo "  ✓ Vault metrics OK"
+  else
+    echo "WARN: Vault metrics check failed (non-fatal if Vault disabled)"
+  fi
+else
+  echo "  Skipped (check-metrics.sh missing)"
+fi
+
 # ── 2. Internal API health (bypass nginx IP restrictions) ──
 echo ""
-echo ">>> [2/6] Internal API health"
+echo ">>> [2/7] Internal API health"
 if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python -c \
   "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/'); assert r.status==200"; then
   echo "  ✓ Backend /api/health/ OK"
@@ -42,7 +67,7 @@ fi
 
 # ── 3. Public nginx health (what GitHub runners can reach) ──
 echo ""
-echo ">>> [3/6] Public gateway health"
+echo ">>> [3/7] Public gateway health"
 if [ -n "$PROD_HOST" ]; then
   if curl -sf --max-time 15 "http://${PROD_HOST}/health" | grep -q ok; then
     echo "  ✓ http://${PROD_HOST}/health OK"
@@ -62,7 +87,7 @@ fi
 
 # ── 4. Scenario Docker images ──
 echo ""
-echo ">>> [4/6] Scenario lab images"
+echo ">>> [4/7] Scenario lab images"
 chmod +x "$ROOT/scripts/validate-scenario-images.sh"
 if bash "$ROOT/scripts/validate-scenario-images.sh"; then
   echo "  ✓ All scenario images present"
@@ -74,7 +99,7 @@ fi
 
 # ── 5. Sample lab provisioning (multi-user) ──
 echo ""
-echo ">>> [5/6] Lab provisioning sample"
+echo ">>> [5/7] Lab provisioning sample"
 if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
   env E2E_SKIP_LAB=0 E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 TERMINAL_MAX_WS_PER_USER=64 \
   python /scripts/e2e_all_scenarios_labs.py; then
@@ -96,12 +121,13 @@ fi
 
 # ── 6. Full E2E API suite ──
 echo ""
-echo ">>> [6/6] Full E2E API tests"
+echo ">>> [6/7] Full E2E API tests"
 if [ "$RUN_E2E" = "true" ] || [ "$RUN_E2E" = "1" ]; then
   chmod +x "$ROOT/scripts/run-full-e2e.sh"
   export E2E_SKIP_LAB=0
   export RUN_FULL_E2E=1
   export BASE_URL="$SITE_URL"
+  export E2E_CLEANUP_IN_RUNNER=1
   if bash "$ROOT/scripts/run-full-e2e.sh"; then
     echo "  ✓ Full E2E passed"
   else
@@ -110,16 +136,6 @@ if [ "$RUN_E2E" = "true" ] || [ "$RUN_E2E" = "1" ]; then
   fi
 else
   echo "  Skipped (RUN_E2E=$RUN_E2E)"
-fi
-
-# ── 7. Remove test users and artifacts ──
-echo ""
-echo ">>> [7/7] Test data cleanup"
-if [ "${E2E_SKIP_CLEANUP:-0}" != "1" ]; then
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-    python /scripts/cleanup-test-data.py || fail=1
-else
-  echo "  Skipped (E2E_SKIP_CLEANUP=1)"
 fi
 
 echo ""

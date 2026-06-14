@@ -89,7 +89,7 @@ class TechnologiesListView(APIView):
             return Response(cached)
         techs = Technology.objects.filter(is_active=True).annotate(
             scenario_count=Count("scenarios", filter=Q(scenarios__is_active=True))
-        )
+        ).order_by("order", "name")
         serializer = TechnologySerializer(techs, many=True)
         cache.set("technologies_list", serializer.data, 300)  # 5 min
         return Response(serializer.data)
@@ -101,6 +101,16 @@ class TechnologyDetailView(APIView):
 
     def get(self, request, slug):
         tech = get_object_or_404(Technology, slug=slug, is_active=True)
+        if tech.coming_soon:
+            tech_data = TechnologySerializer(tech).data
+            tech_data["scenario_count"] = 0
+            tech_data["difficulty_counts"] = {"easy": 0, "medium": 0, "hard": 0}
+            tech_data["categories"] = []
+            if request.user.is_authenticated:
+                from apps.progress.learning_path import get_learning_path_progress
+                tech_data["learning_path_progress"] = get_learning_path_progress(request.user, tech)
+            return Response({"technology": tech_data, "scenarios": [], "coming_soon": True})
+
         scenarios = Scenario.objects.filter(
             technology=tech, is_active=True
         ).select_related("technology").prefetch_related("tags")

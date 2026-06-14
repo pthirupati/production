@@ -26,6 +26,28 @@ _vault_ready() {
     && [ -x "$ROOT/scripts/vault/render-env.sh" ]
 }
 
+_vault_can_seed() {
+  _env_true "${VAULT_ENABLED:-}" \
+    && [ -f "$ROOT/deploy/vault-init.json" ] \
+    && [ -x "$ROOT/scripts/vault/seed-from-env.sh" ]
+}
+
+_seed_vault_from_file() {
+  local src="$1"
+  if _vault_can_seed; then
+    echo "[env] Syncing Vault KV from updated env source"
+    bash "$ROOT/scripts/vault/seed-from-env.sh" "$src" || echo "[env] WARN: Vault KV seed failed"
+  fi
+}
+
+if [ -n "${PRODUCTION_ENV_B64:-}" ]; then
+  TMP_SEED="$(mktemp)"
+  echo "$PRODUCTION_ENV_B64" | base64 -d > "$TMP_SEED"
+  chmod 600 "$TMP_SEED"
+  _seed_vault_from_file "$TMP_SEED"
+  rm -f "$TMP_SEED"
+fi
+
 if _vault_ready; then
   echo "[env] Rendering .env.production from HashiCorp Vault"
   bash "$ROOT/scripts/vault/render-env.sh" "$OUT"
@@ -42,7 +64,14 @@ elif _env_true "${VAULT_ENABLED:-}" && [ -x "$ROOT/scripts/vault/render-env.sh" 
   bash "$ROOT/scripts/vault/render-env.sh" "$OUT"
 elif [ -f "$ROOT/deploy/production.env" ]; then
   echo "[env] Using local deploy/production.env (dev only — use GitHub secrets in CI)"
-  write_env "$ROOT/deploy/production.env"
+  if _vault_can_seed && _env_true "${VAULT_SEED_FROM_LOCAL:-true}"; then
+    _seed_vault_from_file "$ROOT/deploy/production.env"
+  fi
+  if _env_true "${VAULT_ENABLED:-}" && [ -x "$ROOT/scripts/vault/render-env.sh" ] && [ -f "$ROOT/deploy/vault-approle.env" ]; then
+    bash "$ROOT/scripts/vault/render-env.sh" "$OUT"
+  else
+    write_env "$ROOT/deploy/production.env"
+  fi
 elif [ -f "$OUT" ]; then
   echo "[env] Using existing $OUT"
   chmod 600 "$OUT"

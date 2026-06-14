@@ -99,7 +99,11 @@ export default function ScenarioDetail() {
     try {
       const session = await labApi.startLab(scenario.id)
       if (session.jira_reset) {
-        toast(`Fresh attempt #${session.jira_run_count || 1} — ticket history cleared`, { icon: '🔄', duration: 5000 })
+        toast(`Fresh attempt #${session.jira_run_count || 1} — ticket history cleared`, {
+          icon: '🔄',
+          duration: 5000,
+          closeButton: true,
+        })
         jiraApi.getScenarioTicket(scenario.id, { details: 1 })
           .then(res => {
             setJiraTicket(res.data?.ticket || null)
@@ -116,9 +120,13 @@ export default function ScenarioDetail() {
         })
       }
       if (session.resumed) {
-        toast('You already have an active lab for this scenario — reconnecting...', { icon: '🔄', duration: 4000 })
+        toast('You already have an active lab for this scenario — reconnecting...', {
+          icon: '🔄',
+          duration: 4000,
+          closeButton: true,
+        })
       } else if (session.status === 'PROVISIONING') {
-        toast('Launching cloud server — please wait...', { icon: '☁️', duration: 5000 })
+        toast('Launching cloud server — please wait...', { icon: '☁️', duration: 5000, closeButton: true })
       } else {
         toast.success('Lab environment ready!')
       }

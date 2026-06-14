@@ -17,6 +17,7 @@ const techIcons = {
   AWS: Cloud,
   Kubernetes: Cpu,
   Security: Shield,
+  'GPU & NVIDIA': Cpu,
 }
 
 const techColors = {

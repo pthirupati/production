@@ -171,3 +171,5 @@ class Command(BaseCommand):
                 count += 1
 
         self.stdout.write(self.style.SUCCESS(f"\nSeeded {count} scenarios successfully."))
+        from apps.question_bank.cache_utils import invalidate_technologies_cache
+        invalidate_technologies_cache()

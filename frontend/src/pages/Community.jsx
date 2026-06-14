@@ -218,7 +218,7 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
   }
 
   const renderReply = (reply) => (
-    <div key={reply.id} className="border-l-2 border-surface-600/50 pl-4 py-3">
+    <div key={reply.id} className="border-l-2 border-surface-600/50 pl-4 py-3 group/msg">
       <div className="flex items-center gap-2 mb-1">
         <span className="font-medium text-sm">{reply.author?.username}</span>
         {reply.author?.is_premium && (
@@ -251,23 +251,43 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-1 mt-2">
-        {REACTION_EMOJIS.map(em => {
-          const count = reply.reactions?.[em] || 0
-          const active = reply.user_reactions?.includes(em)
-          if (!user && !count) return null
-          return (
-            <button
-              key={em}
-              type="button"
-              disabled={!user}
-              onClick={() => handleReact(reply.id, em)}
-              className={`text-xs px-1.5 py-0.5 rounded-full border ${active ? 'border-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400 hover:border-surface-500'}`}
-            >
-              {em}{count ? ` ${count}` : ''}
-            </button>
-          )
-        })}
+      <div className="relative mt-2 min-h-[1.25rem]">
+        <div className="flex flex-wrap items-center gap-1">
+          {REACTION_EMOJIS.map(em => {
+            const count = reply.reactions?.[em] || 0
+            const active = reply.user_reactions?.includes(em)
+            if (!count) return null
+            return (
+              <button
+                key={em}
+                type="button"
+                disabled={!user}
+                onClick={() => handleReact(reply.id, em)}
+                className={`text-xs px-1.5 py-0.5 rounded-full border ${active ? 'border-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400 hover:border-surface-500'}`}
+              >
+                {em}{count ? ` ${count}` : ''}
+              </button>
+            )
+          })}
+        </div>
+        {user && (
+          <div className="absolute -top-9 left-0 z-10 flex items-center gap-0.5 px-2 py-1 rounded-lg bg-surface-800 border border-surface-700 shadow-lg opacity-0 invisible group-hover/msg:opacity-100 group-hover/msg:visible transition-all duration-150">
+            {REACTION_EMOJIS.map(em => {
+              const active = reply.user_reactions?.includes(em)
+              return (
+                <button
+                  key={`pick-${em}`}
+                  type="button"
+                  title={`React with ${em}`}
+                  onClick={() => handleReact(reply.id, em)}
+                  className={`text-base leading-none px-1 py-0.5 rounded hover:bg-surface-700/80 hover:scale-110 transition-transform ${active ? 'bg-accent-cyan/10' : ''}`}
+                >
+                  {em}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-3 mt-1">

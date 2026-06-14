@@ -34,6 +34,16 @@ docker network inspect fixitlab_labs >/dev/null 2>&1 || docker network create fi
 
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
 
+# Recreate app workers when env file changes so containers pick up new secrets
+ENV_HASH="$(md5sum "$ENV_FILE" 2>/dev/null | awk '{print $1}' || md5 -q "$ENV_FILE" 2>/dev/null || true)"
+ENV_HASH_FILE="/tmp/fixitlab-env-hash"
+if [ -n "$ENV_HASH" ] && [ -f "$ENV_HASH_FILE" ] && [ "$(cat "$ENV_HASH_FILE")" != "$ENV_HASH" ]; then
+  echo "Env changed — recreating backend/celery containers"
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --force-recreate \
+    backend celery_worker celery_provisioning celery_maintenance celery_beat
+fi
+[ -n "$ENV_HASH" ] && echo "$ENV_HASH" > "$ENV_HASH_FILE"
+
 echo "Waiting for backend..."
 for i in $(seq 1 60); do
   if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python -c \

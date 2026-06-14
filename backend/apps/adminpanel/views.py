@@ -153,6 +153,7 @@ class AdminTechnologiesView(APIView):
                 "price": str(t.price),
                 "order": t.order,
                 "is_active": t.is_active,
+                "coming_soon": t.coming_soon,
                 "scenario_count": t.scenario_count,
                 "active_scenarios": t.active_scenarios,
                 "created_at": t.created_at.isoformat(),
@@ -164,6 +165,8 @@ class AdminTechnologiesView(APIView):
         serializer = TechnologySerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
+            from apps.question_bank.cache_utils import invalidate_technologies_cache
+            invalidate_technologies_cache()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -180,6 +183,8 @@ class AdminTechnologyDetailView(APIView):
         serializer = TechnologySerializer(tech, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            from apps.question_bank.cache_utils import invalidate_technologies_cache
+            invalidate_technologies_cache()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
 
@@ -195,6 +200,8 @@ class AdminTechnologyDetailView(APIView):
                 status=400,
             )
         tech.delete()
+        from apps.question_bank.cache_utils import invalidate_technologies_cache
+        invalidate_technologies_cache()
         return Response({"message": "Technology deleted"})
 
 

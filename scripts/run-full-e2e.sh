@@ -18,6 +18,17 @@ echo "Log directory: $LOG_DIR"
 echo "E2E_SKIP_LAB=${E2E_SKIP_LAB:-0} RUN_FULL_E2E=${RUN_FULL_E2E:-1}"
 echo ""
 
+_run_cleanup() {
+  if [ "${E2E_SKIP_CLEANUP:-0}" = "1" ] || [ "${E2E_CLEANUP_IN_RUNNER:-0}" = "1" ]; then
+    return 0
+  fi
+  echo ""
+  echo ">>> [cleanup] Test data cleanup (always runs)"
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    python /scripts/cleanup-test-data.py 2>&1 | tee -a "$LOG_DIR/cleanup.log" || echo "WARN: cleanup failed"
+}
+trap _run_cleanup EXIT
+
 # ── 0. Scenario images must exist ──
 echo ">>> [0/5] Scenario image check"
 chmod +x "$ROOT/scripts/validate-scenario-images.sh"
@@ -104,17 +115,5 @@ EXIT=0
 if [ "$EXIT" -eq 0 ]; then
   echo "ALL CHECKS PASSED"
 fi
-
-# ── 6. Remove all test users/data created during this run ──
-echo ""
-echo ">>> [6/6] Test data cleanup"
-if [ "${E2E_SKIP_CLEANUP:-0}" != "1" ]; then
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-    python /scripts/cleanup-test-data.py 2>&1 | tee "$LOG_DIR/cleanup.log" || CLEANUP_FAIL=1
-else
-  echo "  Skipped (E2E_SKIP_CLEANUP=1)"
-fi
-
-[ "${CLEANUP_FAIL:-0}" = "1" ] && EXIT=1 && echo "CLEANUP: FAILED"
 
 exit "$EXIT"

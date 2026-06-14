@@ -79,6 +79,11 @@ class SimulationProvisioner:
         hk = host_key or "primary"
         stream_key = f"{session_key}:{hk}"
 
+        streams = entry.setdefault("streams", {})
+        existing = streams.get(stream_key)
+        if existing is not None:
+            return existing.exec_id, existing
+
         if hk not in ("primary", "") and hk != "primary":
             hostname = hk
             companion_state = engine.state.clone_for_host(hostname)

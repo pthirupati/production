@@ -107,6 +107,14 @@ After Vault works in production:
 
 ## Day-to-day: change a secret
 
+**Mac (recommended one-liner):**
+
+```bash
+./scripts/vault/push-env-and-render.sh deploy/production.env
+```
+
+Or manually:
+
 1. Edit **`deploy/production.env`** on your Mac (never commit).
 2. Push to Vault:
 
@@ -133,6 +141,12 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d backe
 | `./scripts/vault/bootstrap.sh` | First-time setup |
 | `./scripts/vault/render-env.sh` | Vault → `.env.production` |
 | `./scripts/vault/seed-from-env.sh` | `.env` → Vault |
+| `./scripts/vault/push-env-and-render.sh` | Local edit → Vault → render |
+| `./scripts/vault/check-metrics.sh` | Verify Prometheus metrics on :8201 |
+
+**Metrics:** Vault exposes Prometheus metrics on `127.0.0.1:8201` inside the container (`/v1/sys/metrics?format=prometheus`). Post-deploy verification runs `check-metrics.sh` when Vault is running.
+
+**CI auto-sync:** When `PRODUCTION_ENV_B64` is set and Vault is initialized on the server, `sync-production-env.sh` seeds Vault KV before rendering so deploy always uses the latest secrets.
 
 ---
 

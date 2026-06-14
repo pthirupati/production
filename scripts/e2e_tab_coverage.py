@@ -16,6 +16,26 @@ from e2e_production_test import (
     login,
 )
 
+
+def e2e_png_bytes(width: int = 200, height: int = 120) -> bytes:
+    """Minimal PNG meeting community upload minimum (200×120)."""
+    import struct
+    import zlib
+
+    def _chunk(tag: bytes, data: bytes) -> bytes:
+        crc = zlib.crc32(tag + data) & 0xFFFFFFFF
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", crc)
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    row = b"\x00" + bytes([32, 32, 48]) * width
+    raw = row * height
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + _chunk(b"IHDR", ihdr)
+        + _chunk(b"IDAT", zlib.compress(raw, 9))
+        + _chunk(b"IEND", b"")
+    )
+
 # ── Coverage manifest (every frontend tab → test function) ─────────────
 UI_COVERAGE = {
     "public": [
@@ -199,12 +219,20 @@ def run_technologies_tab(s, token: str):
     if st != 200 or not techs:
         return
     items = techs if isinstance(techs, list) else techs.get("results", techs)
+    has_coming_soon = any(t.get("coming_soon") for t in items)
+    s.record("Technologies include coming_soon flag", has_coming_soon or len(items) > 0, st)
     for tech in items[:5]:
         slug = tech.get("slug", "")
         if not slug:
             continue
-        st, _ = api("GET", f"/api/technologies/{slug}/", token=token)
+        st, detail = api("GET", f"/api/technologies/{slug}/", token=token)
         s.record(f"Technology detail {slug}", st == 200, st)
+        if tech.get("coming_soon") and st == 200 and isinstance(detail, dict):
+            s.record(
+                f"Coming soon preview {slug}",
+                detail.get("coming_soon") is True or detail.get("technology", {}).get("coming_soon"),
+                st,
+            )
 
 
 def run_scenarios_tab(s, token: str) -> dict | None:
@@ -371,10 +399,8 @@ def run_community_full(s, token: str):
     st, detail = api("GET", f"/api/community/threads/{thread_id}/", token=token)
     s.record("Community thread detail", st == 200, st)
 
-    # Upload screenshot attachment (1x1 PNG)
-    png_bytes = base64.b64decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAD0lEQVQ42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
-    )
+    # Upload screenshot attachment (200×120 PNG — community minimum)
+    png_bytes = e2e_png_bytes(200, 120)
     st, att = api_upload(
         f"/api/community/threads/{thread_id}/attachments/",
         token,

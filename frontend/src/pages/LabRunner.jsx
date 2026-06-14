@@ -453,6 +453,18 @@ export default function LabRunner() {
         return `${protocol}://${window.location.host}/ws/terminal/${sessionId}/?token=${token}${hostQ}`
       }
 
+      const bindEnterRetry = (message) => {
+        term.write(message)
+        const retryHandler = term.onData((data) => {
+          if (data === '\r' || data === '\n') {
+            retryHandler.dispose()
+            reconnectAttempts.current = 0
+            term.write('\r\n\x1b[1;36mRetrying connection...\x1b[0m\r\n')
+            connectWs()
+          }
+        })
+      }
+
       const connectWs = () => {
         if (disposed) return
         if (reconnectTimerRef.current) {
@@ -522,13 +534,13 @@ export default function LabRunner() {
             const isSim = session?.provider === 'simulation'
             const isCloud = session?.provider === 'aws_ec2' || session?.provider === 'digitalocean'
             if (isSim && reconnectAttempts.current > 3) {
-              term.write('\r\n\x1b[1;33mSimulation shell paused — press Enter to reconnect\x1b[0m\r\n')
+              bindEnterRetry('\r\n\x1b[1;33mSimulation shell paused — press Enter to reconnect\x1b[0m\r\n')
               return
             }
             const baseDelay = isCloud ? 3000 : isSim ? 1000 : 2000
             const cap = isSim ? 3 : maxReconnectAttempts
             if (reconnectAttempts.current >= cap) {
-              term.write('\r\n\x1b[1;31mConnection lost.\x1b[0m Press Enter to retry.\x1b[0m\r\n')
+              bindEnterRetry('\r\n\x1b[1;31mConnection lost.\x1b[0m Press Enter to retry.\x1b[0m\r\n')
               return
             }
             const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts.current - 1), 20000)
@@ -1244,6 +1256,7 @@ export default function LabRunner() {
           </div>
         </div>
 
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         {/* Terminal action bar — above xterm */}
         <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-2 bg-surface-900 border-b border-surface-800 text-[10px] sm:text-xs">
           {useDualPane && (
@@ -1326,6 +1339,7 @@ export default function LabRunner() {
           ) : (
             <div ref={terminalRef} className="absolute inset-0 p-0.5 sm:p-1 touch-manipulation" />
           )}
+        </div>
         </div>
       </div>
 

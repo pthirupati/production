@@ -288,6 +288,23 @@ jobs:
             export RUN_E2E="${RUN_E2E:-true}"
             ./scripts/ci-post-deploy-verify.sh
 
+      - name: Cleanup E2E test data (always)
+        if: always() && (inputs.action == 'launch' || inputs.action == 'deploy')
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ steps.host.outputs.host }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            cd /opt/fixitlab
+            if [ "${E2E_SKIP_CLEANUP:-0}" = "1" ]; then
+              echo "Cleanup skipped (E2E_SKIP_CLEANUP=1)"
+              exit 0
+            fi
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              python /scripts/cleanup-test-data.py || true
+
       - name: Summary
         if: always() && (inputs.action == 'launch' || inputs.action == 'deploy')
         run: |
