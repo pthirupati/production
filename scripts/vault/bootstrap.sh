@@ -23,6 +23,9 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
+mkdir -p "$(dirname "$INIT_FILE")" "$(dirname "$APPROLE_FILE")"
+chmod 700 "$(dirname "$INIT_FILE")" 2>/dev/null || true
+
 chmod +x "$ROOT/scripts/vault/"*.sh "$ROOT/scripts/vault/env-kv-helper.py"
 bash "$ROOT/scripts/vault/start.sh"
 
@@ -83,8 +86,10 @@ TMP_JSON="$(mktemp)"
 python3 "$ROOT/scripts/vault/env-kv-helper.py" env-to-json "$ENV_FILE" > "$TMP_JSON"
 chmod 600 "$TMP_JSON"
 
+docker cp "$TMP_JSON" fixitlab_vault:/tmp/vault-seed.json
 docker compose -f docker-compose.vault.yml exec -T -e VAULT_TOKEN vault \
-  sh -c "vault kv put $KV_PATH @-" < "$TMP_JSON"
+  vault kv put "$KV_PATH" @/tmp/vault-seed.json
+docker compose -f docker-compose.vault.yml exec -T vault rm -f /tmp/vault-seed.json
 
 rm -f "$TMP_JSON"
 echo "  ✓ Seeded Vault path: $KV_PATH ($(grep -c '^[A-Z]' "$ENV_FILE" || echo 0) keys from env file)"

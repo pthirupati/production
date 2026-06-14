@@ -1,7 +1,4 @@
-# HashiCorp Vault — single-node file storage (FixitLab production VPS)
-# Bound to localhost; only the host and vault CLI/agent reach this port.
-
-ui            = false
+ui = false
 disable_mlock = true
 
 storage "file" {
@@ -10,11 +7,10 @@ storage "file" {
 
 listener "tcp" {
   address     = "0.0.0.0:8200"
-  tls_disable = true
+  tls_disable = 1
 }
 
-api_addr     = "http://127.0.0.1:8200"
-cluster_addr = "http://127.0.0.1:8201"
+api_addr = "http://127.0.0.1:8200"
 
 default_lease_ttl = "768h"
 max_lease_ttl     = "8760h"

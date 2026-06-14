@@ -3,7 +3,7 @@
 #   docker compose -f docker-compose.vault.yml up -d
 #   ./scripts/vault/bootstrap.sh deploy/production.env
 #
-# Vault listens on 127.0.0.1:8200 — not exposed publicly.
+# Access via: docker compose -f docker-compose.vault.yml exec vault vault ...
 
 services:
   vault:
@@ -11,11 +11,10 @@ services:
     container_name: fixitlab_vault
     cap_add:
       - IPC_LOCK
-    command: server -config=/vault/config/config.hcl
-    ports:
-      - "127.0.0.1:8200:8200"
+    # Bypass docker-entrypoint.sh — it injects dev mode on 0.0.0.0:8200 and duplicates listeners
+    entrypoint: ["vault", "server", "-config=/etc/vault/config.hcl"]
     volumes:
-      - ./infra/vault/config.hcl:/vault/config/config.hcl:ro
+      - ./infra/vault/config.hcl:/etc/vault/config.hcl:ro
       - vault_data:/vault/data
     environment:
       VAULT_ADDR: http://127.0.0.1:8200

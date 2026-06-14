@@ -19,6 +19,8 @@ APPROLE_FILE="${VAULT_APPROLE_FILE:-$ROOT/deploy/vault-approle.env}"
 if [ -f "$APPROLE_FILE" ]; then
   # shellcheck disable=SC1090
   source "$APPROLE_FILE"
+  ROLE_ID="${VAULT_ROLE_ID:-$ROLE_ID}"
+  SECRET_ID="${VAULT_SECRET_ID:-$SECRET_ID}"
 fi
 
 if [ -z "$ROLE_ID" ] || [ -z "$SECRET_ID" ]; then

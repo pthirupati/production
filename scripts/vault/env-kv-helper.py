@@ -45,13 +45,15 @@ def kv_json_to_env(payload: str) -> None:
 
 
 def main() -> None:
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
         print("Usage: env-kv-helper.py env-to-json PATH", file=sys.stderr)
         print("       env-kv-helper.py kv-to-env   (reads JSON from stdin)", file=sys.stderr)
         raise SystemExit(2)
-    cmd, arg = sys.argv[1], sys.argv[2]
+    cmd = sys.argv[1]
     if cmd == "env-to-json":
-        env_to_json(arg)
+        if len(sys.argv) < 3:
+            raise SystemExit("env-to-json requires PATH")
+        env_to_json(sys.argv[2])
     elif cmd == "kv-to-env":
         kv_json_to_env(sys.stdin.read())
     else:

@@ -29,8 +29,10 @@ TMP_JSON="$(mktemp)"
 python3 "$ROOT/scripts/vault/env-kv-helper.py" env-to-json "$ENV_FILE" > "$TMP_JSON"
 chmod 600 "$TMP_JSON"
 
+docker cp "$TMP_JSON" fixitlab_vault:/tmp/vault-seed.json
 docker compose -f docker-compose.vault.yml exec -T -e VAULT_TOKEN vault \
-  sh -c "vault kv put $KV_PATH @-" < "$TMP_JSON"
+  vault kv put "$KV_PATH" @/tmp/vault-seed.json
+docker compose -f docker-compose.vault.yml exec -T vault rm -f /tmp/vault-seed.json
 
 rm -f "$TMP_JSON"
 echo "[vault] Updated $KV_PATH from $ENV_FILE"
