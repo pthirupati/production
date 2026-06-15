@@ -25,6 +25,21 @@ from .simulation.validation import (
 logger = logging.getLogger(__name__)
 
 
+def evict_sim_stream(session_key: str, host_key: str = "primary") -> None:
+    """Remove a cached (possibly closed) simulation stream so reconnect gets a fresh shell."""
+    entry = get_sim_session(session_key)
+    if not entry:
+        return
+    stream_key = f"{session_key}:{host_key or 'primary'}"
+    streams = entry.get("streams") or {}
+    if stream_key in streams:
+        holder = streams.pop(stream_key)
+        try:
+            holder.close()
+        except Exception:
+            pass
+
+
 class SimulationProvisioner:
     """Provisioner for lab_mode=simulation — one engine, scenario-driven behavior."""
 
@@ -106,7 +121,10 @@ class SimulationProvisioner:
         streams = entry.setdefault("streams", {})
         existing = streams.get(stream_key)
         if existing is not None:
-            return existing.exec_id, existing
+            if getattr(existing, "_closed", False):
+                del streams[stream_key]
+            else:
+                return existing.exec_id, existing
 
         if hk == "ssh_client":
             hostname = "ssh-client"

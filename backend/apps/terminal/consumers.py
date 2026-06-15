@@ -277,6 +277,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     return host["container_id"]
         if self.provider_type == "docker":
             return self.lab_session.container_id
+        if self.provider_type == "simulation":
+            return self.lab_session.container_id
         return self.lab_session.instance_id
 
     async def receive(self, text_data=None, bytes_data=None):
@@ -416,6 +418,11 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     pass
             self.raw_socket = None
             self._shell_ready = False
+
+            if self.provider_type == "simulation":
+                from apps.labs.provisioner.simulation_provisioner import evict_sim_stream
+                host_key = getattr(self, "_terminal_host", "primary")
+                await asyncio.to_thread(evict_sim_stream, str(self.lab_session.id), host_key)
 
             if not await self._safe_send(json.dumps({
                 "type": "shell_respawn",

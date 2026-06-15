@@ -7,7 +7,7 @@ import { subscriptionApi } from '../api/subscriptions'
 import api from '../api/client'
 import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download, Github, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { buildOAuthAuthorizeUrl } from '../utils/oauth'
+import { startOAuth } from '../utils/oauth'
 import { validators } from '../utils/validators'
 import { SkeletonCard } from '../components/Skeleton'
 
@@ -112,10 +112,7 @@ export default function Profile() {
       toast.error(`${provider === 'github' ? 'GitHub' : 'Google'} is not configured on this server.`)
       return
     }
-    sessionStorage.setItem('oauth_intent', 'link')
-    const url = buildOAuthAuthorizeUrl(socialConfig, provider)
-    if (!url) return
-    window.location.href = url
+    startOAuth(provider, 'link')
   }
 
   const downloadInvoice = async (inv) => {

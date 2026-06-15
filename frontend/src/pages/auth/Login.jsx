@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { authApi } from '../../api/auth'
 import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff, Terminal, Server, Shield, Cpu, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { buildOAuthAuthorizeUrl } from '../../utils/oauth'
+import { startOAuth } from '../../utils/oauth'
 
 /* ── Animated server-room illustration (left panel) ── */
 function ServerIllustration() {
@@ -96,14 +96,11 @@ export default function Login() {
   }, [])
 
   const handleSocialLogin = (provider) => {
-    if (!socialConfig?.[provider]?.enabled) {
+    if (socialConfig && !socialConfig?.[provider]?.enabled) {
       toast.error(`${provider === 'github' ? 'GitHub' : 'Google'} login is not configured. Add ${provider.toUpperCase()}_CLIENT_ID and ${provider.toUpperCase()}_CLIENT_SECRET to your .env file.`, { duration: 5000 })
       return
     }
-    sessionStorage.setItem('oauth_intent', 'login')
-    const url = buildOAuthAuthorizeUrl(socialConfig, provider)
-    if (!url) return
-    window.location.href = url
+    startOAuth(provider, 'login')
   }
 
   const handleSubmit = async (e) => {

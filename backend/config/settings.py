@@ -180,6 +180,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+# Serve uploaded files through Django when nginx proxies /media/ to the backend.
+SERVE_MEDIA = env.bool("SERVE_MEDIA", default=True)
 
 # --------------------------------------------------
 # Django REST Framework + JWT

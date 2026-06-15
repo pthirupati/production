@@ -1,6 +1,7 @@
 import logging
 from django.contrib.auth import authenticate, get_user_model
 from django.conf import settings
+from django.shortcuts import redirect
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -553,7 +554,12 @@ class ResetPasswordView(APIView):
         return Response({"message": "Password has been reset successfully. You can now sign in."})
 
 
-from .oauth_urls import canonical_frontend_url, oauth_callback_url
+from .oauth_urls import (
+    canonical_frontend_url,
+    github_authorize_url,
+    google_authorize_url,
+    oauth_callback_url,
+)
 
 
 # ─── Social OAuth ─────────────────────────────────────────────────
@@ -564,21 +570,47 @@ class SocialAuthConfigView(APIView):
 
     def get(self, request):
         base = canonical_frontend_url()
+        gh_callback = oauth_callback_url("github")
+        google_callback = oauth_callback_url("google")
         return Response({
             "frontend_url": base,
             "github": {
                 "enabled": bool(settings.GITHUB_CLIENT_ID),
                 "client_id": settings.GITHUB_CLIENT_ID,
                 "authorize_url": "https://github.com/login/oauth/authorize",
-                "callback_url": oauth_callback_url("github"),
+                "callback_url": gh_callback,
+                "login_url": github_authorize_url(intent="login") if settings.GITHUB_CLIENT_ID else "",
+                "start_url": "/api/auth/social/start/github/",
             },
             "google": {
                 "enabled": bool(settings.GOOGLE_CLIENT_ID),
                 "client_id": settings.GOOGLE_CLIENT_ID,
                 "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
-                "callback_url": oauth_callback_url("google"),
+                "callback_url": google_callback,
+                "login_url": google_authorize_url(intent="login") if settings.GOOGLE_CLIENT_ID else "",
+                "start_url": "/api/auth/social/start/google/",
             },
         })
+
+
+class SocialOAuthStartView(APIView):
+    """Redirect browser to GitHub/Google with server-built redirect_uri."""
+    permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
+
+    def get(self, request, provider):
+        intent = (request.GET.get("intent") or "login").strip()
+        if intent not in ("login", "register", "link"):
+            intent = "login"
+        if provider == "github":
+            if not settings.GITHUB_CLIENT_ID:
+                return Response({"error": "GitHub login is not configured."}, status=501)
+            return redirect(github_authorize_url(intent=intent))
+        if provider == "google":
+            if not settings.GOOGLE_CLIENT_ID:
+                return Response({"error": "Google login is not configured."}, status=501)
+            return redirect(google_authorize_url(intent=intent))
+        return Response({"error": "Unknown provider."}, status=400)
 
 
 class GitHubCallbackView(APIView):

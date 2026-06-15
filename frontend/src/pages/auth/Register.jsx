@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { authApi } from '../../api/auth'
 import { Mail, Lock, ArrowRight, AlertCircle, Phone, Eye, EyeOff, Check, X, ShieldCheck, ArrowLeft, Terminal, Server, Cloud, Activity, Shield } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { buildOAuthAuthorizeUrl } from '../../utils/oauth'
+import { startOAuth } from '../../utils/oauth'
 
 /* ── Animated illustration for registration ── */
 function RegisterIllustration() {
@@ -200,14 +200,11 @@ export default function Register() {
   }, [])
 
   const handleSocialRegister = (provider) => {
-    if (!socialConfig?.[provider]?.enabled) {
+    if (socialConfig && !socialConfig?.[provider]?.enabled) {
       toast.error(`${provider === 'github' ? 'GitHub' : 'Google'} sign-up is not configured on this server.`, { duration: 5000 })
       return
     }
-    sessionStorage.setItem('oauth_intent', 'register')
-    const url = buildOAuthAuthorizeUrl(socialConfig, provider)
-    if (!url) return
-    window.location.href = url
+    startOAuth(provider, 'register')
   }
 
   const OTP_EXPIRY_SECONDS = 120

@@ -9,7 +9,7 @@ from apps.accounts.views import (
     RegisterView, LoginView, UserProfileView, ChangePasswordView,
     ForgotPasswordView, ResetPasswordView, LogoutView,
     SendOTPView, VerifyOTPView,
-    SocialAuthConfigView, GitHubCallbackView, GoogleCallbackView,
+    SocialAuthConfigView, SocialOAuthStartView, GitHubCallbackView, GoogleCallbackView,
     GitHubLinkView, GoogleLinkView,
     LabHistoryView, SearchView, ContactView,
 )
@@ -32,6 +32,7 @@ urlpatterns = [
 
     # Social OAuth
     path("api/auth/social/config/", SocialAuthConfigView.as_view(), name="social_config"),
+    path("api/auth/social/start/<str:provider>/", SocialOAuthStartView.as_view(), name="social_oauth_start"),
     path("api/auth/social/github/", GitHubCallbackView.as_view(), name="github_callback"),
     path("api/auth/social/google/", GoogleCallbackView.as_view(), name="google_callback"),
     path("api/auth/social/link/github/", GitHubLinkView.as_view(), name="github_link"),

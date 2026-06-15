@@ -22,6 +22,10 @@ export default defineConfig({
         target: "ws://backend:8000",
         ws: true,
         changeOrigin: true
+      },
+      "/media": {
+        target: "http://backend:8000",
+        changeOrigin: true
       }
     }
   },
