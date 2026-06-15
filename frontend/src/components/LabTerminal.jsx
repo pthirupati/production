@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore'
 const WS_NO_RECONNECT = new Set([1000, 4001, 4003, 4004, 4005, 4008, 4500])
 
 /**
- * Single xterm + WebSocket pane for a lab host (primary or companion).
+ * Single xterm + WebSocket pane for a lab host (primary, companion, or ssh_client).
  */
 export default function LabTerminal({
   sessionId,
@@ -15,19 +15,23 @@ export default function LabTerminal({
   blockedCommands = [],
   className = '',
   onReady,
+  welcomeHint = '',
 }) {
   const terminalRef = useRef(null)
   const xtermRef = useRef(null)
   const wsRef = useRef(null)
   const fitAddonRef = useRef(null)
   const reconnectAttempts = useRef(0)
+  const reconnectTimerRef = useRef(null)
   const inputBufferRef = useRef('')
   const sessionKeyRef = useRef(null)
   const maxReconnectAttempts = 10
 
   useEffect(() => {
     if (!session || session.status !== 'RUNNING' || !terminalRef.current) return
-    if (!session.container_id && !session.instance_id) return
+    const isSimulation = session.provider === 'simulation'
+    const hasResource = session.container_id || session.instance_id || isSimulation
+    if (!hasResource) return
     const sk = `${sessionId}:${hostKey}`
     if (sessionKeyRef.current === sk) return
 
@@ -65,6 +69,10 @@ export default function LabTerminal({
       xtermRef.current = term
       fitAddonRef.current = fitAddon
 
+      if (welcomeHint) {
+        term.write(`\r\n\x1b[1;36m${welcomeHint}\x1b[0m\r\n`)
+      }
+
       const blockedPatterns = (blockedCommands || []).map(entry => {
         if (!entry || typeof entry !== 'string') return null
         const raw = entry.trim()
@@ -83,31 +91,79 @@ export default function LabTerminal({
         return `${protocol}://${window.location.host}/ws/terminal/${sessionId}/?token=${token}${hostQ}`
       }
 
+      const bindEnterRetry = (message) => {
+        term.write(message)
+        const retryHandler = term.onData((data) => {
+          if (data === '\r' || data === '\n') {
+            retryHandler.dispose()
+            reconnectAttempts.current = 0
+            term.write('\r\n\x1b[1;36mRetrying connection...\x1b[0m\r\n')
+            connectWs()
+          }
+        })
+      }
+
       const connectWs = () => {
         if (disposed) return
+        if (reconnectTimerRef.current) {
+          clearTimeout(reconnectTimerRef.current)
+          reconnectTimerRef.current = null
+        }
         if (wsRef.current) {
           wsRef.current.onclose = null
           wsRef.current.close(1000)
         }
         const ws = new WebSocket(buildWsUrl())
         wsRef.current = ws
-        ws.onopen = () => { reconnectAttempts.current = 0; onReady?.() }
+        ws.onopen = () => {
+          reconnectAttempts.current = 0
+          onReady?.()
+        }
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data)
             if (data.type === 'ping') return
+            if (data.type === 'shell_respawn') {
+              reconnectAttempts.current = 0
+              if (data.output) term.write(data.output)
+              return
+            }
+            if (data.type === 'shell_ready') return
             if (data.output) term.write(data.output)
           } catch { term.write(event.data) }
         }
         ws.onclose = (e) => {
           if (disposed || e.code === 1000) return
           if (WS_NO_RECONNECT.has(e.code)) {
-            term.write('\r\n\x1b[1;31mConnection closed.\x1b[0m\r\n')
+            if (e.code === 4500) {
+              bindEnterRetry('\r\n\x1b[1;33mPress Enter to retry connection...\x1b[0m\r\n')
+            } else {
+              term.write('\r\n\x1b[1;31mConnection closed.\x1b[0m\r\n')
+            }
+            return
+          }
+          const isSim = session?.provider === 'simulation'
+          if (e.code === 1006 && reconnectAttempts.current < 2) {
+            reconnectAttempts.current++
+            term.write('\r\n\x1b[1;33mConnection interrupted — retrying...\x1b[0m\r\n')
+            reconnectTimerRef.current = setTimeout(connectWs, 1500)
             return
           }
           if (reconnectAttempts.current < maxReconnectAttempts) {
             reconnectAttempts.current++
-            setTimeout(connectWs, 2000)
+            const cap = isSim ? 3 : maxReconnectAttempts
+            if (isSim && reconnectAttempts.current > 3) {
+              bindEnterRetry('\r\n\x1b[1;33mSimulation shell paused — press Enter to reconnect\x1b[0m\r\n')
+              return
+            }
+            if (reconnectAttempts.current >= cap) {
+              bindEnterRetry('\r\n\x1b[1;31mConnection lost.\x1b[0m Press Enter to retry.\x1b[0m\r\n')
+              return
+            }
+            const delay = isSim ? 1000 : 2000
+            reconnectTimerRef.current = setTimeout(connectWs, delay)
+          } else {
+            bindEnterRetry('\r\n\x1b[1;31mConnection lost after multiple attempts.\x1b[0m\r\n')
           }
         }
       }
@@ -149,6 +205,7 @@ export default function LabTerminal({
 
       cleanup = () => {
         disposed = true
+        if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
         ro?.disconnect()
         wsRef.current?.close(1000)
         wsRef.current = null
@@ -160,7 +217,7 @@ export default function LabTerminal({
 
     init()
     return () => cleanup()
-  }, [sessionId, session?.status, session?.container_id, session?.instance_id, hostKey, isMobile, blockedCommands])
+  }, [sessionId, session?.status, session?.container_id, session?.instance_id, session?.provider, hostKey, isMobile, blockedCommands, welcomeHint])
 
   return (
     <div className={`flex flex-col min-h-0 min-w-0 ${className}`}>

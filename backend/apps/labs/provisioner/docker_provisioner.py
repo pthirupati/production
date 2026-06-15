@@ -166,6 +166,107 @@ class DockerProvisioner:
                 return ip
         return ""
 
+    def _provision_ssh_client(self, lab_session, session_network, username, short_id, remote_hosts):
+        """Dedicated jump box with openssh-client + labuser (passwordless sudo, SSH keys to remotes)."""
+        if not remote_hosts:
+            return None
+
+        image = getattr(settings, "SSH_CLIENT_IMAGE", "alpine:3.19")
+        container_name = f"fixitlab-{username}-{short_id}-sshclient"
+        self._cleanup_stale_container(container_name)
+
+        try:
+            self.client.images.get(image)
+        except NotFound:
+            logger.info("Pulling SSH client image %s...", image)
+            self.client.images.pull(image)
+
+        container = self.client.containers.run(
+            image=image,
+            name=container_name,
+            detach=True,
+            command=["/bin/sh", "-c", "sleep infinity"],
+            hostname="ssh-client",
+            mem_limit=settings.DOCKER_CONTAINER_MEMORY_LIMIT,
+            nano_cpus=int(settings.DOCKER_CONTAINER_CPU_LIMIT * 1e9),
+            network=session_network.name,
+            labels={
+                "fixitlab.type": "lab",
+                "fixitlab.session_id": str(lab_session.id),
+                "fixitlab.user_id": str(lab_session.user_id),
+                "fixitlab.user": getattr(lab_session.user, "username", "") or "",
+                "fixitlab.scenario": lab_session.scenario.slug,
+                "fixitlab.host_role": "ssh_client",
+                "fixitlab.created": str(int(_time.time())),
+            },
+            environment={
+                "FIXITLAB_SESSION_ID": str(lab_session.id),
+                "FIXITLAB_HOST_ROLE": "ssh_client",
+            },
+            read_only=False,
+            tty=True,
+            stdin_open=True,
+        )
+        self._wait_for_container(container)
+
+        setup_script = (
+            "apk add --no-cache openssh-client sudo bash shadow 2>/dev/null; "
+            "adduser -D -s /bin/bash labuser 2>/dev/null || true; "
+            "echo 'labuser ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/labuser; "
+            "chmod 440 /etc/sudoers.d/labuser; "
+            "mkdir -p /home/labuser/.ssh; chown labuser:labuser /home/labuser/.ssh; "
+            "chmod 700 /home/labuser/.ssh; "
+            "su - labuser -c 'ssh-keygen -t ed25519 -N \"\" -f /home/labuser/.ssh/id_ed25519 -q'; "
+            "cat /home/labuser/.ssh/id_ed25519.pub"
+        )
+        setup = container.exec_run(["/bin/sh", "-c", setup_script], user="root")
+        pubkey = ""
+        if setup.exit_code == 0:
+            lines = setup.output.decode(errors="replace").strip().splitlines()
+            pubkey = lines[-1].strip() if lines else ""
+
+        if pubkey:
+            for rh in remote_hosts:
+                cid = rh.get("container_id")
+                if not cid:
+                    continue
+                try:
+                    remote = self.client.containers.get(cid)
+                    remote_user = rh.get("ssh_user") or "root"
+                    auth_cmd = (
+                        f"mkdir -p /root/.ssh; chmod 700 /root/.ssh; "
+                        f"grep -qF '{pubkey}' /root/.ssh/authorized_keys 2>/dev/null || "
+                        f"echo '{pubkey}' >> /root/.ssh/authorized_keys; "
+                        f"chmod 600 /root/.ssh/authorized_keys; "
+                        f"(getent passwd {remote_user} >/dev/null && "
+                        f"mkdir -p /home/{remote_user}/.ssh && "
+                        f"grep -qF '{pubkey}' /home/{remote_user}/.ssh/authorized_keys 2>/dev/null || "
+                        f"echo '{pubkey}' >> /home/{remote_user}/.ssh/authorized_keys && "
+                        f"chown -R {remote_user}:{remote_user} /home/{remote_user}/.ssh) 2>/dev/null || true"
+                    )
+                    remote.exec_run(["/bin/sh", "-c", auth_cmd], user="root")
+                except Exception as exc:
+                    logger.warning("SSH key install failed for %s: %s", cid[:12], exc)
+
+        ip = self._get_container_ip(container, session_network.name)
+        targets = [
+            {
+                "name": h.get("name", ""),
+                "ip": h.get("ip", ""),
+                "user": h.get("ssh_user") or "root",
+            }
+            for h in remote_hosts if h.get("ip")
+        ]
+        logger.info("SSH client host at %s for session %s", ip, lab_session.id)
+        return {
+            "name": "ssh_client",
+            "role": "SSH Client",
+            "container_id": container.id,
+            "ip": ip or "",
+            "ssh_user": "labuser",
+            "ssh_targets": targets,
+        }
+
     def _provision_companion_hosts(self, lab_session, session_network, image_name, privileged, username, short_id):
         """Start additional containers on the same session network (SSH/SCP/NFS labs)."""
         yaml_data = self._load_scenario_yaml(lab_session.scenario)
@@ -355,12 +456,18 @@ class DockerProvisioner:
             lab_session.ssh_user = "root"
             lab_hosts = [{
                 "name": "primary",
-                "role": "client",
+                "role": "Primary",
                 "container_id": container.id,
                 "ip": primary_ip or "",
                 "ssh_user": "root",
             }]
             lab_hosts.extend(companion_hosts)
+            remotes = [h for h in companion_hosts if h.get("ip")]
+            ssh_client = self._provision_ssh_client(
+                lab_session, session_network, username, short_id, remotes,
+            )
+            if ssh_client:
+                lab_hosts.append(ssh_client)
             lab_session.lab_hosts = lab_hosts
             lab_session.save(update_fields=["ssh_host", "ssh_user", "lab_hosts"])
 

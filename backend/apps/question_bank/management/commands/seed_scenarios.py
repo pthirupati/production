@@ -137,7 +137,7 @@ class Command(BaseCommand):
                         "initial_state": data.get("initial_state", ""),
                         "validation_script": validation_script,
                         "docker_image": f"fixitlab/scenario-{data.get('slug', scenario_dir)}:latest",
-                        "time_limit": data.get("time_limit", 900),
+                        "time_limit": data.get("time_limit", 600),
                         "max_score": data.get("max_score", 100),
                         "is_active": True,
                         "is_free": data.get("is_free", False),

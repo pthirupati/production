@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { adminApi } from '../../api/admin'
+import toast from 'react-hot-toast'
 import {
   Users, Target, MonitorPlay, TrendingUp,
   Activity, CheckCircle2, XCircle, AlertCircle,
@@ -27,6 +29,7 @@ const SERVICE_ICONS = {
   'Email': Mail,
   'RabbitMQ': MessageSquare,
   'Celery Workers': Activity,
+  'Vault': Server,
 }
 
 const ACTIVITY_ICONS = {
@@ -136,6 +139,7 @@ export default function AdminDashboard() {
     { name: 'Email', key: 'email' },
     { name: 'RabbitMQ', key: 'rabbitmq' },
     { name: 'Celery Workers', key: 'celery' },
+    { name: 'Vault', key: 'vault' },
   ]
 
   const emailStats = health?.email_stats || {}
@@ -188,7 +192,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             {healthServices.map(({ name, key }) => {
               const svc = health?.[key] || {}
-              const isHealthy = svc.status === 'healthy'
+              const isHealthy = svc.status === 'healthy' || (key === 'vault' && svc.status === 'degraded')
               const Icon = SERVICE_ICONS[name] || Server
               return (
                 <div key={name} className={`flex items-start gap-3 p-3 rounded-lg transition-all ${
@@ -261,6 +265,23 @@ export default function AdminDashboard() {
                 Last: {new Date(emailStats.last_sent_at).toLocaleString()}
               </p>
             )}
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const result = await adminApi.sendTestEmail()
+                  toast.success(result.sent ? `Test email sent to ${result.to_email}` : 'Send failed')
+                } catch (err) {
+                  toast.error(err.response?.data?.error || 'Test email failed')
+                }
+              }}
+              className="w-full mt-3 btn-secondary text-sm flex items-center justify-center gap-2"
+            >
+              <Send size={14} /> Send test email
+            </button>
+            <Link to="/admin/settings" className="block text-center text-[11px] text-accent-cyan hover:underline mt-2">
+              Email settings →
+            </Link>
           </div>
         </div>
       </div>

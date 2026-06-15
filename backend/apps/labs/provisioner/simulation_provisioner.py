@@ -50,6 +50,14 @@ class SimulationProvisioner:
                     {"name": "primary", "role": "server-a", "container_id": resource_id, "ip": "10.0.0.10", "ssh_user": "root"},
                     {"name": "companion", "role": "server-b", "container_id": f"{resource_id}-companion", "ip": "10.0.0.11", "ssh_user": "root"},
                 ]
+        if not lab_hosts:
+            lab_hosts = [{
+                "name": "primary",
+                "role": "Primary",
+                "container_id": resource_id,
+                "ip": "10.0.0.10",
+                "ssh_user": "root",
+            }]
 
         register_sim_session(
             str(lab_session.id),
@@ -67,6 +75,22 @@ class SimulationProvisioner:
         lab_session.lab_hosts = lab_hosts
         lab_session.save(update_fields=["lab_hosts"])
 
+        if len(lab_hosts) >= 2:
+            lab_hosts = list(lab_session.lab_hosts or [])
+            lab_hosts.append({
+                "name": "ssh_client",
+                "role": "SSH Client",
+                "container_id": resource_id,
+                "ip": "10.0.0.5",
+                "ssh_user": "labuser",
+                "ssh_targets": [
+                    {"name": h["name"], "ip": h.get("ip", ""), "user": h.get("ssh_user", "root")}
+                    for h in lab_hosts if h.get("name") not in ("primary", "ssh_client") and h.get("ip")
+                ],
+            })
+            lab_session.lab_hosts = lab_hosts
+            lab_session.save(update_fields=["lab_hosts"])
+
         logger.info("Simulation lab %s persona=%s resource=%s", lab_session.id, sim_type, resource_id)
         return resource_id, f"sim-{slug}"
 
@@ -83,6 +107,23 @@ class SimulationProvisioner:
         existing = streams.get(stream_key)
         if existing is not None:
             return existing.exec_id, existing
+
+        if hk == "ssh_client":
+            hostname = "ssh-client"
+            client_state = engine.state.clone_for_host(hostname)
+            shell = RHELShell(
+                state=client_state,
+                scenario_slug=entry["state"].get("scenario_slug", ""),
+                hostname=hostname,
+            )
+            register_modules(engine, shell)
+            holder = SimulationStreamHolder(
+                shell.run,
+                prompt="labuser@ssh-client:~$ ",
+                dynamic_prompt=lambda: shell.prompt,
+            )
+            streams[stream_key] = holder
+            return holder.exec_id, holder
 
         if hk not in ("primary", "") and hk != "primary":
             hostname = hk

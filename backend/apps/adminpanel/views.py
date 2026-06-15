@@ -4,6 +4,7 @@ lab sessions, system monitoring, platform settings, and data exports.
 """
 import csv
 import logging
+import os
 from io import StringIO
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -948,6 +949,7 @@ class AdminSystemHealthView(APIView):
             "email": self._check_email(),
             "rabbitmq": self._check_rabbitmq(),
             "celery": self._check_celery(),
+            "vault": self._check_vault(),
         }
 
         # Cloud provider health (optional — does not affect core overall)
@@ -1084,6 +1086,44 @@ class AdminSystemHealthView(APIView):
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}
 
+    def _check_vault(self):
+        """HashiCorp Vault container + metrics listener (optional when VAULT_ENABLED)."""
+        vault_enabled = str(getattr(settings, "VAULT_ENABLED", "") or "").lower() in ("1", "true", "yes", "on")
+        if not vault_enabled and not os.environ.get("VAULT_ENABLED"):
+            return {"status": "healthy", "details": "Vault disabled", "optional": True}
+        try:
+            import subprocess
+
+            status = subprocess.run(
+                ["docker", "inspect", "-f", "{{.State.Status}}", "fixitlab_vault"],
+                capture_output=True,
+                text=True,
+                timeout=8,
+            )
+            if status.returncode != 0:
+                return {"status": "unhealthy", "error": "Vault container not found"}
+            state = (status.stdout or "").strip()
+            if state != "running":
+                return {"status": "unhealthy", "error": f"Vault container {state}"}
+
+            metrics = subprocess.run(
+                [
+                    "docker", "run", "--rm", "--network", "container:fixitlab_vault",
+                    "curlimages/curl:8.5.0", "-sf",
+                    "http://127.0.0.1:8201/v1/sys/metrics?format=prometheus",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            metrics_ok = metrics.returncode == 0 and "vault" in (metrics.stdout or "").lower()
+            return {
+                "status": "healthy" if metrics_ok else "degraded",
+                "details": "Vault running, Prometheus metrics OK" if metrics_ok else "Vault running (metrics pending)",
+            }
+        except Exception as e:
+            return {"status": "unhealthy", "error": str(e)}
+
     def _check_containers(self):
         """Get health status of platform Docker containers (not ephemeral lab containers)."""
         try:
@@ -1106,7 +1146,7 @@ class AdminSystemHealthView(APIView):
                 is_platform = (
                     project == "fixitlab-main"
                     or c.name.startswith("fixitlab_")
-                    or c.name in ("fixitlab_db", "fixitlab_redis", "fixitlab_rabbitmq")
+                    or c.name in ("fixitlab_db", "fixitlab_redis", "fixitlab_rabbitmq", "fixitlab_vault")
                 )
                 if not is_platform:
                     continue
@@ -2000,7 +2040,7 @@ class AdminMonitoringContainersView(APIView):
 
     SYSTEM_NAME_HINTS = (
         "backend", "frontend", "gateway", "redis", "postgres", "database",
-        "rabbitmq", "celery", "certbot", "nginx",
+        "rabbitmq", "celery", "certbot", "nginx", "vault", "fixitlab_vault",
     )
 
     def get(self, request):

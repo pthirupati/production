@@ -159,7 +159,7 @@ class Scenario(models.Model):
         help_text="Technology persona when lab_mode=simulation (one unified engine)",
     )
 
-    time_limit = models.PositiveIntegerField(default=900, help_text="Time limit in seconds")
+    time_limit = models.PositiveIntegerField(default=600, help_text="Time limit in seconds (default 10 min)")
     max_score = models.PositiveIntegerField(default=100)
     definition_path = models.CharField(max_length=255, blank=True)
     is_free = models.BooleanField(default=False, help_text="Available without login")

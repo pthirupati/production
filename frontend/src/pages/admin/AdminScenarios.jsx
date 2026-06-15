@@ -54,7 +54,7 @@ export default function AdminScenarios() {
     title: '', slug: '', subtitle: '', description: '', objectives: '',
     initial_state: '', validation_script: '', category: '', difficulty: 'easy',
     technology_id: '', scenario_type: 'fix', infrastructure_type: 'docker',
-    cloud_setup_script: '', blocked_commands: [], tag_ids: [], time_limit: 900,
+    cloud_setup_script: '', blocked_commands: [], tag_ids: [], time_limit: 600,
     max_score: 100, is_active: true, is_free: true, solution_explanation: '',
     jira_priority: 'Medium', jira_issue_template: '',
     requires_companion_hosts: false, dual_terminal: false,
@@ -127,7 +127,7 @@ export default function AdminScenarios() {
         cloud_setup_script: s.cloud_setup_script || '',
         blocked_commands: Array.isArray(s.blocked_commands) ? s.blocked_commands : [],
         tag_ids: s.tags?.map(t => t.id) || [],
-        time_limit: s.time_limit || 900,
+        time_limit: s.time_limit || 600,
         max_score: s.max_score || 100,
         is_active: s.is_active,
         is_free: s.is_free ?? false,
@@ -184,7 +184,7 @@ export default function AdminScenarios() {
       title: '', slug: '', subtitle: '', description: '', objectives: '',
       initial_state: '', validation_script: '', category: '', difficulty: 'easy',
       technology_id: '', scenario_type: 'fix', infrastructure_type: 'docker',
-      cloud_setup_script: '', blocked_commands: [], tag_ids: [], time_limit: 900,
+      cloud_setup_script: '', blocked_commands: [], tag_ids: [], time_limit: 600,
     max_score: 100, is_active: true, is_free: true, solution_explanation: '',
     jira_priority: 'Medium', jira_issue_template: '',
     requires_companion_hosts: false, dual_terminal: false,
@@ -345,7 +345,7 @@ export default function AdminScenarios() {
               <div>
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Time Limit (sec)</label>
                 <input type="number" value={form.time_limit} onChange={(e) => setForm(f => ({ ...f, time_limit: Number(e.target.value) }))} className="input-field" />
-                <p className="text-xs text-surface-500 mt-1">Default 900s (15 min). Labs auto-expire via Celery beat every 5 min.</p>
+                <p className="text-xs text-surface-500 mt-1">Default 600s (10 min). Lab auto-expires and redirects learner to scenario page.</p>
               </div>
               <div>
                 <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Max Score</label>

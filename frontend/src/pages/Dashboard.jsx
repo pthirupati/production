@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { labApi } from '../api/labs'
+import { scenarioApi } from '../api/scenarios'
+import api from '../api/client'
 import { subscriptionApi } from '../api/subscriptions'
 import { jiraApi } from '../api/jira'
 import { useAuthStore } from '../store/authStore'
 import {
   Target, Trophy, Zap, Clock, TrendingUp, ArrowRight,
   CheckCircle2, Award, BookOpen, Play, Star,
-  Calendar, CreditCard, Crown, Layers, ArrowUpRight, XCircle, AlertTriangle, Sparkles, Download, Ticket
+  Calendar, CreditCard, Crown, Layers, ArrowUpRight, XCircle, AlertTriangle, Sparkles, Download, Ticket,
+  Bookmark, Bell, History, BarChart3
 } from 'lucide-react'
 import JiraTicketLink from '../components/JiraTicketLink'
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
@@ -26,6 +29,8 @@ export default function Dashboard() {
   const [cancelModal, setCancelModal] = useState(null)
   const [cancelling, setCancelling] = useState(false)
   const [jiraTickets, setJiraTickets] = useState([])
+  const [bookmarks, setBookmarks] = useState([])
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
 
   useEffect(() => {
     Promise.all([
@@ -34,13 +39,18 @@ export default function Dashboard() {
       labApi.getActiveLabs().catch(() => []),
       subscriptionApi.getMySubscriptions().catch(() => ({ subscriptions: [] })),
       jiraApi.getUserTickets().catch(() => ({ data: { tickets: [] } })),
-    ]).then(([prog, ach, labs, subs, jiraRes]) => {
+      scenarioApi.getBookmarks().catch(() => []),
+      api.get('/notifications/').catch(() => ({ data: { results: [] } })),
+    ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes]) => {
       setProgress(prog)
       setAchievements(ach)
       setActiveLabs(labs.filter(l => l.status === 'RUNNING'))
       setSubscriptions(subs?.subscriptions || [])
       setComplimentaryAccess(subs?.complimentary_access || false)
       setJiraTickets(jiraRes?.data?.tickets || [])
+      setBookmarks(Array.isArray(bms) ? bms : [])
+      const notifs = notifRes?.data?.results || notifRes?.data || []
+      setUnreadNotifications(Array.isArray(notifs) ? notifs.filter(n => !n.is_read).length : 0)
     }).finally(() => setLoading(false))
   }, [])
 
@@ -157,6 +167,72 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Quick actions + continue learning */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Link to="/bookmarks" className="glass-card p-4 hover:border-accent-cyan/30 transition-all group">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium text-white"><Bookmark size={16} className="text-accent-cyan" /> Bookmarks</div>
+            <span className="text-lg font-bold text-accent-cyan">{bookmarks.length}</span>
+          </div>
+          <p className="text-xs text-surface-500 mt-2">Saved scenarios to retry</p>
+        </Link>
+        <Link to="/profile" className="glass-card p-4 hover:border-accent-purple/30 transition-all">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium text-white"><Bell size={16} className="text-accent-purple" /> Notifications</div>
+            <span className="text-lg font-bold text-accent-purple">{unreadNotifications}</span>
+          </div>
+          <p className="text-xs text-surface-500 mt-2">Unread updates</p>
+        </Link>
+        <Link to="/lab-history" className="glass-card p-4 hover:border-accent-amber/30 transition-all">
+          <div className="flex items-center gap-2 text-sm font-medium text-white"><History size={16} className="text-accent-amber" /> Lab History</div>
+          <p className="text-xs text-surface-500 mt-2">Past attempts & scores</p>
+        </Link>
+        <Link to="/achievements" className="glass-card p-4 hover:border-accent-green/30 transition-all">
+          <div className="flex items-center gap-2 text-sm font-medium text-white"><BarChart3 size={16} className="text-accent-green" /> Progress</div>
+          <p className="text-xs text-surface-500 mt-2">{stats.completed || 0} scenarios completed</p>
+        </Link>
+      </div>
+
+      {Object.keys(techProgress).length > 0 && (
+        <div className="glass-card p-6">
+          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Layers size={18} className="text-accent-cyan" /> Progress by Technology</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(techProgress).map(([name, data]) => {
+              const pct = data.total ? Math.round((data.completed / data.total) * 100) : 0
+              return (
+                <Link key={name} to="/technologies" className="p-4 rounded-xl bg-surface-800/40 border border-surface-700/40 hover:border-accent-cyan/30 transition-all">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-semibold text-white">{name}</span>
+                    <span className="text-xs text-accent-cyan font-bold">{pct}%</span>
+                  </div>
+                  <div className="h-2 bg-surface-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-accent-cyan to-accent-blue" style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="text-[11px] text-surface-500 mt-2">{data.completed}/{data.total} scenarios · avg {data.avg_score || 0}</p>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {recent.filter(r => !r.completed && r.status !== 'COMPLETED').length > 0 && (
+        <div className="glass-card p-6 border-accent-cyan/20">
+          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Play size={18} className="text-accent-cyan" /> Continue Learning</h2>
+          <div className="space-y-2">
+            {recent.filter(r => !r.completed && r.status !== 'COMPLETED').slice(0, 4).map(item => (
+              <Link key={item.id || item.scenario_slug} to={`/scenarios/${item.scenario_slug}`} className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 hover:bg-surface-800 transition-colors">
+                <div>
+                  <p className="text-sm font-medium text-white">{item.title}</p>
+                  <p className="text-xs text-surface-500">{item.technology || 'Lab'} · {item.attempts || 1} attempt(s)</p>
+                </div>
+                <ArrowRight size={14} className="text-accent-cyan" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {activeLabs.length > 0 && (
         <div className="glass-card p-4 border-accent-amber/20 bg-accent-amber/5 relative overflow-hidden">

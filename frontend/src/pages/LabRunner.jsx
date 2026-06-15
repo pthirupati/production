@@ -43,6 +43,9 @@ export default function LabRunner() {
   const [jiraTransitioning, setJiraTransitioning] = useState(false)
   const [closingIn, setClosingIn] = useState(null)
   const [terminalHost, setTerminalHost] = useState('primary')
+  const [sshClientTarget, setSshClientTarget] = useState(null)
+
+  const TOAST = { closeButton: true }
 
   const terminalRef = useRef(null)
   const xtermRef = useRef(null)
@@ -79,7 +82,7 @@ export default function LabRunner() {
     if (closeCountdownRef.current) clearInterval(closeCountdownRef.current)
 
     setClosingIn(LAB_CLOSE_SECONDS)
-    toast(`Lab is closing in ${LAB_CLOSE_SECONDS} seconds…`, { icon: '⏳', duration: LAB_CLOSE_SECONDS * 1000 })
+    toast(`Lab is closing in ${LAB_CLOSE_SECONDS} seconds…`, { icon: '⏳', duration: LAB_CLOSE_SECONDS * 1000, ...TOAST })
 
     closeCountdownRef.current = setInterval(() => {
       setClosingIn(prev => (prev != null && prev > 1 ? prev - 1 : prev))
@@ -137,11 +140,11 @@ export default function LabRunner() {
           const msg = reason === 'completed' ? 'Lab completed in another tab!'
             : reason === 'expired' ? 'Lab time expired!'
             : 'Lab was stopped in another tab'
-          toast(msg, { icon: '🔄', duration: 4000 })
+          toast(msg, { icon: '🔄', duration: 4000, ...TOAST })
           navigate('/scenarios')
         }
         if (reason === 'completed' && closingDelayMs > 0) {
-          toast(`Lab completed — closing in ${Math.ceil(closingDelayMs / 1000)}s…`, { icon: '✅', duration: closingDelayMs })
+          toast(`Lab completed — closing in ${Math.ceil(closingDelayMs / 1000)}s…`, { icon: '✅', duration: closingDelayMs, ...TOAST })
           setTimeout(finish, closingDelayMs)
           return
         }
@@ -170,7 +173,7 @@ export default function LabRunner() {
           const msg = lab.status === 'COMPLETED' ? 'Lab completed!'
             : lab.status === 'EXPIRED' ? 'Lab time expired!'
             : 'Lab session ended'
-          toast(msg, { icon: lab.status === 'COMPLETED' ? '✅' : '⏰', duration: 4000 })
+          toast(msg, { icon: lab.status === 'COMPLETED' ? '✅' : '⏰', duration: 4000, ...TOAST })
           navigate(`/scenarios/${lab.scenario?.slug || ''}`, {
             state: lab.status === 'COMPLETED'
               ? { labCompleted: true, scenarioTitle: lab.scenario?.title }
@@ -281,7 +284,7 @@ export default function LabRunner() {
           if (lab.time_remaining > 0) {
             startTimer(lab.time_remaining, async () => {
               // Timer expired — terminate lab, close resources, redirect
-              toast('Lab time completed! The environment is being terminated.', { icon: '⏰', duration: 6000 })
+              toast('Lab time completed! The environment is being terminated.', { icon: '⏰', duration: 6000, ...TOAST })
 
               // Close WebSocket + xterm
               if (wsRef.current) {
@@ -359,9 +362,10 @@ export default function LabRunner() {
   // Initialize xterm.js and WebSocket (single-pane mode only)
   useEffect(() => {
     if (!session || session.status !== 'RUNNING' || !terminalRef.current) return
+    if (session.provider === 'simulation' || terminalHost !== 'primary') return
     const dualPane = session.scenario?.dual_terminal && (session.lab_hosts?.length >= 2)
     if (dualPane) return
-    const hasResource = session.container_id || session.instance_id
+    const hasResource = session.container_id || session.instance_id || session.provider === 'simulation'
     if (!hasResource) return
     if (terminalSessionRef.current === `${sessionId}:${terminalHost}`) return
 
@@ -675,7 +679,7 @@ export default function LabRunner() {
     const resetIdleTimer = () => {
       if (idleTimer) clearTimeout(idleTimer)
       idleTimer = setTimeout(async () => {
-        toast('Lab terminated due to 30 minutes of inactivity.', { icon: '⏰', duration: 8000 })
+        toast('Lab terminated due to 30 minutes of inactivity.', { icon: '⏰', duration: 8000, ...TOAST })
         try {
           if (wsRef.current) { wsRef.current.close(1000); wsRef.current = null }
           await labApi.stopLab(sessionId)
@@ -774,7 +778,7 @@ export default function LabRunner() {
           )
         }
       } else {
-        toast('Validation failed. Keep trying!', { icon: '🔍' })
+        toast('Validation failed. Keep trying!', { icon: '🔍', ...TOAST })
       }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Validation error')
@@ -797,7 +801,7 @@ export default function LabRunner() {
       const code = err.response?.data?.code
       if (code === 'INTERVIEW_MODE') {
         setInterviewMode(true)
-        toast('Use AI coaching hints in interview mode', { icon: '🎯' })
+        toast('Use AI coaching hints in interview mode', { icon: '🎯', ...TOAST })
       } else {
         toast.error(err.response?.data?.error || 'No more hints')
       }
@@ -829,7 +833,7 @@ export default function LabRunner() {
 
       // For cloud labs, wait until the EC2/DO instance is fully terminated
       if (result?.is_cloud) {
-        toast('Terminating cloud server — please wait...', { icon: '☁️', duration: 5000 })
+        toast('Terminating cloud server — please wait...', { icon: '☁️', duration: 5000, ...TOAST })
         const maxWait = 30 // max 30 seconds polling
         const start = Date.now()
         while ((Date.now() - start) / 1000 < maxWait) {
@@ -934,17 +938,17 @@ export default function LabRunner() {
   const useDualPane = Boolean(scenario.dual_terminal && labHosts.length >= 2)
   const dualHosts = useDualPane ? labHosts.slice(0, 2) : []
   const blockedCmds = scenario.blocked_commands || []
-  const sshTargets = labHosts.filter(h => h.ip)
-  const insertSshCommand = (host) => {
-    const user = host.ssh_user || session?.ssh_user || 'root'
-    const ip = host.ip || session?.ssh_host
-    if (!ip || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      toast.error('Terminal not ready for SSH')
+  const remoteSshTargets = labHosts.filter(h => h.ip && h.name !== 'primary' && h.name !== 'ssh_client')
+  const hasSshClient = labHosts.some(h => h.name === 'ssh_client')
+  const openSshClient = (host) => {
+    if (!hasSshClient) {
+      toast.error('SSH client not available for this lab', TOAST)
       return
     }
-    const cmd = `ssh -o StrictHostKeyChecking=no ${user}@${ip}\r`
-    wsRef.current.send(JSON.stringify({ input: cmd }))
-    toast.success(`Sent: ssh ${user}@${ip}`)
+    setSshClientTarget(host)
+    terminalSessionRef.current = null
+    setTerminalHost('ssh_client')
+    toast(`SSH client terminal — connect with: ssh ${host.ssh_user || 'root'}@${host.ip}`, { ...TOAST, duration: 8000 })
   }
   const isTimeLow = timeRemaining < 120 && timeRemaining > 0
   const isTimeCritical = timeRemaining < 60 && timeRemaining > 0
@@ -1273,20 +1277,21 @@ export default function LabRunner() {
                 if (h.name !== terminalHost) {
                   terminalSessionRef.current = null
                   setTerminalHost(h.name)
+                  if (h.name !== 'ssh_client') setSshClientTarget(null)
                 }
               }}
               className={`px-2.5 py-1.5 rounded-md border font-medium ${terminalHost === h.name ? 'border-accent-cyan text-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400 hover:border-surface-600'}`}
             >
-              {h.role === 'client' || h.name === 'companion' ? 'Client' : (h.role || h.name)}
+              {h.role === 'SSH Client' || h.name === 'ssh_client' ? 'SSH Client' : (h.role || h.name)}
             </button>
           ))}
-          {sshTargets.map(h => (
+          {remoteSshTargets.map(h => (
             <button
               key={`ssh-${h.name}`}
               type="button"
-              onClick={() => insertSshCommand(h)}
+              onClick={() => openSshClient(h)}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-700 text-surface-300 hover:border-accent-cyan hover:text-accent-cyan bg-surface-800/50"
-              title={`ssh ${h.ssh_user || 'root'}@${h.ip}`}
+              title={`Open SSH client → ssh ${h.ssh_user || 'root'}@${h.ip}`}
             >
               <Terminal size={12} /> SSH {h.role || h.name}
             </button>
@@ -1320,9 +1325,9 @@ export default function LabRunner() {
           </button>
         </div>
         {/* Terminal */}
-        <div className="flex-1 bg-surface-950 relative min-h-0 overflow-hidden pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
-          {useDualPane ? (
-            <div className="absolute inset-0 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-surface-800">
+        <div className="flex-1 bg-surface-950 relative min-h-0 overflow-hidden flex flex-col pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))] sm:pb-0">
+          {useDualPane && !sshClientTarget && (
+            <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-surface-800">
               {dualHosts.map(h => (
                 <LabTerminal
                   key={h.name}
@@ -1336,8 +1341,42 @@ export default function LabRunner() {
                 />
               ))}
             </div>
-          ) : (
-            <div ref={terminalRef} className="absolute inset-0 p-0.5 sm:p-1 touch-manipulation" />
+          )}
+          {!useDualPane && session.provider !== 'simulation' && terminalHost === 'primary' && (
+            <div ref={terminalRef} className="flex-1 min-h-0 p-0.5 sm:p-1 touch-manipulation" />
+          )}
+          {!useDualPane && (session.provider === 'simulation' || terminalHost !== 'primary') && (
+            <LabTerminal
+              sessionId={sessionId}
+              session={session}
+              hostKey={terminalHost}
+              label={`${labHosts.find(h => h.name === terminalHost)?.role || terminalHost}`}
+              isMobile={isMobile}
+              blockedCommands={blockedCmds}
+              className="flex-1 min-h-0"
+              welcomeHint={terminalHost === 'ssh_client' && sshClientTarget
+                ? `Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`
+                : ''}
+            />
+          )}
+          {sshClientTarget && (
+            <div className={`${useDualPane ? 'h-[45%]' : 'flex-1'} min-h-0 border-t border-accent-cyan/30`}>
+              <div className="flex items-center justify-between px-2 py-1 bg-surface-900 border-b border-surface-800">
+                <span className="text-[10px] text-accent-cyan font-medium">
+                  SSH Client (labuser) → {sshClientTarget.role || sshClientTarget.name}
+                </span>
+                <button type="button" onClick={() => setSshClientTarget(null)} className="text-[10px] text-surface-400 hover:text-white">Close</button>
+              </div>
+              <LabTerminal
+                sessionId={sessionId}
+                session={session}
+                hostKey="ssh_client"
+                isMobile={isMobile}
+                blockedCommands={blockedCmds}
+                className="h-[calc(100%-1.75rem)]"
+                welcomeHint={`Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`}
+              />
+            </div>
           )}
         </div>
         </div>
@@ -1354,12 +1393,12 @@ export default function LabRunner() {
           className="p-2 text-surface-400 hover:text-accent-amber" aria-label="Hints">
           <Lightbulb size={20} />
         </button>
-        {sshTargets.length > 0 && (
+        {remoteSshTargets.length > 0 && (
           <button
-            onClick={() => insertSshCommand(sshTargets[0])}
+            onClick={() => openSshClient(remoteSshTargets[0])}
             className="p-2 text-surface-400 hover:text-accent-cyan"
-            aria-label="SSH to remote host"
-            title={`ssh ${sshTargets[0].ssh_user || 'root'}@${sshTargets[0].ip}`}
+            aria-label="SSH client terminal"
+            title={`SSH client → ${remoteSshTargets[0].ssh_user || 'root'}@${remoteSshTargets[0].ip}`}
           >
             <Terminal size={20} />
           </button>

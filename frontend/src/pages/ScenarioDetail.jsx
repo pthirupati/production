@@ -45,6 +45,7 @@ export default function ScenarioDetail() {
       toast('Lab time completed — the environment has been terminated. You can try again anytime!', {
         icon: '⏰',
         duration: 7000,
+        closeButton: true,
       })
       window.history.replaceState({}, '')
     }
