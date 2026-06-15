@@ -15,7 +15,7 @@ const WS_CLOSE_MESSAGES = {
 /**
  * Single xterm + WebSocket pane for a lab host (primary, companion, or ssh_client).
  */
-export default function LabTerminal({
+function LabTerminal({
   sessionId,
   session,
   hostKey = 'primary',
