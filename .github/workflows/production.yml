@@ -259,7 +259,7 @@ jobs:
           HOST="${{ steps.host.outputs.host }}"
           echo "Checking http://${HOST}/health ..."
           for i in $(seq 1 20); do
-            if curl -sf --max-time 10 "http://${HOST}/health" | grep -q ok; then
+            if curl -sf --max-time 10 -H "Host: fixitlab.in" "http://${HOST}/health" | grep -q ok; then
               echo "Public health OK"
               exit 0
             fi
