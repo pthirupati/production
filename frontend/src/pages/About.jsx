@@ -2,7 +2,9 @@ import { Link } from 'react-router-dom'
 import {
   Terminal, Shield, Cloud, Server, Users, Award, Target,
   Zap, ArrowRight, Globe, Heart, Code, Cpu, BookOpen,
-  CheckCircle2, Github, Linkedin, Twitter, Mail
+  CheckCircle2, Github, Linkedin, Twitter, Mail,
+  Ticket, Bot, MessageSquare, Trophy, Sparkles, Layers,
+  GitBranch, Bookmark, BarChart3, Lock, Monitor, Brain, GraduationCap
 } from 'lucide-react'
 
 const team = [
@@ -36,7 +38,8 @@ const milestones = [
   { year: '2025', title: 'Idea Born', desc: 'Concept for a hands-on troubleshooting platform started from real hiring pain points.' },
   { year: '2025', title: 'MVP Launch', desc: 'First Docker-based scenarios went live with Nginx, Cron, and DNS challenges.' },
   { year: '2026', title: 'Cloud Labs', desc: 'Added AWS EC2 and DigitalOcean support for advanced scenarios needing real servers.' },
-  { year: '2026', title: 'Growing Fast', desc: 'Expanded to 9+ scenarios, multi-provider infrastructure, and a full admin dashboard.' },
+  { year: '2026', title: 'Jira & Teams', desc: 'Incident tickets per learner, Jira bot sync, org invites, member analytics, and AI interview coaching.' },
+  { year: '2026', title: 'Growing Fast', desc: 'Expanded catalog across Linux, cloud, K8s, and simulations — full admin, billing, and certificate flows.' },
 ]
 
 const values = [
@@ -46,6 +49,107 @@ const values = [
   { icon: Globe, title: 'Global Community', desc: 'Engineers share threads with screenshots, vote on solutions, and compete on leaderboards.' },
   { icon: Code, title: 'Real Environments', desc: 'Docker containers, AWS EC2, and DigitalOcean droplets — plus unified RHEL simulations.' },
   { icon: Zap, title: 'Instant Feedback', desc: 'Auto-validation checks your fix inside the environment. Know if you solved it immediately.' },
+]
+
+const platformFeatures = [
+  {
+    icon: Ticket,
+    title: 'Jira Incident Workflow',
+    color: 'blue',
+    desc: 'Many scenarios open with a realistic support ticket — your own issue key, priority, and status timeline. Practice triage the way SRE and L1/L2 teams do in production.',
+    bullets: [
+      'One personal ticket per user per scenario (not shared across learners)',
+      'Ticket moves To Do → In Progress when you start the lab, Done when you pass validation',
+      'In-app ticket panel with comments, activity history, and status — no Atlassian login required',
+      'Works with real Jira Cloud or built-in simulation mode when Jira is not configured',
+    ],
+  },
+  {
+    icon: Bot,
+    title: 'Jira Bot & Webhook Sync',
+    color: 'cyan',
+    desc: 'A server-side integration bot talks to Jira on your behalf. Learners stay inside FixitLab while managers can still update tickets in Jira when connected.',
+    bullets: [
+      'Bot account creates and transitions issues via the Jira REST API',
+      'Bidirectional webhooks sync status changes and comments back to your dashboard',
+      'Retry attempts increment run count on the same ticket — mirrors real re-opened incidents',
+      'Staff admins get full ticket visibility; learners only see their own issues',
+    ],
+  },
+  {
+    icon: Brain,
+    title: 'AI Interview Coaching',
+    color: 'purple',
+    desc: 'Interview-mode scenarios disable spoiler hints and offer AI coaching that nudges you toward the right area without giving away the answer.',
+    bullets: [
+      'Directional guidance for hiring prep and mock on-call drills',
+      'Standard progressive hints still available on learning scenarios',
+      'Hint usage tracked and reflected in your score',
+    ],
+  },
+  {
+    icon: Monitor,
+    title: 'Browser Terminal Labs',
+    color: 'green',
+    desc: 'Full xterm.js shell over WebSocket — type real commands in Chrome, Firefox, or mobile. Dual-pane terminals and SSH-client scenarios for networking and multi-host puzzles.',
+    bullets: [
+      'Docker containers for fast spin-up; AWS EC2 & DigitalOcean for cloud-native drills',
+      'Unified RHEL simulation engine when you need instant labs without waiting for VMs',
+      'Blocked-command guardrails per scenario (e.g. prevent destructive reboots)',
+      'Command history and session recording for review',
+    ],
+  },
+  {
+    icon: MessageSquare,
+    title: 'Community & Leaderboards',
+    color: 'amber',
+    desc: 'Discuss scenarios, attach screenshots, upvote solutions, and climb technology-specific leaderboards.',
+    bullets: [
+      'Threaded community posts tied to scenarios and technologies',
+      'Global and per-tech rankings with timed scoring bonuses',
+      'Achievements, streaks, and downloadable completion certificates',
+    ],
+  },
+  {
+    icon: Users,
+    title: 'Teams & Enterprise',
+    color: 'cyan',
+    desc: 'Organizations invite members, track lab usage, and manage seat-based billing from the Team dashboard.',
+    bullets: [
+      'Email invites, pending invites, and member removal',
+      'Per-member analytics — scenarios attempted, completion rate, time in labs',
+      'Org plans, coupons, and Razorpay checkout on the Pricing page',
+    ],
+  },
+  {
+    icon: BarChart3,
+    title: 'Progress & Bookmarks',
+    color: 'green',
+    desc: 'Your dashboard shows technology progress, difficulty breakdown, recent activity, and saved scenarios to retry later.',
+    bullets: [
+      'Track solved vs attempted across Linux, Docker, AWS, Kubernetes, and more',
+      'Bookmark scenarios for interview prep or team assignments',
+      'In-app notifications for billing, Jira updates, and platform announcements',
+    ],
+  },
+  {
+    icon: Lock,
+    title: 'Auth & Security',
+    color: 'purple',
+    desc: 'Production-ready auth and isolation so you can practice safely on shared infrastructure.',
+    bullets: [
+      'Email OTP registration, GitHub/Google OAuth, and password reset flows',
+      'Isolated lab sandboxes with automatic session expiry and idle timeout',
+      'Admin audit logs, rate limiting, and security dashboards for operators',
+    ],
+  },
+]
+
+const whoItsFor = [
+  { icon: GraduationCap, title: 'Students & career switchers', desc: 'Build muscle memory on real shells instead of only watching videos.' },
+  { icon: Target, title: 'Interview candidates', desc: 'Timed Fix / Build / Hack scenarios plus Jira tickets simulate on-call and hiring loops.' },
+  { icon: Server, title: 'DevOps & SRE teams', desc: 'Run team drills on broken Nginx, DNS, K8s, or cloud misconfigs in minutes.' },
+  { icon: Layers, title: 'Hiring managers', desc: 'Assign scenarios, review completion data, and optionally sync incidents to Jira.' },
 ]
 
 export default function About() {
@@ -134,6 +238,91 @@ export default function About() {
               <p className="text-sm text-surface-400 leading-relaxed">{desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Platform capabilities — features not fully covered on Home */}
+      <section className="bg-surface-900/30 border-y border-surface-800/50">
+        <div className="max-w-7xl mx-auto px-6 py-20">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-cyan/10 border border-accent-cyan/20 text-accent-cyan text-sm mb-4">
+              <Sparkles size={14} />
+              Full platform tour
+            </div>
+            <h2 className="text-3xl font-bold text-white mb-3">Everything FixitLab Offers</h2>
+            <p className="text-surface-400 max-w-2xl mx-auto leading-relaxed">
+              Beyond launching a terminal — FixitLab combines incident workflows, AI coaching,
+              team analytics, and community learning. Here is what you get when you browse, sign up, or assign labs to your team.
+            </p>
+          </div>
+          <div className="grid lg:grid-cols-2 gap-6">
+            {platformFeatures.map(({ icon: Icon, title, desc, bullets, color }) => {
+              const iconBg = {
+                blue: 'bg-blue-500/10 group-hover:bg-blue-500/20',
+                cyan: 'bg-accent-cyan/10 group-hover:bg-accent-cyan/20',
+                purple: 'bg-accent-purple/10 group-hover:bg-accent-purple/20',
+                green: 'bg-accent-green/10 group-hover:bg-accent-green/20',
+                amber: 'bg-accent-amber/10 group-hover:bg-accent-amber/20',
+              }[color] || 'bg-accent-cyan/10'
+              const iconText = {
+                blue: 'text-blue-400',
+                cyan: 'text-accent-cyan',
+                purple: 'text-accent-purple',
+                green: 'text-accent-green',
+                amber: 'text-accent-amber',
+              }[color] || 'text-accent-cyan'
+              return (
+                <div key={title} className="glass-card-hover p-6 group">
+                  <div className={`w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center mb-4 transition-colors`}>
+                    <Icon size={24} className={iconText} />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
+                  <p className="text-sm text-surface-400 leading-relaxed mb-4">{desc}</p>
+                  <ul className="space-y-2">
+                    {bullets.map((b) => (
+                      <li key={b} className="flex gap-2 text-sm text-surface-300">
+                        <CheckCircle2 size={14} className={`${iconText} shrink-0 mt-0.5`} />
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Who it's for */}
+      <section className="max-w-7xl mx-auto px-6 py-20">
+        <h2 className="text-3xl font-bold text-white text-center mb-3">Who Uses FixitLab?</h2>
+        <p className="text-surface-400 text-center mb-12 max-w-xl mx-auto">
+          From solo learners to engineering orgs running structured drills.
+        </p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {whoItsFor.map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="glass-card p-5 text-center">
+              <div className="w-11 h-11 rounded-xl bg-surface-800 flex items-center justify-center mx-auto mb-3">
+                <Icon size={22} className="text-accent-cyan" />
+              </div>
+              <h3 className="text-sm font-semibold text-white mb-2">{title}</h3>
+              <p className="text-xs text-surface-400 leading-relaxed">{desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-10 flex flex-wrap justify-center gap-3 text-sm">
+          <Link to="/scenarios" className="btn-secondary px-5 py-2 inline-flex items-center gap-2">
+            Browse scenarios <ArrowRight size={14} />
+          </Link>
+          <Link to="/leaderboard" className="btn-secondary px-5 py-2 inline-flex items-center gap-2">
+            <Trophy size={14} /> Leaderboard
+          </Link>
+          <Link to="/community" className="btn-secondary px-5 py-2 inline-flex items-center gap-2">
+            <MessageSquare size={14} /> Community
+          </Link>
+          <Link to="/pricing" className="btn-secondary px-5 py-2 inline-flex items-center gap-2">
+            Teams & pricing
+          </Link>
         </div>
       </section>
 

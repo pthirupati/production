@@ -540,6 +540,22 @@ export default function LabRunner() {
     }
   }
 
+  const scenario = session?.scenario_detail || session?.scenario || {}
+  const labHosts = session?.lab_hosts || []
+  const blockedCmds = useMemo(
+    () => (Array.isArray(scenario.blocked_commands) ? scenario.blocked_commands : []),
+    [scenario.blocked_commands],
+  )
+  const terminalSession = useMemo(() => {
+    if (!session || session.status !== 'RUNNING') return null
+    return {
+      status: session.status,
+      provider: session.provider,
+      container_id: session.container_id,
+      instance_id: session.instance_id,
+    }
+  }, [session?.status, session?.provider, session?.container_id, session?.instance_id])
+
   if (loading || provisioning) {
     const cloudSteps = [
       { label: 'Launching cloud server', done: provisioningStep >= 1 },
@@ -607,23 +623,8 @@ export default function LabRunner() {
     </div>
   )}
 
-  const scenario = session?.scenario_detail || session?.scenario || {}
-  const labHosts = session?.lab_hosts || []
   const useDualPane = Boolean(scenario.dual_terminal && labHosts.length >= 2)
   const dualHosts = useDualPane ? labHosts.slice(0, 2) : []
-  const blockedCmds = useMemo(
-    () => (Array.isArray(scenario.blocked_commands) ? scenario.blocked_commands : []),
-    [scenario.blocked_commands],
-  )
-  const terminalSession = useMemo(() => {
-    if (!session || session.status !== 'RUNNING') return null
-    return {
-      status: session.status,
-      provider: session.provider,
-      container_id: session.container_id,
-      instance_id: session.instance_id,
-    }
-  }, [session?.status, session?.provider, session?.container_id, session?.instance_id])
   const remoteSshTargets = labHosts.filter(h => h.ip && h.name !== 'primary' && h.name !== 'ssh_client')
   const hasSshClient = labHosts.some(h => h.name === 'ssh_client')
   const openSshClient = (host) => {
