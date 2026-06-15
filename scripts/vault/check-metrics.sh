@@ -10,9 +10,25 @@ if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx fixitlab_vault; then
   exit 0
 fi
 
-if docker run --rm --network container:fixitlab_vault curlimages/curl:8.5.0 -sf \
-  "http://127.0.0.1:8201/v1/sys/metrics?format=prometheus" | head -c 400 | grep -q vault; then
+_check_metrics() {
+  docker run --rm --network container:fixitlab_vault curlimages/curl:8.5.0 -sf \
+    "http://127.0.0.1:8201/v1/sys/metrics?format=prometheus" 2>/dev/null \
+    | head -c 400 | grep -q vault
+}
+
+if _check_metrics; then
   echo "[vault-metrics] Prometheus metrics OK"
+  exit 0
+fi
+
+echo "[vault-metrics] Metrics not ready — recreating Vault with latest config..."
+chmod +x "$ROOT/scripts/vault/"*.sh 2>/dev/null || true
+docker compose -f docker-compose.vault.yml up -d --force-recreate vault
+bash "$ROOT/scripts/vault/unseal.sh" 2>/dev/null || true
+sleep 3
+
+if _check_metrics; then
+  echo "[vault-metrics] Prometheus metrics OK (after recreate)"
   exit 0
 fi
 

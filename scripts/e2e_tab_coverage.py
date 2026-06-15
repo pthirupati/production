@@ -824,10 +824,8 @@ def run_admin_all_tabs(s, admin_token: str):
         st_mon, _ = api("POST", "/api/admin/config/", token=admin_token, data={"maintenance_banner_enabled": orig_maint_banner})
         s.record("Admin maintenance banner disable/enable", st_moff in (200,) and st_mon in (200,), st_moff)
 
-    # Banner image upload (1x1 PNG)
-    png_bytes = base64.b64decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAD0lEQVQ42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
-    )
+    # Banner image upload (1200×280 promo banner minimum)
+    png_bytes = e2e_png_bytes(1200, 280)
     st, upload = api_upload("/api/admin/upload/", admin_token, png_bytes, "e2e-banner.png", "image/png", fields={"folder": "promo"})
     s.record("Admin banner image upload", st in (200, 201) and bool((upload or {}).get("url")), st)
 

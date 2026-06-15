@@ -21,6 +21,14 @@ chmod +x "$ROOT/scripts/sync-production-env.sh" "$ROOT/scripts/ensure-ssl-certs.
 # Vault must be up before render-env (when enabled via env or local approle file)
 if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; then
   bash "$ROOT/scripts/vault/start.sh" 2>/dev/null || true
+  VAULT_CFG_HASH="$(md5sum "$ROOT/infra/vault/config.hcl" 2>/dev/null | awk '{print $1}' || md5 -q "$ROOT/infra/vault/config.hcl" 2>/dev/null || true)"
+  VAULT_CFG_MARKER="/tmp/fixitlab-vault-config-hash"
+  if [ -n "$VAULT_CFG_HASH" ] && [ -f "$VAULT_CFG_MARKER" ] && [ "$(cat "$VAULT_CFG_MARKER")" != "$VAULT_CFG_HASH" ]; then
+    echo "Vault config changed — recreating container"
+    docker compose -f docker-compose.vault.yml up -d --force-recreate vault 2>/dev/null || true
+    bash "$ROOT/scripts/vault/unseal.sh" 2>/dev/null || true
+  fi
+  [ -n "$VAULT_CFG_HASH" ] && echo "$VAULT_CFG_HASH" > "$VAULT_CFG_MARKER"
 fi
 
 bash "$ROOT/scripts/sync-production-env.sh" "$ROOT/.env.production"
