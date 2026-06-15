@@ -39,3 +39,7 @@ class OAuthCallbackUrlTests(TestCase):
             url,
         )
         self.assertIn("state=login", url)
+
+    @override_settings(FRONTEND_URL="  https://fixitlab.in/  ", GITHUB_CLIENT_ID="gh-test-id")
+    def test_canonical_frontend_url_strips_whitespace(self):
+        self.assertEqual(canonical_frontend_url(), "https://fixitlab.in")

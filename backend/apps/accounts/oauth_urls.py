@@ -11,13 +11,13 @@ def canonical_frontend_url() -> str:
         settings, "OAUTH_CALLBACK_BASE_URL", ""
     )
     if explicit:
-        base = explicit.rstrip("/")
+        base = explicit.strip().rstrip("/")
         if base.endswith("/auth/callback/github"):
             return base[: -len("/auth/callback/github")]
         if base.endswith("/auth/callback/google"):
             return base[: -len("/auth/callback/google")]
         return base
-    url = (settings.FRONTEND_URL or "").rstrip("/") or "http://localhost:8080"
+    url = (settings.FRONTEND_URL or "").strip().rstrip("/") or "http://localhost:8080"
     # GitHub OAuth apps allow one callback URL — always use apex for fixitlab.in
     url = url.replace("://www.fixitlab.in", "://fixitlab.in")
     return url

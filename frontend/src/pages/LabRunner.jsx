@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { labApi } from '../api/labs'
 import { useLabStore } from '../store/labStore'
@@ -16,10 +16,52 @@ import LabTerminal from '../components/LabTerminal'
 import useLabShortcuts from '../hooks/useLabShortcuts'
 import { useIsMobile } from '../hooks/useMediaQuery'
 
+function formatLabTime(seconds) {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+}
+
+/** Isolated timer display — avoids re-rendering the terminal tree every second. */
+function LabTimerBadge({ variant = 'desktop' }) {
+  const timeRemaining = useLabStore((s) => s.timeRemaining)
+  const isTimeLow = timeRemaining < 120 && timeRemaining > 0
+  const isTimeCritical = timeRemaining < 60 && timeRemaining > 0
+
+  if (variant === 'mobile-bar') {
+    return (
+      <span className={`text-xs font-mono font-bold ${isTimeCritical ? 'text-accent-red' : 'text-surface-300'}`}>
+        {formatLabTime(timeRemaining)}
+      </span>
+    )
+  }
+
+  if (variant === 'mobile-float') {
+    return (
+      <span className="absolute left-3 top-1 text-[10px] font-mono text-surface-500">
+        {formatLabTime(timeRemaining)}
+      </span>
+    )
+  }
+
+  return (
+    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono font-bold ${
+      isTimeCritical ? 'bg-accent-red/20 text-accent-red border border-accent-red/30 animate-pulse'
+      : isTimeLow ? 'bg-accent-amber/10 text-accent-amber border border-accent-amber/20'
+      : 'bg-surface-800 text-surface-300 border border-surface-700'
+    }`}>
+      <Timer size={13} />
+      {formatLabTime(timeRemaining)}
+    </div>
+  )
+}
+
 export default function LabRunner() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
-  const { timeRemaining, startTimer, stopTimer, clearSession } = useLabStore()
+  const startTimer = useLabStore((s) => s.startTimer)
+  const stopTimer = useLabStore((s) => s.stopTimer)
+  const clearSession = useLabStore((s) => s.clearSession)
 
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -498,12 +540,6 @@ export default function LabRunner() {
     }
   }
 
-  const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60)
-    const s = seconds % 60
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  }
-
   if (loading || provisioning) {
     const cloudSteps = [
       { label: 'Launching cloud server', done: provisioningStep >= 1 },
@@ -575,7 +611,19 @@ export default function LabRunner() {
   const labHosts = session?.lab_hosts || []
   const useDualPane = Boolean(scenario.dual_terminal && labHosts.length >= 2)
   const dualHosts = useDualPane ? labHosts.slice(0, 2) : []
-  const blockedCmds = scenario.blocked_commands || []
+  const blockedCmds = useMemo(
+    () => (Array.isArray(scenario.blocked_commands) ? scenario.blocked_commands : []),
+    [scenario.blocked_commands],
+  )
+  const terminalSession = useMemo(() => {
+    if (!session || session.status !== 'RUNNING') return null
+    return {
+      status: session.status,
+      provider: session.provider,
+      container_id: session.container_id,
+      instance_id: session.instance_id,
+    }
+  }, [session?.status, session?.provider, session?.container_id, session?.instance_id])
   const remoteSshTargets = labHosts.filter(h => h.ip && h.name !== 'primary' && h.name !== 'ssh_client')
   const hasSshClient = labHosts.some(h => h.name === 'ssh_client')
   const openSshClient = (host) => {
@@ -587,8 +635,6 @@ export default function LabRunner() {
     setTerminalHost('ssh_client')
     toast(`SSH client terminal — connect with: ssh ${host.ssh_user || 'root'}@${host.ip}`, { ...TOAST, duration: 8000 })
   }
-  const isTimeLow = timeRemaining < 120 && timeRemaining > 0
-  const isTimeCritical = timeRemaining < 60 && timeRemaining > 0
   const solved = validationResult?.passed
   const expired = validationResult?.expired
 
@@ -600,9 +646,7 @@ export default function LabRunner() {
           <PanelLeftOpen size={18} />
         </button>
         <p className="text-xs font-semibold text-white truncate flex-1 text-center px-2">{scenario.title || 'Lab'}</p>
-        <span className={`text-xs font-mono font-bold ${isTimeCritical ? 'text-accent-red' : 'text-surface-300'}`}>
-          {formatTime(timeRemaining)}
-        </span>
+        <LabTimerBadge variant="mobile-bar" />
       </div>
       {closingIn != null && (
         <div className="shrink-0 px-4 py-2 bg-accent-green/15 border-b border-accent-green/30 text-center text-sm text-accent-green font-medium animate-pulse">
@@ -634,14 +678,7 @@ export default function LabRunner() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono font-bold ${
-            isTimeCritical ? 'bg-accent-red/20 text-accent-red border border-accent-red/30 animate-pulse'
-            : isTimeLow ? 'bg-accent-amber/10 text-accent-amber border border-accent-amber/20'
-            : 'bg-surface-800 text-surface-300 border border-surface-700'
-          }`}>
-            <Timer size={13} />
-            {formatTime(timeRemaining)}
-          </div>
+          <LabTimerBadge variant="desktop" />
           <button onClick={() => setShowShortcuts(true)} className="p-2 text-surface-400 hover:text-white" title="Keyboard shortcuts">
             <Keyboard size={16} />
           </button>
@@ -968,7 +1005,7 @@ export default function LabRunner() {
                 <LabTerminal
                   key={h.name}
                   sessionId={sessionId}
-                  session={session}
+                  session={terminalSession}
                   hostKey={h.name}
                   label={`${h.role || h.name} (${h.ip || 'sim'})`}
                   isMobile={isMobile}
@@ -983,7 +1020,7 @@ export default function LabRunner() {
             <LabTerminal
               key={`${sessionId}:${terminalHost}`}
               sessionId={sessionId}
-              session={session}
+              session={terminalSession}
               hostKey={terminalHost}
               label={terminalHost !== 'primary' ? `${labHosts.find(h => h.name === terminalHost)?.role || terminalHost}` : ''}
               isMobile={isMobile}
@@ -1005,7 +1042,7 @@ export default function LabRunner() {
               </div>
               <LabTerminal
                 sessionId={sessionId}
-                session={session}
+                session={terminalSession}
                 hostKey="ssh_client"
                 isMobile={isMobile}
                 blockedCommands={blockedCmds}
@@ -1020,7 +1057,7 @@ export default function LabRunner() {
 
       {/* Mobile: floating action bar */}
       <div className="sm:hidden fixed bottom-0 inset-x-0 bg-surface-900 border-t border-surface-700/50 px-2 py-2 flex items-center justify-around z-30 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        <span className="absolute left-3 top-1 text-[10px] font-mono text-surface-500">{formatTime(timeRemaining)}</span>
+        <LabTimerBadge variant="mobile-float" />
         <button onClick={() => { setSidebarTab('instructions'); setSidebarOpen(p => !p) }}
           className="p-2 text-surface-400 hover:text-white" aria-label="Instructions">
           <FileText size={20} />

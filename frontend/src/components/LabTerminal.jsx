@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback, memo } from 'react'
 import { useAuthStore } from '../store/authStore'
 
 const WS_NO_RECONNECT = new Set([1000, 4001, 4003, 4004, 4005, 4008, 4500])
@@ -27,24 +27,35 @@ export default function LabTerminal({
   layoutKey,
   onReady,
 }) {
-  const [mountNode, setMountNode] = useState(null)
+  const mountElRef = useRef(null)
+  const [mountReady, setMountReady] = useState(false)
+  const mountRef = useCallback((node) => {
+    mountElRef.current = node
+    setMountReady(Boolean(node))
+  }, [])
+  const blockedCommandsRef = useRef(blockedCommands)
+  const welcomeHintRef = useRef(welcomeHint)
+  blockedCommandsRef.current = blockedCommands
+  welcomeHintRef.current = welcomeHint
   const xtermRef = useRef(null)
   const wsRef = useRef(null)
   const fitAddonRef = useRef(null)
   const reconnectAttempts = useRef(0)
   const reconnectTimerRef = useRef(null)
   const inputBufferRef = useRef('')
-  const sessionKeyRef = useRef(null)
+  const initGenRef = useRef(0)
+  const isMobileRef = useRef(isMobile)
+  isMobileRef.current = isMobile
   const maxReconnectAttempts = 10
 
   useEffect(() => {
-    if (!session || session.status !== 'RUNNING' || !mountNode) return
+    const mountNode = mountElRef.current
+    if (!session || session.status !== 'RUNNING' || !mountReady || !mountNode) return
     const isSimulation = session.provider === 'simulation'
     const hasResource = session.container_id || session.instance_id || isSimulation
     if (!hasResource) return
-    const sk = `${sessionId}:${hostKey}`
-    if (sessionKeyRef.current === sk) return
 
+    const gen = ++initGenRef.current
     let disposed = false
     let cleanup = () => {}
 
@@ -53,15 +64,14 @@ export default function LabTerminal({
       const { FitAddon } = await import('@xterm/addon-fit')
       const { WebLinksAddon } = await import('@xterm/addon-web-links')
       await import('@xterm/xterm/css/xterm.css')
-      if (disposed || !mountNode) return
+      if (disposed || gen !== initGenRef.current || !mountElRef.current) return
 
-      sessionKeyRef.current = sk
       reconnectAttempts.current = 0
 
       const term = new Terminal({
         cursorBlink: true,
         cursorStyle: 'bar',
-        fontSize: isMobile ? 10 : 13,
+        fontSize: isMobileRef.current ? 10 : 13,
         lineHeight: 1.2,
         fontFamily: '"JetBrains Mono", "Fira Code", monospace',
         theme: {
@@ -79,8 +89,9 @@ export default function LabTerminal({
       xtermRef.current = term
       fitAddonRef.current = fitAddon
 
-      if (welcomeHint) {
-        term.write(`\r\n\x1b[1;36m${welcomeHint}\x1b[0m\r\n`)
+      const hint = welcomeHintRef.current
+      if (hint) {
+        term.write(`\r\n\x1b[1;36m${hint}\x1b[0m\r\n`)
       }
 
       const isCloud = session?.provider === 'aws_ec2' || session?.provider === 'digitalocean'
@@ -99,7 +110,7 @@ export default function LabTerminal({
         resizeDebounceRef.current = setTimeout(sendResize, 300)
       }
 
-      const blockedPatterns = (blockedCommands || []).map(entry => {
+      const blockedPatterns = (blockedCommandsRef.current || []).map(entry => {
         if (!entry || typeof entry !== 'string') return null
         const raw = entry.trim()
         if (!raw) return null
@@ -265,13 +276,15 @@ export default function LabTerminal({
         term.dispose()
         xtermRef.current = null
         fitAddonRef.current = null
-        if (sessionKeyRef.current === sk) sessionKeyRef.current = null
       }
     }
 
     init()
-    return () => cleanup()
-  }, [sessionId, session?.status, session?.container_id, session?.instance_id, session?.provider, hostKey, isMobile, blockedCommands, welcomeHint, mountNode])
+    return () => {
+      disposed = true
+      cleanup()
+    }
+  }, [sessionId, session?.status, session?.container_id, session?.instance_id, session?.provider, hostKey, mountReady])
 
   useEffect(() => {
     if (fitAddonRef.current) {
@@ -286,7 +299,25 @@ export default function LabTerminal({
           {label}
         </div>
       )}
-      <div ref={setMountNode} className="flex-1 min-h-0 p-0.5 touch-manipulation" />
+      <div ref={mountRef} className="flex-1 min-h-0 p-0.5 touch-manipulation" />
     </div>
   )
 }
+
+function terminalPropsEqual(prev, next) {
+  if (prev.sessionId !== next.sessionId || prev.hostKey !== next.hostKey) return false
+  if (prev.layoutKey !== next.layoutKey || prev.className !== next.className) return false
+  if (prev.label !== next.label || prev.welcomeHint !== next.welcomeHint) return false
+  if (prev.isMobile !== next.isMobile) return false
+  if (prev.blockedCommands !== next.blockedCommands) return false
+  const ps = prev.session
+  const ns = next.session
+  if (ps === ns) return true
+  if (!ps || !ns) return ps === ns
+  return ps.status === ns.status
+    && ps.provider === ns.provider
+    && ps.container_id === ns.container_id
+    && ps.instance_id === ns.instance_id
+}
+
+export default memo(LabTerminal, terminalPropsEqual)

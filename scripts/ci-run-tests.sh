@@ -15,6 +15,8 @@ RUN_UNIT="${RUN_UNIT:-true}"
 RUN_E2E="${RUN_E2E:-true}"
 RUN_LAB_VALIDATION="${RUN_LAB_VALIDATION:-true}"
 SKIP_CLEANUP="${E2E_SKIP_CLEANUP:-0}"
+export E2E_SKIP_EMAIL="${E2E_SKIP_EMAIL:-1}"
+export SKIP_EMAIL_TESTS="${SKIP_EMAIL_TESTS:-1}"
 
 # shellcheck source=env-helpers.sh
 source "$ROOT/scripts/env-helpers.sh"

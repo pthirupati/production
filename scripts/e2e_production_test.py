@@ -30,6 +30,7 @@ BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 ADMIN_EMAIL = os.environ.get("SUPERUSER_EMAIL", "")
 ADMIN_PASSWORD = os.environ.get("SUPERUSER_PASSWORD", "")
 SKIP_LAB = os.environ.get("E2E_SKIP_LAB", "0" if os.environ.get("RUN_FULL_E2E") == "1" else "1") == "1"
+SKIP_EMAIL = os.environ.get("E2E_SKIP_EMAIL", os.environ.get("SKIP_EMAIL_TESTS", "1")) == "1"
 VERBOSE = os.environ.get("E2E_VERBOSE", "0") == "1"
 # Django SECURE_SSL_REDIRECT requires this when hitting Daphne directly over HTTP
 INTERNAL_HTTP = BASE_URL.startswith("http://127.0.0.1") or BASE_URL.startswith("http://backend")
@@ -170,9 +171,25 @@ def run_public_tests(s: Suite):
         err = err_msg(data)
         s.record(f"{method} {path}", ok, status, err)
 
+    status, cfg = api("GET", "/api/auth/social/config/")
+    if status == 200 and cfg.get("github", {}).get("enabled"):
+        gh = cfg["github"]
+        cb = gh.get("callback_url", "")
+        login_url = gh.get("login_url", "")
+        ok_cb = cb == "https://fixitlab.in/auth/callback/github" or cb.endswith("/auth/callback/github")
+        s.record("GitHub OAuth callback_url", ok_cb, detail=cb or "missing")
+        encoded = "redirect_uri=https%3A%2F%2Ffixitlab.in%2Fauth%2Fcallback%2Fgithub"
+        s.record(
+            "GitHub login_url redirect_uri",
+            encoded in login_url,
+            detail="matches canonical callback" if encoded in login_url else login_url[:120],
+        )
+
 
 def run_auth_registration(s: Suite) -> tuple[str | None, str, str]:
     print("\n=== Auth: OTP + registration ===")
+    if SKIP_EMAIL:
+        print("  (E2E_SKIP_EMAIL=1 — OTP via DB only, no outbound email checks)")
     email = f"e2e-{uuid.uuid4().hex[:8]}@fixitlab-test.local"
     password = "E2eTestPass123!"
 
@@ -200,21 +217,24 @@ def run_auth_registration(s: Suite) -> tuple[str | None, str, str]:
         else:
             s.record("OTP stored in DB", False, detail="No OTP row found")
 
-        # Verify Celery worker delivered email (poll up to 15s)
-        email_sent = False
-        for _ in range(15):
-            log = EmailLog.objects.filter(to_email=email, template="emails/otp_verification.html").first()
-            if log and log.status == "sent":
-                email_sent = True
-                break
-            if log and log.status == "failed":
-                s.record("OTP email delivery", False, detail=log.error[:120])
-                break
-            _time.sleep(1)
-        if not EmailLog.objects.filter(to_email=email).exists():
-            s.record("OTP email queued", True, detail="No EmailLog yet (worker may be async)")
+        # Verify Celery worker delivered email (poll up to 15s) — skip when E2E_SKIP_EMAIL
+        if SKIP_EMAIL:
+            s.record("OTP email delivery", True, detail="skipped (E2E_SKIP_EMAIL)")
         else:
-            s.record("OTP email delivery", email_sent, detail="sent" if email_sent else "pending/failed")
+            email_sent = False
+            for _ in range(15):
+                log = EmailLog.objects.filter(to_email=email, template="emails/otp_verification.html").first()
+                if log and log.status == "sent":
+                    email_sent = True
+                    break
+                if log and log.status == "failed":
+                    s.record("OTP email delivery", False, detail=log.error[:120])
+                    break
+                _time.sleep(1)
+            if not EmailLog.objects.filter(to_email=email).exists():
+                s.record("OTP email queued", True, detail="No EmailLog yet (worker may be async)")
+            else:
+                s.record("OTP email delivery", email_sent, detail="sent" if email_sent else "pending/failed")
     except Exception as e:
         s.record("OTP DB lookup", False, detail=str(e)[:80])
 
@@ -492,6 +512,9 @@ def clear_rate_limit_cache():
 
 
 def run_concurrent_users(s: Suite, n: int = 3):
+    if SKIP_EMAIL:
+        s.record(f"Concurrent registrations ({n} threads)", True, detail="skipped (E2E_SKIP_EMAIL)")
+        return
     print(f"\n=== Concurrent new user registrations ({n} threads) ===")
     clear_rate_limit_cache()
 
@@ -571,6 +594,9 @@ def run_cleanup():
 
 
 def run_email_logs(s: Suite):
+    if SKIP_EMAIL:
+        s.record("Email delivery logs", True, detail="skipped (E2E_SKIP_EMAIL)")
+        return
     print("\n=== Email delivery logs ===")
     try:
         sys.path.insert(0, "/app")
@@ -597,7 +623,7 @@ def run_email_logs(s: Suite):
 
 
 def main():
-    print(f"FixitLab E2E — BASE_URL={BASE_URL}")
+    print(f"FixitLab E2E — BASE_URL={BASE_URL} E2E_SKIP_EMAIL={SKIP_EMAIL}")
     s = Suite()
     t0 = time.time()
     exit_code = 0

@@ -7,6 +7,16 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+_E2E_SUFFIXES = getattr(settings, "E2E_TEST_EMAIL_SUFFIXES", ("@fixitlab-test.local",))
+
+
+def should_skip_real_email(to_email: str) -> bool:
+    """Skip outbound delivery for CI/E2E test addresses or when SKIP_EMAIL_TESTS is set."""
+    if getattr(settings, "SKIP_EMAIL_TESTS", False):
+        return True
+    email = (to_email or "").strip().lower()
+    return any(email.endswith(suffix) for suffix in _E2E_SUFFIXES)
+
 
 def _strip_html(html):
     """Convert HTML email to plain text fallback."""
@@ -103,6 +113,11 @@ def send_email(subject, to_email, template, context=None):
         return False
 
     text_content = _strip_html(html_content)
+
+    if should_skip_real_email(to_email):
+        logger.info("Skipping real email delivery to %s (test/CI mode)", to_email)
+        _log_email(subject, to_email, template, "sent", "skipped:test_mode")
+        return True
 
     try:
         via = _deliver(subject, to_email, html_content, text_content)

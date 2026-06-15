@@ -372,6 +372,9 @@ SENDGRID_API_KEY = env("SENDGRID_API_KEY", default="")
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:8080")
 OAUTH_CALLBACK_BASE_URL = env("OAUTH_CALLBACK_BASE_URL", default="")
 GITHUB_OAUTH_CALLBACK_URL = env("GITHUB_OAUTH_CALLBACK_URL", default="")
+# When true, skip Gmail/SendGrid/SMTP delivery (E2E/CI). OTP still stored in DB.
+SKIP_EMAIL_TESTS = env.bool("SKIP_EMAIL_TESTS", default=False)
+E2E_TEST_EMAIL_SUFFIXES = ("@fixitlab-test.local",)
 
 # --------------------------------------------------
 # Configurable Contact Emails

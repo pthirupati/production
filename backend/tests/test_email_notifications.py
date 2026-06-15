@@ -79,6 +79,22 @@ class EmailDispatchTest(APITestCase):
         self.assertIsNotNone(log)
         self.assertEqual(log.status, "failed")
 
+    @override_settings(SKIP_EMAIL_TESTS=False)
+    def test_send_email_skips_e2e_test_addresses(self):
+        from apps.notifications.email import send_email
+
+        ok = send_email(
+            subject="OTP",
+            to_email="e2e-abc@fixitlab-test.local",
+            template="emails/otp_verification.html",
+            context={"otp_code": "123456", "expires_minutes": 2},
+        )
+        self.assertTrue(ok)
+        log = EmailLog.objects.filter(to_email="e2e-abc@fixitlab-test.local").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.status, "sent")
+        self.assertIn("skipped", log.error)
+
 
 class SendOTPAPITest(APITestCase):
     @patch("apps.notifications.gmail_api.is_gmail_api_configured", return_value=True)

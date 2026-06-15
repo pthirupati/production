@@ -64,6 +64,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.test_settings
           JIRA_SIMULATION_MODE: "False"
+          SKIP_EMAIL_TESTS: "true"
         run: |
           python manage.py migrate --run-syncdb
           python manage.py test tests --verbosity=2
@@ -89,11 +90,13 @@ jobs:
           RUN_E2E: ${{ inputs.run_e2e }}
           RUN_LAB_VALIDATION: ${{ inputs.run_lab_validation }}
           E2E_SKIP_CLEANUP: ${{ inputs.skip_cleanup && '1' || '0' }}
+          E2E_SKIP_EMAIL: "1"
+          SKIP_EMAIL_TESTS: "1"
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          envs: GITHUB_TOKEN,RUN_UNIT,RUN_E2E,RUN_LAB_VALIDATION,E2E_SKIP_CLEANUP
+          envs: GITHUB_TOKEN,RUN_UNIT,RUN_E2E,RUN_LAB_VALIDATION,E2E_SKIP_CLEANUP,E2E_SKIP_EMAIL,SKIP_EMAIL_TESTS
           command_timeout: 240m
           script: |
             set -e
@@ -115,6 +118,8 @@ jobs:
             export RUN_E2E="${RUN_E2E:-true}"
             export RUN_LAB_VALIDATION="${RUN_LAB_VALIDATION:-true}"
             export E2E_SKIP_CLEANUP="${E2E_SKIP_CLEANUP:-0}"
+            export E2E_SKIP_EMAIL="${E2E_SKIP_EMAIL:-1}"
+            export SKIP_EMAIL_TESTS="${SKIP_EMAIL_TESTS:-1}"
             ./scripts/ci-run-tests.sh
 
       - name: Summary

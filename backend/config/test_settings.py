@@ -55,6 +55,9 @@ else:
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 
+# ── Skip real email in CI/E2E (OTP still written to DB) ──
+SKIP_EMAIL_TESTS = os.environ.get("SKIP_EMAIL_TESTS", "").lower() in ("1", "true", "yes")
+
 # ── Use console email backend ──
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
