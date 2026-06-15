@@ -358,6 +358,9 @@ def main():
     isolation_done = False
     for tech in catalog["technologies"]:
         tech_scenarios = catalog["by_tech"].get(tech.slug, [])
+        if getattr(tech, "coming_soon", False):
+            stats.skip(f"[{tech.slug}] all scenarios", "technology coming soon")
+            continue
         deployable = [s for s in tech_scenarios if s in catalog["deployable"]]
         print(f"\n### Technology: {tech.name} ({tech.slug}) — {len(deployable)}/{len(tech_scenarios)} labs deployable ###")
         for sc in deployable:

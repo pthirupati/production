@@ -61,10 +61,10 @@ def discover_catalog():
     missing_images = []
     for sc in scenarios:
         slug = sc.slug or ""
+        if sc.technology and getattr(sc.technology, "coming_soon", False):
+            continue
         if getattr(sc, "lab_mode", "") == "simulation":
             deployable.append(sc)
-            continue
-        if sc.technology and getattr(sc.technology, "coming_soon", False):
             continue
         if image_exists(slug):
             deployable.append(sc)
