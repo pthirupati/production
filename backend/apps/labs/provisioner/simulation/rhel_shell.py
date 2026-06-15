@@ -122,7 +122,9 @@ class RHELShell:
             "clear": self._cmd_clear,
             "history": self._cmd_history,
             "help": self._cmd_help,
-            "reboot": self._cmd_reboot,
+            "ssh": self._cmd_ssh,
+            "scp": self._cmd_scp,
+            "ping": self._cmd_ping,
             "shutdown": self._cmd_shutdown,
             "exit": self._cmd_exit,
             "logout": self._cmd_exit,
@@ -955,6 +957,46 @@ class RHELShell:
 
     def _cmd_vmware(self, p: list[str]) -> str:
         return "VMware Tools version: 12.3.5"
+
+    def _cmd_ssh(self, p: list[str]) -> str:
+        if len(p) < 2:
+            return "usage: ssh [-l user] user@host [command]"
+        target = p[-1] if len(p) > 2 and not p[1].startswith("-") else p[1]
+        user = self.state.current_user
+        host = target
+        if "@" in target:
+            user, host = target.split("@", 1)
+        host_key = getattr(self, "_host_ips", {}).get(host)
+        if not host_key and host in getattr(self, "_host_names", {}):
+            host_key = host
+        if not host_key:
+            return f"ssh: connect to host {host} port 22: Connection refused"
+        engine = getattr(self, "_engine", None)
+        if engine:
+            remote = engine.state.clone_for_host(host_key)
+            remote.set_prompt_user(user if user in remote.users else "root")
+            self.state = remote
+            self.state.hostname = host_key
+            return (
+                f"Warning: Permanently added '{host}' (ED25519) to the list of known hosts.\r\n"
+                f"Last login: {time.strftime('%a %b %d %H:%M:%S %Y')} from 10.0.0.5"
+            )
+        return f"Connected to {user}@{host}"
+
+    def _cmd_scp(self, p: list[str]) -> str:
+        if len(p) < 3:
+            return "usage: scp source dest"
+        return f"{p[-1]}: simulated copy complete"
+
+    def _cmd_ping(self, p: list[str]) -> str:
+        host = p[1] if len(p) > 1 else "localhost"
+        if host in ("localhost", "127.0.0.1") or host in getattr(self, "_host_ips", {}):
+            return (
+                f"PING {host} ({host if host != 'localhost' else '127.0.0.1'}) 56(84) bytes of data.\n"
+                f"64 bytes from {host}: icmp_seq=1 ttl=64 time=0.3 ms\n"
+                f"--- {host} ping statistics ---\n1 packets transmitted, 1 received, 0% packet loss"
+            )
+        return f"ping: {host}: Name or service not known"
 
     def _cmd_reboot(self, p: list[str]) -> str:
         return "__REBOOT__"

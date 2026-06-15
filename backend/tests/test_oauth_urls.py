@@ -8,6 +8,10 @@ from apps.accounts.oauth_urls import (
 
 
 class OAuthCallbackUrlTests(TestCase):
+    @override_settings(FRONTEND_URL="https://www.fixitlab.in", GITHUB_CLIENT_ID="gh-test-id")
+    def test_canonical_frontend_url_strips_www(self):
+        self.assertEqual(canonical_frontend_url(), "https://fixitlab.in")
+
     @override_settings(FRONTEND_URL="https://fixitlab.in/", GITHUB_CLIENT_ID="gh-test-id")
     def test_canonical_frontend_url_strips_trailing_slash(self):
         self.assertEqual(canonical_frontend_url(), "https://fixitlab.in")

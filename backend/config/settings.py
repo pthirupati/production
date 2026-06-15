@@ -370,6 +370,8 @@ SENDGRID_API_KEY = env("SENDGRID_API_KEY", default="")
 
 # Frontend URL for email links
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:8080")
+OAUTH_CALLBACK_BASE_URL = env("OAUTH_CALLBACK_BASE_URL", default="")
+GITHUB_OAUTH_CALLBACK_URL = env("GITHUB_OAUTH_CALLBACK_URL", default="")
 
 # --------------------------------------------------
 # Configurable Contact Emails

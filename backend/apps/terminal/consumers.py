@@ -592,6 +592,10 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 self.raw_socket.close()
             except Exception:
                 pass
+            if self.provider_type == "simulation":
+                from apps.labs.provisioner.simulation_provisioner import evict_sim_stream
+                host_key = getattr(self, "_terminal_host", "primary")
+                evict_sim_stream(str(self.lab_session.id), host_key)
             self.raw_socket = None
         elif self.raw_socket:
             try:

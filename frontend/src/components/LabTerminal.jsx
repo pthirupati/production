@@ -174,10 +174,11 @@ export default function LabTerminal({
             return
           }
           const isSim = session?.provider === 'simulation'
-          if (e.code === 1006 && reconnectAttempts.current < 2) {
+          const simMax1006 = 5
+          if (e.code === 1006 && reconnectAttempts.current < (isSim ? simMax1006 : 2)) {
             reconnectAttempts.current++
             term.write('\r\n\x1b[1;33mConnection interrupted — retrying...\x1b[0m\r\n')
-            reconnectTimerRef.current = setTimeout(connectWs, 1500)
+            reconnectTimerRef.current = setTimeout(connectWs, isSim ? 800 : 1500)
             return
           }
           if (reconnectAttempts.current < maxReconnectAttempts) {

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 
+from .simulation.rhel_os import SimUser
 from .simulation.rhel_shell import RHELShell
 from .simulation.shell import (
     SimulationStreamHolder,
@@ -25,19 +26,100 @@ from .simulation.validation import (
 logger = logging.getLogger(__name__)
 
 
+def _build_lab_hosts(scenario, resource_id: str, sim_type: str) -> list[dict]:
+    lab_hosts = []
+    if sim_type == "ansible" or getattr(scenario, "requires_companion_hosts", False):
+        if sim_type == "ansible":
+            lab_hosts = [
+                {"name": "primary", "role": "control", "container_id": resource_id, "ip": "10.0.0.10", "ssh_user": "ansible"},
+                {"name": "web1", "role": "client", "container_id": f"{resource_id}-web1", "ip": "10.0.0.11", "ssh_user": "root"},
+                {"name": "web2", "role": "client", "container_id": f"{resource_id}-web2", "ip": "10.0.0.12", "ssh_user": "root"},
+            ]
+        else:
+            lab_hosts = [
+                {"name": "primary", "role": "server-a", "container_id": resource_id, "ip": "10.0.0.10", "ssh_user": "root"},
+                {"name": "companion", "role": "server-b", "container_id": f"{resource_id}-companion", "ip": "10.0.0.11", "ssh_user": "root"},
+            ]
+    if not lab_hosts:
+        lab_hosts = [{
+            "name": "primary",
+            "role": "Primary",
+            "container_id": resource_id,
+            "ip": "10.0.0.10",
+            "ssh_user": "root",
+        }]
+    return lab_hosts
+
+
+def _attach_ssh_client_host(lab_hosts: list[dict], resource_id: str) -> list[dict]:
+    if len(lab_hosts) < 2:
+        return lab_hosts
+    hosts = list(lab_hosts)
+    hosts.append({
+        "name": "ssh_client",
+        "role": "SSH Client",
+        "container_id": resource_id,
+        "ip": "10.0.0.5",
+        "ssh_user": "labuser",
+        "ssh_targets": [
+            {"name": h["name"], "ip": h.get("ip", ""), "user": h.get("ssh_user", "root")}
+            for h in hosts if h.get("name") not in ("primary", "ssh_client") and h.get("ip")
+        ],
+    })
+    return hosts
+
+
+def ensure_sim_session(lab_session) -> dict | None:
+    """Re-register in-memory simulation state after worker restart."""
+    session_id = str(lab_session.id)
+    existing = get_sim_session(session_id)
+    if existing:
+        return existing
+
+    scenario = lab_session.scenario
+    resource_id = lab_session.container_id
+    if not resource_id or not scenario:
+        return None
+
+    raw_type = getattr(scenario, "simulation_type", "generic") or "generic"
+    sim_type = normalize_sim_type(raw_type)
+    slug = scenario.slug
+    engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
+    lab_hosts = lab_session.lab_hosts or _build_lab_hosts(scenario, resource_id, sim_type)
+    if len(lab_hosts) >= 2 and not any(h.get("name") == "ssh_client" for h in lab_hosts):
+        lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
+
+    register_sim_session(
+        session_id,
+        resource_id,
+        sim_type,
+        {
+            "engine": engine,
+            "scenario_slug": slug,
+            "simulation_type": sim_type,
+            "hosts": {h["name"]: h for h in lab_hosts},
+            "host_ips": {h.get("ip", ""): h["name"] for h in lab_hosts if h.get("ip")},
+            "validation_marker": f"/opt/fixitlab/sim-valid-{slug}",
+        },
+    )
+    logger.info("Rehydrated simulation session %s resource=%s", session_id, resource_id)
+    return get_sim_session(session_id)
+
+
 def evict_sim_stream(session_key: str, host_key: str = "primary") -> None:
-    """Remove a cached (possibly closed) simulation stream so reconnect gets a fresh shell."""
+    """Remove cached simulation streams for a host so reconnect gets a fresh shell."""
     entry = get_sim_session(session_key)
     if not entry:
         return
-    stream_key = f"{session_key}:{host_key or 'primary'}"
+    prefix = f"{session_key}:{host_key or 'primary'}"
     streams = entry.get("streams") or {}
-    if stream_key in streams:
-        holder = streams.pop(stream_key)
-        try:
-            holder.close()
-        except Exception:
-            pass
+    for key in list(streams.keys()):
+        if key == prefix or key.startswith(f"{prefix}:"):
+            holder = streams.pop(key)
+            try:
+                holder.close()
+            except Exception:
+                pass
 
 
 class SimulationProvisioner:
@@ -52,27 +134,14 @@ class SimulationProvisioner:
         engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
         resource_id = f"sim-{uuid.uuid4().hex[:12]}"
 
-        lab_hosts = []
-        if sim_type == "ansible" or getattr(scenario, "requires_companion_hosts", False):
-            if sim_type == "ansible":
-                lab_hosts = [
-                    {"name": "primary", "role": "control", "container_id": resource_id, "ip": "10.0.0.10", "ssh_user": "ansible"},
-                    {"name": "web1", "role": "client", "container_id": f"{resource_id}-web1", "ip": "10.0.0.11", "ssh_user": "root"},
-                    {"name": "web2", "role": "client", "container_id": f"{resource_id}-web2", "ip": "10.0.0.12", "ssh_user": "root"},
-                ]
-            else:
-                lab_hosts = [
-                    {"name": "primary", "role": "server-a", "container_id": resource_id, "ip": "10.0.0.10", "ssh_user": "root"},
-                    {"name": "companion", "role": "server-b", "container_id": f"{resource_id}-companion", "ip": "10.0.0.11", "ssh_user": "root"},
-                ]
-        if not lab_hosts:
-            lab_hosts = [{
-                "name": "primary",
-                "role": "Primary",
-                "container_id": resource_id,
-                "ip": "10.0.0.10",
-                "ssh_user": "root",
-            }]
+        lab_hosts = _build_lab_hosts(scenario, resource_id, sim_type)
+        lab_session.lab_hosts = lab_hosts
+        lab_session.save(update_fields=["lab_hosts"])
+
+        if len(lab_hosts) >= 2:
+            lab_hosts = _attach_ssh_client_host(list(lab_session.lab_hosts or []), resource_id)
+            lab_session.lab_hosts = lab_hosts
+            lab_session.save(update_fields=["lab_hosts"])
 
         register_sim_session(
             str(lab_session.id),
@@ -83,64 +152,63 @@ class SimulationProvisioner:
                 "scenario_slug": slug,
                 "simulation_type": sim_type,
                 "hosts": {h["name"]: h for h in lab_hosts},
+                "host_ips": {h.get("ip", ""): h["name"] for h in lab_hosts if h.get("ip")},
                 "validation_marker": f"/opt/fixitlab/sim-valid-{slug}",
             },
         )
 
-        lab_session.lab_hosts = lab_hosts
-        lab_session.save(update_fields=["lab_hosts"])
-
-        if len(lab_hosts) >= 2:
-            lab_hosts = list(lab_session.lab_hosts or [])
-            lab_hosts.append({
-                "name": "ssh_client",
-                "role": "SSH Client",
-                "container_id": resource_id,
-                "ip": "10.0.0.5",
-                "ssh_user": "labuser",
-                "ssh_targets": [
-                    {"name": h["name"], "ip": h.get("ip", ""), "user": h.get("ssh_user", "root")}
-                    for h in lab_hosts if h.get("name") not in ("primary", "ssh_client") and h.get("ip")
-                ],
-            })
-            lab_session.lab_hosts = lab_hosts
-            lab_session.save(update_fields=["lab_hosts"])
-
         logger.info("Simulation lab %s persona=%s resource=%s", lab_session.id, sim_type, resource_id)
         return resource_id, f"sim-{slug}"
 
+    def _setup_ssh_client_shell(self, engine, entry, hostname: str = "ssh-client") -> RHELShell:
+        client_state = engine.state.clone_for_host(hostname)
+        if "labuser" not in client_state.users:
+            client_state.users["labuser"] = SimUser(
+                "labuser", 1002, 1002, "/home/labuser", "/bin/bash", "Lab SSH User",
+            )
+        client_state._mkdir("/home/labuser")
+        client_state._mkdir("/home/labuser/.ssh")
+        client_state._write_file(
+            "/home/labuser/.ssh/id_rsa",
+            "-----BEGIN OPENSSH PRIVATE KEY-----\n(simulated-key)\n-----END OPENSSH PRIVATE KEY-----\n",
+        )
+        client_state.set_prompt_user("labuser")
+        shell = RHELShell(
+            state=client_state,
+            scenario_slug=entry["state"].get("scenario_slug", ""),
+            hostname=hostname,
+        )
+        shell._host_ips = entry["state"].get("host_ips", {})
+        shell._host_names = entry["state"].get("hosts", {})
+        shell._engine = entry["state"]["engine"]
+        register_modules(entry["state"]["engine"], shell)
+        return shell
+
     def create_exec_stream(self, resource_id, session_key: str = "", host_key: str = "primary"):
+        from apps.labs.models import LabSession
+
         entry = get_sim_session(session_key)
         if not entry:
-            raise RuntimeError(f"Simulation session {session_key} not found")
+            try:
+                lab_session = LabSession.objects.select_related("scenario").get(id=session_key)
+            except LabSession.DoesNotExist:
+                raise RuntimeError(f"Simulation session {session_key} not found")
+            entry = ensure_sim_session(lab_session)
+            if not entry:
+                raise RuntimeError(f"Simulation session {session_key} not found")
 
         engine = entry["state"]["engine"]
         hk = host_key or "primary"
-        stream_key = f"{session_key}:{hk}"
-
-        streams = entry.setdefault("streams", {})
-        existing = streams.get(stream_key)
-        if existing is not None:
-            if getattr(existing, "_closed", False):
-                del streams[stream_key]
-            else:
-                return existing.exec_id, existing
+        stream_key = f"{session_key}:{hk}:{uuid.uuid4().hex[:8]}"
 
         if hk == "ssh_client":
-            hostname = "ssh-client"
-            client_state = engine.state.clone_for_host(hostname)
-            shell = RHELShell(
-                state=client_state,
-                scenario_slug=entry["state"].get("scenario_slug", ""),
-                hostname=hostname,
-            )
-            register_modules(engine, shell)
+            shell = self._setup_ssh_client_shell(engine, entry)
             holder = SimulationStreamHolder(
                 shell.run,
-                prompt="labuser@ssh-client:~$ ",
+                prompt=shell.prompt,
                 dynamic_prompt=lambda: shell.prompt,
             )
-            streams[stream_key] = holder
+            entry.setdefault("streams", {})[stream_key] = holder
             return holder.exec_id, holder
 
         if hk not in ("primary", "") and hk != "primary":
@@ -151,6 +219,9 @@ class SimulationProvisioner:
                 scenario_slug=entry["state"].get("scenario_slug", ""),
                 hostname=hostname,
             )
+            shell._host_ips = entry["state"].get("host_ips", {})
+            shell._host_names = entry["state"].get("hosts", {})
+            shell._engine = engine
             register_modules(engine, shell)
 
             def get_ed():
@@ -184,6 +255,13 @@ class SimulationProvisioner:
 
     def run_validation(self, resource_id, validation_script, scenario_slug: str = ""):
         entry = get_sim_session_by_resource(resource_id)
+        if not entry:
+            from apps.labs.models import LabSession
+            try:
+                lab_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                entry = ensure_sim_session(lab_session)
+            except LabSession.DoesNotExist:
+                entry = None
         engine = entry.get("state", {}).get("engine") if entry else None
         slug = scenario_slug or (entry.get("state", {}).get("scenario_slug", "") if entry else "")
         script = resolve_simulation_validation_script(slug, validation_script or "")

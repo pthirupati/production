@@ -173,6 +173,10 @@ class SimulationStreamHolder:
     def setblocking(self, flag: bool) -> None:
         pass
 
+    def resize_pty(self, width: int = 120, height: int = 40) -> None:
+        """No-op for simulation — keeps consumer resize path from failing."""
+        pass
+
 
 _SIM_SESSIONS: dict[str, dict] = {}
 _SIM_LOCK = threading.Lock()

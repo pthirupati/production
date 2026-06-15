@@ -572,10 +572,11 @@ class SocialAuthConfigView(APIView):
         base = canonical_frontend_url()
         gh_callback = oauth_callback_url("github")
         google_callback = oauth_callback_url("google")
+        gh_client = settings.GITHUB_CLIENT_ID or ""
         return Response({
             "frontend_url": base,
             "oauth_setup_note": (
-                "GitHub OAuth App → Authorization callback URL must be exactly: "
+                f"Register this exact callback in your GitHub OAuth App (client {gh_client[:8]}…): "
                 f"{gh_callback}"
             ),
             "github": {
@@ -585,7 +586,7 @@ class SocialAuthConfigView(APIView):
                 "callback_url": gh_callback,
                 "login_url": github_authorize_url(intent="login") if settings.GITHUB_CLIENT_ID else "",
                 "start_url": "/api/auth/social/start/github/",
-                "app_settings_url": "https://github.com/settings/developers",
+                "app_settings_url": f"https://github.com/settings/applications/{settings.GITHUB_CLIENT_ID}" if settings.GITHUB_CLIENT_ID else "https://github.com/settings/developers",
             },
             "google": {
                 "enabled": bool(settings.GOOGLE_CLIENT_ID),
