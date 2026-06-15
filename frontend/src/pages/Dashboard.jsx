@@ -10,7 +10,7 @@ import {
   Target, Trophy, Zap, Clock, TrendingUp, ArrowRight,
   CheckCircle2, Award, BookOpen, Play, Star,
   Calendar, CreditCard, Crown, Layers, ArrowUpRight, XCircle, AlertTriangle, Sparkles, Download, Ticket,
-  Bookmark, Bell, History, BarChart3
+  Bookmark, Bell, History, BarChart3, X
 } from 'lucide-react'
 import JiraTicketLink from '../components/JiraTicketLink'
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
@@ -79,6 +79,17 @@ export default function Dashboard() {
 
   const stats = progress?.summary || {}
   const techProgress = progress?.technology_progress || {}
+  const subscribedTechNames = complimentaryAccess
+    ? null
+    : new Set(
+        subscriptions
+          .filter(s => s.is_active)
+          .map(s => s.technology?.name)
+          .filter(Boolean)
+      )
+  const displayedTechProgress = subscribedTechNames
+    ? Object.fromEntries(Object.entries(techProgress).filter(([name]) => subscribedTechNames.has(name)))
+    : techProgress
   const diffProgress = progress?.difficulty_progress || {}
   const recent = progress?.recent_activity || []
   const earnedAch = achievements.filter?.(a => a.earned) || []
@@ -194,11 +205,11 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {Object.keys(techProgress).length > 0 && (
+      {Object.keys(displayedTechProgress).length > 0 && (
         <div className="glass-card p-6">
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Layers size={18} className="text-accent-cyan" /> Progress by Technology</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(techProgress).map(([name, data]) => {
+            {Object.entries(displayedTechProgress).map(([name, data]) => {
               const pct = data.total ? Math.round((data.completed / data.total) * 100) : 0
               return (
                 <Link key={name} to="/technologies" className="p-4 rounded-xl bg-surface-800/40 border border-surface-700/40 hover:border-accent-cyan/30 transition-all">
@@ -477,6 +488,14 @@ export default function Dashboard() {
       {cancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in" onClick={() => !cancelling && setCancelModal(null)}>
           <div className="glass-card p-6 max-w-md w-full gradient-border animate-scale-in relative overflow-hidden" onClick={e => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => !cancelling && setCancelModal(null)}
+              className="absolute top-4 right-4 text-surface-400 hover:text-white p-1 rounded-md hover:bg-surface-800/60 transition-colors"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
             <div className="absolute inset-0 bg-gradient-to-br from-accent-red/[0.05] via-transparent to-accent-red/[0.02] pointer-events-none" />
             <div className="flex items-center gap-3 mb-4 relative">
               <div className="w-12 h-12 rounded-xl bg-accent-red/10 flex items-center justify-center border border-accent-red/20 shadow-lg shadow-accent-red/10"><AlertTriangle size={24} className="text-accent-red" /></div>

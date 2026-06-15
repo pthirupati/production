@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { Ticket, Search, RefreshCw, Plus, User, Target } from 'lucide-react'
+import { Ticket, Search, RefreshCw, Plus, User, Target, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import JiraTicketLink from '../../components/JiraTicketLink'
 
@@ -173,9 +173,14 @@ export default function AdminJira() {
       </div>
 
       {showCreate && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="glass-card p-6 w-full max-w-md space-y-4">
-            <h2 className="text-lg font-bold text-white">Create Jira Ticket</h2>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
+          <div className="glass-card p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Create Jira Ticket</h2>
+              <button type="button" onClick={() => setShowCreate(false)} className="text-surface-400 hover:text-white p-1 rounded-md hover:bg-surface-800/60">
+                <X size={20} />
+              </button>
+            </div>
             <p className="text-sm text-surface-400">Creates a personal ticket for the selected user and scenario.</p>
             <div>
               <label className="text-xs text-surface-400 mb-1 block">User</label>

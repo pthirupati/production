@@ -45,34 +45,15 @@ export default function LabRunner() {
   const [terminalHost, setTerminalHost] = useState('primary')
   const [sshClientTarget, setSshClientTarget] = useState(null)
 
-  const TOAST = { closeButton: true }
+  const TOAST = {}
 
-  const terminalRef = useRef(null)
-  const xtermRef = useRef(null)
-  const wsRef = useRef(null)
-  const fitAddonRef = useRef(null)
-  const reconnectAttempts = useRef(0)
-  const maxReconnectAttempts = 10  // Cloud labs may need more; simulation capped in onclose handler
   const labChannelRef = useRef(null)  // BroadcastChannel for cross-tab sync
-  const inputBufferRef = useRef('')   // Accumulate keystrokes to check blocked commands
-  const blockedPatternsRef = useRef([]) // [{pattern: RegExp, label: string}]
-  const reconnectTimerRef = useRef(null)
-  const terminalSessionRef = useRef(null)
   const closeTimerRef = useRef(null)
   const closeCountdownRef = useRef(null)
 
   const LAB_CLOSE_SECONDS = 10
 
   const cleanupLabResources = useCallback(() => {
-    if (wsRef.current) {
-      wsRef.current.onclose = null
-      wsRef.current.close(1000)
-      wsRef.current = null
-    }
-    if (xtermRef.current) {
-      xtermRef.current.dispose()
-      xtermRef.current = null
-    }
     clearSession()
     stopTimer()
   }, [clearSession, stopTimer])
@@ -106,8 +87,6 @@ export default function LabRunner() {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
     if (closeCountdownRef.current) clearInterval(closeCountdownRef.current)
   }, [])
-
-  const WS_NO_RECONNECT = new Set([1000, 4001, 4003, 4004, 4005, 4008, 4500])
 
   // Keyboard shortcuts
   const toggleHints = useCallback(() => {
@@ -265,39 +244,10 @@ export default function LabRunner() {
             )
           }
 
-          // Compile blocked command patterns from scenario
-          const blockedCmds = lab.scenario?.blocked_commands || []
-          blockedPatternsRef.current = blockedCmds.map(entry => {
-            if (!entry || typeof entry !== 'string') return null
-            const raw = entry.trim()
-            if (!raw) return null
-            try {
-              if (raw.startsWith('^')) {
-                return { pattern: new RegExp(raw, 'i'), label: raw }
-              } else {
-                const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                return { pattern: new RegExp(`(?:^|[;&|]\\s*)${escaped}`, 'i'), label: raw }
-              }
-            } catch { return null }
-          }).filter(Boolean)
-
           if (lab.time_remaining > 0) {
             startTimer(lab.time_remaining, async () => {
-              // Timer expired — terminate lab, close resources, redirect
               toast('Lab time completed! The environment is being terminated.', { icon: '⏰', duration: 6000, ...TOAST })
 
-              // Close WebSocket + xterm
-              if (wsRef.current) {
-                wsRef.current.onclose = null
-                wsRef.current.close(1000)
-                wsRef.current = null
-              }
-              if (xtermRef.current) {
-                xtermRef.current.dispose()
-                xtermRef.current = null
-              }
-
-              // Terminate the lab (EC2/Docker)
               try {
                 await labApi.stopLab(sessionId)
               } catch (e) {
@@ -359,294 +309,6 @@ export default function LabRunner() {
     }
   }, [sessionId])
 
-  // Initialize xterm.js and WebSocket (single-pane mode only)
-  useEffect(() => {
-    if (!session || session.status !== 'RUNNING' || !terminalRef.current) return
-    if (session.provider === 'simulation' || terminalHost !== 'primary') return
-    const dualPane = session.scenario?.dual_terminal && (session.lab_hosts?.length >= 2)
-    if (dualPane) return
-    const hasResource = session.container_id || session.instance_id || session.provider === 'simulation'
-    if (!hasResource) return
-    if (terminalSessionRef.current === `${sessionId}:${terminalHost}`) return
-
-    let disposed = false
-    let cleanup = () => {}
-
-    const initTerminal = async () => {
-      const { Terminal } = await import('@xterm/xterm')
-      const { FitAddon } = await import('@xterm/addon-fit')
-      const { WebLinksAddon } = await import('@xterm/addon-web-links')
-      await import('@xterm/xterm/css/xterm.css')
-
-      if (disposed) return
-      terminalSessionRef.current = `${sessionId}:${terminalHost}`
-      reconnectAttempts.current = 0
-
-      const term = new Terminal({
-        cursorBlink: true,
-        cursorStyle: 'bar',
-        fontSize: isMobile ? 11 : 14,
-        lineHeight: isMobile ? 1.15 : 1.2,
-        fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
-        theme: {
-          background: '#020617',
-          foreground: '#e2e8f0',
-          cursor: '#06b6d4',
-          cursorAccent: '#020617',
-          selectionBackground: '#334155',
-          black: '#0f172a', red: '#ef4444', green: '#10b981', yellow: '#f59e0b',
-          blue: '#3b82f6', magenta: '#8b5cf6', cyan: '#06b6d4', white: '#f1f5f9',
-          brightBlack: '#475569', brightRed: '#f87171', brightGreen: '#34d399',
-          brightYellow: '#fbbf24', brightBlue: '#60a5fa', brightMagenta: '#a78bfa',
-          brightCyan: '#22d3ee', brightWhite: '#f8fafc',
-        },
-        allowProposedApi: true,
-      })
-
-      const fitAddon = new FitAddon()
-      const webLinksAddon = new WebLinksAddon()
-      term.loadAddon(fitAddon)
-      term.loadAddon(webLinksAddon)
-      term.open(terminalRef.current)
-      fitAddon.fit()
-
-      xtermRef.current = term
-      fitAddonRef.current = fitAddon
-
-      const shellReadyRef = { current: false }
-      const resizeDebounceRef = { current: null }
-
-      const sendResize = () => {
-        const isCloud = session?.provider === 'aws_ec2' || session?.provider === 'digitalocean'
-        if (!isCloud || !shellReadyRef.current) return
-        if (wsRef.current?.readyState === WebSocket.OPEN && term.cols && term.rows) {
-          wsRef.current.send(JSON.stringify({ resize: { cols: term.cols, rows: term.rows } }))
-        }
-      }
-
-      const scheduleResize = () => {
-        if (resizeDebounceRef.current) clearTimeout(resizeDebounceRef.current)
-        resizeDebounceRef.current = setTimeout(sendResize, 300)
-      }
-
-      const resizeObserver =
-        typeof ResizeObserver !== 'undefined'
-          ? new ResizeObserver(() => {
-              if (disposed) return
-              fitAddon.fit()
-              scheduleResize()
-            })
-          : null
-      if (resizeObserver && terminalRef.current) {
-        resizeObserver.observe(terminalRef.current)
-      }
-
-      const wsCloseMessages = {
-        4001: '\r\n\x1b[1;31mAuthentication expired — refresh the page to reconnect.\x1b[0m\r\n',
-        4003: '\r\n\x1b[1;33mLab is not running yet — wait for provisioning to finish.\x1b[0m\r\n',
-        4004: '\r\n\x1b[1;31mLab session not found.\x1b[0m\r\n',
-        4005: '\r\n\x1b[1;31mLab environment not ready — try again in a few seconds.\x1b[0m\r\n',
-        4008: '\r\n\x1b[1;31mToo many terminal tabs open — close another tab and refresh.\x1b[0m\r\n',
-        4500: '\r\n\x1b[1;31mCould not connect to lab shell.\x1b[0m\r\n',
-      }
-
-      const buildWsUrl = () => {
-        const token = useAuthStore.getState().accessToken
-        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-        const hostQ = terminalHost && terminalHost !== 'primary' ? `&host=${encodeURIComponent(terminalHost)}` : ''
-        return `${protocol}://${window.location.host}/ws/terminal/${sessionId}/?token=${token}${hostQ}`
-      }
-
-      const bindEnterRetry = (message) => {
-        term.write(message)
-        const retryHandler = term.onData((data) => {
-          if (data === '\r' || data === '\n') {
-            retryHandler.dispose()
-            reconnectAttempts.current = 0
-            term.write('\r\n\x1b[1;36mRetrying connection...\x1b[0m\r\n')
-            connectWs()
-          }
-        })
-      }
-
-      const connectWs = () => {
-        if (disposed) return
-        if (reconnectTimerRef.current) {
-          clearTimeout(reconnectTimerRef.current)
-          reconnectTimerRef.current = null
-        }
-        if (wsRef.current) {
-          wsRef.current.onclose = null
-          wsRef.current.close(1000)
-          wsRef.current = null
-        }
-
-        const ws = new WebSocket(buildWsUrl())
-        wsRef.current = ws
-
-        ws.onopen = () => {
-          reconnectAttempts.current = 0
-          shellReadyRef.current = false
-        }
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            if (data.type === 'ping') return
-            if (data.type === 'shell_respawn') {
-              reconnectAttempts.current = 0
-              shellReadyRef.current = false
-              if (data.output) term.write(data.output)
-              return
-            }
-            if (data.type === 'shell_ready') {
-              shellReadyRef.current = true
-              scheduleResize()
-              return
-            }
-            if (data.output) term.write(data.output)
-          } catch { term.write(event.data) }
-        }
-        ws.onclose = (e) => {
-          if (disposed || e.code === 1000) {
-            if (e.code === 1000) term.write('\r\n\x1b[1;33mSession ended\x1b[0m\r\n')
-            return
-          }
-          if (WS_NO_RECONNECT.has(e.code)) {
-            term.write(wsCloseMessages[e.code] || '\r\n\x1b[1;31mConnection closed.\x1b[0m\r\n')
-            if (e.code === 4500) {
-              term.write('\x1b[1;33mPress Enter to retry connection...\x1b[0m\r\n')
-              const retryHandler = term.onData((data) => {
-                if (data === '\r' || data === '\n') {
-                  retryHandler.dispose()
-                  reconnectAttempts.current = 0
-                  term.write('\r\n\x1b[1;36mRetrying connection...\x1b[0m\r\n')
-                  connectWs()
-                }
-              })
-            }
-            return
-          }
-          // Abnormal closure (1006) — server respawns shell in-place; brief pause then one retry
-          if (e.code === 1006 && reconnectAttempts.current < 2) {
-            reconnectAttempts.current++
-            term.write('\r\n\x1b[1;33mConnection interrupted — retrying...\x1b[0m\r\n')
-            reconnectTimerRef.current = setTimeout(connectWs, 1500)
-            return
-          }
-          if (reconnectAttempts.current < maxReconnectAttempts) {
-            reconnectAttempts.current++
-            const isSim = session?.provider === 'simulation'
-            const isCloud = session?.provider === 'aws_ec2' || session?.provider === 'digitalocean'
-            if (isSim && reconnectAttempts.current > 3) {
-              bindEnterRetry('\r\n\x1b[1;33mSimulation shell paused — press Enter to reconnect\x1b[0m\r\n')
-              return
-            }
-            const baseDelay = isCloud ? 3000 : isSim ? 1000 : 2000
-            const cap = isSim ? 3 : maxReconnectAttempts
-            if (reconnectAttempts.current >= cap) {
-              bindEnterRetry('\r\n\x1b[1;31mConnection lost.\x1b[0m Press Enter to retry.\x1b[0m\r\n')
-              return
-            }
-            const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts.current - 1), 20000)
-            if (!isSim) {
-              term.write(`\r\n\x1b[1;33mReconnecting in ${Math.round(delay / 1000)}s... (${reconnectAttempts.current}/${maxReconnectAttempts})\x1b[0m\r\n`)
-            }
-            reconnectTimerRef.current = setTimeout(connectWs, delay)
-          } else {
-            term.write('\r\n\x1b[1;31mConnection lost after multiple attempts.\x1b[0m\r\n')
-            term.write('\x1b[1;33mPress Enter to retry connection...\x1b[0m\r\n')
-            const retryHandler = term.onData((data) => {
-              if (data === '\r' || data === '\n') {
-                retryHandler.dispose()
-                reconnectAttempts.current = 0
-                term.write('\r\n\x1b[1;36mRetrying connection...\x1b[0m\r\n')
-                connectWs()
-              }
-            })
-          }
-        }
-        ws.onerror = () => {} // onclose handles recovery
-      }
-
-      connectWs()
-
-      term.onData((data) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          // Accumulate input and check blocked commands on Enter
-          if (data === '\r' || data === '\n') {
-            const cmd = inputBufferRef.current.trim()
-            inputBufferRef.current = ''
-            if (cmd && blockedPatternsRef.current.length > 0) {
-              // Split on shell separators to check chained commands
-              const parts = cmd.split(/\s*(?:;|&&|\|\||\|)\s*/)
-              for (const part of parts) {
-                const trimmed = part.trim()
-                if (!trimmed) continue
-                for (const { pattern, label } of blockedPatternsRef.current) {
-                  if (pattern.test(trimmed)) {
-                    // Block: show warning in terminal, don't send Enter
-                    term.write(`\r\n\x1b[1;31m⛔ Command blocked: \x1b[0;33m${label}\x1b[1;31m is not allowed in this scenario.\x1b[0m\r\n`)
-                    // Send Ctrl+C to get a fresh prompt
-                    wsRef.current.send(JSON.stringify({ input: '\x03' }))
-                    return
-                  }
-                }
-              }
-            }
-            // Command allowed — send the Enter key
-            wsRef.current.send(JSON.stringify({ input: data }))
-          } else if (data === '\x7f' || data === '\b') {
-            // Backspace — remove last char from buffer
-            inputBufferRef.current = inputBufferRef.current.slice(0, -1)
-            wsRef.current.send(JSON.stringify({ input: data }))
-          } else if (data === '\x03') {
-            // Ctrl+C — clear buffer
-            inputBufferRef.current = ''
-            wsRef.current.send(JSON.stringify({ input: data }))
-          } else if (data === '\x15') {
-            // Ctrl+U — clear line
-            inputBufferRef.current = ''
-            wsRef.current.send(JSON.stringify({ input: data }))
-          } else {
-            inputBufferRef.current += data
-            wsRef.current.send(JSON.stringify({ input: data }))
-          }
-        }
-      })
-
-      const handleResize = () => {
-        fitAddon.fit()
-        scheduleResize()
-      }
-      term.onResize(() => scheduleResize())
-      window.addEventListener('resize', handleResize)
-
-      cleanup = () => {
-        disposed = true
-        resizeObserver?.disconnect()
-        window.removeEventListener('resize', handleResize)
-        if (resizeDebounceRef.current) {
-          clearTimeout(resizeDebounceRef.current)
-          resizeDebounceRef.current = null
-        }
-        if (reconnectTimerRef.current) {
-          clearTimeout(reconnectTimerRef.current)
-          reconnectTimerRef.current = null
-        }
-        reconnectAttempts.current = maxReconnectAttempts
-        if (wsRef.current) {
-          wsRef.current.onclose = null
-          wsRef.current.close(1000)
-          wsRef.current = null
-        }
-        term.dispose()
-        if (terminalSessionRef.current === sessionId) terminalSessionRef.current = null
-      }
-    }
-
-    initTerminal()
-    return () => cleanup()
-  }, [sessionId, session?.status, session?.container_id, session?.instance_id, terminalHost, isMobile])
 
   // Auto-terminate lab on tab close / navigate away
   useEffect(() => {
@@ -681,7 +343,6 @@ export default function LabRunner() {
       idleTimer = setTimeout(async () => {
         toast('Lab terminated due to 30 minutes of inactivity.', { icon: '⏰', duration: 8000, ...TOAST })
         try {
-          if (wsRef.current) { wsRef.current.close(1000); wsRef.current = null }
           await labApi.stopLab(sessionId)
         } catch {}
         clearSession()
@@ -700,13 +361,6 @@ export default function LabRunner() {
       events.forEach(e => window.removeEventListener(e, resetIdleTimer))
     }
   }, [session, sessionId])
-
-  // Refit terminal when sidebar toggles
-  useEffect(() => {
-    if (fitAddonRef.current) {
-      setTimeout(() => fitAddonRef.current.fit(), 300)
-    }
-  }, [sidebarOpen])
 
   const handleJiraTransition = async (status) => {
     if (!session?.jira_issue_key) return
@@ -759,11 +413,6 @@ export default function LabRunner() {
             closingDelayMs: LAB_CLOSE_SECONDS * 1000,
           })
         }
-        if (wsRef.current) {
-          wsRef.current.onclose = null
-          wsRef.current.close()
-          wsRef.current = null
-        }
         const slug = session?.scenario?.slug || session?.scenario_detail?.slug || ''
         scheduleLabClose(result, slug)
         if (session?.scenario?.id) {
@@ -811,17 +460,6 @@ export default function LabRunner() {
   const handleStop = async () => {
     setStopping(true)
     try {
-      // Close WebSocket connection first to release the terminal
-      if (wsRef.current) {
-        wsRef.current.onclose = null  // Prevent "Connection closed" message
-        wsRef.current.close()
-        wsRef.current = null
-      }
-      // Dispose xterm to clean up
-      if (xtermRef.current) {
-        xtermRef.current.dispose()
-        xtermRef.current = null
-      }
       const result = await labApi.stopLab(sessionId)
       clearSession()
       stopTimer()
@@ -946,7 +584,6 @@ export default function LabRunner() {
       return
     }
     setSshClientTarget(host)
-    terminalSessionRef.current = null
     setTerminalHost('ssh_client')
     toast(`SSH client terminal — connect with: ssh ${host.ssh_user || 'root'}@${host.ip}`, { ...TOAST, duration: 8000 })
   }
@@ -1275,7 +912,6 @@ export default function LabRunner() {
               type="button"
               onClick={() => {
                 if (h.name !== terminalHost) {
-                  terminalSessionRef.current = null
                   setTerminalHost(h.name)
                   if (h.name !== 'ssh_client') setSshClientTarget(null)
                 }
@@ -1338,22 +974,22 @@ export default function LabRunner() {
                   isMobile={isMobile}
                   blockedCommands={blockedCmds}
                   className="h-full"
+                  layoutKey={sidebarOpen}
                 />
               ))}
             </div>
           )}
-          {!useDualPane && session.provider !== 'simulation' && terminalHost === 'primary' && (
-            <div ref={terminalRef} className="flex-1 min-h-0 p-0.5 sm:p-1 touch-manipulation" />
-          )}
-          {!useDualPane && (session.provider === 'simulation' || terminalHost !== 'primary') && (
+          {!useDualPane && !sshClientTarget && (
             <LabTerminal
+              key={`${sessionId}:${terminalHost}`}
               sessionId={sessionId}
               session={session}
               hostKey={terminalHost}
-              label={`${labHosts.find(h => h.name === terminalHost)?.role || terminalHost}`}
+              label={terminalHost !== 'primary' ? `${labHosts.find(h => h.name === terminalHost)?.role || terminalHost}` : ''}
               isMobile={isMobile}
               blockedCommands={blockedCmds}
               className="flex-1 min-h-0"
+              layoutKey={sidebarOpen}
               welcomeHint={terminalHost === 'ssh_client' && sshClientTarget
                 ? `Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`
                 : ''}

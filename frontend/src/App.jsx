@@ -1,5 +1,5 @@
 import { BrowserRouter } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
+import DismissableToaster from './components/DismissableToaster'
 import { useEffect } from 'react'
 import ErrorBoundary from './components/ErrorBoundary'
 import OfflineBanner from './components/OfflineBanner'
@@ -28,18 +28,7 @@ export default function App() {
         <ScrollToTop />
         <OfflineBanner />
         <SessionMonitor />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 5000,
-            closeButton: true,
-            style: {
-              background: 'rgb(var(--s-800))',
-              color: 'rgb(var(--s-100))',
-              border: '1px solid rgb(var(--s-700))',
-            },
-          }}
-        />
+        <DismissableToaster />
         <ChangelogModal />
         <AppRouter />
       </BrowserRouter>
