@@ -18,6 +18,7 @@ const ResetPassword = lazy(() => import('../pages/auth/ResetPassword'))
 const Pricing = lazy(() => import('../pages/Pricing'))
 const Dashboard = lazy(() => import('../pages/Dashboard'))
 const Technologies = lazy(() => import('../pages/Technologies'))
+const TechnologyDetail = lazy(() => import('../pages/TechnologyDetail'))
 const Scenarios = lazy(() => import('../pages/Scenarios'))
 const ScenarioDetail = lazy(() => import('../pages/ScenarioDetail'))
 const LabRunner = lazy(() => import('../pages/LabRunner'))
@@ -110,6 +111,7 @@ export default function AppRouter() {
         <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/technologies" element={<Technologies />} />
+          <Route path="/technologies/:slug" element={<TechnologyDetail />} />
           <Route path="/scenarios" element={<Scenarios />} />
           <Route path="/scenarios/:slug" element={<ScenarioDetail />} />
           <Route path="/lab/:sessionId" element={<LabRunner />} />

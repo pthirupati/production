@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Team invite — FixitLab</title></head>
+<body style="margin:0;padding:0;background-color:#0a0e1a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0e1a;padding:32px 16px;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+  <tr><td style="text-align:center;padding:24px 0 20px;">
+    <span style="color:#ffffff;font-size:22px;font-weight:700;">FixitLab</span>
+  </td></tr>
+  <tr><td>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#141b2d;border-radius:16px;border:1px solid #1e293b;">
+      <tr><td style="padding:40px;">
+        <h1 style="color:#ffffff;font-size:24px;margin:0 0 16px;">You're invited to join {{ org_name }}</h1>
+        <p style="color:#94a3b8;font-size:15px;line-height:1.6;margin:0 0 24px;">
+          {{ inviter_name }} invited you to collaborate on FixitLab as a team member.
+          {% if is_new_user %}
+          Create your account with this email address to join automatically.
+          {% else %}
+          Sign in with your existing FixitLab account to access shared technologies and team analytics.
+          {% endif %}
+        </p>
+        <p style="text-align:center;margin:0 0 16px;">
+          <a href="{{ action_url }}" style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:12px;font-weight:700;">
+            {% if is_new_user %}Create account &amp; join{% else %}Sign in to join{% endif %}
+          </a>
+        </p>
+        <p style="color:#64748b;font-size:12px;margin:0;text-align:center;">This invite expires in 14 days.</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</td></tr></table>
+</body>
+</html>

@@ -34,9 +34,20 @@ _vault_can_seed() {
 
 _seed_vault_from_file() {
   local src="$1"
+  if [ ! -f "$src" ]; then
+    return 0
+  fi
+  if grep -q '^VAULT_ENABLED=true' "$src" 2>/dev/null; then
+    export VAULT_ENABLED=true
+  fi
   if _vault_can_seed; then
     echo "[env] Syncing Vault KV from updated env source"
     bash "$ROOT/scripts/vault/seed-from-env.sh" "$src" || echo "[env] WARN: Vault KV seed failed"
+    return 0
+  fi
+  if _env_true "${VAULT_ENABLED:-}" && [ -x "$ROOT/scripts/vault/bootstrap.sh" ] && [ ! -f "$ROOT/deploy/vault-init.json" ]; then
+    echo "[env] First-time Vault bootstrap from env source"
+    bash "$ROOT/scripts/vault/bootstrap.sh" "$src" || echo "[env] WARN: Vault bootstrap failed"
   fi
 }
 

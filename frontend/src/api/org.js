@@ -17,4 +17,16 @@ export const orgApi = {
     const { data } = await api.get(`/org/${slug}/analytics/`)
     return data
   },
+  async getMember(slug, userId) {
+    const { data } = await api.get(`/org/${slug}/members/${userId}/`)
+    return data
+  },
+  async removeMember(slug, userId) {
+    const { data } = await api.delete(`/org/${slug}/members/${userId}/remove/`)
+    return data
+  },
+  async cancelInvite(slug, inviteId) {
+    const { data } = await api.delete(`/org/${slug}/invites/${inviteId}/`)
+    return data
+  },
 }
