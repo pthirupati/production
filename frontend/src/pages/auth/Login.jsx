@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { authApi } from '../../api/auth'
 import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff, Terminal, Server, Shield, Cpu, Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { buildOAuthAuthorizeUrl } from '../../utils/oauth'
 
 /* ── Animated server-room illustration (left panel) ── */
 function ServerIllustration() {
@@ -100,13 +101,8 @@ export default function Login() {
       return
     }
     sessionStorage.setItem('oauth_intent', 'login')
-    const cfg = socialConfig[provider]
-    const redirectUri = `${window.location.origin}/auth/callback/${provider}`
-    const scopes = provider === 'github' ? 'user:email' : 'openid email profile'
-    const scopeParam = provider === 'github' ? 'scope' : 'scope'
-    const url = provider === 'github'
-      ? `${cfg.authorize_url}?client_id=${cfg.client_id}&redirect_uri=${encodeURIComponent(redirectUri)}&${scopeParam}=${encodeURIComponent(scopes)}`
-      : `${cfg.authorize_url}?client_id=${cfg.client_id}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&access_type=offline&prompt=consent`
+    const url = buildOAuthAuthorizeUrl(socialConfig, provider)
+    if (!url) return
     window.location.href = url
   }
 

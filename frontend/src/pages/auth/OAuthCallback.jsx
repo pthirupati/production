@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { authApi } from '../../api/auth'
 import { Terminal, AlertCircle, CheckCircle2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { getOAuthRedirectUri } from '../../utils/oauth'
 
 export default function OAuthCallback() {
   const { provider } = useParams()
@@ -23,7 +24,8 @@ export default function OAuthCallback() {
 
     const exchange = async () => {
       try {
-        const redirectUri = `${window.location.origin}/auth/callback/${provider}`
+        const socialConfig = await authApi.getSocialConfig()
+        const redirectUri = getOAuthRedirectUri(socialConfig, provider)
         const intent = sessionStorage.getItem('oauth_intent') || searchParams.get('intent') || 'login'
         sessionStorage.removeItem('oauth_intent')
         if (intent === 'link') {

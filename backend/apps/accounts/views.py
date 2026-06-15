@@ -553,6 +553,9 @@ class ResetPasswordView(APIView):
         return Response({"message": "Password has been reset successfully. You can now sign in."})
 
 
+from .oauth_urls import canonical_frontend_url, oauth_callback_url
+
+
 # ─── Social OAuth ─────────────────────────────────────────────────
 
 class SocialAuthConfigView(APIView):
@@ -560,16 +563,20 @@ class SocialAuthConfigView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        base = canonical_frontend_url()
         return Response({
+            "frontend_url": base,
             "github": {
                 "enabled": bool(settings.GITHUB_CLIENT_ID),
                 "client_id": settings.GITHUB_CLIENT_ID,
                 "authorize_url": "https://github.com/login/oauth/authorize",
+                "callback_url": oauth_callback_url("github"),
             },
             "google": {
                 "enabled": bool(settings.GOOGLE_CLIENT_ID),
                 "client_id": settings.GOOGLE_CLIENT_ID,
                 "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+                "callback_url": oauth_callback_url("google"),
             },
         })
 
@@ -581,7 +588,6 @@ class GitHubCallbackView(APIView):
 
     def post(self, request):
         code = request.data.get("code", "").strip()
-        redirect_uri = request.data.get("redirect_uri", "").strip()
         if not code:
             return Response({"error": "Authorization code is required."}, status=400)
 
@@ -592,8 +598,7 @@ class GitHubCallbackView(APIView):
 
         import requests as http_requests
 
-        if not redirect_uri:
-            redirect_uri = f"{settings.FRONTEND_URL}/auth/callback/github"
+        redirect_uri = oauth_callback_url("github")
 
         # 1. Exchange code for access token
         try:
@@ -747,7 +752,6 @@ class GoogleCallbackView(APIView):
 
     def post(self, request):
         code = request.data.get("code", "").strip()
-        redirect_uri = request.data.get("redirect_uri", "").strip()
         if not code:
             return Response({"error": "Authorization code is required."}, status=400)
 
@@ -757,6 +761,7 @@ class GoogleCallbackView(APIView):
             return Response({"error": "Google login is not configured on this server."}, status=501)
 
         import requests as http_requests
+        redirect_uri = oauth_callback_url("google")
 
         # 1. Exchange code for tokens
         try:
@@ -766,7 +771,7 @@ class GoogleCallbackView(APIView):
                     "code": code,
                     "client_id": client_id,
                     "client_secret": client_secret,
-                    "redirect_uri": redirect_uri or f"{settings.FRONTEND_URL}/auth/callback/google",
+                    "redirect_uri": redirect_uri,
                     "grant_type": "authorization_code",
                 },
                 timeout=15,
@@ -846,16 +851,13 @@ class GitHubLinkView(APIView):
 
     def post(self, request):
         code = request.data.get("code", "").strip()
-        redirect_uri = request.data.get("redirect_uri", "").strip()
         if not code:
             return Response({"error": "Authorization code is required."}, status=400)
         if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
             return Response({"error": "GitHub login is not configured."}, status=501)
 
         import requests as http_requests
-
-        if not redirect_uri:
-            redirect_uri = f"{settings.FRONTEND_URL}/auth/callback/github"
+        redirect_uri = oauth_callback_url("github")
         try:
             token_resp = http_requests.post(
                 "https://github.com/login/oauth/access_token",
@@ -863,7 +865,7 @@ class GitHubLinkView(APIView):
                     "client_id": settings.GITHUB_CLIENT_ID,
                     "client_secret": settings.GITHUB_CLIENT_SECRET,
                     "code": code,
-                    "redirect_uri": redirect_uri.split("?")[0],
+                    "redirect_uri": redirect_uri,
                 },
                 headers={"Accept": "application/json"},
                 timeout=15,
@@ -894,16 +896,13 @@ class GoogleLinkView(APIView):
 
     def post(self, request):
         code = request.data.get("code", "").strip()
-        redirect_uri = request.data.get("redirect_uri", "").strip()
         if not code:
             return Response({"error": "Authorization code is required."}, status=400)
         if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
             return Response({"error": "Google login is not configured."}, status=501)
 
         import requests as http_requests
-
-        if not redirect_uri:
-            redirect_uri = f"{settings.FRONTEND_URL}/auth/callback/google"
+        redirect_uri = oauth_callback_url("google")
         try:
             token_resp = http_requests.post(
                 "https://oauth2.googleapis.com/token",
@@ -911,7 +910,7 @@ class GoogleLinkView(APIView):
                     "code": code,
                     "client_id": settings.GOOGLE_CLIENT_ID,
                     "client_secret": settings.GOOGLE_CLIENT_SECRET,
-                    "redirect_uri": redirect_uri.split("?")[0],
+                    "redirect_uri": redirect_uri,
                     "grant_type": "authorization_code",
                 },
                 timeout=15,

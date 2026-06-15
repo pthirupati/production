@@ -7,6 +7,7 @@ import { subscriptionApi } from '../api/subscriptions'
 import api from '../api/client'
 import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download, Github, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { buildOAuthAuthorizeUrl } from '../utils/oauth'
 import { validators } from '../utils/validators'
 import { SkeletonCard } from '../components/Skeleton'
 
@@ -112,12 +113,8 @@ export default function Profile() {
       return
     }
     sessionStorage.setItem('oauth_intent', 'link')
-    const cfg = socialConfig[provider]
-    const redirectUri = `${window.location.origin}/auth/callback/${provider}`
-    const scopes = provider === 'github' ? 'user:email' : 'openid email profile'
-    const url = provider === 'github'
-      ? `${cfg.authorize_url}?client_id=${cfg.client_id}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`
-      : `${cfg.authorize_url}?client_id=${cfg.client_id}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}&access_type=offline&prompt=consent`
+    const url = buildOAuthAuthorizeUrl(socialConfig, provider)
+    if (!url) return
     window.location.href = url
   }
 
