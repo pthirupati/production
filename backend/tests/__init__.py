@@ -38,7 +38,6 @@ class AuthMixin:
         user = User.objects.create_user(
             username=email, email=email, password=password, is_staff=is_staff
         )
-        Profile.objects.get_or_create(user=user)
         return user
 
     def get_tokens(self, email="user@test.com", password="TestP@ssw0rd!"):

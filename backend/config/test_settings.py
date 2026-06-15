@@ -31,13 +31,25 @@ from .settings import *  # noqa
 
 DEBUG = True
 
-# ── Override database to SQLite for fast, isolated tests ──
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ":memory:",
+# CI uses the Postgres service container (avoids flaky SQLite "database table is locked").
+if os.environ.get("GITHUB_ACTIONS") == "true":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": "fixitlab_test",
+            "USER": "postgres",
+            "PASSWORD": "postgres",
+            "HOST": "127.0.0.1",
+            "PORT": "5432",
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
+    }
 
 # ── Disable Celery during tests (run tasks synchronously) ──
 CELERY_TASK_ALWAYS_EAGER = True

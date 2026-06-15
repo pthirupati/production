@@ -257,6 +257,14 @@ export default function Login() {
               GitHub and Google sign-in only work for existing accounts. New users must{' '}
               <Link to="/register" className="text-accent-cyan hover:underline">register first</Link>.
             </p>
+            {socialConfig?.github?.callback_url && (
+              <p className="text-[10px] text-surface-600 text-center mt-2 leading-relaxed">
+                GitHub OAuth callback must be{' '}
+                <code className="text-surface-400">{socialConfig.github.callback_url}</code>
+                {' '}in your{' '}
+                <a href={socialConfig.github.app_settings_url || 'https://github.com/settings/developers'} target="_blank" rel="noopener noreferrer" className="text-accent-cyan hover:underline">GitHub OAuth App</a>.
+              </p>
+            )}
           </div>
 
           <p className="text-center text-sm text-surface-500 mt-6">
