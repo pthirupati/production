@@ -310,7 +310,7 @@ export default function JiraTicketPage() {
                 <FieldRow label="Reporter">
                   <span className="inline-flex items-center gap-2">
                     <User size={14} className="text-[#6B778C]" />
-                    FixitLab System
+                    {ticket.owner?.username || ticket.owner?.email || 'FixitLab System'}
                   </span>
                 </FieldRow>
                 <FieldRow label="Labels">

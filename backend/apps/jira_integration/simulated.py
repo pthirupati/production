@@ -260,9 +260,13 @@ def sync_lab_in_progress(session) -> dict:
 
 
 def get_ticket_for_user(issue_key: str, user) -> Optional[UserScenarioJiraTicket]:
-    return UserScenarioJiraTicket.objects.filter(
-        issue_key=issue_key, user=user
-    ).select_related("scenario", "last_session").first()
+    """Return ticket if owned by user, or any ticket when viewer is platform staff."""
+    qs = UserScenarioJiraTicket.objects.filter(
+        issue_key=issue_key,
+    ).select_related("scenario", "last_session", "user")
+    if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
+        return qs.first()
+    return qs.filter(user=user).first()
 
 
 def ticket_detail_payload(ticket: UserScenarioJiraTicket) -> dict:
@@ -291,6 +295,11 @@ def ticket_detail_payload(ticket: UserScenarioJiraTicket) -> dict:
             "id": ticket.scenario_id,
             "slug": ticket.scenario.slug,
             "title": ticket.scenario.title,
+        },
+        "owner": {
+            "id": ticket.user_id,
+            "username": ticket.user.username,
+            "email": ticket.user.email,
         },
         "last_session_id": str(ticket.last_session_id) if ticket.last_session_id else None,
         "updated_at": ticket.updated_at.isoformat(),

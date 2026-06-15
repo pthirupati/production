@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 # Per-user WebSocket connection tracking (prevents resource exhaustion)
 _user_connections = {}  # user_id -> count
 _conn_lock = threading.Lock()
-MAX_WS_PER_USER = int(os.environ.get("TERMINAL_MAX_WS_PER_USER", "3"))
+MAX_WS_PER_USER = int(os.environ.get("TERMINAL_MAX_WS_PER_USER", "20"))
 
 
 def reset_user_ws_connections(user_id: int | None = None) -> None:
@@ -97,6 +97,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         self._ping_task = None
         self._respawn_in_progress = False
         self._ws_connected = False
+        self._sim_stream_key = None
 
     async def _safe_send(self, text_data: str) -> bool:
         """Send on WebSocket; return False if client already disconnected."""
@@ -220,6 +221,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                         )
                     if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
                         await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
+                    if isinstance(self.raw_socket, SimulationStreamHolder):
+                        self._sim_stream_key = getattr(self.raw_socket, "_stream_key", None)
                     exec_error = None
                     break
                 except Exception as e:
@@ -389,6 +392,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 str(self.lab_session.id),
                 host_key,
             )
+            if isinstance(self.raw_socket, SimulationStreamHolder):
+                self._sim_stream_key = getattr(self.raw_socket, "_stream_key", None)
         else:
             ssh_user = self.lab_session.ssh_user or "ec2-user"
             self.exec_id, self.raw_socket = await asyncio.to_thread(
@@ -422,7 +427,13 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             if self.provider_type == "simulation":
                 from apps.labs.provisioner.simulation_provisioner import evict_sim_stream
                 host_key = getattr(self, "_terminal_host", "primary")
-                await asyncio.to_thread(evict_sim_stream, str(self.lab_session.id), host_key)
+                await asyncio.to_thread(
+                    evict_sim_stream,
+                    str(self.lab_session.id),
+                    host_key,
+                    self._sim_stream_key,
+                )
+                self._sim_stream_key = None
 
             if not await self._safe_send(json.dumps({
                 "type": "shell_respawn",
@@ -431,6 +442,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 return False
 
             await self._open_shell(resource_id)
+            if isinstance(self.raw_socket, SimulationStreamHolder):
+                self._sim_stream_key = getattr(self.raw_socket, "_stream_key", None)
             if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
                 await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
             return True
@@ -480,7 +493,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 if not data:
                     empty_reads += 1
                     if self.provider_type == "simulation":
-                        if empty_reads > 8:
+                        if empty_reads > 25:
                             logger.info(
                                 "Simulation stream EOF for session %s — respawning shell",
                                 self.lab_session.id,
@@ -595,7 +608,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             if self.provider_type == "simulation":
                 from apps.labs.provisioner.simulation_provisioner import evict_sim_stream
                 host_key = getattr(self, "_terminal_host", "primary")
-                evict_sim_stream(str(self.lab_session.id), host_key)
+                evict_sim_stream(str(self.lab_session.id), host_key, self._sim_stream_key)
+                self._sim_stream_key = None
             self.raw_socket = None
         elif self.raw_socket:
             try:

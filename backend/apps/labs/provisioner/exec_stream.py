@@ -54,23 +54,28 @@ class ExecStreamHolder:
         exec_close(self.socket)
 
 
+def _holder_key(session_key: str, holder: ExecStreamHolder) -> str:
+    suffix = holder.exec_id or id(holder)
+    return f"{session_key}:{suffix}"
+
+
 def register_holder(session_key: str, holder: ExecStreamHolder) -> None:
+    """Track holder without closing other active exec streams for the same lab session."""
+    if not session_key:
+        return
     with _registry_lock:
-        old = _active_holders.pop(session_key, None)
-        if old and old is not holder:
-            try:
-                old.close()
-            except Exception:
-                pass
-        _active_holders[session_key] = holder
+        _active_holders[_holder_key(session_key, holder)] = holder
 
 
 def release_holder(session_key: str, holder: Optional[ExecStreamHolder] = None) -> None:
     with _registry_lock:
-        current = _active_holders.get(session_key)
-        if holder is not None and current is not holder:
-            return
-        _active_holders.pop(session_key, None)
+        if holder is not None and session_key:
+            _active_holders.pop(_holder_key(session_key, holder), None)
+        elif session_key:
+            prefix = f"{session_key}:"
+            for key in list(_active_holders.keys()):
+                if key.startswith(prefix) or key == session_key:
+                    _active_holders.pop(key, None)
     if holder:
         try:
             holder.close()

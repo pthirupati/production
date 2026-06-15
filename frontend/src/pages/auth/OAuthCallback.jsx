@@ -15,6 +15,12 @@ export default function OAuthCallback() {
   const [providerEmail, setProviderEmail] = useState('')
 
   useEffect(() => {
+    const oauthError = searchParams.get('error')
+    if (oauthError) {
+      setStatus('error')
+      setError(searchParams.get('error_description') || oauthError)
+      return
+    }
     const code = searchParams.get('code')
     if (!code) {
       setStatus('error')

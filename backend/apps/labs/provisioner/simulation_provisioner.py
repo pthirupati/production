@@ -106,13 +106,21 @@ def ensure_sim_session(lab_session) -> dict | None:
     return get_sim_session(session_id)
 
 
-def evict_sim_stream(session_key: str, host_key: str = "primary") -> None:
-    """Remove cached simulation streams for a host so reconnect gets a fresh shell."""
+def evict_sim_stream(session_key: str, host_key: str = "primary", stream_key: str | None = None) -> None:
+    """Remove one simulation stream (or all for host when stream_key omitted)."""
     entry = get_sim_session(session_key)
     if not entry:
         return
-    prefix = f"{session_key}:{host_key or 'primary'}"
     streams = entry.get("streams") or {}
+    if stream_key:
+        holder = streams.pop(stream_key, None)
+        if holder:
+            try:
+                holder.close()
+            except Exception:
+                pass
+        return
+    prefix = f"{session_key}:{host_key or 'primary'}"
     for key in list(streams.keys()):
         if key == prefix or key.startswith(f"{prefix}:"):
             holder = streams.pop(key)
@@ -209,6 +217,7 @@ class SimulationProvisioner:
                 dynamic_prompt=lambda: shell.prompt,
             )
             entry.setdefault("streams", {})[stream_key] = holder
+            holder._stream_key = stream_key
             return holder.exec_id, holder
 
         if hk not in ("primary", "") and hk != "primary":
@@ -246,6 +255,7 @@ class SimulationProvisioner:
             holder = engine.create_stream()
 
         entry.setdefault("streams", {})[stream_key] = holder
+        holder._stream_key = stream_key
         return holder.exec_id, holder
 
     def execute_command(self, resource_id, command):
