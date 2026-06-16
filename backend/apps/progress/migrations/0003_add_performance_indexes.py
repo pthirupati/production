@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="userscenarioprogress",
-            index=models.Index(fields=["scenario", "completed"], name="progress_scenario_completed_idx"),
+            index=models.Index(fields=["scenario", "completed"], name="progress_scen_completed_idx"),
         ),
         migrations.AddIndex(
             model_name="userscenarioprogress",
