@@ -62,6 +62,6 @@ Pillow>=10.0
 
 # Email (Gmail API over HTTPS — works when SMTP ports are blocked)
 google-api-python-client>=2.100
-google-auth>=2.23
+google-auth>=2.55.0
 google-auth-httplib2>=0.2
 
