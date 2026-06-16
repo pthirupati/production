@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework import status
+from common.throttles import LoginRateThrottle, OTPRateThrottle, PasswordResetRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -35,7 +36,7 @@ class AuthRateThrottle(AnonRateThrottle):
 class SendOTPView(APIView):
     """Send a 6-digit OTP to an email for verification during registration."""
     permission_classes = [AllowAny]
-    throttle_classes = [AuthRateThrottle]
+    throttle_classes = [OTPRateThrottle]
 
     def post(self, request):
         email = request.data.get("email", "").strip().lower()
@@ -128,7 +129,7 @@ class SendOTPView(APIView):
 class VerifyOTPView(APIView):
     """Verify the 6-digit OTP code."""
     permission_classes = [AllowAny]
-    throttle_classes = [AuthRateThrottle]
+    throttle_classes = [OTPRateThrottle]
 
     def post(self, request):
         session_token = request.data.get("session_token", "")
@@ -267,7 +268,7 @@ class RegisterView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
-    throttle_classes = [AuthRateThrottle]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -550,7 +551,7 @@ class LogoutView(APIView):
 class ForgotPasswordView(APIView):
     """Send a password reset email with a one-time token."""
     permission_classes = [AllowAny]
-    throttle_classes = [AuthRateThrottle]
+    throttle_classes = [PasswordResetRateThrottle]
 
     def post(self, request):
         serializer = ForgotPasswordSerializer(data=request.data)

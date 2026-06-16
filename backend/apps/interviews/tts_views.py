@@ -12,11 +12,13 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 
 from apps.interviews.services.tts_service import synthesize, tts_config_for_frontend
+from common.throttles import StrictAnonRateThrottle
 
 
 class TTSConfigView(APIView):
     """GET /api/interviews/tts/config/ — returns provider capabilities."""
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         return JsonResponse(tts_config_for_frontend())

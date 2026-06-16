@@ -38,6 +38,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
+from common.throttles import PaymentRateThrottle
 from rest_framework import status as http_status
 
 from .models import Plan, Subscription, TechnologySubscription
@@ -338,7 +339,7 @@ class ValidateCouponView(APIView):
 
 class CreateRazorpayOrderView(APIView):
     permission_classes = [IsAuthenticated]
-    throttle_classes = [BillingRateThrottle]
+    throttle_classes = [PaymentRateThrottle]
 
     def post(self, request):
         from apps.question_bank.models import Technology
@@ -598,7 +599,7 @@ class CreateRazorpayOrderView(APIView):
 class VerifyRazorpayPaymentView(APIView):
     """Verify Razorpay payment signature and create subscription."""
     permission_classes = [IsAuthenticated]
-    throttle_classes = [BillingRateThrottle]
+    throttle_classes = [PaymentRateThrottle]
 
     def post(self, request):
         from apps.question_bank.models import Technology
@@ -1193,7 +1194,7 @@ class ConfirmPaymentView(APIView):
     Validates the payment_token and creates the subscription.
     """
     permission_classes = [IsAuthenticated]
-    throttle_classes = [BillingRateThrottle]
+    throttle_classes = [PaymentRateThrottle]
 
     def post(self, request):
         from django.conf import settings

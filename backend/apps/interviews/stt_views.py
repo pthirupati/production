@@ -13,10 +13,12 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 
 from apps.interviews.services.stt_service import transcribe_audio, stt_config_for_frontend
+from common.throttles import StrictAnonRateThrottle
 
 
 class STTConfigView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         return JsonResponse(stt_config_for_frontend())

@@ -38,10 +38,12 @@ from apps.interviews.services.entitlements import (
 )
 from apps.interviews.services import engine
 from apps.interviews.services.resume_parser import extract_text_from_upload, parse_resume_text, build_profile_from_inputs
+from common.throttles import InterviewRateThrottle, StrictAnonRateThrottle
 
 
 class InterviewPlansView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         tiers = InterviewPlanTier.objects.filter(is_active=True)
@@ -286,6 +288,7 @@ class InterviewRoundScheduleView(APIView):
 
 class InterviewRoundStartView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [InterviewRateThrottle]
 
     def post(self, request, round_id):
         round_obj = get_object_or_404(
@@ -307,6 +310,7 @@ class InterviewRoundStartView(APIView):
 
 class InterviewRoundMessageView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [InterviewRateThrottle]
 
     def post(self, request, round_id):
         round_obj = get_object_or_404(
@@ -418,6 +422,7 @@ class InterviewRoundJoinView(APIView):
 
 class InterviewCertificateVerifyView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         cert_id = request.query_params.get("certificate_id", "").strip()
@@ -437,6 +442,7 @@ class InterviewCertificateVerifyView(APIView):
 
 class InterviewVoicesView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         from apps.interviews.services.voice_service import voice_config_payload

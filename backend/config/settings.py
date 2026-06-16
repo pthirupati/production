@@ -169,7 +169,7 @@ DATABASES = {
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-     "OPTIONS": {"min_length": 8}},
+     "OPTIONS": {"min_length": 10}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
@@ -184,6 +184,10 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 # Serve uploaded files through Django when nginx proxies /media/ to the backend.
 SERVE_MEDIA = env.bool("SERVE_MEDIA", default=True)
+
+# Limit upload sizes to prevent DoS via large file uploads
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5MB
 
 # --------------------------------------------------
 # Django REST Framework + JWT
@@ -211,6 +215,12 @@ REST_FRAMEWORK = {
         "user": "1000/hour",
         "auth": "10/minute",  # Strict limit on auth endpoints
         "lab_start": "60/hour",  # Limit lab provisioning (DoS protection)
+        "login": "5/minute",
+        "otp": "3/minute",
+        "password_reset": "3/minute",
+        "payment": "20/hour",
+        "interview": "100/day",
+        "strict_anon": "10/minute",
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
@@ -229,7 +239,7 @@ SIMPLE_JWT = {
     "ALGORITHM": env("JWT_ALGORITHM", default="RS256"),
     
     # Token lifetimes
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),  # Reduced from 2 hours for security
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),  # Short-lived access tokens for security
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     
     # RSA Keys (set from environment variables or PEM file paths)

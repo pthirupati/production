@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from .models import Rating
 from .serializers import RatingSerializer
+from common.throttles import StrictAnonRateThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ class RateView(APIView):
 class RatingsListView(APIView):
     """Get ratings summary and recent reviews."""
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         rating_type = request.query_params.get("type", "platform")

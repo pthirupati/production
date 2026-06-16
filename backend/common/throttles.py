@@ -1,7 +1,32 @@
 """
 Custom DRF throttles for resource-intensive operations.
 """
-from rest_framework.throttling import UserRateThrottle
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
+
+
+class LoginRateThrottle(AnonRateThrottle):
+    scope = 'login'
+
+
+class OTPRateThrottle(AnonRateThrottle):
+    scope = 'otp'
+
+
+class PasswordResetRateThrottle(AnonRateThrottle):
+    scope = 'password_reset'
+
+
+class PaymentRateThrottle(UserRateThrottle):
+    scope = 'payment'
+
+
+class InterviewRateThrottle(UserRateThrottle):
+    scope = 'interview'
+
+
+class StrictAnonRateThrottle(AnonRateThrottle):
+    """For endpoints that anonymous users shouldn't hammer."""
+    scope = 'strict_anon'
 
 
 class LabStartThrottle(UserRateThrottle):

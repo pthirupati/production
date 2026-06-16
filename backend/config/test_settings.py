@@ -63,10 +63,24 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 # ── Disable throttling so tests don't get rate-limited ──
 REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = []  # noqa: F405
-REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {}  # noqa: F405
+# Keep all scopes registered so view-level throttle_classes don't crash on
+# get_rate() — all limits are set very high so tests never actually throttle.
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {  # noqa: F405
+    "anon": "10000/minute",
+    "user": "10000/minute",
+    "auth": "10000/minute",
+    "login": "10000/minute",
+    "otp": "10000/minute",
+    "password_reset": "10000/minute",
+    "payment": "10000/minute",
+    "interview": "10000/minute",
+    "strict_anon": "10000/minute",
+    "lab_start": "10000/minute",
+}
 
-# Monkey-patch AuthRateThrottle to never throttle during tests
-from rest_framework.throttling import SimpleRateThrottle
+# Monkey-patch allow_request so throttle classes always pass in tests
+# (covers both global and view-level throttle_classes assignments).
+from rest_framework.throttling import SimpleRateThrottle  # noqa: E402
 SimpleRateThrottle.allow_request = lambda self, request, view: True
 
 # ── Speed up password hashing for tests ──

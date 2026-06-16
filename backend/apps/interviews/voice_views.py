@@ -5,10 +5,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.interviews.services.voice_service import resolve_voice_for_code, voice_config_payload
+from common.throttles import StrictAnonRateThrottle
 
 
 class InterviewVoiceConfigView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         return Response(voice_config_payload())
