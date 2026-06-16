@@ -1,8 +1,17 @@
 import { useState } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
-import { Mail, Phone, MapPin, Send, MessageCircle } from 'lucide-react'
+import { Mail, Phone, MapPin, Send, MessageCircle, Mic } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../api/client'
+
+const SUBJECT_PRESETS = [
+  { label: 'General support', value: 'General support' },
+  { label: 'Interview Studio / mock interviews', value: 'Interview Studio support' },
+  { label: 'Billing & subscriptions', value: 'Billing question' },
+  { label: 'Interview billing / refunds', value: 'Interview plan billing' },
+  { label: 'Certificate verification', value: 'Certificate verification' },
+]
 
 export default function Contact() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' })
@@ -44,7 +53,16 @@ export default function Contact() {
             <MessageCircle size={32} className="text-cyan-400" />
           </div>
           <h1 className="text-4xl font-bold mb-2">Contact Us</h1>
-          <p className="text-surface-400">We'd love to hear from you. Get in touch with our team.</p>
+          <p className="text-surface-400">We'd love to hear from you. Labs, interviews, billing — we're here to help.</p>
+        </div>
+
+        <div className="glass-card p-4 mb-8 border border-indigo-500/20 flex flex-col sm:flex-row sm:items-center gap-3">
+          <Mic className="text-indigo-400 shrink-0" size={22} />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-white">AI Interview Studio</p>
+            <p className="text-xs text-surface-500">Questions about mock interviews, voice, certificates (FIXIT-INT), or interview plans.</p>
+          </div>
+          <Link to="/mock-interviews" className="text-xs text-indigo-400 hover:underline whitespace-nowrap">Learn more →</Link>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
@@ -62,6 +80,13 @@ export default function Contact() {
               <h3 className="font-semibold mb-1">Support</h3>
               <a href="mailto:fixitlab.techsupport@gmail.com" className="text-sm text-cyan-400 hover:underline">
                 fixitlab.techsupport@gmail.com
+              </a>
+            </div>
+            <div className="glass-card p-6 text-center">
+              <Mic size={24} className="text-indigo-400 mx-auto mb-3" />
+              <h3 className="font-semibold mb-1">Interviews</h3>
+              <a href="mailto:fixitlab.techsupport@gmail.com?subject=Interview%20Studio" className="text-sm text-cyan-400 hover:underline">
+                Interview support
               </a>
             </div>
             <div className="glass-card p-6 text-center">
@@ -102,6 +127,22 @@ export default function Contact() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Subject</label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {SUBJECT_PRESETS.map(p => (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, subject: p.value })}
+                      className={`text-[10px] px-2 py-1 rounded border ${
+                        form.subject === p.value
+                          ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
+                          : 'border-surface-700 text-surface-500'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   className={`input-field w-full ${errors.subject ? 'border-accent-red' : ''}`}

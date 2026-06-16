@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/authStore'
 import {
   Clock, CheckCircle2, XCircle, Lightbulb, StopCircle,
   ChevronRight, Trophy, Target, Eye, FileText,
-  PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard, ExternalLink, Terminal
+  PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard, ExternalLink, Terminal, Wand2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ConfirmDialog } from '../components/ConfirmModal'
@@ -15,6 +15,7 @@ import JiraTicketLink from '../components/JiraTicketLink'
 import LabTerminal from '../components/LabTerminal'
 import SimLabTips from '../components/SimLabTips'
 import SimLabQuickActions from '../components/SimLabQuickActions'
+import SimLabWizard from '../components/SimLabWizard'
 import useLabShortcuts from '../hooks/useLabShortcuts'
 import { useIsMobile } from '../hooks/useMediaQuery'
 
@@ -87,6 +88,7 @@ export default function LabRunner() {
   const [jiraTransitioning, setJiraTransitioning] = useState(false)
   const [closingIn, setClosingIn] = useState(null)
   const [terminalHost, setTerminalHost] = useState('primary')
+  const [showSimWizard, setShowSimWizard] = useState(false)
   const terminalRefs = useRef({})
   const [sshClientTarget, setSshClientTarget] = useState(null)
 
@@ -432,9 +434,30 @@ export default function LabRunner() {
     try {
       const { jiraApi } = await import('../api/jira')
       const res = await jiraApi.addComment(session.jira_issue_key, text)
-      setJiraTicket(res.data)
-      setJiraComments(res.data?.comments || [])
-      toast.success('Customer replied')
+      const data = res.data || res
+      setJiraTicket(data)
+      setJiraComments(data?.comments || data?.recent_comments || [])
+      setJiraActivity(data?.activity || [])
+
+      if (data?.team_reply?.scheduled) {
+        const delay = (data.team_reply.delay_seconds || 30) * 1000
+        toast.success(`Teams notified — reply expected in ~${data.team_reply.delay_seconds || 30}s`, { duration: 5000 })
+        const pollUntil = Date.now() + delay + 8000
+        const poll = async () => {
+          if (Date.now() > pollUntil || !session?.scenario?.id) return
+          try {
+            const fresh = await jiraApi.getScenarioTicket(session.scenario.id, { details: 1 })
+            const fd = fresh.data || fresh
+            setJiraComments(fd?.recent_comments || fd?.comments || [])
+            if (fd?.ticket) setJiraTicket(fd.ticket)
+            setJiraActivity(fd?.activity || [])
+          } catch { /* ignore */ }
+          setTimeout(poll, 4000)
+        }
+        setTimeout(poll, delay)
+      } else {
+        toast.success('Comment posted')
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to post comment')
     }
@@ -968,12 +991,22 @@ export default function LabRunner() {
             <span className="text-accent-purple font-medium mr-1">Dual terminal</span>
           )}
           {isSimulationLab && (
-            <SimLabQuickActions
-              scenario={scenario}
-              labHosts={labHosts}
-              activeHost={terminalHost}
-              onSendCommand={sendSimCommand}
-            />
+            <>
+              <SimLabQuickActions
+                scenario={scenario}
+                labHosts={labHosts}
+                activeHost={terminalHost}
+                onSendCommand={sendSimCommand}
+              />
+              <button
+                type="button"
+                onClick={() => setShowSimWizard(true)}
+                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 text-[10px] font-medium"
+                title="Step-by-step disk, NIC, SSH, firewall, and MySQL wizards"
+              >
+                <Wand2 size={12} /> Wizards
+              </button>
+            </>
           )}
           {!useDualPane && labHosts.length > 1 && (
             <span className="text-surface-500 mr-0.5 hidden sm:inline">Shell:</span>
@@ -1142,6 +1175,16 @@ export default function LabRunner() {
         onConfirm={handleStop}
         loading={stopping}
       />
+
+      {isSimulationLab && (
+        <SimLabWizard
+          open={showSimWizard}
+          onClose={() => setShowSimWizard(false)}
+          scenario={scenario}
+          labHosts={labHosts}
+          onSendCommand={sendSimCommand}
+        />
+      )}
 
       {/* Keyboard shortcuts help */}
       {showShortcuts && (

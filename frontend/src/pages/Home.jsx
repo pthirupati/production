@@ -11,11 +11,12 @@ import {
   Users, Award, BookOpen, Wrench, Skull, Play,
   Star, ChevronRight, Monitor, Globe, Sun, Moon,
   Sparkles, Code2, Rocket, GraduationCap, Layers,
-  Activity, GitBranch, Database, Target, Flame, Menu, X
+  Activity, GitBranch, Database, Target, Flame, Menu, X, Mic2,
 } from 'lucide-react'
 
 const features = [
   { icon: Terminal, title: 'Real Terminal', desc: 'Full interactive bash shell in your browser — connected to a real Linux environment via WebSocket', color: 'cyan' },
+  { icon: Mic2, title: 'AI Interview Studio', desc: 'Multi-round voice mock interviews — resume-aware questions, verifiable FIXIT-INT certificates', color: 'indigo' },
   { icon: Shield, title: 'Isolated Sandbox', desc: 'Docker, AWS EC2, or DigitalOcean labs — each session is isolated and auto-expires after 15 minutes.', color: 'purple' },
   { icon: Clock, title: 'Timed Challenges', desc: 'Race against the clock. Faster solves earn bonus points — just like real incident response.', color: 'amber' },
   { icon: Trophy, title: 'Leaderboard & Scoring', desc: 'Compete globally, track rankings per technology, and earn achievements for milestones.', color: 'green' },
@@ -91,6 +92,7 @@ export default function Home() {
           <div className="hidden md:flex items-center gap-6">
             {[
               { to: '/scenarios', label: 'Scenarios' },
+              { to: '/mock-interviews', label: 'Mock Interviews' },
               { to: '/leaderboard', label: 'Leaderboard' },
               { to: '/pricing', label: 'Pricing' },
               { to: '/faq', label: 'FAQ' },
@@ -122,7 +124,7 @@ export default function Home() {
         </div>
         {mobileNavOpen && (
           <div className="md:hidden border-t border-surface-800 px-4 py-3 flex flex-col gap-2 bg-surface-950/95">
-            {['/scenarios', '/leaderboard', '/pricing', '/faq', '/contact'].map(to => (
+            {['/scenarios', '/mock-interviews', '/leaderboard', '/pricing', '/faq', '/contact'].map(to => (
               <Link key={to} to={to} onClick={() => setMobileNavOpen(false)} className="text-sm text-surface-300 py-2">{to.slice(1).replace('-', ' ')}</Link>
             ))}
           </div>
@@ -523,7 +525,7 @@ export default function Home() {
             <div>
               <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Product</h4>
               <div className="space-y-3">
-                {[['Scenarios', '/scenarios'], ['Pricing', '/pricing'], ['Leaderboard', '/leaderboard'], ['Technologies', '/technologies']].map(([label, to]) => (
+                {[['Scenarios', '/scenarios'], ['Mock Interviews', '/mock-interviews'], ['Pricing', '/pricing'], ['Leaderboard', '/leaderboard'], ['Technologies', '/technologies']].map(([label, to]) => (
                   <Link key={to} to={to} className="block text-sm text-surface-400 hover:text-accent-cyan transition-colors">{label}</Link>
                 ))}
               </div>

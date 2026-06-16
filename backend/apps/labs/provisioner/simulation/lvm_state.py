@@ -44,6 +44,11 @@ class LVMState:
             "rhel/swap": SimLV("swap", "rhel", "8.00g", "[SWAP]", "/dev/mapper/rhel-swap"),
         }
 
+    def provision_disk(self, device: str) -> None:
+        """Attach a disk that was provisioned via Jira @storage team."""
+        if device not in self.pvs:
+            self.pvs[device] = SimPV(device, "", "50.00g", "50.00g")
+
     def pvcreate(self, device: str) -> tuple[bool, str]:
         if device not in self.pvs:
             self.pvs[device] = SimPV(device, "", "50.00g", "50.00g")

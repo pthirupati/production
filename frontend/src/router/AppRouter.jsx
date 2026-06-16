@@ -25,6 +25,7 @@ const LabRunner = lazy(() => import('../pages/LabRunner'))
 const JiraTicketPage = lazy(() => import('../pages/JiraTicketPage'))
 const Leaderboard = lazy(() => import('../pages/Leaderboard'))
 const Profile = lazy(() => import('../pages/Profile'))
+const Subscriptions = lazy(() => import('../pages/Subscriptions'))
 const Bookmarks = lazy(() => import('../pages/Bookmarks'))
 const About = lazy(() => import('../pages/About'))
 const Blog = lazy(() => import('../pages/Blog'))
@@ -58,6 +59,14 @@ const AdminInvoices = lazy(() => import('../pages/admin/AdminInvoices'))
 const AdminMonitoring = lazy(() => import('../pages/admin/AdminMonitoring'))
 const Team = lazy(() => import('../pages/Team'))
 const AdminSettings = lazy(() => import('../pages/admin/AdminSettings'))
+const InterviewHub = lazy(() => import('../pages/interviews/InterviewHub'))
+const InterviewSetup = lazy(() => import('../pages/interviews/InterviewSetup'))
+const InterviewCampaign = lazy(() => import('../pages/interviews/InterviewCampaign'))
+const InterviewRoom = lazy(() => import('../pages/interviews/InterviewRoom'))
+const InterviewReport = lazy(() => import('../pages/interviews/InterviewReport'))
+const AdminInterviews = lazy(() => import('../pages/admin/AdminInterviews'))
+const InterviewLanding = lazy(() => import('../pages/interviews/InterviewLanding'))
+const Unsubscribe = lazy(() => import('../pages/Unsubscribe'))
 
 function PageLoader() {
   return (
@@ -99,9 +108,11 @@ export default function AppRouter() {
         <Route path="/blog/:slug" element={<PublicLayout><BlogPost /></PublicLayout>} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/support" element={<Navigate to="/contact" replace />} />
         <Route path="/faq" element={<FAQ />} />
+        <Route path="/mock-interviews" element={<InterviewLanding />} />
         <Route path="/verify-certificate" element={<CertificateVerify />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
         <Route path="/jira/:issueKey" element={<ProtectedRoute><JiraTicketPage /></ProtectedRoute>} />
@@ -122,7 +133,13 @@ export default function AppRouter() {
           <Route path="/session-replay/:sessionId" element={<SessionReplay />} />
           <Route path="/community" element={<Community />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/subscriptions" element={<Subscriptions />} />
           <Route path="/team" element={<Team />} />
+          <Route path="/interviews" element={<InterviewHub />} />
+          <Route path="/interviews/setup" element={<InterviewSetup />} />
+          <Route path="/interviews/campaign/:campaignId" element={<InterviewCampaign />} />
+          <Route path="/interviews/room/:roundId" element={<InterviewRoom />} />
+          <Route path="/interviews/round/:roundId/report" element={<InterviewReport />} />
         </Route>
 
         {/* Admin routes */}
@@ -143,6 +160,7 @@ export default function AppRouter() {
           <Route path="/admin/teams" element={<AdminTeams />} />
           <Route path="/admin/security" element={<AdminSecurity />} />
           <Route path="/admin/audit-logs" element={<AdminAuditLogs />} />
+          <Route path="/admin/interviews" element={<AdminInterviews />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

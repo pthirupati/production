@@ -1324,6 +1324,27 @@ class CertificateVerifyView(APIView):
                 status=400,
             )
 
+        if cert_id.startswith("FIXIT-INT-"):
+            from apps.interviews.models import InterviewCertificate
+            from django.utils import timezone as tz
+
+            icert = InterviewCertificate.objects.filter(certificate_id=cert_id).first()
+            if not icert:
+                return Response({"valid": False, "error": "Certificate not found"})
+            if icert.expires_at < tz.now():
+                return Response({"valid": False, "error": "Certificate expired", "certificate_id": cert_id})
+            return Response({
+                "valid": True,
+                "type": "interview",
+                "certificate_id": icert.certificate_id,
+                "holder_name": icert.holder_name,
+                "technology": icert.technology_name,
+                "level": icert.level,
+                "rounds_cleared": icert.rounds_cleared,
+                "overall_score": icert.overall_score,
+                "issued_date": icert.issued_at.strftime("%Y-%m-%d"),
+            })
+
         from apps.billing.subscription_utils import TEST_CERTIFICATE_ID
 
         if cert_id == TEST_CERTIFICATE_ID:

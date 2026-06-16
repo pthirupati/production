@@ -1,7 +1,7 @@
-import { HardDrive, Network, Terminal, RotateCcw, Play, Server } from 'lucide-react'
+import { HardDrive, Network, Terminal, Server } from 'lucide-react'
 
 /**
- * One-click commands injected into the active simulation terminal.
+ * Inspection-only quick actions — resource changes go through Jira @team mentions.
  */
 export default function SimLabQuickActions({
   scenario,
@@ -11,9 +11,8 @@ export default function SimLabQuickActions({
 }) {
   if (!scenario || !onSendCommand) return null
 
-  const slug = (scenario.slug || '').lower()
+  const slug = (scenario.slug || '').toLowerCase()
   const primary = labHosts.find(h => h.name === 'primary') || { ip: '10.0.0.10' }
-  const suggestedIp = primary.ip?.replace(/\.\d+$/, '.20') || '10.0.0.20'
 
   const run = (cmd, host = activeHost) => {
     onSendCommand(cmd, host || activeHost)
@@ -25,38 +24,47 @@ export default function SimLabQuickActions({
     actions.push(
       { label: 'SSH test', icon: Terminal, cmd: `ssh root@${primary.ip}`, host: 'ssh_client' },
       { label: 'sshd status', icon: Server, cmd: 'systemctl status sshd', host: 'primary' },
-      { label: 'Start sshd', icon: Play, cmd: 'systemctl start sshd', host: 'primary' },
     )
   }
 
   if (slug.includes('lvm')) {
     actions.push(
-      { label: 'pvdisplay', icon: HardDrive, cmd: 'pvs' },
-      { label: 'Add disk', icon: HardDrive, cmd: 'pvcreate /dev/sdb && vgextend rhel /dev/sdb && lvextend -L +5G /dev/rhel/root' },
+      { label: 'pvs', icon: HardDrive, cmd: 'pvs' },
+      { label: 'fdisk -l', icon: HardDrive, cmd: 'fdisk -l' },
       { label: 'df -h', icon: HardDrive, cmd: 'df -h' },
     )
   }
 
-  if (slug.includes('firewalld') || slug.includes('network') || slug.includes('hosts')) {
+  if (slug.includes('firewalld') || slug.includes('firewall') || slug.includes('mysql')) {
+    if (slug.includes('mysql')) {
+      actions.push(
+        { label: 'MySQL ping', icon: Server, cmd: `mysqladmin ping -h ${primary.ip}`, host: 'ssh_client' },
+      )
+    }
+    if (slug.includes('firewall') || slug.includes('firewalld')) {
+      actions.push(
+        { label: 'curl test', icon: Network, cmd: `curl -s -o /dev/null -w '%{{http_code}}' http://${primary.ip}/`, host: 'ssh_client' },
+      )
+    }
+  }
+
+  if (slug.includes('network') || slug.includes('nic')) {
     actions.push(
       { label: 'ip addr', icon: Network, cmd: 'ip addr' },
-      { label: 'Add NIC IP', icon: Network, cmd: `ip addr add ${suggestedIp}/24 dev eth0` },
       { label: 'Listening ports', icon: Network, cmd: 'ss -tlnp' },
     )
   }
 
   if (slug.includes('patch')) {
     actions.push(
-      { label: 'Precheck', icon: Play, cmd: 'bash /opt/fixitlab/precheck.sh' },
-      { label: 'dnf update', icon: Play, cmd: 'dnf update -y' },
-      { label: 'Reboot', icon: RotateCcw, cmd: 'reboot' },
+      { label: 'Precheck', icon: Terminal, cmd: 'bash /opt/fixitlab/precheck.sh' },
+      { label: 'df -h', icon: HardDrive, cmd: 'df -h' },
     )
   }
 
   if (slug.includes('grub') || slug.includes('boot') || slug.includes('initramfs')) {
     actions.push(
-      { label: 'Reboot', icon: RotateCcw, cmd: 'reboot' },
-      { label: 'dracut -f', icon: HardDrive, cmd: 'dracut -f' },
+      { label: 'Reboot', icon: Terminal, cmd: 'reboot' },
     )
   }
 
@@ -68,11 +76,11 @@ export default function SimLabQuickActions({
     )
   }
 
-  const unique = actions.slice(0, 6)
+  const unique = actions.slice(0, 5)
 
   return (
     <div className="flex flex-wrap items-center gap-1">
-      <span className="text-[10px] text-indigo-400/80 font-medium mr-0.5 hidden lg:inline">Quick:</span>
+      <span className="text-[10px] text-indigo-400/80 font-medium mr-0.5 hidden lg:inline">Inspect:</span>
       {unique.map(({ label, icon: Icon, cmd, host }) => (
         <button
           key={label}

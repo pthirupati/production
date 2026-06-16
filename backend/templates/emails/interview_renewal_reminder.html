@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>FixitLab Interview Renewal</title></head>
+<body style="margin:0;padding:0;background:#0a0e1a;font-family:Segoe UI,Roboto,Arial,sans-serif;">
+<table width="100%" style="background:#0a0e1a;padding:32px 16px;"><tr><td align="center">
+<table width="600" style="max-width:600px;background:#141b2d;border-radius:16px;border:1px solid #1e293b;">
+  <tr><td style="padding:32px 40px;">
+    <h1 style="color:#fff;font-size:22px;margin:0 0 16px;">Renew your {{ plan_name }} plan</h1>
+    <p style="color:#94a3b8;font-size:15px;line-height:1.6;">Hi {{ username }}, your interview plan expires on <strong style="color:#e2e8f0;">{{ expiry_date }}</strong> ({{ days_remaining }} day(s) left).</p>
+    <p style="color:#94a3b8;font-size:15px;">You have <strong style="color:#a5b4fc;">{{ attempts_remaining }}</strong> interview attempt(s) remaining. Renew now to extend your access for another year.</p>
+    <p style="text-align:center;margin:28px 0;">
+      <a href="{{ renew_url }}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:700;">Renew interview plan</a>
+    </p>
+    <p style="color:#64748b;font-size:12px;text-align:center;">View all subscriptions at <a href="{{ subscriptions_url }}" style="color:#06b6d4;">Subscriptions</a></p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body>
+</html>

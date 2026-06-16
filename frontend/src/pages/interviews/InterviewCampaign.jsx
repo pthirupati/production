@@ -1,0 +1,139 @@
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { interviewsApi } from '../../api/interviews'
+import { Calendar, Play, CheckCircle2, Lock, Award, ChevronRight } from 'lucide-react'
+import toast from 'react-hot-toast'
+
+export default function InterviewCampaign() {
+  const { campaignId } = useParams()
+  const navigate = useNavigate()
+  const [campaign, setCampaign] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = () => {
+    interviewsApi.getCampaign(campaignId)
+      .then(setCampaign)
+      .catch(() => toast.error('Interview not found'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [campaignId])
+
+  const scheduleRound = async (round) => {
+    try {
+      const dt = new Date(Date.now() + 3600000).toISOString()
+      await interviewsApi.scheduleRound(round.id, dt)
+      toast.success('Round scheduled — check your email')
+      load()
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Could not schedule')
+    }
+  }
+
+  const startRound = async (round) => {
+    navigate(`/interviews/room/${round.id}`)
+  }
+
+  if (loading) return <p className="text-surface-500 text-sm p-8">Loading…</p>
+  if (!campaign) return null
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+      <div>
+        <Link to="/interviews" className="text-xs text-surface-500 hover:text-white">← Interviews</Link>
+        <h1 className="text-2xl font-bold text-white mt-2">{campaign.title}</h1>
+        <p className="text-sm text-surface-400">
+          {campaign.is_sample ? 'Free sample' : `${campaign.round_count} rounds`} · {campaign.experience_level}
+        </p>
+        {campaign.is_sample && (
+          <p className="text-xs text-cyan-400 mt-2">
+            One-time preview — start the room when ready. No scheduling needed.
+          </p>
+        )}
+      </div>
+
+      {campaign.certificate_id && (
+        <div className="glass-card p-4 border border-emerald-500/30 bg-emerald-500/10 flex items-center gap-3">
+          <Award className="text-emerald-400" size={24} />
+          <div>
+            <p className="text-sm font-medium text-emerald-300">All rounds cleared!</p>
+            <p className="text-xs text-surface-400">Certificate: {campaign.certificate_id}</p>
+            <Link
+              to={`/verify-certificate?certificate_id=${campaign.certificate_id}`}
+              className="text-xs text-indigo-400 hover:underline mt-1 inline-block"
+            >
+              Verify & share →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {(campaign.rounds || []).map((round, i) => {
+          const locked = round.status === 'locked'
+          const passed = round.status === 'passed'
+          const canSchedule = ['schedulable', 'scheduled'].includes(round.status)
+          const canStart = ['scheduled', 'ready', 'schedulable'].includes(round.status)
+          const isSample = campaign.is_sample
+
+          return (
+            <div
+              key={round.id}
+              className={`glass-card p-4 border ${
+                passed ? 'border-emerald-500/30' : locked ? 'border-surface-800 opacity-60' : 'border-surface-700'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-indigo-400 font-semibold uppercase">Round {round.round_number}</p>
+                  <p className="text-sm font-medium text-white">{round.title}</p>
+                  <p className="text-xs text-surface-500 mt-1">
+                    {round.duration_minutes} min · {round.persona_name} · {round.status}
+                  </p>
+                  {round.schedule_deadline && round.status === 'schedulable' && (
+                    <p className="text-xs text-amber-400 mt-1">
+                      Schedule within 48h (by {new Date(round.schedule_deadline).toLocaleString()})
+                    </p>
+                  )}
+                  {round.overall_score != null && (
+                    <p className="text-xs text-surface-400 mt-1">Score: {round.overall_score.toFixed(0)}/100</p>
+                  )}
+                </div>
+                {locked && <Lock size={18} className="text-surface-600" />}
+                {passed && <CheckCircle2 size={18} className="text-emerald-400" />}
+              </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {canSchedule && round.status === 'schedulable' && !isSample && (
+                  <button
+                    type="button"
+                    onClick={() => scheduleRound(round)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-surface-600 text-surface-300 hover:bg-surface-800"
+                  >
+                    <Calendar size={12} /> Schedule
+                  </button>
+                )}
+                {canStart && !locked && (
+                  <button
+                    type="button"
+                    onClick={() => startRound(round)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-300"
+                  >
+                    <Play size={12} /> Enter room
+                  </button>
+                )}
+                {round.report && (
+                  <Link
+                    to={`/interviews/round/${round.id}/report`}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-surface-600 text-surface-400"
+                  >
+                    Report <ChevronRight size={12} />
+                  </Link>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

@@ -40,7 +40,10 @@ class NotificationPreference(models.Model):
     email_lab_completed = models.BooleanField(default=False, help_text="Email when completing a lab")
     email_lab_expired = models.BooleanField(default=False, help_text="Email when a lab session expires")
     email_subscription = models.BooleanField(default=True, help_text="Email for subscription confirmations")
-    email_marketing = models.BooleanField(default=False, help_text="Marketing and product update emails")
+    email_marketing = models.BooleanField(
+        default=True,
+        help_text="Subscribe reminders, product tips, and benefit emails",
+    )
 
     # In-app preferences
     inapp_achievements = models.BooleanField(default=True)
@@ -117,3 +120,31 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.type}: {self.title} → {self.user}"
+
+
+class MarketingEmailLog(models.Model):
+    """Tracks nurture/marketing emails to enforce cadence (e.g. every 5 days)."""
+
+    CAMPAIGN_CHOICES = [
+        ("interview_sample_nudge", "Interview sample → subscribe"),
+        ("technology_subscribe_nudge", "No tech subscription nudge"),
+        ("combined_subscribe_nudge", "Interview + technology combined nudge"),
+        ("interview_renewal_reminder", "Interview plan renewal reminder"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="marketing_emails",
+    )
+    campaign = models.CharField(max_length=64, choices=CAMPAIGN_CHOICES, db_index=True)
+    sent_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-sent_at"]
+        indexes = [
+            models.Index(fields=["user", "campaign", "-sent_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.campaign} → {self.user_id} @ {self.sent_at}"

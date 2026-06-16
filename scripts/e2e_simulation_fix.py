@@ -90,6 +90,10 @@ def apply_simulation_fix(session) -> tuple[bool, str]:
             shell.run("firewall-cmd --reload")
             return True, "firewall fixed"
 
+        if "mysql-dual" in slug:
+            shell.run("systemctl start mysqld")
+            return True, "mysqld started"
+
         return False, f"no simulation fix map for {slug}"
     except Exception as exc:
         return False, str(exc)[:200]

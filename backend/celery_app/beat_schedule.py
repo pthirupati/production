@@ -33,5 +33,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "celery_app.tasks.process_subscription_expiry",
         "schedule": crontab(hour=6, minute=0),  # 6:00 AM UTC daily
     },
+    "marketing-nurture-emails-daily": {
+        "task": "celery_app.tasks.send_marketing_nurture_emails",
+        "schedule": crontab(hour=10, minute=0),  # 10:00 AM UTC daily (5-day cadence per user)
+    },
+    "inactive-account-cleanup-daily": {
+        "task": "celery_app.tasks.process_inactive_accounts",
+        "schedule": crontab(hour=5, minute=0),  # 5:00 AM UTC daily
+    },
 }
 

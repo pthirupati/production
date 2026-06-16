@@ -7,7 +7,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.accounts.views import (
     RegisterView, LoginView, UserProfileView, ChangePasswordView,
-    ForgotPasswordView, ResetPasswordView, LogoutView,
+    ForgotPasswordView, ResetPasswordView, LogoutView, DeleteAccountView,
     SendOTPView, VerifyOTPView,
     SocialAuthConfigView, SocialOAuthStartView, GitHubCallbackView, GoogleCallbackView,
     GitHubLinkView, GoogleLinkView,
@@ -26,6 +26,7 @@ urlpatterns = [
     path("api/auth/verify-otp/", VerifyOTPView.as_view(), name="verify_otp"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/auth/profile/", UserProfileView.as_view(), name="profile"),
+    path("api/auth/account/delete/", DeleteAccountView.as_view(), name="delete_account"),
     path("api/auth/change-password/", ChangePasswordView.as_view(), name="change_password"),
     path("api/auth/forgot-password/", ForgotPasswordView.as_view(), name="forgot_password"),
     path("api/auth/reset-password/", ResetPasswordView.as_view(), name="reset_password"),
@@ -76,6 +77,9 @@ urlpatterns = [
 
     # Jira integration (webhooks + ticket status)
     path("api/jira/", include("apps.jira_integration.urls")),
+
+    # AI Interview Studio
+    path("api/interviews/", include("apps.interviews.urls")),
 
     # OpenAPI schema + Swagger UI
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

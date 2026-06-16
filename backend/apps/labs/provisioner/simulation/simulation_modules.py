@@ -212,7 +212,10 @@ def _register_database(engine: "UnifiedSimulationEngine", shell: RHELShell) -> N
     def handler(parts, line):
         low = line.strip().lower()
         if low.startswith("mysqladmin") and "ping" in low:
-            svc = shell.state.services.get("mysqld")
+            st = shell.state
+            if "-h" in parts:
+                st = engine.shell.state
+            svc = st.services.get("mysqld")
             return "mysqld is alive" if svc and svc.active == "active" else "mysqladmin: connect to server failed"
         return None
     shell.register_handler(handler)

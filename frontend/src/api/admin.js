@@ -360,6 +360,71 @@ export const adminApi = {
     const { data } = await api.get(`/admin/security/?days=${days}`)
     return data
   },
+
+  async getInterviewOverview() {
+    const { data } = await api.get('/admin/interviews/overview/')
+    return data
+  },
+  async getInterviewCampaigns() {
+    const { data } = await api.get('/admin/interviews/campaigns/')
+    return data
+  },
+  async getInterviewQuestions() {
+    const { data } = await api.get('/admin/interviews/questions/')
+    return data
+  },
+  async grantInterviewEntitlement(payload) {
+    const { data } = await api.post('/admin/interviews/entitlements/', payload)
+    return data
+  },
+  async getInterviewSettings() {
+    const { data } = await api.get('/admin/interviews/settings/')
+    return data
+  },
+  async updateInterviewSettings(payload) {
+    const { data } = await api.put('/admin/interviews/settings/', payload)
+    return data
+  },
+  async getInterviewTiers() {
+    const { data } = await api.get('/admin/interviews/tiers/')
+    return data
+  },
+  async updateInterviewTier(pk, payload) {
+    const { data } = await api.put(`/admin/interviews/tiers/${pk}/`, payload)
+    return data
+  },
+  async getInterviewVoices() {
+    const { data } = await api.get('/admin/interviews/voices/')
+    return data
+  },
+  async createInterviewVoice(payload) {
+    const { data } = await api.post('/admin/interviews/voices/', payload)
+    return data
+  },
+  async updateInterviewVoice(pk, payload) {
+    const { data } = await api.put(`/admin/interviews/voices/${pk}/`, payload)
+    return data
+  },
+  async getInterviewLiveSessions() {
+    const { data } = await api.get('/admin/interviews/live/')
+    return data
+  },
+  async requestInterviewJoin(roundId, message) {
+    const { data } = await api.post('/admin/interviews/join-request/', { round_id: roundId, message })
+    return data
+  },
+  async getInterviewJoinRequests() {
+    const { data } = await api.get('/admin/interviews/join-requests/')
+    return data
+  },
+  async getInterviewObserverSession(token) {
+    const { data } = await api.get(`/admin/interviews/observer/${token}/`)
+    return data
+  },
+  async getInterviewEntitlements() {
+    const { data } = await api.get('/admin/interviews/entitlements/')
+    return data
+  },
 }
 
 /** Trigger a browser download for a Blob */

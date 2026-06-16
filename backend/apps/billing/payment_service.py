@@ -228,6 +228,8 @@ class PaymentService:
     def _activate_subscription(self, transaction):
         """Activate subscription after payment verification."""
         from .subscription_utils import activate_technology_subscription, subscription_expires_at
+        from .razorpay_fulfillment import fulfill_technology_subscription, technology_id_from_transaction
+        from apps.question_bank.models import Technology
 
         if transaction.tech_subscription:
             sub = transaction.tech_subscription
@@ -245,6 +247,39 @@ class PaymentService:
             subscription.expires_at = subscription_expires_at()
             subscription.save(update_fields=["plan", "is_active", "started_at", "expires_at"])
             logger.info(f"Upgraded user {self.user.id} to plan {transaction.plan.code}")
+
+        else:
+            tech_id = technology_id_from_transaction(transaction)
+            if tech_id:
+                try:
+                    technology = Technology.objects.get(id=tech_id, is_active=True)
+                    fulfill_technology_subscription(
+                        user=transaction.user,
+                        technology=technology,
+                        amount=int(transaction.amount),
+                        razorpay_payment_id=transaction.gateway_payment_id or "",
+                        transaction=transaction,
+                    )
+                except Technology.DoesNotExist:
+                    logger.warning("Technology %s not found for tx %s", tech_id, transaction.id)
+            else:
+                from .razorpay_fulfillment import (
+                    fulfill_interview_plan_payment,
+                    plan_code_from_transaction,
+                    product_type_from_transaction,
+                )
+                if product_type_from_transaction(transaction) == "interview":
+                    plan_code = plan_code_from_transaction(transaction)
+                    if plan_code:
+                        try:
+                            fulfill_interview_plan_payment(
+                                user=transaction.user,
+                                plan_code=plan_code,
+                                razorpay_payment_id=transaction.gateway_payment_id or "",
+                                transaction=transaction,
+                            )
+                        except ValueError as exc:
+                            logger.warning("Interview fulfillment failed tx %s: %s", transaction.id, exc)
 
         try:
             from .invoice_service import create_invoice_for_transaction

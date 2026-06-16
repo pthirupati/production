@@ -13,6 +13,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { subscriptionApi } from '../api/subscriptions'
+import { interviewsApi } from '../api/interviews'
 import api from '../api/client'
 import { PlatformBanners } from '../components/PlatformBanners'
 import {
@@ -120,6 +121,9 @@ export default function PaymentPage() {
   const renewSlug = searchParams.get('technology')
   const isRenewFlow = searchParams.get('renew') === '1' && !!renewSlug
   const orgSlug = searchParams.get('org_slug')
+  const productType = searchParams.get('product')
+  const interviewPlan = searchParams.get('interview_plan')
+  const isInterviewProduct = productType === 'interview' && !!interviewPlan
   const existingOrderId = searchParams.get('order_id')
   const existingRazorpayKey = searchParams.get('razorpay_key')
   const displayCurrency = searchParams.get('display_currency') || 'INR'
@@ -325,13 +329,14 @@ export default function PaymentPage() {
       let amountPaise = amountNum * 100
 
       if (!orderId) {
-        // Create a new Razorpay order
-        const orderData = await subscriptionApi.createRazorpayOrder(
-          parseInt(techId),
-          appliedCoupon?.code || couponCode.trim() || '',
-        )
+        const orderData = isInterviewProduct
+          ? await interviewsApi.createRazorpayOrder(interviewPlan)
+          : await subscriptionApi.createRazorpayOrder(
+              parseInt(techId),
+              appliedCoupon?.code || couponCode.trim() || '',
+            )
 
-        if (!orderData.order_id) {
+        if (!orderData.order_id && !orderData.demo_mode) {
           setError(orderData.error || 'Payment gateway is unavailable.')
           setStep('gateway_down')
           return
@@ -357,7 +362,9 @@ export default function PaymentPage() {
         amount: amountPaise,
         currency: 'INR',
         name: 'FixitLab',
-        description: `${techName} \u2014 1-Year Access`,
+        description: isInterviewProduct
+          ? `${techName} — Monthly Interview Plan`
+          : `${techName} \u2014 1-Year Access`,
         order_id: orderId,
         prefill: {
           name: user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : user?.username,
@@ -390,13 +397,24 @@ export default function PaymentPage() {
             }
             const verifyResult = orgSlug
               ? await subscriptionApi.verifyOrgPayment(orgSlug, verifyPayload)
-              : await subscriptionApi.verifyRazorpayPayment({
-                  ...verifyPayload,
-                  technology_id: parseInt(techId),
-                })
+              : isInterviewProduct
+                ? await interviewsApi.verifyRazorpayPayment({
+                    ...verifyPayload,
+                    plan_code: interviewPlan,
+                  })
+                : await subscriptionApi.verifyRazorpayPayment({
+                    ...verifyPayload,
+                    technology_id: parseInt(techId),
+                  })
             setPaymentResult(verifyResult)
             setStep('success')
-            toast.success(orgSlug ? 'Organization seats updated!' : 'Payment verified successfully!')
+            toast.success(
+              orgSlug
+                ? 'Organization seats updated!'
+                : isInterviewProduct
+                  ? 'Interview plan activated!'
+                  : 'Payment verified successfully!',
+            )
           } catch (err) {
             setError(err?.response?.data?.error || 'Payment verification failed. Contact support.')
             setStep('failed')
@@ -565,7 +583,8 @@ export default function PaymentPage() {
                         className="input-field w-full text-sm"
                       />
                       <p className="text-[10px] text-surface-500 mt-1.5">
-                        Enter your UPI ID linked to Google Pay, PhonePe, Paytm, or any bank UPI app.
+                        Razorpay opens a secure checkout — your bank or UPI app will verify the payment with OTP or PIN, same as PhonePe or bank transfer.
+                      </p>
                         A payment request will be sent to your UPI app for approval.
                       </p>
                     </div>
@@ -923,7 +942,9 @@ export default function PaymentPage() {
               Payment Successful!
             </h2>
             <p className="text-surface-400 text-sm mb-8 text-center max-w-md">
-              Your {techName} subscription is now active for 1 year. You have full access to all {techName} scenarios, hints, and certificates.
+              {isInterviewProduct
+                ? `Your ${techName} plan is active. Start a multi-round mock interview with free browser voice.`
+                : `Your ${techName} subscription is now active for 1 year. You have full access to all ${techName} scenarios, hints, and certificates.`}
             </p>
 
             <div className="glass-card p-6 w-full mb-8 border-accent-green/20 bg-accent-green/[0.02]">
@@ -950,7 +971,7 @@ export default function PaymentPage() {
                 )}
                 <div className="flex justify-between">
                   <span className="text-surface-400">Access</span>
-                  <span className="text-surface-300">1 Year</span>
+                  <span className="text-surface-300">{isInterviewProduct ? '30 days' : '1 Year'}</span>
                 </div>
                 <div className="border-t border-surface-700/30 pt-2 flex justify-between">
                   <span className="text-surface-400">Status</span>
@@ -960,11 +981,14 @@ export default function PaymentPage() {
             </div>
 
             <div className="flex gap-3 w-full">
-              <Link to="/dashboard" className="btn-primary flex-1 text-center py-3.5 flex items-center justify-center gap-2 text-base font-bold">
-                Go to Dashboard
+              <Link
+                to={isInterviewProduct ? '/interviews' : '/dashboard'}
+                className="btn-primary flex-1 text-center py-3.5 flex items-center justify-center gap-2 text-base font-bold"
+              >
+                {isInterviewProduct ? 'Start Interviewing' : 'Go to Dashboard'}
               </Link>
-              <Link to="/pricing" className="btn-secondary flex-1 text-center py-3.5 font-semibold">
-                Subscribe More
+              <Link to={isInterviewProduct ? '/interviews/setup' : '/pricing'} className="btn-secondary flex-1 text-center py-3.5 font-semibold">
+                {isInterviewProduct ? 'Set Up Profile' : 'Subscribe More'}
               </Link>
             </div>
 

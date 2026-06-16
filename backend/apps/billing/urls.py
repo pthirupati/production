@@ -1,7 +1,12 @@
 from django.urls import path
 from . import views
 from . import payment_controller
-from .extended_views import UnifiedBillingView, CreateStripeTechCheckoutView, OrgSeatCheckoutView
+from .extended_views import (
+    UnifiedBillingView,
+    CreateStripeTechCheckoutView,
+    OrgSeatCheckoutView,
+    SubscriptionsOverviewView,
+)
 
 urlpatterns = [
     path("status/", payment_controller.PaymentStatusView.as_view(), name="payment_status"),
@@ -24,6 +29,7 @@ urlpatterns = [
     path("invoices/", views.UserInvoicesView.as_view(), name="user_invoices"),
     path("invoices/<uuid:invoice_id>/download/", views.InvoiceDownloadView.as_view(), name="invoice_download"),
     path("unified/", UnifiedBillingView.as_view(), name="unified_billing"),
+    path("subscriptions-overview/", SubscriptionsOverviewView.as_view(), name="subscriptions_overview"),
     path("stripe/tech-checkout/", CreateStripeTechCheckoutView.as_view(), name="stripe_tech_checkout"),
     path("org/<slug:slug>/checkout/", OrgSeatCheckoutView.as_view(), name="org_checkout"),
 ]

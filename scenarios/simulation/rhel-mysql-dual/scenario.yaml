@@ -1,0 +1,33 @@
+title: "RHEL Simulation: MySQL Down (Dual Terminal)"
+slug: sim-rhel-mysql-dual
+technology: Simulation
+category: Database Administration
+difficulty: easy
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: database
+dual_terminal: true
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  mysqld is stopped on the database server. Use the SSH client to test remote connectivity,
+  start MySQL on the server console, then verify mysqladmin ping succeeds.
+objectives:
+  - mysqladmin ping from client fails while mysqld is down
+  - Start mysqld on the server
+  - Remote mysqladmin ping succeeds
+initial_state: |
+  primary (10.0.0.10): mysqld inactive
+  ssh_client: mysqladmin ping -h 10.0.0.10
+hints:
+  - order: 1
+    cost: 10
+    content: "SSH Client: mysqladmin ping -h 10.0.0.10 — expect failure."
+  - order: 2
+    cost: 15
+    content: "Server console: systemctl status mysqld && journalctl -u mysqld -n 20"
+  - order: 3
+    cost: 20
+    content: "Server: systemctl start mysqld — retry mysqladmin ping from client."

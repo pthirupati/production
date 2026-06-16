@@ -46,6 +46,25 @@ def _build_lab_hosts(scenario, resource_id: str, sim_type: str) -> list[dict]:
                 "ssh_targets": [{"name": "primary", "ip": "10.0.0.10", "user": "root"}],
             },
         ]
+    if "firewalld-dual" in slug or "mysql-dual" in slug:
+        role = "Database server" if "mysql" in slug else "Web server"
+        return [
+            {
+                "name": "primary",
+                "role": role,
+                "container_id": resource_id,
+                "ip": "10.0.0.10",
+                "ssh_user": "root",
+            },
+            {
+                "name": "ssh_client",
+                "role": "SSH Client",
+                "container_id": resource_id,
+                "ip": "10.0.0.5",
+                "ssh_user": "labuser",
+                "ssh_targets": [{"name": "primary", "ip": "10.0.0.10", "user": "root"}],
+            },
+        ]
     lab_hosts = []
     if sim_type == "ansible" or getattr(scenario, "requires_companion_hosts", False):
         if sim_type == "ansible":
@@ -115,6 +134,12 @@ def _apply_initial_host_state(engine, slug: str) -> None:
         if svc:
             svc.active = "inactive"
             svc.sub_state = "dead"
+    if "mysql-dual" in low or ("mysql" in low and "dual" in low):
+        from .simulation.scenario_presets import _preset_mysql_down
+        _preset_mysql_down(engine.shell.state)
+    if "firewalld-dual" in low or ("firewalld" in low and "dual" in low):
+        from .simulation.scenario_presets import _preset_firewalld_blocked
+        _preset_firewalld_blocked(engine.shell.state)
 
 
 def ensure_sim_session(lab_session) -> dict | None:

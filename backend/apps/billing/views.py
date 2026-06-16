@@ -185,6 +185,10 @@ class StripeWebhookView(APIView):
             from .extended_views import fulfill_stripe_technology_checkout
             fulfill_stripe_technology_checkout(session)
             return
+        if metadata.get("checkout_type") == "interview":
+            from apps.interviews.billing_views import fulfill_stripe_interview_checkout
+            fulfill_stripe_interview_checkout(session)
+            return
 
         user_id = metadata.get("fixitlab_user_id")
         plan_code = metadata.get("plan_code")
@@ -417,6 +421,15 @@ class CreateRazorpayOrderView(APIView):
 
             order = client.order.create(data=order_data)
 
+            from .razorpay_fulfillment import create_technology_payment_transaction
+            create_technology_payment_transaction(
+                user=request.user,
+                amount=amount,
+                order=order,
+                technology_id=technology.id,
+                coupon_code=coupon_applied.code if coupon_applied else "",
+            )
+
             return Response({
                 "order_id": order["id"],
                 "amount": amount,
@@ -644,6 +657,25 @@ class VerifyRazorpayPaymentView(APIView):
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
+        from .models import PaymentTransaction
+        from .razorpay_fulfillment import fulfill_technology_subscription
+
+        tx = PaymentTransaction.objects.filter(
+            gateway_order_id=razorpay_order_id,
+            user=request.user,
+        ).first()
+        if tx and tx.status == "success" and tx.tech_subscription_id:
+            sub = tx.tech_subscription
+            return Response({
+                "subscription_id": sub.subscription_id,
+                "technology": technology.name,
+                "amount": str(sub.amount),
+                "is_active": True,
+                "payment_verified": True,
+                "razorpay_payment_id": tx.gateway_payment_id or razorpay_payment_id,
+                "already_verified": True,
+            }, status=http_status.HTTP_200_OK)
+
         # Server-side price — prefer Razorpay order amount (supports coupons); fallback to catalog price
         amount = int(getattr(technology, "price", 0) or 0)
         coupon_applied = None
@@ -687,51 +719,44 @@ class VerifyRazorpayPaymentView(APIView):
                 "Razorpay payment amount/order mismatch for user %s order %s",
                 request.user.username, razorpay_order_id,
             )
+            if tx:
+                tx.mark_failed("Amount or order mismatch")
             return Response(
                 {"error": "Payment verification failed — amount or order mismatch."},
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
-        # Create verified subscription
-        sub_id = TechnologySubscription.generate_subscription_id(
-            technology.name, request.user.username
-        )
-
-        tech_sub = TechnologySubscription.objects.create(
+        tech_sub, created = fulfill_technology_subscription(
             user=request.user,
             technology=technology,
-            subscription_id=sub_id,
             amount=amount,
-            is_active=True,
-            payment_verified=True,
+            razorpay_payment_id=razorpay_payment_id,
+            transaction=tx,
+            coupon_applied=coupon_applied,
         )
 
-        if coupon_applied:
-            from .coupon_service import redeem_coupon
-            redeem_coupon(coupon_applied)
-
-        logger.info(f"Payment verified for user {request.user.username}: {razorpay_payment_id} — {technology.name}")
-
-        # Send all emails (confirmation + admin + invoice)
-        CreateRazorpayOrderView()._send_subscription_emails(
-            request.user, technology, sub_id, amount
+        logger.info(
+            "Payment verified for user %s: %s — %s (created=%s)",
+            request.user.username, razorpay_payment_id, technology.name, created,
         )
 
         return Response({
-            "subscription_id": sub_id,
+            "subscription_id": tech_sub.subscription_id,
             "technology": technology.name,
             "amount": str(amount),
             "coupon_applied": coupon_applied.code if coupon_applied else None,
             "is_active": True,
             "payment_verified": True,
             "razorpay_payment_id": razorpay_payment_id,
-        }, status=http_status.HTTP_201_CREATED)
+        }, status=http_status.HTTP_201_CREATED if created else http_status.HTTP_200_OK)
 
     def _verify_signature(self, order_id, payment_id, signature):
         """Verify Razorpay payment signature using HMAC SHA256."""
         if not settings.RAZORPAY_KEY_SECRET:
-            logger.warning("Razorpay key secret not configured — skipping verification")
-            return True  # Skip verification in demo mode
+            if getattr(settings, "DEMO_PAYMENT_ENABLED", False):
+                logger.warning("Razorpay key secret not configured — demo skip")
+                return True
+            return False
 
         try:
             message = f"{order_id}|{payment_id}"
@@ -748,7 +773,7 @@ class VerifyRazorpayPaymentView(APIView):
     def _verify_payment_with_gateway(self, order_id, payment_id, expected_amount_inr):
         """Fetch payment from Razorpay and validate order + amount server-side."""
         if not settings.RAZORPAY_KEY_SECRET or not settings.RAZORPAY_KEY_ID:
-            return True  # demo mode
+            return getattr(settings, "DEMO_PAYMENT_ENABLED", False)
 
         try:
             import razorpay
@@ -758,7 +783,7 @@ class VerifyRazorpayPaymentView(APIView):
                 return False
             if int(payment.get("amount", 0)) != int(expected_amount_inr) * 100:
                 return False
-            if payment.get("status") not in ("captured", "authorized"):
+            if payment.get("status") != "captured":
                 return False
             return True
         except Exception as e:

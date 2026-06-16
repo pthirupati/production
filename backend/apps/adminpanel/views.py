@@ -1693,14 +1693,53 @@ class AdminSubscriptionLogsView(APIView):
         if display_currency == "USD" and exchange_rate:
             total_display = round(total_inr / exchange_rate, 2)
 
+        interview_logs = []
+        try:
+            from apps.interviews.models import InterviewEntitlement
+
+            ents = InterviewEntitlement.objects.select_related("user", "plan_tier").order_by("-updated_at")
+            if user_filter:
+                ents = ents.filter(
+                    Q(user__username__icontains=user_filter) |
+                    Q(user__email__icontains=user_filter)
+                )
+            for ent in ents[:200]:
+                tier = ent.plan_tier
+                amount_inr = float(tier.price_inr) if tier else 0
+                interview_logs.append({
+                    "id": str(ent.id),
+                    "subscription_id": f"INT-{ent.user_id}",
+                    "product_type": "interview",
+                    "user": {
+                        "id": ent.user.id,
+                        "username": ent.user.username,
+                        "email": ent.user.email,
+                        "full_name": ent.user.get_full_name(),
+                    },
+                    "technology": f"Interview — {tier.name if tier else 'Free'}",
+                    "plan_code": tier.code if tier else "free",
+                    "amount": str(amount_inr),
+                    "amount_display": f"₹{int(amount_inr)}" if amount_inr else "—",
+                    "payment_verified": ent.is_active and not ent.is_complimentary,
+                    "interviews_remaining": ent.interviews_remaining,
+                    "admin_granted": ent.is_admin_granted_free or ent.is_complimentary,
+                    "created_at": ent.period_start.isoformat() if ent.period_start else ent.updated_at.isoformat(),
+                    "expires_at": ent.period_end.isoformat() if ent.period_end else None,
+                    "is_active": ent.is_active,
+                })
+        except Exception:
+            pass
+
         return Response({
             "logs": data,
+            "interview_logs": interview_logs,
             "total_revenue": total_display,
             "total_revenue_inr": total_inr,
             "display_currency": display_currency,
             "exchange_rate": exchange_rate,
             "total_count": len(data),
             "active_count": active_count,
+            "interview_active_count": sum(1 for l in interview_logs if l.get("is_active")),
         })
 
 

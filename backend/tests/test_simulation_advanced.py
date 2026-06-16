@@ -8,6 +8,34 @@ from apps.labs.provisioner.simulation.k8s_cluster import K8sCluster
 from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
 from apps.labs.provisioner.simulation.lvm_state import LVMState
 from apps.labs.provisioner.simulation.rhel_shell import RHELShell
+from apps.labs.provisioner.simulation.simulation_modules import register_modules
+
+
+class DualTerminalTests(SimpleTestCase):
+    def test_firewalld_dual_remote_curl(self):
+        sim = UnifiedSimulationEngine(scenario_slug="sim-rhel-firewalld-dual")
+        client = sim.state.clone_for_host("ssh-client")
+        client_shell = RHELShell(state=client, scenario_slug="sim-rhel-firewalld-dual")
+        client_shell._engine = sim
+        register_modules(sim, client_shell)
+        out = client_shell.run("curl -s http://10.0.0.10/")
+        self.assertIn("Connection refused", out)
+        sim.shell.run("firewall-cmd --permanent --add-service=http")
+        sim.shell.run("firewall-cmd --reload")
+        out = client_shell.run("curl -s http://10.0.0.10/")
+        self.assertIn("Welcome", out)
+
+    def test_mysql_dual_remote_ping(self):
+        sim = UnifiedSimulationEngine(scenario_slug="sim-rhel-mysql-dual", simulation_type="database")
+        client = sim.state.clone_for_host("ssh-client")
+        client_shell = RHELShell(state=client, scenario_slug="sim-rhel-mysql-dual")
+        client_shell._engine = sim
+        register_modules(sim, client_shell)
+        out = client_shell.run("mysqladmin ping -h 10.0.0.10")
+        self.assertIn("connect to server failed", out)
+        sim.shell.run("systemctl start mysqld")
+        out = client_shell.run("mysqladmin ping -h 10.0.0.10")
+        self.assertIn("alive", out)
 
 
 class LVMTests(SimpleTestCase):

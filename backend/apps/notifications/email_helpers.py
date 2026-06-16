@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,10 +26,16 @@ def queue_user_email(user, subject, template, context, email_type: str) -> bool:
         return False
     from .tasks import send_notification_email
 
+    ctx = dict(context or {})
+    if email_type == "marketing":
+        from .unsubscribe import marketing_unsubscribe_url
+        ctx.setdefault("unsubscribe_url", marketing_unsubscribe_url(user.id))
+        ctx.setdefault("profile_notifications_url", f"{settings.FRONTEND_URL}/profile#notifications")
+
     send_notification_email.delay(
         subject=subject,
         to_email=user.email,
         template=template,
-        context=context or {},
+        context=ctx,
     )
     return True

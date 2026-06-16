@@ -1,15 +1,21 @@
 category: rhel-linux
-description: Add /dev/sdb to rhel VG and extend root LV.
+description: |
+  Root filesystem is full. Request a new disk from @storage team in Jira, verify with
+  fdisk/lsblk, then extend LVM (pvcreate, vgextend, lvextend, xfs_growfs).
 difficulty: medium
 hints:
-- content: vgextend rhel /dev/sdb
-  cost: 10
-  order: 1
-initial_state: Add /dev/sdb to rhel VG and extend root LV.
+  - content: '@storage team please add a 50G disk for LVM extension'
+    cost: 10
+    order: 1
+initial_state: |
+  VG rhel is low on free space. New disk is NOT attached until @storage team confirms in Jira.
+  After ~30s, verify /dev/sdb with fdisk -l, then extend LVM.
 is_free: false
 lab_mode: simulation
 objectives:
-- vgextend rhel /dev/sdb
-simulation_type: generic
+  - Request disk from @storage team in Jira
+  - pvcreate /dev/sdb && vgextend rhel /dev/sdb && lvextend
+simulation_type: rhel
 slug: sim-rhel-lvm-extend
-title: Extend LVM Volume Group
+time_limit: 900
+title: Extend LVM Volume Group (Jira storage request)

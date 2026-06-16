@@ -10,7 +10,7 @@ import {
   Target, Trophy, Zap, Clock, TrendingUp, ArrowRight,
   CheckCircle2, Award, BookOpen, Play, Star,
   Calendar, CreditCard, Crown, Layers, ArrowUpRight, XCircle, AlertTriangle, Sparkles, Download, Ticket,
-  Bookmark, Bell, History, BarChart3, X
+  Bookmark, Bell, History, BarChart3, X, Mic2,
 } from 'lucide-react'
 import JiraTicketLink from '../components/JiraTicketLink'
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [jiraTickets, setJiraTickets] = useState([])
   const [bookmarks, setBookmarks] = useState([])
   const [unreadNotifications, setUnreadNotifications] = useState(0)
+  const [interviewEntitlement, setInterviewEntitlement] = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -41,7 +42,8 @@ export default function Dashboard() {
       jiraApi.getUserTickets().catch(() => ({ data: { tickets: [] } })),
       scenarioApi.getBookmarks().catch(() => []),
       api.get('/notifications/').catch(() => ({ data: { results: [] } })),
-    ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes]) => {
+      import('../api/interviews').then(m => m.interviewsApi.getEntitlement()).catch(() => null),
+    ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes, interviewEnt]) => {
       setProgress(prog)
       setAchievements(ach)
       setActiveLabs(labs.filter(l => l.status === 'RUNNING'))
@@ -51,6 +53,7 @@ export default function Dashboard() {
       setBookmarks(Array.isArray(bms) ? bms : [])
       const notifs = notifRes?.data?.results || notifRes?.data || []
       setUnreadNotifications(Array.isArray(notifs) ? notifs.filter(n => !n.is_read).length : 0)
+      setInterviewEntitlement(interviewEnt)
     }).finally(() => setLoading(false))
   }, [])
 
@@ -160,10 +163,39 @@ export default function Dashboard() {
                 <Play size={16} /> Resume Lab
               </Link>
             )}
-            <Link to="/pricing" className="btn-secondary flex items-center gap-2 text-sm"><CreditCard size={14} /> Subscriptions</Link>
+            <Link to="/subscriptions" className="btn-secondary flex items-center gap-2 text-sm"><CreditCard size={14} /> Subscriptions</Link>
           </div>
         </div>
       </div>
+
+      {interviewEntitlement?.platform_enabled !== false && (
+        <Link
+          to="/interviews"
+          className="relative block glass-card p-5 border border-indigo-500/25 bg-gradient-to-r from-indigo-500/10 to-purple-500/5 hover:border-indigo-500/40 transition-colors animate-slide-up"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+                <Mic2 size={20} className="text-indigo-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">AI Interview Studio</p>
+                <p className="text-xs text-surface-400">
+                  {interviewEntitlement?.sample_available
+                    ? `Free ${interviewEntitlement?.sample_duration_minutes || 10}-min sample available`
+                    : `${interviewEntitlement?.plan?.name || 'Free'} · ${interviewEntitlement?.interviews_remaining ?? '—'} attempt(s) left`}
+                  {interviewEntitlement?.days_remaining != null && interviewEntitlement.days_remaining <= 30 && (
+                    <span className="text-amber-400"> · {interviewEntitlement.days_remaining}d left</span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <span className="text-xs text-indigo-300 flex items-center gap-1">
+              Open <ArrowRight size={14} />
+            </span>
+          </div>
+        </Link>
+      )}
 
       {/* ═══ STAT CARDS ═══ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">

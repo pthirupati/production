@@ -7,21 +7,20 @@ export const SIM_LAB_TIPS = {
     'reboot triggers a live GRUB → boot → login sequence',
   ],
   patching: [
-    'Run /opt/fixitlab/precheck.sh before patching',
-    'dnf update -y then reboot to load the new kernel',
-    'Login: root / redhat after reboot',
-    'Run /opt/fixitlab/postcheck.sh to verify',
+    'Jira: @backup team @database team @application team — stop & backup (~30s)',
+    'Run /opt/fixitlab/precheck.sh only after team confirmations',
+    'dnf update -y → reboot → mount -a if needed → postcheck',
+    'Start services via Jira: @database team @application team',
   ],
   lvm: [
-    'pvdisplay / vgdisplay / lvdisplay to inspect LVM',
-    'pvcreate /dev/sdb then vgextend and lvextend',
-    'Suggested: pvcreate /dev/sdb; vgextend rhel /dev/sdb; lvextend -L +5G /dev/rhel/root',
+    'Jira: @storage team please add a 50G disk (~30s reply with device name)',
+    'Verify: fdisk -l /dev/sdb or echo 1 > /sys/class/scsi_host/host0/scan',
+    'pvcreate → vgextend → lvextend → xfs_growfs in terminal',
   ],
   network: [
-    'ip addr show — check interfaces and addresses',
-    'ip addr add 10.0.0.20/24 dev eth0 to assign an IP',
-    'systemctl restart NetworkManager after changes',
-    'ss -tlnp to see listening ports',
+    'Jira: @network team please add secondary IP on eth0',
+    'Wait ~30s, then ip addr show dev eth0 to verify',
+    'No Add NIC button — coordinate through the ticket like production',
   ],
   ssh: [
     'Use the SSH Client terminal tab to connect to remote hosts',
@@ -48,7 +47,7 @@ export function tipsForScenario(scenario) {
   const tips = [...SIM_LAB_TIPS.default]
   if (slug.includes('patch')) tips.unshift(...SIM_LAB_TIPS.patching)
   if (slug.includes('lvm')) tips.unshift(...SIM_LAB_TIPS.lvm)
-  if (slug.includes('firewalld') || slug.includes('network') || slug.includes('hosts')) {
+  if (slug.includes('firewalld') || slug.includes('network') || slug.includes('nic') || slug.includes('hosts')) {
     tips.unshift(...SIM_LAB_TIPS.network)
   }
   if (slug.includes('ansible') || slug.includes('ssh') || scenario.dual_terminal) {

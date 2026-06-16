@@ -33,6 +33,9 @@ def create_invoice_for_transaction(transaction: PaymentTransaction) -> Subscript
     elif transaction.plan:
         tech_name = f"{transaction.plan.name} Plan"
         subscription_id = transaction.plan.code.upper()
+    elif isinstance(transaction.gateway_response, dict) and transaction.gateway_response.get("product") == "interview":
+        tech_name = f"Interview {transaction.gateway_response.get('plan_code', 'plan').title()}"
+        subscription_id = transaction.gateway_response.get("plan_code", "interview")
 
     period_start = transaction.verified_at or transaction.created_at
 
@@ -115,10 +118,19 @@ def render_invoice_html(invoice: SubscriptionInvoice) -> str:
 
 
 def invoice_list_payload(invoice: SubscriptionInvoice) -> dict:
+    product_type = "technology"
+    if invoice.technology_name.lower().startswith("interview"):
+        product_type = "interview"
+    elif invoice.payment_transaction_id:
+        gw = invoice.payment_transaction.gateway_response or {}
+        if isinstance(gw, dict) and gw.get("product") == "interview":
+            product_type = "interview"
+
     return {
         "id": str(invoice.id),
         "invoice_number": invoice.invoice_number,
         "technology": invoice.technology_name,
+        "product_type": product_type,
         "subscription_id": invoice.subscription_id,
         "amount": str(invoice.amount),
         "currency": invoice.currency,

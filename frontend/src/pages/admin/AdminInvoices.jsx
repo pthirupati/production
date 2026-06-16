@@ -51,7 +51,7 @@ export default function AdminInvoices() {
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <FileText size={22} className="text-accent-cyan" /> Payment Invoices
           </h1>
-          <p className="text-surface-400 mt-1">Invoices for verified subscription payments</p>
+          <p className="text-surface-400 mt-1">Invoices for verified payments (technology & interview)</p>
         </div>
         <button onClick={loadData} className="btn-secondary text-sm flex items-center gap-2">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
@@ -93,7 +93,8 @@ export default function AdminInvoices() {
                 <tr className="border-b border-surface-700">
                   <th className="text-left p-3 text-surface-400 font-medium">Invoice #</th>
                   <th className="text-left p-3 text-surface-400 font-medium">User</th>
-                  <th className="text-left p-3 text-surface-400 font-medium">Technology</th>
+                  <th className="text-left p-3 text-surface-400 font-medium">Type</th>
+                  <th className="text-left p-3 text-surface-400 font-medium">Product</th>
                   <th className="text-left p-3 text-surface-400 font-medium">Amount</th>
                   <th className="text-left p-3 text-surface-400 font-medium">Date</th>
                   <th className="text-right p-3 text-surface-400 font-medium">Download</th>
@@ -106,6 +107,11 @@ export default function AdminInvoices() {
                     <td className="p-3">
                       <p className="text-white">{inv.user?.username}</p>
                       <p className="text-xs text-surface-500">{inv.user?.email}</p>
+                    </td>
+                    <td className="p-3">
+                      <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${inv.product_type === 'interview' ? 'text-indigo-400 bg-indigo-500/10' : 'text-cyan-400 bg-cyan-500/10'}`}>
+                        {inv.product_type || 'technology'}
+                      </span>
                     </td>
                     <td className="p-3">{inv.technology}</td>
                     <td className="p-3 font-semibold">₹{inv.amount}</td>
@@ -120,7 +126,7 @@ export default function AdminInvoices() {
                   </tr>
                 ))}
                 {invoices.length === 0 && (
-                  <tr><td colSpan={6} className="p-8 text-center text-surface-400">No invoices found</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-surface-400">No invoices found</td></tr>
                 )}
               </tbody>
             </table>

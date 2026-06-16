@@ -257,6 +257,20 @@ class JiraIssueCommentView(APIView):
             return Response({"error": "text is required"}, status=400)
 
         add_comment(ticket, request.user, text, session=ticket.last_session)
-        from .simulated import add_customer_reply
-        add_customer_reply(ticket, text, session=ticket.last_session)
-        return Response(ticket_detail_payload(ticket))
+
+        from .team_bots import parse_team_mentions, schedule_team_replies
+        from .simulated import add_customer_reply, ticket_detail_payload
+
+        teams = parse_team_mentions(text)
+        team_meta = {}
+        if teams:
+            team_meta = schedule_team_replies(ticket, text, session=ticket.last_session)
+            # Customer bot only when not a pure team-ops request
+            if any(w in text.lower() for w in ("customer", "reporter", "impact", "when was")):
+                add_customer_reply(ticket, text, session=ticket.last_session)
+        else:
+            add_customer_reply(ticket, text, session=ticket.last_session)
+
+        payload = ticket_detail_payload(ticket)
+        payload["team_reply"] = team_meta
+        return Response(payload)

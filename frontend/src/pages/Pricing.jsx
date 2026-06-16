@@ -704,6 +704,38 @@ export default function Pricing() {
         </div>
       )}
 
+      {/* Interview Studio plans (separate from tech subscriptions) */}
+      <section id="interview-plans" className="max-w-6xl mx-auto px-4 py-16 border-t border-surface-800/50">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-white">AI Interview Studio</h2>
+          <p className="text-sm text-surface-400 mt-2 max-w-xl mx-auto">
+            Yearly mock interview plans — 10 full attempts per year, multi-round cycles, certificates. Separate from per-technology lab subscriptions.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+          {[
+            { name: 'Free mini', price: '₹0', desc: '1 cycle / month' },
+            { name: 'Pro', price: '₹999', desc: '3 cycles · 3 rounds' },
+            { name: 'Premium', price: '₹2,499', desc: '5 cycles · certificate' },
+          ].map(p => (
+            <div key={p.name} className="glass-card p-5 border border-surface-800 text-center">
+              <p className="text-sm font-medium text-white">{p.name}</p>
+              <p className="text-2xl font-bold text-indigo-300 mt-1">{p.price}<span className="text-xs text-surface-500">/mo</span></p>
+              <p className="text-xs text-surface-500 mt-2">{p.desc}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-center mt-6">
+          <Link to="/mock-interviews" className="text-sm text-indigo-400 hover:underline">Learn about mock interviews →</Link>
+          {isAuthenticated && (
+            <>
+              <span className="text-surface-600 mx-2">·</span>
+              <Link to="/interviews" className="text-sm text-indigo-400 hover:underline">Open Interview Studio</Link>
+            </>
+          )}
+        </p>
+      </section>
+
       {/* Floating Cart FAB */}
       {cart.length > 0 && !showCart && (
         <button

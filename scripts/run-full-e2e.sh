@@ -102,6 +102,12 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
   2>&1 | tee "$LOG_DIR/e2e-external.log" || E2E_EXTERNAL_FAIL=1
 
 echo ""
+echo ">>> [7/7] Interview Studio E2E"
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+  python /scripts/e2e_interviews.py \
+  2>&1 | tee "$LOG_DIR/e2e-interviews.log" || INTERVIEW_E2E_FAIL=1
+
+echo ""
 echo "=== E2E Summary ==="
 echo "Logs saved to: $LOG_DIR"
 [ -f "$LOG_DIR/error-summary.txt" ] && echo "Error summary:" && tail -20 "$LOG_DIR/error-summary.txt"
@@ -111,6 +117,7 @@ EXIT=0
 [ "${ALL_SCENARIOS_FAIL:-0}" = "1" ] && EXIT=1 && echo "ALL SCENARIOS E2E: FAILED"
 [ "${E2E_INTERNAL_FAIL:-0}" = "1" ] && EXIT=1 && echo "E2E INTERNAL: FAILED"
 [ "${E2E_EXTERNAL_FAIL:-0}" = "1" ] && EXIT=1 && echo "E2E EXTERNAL: FAILED"
+[ "${INTERVIEW_E2E_FAIL:-0}" = "1" ] && EXIT=1 && echo "INTERVIEW E2E: FAILED"
 
 if [ "$EXIT" -eq 0 ]; then
   echo "ALL CHECKS PASSED"

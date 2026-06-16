@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "apps.community",
     "apps.ratings",
     "apps.jira_integration",
+    "apps.interviews",
 ]
 
 # --------------------------------------------------
@@ -445,6 +446,29 @@ DO_SSH_KEY_PEM = env("DO_SSH_KEY_PEM", default="")
 DO_SSH_KEY_PATH = env("DO_SSH_KEY_PATH", default="")
 DO_REGION = env("DO_REGION", default="nyc1")
 DO_SIZE = env("DO_SIZE", default="s-1vcpu-1gb")
+
+# --------------------------------------------------
+# AI Interview Studio (100% free — browser voice + rule-based AI)
+# --------------------------------------------------
+INTERVIEW_ENABLED = env.bool("INTERVIEW_ENABLED", default=True)
+INTERVIEW_VOICE_ENGINE = env("INTERVIEW_VOICE_ENGINE", default="browser")
+INTERVIEW_AV_GRACE_SECONDS = env.int("INTERVIEW_AV_GRACE_SECONDS", default=300)
+INTERVIEW_ROUND_SCHEDULE_HOURS = env.int("INTERVIEW_ROUND_SCHEDULE_HOURS", default=48)
+INTERVIEW_STAFF_FREE_BY_DEFAULT = env.bool("INTERVIEW_STAFF_FREE_BY_DEFAULT", default=True)
+INTERVIEW_ALLOW_ADMIN_OBSERVER = env.bool("INTERVIEW_ALLOW_ADMIN_OBSERVER", default=True)
+INTERVIEW_FREE_CAMPAIGNS_PER_MONTH = env.int("INTERVIEW_FREE_CAMPAIGNS_PER_MONTH", default=1)
+
+# Marketing nurture emails (sample → subscribe, no-sub → technology benefits)
+MARKETING_EMAILS_ENABLED = env.bool("MARKETING_EMAILS_ENABLED", default=True)
+MARKETING_NUDGE_INTERVAL_DAYS = env.int("MARKETING_NUDGE_INTERVAL_DAYS", default=5)
+MARKETING_MIN_ACCOUNT_AGE_DAYS = env.int("MARKETING_MIN_ACCOUNT_AGE_DAYS", default=3)
+MARKETING_INACTIVE_LOGIN_DAYS = env.int("MARKETING_INACTIVE_LOGIN_DAYS", default=120)
+JIRA_TEAM_REPLY_DELAY_SECONDS = env.int("JIRA_TEAM_REPLY_DELAY_SECONDS", default=30)
+
+# Inactive account cleanup (no subscription within N months)
+INACTIVE_ACCOUNT_CLEANUP_ENABLED = env.bool("INACTIVE_ACCOUNT_CLEANUP_ENABLED", default=True)
+INACTIVE_ACCOUNT_MONTHS = env.int("INACTIVE_ACCOUNT_MONTHS", default=3)
+INACTIVE_ACCOUNT_WARNING_DAYS = env.int("INACTIVE_ACCOUNT_WARNING_DAYS", default=14)
 
 # --------------------------------------------------
 # Jira Cloud integration

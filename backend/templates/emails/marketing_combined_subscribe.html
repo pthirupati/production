@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>FixitLab — Subscribe</title></head>
+<body style="margin:0;padding:0;background:#0a0e1a;font-family:Segoe UI,Roboto,Arial,sans-serif;">
+<table width="100%" style="background:#0a0e1a;padding:32px 16px;"><tr><td align="center">
+<table width="600" style="max-width:600px;background:#141b2d;border-radius:16px;border:1px solid #1e293b;">
+  <tr><td style="padding:32px 40px;">
+    <h1 style="color:#fff;font-size:22px;margin:0 0 12px;text-align:center;">Hi {{ username }} — unlock interviews &amp; labs</h1>
+    <p style="color:#94a3b8;font-size:15px;line-height:1.6;text-align:center;">You tried our sample interview and explored the platform. Here is everything subscribers get:</p>
+    <p style="color:#a5b4fc;font-size:12px;font-weight:700;text-transform:uppercase;margin:24px 0 8px;">Interview Studio</p>
+    <table width="100%" style="background:#0f172a;border-radius:10px;">
+      {% for benefit in interview_benefits %}
+      <tr><td style="padding:12px 16px;border-bottom:1px solid #1e293b;color:#e2e8f0;font-size:14px;">&#10003; {{ benefit }}</td></tr>
+      {% endfor %}
+    </table>
+    <p style="text-align:center;margin:16px 0;"><a href="{{ interview_plans_url }}" style="color:#818cf8;font-weight:600;">View interview plans &rarr;</a></p>
+    <p style="color:#34d399;font-size:12px;font-weight:700;text-transform:uppercase;margin:24px 0 8px;">Technology labs</p>
+    <table width="100%" style="background:#0f172a;border-radius:10px;">
+      {% for benefit in technology_benefits %}
+      <tr><td style="padding:12px 16px;border-bottom:1px solid #1e293b;color:#e2e8f0;font-size:14px;">&#10003; {{ benefit }}</td></tr>
+      {% endfor %}
+    </table>
+    {% if featured_technologies %}
+    <p style="color:#94a3b8;font-size:13px;margin:16px 0 8px;">Popular technologies:</p>
+    <ul style="color:#cbd5e1;font-size:14px;">
+      {% for t in featured_technologies %}
+      <li>{{ t.name }} — from &#8377;{{ t.price }}/year</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <p style="text-align:center;margin:24px 0;">
+      <a href="{{ pricing_url }}" style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#6366f1);color:#fff;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:700;">Subscribe now</a>
+    </p>
+    <p style="color:#64748b;font-size:11px;text-align:center;">
+      <a href="{{ unsubscribe_url }}" style="color:#64748b;">Unsubscribe</a> from these emails
+      &middot; <a href="{{ profile_notifications_url }}" style="color:#64748b;">Manage in Profile</a>
+    </p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body>
+</html>

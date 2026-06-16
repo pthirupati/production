@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 
 export default function AdminSubscriptions() {
   const [logs, setLogs] = useState([])
+  const [interviewLogs, setInterviewLogs] = useState([])
   const [allTechs, setAllTechs] = useState([])
   const [stats, setStats] = useState({ total_revenue: 0, active_count: 0, total_count: 0, exchange_rate: null })
   const [loading, setLoading] = useState(true)
@@ -54,12 +55,14 @@ export default function AdminSubscriptions() {
 
       const data = await adminApi.getSubscriptionLogs(Object.fromEntries(params))
       setLogs(data.logs || [])
+      setInterviewLogs(data.interview_logs || [])
       setStats({
         total_revenue: data.total_revenue || 0,
         active_count: data.active_count || 0,
         total_count: data.total_count || 0,
         exchange_rate: data.exchange_rate || null,
         display_currency: data.display_currency || 'INR',
+        interview_active_count: data.interview_active_count || 0,
       })
     } catch {
       toast.error('Failed to load subscription logs')
@@ -355,12 +358,65 @@ export default function AdminSubscriptions() {
         </div>
         {logs.length > 0 && (
           <div className="px-4 py-3 border-t border-surface-700/30 text-xs text-surface-500 flex items-center justify-between">
-            <span>Showing {logs.length} of {stats.total_count} subscription{stats.total_count !== 1 ? 's' : ''}</span>
+            <span>Showing {logs.length} of {stats.total_count} technology subscription{stats.total_count !== 1 ? 's' : ''}</span>
             {currency === 'USD' && stats.exchange_rate && (
               <span>Exchange rate: 1 USD = {'\u20B9'}{stats.exchange_rate.toFixed(2)} (updated hourly)</span>
             )}
           </div>
         )}
+      </div>
+
+      {/* Interview entitlements */}
+      <div>
+        <h2 className="text-lg font-semibold text-white mb-3">Interview Studio subscriptions</h2>
+        <p className="text-xs text-surface-500 mb-3">
+          1-year plans · 10 interview attempts per period · {stats.interview_active_count || 0} active
+        </p>
+        <div className="glass-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-700">
+                  <th className="text-left p-3 text-surface-400 font-medium">User</th>
+                  <th className="text-left p-3 text-surface-400 font-medium">Plan</th>
+                  <th className="text-left p-3 text-surface-400 font-medium">Attempts left</th>
+                  <th className="text-left p-3 text-surface-400 font-medium">Status</th>
+                  <th className="text-left p-3 text-surface-400 font-medium">Expires</th>
+                </tr>
+              </thead>
+              <tbody>
+                {interviewLogs.map(log => (
+                  <tr key={log.id} className="border-b border-surface-800 hover:bg-surface-800/30">
+                    <td className="p-3">
+                      <p className="font-medium">{log.user?.username}</p>
+                      <p className="text-xs text-surface-500">{log.user?.email}</p>
+                    </td>
+                    <td className="p-3 text-indigo-300">{log.technology}</td>
+                    <td className="p-3">{log.interviews_remaining}</td>
+                    <td className="p-3">
+                      {log.is_active ? (
+                        <span className="text-accent-green text-xs">Active</span>
+                      ) : (
+                        <span className="text-surface-500 text-xs">Expired / used</span>
+                      )}
+                      {log.admin_granted && (
+                        <span className="text-[10px] text-amber-400 block">Admin granted</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-xs text-surface-400">
+                      {log.expires_at ? new Date(log.expires_at).toLocaleDateString() : '—'}
+                    </td>
+                  </tr>
+                ))}
+                {interviewLogs.length === 0 && !loading && (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-surface-400">No interview entitlements yet</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   )

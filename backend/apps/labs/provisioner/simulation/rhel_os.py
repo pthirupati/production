@@ -77,6 +77,19 @@ class RHELOSState:
         self.rebooted_after_patch: bool = False
         self.emergency_mode: bool = False
         self.fstab_valid: bool = True
+        # Jira-coordinated change management
+        self.ops_backup_taken: bool = False
+        self.ops_db_stopped: bool = False
+        self.ops_app_stopped: bool = False
+        self.ops_db_started: bool = True
+        self.ops_app_started: bool = True
+        self.ops_services_restarted: bool = False
+        self.mount_issue_after_reboot: bool = False
+        self.mount_filesystems_fixed: bool = False
+        self.pending_storage_device: str = "/dev/sdb"
+        self.storage_disk_provisioned: bool = True
+        self.pending_nic_config: str = "10.0.0.20/24"
+        self.network_nic_provisioned: bool = True
         self.editor = None  # EditorSession when nano/vi active
         self.network_ifs: dict[str, dict] = {
             "lo": {"up": True, "addrs": ["127.0.0.1/8"]},
@@ -261,6 +274,13 @@ class RHELOSState:
         if iface not in self.network_ifs:
             self.network_ifs[iface] = {"up": True, "addrs": []}
         self.network_ifs[iface]["addrs"] = [f"{ip}/24" if "/" not in ip else ip]
+
+    def append_host_ip(self, ip: str, iface: str = "eth0") -> None:
+        if iface not in self.network_ifs:
+            self.network_ifs[iface] = {"up": True, "addrs": []}
+        addr = f"{ip}/24" if "/" not in ip else ip
+        if addr not in self.network_ifs[iface]["addrs"]:
+            self.network_ifs[iface]["addrs"].append(addr)
 
     def format_ip_addr(self) -> str:
         lines = []

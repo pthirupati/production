@@ -11,6 +11,10 @@ export default function Privacy() {
         'Your name, email address, phone number, and location',
         'Username and profile information you choose to provide',
         'Lab session activity, including commands entered and results',
+        'Resume uploads and parsed career data for AI Interview Studio',
+        'Interview transcripts, scores, and session metadata from mock interviews',
+        'Camera and microphone status during interviews (not stored as video by default)',
+        'Browser speech recognition text when you use voice answers',
         'Subscription and payment information (processed securely)',
         'Browser type, IP address, and device information for security',
       ],
@@ -21,7 +25,9 @@ export default function Privacy() {
       color: 'from-green-500 to-emerald-600',
       items: [
         'To provide and improve our platform services',
-        'To personalize your learning experience',
+        'To personalize your learning experience and tailor interview questions',
+        'To run AI mock interviews using our own rule-based engine (no third-party LLM APIs)',
+        'To process voice answers via your browser\'s Speech API (audio stays on your device)',
         'To process payments and manage subscriptions',
         'To send important account notifications',
         'To analyze platform usage and improve features',
@@ -42,8 +48,10 @@ export default function Privacy() {
         'Access and download your personal data',
         'Request correction of inaccurate data',
         'Request deletion of your account and data',
-        'Opt out of marketing communications',
+        'Opt out of marketing communications via email unsubscribe link or Profile settings',
         'Export your lab history and progress data',
+        'Request deletion of interview resumes, transcripts, and reports',
+        'Accounts without any subscription for 3 months may be deleted after a warning email — all data is removed from our database',
       ],
     },
   ]
@@ -66,7 +74,7 @@ export default function Privacy() {
             <h1 className="text-5xl font-extrabold mb-4 bg-gradient-to-r from-white via-green-300 to-cyan-400 bg-clip-text text-transparent">
               Privacy Policy
             </h1>
-            <p className="text-surface-400 text-lg">Last updated: March 31, 2026</p>
+            <p className="text-surface-400 text-lg">Last updated: June 5, 2026</p>
             <div className="w-20 h-1 bg-gradient-to-r from-accent-green to-accent-cyan rounded-full mx-auto mt-6" />
           </div>
 
@@ -102,6 +110,18 @@ export default function Privacy() {
                 </section>
               )
             })}
+
+            {/* Interview Studio */}
+            <section className="glass-card p-8 border-indigo-500/20 animate-fade-in">
+              <h2 className="text-xl font-bold text-white mb-4">AI Interview Studio</h2>
+              <ul className="space-y-2 text-surface-300 text-sm">
+                <li>Mock interviews require camera and microphone; you must consent before each session.</li>
+                <li>We store text transcripts and scores. Video is not recorded on our servers unless explicitly stated.</li>
+                <li>Voice uses your browser&apos;s built-in speech APIs — no paid third-party TTS/STT services.</li>
+                <li>Admins may request to observe a live session; you must approve before they can view the transcript.</li>
+                <li>Interview data is retained while your account is active and deleted with account deletion requests.</li>
+              </ul>
+            </section>
 
             {/* Contact */}
             <section className="glass-card p-8 border-accent-green/20 bg-gradient-to-br from-accent-green/5 to-transparent animate-fade-in">

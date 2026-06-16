@@ -1,21 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
 import { ShieldCheck, Search, CheckCircle2, XCircle, Award, Loader } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export default function CertificateVerify() {
+  const [searchParams] = useSearchParams()
   const [certId, setCertId] = useState('')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleVerify = async (e) => {
-    e.preventDefault()
-    if (!certId.trim()) return
+  usePageTitle('Verify Certificate', 'Verify FixitLab technology or AI mock interview certificates by ID.')
+
+  const verifyId = async (id) => {
+    const trimmed = (id || '').trim()
+    if (!trimmed) return
     setLoading(true)
     setError('')
     setResult(null)
     try {
-      const res = await fetch(`/api/achievements/certificate/verify/?certificate_id=${encodeURIComponent(certId.trim())}`)
+      const res = await fetch(`/api/achievements/certificate/verify/?certificate_id=${encodeURIComponent(trimmed)}`)
       const data = await res.json()
       if (data.error && !('valid' in data)) {
         setError(data.error)
@@ -27,6 +32,20 @@ export default function CertificateVerify() {
     } finally {
       setLoading(false)
     }
+  }
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('certificate_id')
+    if (fromUrl) {
+      setCertId(fromUrl)
+      verifyId(fromUrl)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  const handleVerify = async (e) => {
+    e.preventDefault()
+    verifyId(certId)
   }
 
   return (
@@ -41,7 +60,7 @@ export default function CertificateVerify() {
             Verify Certificate
           </h1>
           <p className="text-surface-400 text-lg">
-            Enter a FixitLab certificate ID to verify its authenticity
+            Enter a FixitLab certificate ID — technology labs (FIXIT-*) or mock interviews (FIXIT-INT-*)
           </p>
         </div>
 
@@ -55,7 +74,7 @@ export default function CertificateVerify() {
                 value={certId}
                 onChange={(e) => setCertId(e.target.value)}
                 className="input-field pl-12 py-3 text-lg"
-                placeholder="e.g., FIXIT-LINUX-42-20260401"
+                placeholder="e.g., FIXIT-LINUX-42-20260401 or FIXIT-INT-..."
                 required
               />
             </div>
@@ -105,6 +124,15 @@ export default function CertificateVerify() {
 
             {result.valid && (
               <div className="grid grid-cols-2 gap-4 border-t border-surface-700/50 pt-6">
+                {result.type === 'interview' && (
+                  <div className="glass-card p-4 col-span-2 border border-indigo-500/20 bg-indigo-500/5">
+                    <p className="text-xs text-indigo-400 uppercase tracking-wide mb-1">Certificate type</p>
+                    <p className="font-semibold text-white">AI Mock Interview — {result.rounds_cleared} rounds cleared</p>
+                    {result.level && (
+                      <p className="text-xs text-surface-400 mt-1">Level: {result.level}</p>
+                    )}
+                  </div>
+                )}
                 <div className="glass-card p-4">
                   <p className="text-xs text-surface-500 uppercase tracking-wide mb-1">Certificate Holder</p>
                   <p className="font-semibold text-white">{result.holder_name}</p>
@@ -113,14 +141,18 @@ export default function CertificateVerify() {
                   <p className="text-xs text-surface-500 uppercase tracking-wide mb-1">Technology</p>
                   <p className="font-semibold text-accent-cyan">{result.technology}</p>
                 </div>
+                {result.type !== 'interview' && (
+                  <div className="glass-card p-4">
+                    <p className="text-xs text-surface-500 uppercase tracking-wide mb-1">Scenarios Completed</p>
+                    <p className="font-semibold text-white">{result.scenarios_completed} / {result.total_scenarios}</p>
+                  </div>
+                )}
                 <div className="glass-card p-4">
-                  <p className="text-xs text-surface-500 uppercase tracking-wide mb-1">Scenarios Completed</p>
-                  <p className="font-semibold text-white">{result.scenarios_completed} / {result.total_scenarios}</p>
-                </div>
-                <div className="glass-card p-4">
-                  <p className="text-xs text-surface-500 uppercase tracking-wide mb-1">Total Score</p>
+                  <p className="text-xs text-surface-500 uppercase tracking-wide mb-1">
+                    {result.type === 'interview' ? 'Interview Score' : 'Total Score'}
+                  </p>
                   <p className="font-semibold text-accent-amber flex items-center gap-1">
-                    <Award size={16} /> {result.total_score} pts
+                    <Award size={16} /> {result.overall_score ?? result.total_score}{result.type === 'interview' ? '/100' : ' pts'}
                   </p>
                 </div>
                 <div className="glass-card p-4 col-span-2">

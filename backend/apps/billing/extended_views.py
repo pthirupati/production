@@ -20,6 +20,110 @@ from .views import BillingRateThrottle, get_user_subscription as _get_sub
 logger = logging.getLogger(__name__)
 
 
+def _interview_subscription_payload(user) -> dict:
+    from apps.interviews.services.entitlements import get_entitlement_payload
+
+    ent = get_entitlement_payload(user)
+    tier = ent.get("plan") or {}
+    return {
+        "product_type": "interview",
+        "plan_code": tier.get("code"),
+        "plan_name": tier.get("name"),
+        "is_active": ent.get("is_active"),
+        "expired": ent.get("expired"),
+        "renewal_required": ent.get("renewal_required"),
+        "interviews_remaining": ent.get("interviews_remaining"),
+        "interviews_total": ent.get("interviews_total"),
+        "interviews_used": ent.get("interviews_used"),
+        "days_remaining": ent.get("days_remaining"),
+        "period_start": ent.get("period_start"),
+        "period_end": ent.get("period_end"),
+        "billing_period_days": ent.get("billing_period_days", 365),
+        "max_rounds": tier.get("max_rounds"),
+    }
+
+
+def _payment_history_payload(user) -> list:
+    from apps.billing.models import PaymentTransaction, SubscriptionInvoice
+    from apps.billing.invoice_service import invoice_list_payload
+
+    txs = PaymentTransaction.objects.filter(user=user, status="success").order_by("-verified_at", "-created_at")[:100]
+    invoices = {str(i.payment_transaction_id): i for i in SubscriptionInvoice.objects.filter(user=user).select_related("payment_transaction")}
+    rows = []
+    for tx in txs:
+        gw = tx.gateway_response if isinstance(tx.gateway_response, dict) else {}
+        product = gw.get("product", "technology")
+        plan_code = gw.get("plan_code", "")
+        coupon = gw.get("coupon_code", "")
+        original = gw.get("original_amount") or gw.get("amount_inr")
+        discount_saved = gw.get("discount_saved", 0)
+        inv = invoices.get(str(tx.id))
+        label = f"Interview {plan_code.title()}" if product == "interview" else (
+            tx.tech_subscription.technology.name if tx.tech_subscription_id else (tx.plan.name if tx.plan_id else "Subscription")
+        )
+        rows.append({
+            "id": str(tx.id),
+            "product_type": product,
+            "label": label,
+            "amount": str(tx.amount),
+            "currency": tx.currency,
+            "payment_method": tx.get_payment_method_display(),
+            "gateway_payment_id": tx.gateway_payment_id,
+            "coupon_code": coupon or None,
+            "original_amount": str(original) if original else None,
+            "discount_saved": discount_saved or 0,
+            "paid_at": (tx.verified_at or tx.created_at).isoformat(),
+            "invoice_id": str(inv.id) if inv else None,
+            "invoice_number": inv.invoice_number if inv else None,
+        })
+    return rows
+
+
+class SubscriptionsOverviewView(APIView):
+    """Full subscription audit for user — tech, interview, payments, invoices."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from apps.billing.invoice_service import backfill_invoices_for_user, invoice_list_payload
+        from apps.billing.models import SubscriptionInvoice
+        from apps.billing.subscription_utils import subscription_status_payload, user_has_complimentary_access
+        from apps.billing.services import get_user_plan_info
+
+        user = request.user
+        backfill_invoices_for_user(user)
+        plan_info = get_user_plan_info(user)
+        tech_subs = TechnologySubscription.objects.filter(user=user).select_related("technology").order_by("-created_at")
+        invoices = SubscriptionInvoice.objects.filter(user=user).order_by("-created_at")[:50]
+
+        tech_rows = []
+        for sub in tech_subs:
+            status = subscription_status_payload(sub)
+            days = max(0, (sub.expires_at - timezone.now()).days) if sub.expires_at else None
+            tech_rows.append({
+                "id": str(sub.id),
+                "product_type": "technology",
+                "subscription_id": sub.subscription_id,
+                "technology": sub.technology.name,
+                "technology_slug": sub.technology.slug,
+                "amount": str(sub.amount),
+                "payment_method": sub.payment_method,
+                "payment_verified": sub.payment_verified,
+                "created_at": sub.created_at.isoformat(),
+                "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+                "days_remaining": days,
+                **status,
+            })
+
+        return Response({
+            "platform_plan": plan_info,
+            "complimentary_access": user_has_complimentary_access(user),
+            "technology_subscriptions": tech_rows,
+            "interview_subscription": _interview_subscription_payload(user),
+            "payment_history": _payment_history_payload(user),
+            "invoices": [invoice_list_payload(inv) for inv in invoices],
+        })
+
+
 def _create_technology_subscription(user, technology, amount, payment_method="stripe"):
     """Shared helper after successful payment."""
     from datetime import timedelta
@@ -72,9 +176,14 @@ class UnifiedBillingView(APIView):
                     "expires_at": s.expires_at.isoformat() if s.expires_at else None,
                     "amount": str(s.amount),
                     "subscription_id": s.subscription_id,
+                    "payment_method": s.payment_method,
+                    "payment_verified": s.payment_verified,
+                    "created_at": s.created_at.isoformat(),
+                    "days_remaining": max(0, (s.expires_at - timezone.now()).days) if s.expires_at else None,
                 }
                 for s in tech_subs
             ],
+            "interview_subscription": _interview_subscription_payload(user),
             "organizations": [
                 {
                     "name": m.organization.name,

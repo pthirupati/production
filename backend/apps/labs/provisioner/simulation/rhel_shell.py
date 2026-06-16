@@ -46,6 +46,15 @@ class RHELShell:
             return ""
         if line.startswith("#"):
             return ""
+        if " && " in line:
+            chunks: list[str] = []
+            for segment in line.split(" && "):
+                out = self.run(segment.strip())
+                if out:
+                    chunks.append(out)
+                if self.state.last_exit_code not in (0, None):
+                    break
+            return "\n".join(chunks)
 
         for handler in self._extra_handlers:
             try:
@@ -655,22 +664,37 @@ class RHELShell:
     def _cmd_ss(self, p: list[str]) -> str:
         return "Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port\nu_str ESTAB  0      0      * 22                * *\n"
 
+    def _server_state(self):
+        """Canonical primary/server state for remote checks from client terminals."""
+        engine = getattr(self, "_engine", None)
+        if engine:
+            return engine.shell.state
+        return self.state
+
     def _cmd_curl(self, p: list[str]) -> str:
         url = p[-1]
-        if "localhost" in url or "127.0.0.1" in url:
-            nginx = self.state.services.get("nginx")
+        st = self.state
+        if any(x in url for x in ("10.0.0.10", "primary")):
+            st = self._server_state()
+        elif "localhost" in url or "127.0.0.1" in url:
+            st = self.state
+        else:
+            return f"curl: (6) Could not resolve host: {url}"
+
+        if "localhost" in url or "127.0.0.1" in url or "10.0.0.10" in url or "://" in url:
+            nginx = st.services.get("nginx")
             if nginx and nginx.active == "active":
-                if not self.state.firewall.is_port_open(80):
-                    return "curl: (7) Failed to connect to localhost port 80: Connection refused"
-                sites = self.state.read_file("/etc/nginx/sites-enabled/default") or ""
+                if not st.firewall.is_port_open(80):
+                    return "curl: (7) Failed to connect to host port 80: Connection refused"
+                sites = st.read_file("/etc/nginx/sites-enabled/default") or ""
                 if "listn" in sites:
                     return "curl: (52) Empty reply from server"
                 if "root /var/www/wrong" in sites:
-                    html = self.state.read_file("/var/www/wrong/index.html") or ""
+                    html = st.read_file("/var/www/wrong/index.html") or ""
                     if "Wrong Site" in html:
                         return "<html><body><h1>Wrong Site</h1></body></html>"
                 if "root /var/www/html" in sites:
-                    html = self.state.read_file("/var/www/html/index.html") or ""
+                    html = st.read_file("/var/www/html/index.html") or ""
                     if html.strip():
                         return html.strip() if html.startswith("<") else f"<html><body>{html}</body></html>"
                 return "<html><body><h1>Welcome to nginx!</h1></body></html>"
@@ -881,10 +905,15 @@ class RHELShell:
                     return "success"
                 return "success"
         if "--add-service" in line:
+            svc_tok = None
             for tok in p:
-                if tok not in ("firewall-cmd", "--add-service", "--permanent", "--zone=public"):
-                    fw.add_service(tok, permanent=permanent)
-                    return "success"
+                if tok.startswith("--add-service="):
+                    svc_tok = tok.split("=", 1)[1]
+                elif tok not in ("firewall-cmd", "--add-service", "--permanent", "--zone=public") and not tok.startswith("-"):
+                    svc_tok = tok
+            if svc_tok:
+                fw.add_service(svc_tok, permanent=permanent)
+                return "success"
         if "--get-active-zones" in line:
             return f"public\n  interfaces: eth0"
         return "success"
@@ -912,6 +941,16 @@ class RHELShell:
             return ""
         path = self.state.resolve_path(p[1])
         if "precheck" in path:
+            slug = (self.state.scenario_slug or "").lower()
+            if "patch" in slug:
+                from .ops_state import ops_ready_for_patching
+                if not ops_ready_for_patching(self.state):
+                    return (
+                        "PRECHECK FAILED: change window not ready.\n"
+                        "In Jira, comment:\n"
+                        "  @backup team @database team @application team — stop DB/app and take backup.\n"
+                        "Wait ~30 seconds for team confirmations, then re-run precheck."
+                    )
             self.state.precheck_ran = True
             baseline = self.state.read_file("/opt/fixitlab/PRECHECK_BASELINE") or ""
             return (
@@ -930,6 +969,12 @@ class RHELShell:
             from .boot_sequence import NEW_KERNEL
             if self.state.kernel != NEW_KERNEL:
                 return f"POSTCHECK FAILED: expected kernel {NEW_KERNEL}, got {self.state.kernel}"
+            slug = (self.state.scenario_slug or "").lower()
+            if "patch" in slug and not self.state.ops_services_restarted:
+                return (
+                    "POSTCHECK FAILED: services not restored.\n"
+                    "In Jira, ask @database team and @application team to start services after patching."
+                )
             return "POSTCHECK PASSED: kernel and package state match baseline"
         script = self.state.read_file(p[1])
         if script:
@@ -963,6 +1008,15 @@ class RHELShell:
 
     def _cmd_pvcreate(self, p: list[str]) -> str:
         dev = p[-1] if len(p) > 1 else ""
+        if dev not in self.state.lvm.pvs:
+            pending = getattr(self.state, "pending_storage_device", "/dev/sdb")
+            if not self.state.storage_disk_provisioned and dev == pending:
+                return (
+                    f"  Device {dev} not found.\n"
+                    f"  Comment on Jira: @storage team please add a disk for LVM extension.\n"
+                    f"  Wait ~30s, then run fdisk -l or echo 1 > /sys/class/scsi_host/host0/scan"
+                )
+            return f"  Device {dev} not found"
         ok, msg = self.state.lvm.pvcreate(dev)
         return msg if ok else f"  {msg}"
 
@@ -1015,6 +1069,11 @@ class RHELShell:
         return "COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME\nsshd      412 root    3u  IPv4  12345      0t0  TCP *:22 (LISTEN)"
 
     def _cmd_mount(self, p: list[str]) -> str:
+        if "-a" in p:
+            if self.state.mount_issue_after_reboot and not self.state.mount_filesystems_fixed:
+                self.state.mount_filesystems_fixed = True
+                self.state.fstab_valid = True
+                return "mount: mounting all filesystems in /etc/fstab"
         return self.state.lvm.format_mount()
 
     def _cmd_fdisk(self, p: list[str]) -> str:

@@ -66,6 +66,11 @@ export const subscriptionApi = {
     return data
   },
 
+  async getSubscriptionsOverview() {
+    const { data } = await api.get('/billing/subscriptions-overview/')
+    return data
+  },
+
   async getUnifiedBilling() {
     const { data } = await api.get('/billing/unified/')
     return data

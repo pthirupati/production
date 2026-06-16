@@ -97,9 +97,10 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
             engine._patch_hint_shown = True
             holder._emit(
                 "\r\n\x1b[1;36m[FixitLab Patching Lab]\x1b[0m\r\n"
-                "Run \x1b[1;33m/opt/fixitlab/precheck.sh\x1b[0m, apply updates with "
-                "\x1b[1;33mdnf update -y\x1b[0m, \x1b[1;33mreboot\x1b[0m, then "
-                "\x1b[1;33m/opt/fixitlab/postcheck.sh\x1b[0m.\r\n"
+                "1) Jira: @backup team @database team @application team — stop services & backup (~30s)\r\n"
+                "2) Run \x1b[1;33m/opt/fixitlab/precheck.sh\x1b[0m → \x1b[1;33mdnf update -y\x1b[0m → \x1b[1;33mreboot\x1b[0m\r\n"
+                "3) If mount issue after reboot: \x1b[1;33mmount -a\x1b[0m then ask teams to start in Jira\r\n"
+                "4) \x1b[1;33m/opt/fixitlab/postcheck.sh\x1b[0m → close Jira ticket\r\n"
                 "Login: \x1b[1;33mroot\x1b[0m / \x1b[1;33mredhat\x1b[0m\r\n"
             )
         return holder

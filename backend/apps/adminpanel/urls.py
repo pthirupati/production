@@ -45,6 +45,24 @@ from .views import (
     AdminBlogPostsView,
     AdminBlogPostDetailView,
 )
+from apps.interviews.admin_views import (
+    AdminInterviewOverviewView,
+    AdminInterviewCampaignsView,
+    AdminInterviewQuestionsView,
+    AdminInterviewQuestionDetailView,
+    AdminInterviewTiersView,
+    AdminInterviewTierDetailView,
+    AdminInterviewEntitlementsView,
+    AdminInterviewSettingsView,
+    AdminInterviewVoicesView,
+    AdminInterviewVoiceDetailView,
+)
+from apps.interviews.join_views import (
+    AdminRequestJoinInterviewView,
+    AdminJoinRequestsListView,
+    AdminLiveInterviewSessionsView,
+    AdminObserverSessionView,
+)
 
 urlpatterns = [
     # Overview
@@ -119,4 +137,20 @@ urlpatterns = [
     path("export/users/", AdminExportUsersView.as_view()),
     path("export/labs/", AdminExportLabsView.as_view()),
     path("export/progress/", AdminExportProgressView.as_view()),
+
+    # AI Interview Studio
+    path("interviews/overview/", AdminInterviewOverviewView.as_view()),
+    path("interviews/settings/", AdminInterviewSettingsView.as_view()),
+    path("interviews/campaigns/", AdminInterviewCampaignsView.as_view()),
+    path("interviews/live/", AdminLiveInterviewSessionsView.as_view()),
+    path("interviews/join-request/", AdminRequestJoinInterviewView.as_view()),
+    path("interviews/join-requests/", AdminJoinRequestsListView.as_view()),
+    path("interviews/observer/<uuid:token>/", AdminObserverSessionView.as_view()),
+    path("interviews/questions/", AdminInterviewQuestionsView.as_view()),
+    path("interviews/questions/<int:pk>/", AdminInterviewQuestionDetailView.as_view()),
+    path("interviews/tiers/", AdminInterviewTiersView.as_view()),
+    path("interviews/tiers/<int:pk>/", AdminInterviewTierDetailView.as_view()),
+    path("interviews/voices/", AdminInterviewVoicesView.as_view()),
+    path("interviews/voices/<int:pk>/", AdminInterviewVoiceDetailView.as_view()),
+    path("interviews/entitlements/", AdminInterviewEntitlementsView.as_view()),
 ]

@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { authApi } from '../api/auth'
 import { labApi } from '../api/labs'
 import { subscriptionApi } from '../api/subscriptions'
 import api from '../api/client'
-import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download, Github, Users } from 'lucide-react'
+import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download, Github, Users, Trash2, Mic2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { startOAuth } from '../utils/oauth'
 import { validators } from '../utils/validators'
 import { SkeletonCard } from '../components/Skeleton'
+import { interviewsApi } from '../api/interviews'
 
 export default function Profile() {
   const { user } = useAuthStore()
+  const navigate = useNavigate()
   const [username, setUsername] = useState(user?.username || '')
   const [firstName, setFirstName] = useState(user?.first_name || '')
   const [lastName, setLastName] = useState(user?.last_name || '')
@@ -31,6 +33,12 @@ export default function Profile() {
   const [organizations, setOrganizations] = useState([])
   const [socialAccounts, setSocialAccounts] = useState([])
   const [socialConfig, setSocialConfig] = useState(null)
+  const [interviewProfile, setInterviewProfile] = useState(null)
+  const [gdprBusy, setGdprBusy] = useState(null)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [hasUsablePassword, setHasUsablePassword] = useState(true)
 
   // Load full profile data including phone number
   useEffect(() => {
@@ -42,7 +50,8 @@ export default function Profile() {
       subscriptionApi.getMySubscriptions().catch(() => ({ subscriptions: [] })),
       subscriptionApi.getMyInvoices().catch(() => ({ invoices: [] })),
       subscriptionApi.getUnifiedBilling().catch(() => null),
-    ]).then(([profileData, plan, prefs, subsData, invData, unified]) => {
+      interviewsApi.getProfile().catch(() => null),
+    ]).then(([profileData, plan, prefs, subsData, invData, unified, intProfile]) => {
       setUsername(profileData.username || '')
       setFirstName(profileData.first_name || '')
       setLastName(profileData.last_name || '')
@@ -54,7 +63,9 @@ export default function Profile() {
       setComplimentaryAccess(subsData?.complimentary_access || false)
       setInvoices(invData?.invoices || [])
       setSocialAccounts(profileData.social_accounts || [])
+      setHasUsablePassword(profileData.has_usable_password !== false)
       setOrganizations(unified?.organizations || [])
+      setInterviewProfile(intProfile)
     }).catch(console.error)
       .finally(() => setLoading(false))
   }, [])
@@ -322,7 +333,7 @@ export default function Profile() {
                   { key: 'email_lab_completed', label: 'Lab completed', desc: 'Off by default — use in-app notifications instead' },
                   { key: 'email_lab_expired', label: 'Lab expired', desc: 'Off by default — use in-app notifications instead' },
                   { key: 'email_subscription', label: 'Subscription updates', desc: 'Confirmation and billing emails' },
-                  { key: 'email_marketing', label: 'Product updates', desc: 'New features, scenarios, and tips' },
+                  { key: 'email_marketing', label: 'Subscribe reminders & tips', desc: 'Interview/technology benefits and product updates. Use the Unsubscribe link in any email, or toggle here.' },
                 ].map(({ key, label, desc }) => (
                   <label key={key} className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 hover:bg-surface-800 transition-colors cursor-pointer group">
                     <div>
@@ -459,41 +470,95 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Payment Invoices */}
+      {/* Interview data & GDPR */}
       <div className="glass-card p-6">
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <FileText size={18} className="text-accent-cyan" /> Payment Invoices
+          <Mic2 size={18} className="text-indigo-400" /> Interview Data & Privacy
         </h2>
-        {invoices.length === 0 ? (
-          <p className="text-sm text-surface-400">No payment invoices yet. Invoices appear here after a successful subscription purchase.</p>
-        ) : (
-          <div className="space-y-2">
-            {invoices.map(inv => (
-              <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 border border-surface-700/40 gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{inv.technology}</p>
-                  <p className="text-xs text-surface-500 font-mono">{inv.invoice_number}</p>
-                  <p className="text-xs text-surface-500">
-                    {new Date(inv.created_at).toLocaleDateString()} · ₹{inv.amount} · {inv.payment_method}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => downloadInvoice(inv)}
-                  className="btn-secondary text-xs px-3 py-1.5 shrink-0 flex items-center gap-1"
-                >
-                  <Download size={12} /> Download
-                </button>
-              </div>
-            ))}
+        <p className="text-sm text-surface-400 mb-4">
+          Manage resume and transcript data stored for AI mock interviews.
+        </p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 border border-surface-700/40 gap-3">
+            <div>
+              <p className="text-sm text-white">Uploaded resume</p>
+              <p className="text-xs text-surface-500">
+                {interviewProfile?.has_resume ? 'On file — used to personalize questions' : 'No resume stored'}
+              </p>
+            </div>
+            {interviewProfile?.has_resume && (
+              <button
+                type="button"
+                disabled={gdprBusy === 'resume'}
+                onClick={async () => {
+                  if (!window.confirm('Delete your stored resume and parsed data? This cannot be undone.')) return
+                  setGdprBusy('resume')
+                  try {
+                    await interviewsApi.deleteResume()
+                    setInterviewProfile(p => ({ ...p, has_resume: false, resume_text: '' }))
+                    toast.success('Resume removed')
+                  } catch {
+                    toast.error('Could not delete resume')
+                  } finally {
+                    setGdprBusy(null)
+                  }
+                }}
+                className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 text-accent-red border-accent-red/30 shrink-0"
+              >
+                <Trash2 size={12} /> Delete resume
+              </button>
+            )}
           </div>
-        )}
+          <div className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 border border-surface-700/40 gap-3">
+            <div>
+              <p className="text-sm text-white">Interview transcripts</p>
+              <p className="text-xs text-surface-500">Export all Q&A from mock interviews as JSON</p>
+            </div>
+            <button
+              type="button"
+              disabled={gdprBusy === 'export'}
+              onClick={async () => {
+                setGdprBusy('export')
+                try {
+                  const blob = await interviewsApi.exportTranscripts(true)
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = 'fixitlab-interview-transcripts.json'
+                  a.click()
+                  URL.revokeObjectURL(url)
+                  toast.success('Transcripts exported')
+                } catch {
+                  toast.error('Export failed')
+                } finally {
+                  setGdprBusy(null)
+                }
+              }}
+              className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 shrink-0"
+            >
+              <Download size={12} /> Export JSON
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Plan & Subscription */}
+      {/* Subscriptions shortcut */}
+      <div className="glass-card p-6">
+        <h2 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+          <CreditCard size={18} className="text-accent-cyan" /> Subscriptions & Billing
+        </h2>
+        <p className="text-sm text-surface-400 mb-4">
+          View technology and interview subscriptions, expiry dates, payment history, coupons, and invoices.
+        </p>
+        <Link to="/subscriptions" className="btn-primary text-sm inline-flex items-center gap-2">
+          <CreditCard size={14} /> Open subscriptions
+        </Link>
+      </div>
+
+      {/* Plan & Usage (labs only) */}
       <div className="glass-card p-6">
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <CreditCard size={18} className="text-accent-purple" /> Plan & Usage
+          <Zap size={18} className="text-accent-purple" /> Daily Lab Usage
         </h2>
         {planInfo ? (
           <div className="space-y-4">
@@ -593,6 +658,71 @@ export default function Profile() {
             <p>Unable to load plan info</p>
           </div>
         )}
+      </div>
+
+      {/* Delete account */}
+      <div id="delete-account" className="glass-card p-6 border border-accent-red/20">
+        <h2 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+          <AlertTriangle size={18} className="text-accent-red" /> Delete account
+        </h2>
+        <p className="text-sm text-surface-400 mb-4">
+          Permanently delete your account and all data (labs, interviews, subscriptions metadata, profile).
+          This cannot be undone. You may create a new account later.
+        </p>
+        <div className="space-y-3 max-w-md">
+          <div>
+            <label className="text-xs text-surface-400 block mb-1.5">
+              Type <span className="text-accent-red font-mono">DELETE MY ACCOUNT</span> to confirm
+            </label>
+            <input
+              type="text"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              className="input-field w-full text-sm"
+              placeholder="DELETE MY ACCOUNT"
+              autoComplete="off"
+            />
+          </div>
+          {hasUsablePassword && (
+            <div>
+              <label className="text-xs text-surface-400 block mb-1.5">Current password</label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                className="input-field w-full text-sm"
+                autoComplete="current-password"
+              />
+            </div>
+          )}
+          <button
+            type="button"
+            disabled={deletingAccount || deleteConfirm !== 'DELETE MY ACCOUNT'}
+            onClick={async () => {
+              if (!window.confirm('This permanently deletes your account and all data. Continue?')) return
+              setDeletingAccount(true)
+              try {
+                const refresh = useAuthStore.getState().refreshToken
+                await authApi.deleteAccount({
+                  confirm: deleteConfirm,
+                  password: deletePassword,
+                  refresh,
+                })
+                await authApi.logout()
+                toast.success('Account deleted')
+                navigate('/')
+              } catch (e) {
+                toast.error(e.response?.data?.error || 'Could not delete account')
+              } finally {
+                setDeletingAccount(false)
+              }
+            }}
+            className="btn-secondary text-sm px-4 py-2 border-accent-red/40 text-accent-red hover:bg-accent-red/10 disabled:opacity-40 flex items-center gap-2"
+          >
+            <Trash2 size={14} />
+            {deletingAccount ? 'Deleting…' : 'Permanently delete my account'}
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -1,7 +1,12 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework import status as http_status
+from django.contrib.auth import get_user_model
 from .models import Notification, NotificationPreference
+from .unsubscribe import verify_marketing_unsubscribe_token
+
+User = get_user_model()
 
 
 class NotificationListView(APIView):
@@ -81,3 +86,36 @@ class NotificationPreferenceView(APIView):
                 setattr(prefs, field, bool(request.data[field]))
         prefs.save()
         return Response({"message": "Preferences updated"})
+
+
+class MarketingUnsubscribeView(APIView):
+    """One-click unsubscribe from marketing emails via signed token (no login required)."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        token = request.query_params.get("token", "")
+        user_id = verify_marketing_unsubscribe_token(token)
+        if not user_id:
+            return Response(
+                {"error": "Invalid or expired unsubscribe link."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            user = User.objects.get(id=user_id, is_active=True)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Account not found."},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+        prefs = NotificationPreference.get_for_user(user)
+        prefs.email_marketing = False
+        prefs.save(update_fields=["email_marketing", "updated_at"])
+        return Response({
+            "message": "You have been unsubscribed from marketing emails.",
+            "email_marketing": False,
+        })
+
+    def post(self, request):
+        """Same as GET — supports form POST from email clients."""
+        return self.get(request)

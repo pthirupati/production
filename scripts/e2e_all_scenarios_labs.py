@@ -55,6 +55,12 @@ try:
 except ImportError:
     verify_lab_terminal = None
 
+try:
+    from e2e_simulation_terminal import verify_simulation_terminal, verify_simulation_workflow
+except ImportError:
+    verify_simulation_terminal = None
+    verify_simulation_workflow = None
+
 User = get_user_model()
 SKIP_LAB = os.environ.get("E2E_SKIP_LAB", "0") == "1"
 SKIP_TERMINAL = os.environ.get("E2E_SKIP_TERMINAL", "0") == "1"
@@ -233,14 +239,7 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c, *, test_
             stats.ok(f"{label} replay API")
 
         is_sim = (sess_a.provider or "") == "simulation" or getattr(scenario, "lab_mode", "") == "simulation"
-        if (
-            not SKIP_TERMINAL
-            and verify_lab_terminal
-            and sess_a
-            and not is_sim
-            and (sess_a.provider or "docker") == "docker"
-            and sess_a.container_id
-        ):
+        if not SKIP_TERMINAL and sess_a:
             from rest_framework_simplejwt.tokens import AccessToken
 
             token = str(AccessToken.for_user(user_a))
@@ -250,11 +249,34 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c, *, test_
                 terminal_consumers.reset_user_ws_connections(user_a.id)
             except Exception:
                 pass
-            ok, detail = verify_lab_terminal(str(sid_a), token)
-            if ok:
-                stats.ok(f"{label} terminal WebSocket")
-            else:
-                stats.fail(f"{label} terminal WebSocket", detail[:80])
+
+            if (
+                verify_lab_terminal
+                and not is_sim
+                and (sess_a.provider or "docker") == "docker"
+                and sess_a.container_id
+            ):
+                ok, detail = verify_lab_terminal(str(sid_a), token)
+                if ok:
+                    stats.ok(f"{label} terminal WebSocket")
+                else:
+                    stats.fail(f"{label} terminal WebSocket", detail[:80])
+
+            if is_sim and verify_simulation_terminal:
+                ok, detail = verify_simulation_terminal(str(sid_a), token, "primary")
+                if ok:
+                    stats.ok(f"{label} simulation terminal WS")
+                else:
+                    stats.fail(f"{label} simulation terminal WS", detail[:80])
+                slug = (scenario.slug or "").lower()
+                if verify_simulation_workflow and any(
+                    x in slug for x in ("ssh-stop", "firewalld-dual", "mysql-dual", "sshd-down")
+                ):
+                    ok, detail = verify_simulation_workflow(str(sid_a), token, slug)
+                    if ok:
+                        stats.ok(f"{label} simulation workflow WS")
+                    else:
+                        stats.fail(f"{label} simulation workflow WS", detail[:80])
 
         # Apply fix.sh (docker) or simulation fix, then validate
         db_refresh()

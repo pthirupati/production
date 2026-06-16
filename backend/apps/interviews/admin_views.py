@@ -1,0 +1,369 @@
+"""Admin API for Interview Studio — full control, analytics, pricing."""
+
+from __future__ import annotations
+
+from datetime import timedelta
+
+from django.db.models import Avg, Count, Q
+from django.db.models.functions import TruncDate
+from django.utils import timezone
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.adminpanel.permissions import IsPlatformAdmin
+from apps.interviews.models import (
+    InterviewCampaign,
+    InterviewCertificate,
+    InterviewEntitlement,
+    InterviewPlanTier,
+    InterviewPlatformSettings,
+    InterviewQuestion,
+    InterviewReport,
+    InterviewRound,
+    InterviewVoiceOption,
+)
+from apps.interviews.serializers import InterviewPlanTierSerializer, InterviewQuestionSerializer
+from apps.interviews.billing_views import activate_interview_plan
+from apps.interviews.services.interview_settings import get_platform_settings, settings_payload
+from apps.notifications.models import MarketingEmailLog
+
+
+def _interview_funnel_metrics(days: int) -> dict:
+    """Sample interview → paid subscribe conversion funnel."""
+    since = timezone.now() - timedelta(days=days)
+
+    sample_campaigns = InterviewCampaign.objects.filter(is_sample=True, created_at__gte=since)
+    sample_started = sample_campaigns.count()
+    sample_completed = sample_campaigns.filter(status="completed").count()
+
+    completed_user_ids = list(
+        sample_campaigns.filter(status="completed")
+        .values_list("user_id", flat=True)
+        .distinct()
+    )
+
+    paid_conversions = 0
+    conversion_days = []
+    for uid in completed_user_ids:
+        sample = (
+            InterviewCampaign.objects.filter(user_id=uid, is_sample=True, status="completed")
+            .order_by("-completed_at")
+            .first()
+        )
+        if not sample or not sample.completed_at:
+            continue
+        ent = InterviewEntitlement.objects.filter(user_id=uid).select_related("plan_tier").first()
+        if not ent or ent.is_complimentary or ent.is_admin_granted_free:
+            continue
+        if not ent.plan_tier or ent.plan_tier.code not in ("pro", "premium"):
+            continue
+        if not ent.period_start or ent.period_start <= sample.completed_at:
+            continue
+        paid_conversions += 1
+        conversion_days.append((ent.period_start - sample.completed_at).days)
+
+    nudges_sent = MarketingEmailLog.objects.filter(
+        campaign__in=(
+            "interview_sample_nudge",
+            "combined_subscribe_nudge",
+        ),
+        sent_at__gte=since,
+    ).count()
+
+    median_days = 0
+    if conversion_days:
+        conversion_days.sort()
+        mid = len(conversion_days) // 2
+        median_days = conversion_days[mid]
+
+    rate = round(100 * paid_conversions / sample_completed, 1) if sample_completed else 0
+
+    daily = list(
+        sample_campaigns.filter(status="completed", completed_at__isnull=False)
+        .annotate(day=TruncDate("completed_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+        .order_by("day")
+    )
+
+    return {
+        "sample_started": sample_started,
+        "sample_completed": sample_completed,
+        "paid_conversions": paid_conversions,
+        "conversion_rate_pct": rate,
+        "median_days_to_convert": median_days,
+        "nudges_sent": nudges_sent,
+        "daily_sample_completions": [
+            {"date": row["day"].isoformat() if row["day"] else None, "count": row["count"]}
+            for row in daily
+        ],
+    }
+
+
+class AdminInterviewOverviewView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        days = int(request.query_params.get("days", 30))
+        since = timezone.now() - timedelta(days=days)
+        campaigns = InterviewCampaign.objects.filter(created_at__gte=since)
+        rounds = InterviewRound.objects.filter(created_at__gte=since)
+        reports = InterviewReport.objects.filter(generated_at__gte=since)
+        return Response({
+            **settings_payload(),
+            "days": days,
+            "campaigns_total": campaigns.count(),
+            "campaigns_completed": campaigns.filter(status="completed").count(),
+            "campaigns_failed": campaigns.filter(status="failed").count(),
+            "campaigns_in_progress": campaigns.filter(status="in_progress").count(),
+            "rounds_total": rounds.count(),
+            "rounds_in_progress": rounds.filter(status="in_progress").count(),
+            "rounds_scheduled": rounds.filter(status__in=("scheduled", "ready", "schedulable")).count(),
+            "rounds_passed": rounds.filter(status="passed").count(),
+            "rounds_failed": rounds.filter(status="failed").count(),
+            "avg_round_score": rounds.filter(overall_score__isnull=False).aggregate(avg=Avg("overall_score"))["avg"] or 0,
+            "pass_rate": _pass_rate(rounds),
+            "certificates_issued": InterviewCertificate.objects.filter(issued_at__gte=since).count(),
+            "active_entitlements": InterviewEntitlement.objects.filter(is_active=True).count(),
+            "complimentary_users": InterviewEntitlement.objects.filter(
+                Q(is_complimentary=True) | Q(is_admin_granted_free=True)
+            ).count(),
+            "questions_in_bank": InterviewQuestion.objects.filter(is_active=True).count(),
+            "reports_generated": reports.count(),
+            "by_level": list(
+                campaigns.values("experience_level").annotate(count=Count("id")).order_by("-count")
+            ),
+            "by_round_type": list(
+                rounds.values("round_type").annotate(count=Count("id")).order_by("-count")
+            ),
+            "funnel": _interview_funnel_metrics(days),
+        })
+
+
+def _pass_rate(rounds):
+    done = rounds.filter(status__in=("passed", "failed"))
+    if not done.exists():
+        return 0
+    return round(100 * done.filter(status="passed").count() / done.count(), 1)
+
+
+class AdminInterviewSettingsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        return Response(settings_payload())
+
+    def put(self, request):
+        row = get_platform_settings()
+        for field in (
+            "enabled", "staff_free_by_default", "free_campaigns_per_month",
+            "sample_enabled", "sample_duration_minutes",
+            "av_grace_seconds", "schedule_window_hours", "default_pass_threshold",
+            "allow_admin_observer", "voice_engine",
+        ):
+            if field in request.data:
+                setattr(row, field, request.data[field])
+        row.save()
+        return Response(settings_payload())
+
+
+class AdminInterviewCampaignsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        status_filter = request.query_params.get("status")
+        qs = InterviewCampaign.objects.select_related("user", "primary_technology").order_by("-created_at")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        qs = qs[:300]
+        data = []
+        for c in qs:
+            active_round = c.rounds.filter(status="in_progress").first()
+            data.append({
+                "id": str(c.id),
+                "title": c.title,
+                "user": {"id": c.user_id, "email": c.user.email, "username": c.user.username},
+                "status": c.status,
+                "round_count": c.round_count,
+                "experience_level": c.experience_level,
+                "technology": c.primary_technology.name if c.primary_technology else "",
+                "overall_score": c.overall_score,
+                "created_at": c.created_at.isoformat(),
+                "active_round_id": str(active_round.id) if active_round else None,
+            })
+        return Response({"campaigns": data})
+
+
+class AdminInterviewQuestionsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        qs = InterviewQuestion.objects.all().order_by("-created_at")[:500]
+        return Response({"questions": InterviewQuestionSerializer(qs, many=True).data})
+
+    def post(self, request):
+        ser = InterviewQuestionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        q = ser.save()
+        return Response(InterviewQuestionSerializer(q).data, status=201)
+
+
+class AdminInterviewQuestionDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def put(self, request, pk):
+        q = InterviewQuestion.objects.get(pk=pk)
+        ser = InterviewQuestionSerializer(q, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        return Response(ser.data)
+
+    def delete(self, request, pk):
+        InterviewQuestion.objects.filter(pk=pk).delete()
+        return Response(status=204)
+
+
+class AdminInterviewTiersView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        tiers = InterviewPlanTier.objects.all()
+        return Response({"tiers": InterviewPlanTierSerializer(tiers, many=True).data})
+
+    def post(self, request):
+        ser = InterviewPlanTierSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        tier = InterviewPlanTier.objects.create(**ser.validated_data)
+        return Response(InterviewPlanTierSerializer(tier).data, status=201)
+
+
+class AdminInterviewTierDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def put(self, request, pk):
+        tier = InterviewPlanTier.objects.get(pk=pk)
+        for field in (
+            "name", "description", "price_inr", "interviews_per_month", "max_rounds",
+            "voice_enabled", "practical_enabled", "certificate_enabled", "is_active", "order",
+        ):
+            if field in request.data:
+                setattr(tier, field, request.data[field])
+        tier.save()
+        return Response(InterviewPlanTierSerializer(tier).data)
+
+
+class AdminInterviewEntitlementsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        qs = InterviewEntitlement.objects.select_related("user", "plan_tier").order_by("-updated_at")[:300]
+        rows = []
+        for e in qs:
+            rows.append({
+                "user_id": e.user_id,
+                "email": e.user.email,
+                "plan": e.plan_tier.code if e.plan_tier else None,
+                "interviews_remaining": e.interviews_remaining,
+                "is_active": e.is_active,
+                "is_complimentary": e.is_complimentary,
+                "is_admin_granted_free": e.is_admin_granted_free,
+                "period_end": e.period_end.isoformat() if e.period_end else None,
+            })
+        return Response({"entitlements": rows})
+
+    def post(self, request):
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        email = request.data.get("email", "").strip()
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        grant_free = bool(request.data.get("grant_free", False))
+        if grant_free:
+            ent, _ = InterviewEntitlement.objects.get_or_create(user=user)
+            premium = InterviewPlanTier.objects.filter(code="premium", is_active=True).first()
+            ent.plan_tier = premium
+            ent.is_active = True
+            ent.is_complimentary = True
+            ent.is_admin_granted_free = True
+            ent.interviews_remaining = int(request.data.get("interviews_remaining", 999))
+            ent.period_end = timezone.now() + timedelta(days=3650)
+            ent.save()
+            return Response({"ok": True, "user_id": user.id, "grant_free": True})
+
+        tier_code = request.data.get("plan_code", "pro")
+        tier = InterviewPlanTier.objects.filter(code=tier_code).first()
+        if not tier:
+            return Response({"error": "Plan not found"}, status=404)
+        activate_interview_plan(user, tier)
+        ent = InterviewEntitlement.objects.get(user=user)
+        ent.is_complimentary = bool(request.data.get("complimentary", False))
+        ent.save(update_fields=["is_complimentary"])
+        return Response({"ok": True, "user_id": user.id})
+
+
+class AdminInterviewVoicesView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        voices = InterviewVoiceOption.objects.all()
+        return Response({
+            "voices": [
+                {
+                    "id": v.id,
+                    "code": v.code,
+                    "label": v.label,
+                    "locale": v.locale,
+                    "gender": v.gender,
+                    "region": v.region,
+                    "browser_voice_hint": v.browser_voice_hint,
+                    "pitch": v.pitch,
+                    "rate": v.rate,
+                    "is_default": v.is_default,
+                    "is_active": v.is_active,
+                    "order": v.order,
+                }
+                for v in voices
+            ]
+        })
+
+    def post(self, request):
+        if request.data.get("is_default"):
+            InterviewVoiceOption.objects.update(is_default=False)
+        v = InterviewVoiceOption.objects.create(
+            code=request.data["code"],
+            label=request.data["label"],
+            locale=request.data.get("locale", "en-IN"),
+            gender=request.data.get("gender", "female"),
+            region=request.data.get("region", "india"),
+            browser_voice_hint=request.data.get("browser_voice_hint", ""),
+            pitch=float(request.data.get("pitch", 1.0)),
+            rate=float(request.data.get("rate", 0.95)),
+            is_default=bool(request.data.get("is_default", False)),
+            is_active=bool(request.data.get("is_active", True)),
+            order=int(request.data.get("order", 0)),
+        )
+        return Response({"id": v.id, "code": v.code}, status=201)
+
+
+class AdminInterviewVoiceDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def put(self, request, pk):
+        v = InterviewVoiceOption.objects.get(pk=pk)
+        if request.data.get("is_default"):
+            InterviewVoiceOption.objects.exclude(pk=pk).update(is_default=False)
+        for field in (
+            "label", "locale", "gender", "region", "browser_voice_hint",
+            "pitch", "rate", "is_default", "is_active", "order",
+        ):
+            if field in request.data:
+                setattr(v, field, request.data[field])
+        v.save()
+        return Response({"ok": True})
+
+    def delete(self, request, pk):
+        InterviewVoiceOption.objects.filter(pk=pk).delete()
+        return Response(status=204)

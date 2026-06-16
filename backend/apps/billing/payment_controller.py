@@ -337,6 +337,13 @@ class RazorpayWebhookView(APIView):
 
             event = json.loads(payload)
             event_type = event.get("event", "")
+            event_id = event.get("id") or event.get("event_id", "")
+
+            if event_id:
+                cache_key = f"razorpay_webhook:{event_id}"
+                if not cache.add(cache_key, True, timeout=60 * 60):
+                    logger.info("Duplicate Razorpay webhook ignored: %s", event_id)
+                    return Response({"status": "duplicate"})
 
             logger.info(f"Razorpay webhook: {event_type}")
 
@@ -438,6 +445,15 @@ class RazorpayWebhookView(APIView):
                 # Mark as processing to avoid races
                 tx.status = 'processing'
                 tx.save(update_fields=['status'])
+
+                # Validate amount before activation
+                if int(payment_data.get("amount", 0)) != int(tx.amount * 100):
+                    logger.error(
+                        "Webhook amount mismatch for order %s: expected %s got %s",
+                        order_id, tx.amount, payment_data.get("amount"),
+                    )
+                    tx.mark_failed("Webhook amount mismatch")
+                    return
 
                 tx.mark_success(gateway_payment_id=payment_id, gateway_response=payment_data)
                 service = PaymentService(

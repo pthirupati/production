@@ -47,9 +47,11 @@ export default function Terms() {
       content: (
         <ul className="space-y-2">
           {[
-            'Technology subscriptions grant access to specific technology content',
-            'Subscriptions are per-technology and pricing may vary',
-            'Free tier access is limited to demo scenarios',
+            'Technology subscriptions grant 1-year access to specific technology content',
+            'Interview Studio plans (Pro/Premium) include 10 attempts per year with 1-year validity',
+            'Payments are processed by Razorpay (INR) or Stripe (USD) — card, UPI, net banking, and wallet',
+            'Bank OTP, 3D Secure, and UPI authentication are handled entirely by the payment gateway',
+            'FixitLab never stores your card number, CVV, or UPI PIN — only payment confirmation IDs',
             'Refund requests must be made within 7 days of purchase',
             'We reserve the right to modify pricing with 30 days notice',
           ].map((item, i) => (
@@ -63,7 +65,30 @@ export default function Terms() {
     },
     {
       icon: AlertCircle,
-      title: '4. Content & Intellectual Property',
+      title: '4. AI Interview Studio',
+      color: 'from-indigo-500 to-purple-600',
+      content: (
+        <ul className="space-y-2">
+          {[
+            'Interview sessions require a working camera and microphone throughout the round',
+            'A 5-minute grace period applies if AV is disabled; the session may end automatically after that',
+            'You consent to transcript storage and AI scoring when you start an interview',
+            'Voice features use your browser — FixitLab does not provide human interviewers',
+            'Admin observers may join only with your explicit approval during a live session',
+            'Interview certificates (FIXIT-INT) are issued only after passing all campaign rounds',
+            'Complimentary or admin-granted free access may be revoked at our discretion',
+          ].map((item, i) => (
+            <li key={i} className="flex items-start gap-3 text-surface-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-2 shrink-0" />
+              <span className="leading-relaxed">{item}</span>
+            </li>
+          ))}
+        </ul>
+      ),
+    },
+    {
+      icon: AlertCircle,
+      title: '5. Content & Intellectual Property',
       color: 'from-purple-500 to-violet-600',
       content: (
         <p className="text-surface-300 leading-relaxed">
@@ -75,14 +100,31 @@ export default function Terms() {
     },
     {
       icon: UserX,
-      title: '5. Account Termination',
+      title: '6. Account Termination',
       color: 'from-red-500 to-rose-600',
       content: (
-        <p className="text-surface-300 leading-relaxed">
-          We reserve the right to suspend or terminate accounts that violate these terms, engage in
-          abusive behavior, or remain inactive for extended periods. Users may delete their own
-          accounts at any time through the profile settings.
-        </p>
+        <>
+          <p className="text-surface-300 leading-relaxed mb-3">
+            We reserve the right to suspend or terminate accounts that violate these terms or engage in
+            abusive behavior.
+          </p>
+          <ul className="space-y-2">
+            {[
+              'Accounts with no paid subscription may receive a warning email 14 days before removal',
+              'If you do not subscribe within 3 months of signup, your account and all personal data may be permanently deleted',
+              'Deleted data includes profile, lab history, interview transcripts, and payment metadata linked to your account',
+              'You may create a new account at any time after deletion',
+              'You can permanently delete your account anytime in Profile → Delete account',
+              'You can opt out of marketing emails via the unsubscribe link in emails or Profile → Notifications',
+              'Users with active subscriptions are never removed under this policy',
+            ].map((item, i) => (
+              <li key={i} className="flex items-start gap-3 text-surface-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 mt-2 shrink-0" />
+                <span className="leading-relaxed">{item}</span>
+              </li>
+            ))}
+          </ul>
+        </>
       ),
     },
   ]
@@ -105,7 +147,7 @@ export default function Terms() {
             <h1 className="text-5xl font-extrabold mb-4 bg-gradient-to-r from-white via-cyan-300 to-cyan-500 bg-clip-text text-transparent">
               Terms of Service
             </h1>
-            <p className="text-surface-400 text-lg">Last updated: March 31, 2026</p>
+            <p className="text-surface-400 text-lg">Last updated: June 5, 2026</p>
             <div className="w-20 h-1 bg-gradient-to-r from-accent-cyan to-accent-purple rounded-full mx-auto mt-6" />
           </div>
 
@@ -132,7 +174,7 @@ export default function Terms() {
 
             {/* Contact */}
             <section className="glass-card p-8 border-accent-cyan/20 bg-gradient-to-br from-accent-cyan/5 to-transparent animate-fade-in">
-              <h2 className="text-xl font-bold text-white mb-4">6. Contact</h2>
+              <h2 className="text-xl font-bold text-white mb-4">7. Contact</h2>
               <p className="text-surface-300 leading-relaxed">
                 Questions about these terms? Contact us at{' '}
                 <a href="mailto:fixitlab.admin@gmail.com" className="inline-flex items-center gap-1 text-accent-cyan hover:underline font-medium">

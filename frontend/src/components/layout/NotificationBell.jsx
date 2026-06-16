@@ -70,6 +70,22 @@ export default function NotificationBell() {
   const handleNotificationClick = (n) => {
     if (!n.read) markRead(n.id)
     const meta = n.metadata || {}
+    if (meta.category === 'interview' || meta.event) {
+      setOpen(false)
+      if (meta.certificate_id) {
+        navigate(`/verify-certificate?certificate_id=${encodeURIComponent(meta.certificate_id)}`)
+      } else if (meta.round_id) {
+        navigate(`/interviews/round/${meta.round_id}/report`)
+      } else {
+        navigate('/interviews')
+      }
+      return
+    }
+    if (meta.url) {
+      setOpen(false)
+      navigate(meta.url.startsWith('http') ? new URL(meta.url).pathname : meta.url)
+      return
+    }
     if (meta.needs_renewal && meta.technology_slug) {
       setOpen(false)
       navigate(`/payment?technology=${meta.technology_slug}&renew=1`)

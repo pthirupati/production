@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { SkeletonCard } from '../components/Skeleton'
 import toast from 'react-hot-toast'
+import { interviewsApi } from '../api/interviews'
 import { ACHIEVEMENT_META } from '../utils/constants'
 
 const techIcons = { Linux: Server, Docker: Monitor, Networking: Globe, 'Web Servers': Globe, Databases: Database, AWS: Cpu, Kubernetes: Cpu, Security: Shield }
@@ -17,15 +18,18 @@ export default function Achievements() {
   const [achievements, setAchievements] = useState([])
   const [eligibleTechs, setEligibleTechs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [downloading, setDownloading] = useState(null) // tech slug being downloaded
+  const [interviewCerts, setInterviewCerts] = useState([])
+  const [downloading, setDownloading] = useState(null)
 
   useEffect(() => {
     Promise.all([
       labApi.getAchievements().catch(() => []),
       labApi.getAchievementsCertificate().catch(() => ({ eligible_technologies: [] })),
-    ]).then(([achData, certData]) => {
+      interviewsApi.listCertificates().catch(() => ({ certificates: [] })),
+    ]).then(([achData, certData, intCerts]) => {
       setAchievements(achData)
       setEligibleTechs(certData.eligible_technologies || [])
+      setInterviewCerts(intCerts.certificates || [])
     }).finally(() => setLoading(false))
   }, [])
 
@@ -183,6 +187,52 @@ export default function Achievements() {
                 </div>
               )
             })}
+          </div>
+        )}
+      </div>
+
+      {/* Interview certificates */}
+      <div>
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Award size={18} className="text-indigo-400" /> Interview Certificates (FIXIT-INT)
+        </h2>
+        <p className="text-sm text-surface-400 mb-4">
+          Earned by clearing all rounds in an AI mock interview campaign. Verifiable and shareable on LinkedIn.
+        </p>
+        {interviewCerts.length === 0 ? (
+          <div className="glass-card p-6 text-center border border-dashed border-surface-700">
+            <p className="text-surface-400 text-sm">No interview certificates yet.</p>
+            <a href="/interviews" className="text-xs text-indigo-400 hover:underline mt-2 inline-block">Start a mock interview →</a>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-4">
+            {interviewCerts.map(cert => (
+              <div key={cert.certificate_id} className="glass-card p-5 border border-indigo-500/20">
+                <p className="text-sm font-bold text-white">{cert.technology_name}</p>
+                <p className="text-xs text-surface-500 font-mono mt-1">{cert.certificate_id}</p>
+                <p className="text-xs text-surface-400 mt-2">
+                  {cert.rounds_cleared} rounds · Score {Math.round(cert.overall_score)} · {new Date(cert.issued_at).toLocaleDateString()}
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <a
+                    href={`/verify-certificate?certificate_id=${encodeURIComponent(cert.certificate_id)}`}
+                    className="text-xs text-indigo-400 hover:underline inline-flex items-center gap-1"
+                  >
+                    <ExternalLink size={12} /> Verify
+                  </a>
+                  {cert.linkedin_share_text && (
+                    <a
+                      href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}${cert.verify_url}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-400 hover:underline"
+                    >
+                      LinkedIn
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

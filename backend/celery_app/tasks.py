@@ -466,5 +466,118 @@ def process_subscription_expiry():
     logger.info(
         f"Subscription expiry: deactivated={expired_count}, reminders_sent={reminder_count}"
     )
-    return {"expired": expired_count, "reminders_sent": reminder_count}
+    interview_reminders = _process_interview_renewal_reminders(now, warning_cutoff)
+    return {
+        "expired": expired_count,
+        "reminders_sent": reminder_count,
+        "interview_reminders_sent": interview_reminders,
+    }
+
+
+def _process_interview_renewal_reminders(now, warning_cutoff):
+    """Send renewal reminders for interview plans expiring within RENEWAL_WARNING_DAYS."""
+    from django.conf import settings
+    from django.db.models import Q
+    from apps.interviews.models import InterviewEntitlement
+    from apps.notifications.tasks import create_in_app_notification
+    from apps.notifications.email_helpers import queue_user_email
+
+    count = 0
+    qs = InterviewEntitlement.objects.filter(
+        is_active=True,
+        period_end__isnull=False,
+        period_end__gt=now,
+        period_end__lte=warning_cutoff,
+        is_complimentary=False,
+        is_admin_granted_free=False,
+        plan_tier__isnull=False,
+    ).filter(
+        Q(renewal_reminder_at__isnull=True) | Q(renewal_reminder_at__lt=now - timedelta(days=1))
+    ).select_related("user", "plan_tier")
+
+    for ent in qs.iterator(chunk_size=100):
+        if not ent.plan_tier or ent.plan_tier.code not in ("pro", "premium"):
+            continue
+        days_left = (ent.period_end - now).days
+        user = ent.user
+        plan_name = ent.plan_tier.name
+        renew_url = f"{settings.FRONTEND_URL}/interviews#interview-plans"
+        expiry_str = ent.period_end.strftime("%B %d, %Y")
+        try:
+            create_in_app_notification.delay(
+                user_id=user.id,
+                notification_type="system",
+                title=f"Renew {plan_name} — expires in {days_left} day(s)",
+                message=f"Your interview plan expires on {expiry_str}. Renew to keep your attempts.",
+                metadata={"needs_renewal": True, "url": renew_url},
+            )
+            queue_user_email(
+                user,
+                subject=f"FixitLab: Renew your {plan_name} interview plan",
+                template="emails/interview_renewal_reminder.html",
+                context={
+                    "username": user.get_full_name() or user.username,
+                    "plan_name": plan_name,
+                    "expiry_date": expiry_str,
+                    "days_remaining": days_left,
+                    "attempts_remaining": ent.interviews_remaining,
+                    "renew_url": renew_url,
+                    "subscriptions_url": f"{settings.FRONTEND_URL}/subscriptions",
+                },
+                email_type="subscription",
+            )
+            ent.renewal_reminder_at = now
+            ent.save(update_fields=["renewal_reminder_at"])
+            count += 1
+        except Exception as exc:
+            logger.warning("Interview renewal reminder failed ent=%s: %s", ent.id, exc)
+    return count
+
+
+@shared_task
+def deliver_jira_team_reply(
+    issue_key: str,
+    session_id: str,
+    author: str,
+    message: str,
+    actions: list | None = None,
+    scenario_slug: str = "",
+):
+    """Delayed Jira @team bot reply — applies simulation ops then posts comment."""
+    from apps.jira_integration.team_bots import deliver_team_reply_now
+
+    deliver_team_reply_now(
+        issue_key,
+        session_id,
+        author,
+        message,
+        actions or [],
+        scenario_slug,
+    )
+    logger.info("Jira team reply delivered issue=%s author=%s", issue_key, author)
+    return {"issue_key": issue_key, "author": author}
+
+
+@shared_task
+def process_inactive_accounts():
+    """Warn and delete accounts with no subscription after INACTIVE_ACCOUNT_MONTHS."""
+    from apps.accounts.account_lifecycle import run_account_lifecycle
+
+    result = run_account_lifecycle()
+    logger.info("Inactive account lifecycle: %s", result)
+    return result
+
+
+@shared_task
+def send_marketing_nurture_emails():
+    """
+    Daily job: nurture emails every MARKETING_NUDGE_INTERVAL_DAYS (default 5).
+    - Sample interview completed → interview subscribe benefits
+    - Logged-in users without tech subscription → technology benefits
+    """
+    from apps.notifications.marketing_service import run_marketing_nudges
+
+    result = run_marketing_nudges()
+    logger.info("Marketing nurture emails: %s", result)
+    return result
 

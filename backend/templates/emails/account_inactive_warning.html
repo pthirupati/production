@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>FixitLab Account Notice</title></head>
+<body style="margin:0;padding:0;background:#0a0e1a;font-family:Segoe UI,Roboto,Arial,sans-serif;">
+<table width="100%" style="background:#0a0e1a;padding:32px 16px;"><tr><td align="center">
+<table width="600" style="max-width:600px;background:#141b2d;border-radius:16px;border:1px solid #1e293b;">
+  <tr><td style="padding:32px 40px;">
+    <h1 style="color:#fff;font-size:22px;margin:0 0 16px;">Your account will be removed on {{ delete_date }}</h1>
+    <p style="color:#94a3b8;font-size:15px;line-height:1.6;">Hi {{ username }}, you signed up for FixitLab but have not subscribed to any technology or interview plan within {{ months }} months.</p>
+    <p style="color:#94a3b8;font-size:15px;line-height:1.6;">To keep your account, subscribe before <strong style="color:#e2e8f0;">{{ delete_date }}</strong>. Otherwise your profile, progress, and all personal data will be <strong style="color:#f87171;">permanently deleted</strong> from our database.</p>
+    <p style="text-align:center;margin:28px 0;">
+      <a href="{{ pricing_url }}" style="display:inline-block;background:#06b6d4;color:#0a0e1a;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;">Browse technology plans</a>
+      &nbsp;
+      <a href="{{ interviews_url }}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;">Interview plans</a>
+    </p>
+    <p style="color:#64748b;font-size:12px;">You may recreate an account anytime after deletion. See our Terms of Service for details.</p>
+    {% if unsubscribe_url %}
+    <p style="color:#64748b;font-size:11px;margin-top:20px;"><a href="{{ unsubscribe_url }}" style="color:#64748b;">Unsubscribe</a> from reminder emails</p>
+    {% endif %}
+  </td></tr>
+</table>
+</td></tr></table>
+</body>
+</html>

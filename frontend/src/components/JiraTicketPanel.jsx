@@ -119,7 +119,7 @@ export default function JiraTicketPanel({
             type="text"
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Ask the customer about impact, errors, timeline..."
+            placeholder="Comment on Jira — @backup team @database team @application team @storage team @network team…"
             className="input-field flex-1 text-xs py-1.5"
             disabled={commenting}
           />

@@ -279,3 +279,34 @@ class PendingOrgInvite(models.Model):
     def is_valid(self) -> bool:
         return self.accepted_at is None and timezone.now() < self.expires_at
 
+
+class AccountLifecycleEvent(models.Model):
+    """Tracks inactive-account warnings and deletions (audit survives user delete)."""
+
+    EVENT_CHOICES = [
+        ("inactive_warning", "Inactive account warning sent"),
+        ("deleted", "Account deleted (no subscription)"),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lifecycle_events",
+    )
+    email = models.EmailField(db_index=True)
+    event_type = models.CharField(max_length=32, choices=EVENT_CHOICES, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "event_type"]),
+            models.Index(fields=["email", "event_type"]),
+        ]
+
+    def __str__(self):
+        return f"{self.event_type} — {self.email}"
+

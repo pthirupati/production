@@ -162,6 +162,8 @@ def run_public_tests(s: Suite):
         ("GET", "/api/auth/social/config/", None, (200,)),
         ("GET", "/api/billing/gateway-status/", None, (200,)),
         ("GET", "/api/billing/currency-rate/", None, (200,)),
+        ("GET", "/api/interviews/plans/", None, (200,)),
+        ("GET", "/api/interviews/voice/config/", None, (200, 401)),
         ("GET", "/api/search/?q=linux", None, (200,)),
         ("GET", "/api/community/threads/", None, (200, 401)),  # may require auth
     ]
@@ -170,6 +172,10 @@ def run_public_tests(s: Suite):
         ok = status in ok_statuses
         err = err_msg(data)
         s.record(f"{method} {path}", ok, status, err)
+
+    status, cfg = api("GET", "/api/config/")
+    if status == 200:
+        s.record("Platform config interview_enabled", "interview_enabled" in cfg, status)
 
     status, cfg = api("GET", "/api/auth/social/config/")
     if status == 200 and cfg.get("github", {}).get("enabled"):
@@ -427,6 +433,9 @@ def run_admin_flow(s: Suite):
         "/api/admin/jira/tickets/",
         "/api/admin/config/",
         "/api/admin/audit-logs/",
+        "/api/admin/interviews/overview/",
+        "/api/admin/interviews/settings/",
+        "/api/admin/interviews/live/",
         "/api/billing/subscription-logs/",
     ]
     for path in admin_paths:
@@ -639,6 +648,11 @@ def main():
 
         run_contact(s)
         run_jira_webhook(s)
+        try:
+            from e2e_interviews import run_interview_e2e
+            run_interview_e2e(s)
+        except Exception as exc:
+            s.record("Interview Studio E2E", False, detail=str(exc)[:120])
         run_concurrent_users(s, 3)
         run_concurrent_login(s, 8)
         run_email_logs(s)

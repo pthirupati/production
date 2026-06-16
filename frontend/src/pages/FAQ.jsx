@@ -60,11 +60,40 @@ const FAQ_ITEMS = [
     ],
   },
   {
+    category: 'AI Interview Studio',
+    items: [
+      {
+        q: 'What is AI Interview Studio?',
+        a: 'A multi-round mock interview product on FixitLab. Upload your resume, pick 3–5 rounds (technical, manager, HR, etc.), and practice with voice Q&A in your browser.',
+      },
+      {
+        q: 'Do I need camera and microphone?',
+        a: 'Yes. Mic and camera must stay on during each round. You get a 5-minute grace period to re-enable them; after that the session may end automatically.',
+      },
+      {
+        q: 'How is Interview Studio priced?',
+        a: 'Separate monthly plans: Free mini (1 cycle), Pro (₹999), Premium (₹2,499). This is independent of per-technology lab subscriptions. See Pricing or /mock-interviews.',
+      },
+      {
+        q: 'How do interview certificates work?',
+        a: 'Pass all rounds in a campaign to earn a FIXIT-INT certificate. Verify any certificate at /verify-certificate — IDs start with FIXIT-INT.',
+      },
+      {
+        q: 'Can an admin join my interview?',
+        a: 'Only if you approve. Admins can request to observe a live session; you see a prompt in the interview room to approve or decline.',
+      },
+    ],
+  },
+  {
     category: 'Certificates',
     items: [
       {
-        q: 'How do I earn a certificate?',
+        q: 'How do I earn a technology certificate?',
         a: 'Complete ALL scenarios within a technology and you\'ll be able to download a certificate. You must be a paid subscriber of that technology.',
+      },
+      {
+        q: 'How do I earn an interview certificate?',
+        a: 'Complete all rounds in an Interview Studio campaign with passing scores. Premium plans include certificate issuance.',
       },
       {
         q: 'Are certificates shareable?',
@@ -81,7 +110,7 @@ const FAQ_ITEMS = [
       },
       {
         q: 'Can I delete my account?',
-        a: 'Yes, you can request account deletion by contacting our support team. All your data will be permanently removed within 30 days.',
+        a: 'Yes, you can request account deletion by contacting our support team. All your data — including lab history, interview transcripts, and uploaded resumes — will be permanently removed within 30 days.',
       },
     ],
   },

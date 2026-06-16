@@ -29,6 +29,7 @@ export default function PublicLayout({ children }) {
           </Link>
           <div className="flex items-center gap-4">
             <Link to="/about" className={`${navLinkClass(pathname === '/about')} hidden sm:block`}>About</Link>
+            <Link to="/mock-interviews" className={`${navLinkClass(pathname === '/mock-interviews')} hidden sm:block`}>Interviews</Link>
             <Link to="/pricing" className={`${navLinkClass(pathname === '/pricing')} hidden sm:block`}>Pricing</Link>
             <Link to="/blog" className={`${navLinkClass(onBlog)} hidden sm:block`}>Blog</Link>
             <Link to="/faq" className={`${navLinkClass(pathname === '/faq')} hidden sm:block`}>FAQ</Link>
@@ -55,6 +56,7 @@ export default function PublicLayout({ children }) {
           <div className="sm:hidden border-t border-surface-700/50 bg-surface-950/95 backdrop-blur-xl">
             <div className="px-4 py-4 space-y-2">
               <Link to="/about" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-surface-400 hover:text-white py-2">About</Link>
+              <Link to="/mock-interviews" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-surface-400 hover:text-white py-2">Interviews</Link>
               <Link to="/pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-surface-400 hover:text-white py-2">Pricing</Link>
               <Link to="/blog" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-surface-400 hover:text-white py-2">Blog</Link>
               <Link to="/faq" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-surface-400 hover:text-white py-2">FAQ</Link>
@@ -88,6 +90,7 @@ export default function PublicLayout({ children }) {
               <h3 className="font-semibold mb-3">Product</h3>
               <div className="space-y-2 text-sm text-surface-400">
                 <Link to="/pricing" className="block hover:text-surface-100">Pricing</Link>
+                <Link to="/mock-interviews" className="block hover:text-surface-100">Mock Interviews</Link>
                 <Link to="/scenarios" className="block hover:text-surface-100">Scenarios</Link>
                 <Link to="/technologies" className="block hover:text-surface-100">Technologies</Link>
               </div>

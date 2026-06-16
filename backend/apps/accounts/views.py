@@ -384,6 +384,7 @@ class UserProfileView(APIView):
             "phone_number": profile.phone_number if profile else None,
             "country": profile.country if profile else "",
             "is_staff": user.is_staff,
+            "has_usable_password": user.has_usable_password(),
             "date_joined": user.date_joined.isoformat(),
             "social_accounts": [
                 {
@@ -433,6 +434,74 @@ class UserProfileView(APIView):
             "last_name": user.last_name,
             "phone_number": profile.phone_number,
             "country": profile.country,
+        })
+
+
+class DeleteAccountView(APIView):
+    """Self-service permanent account deletion (GDPR)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        confirm = (request.data.get("confirm") or "").strip()
+        password = request.data.get("password") or ""
+
+        if confirm != "DELETE MY ACCOUNT":
+            return Response(
+                {"error": 'Type exactly "DELETE MY ACCOUNT" to confirm permanent deletion.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = request.user
+        if user.is_staff or user.is_superuser:
+            return Response(
+                {"error": "Staff accounts cannot be deleted via self-service. Contact an administrator."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if user.has_usable_password():
+            if not password:
+                return Response(
+                    {"error": "Password is required to delete your account."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not user.check_password(password):
+                return Response(
+                    {"error": "Incorrect password."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        from apps.accounts.models import AccountLifecycleEvent
+
+        user_id = user.id
+        email = user.email
+        username = user.username
+
+        AccountLifecycleEvent.objects.create(
+            user=None,
+            email=email,
+            event_type="deleted",
+            metadata={
+                "user_id": user_id,
+                "username": username,
+                "reason": "self_service",
+            },
+        )
+
+        try:
+            refresh = request.data.get("refresh")
+            if refresh:
+                from rest_framework_simplejwt.tokens import RefreshToken
+                token = RefreshToken(refresh)
+                token.blacklist()
+        except Exception:
+            pass
+
+        user.delete()
+        logger.info("Self-service account deletion: user_id=%s email=%s", user_id, email)
+
+        return Response({
+            "message": "Your account and all associated data have been permanently deleted.",
         })
 
 

@@ -99,7 +99,23 @@ def public_config_payload() -> dict:
         "changelog": row.changelog or [],
         "platform_stats": _platform_stats(),
         "image_upload_specs": image_specs_for_api(),
+        **_interview_public_config(),
     }
+
+
+def _interview_public_config() -> dict:
+    try:
+        from apps.interviews.services.interview_settings import get_platform_settings
+        row = get_platform_settings()
+        return {
+            "interview_enabled": row.enabled,
+            "interview_voice_engine": row.voice_engine or "browser",
+        }
+    except Exception:
+        return {
+            "interview_enabled": getattr(settings, "INTERVIEW_ENABLED", True),
+            "interview_voice_engine": getattr(settings, "INTERVIEW_VOICE_ENGINE", "browser"),
+        }
 
 
 def _platform_stats() -> dict:

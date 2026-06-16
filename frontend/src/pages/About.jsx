@@ -78,7 +78,19 @@ const platformFeatures = [
   },
   {
     icon: Brain,
-    title: 'AI Interview Coaching',
+    title: 'AI Interview Studio',
+    color: 'indigo',
+    desc: 'Full mock interview cycles — voice Q&A, resume-aware questions, 3–5 rounds, and FIXIT-INT certificates.',
+    bullets: [
+      'Technical, manager, HR, deep-dive, and leadership panels',
+      'Camera/mic required with adaptive scoring and post-round reports',
+      'Monthly Pro/Premium plans separate from lab subscriptions',
+      'Public certificate verification at /verify-certificate',
+    ],
+  },
+  {
+    icon: Brain,
+    title: 'Scenario Interview Coaching',
     color: 'purple',
     desc: 'Interview-mode scenarios disable spoiler hints and offer AI coaching that nudges you toward the right area without giving away the answer.',
     bullets: [
@@ -118,7 +130,7 @@ const platformFeatures = [
     bullets: [
       'Email invites, pending invites, and member removal',
       'Per-member analytics — scenarios attempted, completion rate, time in labs',
-      'Org plans, coupons, and Razorpay checkout on the Pricing page',
+      'Org plans, coupons, and secure checkout on the Pricing page',
     ],
   },
   {
@@ -147,7 +159,7 @@ const platformFeatures = [
 
 const whoItsFor = [
   { icon: GraduationCap, title: 'Students & career switchers', desc: 'Build muscle memory on real shells instead of only watching videos.' },
-  { icon: Target, title: 'Interview candidates', desc: 'Timed Fix / Build / Hack scenarios plus Jira tickets simulate on-call and hiring loops.' },
+  { icon: Target, title: 'Interview candidates', desc: 'Mock Interview Studio for voice panels, plus timed Fix / Build / Hack labs and Jira tickets for on-call prep.' },
   { icon: Server, title: 'DevOps & SRE teams', desc: 'Run team drills on broken Nginx, DNS, K8s, or cloud misconfigs in minutes.' },
   { icon: Layers, title: 'Hiring managers', desc: 'Assign scenarios, review completion data, and optionally sync incidents to Jira.' },
 ]
@@ -166,6 +178,7 @@ export default function About() {
           </Link>
           <div className="hidden md:flex items-center gap-6">
             <Link to="/scenarios" className="text-sm text-surface-400 hover:text-white transition-colors">Scenarios</Link>
+            <Link to="/mock-interviews" className="text-sm text-surface-400 hover:text-white transition-colors">Interviews</Link>
             <Link to="/pricing" className="text-sm text-surface-400 hover:text-white transition-colors">Pricing</Link>
             <Link to="/blog" className="text-sm text-surface-400 hover:text-white transition-colors">Blog</Link>
             <Link to="/about" className="text-sm text-white font-medium">About</Link>
@@ -374,29 +387,25 @@ export default function About() {
         </div>
       </section>
 
-      {/* Tech Stack */}
+      {/* Why FixitLab — no internal stack disclosure */}
       <section className="bg-surface-900/30 border-y border-surface-800/50">
         <div className="max-w-5xl mx-auto px-6 py-20">
-          <h2 className="text-3xl font-bold text-white text-center mb-3">Built With</h2>
-          <p className="text-surface-400 text-center mb-12">Production-grade stack trusted by enterprise teams.</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <h2 className="text-3xl font-bold text-white text-center mb-3">Why engineers choose FixitLab</h2>
+          <p className="text-surface-400 text-center mb-12 max-w-2xl mx-auto">
+            Real environments, structured learning paths, and outcomes you can prove — built for practitioners, not slide decks.
+          </p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { name: 'React 18', cat: 'Frontend' },
-              { name: 'Django 5', cat: 'Backend' },
-              { name: 'PostgreSQL', cat: 'Database' },
-              { name: 'Redis', cat: 'Cache' },
-              { name: 'Docker', cat: 'Containers' },
-              { name: 'Kubernetes', cat: 'Orchestration' },
-              { name: 'Terraform', cat: 'IaC' },
-              { name: 'AWS EC2', cat: 'Cloud' },
-              { name: 'DigitalOcean', cat: 'Cloud' },
-              { name: 'Celery', cat: 'Task Queue' },
-              { name: 'RabbitMQ', cat: 'Broker' },
-              { name: 'Nginx', cat: 'Gateway' },
-            ].map(({ name, cat }) => (
-              <div key={name} className="glass-card p-3 text-center hover:border-accent-cyan/30 transition-colors">
-                <p className="text-sm font-medium text-white">{name}</p>
-                <p className="text-[10px] text-surface-500">{cat}</p>
+              { title: 'Hands-on labs', desc: 'Break-fix scenarios in isolated environments — the same muscle memory you need on the job.' },
+              { title: 'Verifiable progress', desc: 'Certificates, leaderboards, and interview reports you can share with hiring managers.' },
+              { title: 'Always improving', desc: 'New scenarios and interview panels added regularly from real production incidents.' },
+              { title: 'Fair pricing', desc: 'Per-technology yearly access and interview plans with clear attempt limits — no surprise renewals.' },
+              { title: 'Privacy first', desc: 'You control resume and transcript data. Export or delete from your profile anytime.' },
+              { title: 'Community support', desc: 'Discuss scenarios, share fixes, and learn from peers who have been in the same outage.' },
+            ].map(({ title, desc }) => (
+              <div key={title} className="glass-card p-5 hover:border-accent-cyan/30 transition-colors">
+                <h3 className="text-sm font-semibold text-white mb-2">{title}</h3>
+                <p className="text-xs text-surface-400 leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>

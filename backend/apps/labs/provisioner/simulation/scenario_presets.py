@@ -156,23 +156,44 @@ def _preset_firewalld_blocked(state: RHELOSState) -> None:
 
 def _preset_patching(state: RHELOSState) -> None:
     from .boot_sequence import OLD_KERNEL
+    from .ops_state import init_patching_ops
+
     state.kernel = OLD_KERNEL
     state.patching_done = False
     state.precheck_ran = False
     state.postcheck_ran = False
     state.rebooted_after_patch = False
+    init_patching_ops(state)
+    if "mysqld" not in state.services:
+        from .rhel_os import SimService
+        state.services["mysqld"] = SimService("mysqld", "active", "enabled", "MySQL Server")
+    if "nginx" not in state.services:
+        from .rhel_os import SimService
+        state.services["nginx"] = SimService("nginx", "active", "enabled", "nginx web server")
     state._write_file(
         "/opt/fixitlab/PRECHECK_BASELINE",
         f"kernel={OLD_KERNEL}\npatching_done=False\nrebooted=False\n",
     )
     state._write_file(
         "/opt/fixitlab/precheck.sh",
-        "#!/bin/bash\n# Records pre-patch baseline\necho kernel=$(uname -r)\n",
+        "#!/bin/bash\n# Records pre-patch baseline — requires Jira change window\necho kernel=$(uname -r)\n",
     )
     state._write_file(
         "/opt/fixitlab/postcheck.sh",
         "#!/bin/bash\n# Verifies post-patch state matches baseline\nuname -r\n",
     )
+
+
+def _preset_lvm_extend(state: RHELOSState) -> None:
+    from .ops_state import init_lvm_storage_ops
+
+    init_lvm_storage_ops(state)
+
+
+def _preset_network_nic(state: RHELOSState) -> None:
+    from .ops_state import init_network_ops
+
+    init_network_ops(state, "10.0.0.20/24")
 
 
 _PRESETS: dict[str, callable] = {
@@ -196,6 +217,11 @@ _PRESETS: dict[str, callable] = {
     "sim-postgres-refused": _preset_postgres_down,
     "sim-html-nginx-root": _preset_wrong_nginx_root,
     "sim-rhel-firewalld-port": _preset_firewalld_blocked,
+    "sim-rhel-firewalld-dual": _preset_firewalld_blocked,
+    "sim-rhel-mysql-dual": _preset_mysql_down,
     "sim-rhel-patching": _preset_patching,
     "rhel-patching": _preset_patching,
+    "sim-rhel-lvm-extend": _preset_lvm_extend,
+    "lvm-extend": _preset_lvm_extend,
+    "sim-rhel-network-nic": _preset_network_nic,
 }

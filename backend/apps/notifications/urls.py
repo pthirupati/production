@@ -4,6 +4,7 @@ from .views import (
     NotificationMarkReadView,
     NotificationDismissView,
     NotificationPreferenceView,
+    MarketingUnsubscribeView,
 )
 
 urlpatterns = [
@@ -12,4 +13,5 @@ urlpatterns = [
     path("<int:pk>/read/", NotificationMarkReadView.as_view(), name="mark-read"),
     path("<int:pk>/", NotificationDismissView.as_view(), name="dismiss-notification"),
     path("preferences/", NotificationPreferenceView.as_view(), name="notification-preferences"),
+    path("unsubscribe/", MarketingUnsubscribeView.as_view(), name="marketing-unsubscribe"),
 ]

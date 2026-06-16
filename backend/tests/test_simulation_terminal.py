@@ -51,6 +51,9 @@ class BootSequenceTests(SimpleTestCase):
     def test_patching_full_workflow(self):
         engine = UnifiedSimulationEngine(scenario_slug="sim-rhel-patching", simulation_type="rhel")
         shell = engine.shell
+        shell.state.ops_backup_taken = True
+        shell.state.ops_db_stopped = True
+        shell.state.ops_app_stopped = True
         out = shell.run("bash /opt/fixitlab/precheck.sh")
         self.assertIn("Precheck", out)
         self.assertTrue(shell.state.precheck_ran)
@@ -58,6 +61,8 @@ class BootSequenceTests(SimpleTestCase):
         self.assertTrue(shell.state.patching_done)
         reboot_out = engine._reboot_from_shell()
         self.assertTrue(shell.state.rebooted_after_patch)
+        shell.run("mount -a")
+        shell.state.ops_services_restarted = True
         engine._handle_boot("")
         engine._handle_boot("root")
         engine._handle_boot("redhat")

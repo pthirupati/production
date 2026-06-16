@@ -85,6 +85,18 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
         "rebooted_after_patch": st.rebooted_after_patch,
         "emergency_mode": st.emergency_mode,
         "fstab_valid": st.fstab_valid,
+        "ops_backup_taken": st.ops_backup_taken,
+        "ops_db_stopped": st.ops_db_stopped,
+        "ops_app_stopped": st.ops_app_stopped,
+        "ops_db_started": st.ops_db_started,
+        "ops_app_started": st.ops_app_started,
+        "ops_services_restarted": st.ops_services_restarted,
+        "mount_issue_after_reboot": st.mount_issue_after_reboot,
+        "mount_filesystems_fixed": st.mount_filesystems_fixed,
+        "pending_storage_device": st.pending_storage_device,
+        "storage_disk_provisioned": st.storage_disk_provisioned,
+        "pending_nic_config": st.pending_nic_config,
+        "network_nic_provisioned": st.network_nic_provisioned,
         "network_ifs": st.network_ifs,
         "lvm": {
             "pvs": {k: asdict(v) for k, v in lvm.pvs.items()},
@@ -139,6 +151,18 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
     st.rebooted_after_patch = data.get("rebooted_after_patch", False)
     st.emergency_mode = data.get("emergency_mode", False)
     st.fstab_valid = data.get("fstab_valid", True)
+    st.ops_backup_taken = data.get("ops_backup_taken", False)
+    st.ops_db_stopped = data.get("ops_db_stopped", False)
+    st.ops_app_stopped = data.get("ops_app_stopped", False)
+    st.ops_db_started = data.get("ops_db_started", True)
+    st.ops_app_started = data.get("ops_app_started", True)
+    st.ops_services_restarted = data.get("ops_services_restarted", False)
+    st.mount_issue_after_reboot = data.get("mount_issue_after_reboot", False)
+    st.mount_filesystems_fixed = data.get("mount_filesystems_fixed", False)
+    st.pending_storage_device = data.get("pending_storage_device", "/dev/sdb")
+    st.storage_disk_provisioned = data.get("storage_disk_provisioned", True)
+    st.pending_nic_config = data.get("pending_nic_config", "10.0.0.20/24")
+    st.network_nic_provisioned = data.get("network_nic_provisioned", True)
     st.network_ifs = data.get("network_ifs", st.network_ifs)
     st._scenario_preset_applied = True
 

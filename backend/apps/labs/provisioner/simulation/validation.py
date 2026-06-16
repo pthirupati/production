@@ -347,10 +347,23 @@ def _run_line_check(
         return True
 
     if "lvextend" in stripped or ("pvs" in stripped and "sdb" in stripped):
+        slug = (state.scenario_slug or "").lower()
+        if "lvm" in slug and not getattr(state, "storage_disk_provisioned", True):
+            failures.append("new disk not attached — request @storage team in Jira")
+            return True
         pv = state.lvm.pvs.get("/dev/sdb")
         if pv and not pv.vg:
             failures.append("PV /dev/sdb not in volume group")
         return True
+
+    if "ip addr" in stripped or "10.0.0.20" in stripped:
+        slug = (state.scenario_slug or "").lower()
+        if "network-nic" in slug or "network-nic" in slug:
+            if not getattr(state, "network_nic_provisioned", True):
+                failures.append("secondary IP not provisioned — request @network team in Jira")
+            elif "10.0.0.20" not in state.format_ip_addr():
+                failures.append("secondary IP 10.0.0.20 not visible on eth0")
+            return True
 
     if "dracut" in stripped:
         boot = getattr(engine, "boot", None) if engine else None

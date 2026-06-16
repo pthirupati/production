@@ -55,6 +55,15 @@ export const authApi = {
     return data
   },
 
+  async deleteAccount({ password, confirm, refresh }) {
+    const { data } = await api.post('/auth/account/delete/', {
+      password: password || '',
+      confirm,
+      refresh: refresh || null,
+    })
+    return data
+  },
+
   async changePassword(oldPassword, newPassword) {
     const { data } = await api.post('/auth/change-password/', {
       old_password: oldPassword,
