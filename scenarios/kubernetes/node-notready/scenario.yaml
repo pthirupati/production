@@ -1,0 +1,35 @@
+title: Node in NotReady State
+slug: k8s-node-notready
+difficulty: hard
+category: Kubernetes
+description: 'A worker node has transitioned to NotReady and all pods scheduled on
+  it are evicted. The kubelet service on the node has stopped, preventing it from
+  sending heartbeats to the control plane. You must SSH to the node, diagnose the
+  kubelet failure, and restore the node to Ready state.
+
+  '
+initial_state: 'Simulated Kubernetes cluster. Node "worker-1" is in NotReady state.
+  Multiple pods have been evicted and workloads are degraded.
+
+  '
+objectives:
+  - Identify which node is NotReady and investigate why the kubelet stopped
+  - Restart the kubelet service and resolve any configuration errors
+  - Confirm the node returns to Ready state and pods are rescheduled
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: kubectl describe node worker-1 and look at the Conditions section
+      for the failure reason.'
+    cost: 10
+    order: 1
+  - content: 'On the node: sudo systemctl status kubelet and sudo journalctl -u kubelet
+      -n 50 to see the error.'
+    cost: 20
+    order: 2
+requires_companion_hosts: true
+dual_terminal: true
+jira_priority: High

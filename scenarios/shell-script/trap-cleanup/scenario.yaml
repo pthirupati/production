@@ -1,0 +1,35 @@
+title: Script Leaves Temp Files on Exit
+slug: shell-trap-cleanup
+difficulty: medium
+category: Shell Scripting
+description: 'A data-processing script creates temporary files in /tmp during execution
+  but fails to clean them up when it exits — especially when killed with SIGINT or
+  SIGTERM. Over time, gigabytes of temp data accumulate. The script must be refactored
+  to use a trap handler that cleans up on all exit paths including signals.
+
+  '
+initial_state: 'Simulated RHEL 9 server. /tmp is filling with files named proc_*.tmp
+  left behind by process.sh. Killing the script mid-run always leaves orphaned files.
+
+  '
+objectives:
+  - Identify the missing trap statement in the script
+  - Add a cleanup function and trap it on EXIT, INT, and TERM signals
+  - Confirm that temp files are removed whether the script exits normally or is killed
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Add a cleanup function and register it: trap cleanup EXIT INT TERM to
+      ensure it runs on all exit paths.'
+    cost: 10
+    order: 1
+  - content: 'Store temp file paths in a variable at creation time so the cleanup
+      function knows exactly what to remove.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

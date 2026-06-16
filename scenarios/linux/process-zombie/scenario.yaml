@@ -1,0 +1,34 @@
+title: Zombie Processes Accumulating
+slug: linux-process-zombie
+difficulty: medium
+category: Linux Administration
+description: 'The system is accumulating zombie (defunct) processes and the process
+  table is nearly full. A poorly written parent process is not calling wait() to
+  reap its children, leaving them in the zombie state. You must identify the parent,
+  fix or restart it, and clear the zombie entries.
+
+  '
+initial_state: 'Simulated RHEL 9 server. Several hundred zombie processes are visible
+  in ps output. New processes cannot be forked on the system.
+
+  '
+objectives:
+  - Use ps to identify zombie processes and trace them to their parent process
+  - Determine why the parent is not reaping children (crashed, stuck, or buggy)
+  - Kill or restart the parent process to clear the zombie entries
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: ps aux | grep Z to list zombie processes and note the PPID column.'
+    cost: 10
+    order: 1
+  - content: 'Send SIGCHLD to the parent: kill -SIGCHLD <ppid> or kill the parent
+      if it is unresponsive.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

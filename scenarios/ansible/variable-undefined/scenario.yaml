@@ -1,0 +1,35 @@
+title: Variable Not Defined Error
+slug: ansible-variable-undefined
+difficulty: medium
+category: Ansible Automation
+description: 'A playbook fails mid-run with "AnsibleUndefinedVariable: ''app_port''
+  is undefined". The variable is declared in group_vars but is misspelled in the task
+  and missing from host_vars for one host. You must locate all usages, fix the variable
+  name, and add the missing host override before the playbook will complete.
+
+  '
+initial_state: 'Simulated control node. Playbook deploy.yml fails on the "Configure
+  nginx" task with an undefined variable error. Other tasks have already run.
+
+  '
+objectives:
+  - Read the error to identify the exact variable name and task that failed
+  - Fix the variable reference in the task and add the missing host_vars entry
+  - Run the playbook again and confirm it completes without variable errors
+lab_mode: simulation
+simulation_type: ansible
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Use the -e flag to override variables at runtime: ansible-playbook deploy.yml
+      -e "app_port=8080" as a quick test.'
+    cost: 10
+    order: 1
+  - content: 'Check group_vars/all.yml and host_vars/ for the correct variable name
+      and ensure it is spelled consistently.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

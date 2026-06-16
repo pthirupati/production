@@ -1,0 +1,35 @@
+title: SSH Connection Refused
+slug: linux-ssh-refused
+difficulty: easy
+category: Linux Administration
+description: 'SSH connections to the server are being refused. The sshd service has
+  stopped, the firewall is blocking port 22, and the sshd configuration file has a
+  syntax error introduced by a recent change. All three issues must be diagnosed and
+  resolved in the correct order to restore remote access.
+
+  '
+initial_state: 'Simulated RHEL 9 server. Attempts to SSH to the host return "Connection
+  refused". Console access is available to diagnose the issue.
+
+  '
+objectives:
+  - Check sshd service status and firewall rules to identify what is blocking SSH
+  - Fix the sshd_config syntax error and restart the sshd service
+  - Open the firewall port and confirm SSH connections succeed
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: systemctl status sshd and firewall-cmd --list-ports to check service
+      and firewall state.'
+    cost: 10
+    order: 1
+  - content: 'Validate config: sshd -t will report any syntax errors in sshd_config
+      before you restart.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

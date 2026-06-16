@@ -17,7 +17,6 @@ import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
 import { ACHIEVEMENT_META } from '../utils/constants'
 import ActivityHeatmap from '../components/ActivityHeatmap'
 import OnboardingTour from '../components/OnboardingTour'
-import StickyPageToolbar from '../components/StickyPageToolbar'
 
 export default function Dashboard() {
   const { user } = useAuthStore()
@@ -116,7 +115,6 @@ export default function Dashboard() {
       <OnboardingTour />
 
       {/* ═══ HERO HEADER ═══ */}
-      <StickyPageToolbar>
       <div className="relative overflow-hidden glass-card p-6 sm:p-8 gradient-border animate-slide-up">
         <div className="absolute inset-0 bg-gradient-to-r from-accent-cyan/10 via-transparent to-accent-purple/10" />
         <div className="absolute inset-0 bg-grid-pattern opacity-20" />
@@ -148,7 +146,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      </StickyPageToolbar>
 
       {interviewEntitlement?.platform_enabled !== false && (
         <Link

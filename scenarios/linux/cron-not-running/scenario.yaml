@@ -1,0 +1,34 @@
+title: Cron Jobs Not Executing
+slug: linux-cron-not-running
+difficulty: easy
+category: Linux Administration
+description: 'Scheduled cron jobs are silently not running. The crond service is active
+  but jobs are skipped. The issue stems from a missing PATH in the crontab, a permission
+  error on the script, and the cron access control file blocking the user. All three
+  issues must be resolved for jobs to execute correctly.
+
+  '
+initial_state: 'Simulated RHEL 9 server. A cron job scheduled to run every minute
+  has not produced any output or logs for the past hour. Crond reports as active.
+
+  '
+objectives:
+  - Check cron logs and identify why jobs are not executing
+  - Fix the PATH, script permissions, and cron access control issues
+  - Confirm the job runs on the next scheduled minute
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check cron logs: grep CRON /var/log/syslog or journalctl -u crond'
+    cost: 10
+    order: 1
+  - content: 'Check /etc/cron.allow and /etc/cron.deny — if cron.allow exists, only
+      listed users may run cron jobs.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Low

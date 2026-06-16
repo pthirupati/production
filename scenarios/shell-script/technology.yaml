@@ -1,6 +1,8 @@
-description: "Shell Scripting simulation labs \u2014 \u20B9499 subscription"
-icon: terminal
 name: Shell Scripting
+icon: terminal
+color: teal
+description: Bash and shell scripting for automation and system administration
 order: 18
+is_active: true
 price: 499
 slug: shell-script

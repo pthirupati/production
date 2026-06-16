@@ -1,0 +1,35 @@
+title: Disk Shows Full But df -h Shows Space
+slug: linux-disk-full-inode
+difficulty: medium
+category: Linux Administration
+description: 'The system reports "No space left on device" errors even though df -h
+  shows the filesystem is only 40% full. The root cause is inode exhaustion — the
+  filesystem has run out of inodes due to millions of tiny temporary files created
+  by a runaway process, even though block space remains available.
+
+  '
+initial_state: 'Simulated RHEL 9 server. Application writes are failing with "No
+  space left on device". df -h shows 40% usage but new files cannot be created on
+  /var.
+
+  '
+objectives:
+  - Use df -i to discover that inodes are exhausted on the filesystem
+  - Identify the directory with millions of small files consuming all inodes
+  - Remove the excess files and confirm inode space is recovered
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: true
+hints:
+  - content: 'Run: df -i to check inode usage across filesystems. Look for 100% iuse.'
+    cost: 10
+    order: 1
+  - content: 'Find the directory: for i in /*; do echo $i; find $i -xdev | wc -l;
+      done | sort -k2 -rn | head'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

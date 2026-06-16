@@ -1,0 +1,6 @@
+name: Linux Administration
+icon: terminal
+color: cyan
+description: Master Linux system administration, troubleshooting, and performance tuning
+order: 5
+is_active: true

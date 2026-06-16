@@ -1,0 +1,34 @@
+title: Deployment ImagePullBackOff
+slug: k8s-deployment-imagepull
+difficulty: easy
+category: Kubernetes
+description: 'A Deployment is stuck with pods in ImagePullBackOff state. The container
+  image tag does not exist in the registry, preventing the deployment from rolling
+  out. Identify the bad image reference and correct it.
+
+  '
+initial_state: 'Simulated Kubernetes cluster. A Deployment named "api-server" has
+  pods stuck in ImagePullBackOff. No application traffic is being served.
+
+  '
+objectives:
+  - Use kubectl to inspect the Deployment and identify the failing image reference
+  - Patch the Deployment to use the correct image tag
+  - Confirm all pods reach Running state and the rollout completes
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 900
+max_score: 100
+is_free: true
+hints:
+  - content: 'Run: kubectl describe pod <pod-name> and look at the Events section for
+      the exact image pull error.'
+    cost: 10
+    order: 1
+  - content: 'Use: kubectl set image deployment/api-server api-server=myrepo/api-server:v1.2
+      to update the image tag.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

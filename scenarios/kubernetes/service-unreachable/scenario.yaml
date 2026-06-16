@@ -1,0 +1,34 @@
+title: Service Cannot Reach Pod
+slug: k8s-service-unreachable
+difficulty: medium
+category: Kubernetes
+description: 'A Kubernetes Service is not routing traffic to its backing pods. Curl
+  requests to the Service ClusterIP return connection refused. The pod selector label
+  in the Service spec does not match the labels on the pods, causing the Endpoints
+  object to remain empty.
+
+  '
+initial_state: 'Simulated Kubernetes cluster. A Service named "frontend-svc" exists
+  but has no Endpoints. Pods are Running but receive no traffic.
+
+  '
+objectives:
+  - Inspect the Service and the target pods to find the label mismatch
+  - Patch the Service selector to correctly match the pod labels
+  - Verify the Endpoints object is populated and traffic routes successfully
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Compare: kubectl get svc frontend-svc -o yaml vs kubectl get pods --show-labels'
+    cost: 10
+    order: 1
+  - content: 'Use: kubectl patch svc frontend-svc -p ''{"spec":{"selector":{"app":"frontend"}}}''
+      to fix the selector.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

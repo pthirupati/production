@@ -109,50 +109,63 @@ export default function Scenarios() {
   const activeCount = totalCount
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
-      <StickyPageToolbar>
-      {/* Header */}
-      <div className="relative overflow-hidden glass-card p-6 sm:p-8">
-        <div className="absolute inset-0 bg-gradient-to-r from-accent-purple/8 via-transparent to-accent-cyan/8" />
-        <div className="absolute inset-0 bg-dots-pattern opacity-20" />
+    <div className="max-w-6xl mx-auto space-y-4 animate-fade-in">
+      {/* Header — scrolls with page */}
+      <div className="relative overflow-hidden glass-card p-5 sm:p-6 gradient-border">
+        <div className="absolute inset-0 bg-gradient-to-r from-accent-purple/8 via-transparent to-accent-cyan/8 pointer-events-none" />
         <div className="relative flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Scenarios</h1>
-          <p className="text-surface-400 mt-1 text-sm">
-            {activeCount} challenge{activeCount !== 1 && 's'} available
-          </p>
-        </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all shrink-0 ${
-            showFilters || hasFilters
-              ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20'
-              : 'bg-surface-800 text-surface-400 hover:text-white'
-          }`}
-        >
-          <Filter size={14} />
-          Filters
-          {hasFilters && <span className="w-2 h-2 rounded-full bg-accent-cyan" />}
-        </button>
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Scenarios</h1>
+            <p className="text-surface-400 mt-0.5 text-sm">
+              {activeCount} challenge{activeCount !== 1 && 's'} available
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {hasFilters && (
+              <button onClick={clearFilters} className="text-xs text-surface-500 hover:text-accent-red transition-colors px-2 py-1">
+                Clear
+              </button>
+            )}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+                showFilters || hasFilters
+                  ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20'
+                  : 'bg-surface-800 text-surface-400 hover:text-white border border-transparent'
+              }`}
+            >
+              <Filter size={14} />
+              Filters
+              {hasFilters && <span className="w-1.5 h-1.5 rounded-full bg-accent-cyan" />}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Search bar — stays visible while scrolling */}
-      <div className="relative">
-        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-500" />
-        <input
-          type="text"
-          placeholder="Search scenarios by name, tag, or description..."
-          value={filters.search}
-          onChange={(e) => setFilter('search', e.target.value)}
-          className="input-field pl-12 py-3 text-base"
-        />
-        {filters.search && (
-          <button onClick={() => setFilter('search', '')} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 hover:text-white">
-            <X size={16} />
-          </button>
-        )}
-      </div>
+      {/* Sticky search bar — only this sticks on scroll */}
+      <StickyPageToolbar>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500" />
+            <input
+              type="text"
+              placeholder="Search scenarios..."
+              value={filters.search}
+              onChange={(e) => setFilter('search', e.target.value)}
+              className="input-field pl-10 py-2.5 text-sm w-full"
+            />
+            {filters.search && (
+              <button onClick={() => setFilter('search', '')} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 hover:text-white">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {hasFilters && (
+            <span className="text-xs text-accent-cyan bg-accent-cyan/10 border border-accent-cyan/20 px-2 py-1 rounded-lg whitespace-nowrap">
+              {[filters.technology && 'Tech', filters.difficulty, filters.type, filters.tag && 'Tag'].filter(Boolean).join(' · ')}
+            </span>
+          )}
+        </div>
       </StickyPageToolbar>
 
       {/* Filter panel */}

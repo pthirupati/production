@@ -1,0 +1,37 @@
+title: Handler Not Triggered After Task
+slug: ansible-handler-not-notified
+difficulty: hard
+category: Ansible Automation
+description: 'A playbook deploys a new nginx configuration file but the nginx service
+  is never reloaded — the handler is defined but never triggered. The notify directive
+  is misspelled (case mismatch), the handler name has a leading space, and the task
+  is marked changed_when: false, preventing the notification. All three issues must
+  be fixed.
+
+  '
+initial_state: 'Simulated control node. Playbook deploys nginx.conf but after the
+  run the old configuration is still active. No "RUNNING HANDLER" line appears in
+  the output.
+
+  '
+objectives:
+  - Inspect the playbook to find why the handler is not being notified
+  - Fix the notify name, handler name formatting, and changed_when setting
+  - Verify the handler runs (nginx reloads) on the next playbook execution
+lab_mode: simulation
+simulation_type: ansible
+time_limit: 1200
+max_score: 100
+is_free: false
+hints:
+  - content: 'Ansible handler names are case-sensitive and must match the notify string
+      exactly, including spaces.'
+    cost: 10
+    order: 1
+  - content: 'If changed_when: false is set on a task, Ansible will never send a notification
+      even if the file changes.'
+    cost: 20
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

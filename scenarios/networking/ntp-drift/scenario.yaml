@@ -1,0 +1,36 @@
+title: NTP Time Drift Causing Auth Failures
+slug: networking-ntp-drift
+difficulty: medium
+category: Networking
+description: 'Kerberos authentication and TLS certificate validation are failing across
+  the environment because the system clock has drifted more than 5 minutes from the
+  authoritative time source. The NTP/chrony service is not running and the configured
+  upstream servers are unreachable due to a firewall rule blocking UDP 123. Both
+  the service and the firewall must be fixed.
+
+  '
+initial_state: 'Simulated RHEL 9 server. SSH logins and API calls that use Kerberos
+  authentication are rejected. System time is 8 minutes ahead of actual time.
+
+  '
+objectives:
+  - Diagnose time drift using chronyc tracking and timedatectl
+  - Fix the firewall rule to allow NTP (UDP 123) to the upstream time servers
+  - Start and enable chronyd, confirm synchronization, and verify auth works
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: timedatectl status and chronyc tracking to see the current offset
+      and sync status.'
+    cost: 10
+    order: 1
+  - content: 'Check firewall: firewall-cmd --list-all to see if UDP 123 is permitted
+      outbound. NTP needs UDP port 123.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

@@ -1,0 +1,40 @@
+title: High Load Average But CPU Is Idle
+slug: linux-high-load-no-cpu
+difficulty: hard
+category: Linux Administration
+description: 'The system load average is above 30 but CPU usage (us + sy) is near
+  zero. This is a classic I/O wait problem — processes are blocked waiting for a slow
+  or failing storage device. The disk is experiencing high latency due to a degraded
+  RAID member. Identify the I/O bottleneck, pin down the offending process and device,
+  and mitigate the issue.
+
+  '
+initial_state: 'Simulated RHEL 9 server. Load average reads 32.5 in top. CPU iowait
+  column is at 95%. Application response times are extremely high.
+
+  '
+objectives:
+  - Use iostat and iotop to identify the device and process causing I/O wait
+  - Determine the root cause of the storage latency (degraded array member)
+  - Initiate a fix or workaround to restore acceptable I/O throughput
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: iostat -xz 1 5 and look for the device with high await and util
+      values.'
+    cost: 10
+    order: 1
+  - content: 'Use iotop -o to see which processes are contributing most to disk I/O
+      in real time.'
+    cost: 15
+    order: 2
+  - content: 'Check RAID status: cat /proc/mdstat or mdadm --detail /dev/md0 to see
+      if a disk is faulty.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

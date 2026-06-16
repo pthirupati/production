@@ -1,0 +1,37 @@
+title: Here-Doc Syntax Issue
+slug: shell-heredoc-broken
+difficulty: medium
+category: Shell Scripting
+description: 'A script that generates configuration files using here-documents is
+  producing empty files or mangled output. The heredoc delimiter has a leading tab
+  on the closing token (but the opening does not use <<-), variable expansion is
+  accidentally suppressed by quoting the delimiter, and a pipe after the heredoc is
+  breaking the construct. All three issues must be fixed.
+
+  '
+initial_state: 'Simulated RHEL 9 server. Running gen-config.sh produces an empty
+  nginx.conf file. No errors are printed because the heredoc silently consumes the
+  issue.
+
+  '
+objectives:
+  - Add bash -x tracing to understand what the heredoc is actually producing
+  - Fix the delimiter quoting, indentation, and pipe placement issues
+  - Confirm the script generates the correct nginx.conf with all variables expanded
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Quoting the heredoc delimiter (<<''EOF'') prevents variable expansion.
+      Leave it unquoted to allow $VAR substitution.'
+    cost: 10
+    order: 1
+  - content: 'Use <<- (with a dash) only when the closing delimiter has a leading
+      tab and the opening token also uses <<-.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

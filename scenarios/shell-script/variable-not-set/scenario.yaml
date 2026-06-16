@@ -1,0 +1,37 @@
+title: Unbound Variable Error in Script
+slug: shell-variable-not-set
+difficulty: easy
+category: Shell Scripting
+description: 'A bash script exits immediately with "unbound variable" errors when run
+  with strict mode (set -euo pipefail). Variables are referenced before assignment,
+  one variable has a typo in its name, and an array element is accessed without a
+  bounds check. The script must be fixed to handle unset variables gracefully using
+  default values and proper quoting.
+
+  '
+initial_state: 'Simulated RHEL 9 server. Running backup.sh with set -u active causes
+  it to abort immediately with "BACKUP_DIR: unbound variable" before any backup is
+  created.
+
+  '
+objectives:
+  - Identify all unbound variable references using bash -n and the error output
+  - Add default value assignments or parameter expansions to handle unset variables
+  - Confirm the script runs to completion without unbound variable errors
+lab_mode: simulation
+simulation_type: generic
+time_limit: 600
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check the script: bash -n backup.sh for syntax errors, and run with
+      bash -x to trace execution.'
+    cost: 10
+    order: 1
+  - content: 'Use parameter expansion with defaults: ${BACKUP_DIR:-/tmp/backup} to
+      avoid unbound variable errors.'
+    cost: 10
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Low

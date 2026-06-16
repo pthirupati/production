@@ -308,6 +308,45 @@ body::after {
   left: 100%;
 }
 
+/* ─── 3D card tilt on hover ─── */
+.card-3d:hover {
+  transform: perspective(800px) rotateX(-2deg) rotateY(2deg) translateZ(4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(6,182,212,0.1);
+}
+
+/* ─── Floating card animation ─── */
+@keyframes card-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+.card-float {
+  animation: card-float 4s ease-in-out infinite;
+}
+
+/* ─── Shimmer sweep on stat cards ─── */
+.card-shine::after {
+  content: '';
+  position: absolute;
+  inset: -100%;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.04) 50%, transparent 60%);
+  animation: shine-sweep 4s linear infinite;
+}
+@keyframes shine-sweep {
+  from { transform: translateX(-100%) rotate(15deg); }
+  to   { transform: translateX(200%) rotate(15deg); }
+}
+
+/* ─── Glowing border on hover ─── */
+.hover-glow:hover {
+  box-shadow: 0 0 0 1px rgba(6,182,212,0.3), 0 0 20px rgba(6,182,212,0.1);
+}
+
+/* ─── Depth badge ─── */
+.badge-3d {
+  box-shadow: 0 2px 0 rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.2);
+  transform: translateZ(0);
+}
+
 .gradient-border {
   position: relative;
 }

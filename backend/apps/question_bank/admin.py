@@ -4,10 +4,21 @@ Question bank admin — Technology, Scenario, Tag.
 import csv
 
 from django.contrib import admin, messages
+from django.core.cache import cache
 from django.http import HttpResponse
 from django.utils.html import format_html
 
 from .models import Scenario, Tag, Technology
+
+
+def _clear_technology_caches():
+    """Bust all technology-related API caches so changes are reflected immediately."""
+    cache.delete("technologies_list")
+    cache.delete_many([
+        "technologies_list",
+        "scenarios_list_all",
+        "pricing_technologies",
+    ])
 
 
 # ---------------------------------------------------------------------------
@@ -20,7 +31,7 @@ class ScenarioInline(admin.TabularInline):
     readonly_fields = ("slug",)
     extra = 0
     show_change_link = True
-    can_delete = False
+    can_delete = True
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +93,35 @@ class TechnologyAdmin(admin.ModelAdmin):
         for t in queryset.annotate_scenario_count() if hasattr(queryset, "annotate_scenario_count") else queryset:
             writer.writerow([t.id, t.name, t.slug, t.price, t.is_active, t.coming_soon, t.scenarios.count()])
         return response
+
+    def delete_model(self, request, obj):
+        """Clear API caches after a single Technology is deleted."""
+        name = obj.name
+        scenario_count = obj.scenarios.count()
+        super().delete_model(request, obj)
+        _clear_technology_caches()
+        self.message_user(
+            request,
+            f"Technology '{name}' and its {scenario_count} scenario(s) have been deleted. "
+            "API cache cleared — changes are live immediately.",
+            messages.SUCCESS,
+        )
+
+    def delete_queryset(self, request, queryset):
+        """Clear API caches after bulk-delete of Technologies."""
+        names = list(queryset.values_list("name", flat=True))
+        super().delete_queryset(request, queryset)
+        _clear_technology_caches()
+        self.message_user(
+            request,
+            f"Deleted technologies: {', '.join(names)}. API cache cleared.",
+            messages.SUCCESS,
+        )
+
+    def save_model(self, request, obj, form, change):
+        """Clear API caches whenever a Technology is saved (name/price/active status changed)."""
+        super().save_model(request, obj, form, change)
+        _clear_technology_caches()
 
 
 # ---------------------------------------------------------------------------

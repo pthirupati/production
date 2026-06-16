@@ -1,0 +1,35 @@
+title: Hosts Unreachable in Inventory
+slug: ansible-inventory-unreachable
+difficulty: medium
+category: Ansible Automation
+description: 'Ansible reports all hosts as UNREACHABLE when the playbook runs. The
+  inventory file specifies incorrect SSH usernames and a wrong private key path. Additionally,
+  the ansible_host addresses have a typo in one subnet octet. All three must be corrected
+  for Ansible to connect to the managed nodes.
+
+  '
+initial_state: 'Simulated control node with inventory file pointing at three managed
+  hosts. Running ansible all -m ping returns UNREACHABLE for all hosts.
+
+  '
+objectives:
+  - Run ansible all -m ping -vvv to inspect the exact SSH connection attempt details
+  - Correct the ansible_user, ansible_ssh_private_key_file, and ansible_host values
+  - Confirm all hosts respond to ansible all -m ping with pong
+lab_mode: simulation
+simulation_type: ansible
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: ansible all -m ping -vvv to see the exact SSH command being attempted
+      and the failure reason.'
+    cost: 10
+    order: 1
+  - content: 'Check inventory variables: ansible_user, ansible_host, and ansible_ssh_private_key_file
+      for typos.'
+    cost: 15
+    order: 2
+requires_companion_hosts: true
+dual_terminal: false
+jira_priority: Medium

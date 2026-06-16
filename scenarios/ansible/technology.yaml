@@ -1,6 +1,8 @@
-description: "Ansible Automation simulation labs \u2014 \u20B9499 subscription"
-icon: network
 name: Ansible Automation
+icon: network
+color: purple
+description: Automate infrastructure with Ansible playbooks and roles
 order: 12
+is_active: true
 price: 499
 slug: ansible

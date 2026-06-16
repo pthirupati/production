@@ -1,0 +1,6 @@
+name: Networking
+icon: globe
+color: blue
+description: Network troubleshooting, DNS, routing, and firewall management
+order: 7
+is_active: true
