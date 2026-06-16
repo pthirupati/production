@@ -195,15 +195,36 @@ class AdminTechnologyDetailView(APIView):
         except Technology.DoesNotExist:
             return Response({"error": "Not found"}, status=404)
 
-        if tech.scenarios.exists():
+        cascade = str(request.data.get("cascade", request.query_params.get("cascade", ""))).lower() in (
+            "1", "true", "yes",
+        )
+        scenario_count = tech.scenarios.count()
+        if scenario_count and not cascade:
             return Response(
-                {"error": "Cannot delete technology with existing scenarios. Deactivate it instead."},
+                {
+                    "error": (
+                        f"Technology has {scenario_count} scenario(s). "
+                        "Send cascade=true to delete the technology and all its scenarios."
+                    ),
+                    "scenario_count": scenario_count,
+                },
                 status=400,
             )
+
+        deleted_scenarios = 0
+        if scenario_count:
+            deleted_scenarios = scenario_count
+            tech.scenarios.all().delete()
+
+        tech_name = tech.name
         tech.delete()
         from apps.question_bank.cache_utils import invalidate_technologies_cache
         invalidate_technologies_cache()
-        return Response({"message": "Technology deleted"})
+        return Response({
+            "message": "Technology deleted",
+            "technology": tech_name,
+            "scenarios_deleted": deleted_scenarios,
+        })
 
 
 # ─── Tag Management ──────────────────────────────────────────────────
@@ -2637,4 +2658,83 @@ class AdminBlogPostDetailView(APIView):
         if not deleted:
             return Response({"error": "Not found"}, status=404)
         return Response({"deleted": True})
+
+
+class AdminCertificatesView(APIView):
+    """List user technology certificates, interview certificates, and achievements."""
+
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from django.utils import timezone
+
+        from apps.billing.models import UserCertificate
+        from apps.interviews.models import InterviewCertificate
+        from apps.progress.models import UserAchievement
+
+        now = timezone.now()
+        email_q = request.query_params.get("email", "").strip()
+
+        tech_qs = UserCertificate.objects.select_related("user", "technology").order_by("-issued_at")
+        interview_qs = InterviewCertificate.objects.select_related("user").order_by("-issued_at")
+        achievement_qs = UserAchievement.objects.select_related("user").order_by("-earned_at")
+
+        if email_q:
+            tech_qs = tech_qs.filter(user__email__icontains=email_q)
+            interview_qs = interview_qs.filter(user__email__icontains=email_q)
+            achievement_qs = achievement_qs.filter(user__email__icontains=email_q)
+
+        tech_certs = [
+            {
+                "type": "technology",
+                "certificate_id": c.certificate_id,
+                "user_email": c.user.email,
+                "user_id": c.user_id,
+                "technology": c.technology.name,
+                "technology_slug": c.technology.slug,
+                "issued_at": c.issued_at.isoformat() if c.issued_at else None,
+                "expires_at": c.expires_at.isoformat() if c.expires_at else None,
+                "is_expired": bool(c.expires_at and c.expires_at <= now),
+            }
+            for c in tech_qs[:500]
+        ]
+
+        interview_certs = [
+            {
+                "type": "interview",
+                "certificate_id": c.certificate_id,
+                "user_email": c.user.email,
+                "user_id": c.user_id,
+                "technology": c.technology_name or "Interview Studio",
+                "level": c.level,
+                "rounds_cleared": c.rounds_cleared,
+                "overall_score": c.overall_score,
+                "issued_at": c.issued_at.isoformat() if c.issued_at else None,
+                "expires_at": c.expires_at.isoformat() if c.expires_at else None,
+                "is_expired": bool(c.expires_at and c.expires_at <= now),
+            }
+            for c in interview_qs[:500]
+        ]
+
+        achievements = [
+            {
+                "user_email": a.user.email,
+                "user_id": a.user_id,
+                "achievement": a.get_achievement_display(),
+                "achievement_code": a.achievement,
+                "earned_at": a.earned_at.isoformat() if a.earned_at else None,
+            }
+            for a in achievement_qs[:500]
+        ]
+
+        return Response({
+            "technology_certificates": tech_certs,
+            "interview_certificates": interview_certs,
+            "achievements": achievements,
+            "counts": {
+                "technology": len(tech_certs),
+                "interview": len(interview_certs),
+                "achievements": len(achievements),
+            },
+        })
 

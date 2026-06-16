@@ -16,6 +16,7 @@ TEAM_AUTHORS = {
     "application": "Application Team",
     "storage": "Storage Team",
     "network": "Network Team",
+    "security": "Security Team",
     "changemgmt": "Change Management Bot",
 }
 
@@ -25,6 +26,7 @@ MENTION_PATTERNS = {
     "application": re.compile(r"@?\s*application\s*team|@application\b|@app\s*team", re.I),
     "storage": re.compile(r"@?\s*storage\s*team|@storage\b", re.I),
     "network": re.compile(r"@?\s*network\s*team|@network\b", re.I),
+    "security": re.compile(r"@?\s*security\s*team|@security\b", re.I),
 }
 
 

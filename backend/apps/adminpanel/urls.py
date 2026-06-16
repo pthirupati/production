@@ -44,6 +44,7 @@ from .views import (
     AdminSyncScenariosView,
     AdminBlogPostsView,
     AdminBlogPostDetailView,
+    AdminCertificatesView,
 )
 from apps.interviews.admin_views import (
     AdminInterviewOverviewView,
@@ -153,4 +154,5 @@ urlpatterns = [
     path("interviews/voices/", AdminInterviewVoicesView.as_view()),
     path("interviews/voices/<int:pk>/", AdminInterviewVoiceDetailView.as_view()),
     path("interviews/entitlements/", AdminInterviewEntitlementsView.as_view()),
+    path("certificates/", AdminCertificatesView.as_view()),
 ]

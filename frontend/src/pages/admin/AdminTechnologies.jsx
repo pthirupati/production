@@ -59,10 +59,19 @@ export default function AdminTechnologies() {
     setEditingId(tech.id); setShowForm(true)
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this technology? This only works if it has no scenarios.')) return
-    try { await adminApi.deleteTechnology(id); toast.success('Deleted'); loadData() }
-    catch (err) { toast.error(err.response?.data?.error || 'Cannot delete') }
+  const handleDelete = async (tech) => {
+    const count = tech.scenario_count ?? tech.active_scenarios ?? 0
+    const msg = count > 0
+      ? `Delete "${tech.name}" and ALL ${count} scenario(s)? This cannot be undone.`
+      : `Delete technology "${tech.name}"?`
+    if (!confirm(msg)) return
+    try {
+      const res = await adminApi.deleteTechnology(tech.id, { cascade: count > 0 })
+      toast.success(res.scenarios_deleted
+        ? `Deleted ${tech.name} and ${res.scenarios_deleted} scenario(s)`
+        : 'Technology deleted')
+      loadData()
+    } catch (err) { toast.error(err.response?.data?.error || 'Cannot delete') }
   }
 
   // Tag CRUD
@@ -194,7 +203,7 @@ export default function AdminTechnologies() {
                     </div>
                     <div className="flex gap-1">
                       <button onClick={() => handleEdit(tech)} className="p-1.5 text-surface-500 hover:text-accent-cyan"><Edit2 size={14} /></button>
-                      <button onClick={() => handleDelete(tech.id)} className="p-1.5 text-surface-500 hover:text-accent-red"><Trash2 size={14} /></button>
+                      <button onClick={() => handleDelete(tech)} className="p-1.5 text-surface-500 hover:text-accent-red"><Trash2 size={14} /></button>
                     </div>
                   </div>
                   <h3 className="text-lg font-semibold text-white">{tech.name}</h3>

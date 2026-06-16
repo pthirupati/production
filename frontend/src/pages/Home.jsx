@@ -5,6 +5,7 @@ import { useThemeStore } from '../store/themeStore'
 import { scenarioApi } from '../api/scenarios'
 import api from '../api/client'
 import { PlatformBanners } from '../components/PlatformBanners'
+import { PUBLIC_NAV_LINKS } from '../constants/publicNav'
 import {
   Terminal, Shield, Clock, Trophy, Zap, Server,
   Cloud, Lock, Cpu, ArrowRight, CheckCircle2,
@@ -89,17 +90,9 @@ export default function Home() {
             </div>
             <span className="text-xl font-bold text-white tracking-tight">FixitLab</span>
           </Link>
-          <div className="hidden md:flex items-center gap-6">
-            {[
-              { to: '/scenarios', label: 'Scenarios' },
-              { to: '/mock-interviews', label: 'Mock Interviews' },
-              { to: '/leaderboard', label: 'Leaderboard' },
-              { to: '/pricing', label: 'Pricing' },
-              { to: '/faq', label: 'FAQ' },
-              { to: '/verify-certificate', label: 'Verify Certificate' },
-              { to: '/contact', label: 'Contact' },
-            ].map(({ to, label }) => (
-              <Link key={to} to={to} className="text-sm text-surface-400 hover:text-white transition-colors relative group">
+          <div className="hidden md:flex items-center gap-5 overflow-x-auto max-w-[70vw] pb-1">
+            {PUBLIC_NAV_LINKS.map(({ to, label }) => (
+              <Link key={to} to={to} className="text-sm text-surface-400 hover:text-white transition-colors relative group whitespace-nowrap shrink-0">
                 {label}
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-accent-cyan to-accent-purple group-hover:w-full transition-all duration-300" />
               </Link>
@@ -123,9 +116,9 @@ export default function Home() {
           </div>
         </div>
         {mobileNavOpen && (
-          <div className="md:hidden border-t border-surface-800 px-4 py-3 flex flex-col gap-2 bg-surface-950/95">
-            {['/scenarios', '/mock-interviews', '/leaderboard', '/pricing', '/faq', '/contact'].map(to => (
-              <Link key={to} to={to} onClick={() => setMobileNavOpen(false)} className="text-sm text-surface-300 py-2">{to.slice(1).replace('-', ' ')}</Link>
+          <div className="md:hidden border-t border-surface-800 px-4 py-3 flex flex-col gap-2 bg-surface-950/95 max-h-[70vh] overflow-y-auto">
+            {PUBLIC_NAV_LINKS.map(({ to, label }) => (
+              <Link key={to} to={to} onClick={() => setMobileNavOpen(false)} className="text-sm text-surface-300 py-2">{label}</Link>
             ))}
           </div>
         )}

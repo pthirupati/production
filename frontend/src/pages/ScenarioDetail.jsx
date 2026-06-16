@@ -5,6 +5,7 @@ import { labApi } from '../api/labs'
 import { ratingsApi } from '../api/ratings'
 import { jiraApi } from '../api/jira'
 import ScenarioIssueBar from '../components/ScenarioIssueBar'
+import JiraTeamGuide from '../components/JiraTeamGuide'
 import { useAuthStore } from '../store/authStore'
 import {
   Clock, Target, Lightbulb, Play, CheckCircle2,
@@ -253,6 +254,10 @@ export default function ScenarioDetail() {
         jiraComments={jiraComments}
         isAuthenticated={isAuthenticated}
       />
+
+      {(scenario.lab_mode === 'simulation' || scenario.slug?.startsWith('sim-')) && (
+        <JiraTeamGuide scenarioSlug={scenario.slug} />
+      )}
 
       {/* Hero */}
       <div className="glass-card p-6 lg:p-8">

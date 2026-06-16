@@ -54,8 +54,15 @@ export const adminApi = {
     return data
   },
 
-  async deleteTechnology(id) {
-    const { data } = await api.delete(`/admin/technologies/${id}/`)
+  async deleteTechnology(id, options = {}) {
+    const { data } = await api.delete(`/admin/technologies/${id}/`, {
+      params: options.cascade ? { cascade: 'true' } : {},
+    })
+    return data
+  },
+
+  async getCertificates(params = {}) {
+    const { data } = await api.get('/admin/certificates/', { params })
     return data
   },
 

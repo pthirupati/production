@@ -4,14 +4,16 @@ import {
   Check, ArrowRight, Zap, Crown, Loader2, Sun, Moon, Server, Globe,
   Monitor, Database, Cpu, Shield, Lock, Sparkles, ShoppingCart, X,
   IndianRupee, DollarSign, BadgeCheck, ChevronRight,
-  RefreshCw, ShieldCheck, AlertTriangle
+  RefreshCw, ShieldCheck, AlertTriangle, Mic2,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { scenarioApi } from '../api/scenarios'
 import { subscriptionApi } from '../api/subscriptions'
+import { interviewsApi } from '../api/interviews'
 import api from '../api/client'
 import { PlatformBanners } from '../components/PlatformBanners'
+import { PUBLIC_NAV_LINKS } from '../constants/publicNav'
 import toast from 'react-hot-toast'
 
 const techIcons = { Linux: Server, Docker: Monitor, Networking: Globe, 'Web Servers': Globe, Databases: Database, AWS: Cpu, Kubernetes: Cpu, Security: Shield }
@@ -73,6 +75,9 @@ export default function Pricing() {
   const [couponLoading, setCouponLoading] = useState(false)
   const [batchProcessing, setBatchProcessing] = useState(false)
   const [stripeConfigured, setStripeConfigured] = useState(false)
+  const [interviewPlans, setInterviewPlans] = useState([])
+  const [interviewEntitlement, setInterviewEntitlement] = useState(null)
+  const [subscribingInterview, setSubscribingInterview] = useState(null)
 
   useEffect(() => {
     api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
@@ -118,9 +123,13 @@ export default function Pricing() {
   // Load technologies and subscriptions
   useEffect(() => {
     scenarioApi.getTechnologies().then(setTechnologies).catch(() => {})
+    interviewsApi.getPlans().then(d => setInterviewPlans(d.plans || [])).catch(() => {})
     if (isAuthenticated) {
       subscriptionApi.getMySubscriptions()
         .then(data => setMySubscriptions(data.subscriptions || []))
+        .catch(() => {})
+      interviewsApi.getEntitlement()
+        .then(setInterviewEntitlement)
         .catch(() => {})
     }
   }, [isAuthenticated])
@@ -170,6 +179,54 @@ export default function Pricing() {
   const cartTotal = useMemo(() => {
     return cart.reduce((sum, tech) => sum + (tech.price || 499), 0)
   }, [cart])
+
+  const handleInterviewSubscribe = async (plan) => {
+    if (!isAuthenticated) {
+      toast('Please sign in first to subscribe.', { icon: '🔒' })
+      navigateTo('/login')
+      return
+    }
+    if (plan.code === 'free') {
+      navigateTo('/interviews')
+      return
+    }
+    if (gatewayDown) {
+      toast.error(gatewayMessage || 'Payment gateway is unavailable.')
+      return
+    }
+    setSubscribingInterview(plan.code)
+    try {
+      if (currency === 'USD' && stripeConfigured) {
+        const checkout = await interviewsApi.createStripeCheckout(plan.code, 'USD')
+        if (checkout.checkout_url) {
+          window.location.href = checkout.checkout_url
+          return
+        }
+      }
+      const order = await interviewsApi.createRazorpayOrder(plan.code)
+      const params = new URLSearchParams({
+        type: 'interview',
+        plan: plan.code,
+        order_id: order.order_id || order.id,
+        amount: order.amount,
+        currency: order.currency || 'INR',
+      })
+      navigateTo(`/payment?${params}`)
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Could not start checkout')
+    } finally {
+      setSubscribingInterview(null)
+    }
+  }
+
+  const isInterviewSubscribed = (plan) => {
+    if (!interviewEntitlement) return false
+    const code = interviewEntitlement.plan?.code
+    if (plan.code === 'free') {
+      return code === 'free' && interviewEntitlement.is_active
+    }
+    return code === plan.code && (interviewEntitlement.is_subscribed || interviewEntitlement.is_admin_granted_free)
+  }
 
   const handleSubscribe = async (tech) => {
     if (!isAuthenticated) {
@@ -288,13 +345,9 @@ export default function Pricing() {
             </div>
             <span className="text-xl font-bold text-white">FixitLab</span>
           </Link>
-          <div className="hidden md:flex items-center gap-5">
-            {[
-              { to: '/faq', label: 'FAQ' },
-              { to: '/verify-certificate', label: 'Verify Certificate' },
-              { to: '/contact', label: 'Contact' },
-            ].map(({ to, label }) => (
-              <Link key={to} to={to} className="text-sm text-surface-400 hover:text-white transition-colors relative group">
+          <div className="hidden md:flex items-center gap-4 overflow-x-auto max-w-[65vw] pb-1">
+            {PUBLIC_NAV_LINKS.map(({ to, label }) => (
+              <Link key={to} to={to} className="text-sm text-surface-400 hover:text-white transition-colors relative group whitespace-nowrap shrink-0">
                 {label}
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-accent-cyan to-accent-purple group-hover:w-full transition-all duration-300" />
               </Link>
@@ -405,14 +458,18 @@ export default function Pricing() {
         <div className="text-center mb-14 relative">
           <div className="relative">
             <div className="inline-flex items-center gap-2 bg-accent-cyan/10 border border-accent-cyan/20 rounded-full px-4 py-1.5 text-sm text-accent-cyan mb-6 animate-fade-in">
-              <Sparkles size={14} className="animate-pulse" /> Per-Technology Pricing
+              <Sparkles size={14} className="animate-pulse" /> Technology + Interview Studio
             </div>
             <h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-white via-cyan-300 to-accent-purple bg-clip-text text-transparent animate-slide-up">
-              Pay Only For What You Learn
+              Simple Yearly Pricing
             </h1>
             <p className="text-surface-400 text-lg max-w-2xl mx-auto animate-fade-in">
-              Subscribe to individual technologies. Get 1-year access to all scenarios, hints, and certificates for each technology you choose.
+              Subscribe per technology for lab scenarios, or choose an AI Interview Studio plan — both billed yearly with admin-controlled prices.
             </p>
+            <div className="flex flex-wrap justify-center gap-3 mt-6">
+              <a href="#technology-pricing" className="btn-secondary text-sm">Technology labs</a>
+              <a href="#interview-plans" className="btn-primary text-sm inline-flex items-center gap-1"><Mic2 size={14} /> Interview plans</a>
+            </div>
 
             {/* Exchange rate indicator */}
             {currency === 'USD' && exchangeRate && (
@@ -468,7 +525,8 @@ export default function Pricing() {
         </div>
 
         {/* Technology pricing grid */}
-        <h2 className="text-2xl font-bold text-white text-center mb-3">Choose Your Technologies</h2>
+        <h2 id="technology-pricing" className="text-2xl font-bold text-white text-center mb-3 scroll-mt-24">Technology Subscriptions</h2>
+        <p className="text-surface-400 text-center mb-2">1-year access per technology · prices set by admin</p>
         <p className="text-surface-400 text-center mb-8 flex items-center justify-center gap-2">
           <ShoppingCart size={14} />
           Select multiple technologies and subscribe at once
@@ -589,27 +647,85 @@ export default function Pricing() {
           })}
         </div>
 
-        {/* FAQ */}
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-xl font-bold text-white text-center mb-6">Frequently Asked Questions</h2>
-          <div className="space-y-4">
-            {[
-              { q: 'How does per-technology pricing work?', a: 'You subscribe to individual technologies (e.g., Linux, Docker). Each subscription gives you 1-year access to all scenarios, hints, and the certificate for that technology.' },
-              { q: 'What can I access for free?', a: 'Free users get access to demo scenarios for every technology, the community forum, leaderboard, and basic progress tracking.' },
-              { q: 'Is the subscription one-time or recurring?', a: 'Subscriptions are valid for 1 year from purchase. You will receive renewal reminders 7 days before expiry via email and in-app notifications. Renew anytime to extend access for another year.' },
-              { q: 'Can I subscribe to multiple technologies at once?', a: 'Yes! Use the "Add to Cart" button for each technology you want, then click "Subscribe All" in the cart panel to subscribe in one go.' },
-              { q: 'Will I get a certificate?', a: 'Yes! After completing all scenarios for a subscribed technology, you can generate a verifiable certificate that can be shared and verified by anyone.' },
-              { q: 'Are prices shown in different currencies?', a: 'Yes! Use the INR/USD toggle to see prices in your preferred currency. We fetch live exchange rates updated hourly. Payment is processed in INR by Razorpay.' },
-              { q: 'Do you offer refunds?', a: 'Refund requests can be made within 7 days of purchase. Contact fixitlab.techsupport@gmail.com.' },
-            ].map(({ q, a }) => (
-              <div key={q} className="glass-card p-5 hover:border-accent-cyan/20 transition-all group">
-                <h3 className="text-sm font-semibold text-white mb-1.5 group-hover:text-accent-cyan transition-colors">{q}</h3>
-                <p className="text-sm text-surface-400 leading-relaxed">{a}</p>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
+
+      {/* Interview Studio plans */}
+      <section id="interview-plans" className="max-w-6xl mx-auto px-4 py-16 border-t border-surface-800/50 scroll-mt-24">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-white flex items-center justify-center gap-2">
+            <Mic2 className="text-indigo-400" size={22} />
+            AI Interview Studio
+          </h2>
+          <p className="text-sm text-surface-400 mt-2 max-w-xl mx-auto">
+            Yearly mock interview plans — admin sets prices in Admin → Interviews → Pricing. 10 full interview attempts per year on paid tiers.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
+          {(interviewPlans.length ? interviewPlans : [
+            { code: 'free', name: 'Free mini', price_inr: 0, interviews_per_month: 1, max_rounds: 1, description: '1 sample per month' },
+            { code: 'pro', name: 'Interview Pro', price_inr: 999, interviews_per_month: 10, max_rounds: 3, description: 'Voice + reports' },
+            { code: 'premium', name: 'Interview Premium', price_inr: 2499, interviews_per_month: 10, max_rounds: 5, description: 'Certificate + 5 rounds' },
+          ]).filter(p => p.is_active !== false).map(plan => {
+            const priceINR = Number(plan.price_inr || 0)
+            const priceDisplay = getDisplayPrice(priceINR)
+            const subscribed = isInterviewSubscribed(plan)
+            return (
+              <div key={plan.code} className={`glass-card p-5 border text-center ${plan.code === 'pro' ? 'border-indigo-500/40 bg-indigo-500/5' : 'border-surface-800'}`}>
+                <p className="text-sm font-medium text-white">{plan.name}</p>
+                <p className="text-2xl font-bold text-indigo-300 mt-1">
+                  {priceDisplay.display}
+                  <span className="text-xs text-surface-500 font-normal">/year</span>
+                </p>
+                <p className="text-xs text-surface-500 mt-2">
+                  {plan.interviews_per_month || 10} attempts/yr · up to {plan.max_rounds} rounds
+                </p>
+                {plan.description && <p className="text-[10px] text-surface-600 mt-1">{plan.description}</p>}
+                <div className="mt-4">
+                  {subscribed ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-emerald-400"><BadgeCheck size={14} /> Subscribed</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={subscribingInterview === plan.code}
+                      onClick={() => handleInterviewSubscribe(plan)}
+                      className="w-full btn-primary text-sm py-2 disabled:opacity-50"
+                    >
+                      {subscribingInterview === plan.code ? (
+                        <Loader2 size={14} className="animate-spin inline" />
+                      ) : plan.code === 'free' ? 'Start free' : (
+                        <span className="inline-flex items-center gap-1 justify-center"><ShoppingCart size={14} /> Subscribe</span>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <p className="text-center mt-6 text-xs text-surface-500">
+          Interview billing is separate from technology lab subscriptions.
+        </p>
+      </section>
+
+      {/* FAQ — bottom of page */}
+      <section className="max-w-2xl mx-auto px-4 pb-16">
+        <h2 className="text-xl font-bold text-white text-center mb-6">Frequently Asked Questions</h2>
+        <div className="space-y-4">
+          {[
+            { q: 'How does per-technology pricing work?', a: 'You subscribe to individual technologies (e.g., Linux, Docker). Each subscription gives you 1-year access to all scenarios, hints, and the certificate for that technology.' },
+            { q: 'How do interview plans work?', a: 'Interview Studio plans are billed yearly. Pro and Premium include 10 full mock interview attempts per year with multi-round voice interviews and reports. Prices are configured by admins.' },
+            { q: 'What can I access for free?', a: 'Free users get demo scenarios for every technology, one interview sample, community forum, leaderboard, and basic progress tracking.' },
+            { q: 'Can I subscribe to multiple technologies at once?', a: 'Yes! Use "Add to Cart" for each technology, then "Subscribe All" in the cart panel.' },
+            { q: 'Will I get a certificate?', a: 'Yes — technology completion certificates and FIXIT-INT interview certificates are verifiable on the Verify Certificate page.' },
+            { q: 'Are prices per month or per year?', a: 'All subscriptions are yearly (1-year access from purchase). Interview plan prices shown are per year, not per month.' },
+          ].map(({ q, a }) => (
+            <div key={q} className="glass-card p-5 hover:border-accent-cyan/20 transition-all group">
+              <h3 className="text-sm font-semibold text-white mb-1.5 group-hover:text-accent-cyan transition-colors">{q}</h3>
+              <p className="text-sm text-surface-400 leading-relaxed">{a}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Floating Cart Panel */}
       {showCart && cart.length > 0 && (
@@ -703,38 +819,6 @@ export default function Pricing() {
           </div>
         </div>
       )}
-
-      {/* Interview Studio plans (separate from tech subscriptions) */}
-      <section id="interview-plans" className="max-w-6xl mx-auto px-4 py-16 border-t border-surface-800/50">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-white">AI Interview Studio</h2>
-          <p className="text-sm text-surface-400 mt-2 max-w-xl mx-auto">
-            Yearly mock interview plans — 10 full attempts per year, multi-round cycles, certificates. Separate from per-technology lab subscriptions.
-          </p>
-        </div>
-        <div className="grid sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
-          {[
-            { name: 'Free mini', price: '₹0', desc: '1 cycle / month' },
-            { name: 'Pro', price: '₹999', desc: '3 cycles · 3 rounds' },
-            { name: 'Premium', price: '₹2,499', desc: '5 cycles · certificate' },
-          ].map(p => (
-            <div key={p.name} className="glass-card p-5 border border-surface-800 text-center">
-              <p className="text-sm font-medium text-white">{p.name}</p>
-              <p className="text-2xl font-bold text-indigo-300 mt-1">{p.price}<span className="text-xs text-surface-500">/mo</span></p>
-              <p className="text-xs text-surface-500 mt-2">{p.desc}</p>
-            </div>
-          ))}
-        </div>
-        <p className="text-center mt-6">
-          <Link to="/mock-interviews" className="text-sm text-indigo-400 hover:underline">Learn about mock interviews →</Link>
-          {isAuthenticated && (
-            <>
-              <span className="text-surface-600 mx-2">·</span>
-              <Link to="/interviews" className="text-sm text-indigo-400 hover:underline">Open Interview Studio</Link>
-            </>
-          )}
-        </p>
-      </section>
 
       {/* Floating Cart FAB */}
       {cart.length > 0 && !showCart && (

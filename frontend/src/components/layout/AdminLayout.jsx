@@ -5,7 +5,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard, Target, Cpu, Users, MonitorPlay, ArrowLeft, Shield, Sun, Moon,
   CreditCard, MessageSquare, Wrench, Menu, X, Ticket, Activity, ScrollText, FileText, Tag, ShieldAlert,
-  BarChart3, Building2, Mic2
+  BarChart3, Building2, Mic2, Award
 } from 'lucide-react'
 
 const adminNav = [
@@ -17,6 +17,7 @@ const adminNav = [
   { path: '/admin/labs', icon: MonitorPlay, label: 'Active Labs' },
   { path: '/admin/monitoring', icon: Activity, label: 'Monitoring' },
   { path: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+  { path: '/admin/certificates', icon: Award, label: 'Certificates' },
   { path: '/admin/invoices', icon: FileText, label: 'Invoices' },
   { path: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
   { path: '/admin/interviews', icon: Mic2, label: 'Interviews' },
