@@ -6,6 +6,7 @@ import {
   ArrowRight, Layers, Shield
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import StickyPageToolbar from '../components/StickyPageToolbar'
 
 const techIcons = {
   Linux: Server,
@@ -56,24 +57,26 @@ export default function Technologies() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
-      <div className="relative overflow-hidden glass-card p-8 mb-6">
+      <StickyPageToolbar>
+      <div className="relative overflow-hidden glass-card p-6 sm:p-8">
         <div className="absolute inset-0 bg-gradient-to-r from-accent-cyan/8 via-transparent to-accent-purple/8" />
         <div className="absolute inset-0 bg-dots-pattern opacity-20" />
-        <div className="relative flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-              <Layers size={24} className="text-accent-cyan" />
-              <span className="bg-gradient-to-r from-accent-cyan to-accent-purple bg-clip-text text-transparent">Technologies</span>
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
+              <Layers size={24} className="text-accent-cyan shrink-0" />
+              <span className="bg-gradient-to-r from-accent-cyan to-accent-purple bg-clip-text text-transparent truncate">Technologies</span>
             </h1>
-            <p className="text-surface-400 mt-2">
+            <p className="text-surface-400 mt-2 text-sm">
               Choose a technology to explore its challenges
             </p>
           </div>
-          <Link to="/scenarios" className="text-sm text-surface-400 hover:text-accent-cyan transition-colors flex items-center gap-1">
+          <Link to="/scenarios" className="text-sm text-surface-400 hover:text-accent-cyan transition-colors flex items-center gap-1 shrink-0">
             View All Scenarios <ArrowRight size={14} />
           </Link>
         </div>
       </div>
+      </StickyPageToolbar>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {sortedTechnologies.map(tech => {

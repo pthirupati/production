@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/authStore'
 import toast from 'react-hot-toast'
 import { resolveMediaUrl, IMAGE_UPLOAD_HINTS } from '../utils/mediaUrl'
 import Pagination from '../components/Pagination'
+import StickyPageToolbar from '../components/StickyPageToolbar'
 
 function timeAgo(dateStr) {
   const d = new Date(dateStr)
@@ -321,20 +322,21 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
 
   return (
     <div className="space-y-6">
+      <StickyPageToolbar>
       {/* Header */}
-      <div className="relative overflow-hidden glass-card p-8 mb-6">
+      <div className="relative overflow-hidden glass-card p-6 sm:p-8">
         <div className="absolute inset-0 bg-gradient-to-r from-accent-cyan/8 via-transparent to-accent-purple/8" />
         <div className="absolute inset-0 bg-dots-pattern opacity-20" />
-        <div className="relative flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-              <MessageSquare className="text-accent-cyan" size={28} /> <span className="bg-gradient-to-r from-accent-cyan to-accent-purple bg-clip-text text-transparent">Community</span>
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
+              <MessageSquare className="text-accent-cyan shrink-0" size={28} /> <span className="bg-gradient-to-r from-accent-cyan to-accent-purple bg-clip-text text-transparent">Community</span>
             </h1>
-            <p className="text-surface-400 mt-2">Ask questions, share knowledge, and help others</p>
+            <p className="text-surface-400 mt-2 text-sm">Ask questions, share knowledge, and help others</p>
           </div>
           <button
             onClick={() => setShowNewThread(true)}
-            className="btn-primary flex items-center gap-2"
+            className="btn-primary flex items-center gap-2 shrink-0"
           >
             <Plus size={16} /> New Thread
           </button>
@@ -364,6 +366,7 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
           ))}
         </select>
       </div>
+      </StickyPageToolbar>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Thread List */}

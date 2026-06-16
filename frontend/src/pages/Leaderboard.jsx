@@ -4,6 +4,7 @@ import { scenarioApi } from '../api/scenarios'
 import { useAuthStore } from '../store/authStore'
 import { Trophy, Medal, Crown, Star, Clock, TrendingUp } from 'lucide-react'
 import Pagination from '../components/Pagination'
+import StickyPageToolbar from '../components/StickyPageToolbar'
 
 const PAGE_SIZE = 20
 
@@ -55,14 +56,15 @@ export default function Leaderboard() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
-      <div className="relative overflow-hidden glass-card p-8 mb-6">
+      <StickyPageToolbar>
+      <div className="relative overflow-hidden glass-card p-6 sm:p-8">
         <div className="absolute inset-0 bg-gradient-to-r from-accent-amber/8 via-transparent to-accent-cyan/8" />
         <div className="absolute inset-0 bg-dots-pattern opacity-20" />
         <div className="relative">
-          <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <Trophy className="text-accent-amber" /> <span className="bg-gradient-to-r from-accent-amber to-accent-cyan bg-clip-text text-transparent">Leaderboard</span>
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
+            <Trophy className="text-accent-amber shrink-0" /> <span className="bg-gradient-to-r from-accent-amber to-accent-cyan bg-clip-text text-transparent">Leaderboard</span>
           </h1>
-          <p className="text-surface-400 mt-2">Top fixers ranked by total score</p>
+          <p className="text-surface-400 mt-2 text-sm">Top fixers ranked by total score</p>
         </div>
       </div>
 
@@ -84,6 +86,7 @@ export default function Leaderboard() {
           </button>
         ))}
       </div>
+      </StickyPageToolbar>
 
       {/* Your rank */}
       {data.user_rank && (

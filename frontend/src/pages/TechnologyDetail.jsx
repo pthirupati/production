@@ -6,6 +6,7 @@ import {
   Wrench, Play, Skull
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import StickyPageToolbar from '../components/StickyPageToolbar'
 
 const difficultyConfig = {
   easy: { label: 'Easy', bg: 'bg-green-500/10 text-green-400' },
@@ -62,29 +63,30 @@ export default function TechnologyDetail() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-4 animate-fade-in">
+      <StickyPageToolbar className="space-y-3">
       <button type="button" onClick={() => navigate('/technologies')} className="text-sm text-surface-400 hover:text-accent-cyan flex items-center gap-1">
         <ChevronLeft size={16} /> All technologies
       </button>
-
-      <div className="glass-card p-0 overflow-hidden">
-        <div className="p-6 border-b border-surface-800/50">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <h1 className="text-2xl font-bold text-white">{tech.name}</h1>
-              <p className="text-sm text-surface-400 mt-1 max-w-xl">{tech.description}</p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {tech.difficulty_counts && Object.entries(tech.difficulty_counts).map(([diff, count]) => (
-                count > 0 && (
-                  <div key={diff} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${difficultyConfig[diff]?.bg || ''}`}>
-                    {difficultyConfig[diff]?.label}: {count}
-                  </div>
-                )
-              ))}
-            </div>
+      <div className="glass-card p-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-white truncate">{tech.name}</h1>
+            <p className="text-sm text-surface-400 mt-1 max-w-xl">{tech.description}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {tech.difficulty_counts && Object.entries(tech.difficulty_counts).map(([diff, count]) => (
+              count > 0 && (
+                <div key={diff} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${difficultyConfig[diff]?.bg || ''}`}>
+                  {difficultyConfig[diff]?.label}: {count}
+                </div>
+              )
+            ))}
           </div>
         </div>
+      </div>
+      </StickyPageToolbar>
 
+      <div className="glass-card p-0 overflow-hidden">
         {tech.learning_path?.length > 0 && (
           <div className="px-6 py-4 border-b border-surface-800/50 bg-surface-900/30">
             <div className="flex items-center justify-between mb-3">

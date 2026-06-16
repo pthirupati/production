@@ -243,9 +243,20 @@ export default function ScenarioDetail() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 animate-fade-in pb-8">
-      <Link to="/scenarios" className="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-white transition-colors">
-        <ArrowLeft size={14} /> All Scenarios
-      </Link>
+      <div className="sticky top-0 z-20 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 py-3 mb-2 bg-surface-950/92 backdrop-blur-xl border-b border-surface-800/50">
+        <Link to="/scenarios" className="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-white transition-colors mb-2">
+          <ArrowLeft size={14} /> All Scenarios
+        </Link>
+        <div className="flex items-start justify-between gap-3 min-w-0">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold text-white truncate">{scenario.title}</h1>
+            <p className="text-xs text-surface-500 mt-0.5 truncate">{scenario.technology_name || scenario.category}</p>
+          </div>
+          <span className={`shrink-0 text-xs px-2 py-1 rounded border ${typeInfo.label === 'Fix' ? 'border-accent-cyan/30 text-accent-cyan' : 'border-surface-600 text-surface-400'}`}>
+            {typeInfo.label}
+          </span>
+        </div>
+      </div>
 
       {/* Issue / Jira bar — top only, no duplicate panel below */}
       <ScenarioIssueBar
@@ -293,7 +304,6 @@ export default function ScenarioDetail() {
           </button>
         </div>
 
-        <h1 className="text-2xl lg:text-3xl font-bold text-white mb-4">{scenario.title}</h1>
         {scenario.subtitle && <p className="text-surface-400 text-sm mb-4">{scenario.subtitle}</p>}
 
         {/* Stats row — matches reference layout */}

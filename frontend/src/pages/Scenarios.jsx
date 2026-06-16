@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Pagination from '../components/Pagination'
+import StickyPageToolbar from '../components/StickyPageToolbar'
 
 const typeConfig = {
   fix: { icon: Wrench, label: 'Fix', color: 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20' },
@@ -109,20 +110,21 @@ export default function Scenarios() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
+      <StickyPageToolbar>
       {/* Header */}
-      <div className="relative overflow-hidden glass-card p-8">
+      <div className="relative overflow-hidden glass-card p-6 sm:p-8">
         <div className="absolute inset-0 bg-gradient-to-r from-accent-purple/8 via-transparent to-accent-cyan/8" />
         <div className="absolute inset-0 bg-dots-pattern opacity-20" />
-        <div className="relative flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">Scenarios</h1>
-          <p className="text-surface-400 mt-1">
+        <div className="relative flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Scenarios</h1>
+          <p className="text-surface-400 mt-1 text-sm">
             {activeCount} challenge{activeCount !== 1 && 's'} available
           </p>
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all shrink-0 ${
             showFilters || hasFilters
               ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20'
               : 'bg-surface-800 text-surface-400 hover:text-white'
@@ -135,7 +137,7 @@ export default function Scenarios() {
         </div>
       </div>
 
-      {/* Search bar — always visible */}
+      {/* Search bar — stays visible while scrolling */}
       <div className="relative">
         <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-500" />
         <input
@@ -151,6 +153,7 @@ export default function Scenarios() {
           </button>
         )}
       </div>
+      </StickyPageToolbar>
 
       {/* Filter panel */}
       {showFilters && (

@@ -4,6 +4,15 @@ import { interviewsApi } from '../../api/interviews'
 import { adminApi } from '../../api/admin'
 import { useInterviewVoice } from '../../hooks/useInterviewVoice'
 import {
+  getMediaErrorMessage,
+  isMediaDevicesSupported,
+  queryMediaPermission,
+  requestUserMedia,
+  stopMediaStream,
+} from '../../utils/mediaDevices'
+import MediaPermissionDialog from '../../components/interviews/MediaPermissionDialog'
+import InterviewVideoPreview from '../../components/interviews/InterviewVideoPreview'
+import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Clock, MessageSquare, Terminal,
   Volume2, Plus, ExternalLink, Loader2, ArrowLeft, Calendar, X,
 } from 'lucide-react'
@@ -14,8 +23,8 @@ export default function InterviewRoom() {
   const [searchParams] = useSearchParams()
   const observerToken = searchParams.get('observer')
   const navigate = useNavigate()
-  const videoRef = useRef(null)
   const streamRef = useRef(null)
+  const [mediaStream, setMediaStream] = useState(null)
   const { speak, listen, config: voiceConfig, resolveVoiceProfile } = useInterviewVoice()
 
   const [round, setRound] = useState(null)
@@ -35,14 +44,117 @@ export default function InterviewRoom() {
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [showReschedule, setShowReschedule] = useState(false)
   const [rescheduleAt, setRescheduleAt] = useState('')
+  const [mediaError, setMediaError] = useState('')
+  const [mediaLoading, setMediaLoading] = useState(false)
+  const [permissionRequest, setPermissionRequest] = useState(null)
+  const [backgroundId, setBackgroundId] = useState('none')
 
   const endsAt = round?.ends_at ? new Date(round.ends_at).getTime() : null
 
   useEffect(() => {
-    if (!preflight && streamRef.current && videoRef.current) {
-      videoRef.current.srcObject = streamRef.current
+    return () => {
+      stopMediaStream(streamRef.current)
+      streamRef.current = null
+      setMediaStream(null)
     }
-  }, [preflight, started])
+  }, [])
+
+  const syncMediaState = (stream) => {
+    streamRef.current = stream
+    setMediaStream(stream || null)
+    const audioTrack = stream?.getAudioTracks()[0]
+    const videoTrack = stream?.getVideoTracks()[0]
+    setMicOn(!!audioTrack?.enabled)
+    setCameraOn(!!videoTrack?.enabled)
+  }
+
+  const runEnableMic = async () => {
+    const { stream } = await requestUserMedia({ audio: true, video: false }, streamRef.current)
+    streamRef.current = stream
+    stream.getAudioTracks().forEach((t) => { t.enabled = true })
+    syncMediaState(stream)
+    toast.success('Microphone enabled')
+  }
+
+  const runEnableCamera = async () => {
+    const { stream } = await requestUserMedia({ audio: false, video: true }, streamRef.current)
+    streamRef.current = stream
+    stream.getVideoTracks().forEach((t) => { t.enabled = true })
+    syncMediaState(stream)
+    toast.success('Camera enabled')
+  }
+
+  const runEnableBoth = async () => {
+    const { stream } = await requestUserMedia({ audio: true, video: true }, streamRef.current)
+    streamRef.current = stream
+    stream.getAudioTracks().forEach((t) => { t.enabled = true })
+    stream.getVideoTracks().forEach((t) => { t.enabled = true })
+    syncMediaState(stream)
+    toast.success('Camera and microphone ready')
+  }
+
+  const executeMediaRequest = async (type) => {
+    if (!isMediaDevicesSupported()) {
+      const msg = getMediaErrorMessage({ name: 'NotSupportedError' })
+      setMediaError(msg)
+      toast.error(msg)
+      return
+    }
+    setMediaLoading(true)
+    setMediaError('')
+    try {
+      if (type === 'audio') await runEnableMic()
+      else if (type === 'video') await runEnableCamera()
+      else await runEnableBoth()
+    } catch (err) {
+      const msg = getMediaErrorMessage(err)
+      setMediaError(msg)
+      toast.error(msg)
+      if (type === 'both') {
+        try {
+          if (!streamRef.current?.getAudioTracks().length) await runEnableMic()
+          if (!streamRef.current?.getVideoTracks().length) await runEnableCamera()
+          if (streamRef.current?.getAudioTracks().length && streamRef.current?.getVideoTracks().length) {
+            setMediaError('')
+          }
+        } catch {
+          /* partial failure already surfaced */
+        }
+      }
+    } finally {
+      setMediaLoading(false)
+      setPermissionRequest(null)
+    }
+  }
+
+  const requestMediaAccess = async (type) => {
+    if (!isMediaDevicesSupported()) {
+      const msg = getMediaErrorMessage({ name: 'NotSupportedError' })
+      setMediaError(msg)
+      toast.error(msg)
+      return
+    }
+    const needsMic = type === 'both' || type === 'audio'
+    const needsCam = type === 'both' || type === 'video'
+    const micState = needsMic ? await queryMediaPermission('microphone') : 'granted'
+    const camState = needsCam ? await queryMediaPermission('camera') : 'granted'
+
+    if (micState === 'denied' || camState === 'denied') {
+      const msg = getMediaErrorMessage({ name: 'NotAllowedError' })
+      setMediaError(msg)
+      toast.error(msg)
+      return
+    }
+    if ((!needsMic || micState === 'granted') && (!needsCam || camState === 'granted')) {
+      await executeMediaRequest(type)
+      return
+    }
+    setPermissionRequest(type)
+  }
+
+  const enableMic = () => requestMediaAccess('audio')
+  const enableCamera = () => requestMediaAccess('video')
+  const enableMedia = () => requestMediaAccess('both')
 
   useEffect(() => {
     if (observerToken) {
@@ -85,24 +197,11 @@ export default function InterviewRoom() {
     return () => clearInterval(t)
   }, [endsAt])
 
-  const enableMedia = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play().catch(() => {})
-      }
-      setMicOn(true)
-      setCameraOn(true)
-    } catch (err) {
-      toast.error(err?.message || 'Allow camera and microphone to continue')
-    }
-  }
-
   const cancelInterview = async () => {
     if (!window.confirm('Cancel this interview round?')) return
-    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+    stopMediaStream(streamRef.current)
+    streamRef.current = null
+    setMediaStream(null)
     try {
       if (round?.campaign_id) {
         await interviewsApi.cancelCampaign(round.campaign_id)
@@ -214,7 +313,9 @@ export default function InterviewRoom() {
   }
 
   const endInterview = async () => {
-    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+    stopMediaStream(streamRef.current)
+    streamRef.current = null
+    setMediaStream(null)
     try {
       const res = await interviewsApi.endRound(roundId)
       toast.success(res.passed ? 'Round passed!' : 'Round complete — see report')
@@ -263,6 +364,19 @@ export default function InterviewRoom() {
     return `${m}:${sec.toString().padStart(2, '0')}`
   }
 
+  const permissionDialog = (
+    <MediaPermissionDialog
+      open={!!permissionRequest}
+      type={permissionRequest || 'both'}
+      loading={mediaLoading}
+      onAllow={() => executeMediaRequest(permissionRequest || 'both')}
+      onBlock={() => {
+        setPermissionRequest(null)
+        setMediaError('Camera and microphone are required for interviews. Click Enable when you are ready.')
+      }}
+    />
+  )
+
   if (!round) return <p className="text-surface-500 p-8">Loading room…</p>
 
   if (observerMode) {
@@ -286,6 +400,7 @@ export default function InterviewRoom() {
 
   if (preflight) {
     return (
+      <>
       <div className="max-w-lg mx-auto p-8 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between gap-2">
           <Link to={`/interviews/campaign/${round.campaign_id || ''}`} className="text-xs text-surface-500 hover:text-white inline-flex items-center gap-1">
@@ -328,12 +443,53 @@ export default function InterviewRoom() {
             {' '}for AI Interview Studio.
           </span>
         </label>
-        <div className="aspect-video bg-surface-900 rounded-xl overflow-hidden border border-surface-700">
-          <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover mirror" />
+        <div className="aspect-video rounded-xl overflow-hidden border border-surface-700">
+          <InterviewVideoPreview
+            stream={mediaStream}
+            cameraOn={cameraOn}
+            backgroundId={backgroundId}
+            onBackgroundChange={setBackgroundId}
+            className="w-full h-full min-h-[200px]"
+            mirror
+            placeholder="Click Allow below — your browser will ask to use camera & mic"
+          />
         </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={enableMedia} className="btn-primary text-sm flex-1">
+        {mediaError && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+            {mediaError}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={enableMedia}
+            disabled={mediaLoading}
+            className="btn-primary text-sm flex-1 min-w-[140px] inline-flex items-center justify-center gap-2"
+          >
+            {mediaLoading ? <Loader2 size={14} className="animate-spin" /> : <Video size={14} />}
             Enable camera & mic
+          </button>
+          <button
+            type="button"
+            onClick={enableMic}
+            disabled={mediaLoading || micOn}
+            className={`text-sm px-3 py-2 rounded-lg border inline-flex items-center gap-1.5 ${
+              micOn ? 'border-accent-green/40 bg-accent-green/10 text-accent-green' : 'btn-secondary'
+            }`}
+          >
+            {micOn ? <Mic size={14} /> : <MicOff size={14} />}
+            {micOn ? 'Mic on' : 'Mic only'}
+          </button>
+          <button
+            type="button"
+            onClick={enableCamera}
+            disabled={mediaLoading || cameraOn}
+            className={`text-sm px-3 py-2 rounded-lg border inline-flex items-center gap-1.5 ${
+              cameraOn ? 'border-accent-green/40 bg-accent-green/10 text-accent-green' : 'btn-secondary'
+            }`}
+          >
+            {cameraOn ? <Video size={14} /> : <VideoOff size={14} />}
+            {cameraOn ? 'Camera on' : 'Camera only'}
           </button>
           {!round.is_sample && (
             <button type="button" onClick={() => setShowReschedule(s => !s)} className="btn-secondary text-sm">
@@ -363,10 +519,13 @@ export default function InterviewRoom() {
           I'm ready — start interview
         </button>
       </div>
+      {permissionDialog}
+      </>
     )
   }
 
   return (
+    <>
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-surface-950">
       <header className="flex items-center justify-between px-4 py-2 border-b border-surface-800 bg-surface-900/80 gap-2 overflow-x-auto">
         <div className="min-w-0 shrink">
@@ -413,14 +572,22 @@ export default function InterviewRoom() {
       <div className="flex-1 grid lg:grid-cols-3 gap-0 min-h-0">
         <div className="lg:col-span-2 flex flex-col min-h-0 border-r border-surface-800">
           <div className="relative flex-1 bg-black min-h-[200px]">
-            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+            <InterviewVideoPreview
+              stream={mediaStream}
+              cameraOn={cameraOn}
+              backgroundId={backgroundId}
+              onBackgroundChange={setBackgroundId}
+              className="absolute inset-0 w-full h-full"
+              mirror={false}
+              placeholder=""
+            />
             <div className="absolute bottom-3 left-3 flex gap-2">
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   const t = streamRef.current?.getAudioTracks()[0]
                   if (!t) {
-                    enableMedia()
+                    await requestMediaAccess('audio')
                     return
                   }
                   t.enabled = !t.enabled
@@ -432,10 +599,10 @@ export default function InterviewRoom() {
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   const t = streamRef.current?.getVideoTracks()[0]
                   if (!t) {
-                    enableMedia()
+                    await requestMediaAccess('video')
                     return
                   }
                   t.enabled = !t.enabled
@@ -559,5 +726,7 @@ export default function InterviewRoom() {
         </div>
       </div>
     </div>
+    {permissionDialog}
+    </>
   )
 }

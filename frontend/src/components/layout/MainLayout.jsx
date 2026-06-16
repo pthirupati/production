@@ -203,7 +203,7 @@ export default function MainLayout() {
 
       {/* Main column — only this area scrolls */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 relative z-10">
-        <header className="shrink-0 z-40 border-b border-surface-700/50 bg-surface-900/95 backdrop-blur-xl overflow-x-auto">
+        <header className="sticky top-0 shrink-0 z-40 border-b border-surface-700/50 bg-surface-900/95 backdrop-blur-xl overflow-x-auto">
           <div className="min-w-max lg:min-w-0">
           <div className="lg:hidden flex items-center gap-3 px-4 py-3">
             <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-surface-400" aria-label="Toggle menu">

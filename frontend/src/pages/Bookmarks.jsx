@@ -6,6 +6,7 @@ import {
   Server, ArrowRight, Loader2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import StickyPageToolbar from '../components/StickyPageToolbar'
 
 const typeConfig = {
   fix:  { icon: Wrench, label: 'Fix', color: 'text-accent-cyan' },
@@ -56,7 +57,8 @@ export default function Bookmarks() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
-      <div className="relative overflow-hidden glass-card p-8 mb-6">
+      <StickyPageToolbar>
+      <div className="relative overflow-hidden glass-card p-6 sm:p-8">
         <div className="absolute inset-0 bg-gradient-to-r from-accent-cyan/8 via-transparent to-accent-purple/8" />
         <div className="absolute inset-0 bg-dots-pattern opacity-20" />
         <div className="relative">
@@ -66,6 +68,7 @@ export default function Bookmarks() {
           </h1>
         </div>
       </div>
+      </StickyPageToolbar>
 
       {bookmarks.length === 0 ? (
         <div className="glass-card p-12 text-center">
