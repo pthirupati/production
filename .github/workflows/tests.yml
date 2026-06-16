@@ -4,6 +4,9 @@
 #
 #   ci          → unit tests on GitHub (PR-quality, no server needed)
 #   production  → full E2E on live server via SSH (all tabs, labs, admin)
+#
+# Recommended order: run **FixitLab Production** (deploy) first so the server has
+# migrations + scenario seed, then run FixitLab Tests with target=production.
 
 name: FixitLab Tests
 

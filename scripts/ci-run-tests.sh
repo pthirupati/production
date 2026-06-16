@@ -36,14 +36,35 @@ if [ "$RUN_UNIT" = "true" ] || [ "$RUN_UNIT" = "1" ] || [ "$RUN_E2E" = "true" ] 
   echo ""
   echo ">>> Rebuild backend / frontend / gateway (latest code)"
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build backend frontend-prod gateway
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d backend frontend-prod gateway
-  echo ">>> Waiting for backend healthy..."
-  for _ in $(seq 1 90); do
-    if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps backend 2>/dev/null | grep -q "(healthy)"; then
+
+  echo ">>> Start stack (staged — backend first, then gateway after healthy + migrate)"
+  docker network inspect fixitlab_labs >/dev/null 2>&1 || docker network create fixitlab_labs
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d database redis rabbitmq
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --force-recreate backend
+
+  echo ">>> Waiting for backend healthy (migrate + daphne)..."
+  backend_ok=0
+  for i in $(seq 1 90); do
+    if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python -c \
+      "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/'); assert r.status==200" 2>/dev/null; then
+      backend_ok=1
+      echo "  Backend healthy (attempt $i)"
       break
     fi
-    sleep 2
+    sleep 3
   done
+  if [ "$backend_ok" -ne 1 ]; then
+    echo "ERROR: Backend did not become healthy"
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" logs backend --tail 100 || true
+    exit 1
+  fi
+
+  echo ">>> Running migrations + seed (safe on existing data)"
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py migrate --noinput
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_scenarios --dir /scenarios || true
+
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d frontend-prod gateway \
+    celery_worker celery_provisioning celery_maintenance celery_beat
 fi
 
 fail=0
