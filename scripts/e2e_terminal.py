@@ -57,8 +57,15 @@ async def _check_terminal_async(session_id: str, token: str) -> tuple[bool, str]
                         continue
                     chunk = data.get("output") or ""
                     output += chunk
-                    if "root@" in output or "FixitLab Terminal Ready" in output:
+                    if (
+                        "root@" in output
+                        or "FixitLab Terminal Ready" in output
+                        or ("]#" in output and "@" in output)
+                        or ("]$" in output and "@" in output)
+                    ):
                         got_prompt = True
+                        if "@" in output and ("#" in output or "$" in output):
+                            break
                         if "root@" in output:
                             break
                 except asyncio.TimeoutError:
@@ -66,7 +73,11 @@ async def _check_terminal_async(session_id: str, token: str) -> tuple[bool, str]
                         break
                     continue
 
-            if "root@" not in output:
+            if not (
+                "root@" in output
+                or ("]#" in output and "@" in output)
+                or ("]$" in output and "@" in output)
+            ):
                 return False, f"no shell prompt (tail: {output[-120:]!r})"
 
             await asyncio.sleep(0.3)

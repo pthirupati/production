@@ -153,7 +153,7 @@ def resolve_simulation_validation_script(scenario_slug: str, validation_script: 
         (lambda s: "gpu" in s or "nvidia" in s, CANONICAL_GPU_CHECK),
         (lambda s: "mysql" in s, CANONICAL_MYSQL_CHECK),
         (lambda s: "postgres" in s, CANONICAL_POSTGRES_CHECK),
-        (lambda s: "endpoint" in s, CANONICAL_K8S_ENDPOINTS_CHECK),
+        (lambda s: "endpoint" in s or "service-not-ready" in s, CANONICAL_K8S_ENDPOINTS_CHECK),
         (lambda s: "pod" in s or "crashloop" in s or "k8s" in s or "kubernetes" in s, CANONICAL_K8S_POD_CHECK),
         (lambda s: "ansible" in s, CANONICAL_ANSIBLE_CHECK),
         (lambda s: "firewall" in s or "firewalld" in s, CANONICAL_FIREWALL_CHECK),

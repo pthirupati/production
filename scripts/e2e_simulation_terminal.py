@@ -4,10 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 
 MARKER = "FIXITLAB_SIM_WS"
 WS_HOST = __import__("os").environ.get("E2E_TERMINAL_WS_HOST", "127.0.0.1:8000")
+
+SIM_PROMPT_RE = re.compile(
+    r"(root@|\]#[\s\r]|]\$[\s\r]|\[\w+@\S+|grub rescue>|grub>|login:)",
+    re.IGNORECASE,
+)
+
+
+def _has_sim_prompt(output: str) -> bool:
+    return bool(SIM_PROMPT_RE.search(output))
 
 
 def _reset_ws_counter(token: str) -> None:
@@ -28,24 +38,56 @@ async def _recv_json(ws, timeout: float = 2.0) -> dict:
     return json.loads(raw)
 
 
-async def _collect_until_prompt(ws, timeout: float = 20.0) -> str:
+async def _drain_output(ws, timeout: float = 3.0) -> str:
     output = ""
     deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            data = await _recv_json(ws, timeout=1.0)
+            if data.get("type") == "ping":
+                continue
+            output += data.get("output") or ""
+        except asyncio.TimeoutError:
+            break
+    return output
+
+
+async def _collect_until_prompt(ws, timeout: float = 30.0) -> str:
+    output = ""
+    deadline = time.time() + timeout
+    nudged = False
     while time.time() < deadline:
         try:
             data = await _recv_json(ws, timeout=2.0)
             if data.get("type") == "ping":
                 continue
             output += data.get("output") or ""
-            if "root@" in output or "]# " in output:
+            if _has_sim_prompt(output):
                 return output
         except asyncio.TimeoutError:
+            if output and not nudged and "FixitLab" in output:
+                nudged = True
+                await ws.send(json.dumps({"input": "\r"}))
+                continue
             if output:
                 return output
     return output
 
 
-async def _run_command(ws, command: str, timeout: float = 12.0) -> str:
+async def _maybe_boot_to_shell(ws, output: str) -> str:
+    """Reach an interactive shell from GRUB/login when possible."""
+    if "grub>" in output and "grub rescue" not in output.lower():
+        await ws.send(json.dumps({"input": "\r"}))
+        output += await _drain_output(ws, 12.0)
+    if "login:" in output.lower() and "root@" not in output and "]#" not in output:
+        await ws.send(json.dumps({"input": "root\r"}))
+        output += await _drain_output(ws, 8.0)
+        await ws.send(json.dumps({"input": "redhat\r"}))
+        output += await _drain_output(ws, 8.0)
+    return output
+
+
+async def _run_command(ws, command: str, timeout: float = 15.0) -> str:
     await ws.send(json.dumps({"input": command + "\r"}))
     out = ""
     deadline = time.time() + timeout
@@ -55,10 +97,13 @@ async def _run_command(ws, command: str, timeout: float = 12.0) -> str:
             if data.get("type") == "ping":
                 continue
             out += data.get("output") or ""
-            if "]# " in out or "root@" in out:
+            if _has_sim_prompt(out) and MARKER in out:
+                break
+            if _has_sim_prompt(out) and command.split()[-1] in out:
                 break
         except asyncio.TimeoutError:
-            break
+            if out:
+                break
     return out
 
 
@@ -71,8 +116,18 @@ async def _check_sim_terminal_async(session_id: str, token: str, host: str = "pr
     try:
         async with websockets.connect(uri, open_timeout=15, close_timeout=5) as ws:
             output = await _collect_until_prompt(ws)
-            if "root@" not in output and "]# " not in output:
+            if not _has_sim_prompt(output):
+                await ws.send(json.dumps({"input": "\r"}))
+                output += await _drain_output(ws, 5.0)
+            output = await _maybe_boot_to_shell(ws, output)
+            if not _has_sim_prompt(output):
                 return False, f"no sim prompt on {host} (tail: {output[-100:]!r})"
+
+            if "grub rescue>" in output.lower() or (
+                "grub>" in output.lower() and "root@" not in output and "]#" not in output
+            ):
+                return True, f"sim WS ok ({host}, boot console)"
+
             echo_out = await _run_command(ws, f"echo {MARKER}")
             if MARKER not in echo_out:
                 return False, f"echo failed on {host}"

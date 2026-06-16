@@ -37,8 +37,27 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
     elif sim_type == "python":
         state.hostname = "dev-server"
         state._mkdir("/home/dev")
+        state._mkdir("/opt/app")
         if not state.read_file("/home/dev/app.py"):
             state._write_file("/home/dev/app.py", '#!/usr/bin/env python3\nprint("hello"\n')
+        if "pip" in slug:
+            state._write_file("/opt/app/main.py", 'import requests\n# missing package\n')
+        else:
+            state._write_file("/opt/app/main.py", 'print("hello"\n')
+
+    if "unbound" in slug:
+        state._mkdir("/opt/scripts")
+        state._write_file(
+            "/opt/scripts/deploy.sh",
+            "#!/bin/bash\nset -u\necho ${MISSING_VAR}\n",
+        )
+
+    if "docker" in slug:
+        state.services.setdefault(
+            "docker",
+            SimService("docker", active="active", enabled="enabled", description="Docker Engine"),
+        )
+        engine._container_running = False
 
     # Always ensure docker service exists for generic/docker scenarios
     if sim_type in ("generic", "rhel") or "docker" in slug:
