@@ -1,0 +1,38 @@
+title: Application Unreachable — Firewall Blocking Port 8080
+slug: linux-iptables-allow-port
+difficulty: easy
+category: Linux Administration
+description: |
+  A web application is running and listening on port 8080 but is not reachable from
+  external clients. The firewalld service is active and blocking inbound connections to
+  port 8080 because no rule has been added to allow it. The firewall must be updated
+  to permit port 8080/tcp traffic permanently so the rule survives a firewalld reload.
+
+initial_state: |
+  Simulated RHEL 9 server. A web application is confirmed running: ss -tlnp | grep 8080
+  shows the process listening on 0.0.0.0:8080. However, curl http://localhost:8080 works
+  locally but the same URL is unreachable from external hosts. firewall-cmd --list-all
+  shows no rule for port 8080.
+
+objectives:
+  - Confirm the service is listening locally with ss -tlnp | grep 8080
+  - Check the current firewall rules with firewall-cmd --list-all
+  - Add a permanent rule with firewall-cmd --permanent --add-port=8080/tcp
+  - Reload the firewall with firewall-cmd --reload
+  - Verify the rule is active with firewall-cmd --list-ports
+  - Test external access with curl from a different host or verify rule with nmap
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Add the permanent rule: firewall-cmd --permanent --add-port=8080/tcp. You must also run firewall-cmd --reload to apply it to the running ruleset — permanent alone does not activate immediately.'
+    cost: 10
+    order: 1
+  - content: 'Alternatively, use a service definition: firewall-cmd --permanent --add-service=http if using port 80. For custom ports, use --add-port. Verify with firewall-cmd --list-all after reload.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

@@ -1,0 +1,40 @@
+title: Set Up NFS Server and Client Mount
+slug: linux-nfs-setup
+difficulty: medium
+category: Linux Administration
+description: |
+  A shared directory /srv/shared exists on the NFS server and must be exported to client
+  machines on the 192.168.1.0/24 network. The NFS server packages are not yet installed.
+  After configuring the server, the client must mount the share and the mount must persist
+  across reboots via /etc/fstab using the _netdev mount option.
+
+initial_state: |
+  Simulated RHEL 9 server acting as both NFS server and client for this lab. The directory
+  /srv/shared exists and contains sample files. The nfs-utils package is not installed.
+  Attempting to showmount -e localhost fails with "clnt_create: RPC: Program not registered"
+  because the NFS server is not yet running.
+
+objectives:
+  - Install nfs-utils with yum install -y nfs-utils
+  - Configure /etc/exports to export /srv/shared with rw,sync,no_subtree_check options
+  - Run exportfs -a and systemctl enable --now nfs-server to start the NFS server
+  - Mount the NFS share on the client with mount server:/srv/shared /mnt/shared
+  - Add a persistent fstab entry using the _netdev option and verify with mount -a
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+hints:
+  - content: 'Add to /etc/exports: /srv/shared 192.168.1.0/24(rw,sync,no_subtree_check) then run exportfs -a to activate the export.'
+    cost: 10
+    order: 1
+  - content: 'Enable and start the NFS server: systemctl enable --now nfs-server. Verify exports with showmount -e localhost before attempting the client mount.'
+    cost: 20
+    order: 2
+  - content: 'fstab entry format: server:/srv/shared /mnt/shared nfs defaults,_netdev 0 0. The _netdev option tells systemd to mount only after network is up.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

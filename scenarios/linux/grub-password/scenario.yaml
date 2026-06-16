@@ -1,0 +1,41 @@
+title: Set GRUB Password to Prevent Unauthorized Boot Options
+slug: linux-grub-password
+difficulty: medium
+category: Linux Administration
+description: |
+  Physical security requires that the GRUB bootloader be password-protected so that
+  unauthorized users cannot boot into single-user mode, modify kernel parameters, or
+  bypass root authentication by appending init=/bin/bash to the kernel command line.
+  A PBKDF2-hashed GRUB password must be configured and the GRUB configuration must be
+  regenerated to apply the change.
+
+initial_state: |
+  Simulated RHEL 9 server. The GRUB bootloader has no password set. Pressing 'e' at the
+  GRUB menu allows editing of boot entries without any authentication. A security audit
+  has flagged this as a critical finding. The server uses BIOS boot with GRUB2 at
+  /boot/grub2/grub.cfg.
+
+objectives:
+  - Generate a PBKDF2 password hash with grub2-mkpasswd-pbkdf2 and save the output
+  - Edit /etc/grub.d/40_custom to add set superusers="root" and the password_pbkdf2 line
+  - Regenerate the GRUB config with grub2-mkconfig -o /boot/grub2/grub.cfg
+  - Verify the grub.cfg contains the superusers and password entries
+  - Test that GRUB prompts for username/password when pressing 'e' at the boot menu
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run grub2-mkpasswd-pbkdf2 and enter your desired password twice. It outputs a hash starting with grub.pbkdf2.sha512. Copy the entire hash string.'
+    cost: 10
+    order: 1
+  - content: 'Add to /etc/grub.d/40_custom: set superusers="root" and password_pbkdf2 root grub.pbkdf2.sha512.10000.<your-hash>. Then run grub2-mkconfig -o /boot/grub2/grub.cfg'
+    cost: 20
+    order: 2
+  - content: 'For UEFI systems, the grub.cfg path is /boot/efi/EFI/redhat/grub.cfg instead of /boot/grub2/grub.cfg. Check with ls /boot/efi/ to determine which applies.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

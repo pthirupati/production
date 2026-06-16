@@ -1,0 +1,41 @@
+title: Create Chroot SFTP User Who Cannot SSH
+slug: linux-sftp-chroot
+difficulty: medium
+category: Linux Administration
+description: |
+  A vendor needs SFTP access to upload files to /srv/uploads but must not be able to
+  SSH into the server and run commands. A chroot SFTP configuration in sshd_config will
+  restrict the vendor to SFTP-only access within a jailed directory. The user's shell
+  must be set to /sbin/nologin to prevent SSH login and the sshd_config Match Group
+  directive must enforce the SFTP restriction.
+
+initial_state: |
+  Simulated RHEL 9 server. A request has come in to create SFTP-only access for user
+  'sftpuser'. No such user exists yet. The /srv/uploads directory exists. Currently any
+  user with a valid password can both SSH and SFTP to this server.
+
+objectives:
+  - Create user sftpuser with shell /sbin/nologin: useradd -m -s /sbin/nologin sftpuser
+  - Set a password and create the sftp group, add sftpuser to it
+  - Add to /etc/ssh/sshd_config: Match Group sftp with ChrootDirectory /srv/uploads and ForceCommand internal-sftp
+  - Ensure /srv/uploads is owned by root (chroot requirement)
+  - Restart sshd and verify sftp sftpuser@localhost works
+  - Verify ssh sftpuser@localhost is rejected with "This account is currently not available"
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'The ChrootDirectory must be owned by root and not writable by any other user. Create a subdirectory inside for the user to write to: mkdir /srv/uploads/files && chown sftpuser:sftpuser /srv/uploads/files'
+    cost: 10
+    order: 1
+  - content: 'Add to /etc/ssh/sshd_config at the end: Match Group sftp\n  ChrootDirectory /srv/uploads\n  ForceCommand internal-sftp\n  AllowTcpForwarding no\n  X11Forwarding no'
+    cost: 20
+    order: 2
+  - content: 'Test SFTP: sftp sftpuser@localhost — should connect and see the chroot directory. Test SSH: ssh sftpuser@localhost — should fail with "This account is currently not available".'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

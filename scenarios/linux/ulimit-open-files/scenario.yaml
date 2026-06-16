@@ -1,0 +1,41 @@
+title: Application Fails with Too Many Open Files (EMFILE)
+slug: linux-ulimit-open-files
+difficulty: medium
+category: Linux Administration
+description: |
+  A Java application server is crashing with "java.io.IOException: Too many open files"
+  in its logs. The system default limit of 1024 open file descriptors is too low for a
+  busy application server that opens thousands of connections and file handles. The limit
+  must be raised permanently in /etc/security/limits.conf and the service must be
+  restarted to pick up the new limit.
+
+initial_state: |
+  Simulated RHEL 9 server. The appserver service is failing. Checking the application
+  log at /var/log/appserver/app.log shows repeated errors:
+  "ERROR: java.io.IOException: Too many open files (EMFILE)"
+  Running ulimit -n as the 'appuser' shows 1024, which is the system default.
+
+objectives:
+  - Confirm the current limit with ulimit -n (shows 1024)
+  - Check /proc/<pid>/limits for the running process's actual limits
+  - Edit /etc/security/limits.conf to add soft and hard nofile limits for appuser
+  - Set: appuser soft nofile 65536 and appuser hard nofile 65536
+  - Restart the appserver service and verify the new limit with ulimit -n as appuser
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Add to /etc/security/limits.conf: appuser soft nofile 65536 and appuser hard nofile 65536. These take effect on new login sessions and service restarts.'
+    cost: 10
+    order: 1
+  - content: 'For systemd-managed services, also check the service unit file — you may need to add LimitNOFILE=65536 to the [Service] section if PAM limits are not applied to systemd services.'
+    cost: 20
+    order: 2
+  - content: 'Verify the limit applied to the process: cat /proc/$(pgrep -f appserver)/limits | grep open'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

@@ -1,0 +1,41 @@
+title: Configure autofs for On-Demand NFS Mounting
+slug: linux-autofs-setup
+difficulty: medium
+category: Linux Administration
+description: |
+  The team wants NFS shares to be mounted on-demand rather than at boot time. autofs
+  provides this capability by mounting filesystems automatically when they are accessed
+  and unmounting them after a period of inactivity. The NFS server at 192.168.1.10 is
+  exporting /srv/data. autofs must be configured to mount this share at /mnt/nfs/data
+  automatically when a user navigates to that path.
+
+initial_state: |
+  Simulated RHEL 9 server. The autofs package is not installed. The NFS server at
+  192.168.1.10 is exporting /srv/data (verified with showmount -e 192.168.1.10).
+  Attempting to cd /mnt/nfs/data fails with "No such file or directory" because
+  autofs is not yet configured to handle that path.
+
+objectives:
+  - Install autofs with yum install -y autofs
+  - Configure /etc/auto.master to add the /mnt/nfs indirect map pointing to /etc/auto.nfs
+  - Create /etc/auto.nfs with the entry: data -rw,soft 192.168.1.10:/srv/data
+  - Enable and start autofs with systemctl enable --now autofs
+  - Verify the mount triggers automatically when running cd /mnt/nfs/data
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+hints:
+  - content: 'Add to /etc/auto.master: /mnt/nfs /etc/auto.nfs --timeout=60. The timeout controls how long after last access before autofs unmounts the share.'
+    cost: 10
+    order: 1
+  - content: 'Create /etc/auto.nfs with content: data -rw,soft,intr 192.168.1.10:/srv/data. The key "data" becomes the subdirectory under /mnt/nfs.'
+    cost: 20
+    order: 2
+  - content: 'After systemctl start autofs, test with: cd /mnt/nfs/data && ls. autofs will auto-create the mount point and mount the NFS share on first access.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

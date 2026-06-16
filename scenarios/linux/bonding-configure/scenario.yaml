@@ -1,0 +1,41 @@
+title: Configure Network Bonding Mode 1 (Active-Backup) for HA
+slug: linux-bonding-configure
+difficulty: hard
+category: Linux Administration
+description: |
+  The server has two physical NICs, eth0 and eth1, but only one is active at a time.
+  Network bonding in mode 1 (active-backup) must be configured so that if eth0 fails,
+  eth1 automatically becomes the active link with no service interruption. This requires
+  creating a bond interface, enslaving both NICs, and configuring the bonding options in
+  the network scripts. The link failover must be verified.
+
+initial_state: |
+  Simulated RHEL 9 server with two NICs: eth0 (192.168.1.100/24, active) and eth1 (up,
+  no IP assigned). There is currently no bonding configured. Running cat /proc/net/bonding/
+  returns "No such file or directory". A network outage is expected during maintenance
+  and the server needs HA networking before then.
+
+objectives:
+  - Create /etc/sysconfig/network-scripts/ifcfg-bond0 with BONDING_OPTS="mode=1 miimon=100"
+  - Configure ifcfg-eth0 and ifcfg-eth1 as SLAVE with MASTER=bond0
+  - Bring up the bond with ifup bond0 and verify with ip link show bond0
+  - Read /proc/net/bonding/bond0 to confirm active slave and bonding mode
+  - Test failover by bringing down eth0 with ip link set eth0 down and verifying connectivity
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+hints:
+  - content: 'Create ifcfg-bond0 with: DEVICE=bond0, BONDING_MASTER=yes, BONDING_OPTS="mode=1 miimon=100", BOOTPROTO=none, IPADDR=192.168.1.100, PREFIX=24, ONBOOT=yes'
+    cost: 10
+    order: 1
+  - content: 'Configure slave interfaces with: DEVICE=eth0, MASTER=bond0, SLAVE=yes, ONBOOT=yes. Set BOOTPROTO=none and remove any IPADDR from the slave ifcfg files.'
+    cost: 20
+    order: 2
+  - content: 'After bringing up the bond, verify with: cat /proc/net/bonding/bond0. Look for "Active Slave: eth0" and "MII Status: up" for both slaves.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

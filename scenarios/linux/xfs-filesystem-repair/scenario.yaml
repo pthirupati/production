@@ -1,0 +1,40 @@
+title: XFS Filesystem Corrupt — Repair with xfs_repair
+slug: linux-xfs-filesystem-repair
+difficulty: hard
+category: Linux Administration
+description: |
+  The XFS filesystem on /dev/sdb1, normally mounted at /var/data, has become corrupt
+  after an unclean shutdown. The kernel refuses to mount it and dmesg shows XFS metadata
+  errors. The xfs_repair utility must be used to scan and repair the filesystem before
+  it can be remounted. Data integrity must be verified after the repair completes.
+
+initial_state: |
+  Simulated RHEL 9 server. /var/data is not mounted. dmesg shows XFS mount errors for
+  /dev/sdb1 including "Metadata CRC error" and "xfs_mountfs: corrupted superblock".
+  Applications that store data in /var/data are failing to start. The directory
+  /var/data exists but ls /var/data shows nothing since the filesystem is unmounted.
+
+objectives:
+  - Read dmesg | grep -i xfs to understand the corruption error
+  - Confirm the filesystem is unmounted with mount | grep sdb1
+  - Run xfs_repair /dev/sdb1 and review its output for repaired structures
+  - Mount the filesystem with mount /dev/sdb1 /var/data
+  - Verify data integrity by listing /var/data and checking key files are present
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+hints:
+  - content: 'CRITICAL: Never run xfs_repair on a mounted filesystem. Always confirm unmounted with umount /var/data and mount | grep sdb1 first.'
+    cost: 10
+    order: 1
+  - content: 'Run xfs_repair /dev/sdb1 (no flags needed for a standard repair). If the log is dirty, it will prompt you to run xfs_repair -L to zero the log — only do this as a last resort.'
+    cost: 20
+    order: 2
+  - content: 'After repair, mount with: mount /dev/sdb1 /var/data. Use xfs_info /var/data to confirm the filesystem mounted cleanly.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

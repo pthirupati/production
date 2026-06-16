@@ -1,0 +1,42 @@
+title: Migrate LVM Data from Failing Disk to New Disk
+slug: linux-lvm-migrate-disk
+difficulty: hard
+category: Linux Administration
+description: |
+  SMART diagnostics show that /dev/sda, a physical volume in volume group vg_data, is
+  developing bad sectors and will fail soon. A new replacement disk /dev/sdb has been
+  provisioned. All data must be migrated from /dev/sda to /dev/sdb using pvmove without
+  any service downtime or data loss. After migration, the old disk must be safely removed
+  from the volume group.
+
+initial_state: |
+  Simulated RHEL 9 server. Volume group vg_data contains one PV: /dev/sda. The LV lv_data
+  is mounted at /data and actively used. smartctl -H /dev/sda shows "FAILED!" for the
+  overall health assessment. /dev/sdb is a new blank disk of equal or larger size that
+  has been hot-plugged and is visible via lsblk.
+
+objectives:
+  - Initialize the new disk with pvcreate /dev/sdb
+  - Extend the volume group to include the new disk: vgextend vg_data /dev/sdb
+  - Move all extents from the old disk: pvmove /dev/sda /dev/sdb (this runs online, no downtime)
+  - After pvmove completes, remove the old PV: vgreduce vg_data /dev/sda
+  - Wipe the old disk metadata with pvremove /dev/sda
+  - Verify the data volume is intact with df -h /data and ls /data
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+hints:
+  - content: 'pvmove can run while the filesystem is mounted and data is being accessed. It moves extents in the background. Monitor progress with pvdisplay /dev/sda — free PE count increases as extents move.'
+    cost: 10
+    order: 1
+  - content: 'Full sequence: pvcreate /dev/sdb && vgextend vg_data /dev/sdb && pvmove /dev/sda /dev/sdb && vgreduce vg_data /dev/sda && pvremove /dev/sda'
+    cost: 25
+    order: 2
+  - content: 'Verify pvmove completed: pvdisplay /dev/sda should show 0 allocated PE. Only then run vgreduce to remove it from the VG.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

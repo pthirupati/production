@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import InterviewDemoWidget from '../components/InterviewDemoWidget'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { scenarioApi } from '../api/scenarios'
@@ -346,6 +347,68 @@ export default function Home() {
                 <p className="text-sm text-surface-400 leading-relaxed">{desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="bg-gradient-stripe" />
+
+      {/* ══════ AI Interview Studio Demo ══════ */}
+      <section className="relative overflow-hidden py-24">
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgb(139 92 246 / 0.08) 0%, transparent 70%)' }} />
+        <div className="glow-orb-purple absolute -left-40 top-1/2 -translate-y-1/2" />
+        <div className="glow-orb-cyan absolute right-0 bottom-0" />
+        <div className="max-w-7xl mx-auto px-6 relative">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            {/* Left: copy */}
+            <div className="animate-slide-up">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-purple/10 border border-accent-purple/20 text-accent-purple text-xs font-bold uppercase tracking-widest mb-6">
+                <Mic2 size={13} className="animate-pulse" /> AI Interview Studio
+              </div>
+              <h2 className="text-4xl lg:text-5xl font-black text-white mb-6 leading-tight">
+                Get Hired Faster with<br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-purple via-accent-cyan to-accent-pink">AI-Powered Mock Interviews</span>
+              </h2>
+              <p className="text-surface-300 text-lg mb-8 leading-relaxed">
+                Practice with AI interviewers across technical, behavioral, and system design rounds. Get instant STAR-framework scoring, keyword detection, and actionable feedback — all 100% free, no API key required.
+              </p>
+              <div className="space-y-4 mb-10">
+                {[
+                  { icon: Mic2, title: 'Voice-powered sessions', desc: 'Speak naturally — browser STT captures your answer in real time', color: 'purple' },
+                  { icon: Star, title: 'STAR scoring engine', desc: 'Every answer scored on Situation, Task, Action, Result coverage', color: 'cyan' },
+                  { icon: Shield, title: '100% free — no paid APIs', desc: 'Our open scoring engine runs entirely in-process, zero external cost', color: 'green' },
+                  { icon: Award, title: 'FIXIT-INT certificates', desc: 'Earn verifiable interview certificates to add to your resume', color: 'amber' },
+                ].map(({ icon: Icon, title, desc, color }) => (
+                  <div key={title} className="flex items-start gap-3 group">
+                    <div className={`w-9 h-9 rounded-lg bg-accent-${color}/10 border border-accent-${color}/20 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-110 transition-transform duration-200`}>
+                      <Icon size={16} className={`text-accent-${color}`} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{title}</p>
+                      <p className="text-xs text-surface-400 mt-0.5">{desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link to={isAuthenticated ? '/interview-hub' : '/register'} className="btn-primary px-7 py-3 flex items-center gap-2 group shadow-lg shadow-accent-purple/25 hover:shadow-accent-purple/40 transition-all">
+                  <Mic2 size={16} className="group-hover:scale-110 transition-transform" />
+                  Start Mock Interview
+                  <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+                </Link>
+                <Link to="/mock-interviews" className="btn-secondary px-6 py-3 flex items-center gap-2">
+                  <Play size={14} /> Watch Demo
+                </Link>
+              </div>
+            </div>
+            {/* Right: live animated demo */}
+            <div className="hidden lg:block animate-slide-in-right">
+              <InterviewDemoWidget />
+            </div>
+          </div>
+          {/* Mobile demo — shown below text on small screens */}
+          <div className="lg:hidden mt-12">
+            <InterviewDemoWidget />
           </div>
         </div>
       </section>

@@ -210,7 +210,7 @@ jobs:
       (needs.test-backend.result == 'skipped' || needs.test-backend.result == 'success') &&
       (needs.test-frontend.result == 'skipped' || needs.test-frontend.result == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     environment: production
     outputs:
       prod_host: ${{ steps.host.outputs.host }}

@@ -1,0 +1,42 @@
+title: Restore Accidentally Deleted Logical Volume Using LVM Archive
+slug: linux-lv-deleted-restore
+difficulty: hard
+category: Linux Administration
+description: |
+  An operator accidentally ran lvremove on the wrong logical volume, deleting lv_data
+  from vg_prod while intending to remove a different volume. The data on the underlying
+  physical extents has not been overwritten — LVM keeps configuration archives in
+  /etc/lvm/archive/ that allow metadata to be restored. The LV metadata must be restored
+  from the archive before any new LV is created in its place.
+
+initial_state: |
+  Simulated RHEL 9 server. The volume group vg_prod exists but lvs shows lv_data is
+  missing. The physical extents containing the data are still intact but unallocated.
+  Applications using /data are down. /etc/lvm/archive/ contains timestamped backup files
+  of the VG metadata from before the accidental deletion.
+
+objectives:
+  - List available LVM archives with ls -ltr /etc/lvm/archive/
+  - Identify the most recent archive file for vg_prod before the deletion occurred
+  - Restore the LV metadata with vgcfgrestore -f /etc/lvm/archive/vg_prod_<timestamp>.vg vg_prod
+  - Activate the restored logical volume with lvchange -ay vg_prod/lv_data
+  - Mount the logical volume and verify data is intact
+  - Review the data and confirm no corruption with application-level checks
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check /etc/lvm/archive/ — LVM automatically backs up VG metadata here before any change. Pick the timestamp just before the lvremove was run.'
+    cost: 10
+    order: 1
+  - content: 'Restore with: vgcfgrestore -f /etc/lvm/archive/vg_prod_<timestamp>.vg vg_prod. This restores LV metadata only — the actual data on disk is untouched.'
+    cost: 25
+    order: 2
+  - content: 'After vgcfgrestore, activate with lvchange -ay /dev/vg_prod/lv_data. Then mount and run fsck if needed before trusting the data. Do NOT run mkfs on the restored LV.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

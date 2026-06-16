@@ -1,0 +1,40 @@
+title: SELinux Blocking Service from Binding to Non-Standard Port
+slug: linux-selinux-blocking
+difficulty: medium
+category: Linux Administration
+description: |
+  nginx has been configured to listen on port 8080 instead of the default port 80, but
+  the service fails to start. SELinux in Enforcing mode is preventing nginx from binding
+  to port 8080 because it is not in the list of allowed HTTP ports. The correct fix is
+  to add the port to SELinux's http_port_t type using semanage rather than disabling SELinux.
+
+initial_state: |
+  Simulated RHEL 9 server with SELinux in Enforcing mode. nginx is configured to listen
+  on port 8080 in /etc/nginx/nginx.conf. Running systemctl start nginx fails with:
+  "nginx: [emerg] bind() to 0.0.0.0:8080 failed (13: Permission denied)"
+  journalctl -u nginx shows the service failing immediately on start.
+
+objectives:
+  - Check SELinux status with sestatus and confirm Enforcing mode
+  - Inspect /var/log/audit/audit.log or run ausearch -c nginx for AVC denied messages
+  - Identify port 8080 is not in the http_port_t SELinux type
+  - Add the port with semanage port -a -t http_port_t -p tcp 8080
+  - Start nginx with systemctl start nginx and verify it is running
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: ausearch -c nginx --raw | audit2allow -M nginx_port to see the SELinux denial. The audit log will show type=AVC denied for name_bind on port 8080.'
+    cost: 10
+    order: 1
+  - content: 'Add the port to SELinux policy: semanage port -a -t http_port_t -p tcp 8080. Verify with semanage port -l | grep http_port_t before starting nginx.'
+    cost: 20
+    order: 2
+  - content: 'If semanage is not available, install policycoreutils-python-utils: yum install -y policycoreutils-python-utils'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

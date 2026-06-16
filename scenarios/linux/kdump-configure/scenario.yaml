@@ -1,0 +1,41 @@
+title: Configure kdump to Capture Kernel Crash Dumps
+slug: linux-kdump-configure
+difficulty: medium
+category: Linux Administration
+description: |
+  The server had an unexpected kernel panic last week but no vmcore dump was captured
+  for analysis because kdump was not configured. kdump uses kexec to boot a capture
+  kernel when the main kernel crashes and saves the memory dump to disk. It must be
+  properly installed and configured so future crashes produce a vmcore that can be
+  analyzed with crash or gdb.
+
+initial_state: |
+  Simulated RHEL 9 server. systemctl status kdump shows "Unit kdump.service could not
+  be found". The /etc/default/grub file does not have crashkernel= in GRUB_CMDLINE_LINUX.
+  The previous kernel panic left no trace in /var/crash/ because kdump was absent.
+
+objectives:
+  - Install kexec-tools with yum install -y kexec-tools
+  - Add crashkernel=auto to GRUB_CMDLINE_LINUX in /etc/default/grub
+  - Regenerate GRUB config with grub2-mkconfig -o /boot/grub2/grub.cfg
+  - Configure /etc/kdump.conf to set path /var/crash and core_collector makedumpfile -l --message-level 1
+  - Enable and start kdump with systemctl enable --now kdump
+  - Reboot and verify kdump service is active after reboot
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'After adding crashkernel=auto to /etc/default/grub, run grub2-mkconfig -o /boot/grub2/grub.cfg to regenerate. A reboot is required for the crashkernel memory reservation to take effect.'
+    cost: 10
+    order: 1
+  - content: 'Key /etc/kdump.conf settings: path /var/crash (dump destination) and core_collector makedumpfile -l --message-level 1 -d 31 (compress dump, exclude unnecessary pages).'
+    cost: 20
+    order: 2
+  - content: 'Verify kdump is ready after reboot with: systemctl status kdump — it should show "Kdump is operational". If it shows failed, check available memory for the capture kernel.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

@@ -1,0 +1,42 @@
+title: Network Slow and Large Transfers Failing — MTU Mismatch
+slug: linux-network-slow-mtu
+difficulty: medium
+category: Linux Administration
+description: |
+  Small network packets like SSH keystrokes work fine but large file transfers are either
+  failing entirely or running at a fraction of expected speed. This is a classic symptom
+  of an MTU mismatch — the interface MTU is set higher than the network path supports,
+  causing packet fragmentation or silent drops. The path MTU must be discovered and the
+  interface MTU must be adjusted accordingly.
+
+initial_state: |
+  Simulated RHEL 9 server connected through a VPN. SSH sessions are responsive but scp
+  and rsync transfers stall after a few kilobytes. ping -c 3 8.8.8.8 succeeds but
+  ping -M do -s 1472 8.8.8.8 (a 1500-byte packet with DF bit) returns "Message too long".
+  The interface eth0 shows MTU 1500 with ip link show.
+
+objectives:
+  - Test path MTU with ping -M do -s 1472 <target> and decrease packet size until pings succeed
+  - Calculate correct MTU (payload size that succeeds + 28 bytes for IP/ICMP headers)
+  - Check current MTU with ip link show eth0
+  - Set the correct MTU: ip link set dev eth0 mtu 1450 (or appropriate value found)
+  - Make the MTU change persistent in /etc/sysconfig/network-scripts/ifcfg-eth0 with MTU=1450
+  - Verify large scp transfer works after MTU adjustment
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Binary search for the correct MTU: try ping -M do -s 1400 target, then increase or decrease. Add 28 (IP+ICMP header) to the working payload size to get the actual MTU.'
+    cost: 10
+    order: 1
+  - content: 'Set MTU immediately: ip link set dev eth0 mtu 1450. To persist across reboots, add MTU=1450 to /etc/sysconfig/network-scripts/ifcfg-eth0 and run nmcli con reload.'
+    cost: 20
+    order: 2
+  - content: 'Common MTU values: 1500 (standard Ethernet), 1492 (PPPoE), 1450 (many VPN tunnels), 9000 (jumbo frames). The VPN overhead determines how much to reduce from the standard 1500.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

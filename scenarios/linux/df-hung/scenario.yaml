@@ -1,0 +1,40 @@
+title: df -Th Hangs Indefinitely Due to Stale NFS Mount
+slug: linux-df-hung
+difficulty: medium
+category: Linux Administration
+description: |
+  Running df -Th on the server hangs forever and must be killed with Ctrl-C. This is a
+  classic symptom of a stale NFS mount — the NFS server is unreachable but the mount
+  point is still listed in /proc/mounts. Any command that touches the mount point will
+  block waiting for the unresponsive NFS server. The stale mount must be force-unmounted
+  and the fstab entry corrected to prevent recurrence.
+
+initial_state: |
+  Simulated RHEL 9 server. Running df -Th hangs and never returns. The NFS server at
+  192.168.1.50 is no longer reachable. /proc/mounts shows /mnt/oldshare as an NFS mount.
+  Applications trying to access /mnt/oldshare are blocked in D (uninterruptible sleep) state.
+
+objectives:
+  - Identify the stale NFS mount using cat /proc/mounts | grep nfs and findmnt
+  - Check for processes blocked on the stale mount with lsof | grep mnt/oldshare
+  - Force unmount the stale mount with umount -f -l /mnt/oldshare
+  - Confirm df -Th now completes normally
+  - Update /etc/fstab to add the _netdev and soft,timeo=30 options or comment out the stale entry
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Use cat /proc/mounts | grep nfs to identify NFS mounts without running df. Never run df or ls on the stale mount point directly as they will block.'
+    cost: 10
+    order: 1
+  - content: 'Force unmount with: umount -f -l /mnt/oldshare. The -f flag forces unmount of an unreachable NFS, -l does a lazy unmount detaching from the namespace immediately.'
+    cost: 20
+    order: 2
+  - content: 'Add the soft and timeo=30 options to the fstab entry so future NFS issues time out instead of hanging: server:/share /mnt/oldshare nfs defaults,_netdev,soft,timeo=30 0 0'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

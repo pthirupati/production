@@ -347,6 +347,12 @@ body::after {
   transform: translateZ(0);
 }
 
+/* ─── Voice waveform bar animation (InterviewDemoWidget) ─── */
+@keyframes voice-bar {
+  from { transform: scaleY(0.3); opacity: 0.5; }
+  to   { transform: scaleY(1.0); opacity: 1.0; }
+}
+
 .gradient-border {
   position: relative;
 }

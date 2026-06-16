@@ -1,0 +1,42 @@
+title: Configure Device Multipath for SAN LUN
+slug: linux-multipath-setup
+difficulty: hard
+category: Linux Administration
+description: |
+  A SAN LUN is presenting to this server through two separate FC/iSCSI paths, appearing
+  as both /dev/sdb and /dev/sdc. Without multipath, the operating system treats these
+  as two separate disks, which leads to data corruption if both are written to. Device
+  mapper multipath must be configured to present both paths as a single logical device
+  with automatic failover.
+
+initial_state: |
+  Simulated RHEL 9 server. lsblk shows /dev/sdb and /dev/sdc, both with identical size
+  (the same SAN LUN seen through two HBA paths). The device-mapper-multipath package
+  is not installed. Writing to both /dev/sdb and /dev/sdc without multipath risks
+  data corruption from split writes.
+
+objectives:
+  - Install device-mapper-multipath with yum install -y device-mapper-multipath
+  - Generate a default multipath config with mpathconf --enable --with_multipathd y
+  - Get the LUN WWID with /sbin/scsi_id --whitelisted --device=/dev/sdb
+  - Add a blacklist exception for the WWID in /etc/multipath.conf
+  - Start multipathd with systemctl enable --now multipathd
+  - Verify the multipath device with multipath -ll (should show mpatha with two paths)
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run mpathconf --enable --with_multipathd y to create a working /etc/multipath.conf with defaults. This also enables and starts multipathd in one step.'
+    cost: 10
+    order: 1
+  - content: 'Get the WWID: /sbin/scsi_id -g -u -d /dev/sdb. Add a multipaths section to /etc/multipath.conf referencing this WWID to give the device a friendly alias.'
+    cost: 25
+    order: 2
+  - content: 'Verify with multipath -ll — each path should show: H:C:T:L format, ready state, and the path priority. The output shows the device map name (e.g., mpatha) and both paths underneath.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

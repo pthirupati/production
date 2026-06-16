@@ -1,0 +1,38 @@
+title: Generate sosreport for Red Hat Support Case
+slug: linux-sosreport-generate
+difficulty: easy
+category: Linux Administration
+description: |
+  A Red Hat support case has been opened for a production issue and the support engineer
+  has requested a sosreport diagnostic bundle. sosreport collects system configuration,
+  logs, hardware information, and service status into a compressed archive that support
+  engineers use to diagnose problems without needing direct server access.
+
+initial_state: |
+  Simulated RHEL 9 server. A support ticket has been opened with Red Hat for an
+  intermittent network performance issue. The support engineer's first request is:
+  "Please provide a sosreport from the affected system." The sos package may or may
+  not be installed on this server.
+
+objectives:
+  - Check if sos is installed with rpm -q sos; install with yum install -y sos if missing
+  - Run sos report to generate the diagnostic bundle
+  - Find the output file in /var/tmp/sosreport-<hostname>-<date>.tar.xz
+  - Record the MD5 checksum from the sos report output for integrity verification
+  - Verify the archive is complete by listing its contents with tar -tvf <sosreport>.tar.xz | head
+  - Share the file path and MD5 with the support engineer
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run sos report (or sosreport on older systems) as root. It will ask for your case number and name. Enter the support case number when prompted.'
+    cost: 10
+    order: 1
+  - content: 'The output file is saved to /var/tmp/ and sos prints the exact path and MD5 at the end of the run. Use scp or sftp to transfer it to a location accessible to the support engineer.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

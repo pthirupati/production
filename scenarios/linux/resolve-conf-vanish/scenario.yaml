@@ -1,0 +1,42 @@
+title: /etc/resolv.conf Reverts After Reboot — DNS Lost
+slug: linux-resolve-conf-vanish
+difficulty: medium
+category: Linux Administration
+description: |
+  DNS resolution works fine until the server is rebooted, at which point /etc/resolv.conf
+  is overwritten by NetworkManager and the manually added nameserver entries are gone.
+  This is because NetworkManager manages /etc/resolv.conf by default and overwrites any
+  manual edits. The correct fix is to configure DNS through NetworkManager rather than
+  editing /etc/resolv.conf directly.
+
+initial_state: |
+  Simulated RHEL 9 server. /etc/resolv.conf currently contains:
+  nameserver 8.8.8.8
+  nameserver 8.8.4.4
+  DNS resolution works now but a previous reboot cleared these entries. NetworkManager
+  is running and manages the primary network connection "System eth0".
+
+objectives:
+  - Confirm NetworkManager is managing the connection with nmcli con show
+  - Set DNS persistently using nmcli: nmcli con mod "System eth0" ipv4.dns "8.8.8.8 8.8.4.4"
+  - Disable NetworkManager from overwriting resolv.conf with PEERDNS=no in the ifcfg file
+  - Apply changes with nmcli con up "System eth0"
+  - Reboot and verify /etc/resolv.conf still contains the correct nameservers
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Use nmcli instead of editing /etc/resolv.conf: nmcli con mod "System eth0" ipv4.dns "8.8.8.8 8.8.4.4" && nmcli con up "System eth0". This persists across reboots.'
+    cost: 10
+    order: 1
+  - content: 'To prevent NetworkManager from overwriting DNS settings received from DHCP, add PEERDNS=no to /etc/sysconfig/network-scripts/ifcfg-eth0. Then reload the connection.'
+    cost: 20
+    order: 2
+  - content: 'Verify DNS is set in the connection: nmcli con show "System eth0" | grep DNS. The ipv4.dns field should show your configured nameservers.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

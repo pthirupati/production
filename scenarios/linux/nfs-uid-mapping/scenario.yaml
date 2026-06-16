@@ -1,0 +1,37 @@
+title: NFS Files Show UID Numbers Instead of Usernames
+slug: linux-nfs-uid-mapping
+difficulty: easy
+category: Linux Administration
+description: |
+  An NFS share is mounted and accessible, but ls -l output displays numeric UID and GID
+  values (e.g., "1001 1001") instead of the username and group name. This happens when
+  the NFS ID mapping daemon is not configured or the domain settings differ between client
+  and server. Installing and configuring nfs-idmapd resolves the problem.
+
+initial_state: |
+  Simulated RHEL 9 server. The NFS share is mounted at /mnt/shared and files are readable.
+  Running ls -ltr /mnt/shared shows output like:
+  -rw-r--r-- 1 1001 1001 1234 Jun 10 09:00 report.txt
+  instead of the expected username. The nfs-idmapd service is not running.
+
+objectives:
+  - Confirm the uid mapping issue with ls -l /mnt/shared
+  - Install or enable the rpcbind and nfs-idmapd services
+  - Configure /etc/idmapd.conf to set the correct Domain matching the NFS server
+  - Restart the nfs-idmapd service with systemctl restart nfs-idmapd
+  - Verify ls -l /mnt/shared now shows usernames instead of numeric IDs
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check systemctl status nfs-idmapd. If not running, start it. The domain in /etc/idmapd.conf must match on both client and server.'
+    cost: 10
+    order: 1
+  - content: 'Edit /etc/idmapd.conf and set Domain = your.domain.com under [General]. After editing, run: systemctl restart nfs-idmapd and remount the share to see the change.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

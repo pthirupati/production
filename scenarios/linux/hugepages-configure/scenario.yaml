@@ -1,0 +1,43 @@
+title: Configure HugePages for Oracle Database
+slug: linux-hugepages-configure
+difficulty: medium
+category: Linux Administration
+description: |
+  An Oracle database instance requires 512 HugePages (2MB each = 1GB total) to be
+  pre-allocated for the SGA (System Global Area). Without HugePages, Oracle must manage
+  thousands of 4KB TLB entries which degrades performance significantly. HugePages must
+  be configured in the kernel and verified before the database startup scripts are updated.
+
+initial_state: |
+  Simulated RHEL 9 server running Oracle Database 19c. The database is failing to allocate
+  shared memory from HugePages. cat /proc/meminfo | grep Huge shows:
+  HugePages_Total: 0
+  HugePages_Free:  0
+  Hugepagesize:    2048 kB
+  The database alert log shows: "ORA-27102: out of memory" during startup.
+
+objectives:
+  - Check current HugePage status with cat /proc/meminfo | grep -i huge
+  - Set vm.nr_hugepages=512 in /etc/sysctl.conf
+  - Apply immediately with sysctl -p and verify vm.nr_hugepages is 512
+  - Confirm allocation with cat /proc/meminfo | grep HugePages_Total showing 512
+  - Add the oracle user to the hugepages group or set vm.hugetlb_shm_group in sysctl.conf
+  - Verify HugePages_Free is 512 before starting Oracle
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Add to /etc/sysctl.conf: vm.nr_hugepages = 512. Then run sysctl -p to apply. Check /proc/meminfo | grep Huge to verify the pages were allocated.'
+    cost: 10
+    order: 1
+  - content: 'If HugePages_Total is 512 but HugePages_Free is 0 after setting, the system may not have enough contiguous memory. Try setting the value and rebooting — hugepages are best allocated at boot time.'
+    cost: 20
+    order: 2
+  - content: 'For Oracle, also set: kernel.shmmax and kernel.shmall to cover the SGA size, and add the oracle user GID to vm.hugetlb_shm_group in sysctl.conf.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

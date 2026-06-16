@@ -1,0 +1,36 @@
+title: Configure Sudo Access for a User Without Full Root
+slug: linux-sudo-access
+difficulty: easy
+category: Linux Administration
+description: |
+  The 'devops' user needs to run systemctl commands to manage services as part of their
+  job, but should not have unrestricted root access. Sudo must be configured to grant
+  targeted access to systemctl only. The visudo command must be used to safely edit the
+  sudoers configuration to avoid syntax errors that could lock out all sudo access.
+
+initial_state: |
+  Simulated RHEL 9 server. User 'devops' exists. Running sudo systemctl status nginx
+  as devops returns: "devops is not in the sudoers file. This incident will be reported."
+  The devops user needs systemctl access without being given full sudo rights.
+
+objectives:
+  - Open the sudoers file safely with visudo
+  - Add the rule: devops ALL=(ALL) NOPASSWD:/usr/bin/systemctl
+  - Save and exit visudo without syntax errors
+  - Switch to the devops user and verify sudo systemctl status nginx works
+  - Confirm devops cannot run other privileged commands like sudo bash
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Always use visudo to edit /etc/sudoers — it validates syntax before saving. Never use vi /etc/sudoers directly as a syntax error will break all sudo access.'
+    cost: 10
+    order: 1
+  - content: 'Add this line: devops ALL=(ALL) NOPASSWD:/usr/bin/systemctl. Alternatively, create /etc/sudoers.d/devops with the same content for cleaner management.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

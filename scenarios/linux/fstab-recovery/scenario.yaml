@@ -1,0 +1,43 @@
+title: Server Stuck in Emergency Mode After Bad fstab Entry
+slug: linux-fstab-recovery
+difficulty: hard
+category: Linux Administration
+description: |
+  A server is stuck in emergency maintenance mode after a bad /etc/fstab entry was added
+  for a new disk. The UUID referenced in fstab does not match any existing block device,
+  causing systemd to fail during boot and drop to an emergency shell. The fstab must be
+  corrected from the emergency shell to restore normal boot. This is a high-pressure
+  scenario that simulates real-world boot recovery.
+
+initial_state: |
+  Simulated RHEL 9 server in emergency shell. Boot shows:
+  "[FAILED] Failed to mount /data."
+  "See 'journalctl -xb' for details."
+  "You are in emergency mode. After logging in, type 'journalctl -xb' to view system logs..."
+  Root password prompt is displayed. The root filesystem is mounted read-only.
+
+objectives:
+  - Enter the root password to get a shell in emergency mode
+  - Remount the root filesystem read-write with mount -o remount,rw /
+  - Check dmesg and journalctl -xb to identify which fstab entry failed
+  - Use blkid to find the correct UUID for the disk
+  - Edit /etc/fstab to correct the wrong UUID or comment out the bad entry
+  - Run systemctl reboot to restart and verify normal boot completes
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'In emergency shell, run dmesg | grep -i "failed\|error\|fstab" to identify the failing mount. The UUID in /etc/fstab may not match any block device — check with blkid.'
+    cost: 10
+    order: 1
+  - content: 'Remount root read-write first: mount -o remount,rw /. Then edit /etc/fstab: either fix the UUID using blkid output, or comment out the bad line with # to skip it on reboot.'
+    cost: 20
+    order: 2
+  - content: 'After editing fstab, run mount -a to test all entries before rebooting. If mount -a returns errors, fix them before rebooting — otherwise you will be back in emergency mode.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

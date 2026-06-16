@@ -1,0 +1,41 @@
+title: Passwordless SSH Key Authentication Not Working
+slug: linux-ssh-key-auth-fail
+difficulty: medium
+category: Linux Administration
+description: |
+  A developer has copied their public key to the server with ssh-copy-id but SSH still
+  prompts for a password instead of authenticating with the key. This is a common problem
+  caused by incorrect permissions on the ~/.ssh directory or authorized_keys file, or by
+  sshd_config having PubkeyAuthentication disabled. On SELinux systems an incorrect file
+  context can also prevent sshd from reading authorized_keys.
+
+initial_state: |
+  Simulated RHEL 9 server. User 'developer' has ~/.ssh/authorized_keys in place with
+  the correct public key. Running ssh developer@localhost still prompts for a password.
+  Running ssh -v developer@localhost shows "Server refused our key" in the verbose output.
+  SELinux is in Enforcing mode.
+
+objectives:
+  - Check ~/.ssh directory permissions — must be 700 (chmod 700 ~/.ssh)
+  - Check ~/.ssh/authorized_keys permissions — must be 600 (chmod 600 ~/.ssh/authorized_keys)
+  - Verify /etc/ssh/sshd_config has PubkeyAuthentication yes and AuthorizedKeysFile .ssh/authorized_keys
+  - Restore SELinux context on the .ssh directory with restorecon -Rv ~/.ssh
+  - Test key auth with ssh -v and confirm no password is requested
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check permissions: ls -la ~/.ssh — the .ssh directory must be 700 and authorized_keys must be 600. sshd silently rejects keys if permissions are too open.'
+    cost: 10
+    order: 1
+  - content: 'Fix permissions: chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys. Then check SELinux: restorecon -Rv ~/.ssh to restore the correct ssh_home_t context.'
+    cost: 20
+    order: 2
+  - content: 'Check sshd_config: grep -i pubkey /etc/ssh/sshd_config — ensure PubkeyAuthentication yes is set and not commented out. Restart sshd after any config change.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

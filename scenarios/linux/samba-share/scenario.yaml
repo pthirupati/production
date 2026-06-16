@@ -1,0 +1,41 @@
+title: Configure Samba Share for Windows Client Access
+slug: linux-samba-share
+difficulty: medium
+category: Linux Administration
+description: |
+  Windows workstations in the office need to access /srv/share on this Linux server as
+  a network drive. Samba must be installed and configured to expose this directory as a
+  Windows-compatible SMB share with proper authentication. The firewall must also be
+  opened for Samba traffic and the configuration must be validated before enabling the
+  service.
+
+initial_state: |
+  Simulated RHEL 9 server. The directory /srv/share exists and contains project files.
+  The samba package is not installed. Windows clients attempting to browse the network
+  cannot see this server. The server's IP is 192.168.1.20.
+
+objectives:
+  - Install samba with yum install -y samba
+  - Configure /etc/samba/smb.conf with a [projects] share section pointing to /srv/share
+  - Create a Samba user with smbpasswd -a smbuser to set the Samba password
+  - Enable and start smb and nmb services with systemctl enable --now smb nmb
+  - Open the firewall with firewall-cmd --permanent --add-service=samba && firewall-cmd --reload
+  - Validate configuration with testparm and verify with smbclient -L localhost -U smbuser
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+hints:
+  - content: 'Add to /etc/samba/smb.conf: [projects] path = /srv/share browseable = yes writable = yes valid users = smbuser. Run testparm to validate syntax.'
+    cost: 10
+    order: 1
+  - content: 'The Samba user must exist as a Linux user first: useradd smbuser. Then set the Samba-specific password: smbpasswd -a smbuser. These are separate credential stores.'
+    cost: 20
+    order: 2
+  - content: 'Also check SELinux: setsebool -P samba_export_all_rw 1 if SELinux is enforcing, and set the correct context: chcon -t samba_share_t /srv/share'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

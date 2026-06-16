@@ -1,0 +1,42 @@
+title: New User Cannot Login — Existing Users Unaffected
+slug: linux-user-login-fail
+difficulty: medium
+category: Linux Administration
+description: |
+  A new user account 'appuser' was created by the ops team but the user reports being
+  unable to log in. SSH returns "Permission denied" immediately and console login also
+  fails. All existing users can log in normally. There are multiple possible causes:
+  a locked password, an invalid shell, a missing home directory, or pam_nologin being
+  active. Each must be checked systematically.
+
+initial_state: |
+  Simulated RHEL 9 server. The user 'appuser' exists in /etc/passwd. Attempting to
+  switch to the user with su - appuser fails. SSH login as appuser is also rejected.
+  Other users like 'admin' and 'root' can log in without issue.
+  The account was created with: useradd -m appuser but no password was set.
+
+objectives:
+  - Check /etc/shadow for appuser — the password field will show !! indicating locked
+  - Set a password with passwd appuser to unlock the account
+  - Verify the shell in /etc/passwd is not /sbin/nologin or /bin/false
+  - Check that the home directory /home/appuser exists with correct ownership
+  - Confirm /etc/nologin does not exist (if it does, remove it as it blocks all non-root logins)
+  - Verify login succeeds with su - appuser
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check: grep appuser /etc/shadow — if the password field starts with !! the account has no password set and is locked. Run passwd appuser to set one.'
+    cost: 10
+    order: 1
+  - content: 'Check the shell: grep appuser /etc/passwd — last field should be /bin/bash or /bin/sh, not /sbin/nologin. Change with: usermod -s /bin/bash appuser'
+    cost: 15
+    order: 2
+  - content: 'Check if /etc/nologin exists: ls /etc/nologin. If present, it blocks all non-root logins system-wide. Remove it if login lock was unintended: rm /etc/nologin'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

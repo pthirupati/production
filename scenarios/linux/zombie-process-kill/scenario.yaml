@@ -1,0 +1,42 @@
+title: Zombie Processes Accumulating — System Becoming Slow
+slug: linux-zombie-process-kill
+difficulty: medium
+category: Linux Administration
+description: |
+  The system has a growing number of zombie (Z state) processes shown in ps aux. Zombie
+  processes are child processes that have exited but whose parent has not called wait()
+  to collect the exit status. They hold a PID and process table slot but no memory or CPU.
+  However, if enough accumulate they can exhaust PID space. The parent process must be
+  identified and restarted to reap the zombies.
+
+initial_state: |
+  Simulated RHEL 9 server. Running ps aux | grep Z shows many processes in Z (zombie) state:
+  appworker 1234 0.0 0.0 0 0 ? Z 10:00 0:00 [child] <defunct>
+  The system load is elevated and some new processes cannot be created. The zombie parent
+  is a Python-based job worker that does not properly handle SIGCHLD.
+
+objectives:
+  - Identify zombie processes with ps aux | awk '$8 == "Z" { print }'
+  - Find the parent PID of a zombie with ps -o ppid= -p <zombie_pid>
+  - Use pstree -s <ppid> to understand the parent process tree
+  - Send SIGCHLD to the parent with kill -SIGCHLD <ppid> to trigger wait()
+  - If SIGCHLD does not work, restart the parent process to reap all zombies
+  - Verify zombie count drops to zero with ps aux | grep -c Z
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Find zombie parent: ps -eo pid,ppid,stat,comm | grep Z — note the PPID column. The parent is responsible for reaping; killing the zombie directly has no effect.'
+    cost: 10
+    order: 1
+  - content: 'Send SIGCHLD to the parent: kill -SIGCHLD <ppid>. If the parent ignores it, restart the parent service. Killing a zombie directly (kill <zombie_pid>) does nothing.'
+    cost: 20
+    order: 2
+  - content: 'Zombies cannot be killed directly — they are already dead. Only the parent can reap them by calling wait(). If the parent itself is stuck, killing the parent will reparent zombies to init (PID 1) which will reap them.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

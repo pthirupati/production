@@ -1,0 +1,39 @@
+title: Add Swap Space to Prevent OOM Kills
+slug: linux-swap-create
+difficulty: easy
+category: Linux Administration
+description: |
+  The system is experiencing out-of-memory (OOM) kills because it has no swap space
+  configured. swapon -s shows empty output. A 2GB swap file must be created, configured,
+  and activated to provide a memory pressure safety net. The swap must also be added to
+  /etc/fstab to persist across reboots.
+
+initial_state: |
+  Simulated RHEL 9 server. Running free -h shows 0B swap:
+  Mem:  3.7G  3.5G  200M  0B   0B  100M
+  Swap:   0B    0B    0B
+  The kernel OOM killer has recently terminated the database process due to memory
+  exhaustion. swapon --show returns no output.
+
+objectives:
+  - Create a 2GB swap file with fallocate -l 2G /swapfile (or dd if fallocate unavailable)
+  - Set secure permissions with chmod 600 /swapfile
+  - Initialize it as swap with mkswap /swapfile
+  - Activate it immediately with swapon /swapfile
+  - Verify with swapon --show and free -h
+  - Add to /etc/fstab: /swapfile none swap sw 0 0
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Create with fallocate: fallocate -l 2G /swapfile. If fallocate is unavailable: dd if=/dev/zero of=/swapfile bs=1M count=2048. Then chmod 600 /swapfile.'
+    cost: 10
+    order: 1
+  - content: 'Initialize and activate: mkswap /swapfile && swapon /swapfile. Add to fstab: /swapfile none swap sw 0 0 — the 0 0 means no dump and no fsck.'
+    cost: 15
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

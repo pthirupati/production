@@ -1,0 +1,40 @@
+title: LVM — Create PV, VG, LV and Extend Filesystem
+slug: linux-lvm-create-extend
+difficulty: medium
+category: Linux Administration
+description: |
+  A new disk /dev/sdb has been assigned to the server but no partitions or LVM structures
+  have been configured on it. Storage must be provisioned using LVM so that applications
+  can use the space. After creating the initial logical volume and mounting it, the volume
+  must then be extended to accommodate growing data requirements.
+
+initial_state: |
+  Simulated RHEL 9 server. A second disk /dev/sdb is visible via lsblk but has no
+  partitions or LVM metadata. The /mnt/data directory exists but is empty and unmounted.
+  Applications are waiting on storage to be provisioned before they can start.
+
+objectives:
+  - Run pvcreate /dev/sdb to initialize the disk as an LVM physical volume
+  - Create a volume group named vg_data using vgcreate vg_data /dev/sdb
+  - Create a logical volume named lv_data using lvcreate -l 50%FREE -n lv_data vg_data
+  - Format the logical volume with mkfs.xfs /dev/vg_data/lv_data
+  - Mount the logical volume at /mnt/data and verify with df -h
+  - Extend the logical volume with lvextend -l +100%FREE and grow the filesystem with xfs_growfs
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run lsblk to confirm /dev/sdb is visible and unpartitioned, then use pvcreate /dev/sdb to initialize it as a physical volume.'
+    cost: 10
+    order: 1
+  - content: 'After pvcreate, run: vgcreate vg_data /dev/sdb to create the volume group, then lvcreate -l 50%FREE -n lv_data vg_data to create the logical volume.'
+    cost: 20
+    order: 2
+  - content: 'To extend: lvextend -l +100%FREE /dev/vg_data/lv_data then xfs_growfs /mnt/data (for XFS). Use resize2fs for ext4 filesystems.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

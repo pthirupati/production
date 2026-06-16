@@ -1,0 +1,37 @@
+title: Filesystem Mounted Read-Only After Disk Errors
+slug: linux-fs-readonly-fix
+difficulty: medium
+category: Linux Administration
+description: |
+  The /data filesystem has been automatically remounted read-only by the kernel after
+  detecting I/O errors on the underlying block device. Applications writing to /data are
+  now failing. The filesystem must be checked with fsck to clear errors and then safely
+  remounted read-write. The fstab entry should also be updated with the nofail option to
+  prevent the system from hanging on boot if the disk has issues in future.
+
+initial_state: |
+  Simulated RHEL 9 server. Attempting to write to /data fails with "Read-only file system".
+  dmesg shows recent EXT4-fs errors and an I/O error on /dev/sdb1. The /data directory
+  is currently mounted but all write operations are rejected by the kernel.
+
+objectives:
+  - Identify the read-only condition using mount | grep /data and dmesg | grep -i error
+  - Unmount /data cleanly with umount /data
+  - Run fsck.ext4 -y /dev/sdb1 to automatically repair filesystem errors
+  - Remount the filesystem read-write with mount /data and verify with touch /data/test
+  - Update /etc/fstab to add the nofail option for the /data entry
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check dmesg | tail -30 for I/O errors and EXT4-fs remount messages to confirm the filesystem went read-only due to disk errors.'
+    cost: 10
+    order: 1
+  - content: 'Unmount first: umount /data, then run fsck.ext4 -y /dev/sdb1. The -y flag auto-answers yes to all repair prompts.'
+    cost: 20
+    order: 2
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium
