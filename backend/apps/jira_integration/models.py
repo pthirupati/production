@@ -31,8 +31,8 @@ class JiraTicketLog(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["issue_key"]),
-            models.Index(fields=["session", "created_at"]),
+            models.Index(fields=["issue_key"], name="jira_integ_issue_k_idx"),
+            models.Index(fields=["session", "created_at"], name="jira_integ_session_idx"),
         ]
 
     def __str__(self):
@@ -73,7 +73,7 @@ class UserScenarioJiraTicket(models.Model):
     class Meta:
         unique_together = ("user", "scenario")
         indexes = [
-            models.Index(fields=["issue_key"]),
+            models.Index(fields=["issue_key"], name="jira_integ_user_issue_idx"),
         ]
 
     def __str__(self):
@@ -114,5 +114,5 @@ class JiraWebhookEvent(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["jira_issue_key", "processed"]),
+            models.Index(fields=["jira_issue_key", "processed"], name="jira_webhook_issue_proc_idx"),
         ]

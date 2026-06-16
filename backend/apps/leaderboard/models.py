@@ -25,8 +25,8 @@ class LeaderboardEntry(models.Model):
         unique_together = ("user", "scenario")
         ordering = ["rank"]
         indexes = [
-            models.Index(fields=["rank"]),
-            models.Index(fields=["scenario", "rank"]),
+            models.Index(fields=["rank"], name="leaderboard_rank_idx"),
+            models.Index(fields=["scenario", "rank"], name="leaderboard_scenario_rank_idx"),
         ]
 
     def __str__(self):

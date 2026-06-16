@@ -177,8 +177,8 @@ class Scenario(models.Model):
     class Meta:
         ordering = ["technology", "difficulty", "title"]
         indexes = [
-            models.Index(fields=["is_active", "technology"]),
-            models.Index(fields=["is_active", "difficulty"]),
+            models.Index(fields=["is_active", "technology"], name="scenario_active_tech_idx"),
+            models.Index(fields=["is_active", "difficulty"], name="scenario_active_diff_idx"),
         ]
 
     @property

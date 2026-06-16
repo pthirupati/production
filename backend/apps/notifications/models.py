@@ -19,8 +19,8 @@ class EmailLog(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["-created_at"]),
-            models.Index(fields=["status"]),
+            models.Index(fields=["-created_at"], name="notificatio_created_4c6dec_idx"),
+            models.Index(fields=["status"], name="notificatio_status_18a272_idx"),
         ]
 
     def __str__(self):
@@ -114,8 +114,8 @@ class Notification(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["user", "-created_at"]),
-            models.Index(fields=["user", "read"]),
+            models.Index(fields=["user", "-created_at"], name="notificatio_user_id_05b4bc_idx"),
+            models.Index(fields=["user", "read"], name="notificatio_user_id_878a13_idx"),
         ]
 
     def __str__(self):
@@ -143,7 +143,7 @@ class MarketingEmailLog(models.Model):
     class Meta:
         ordering = ["-sent_at"]
         indexes = [
-            models.Index(fields=["user", "campaign", "-sent_at"]),
+            models.Index(fields=["user", "campaign", "-sent_at"], name="notificatio_user_id_8a1f2c_idx"),
         ]
 
     def __str__(self):

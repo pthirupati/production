@@ -27,9 +27,9 @@ class UserScenarioProgress(models.Model):
     class Meta:
         unique_together = ("user", "scenario")
         indexes = [
-            models.Index(fields=["user", "completed"]),
-            models.Index(fields=["scenario", "completed"]),
-            models.Index(fields=["completed", "best_score"]),
+            models.Index(fields=["user", "completed"], name="progress_user_completed_idx"),
+            models.Index(fields=["scenario", "completed"], name="progress_scenario_completed_idx"),
+            models.Index(fields=["completed", "best_score"], name="progress_completed_score_idx"),
         ]
 
     def __str__(self):

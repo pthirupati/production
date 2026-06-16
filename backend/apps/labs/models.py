@@ -20,7 +20,7 @@ class CommandHistory(models.Model):
     class Meta:
         ordering = ["timestamp"]
         indexes = [
-            models.Index(fields=["session", "timestamp"]),
+            models.Index(fields=["session", "timestamp"], name="labs_comman_session_bfa6ad_idx"),
         ]
 
     def __str__(self):
@@ -131,12 +131,12 @@ class LabSession(models.Model):
     class Meta:
         ordering = ["-started_at"]
         indexes = [
-            models.Index(fields=["user", "status"]),
-            models.Index(fields=["status", "started_at"]),
-            models.Index(fields=["user", "started_at"]),  # daily count queries
-            models.Index(fields=["instance_id"]),  # cleanup lookups
-            models.Index(fields=["container_id"]),  # cleanup lookups
-            models.Index(fields=["status", "expires_at"]),  # expiry cleanup queries
+            models.Index(fields=["user", "status"], name="labs_labses_user_id_386172_idx"),
+            models.Index(fields=["status", "started_at"], name="labs_labses_status_8decd6_idx"),
+            models.Index(fields=["user", "started_at"], name="labs_labses_user_started_idx"),
+            models.Index(fields=["instance_id"], name="labs_labses_instance_idx"),
+            models.Index(fields=["container_id"], name="labs_labses_container_idx"),
+            models.Index(fields=["status", "expires_at"], name="labs_labses_status_expires_idx"),
         ]
 
     def save(self, *args, **kwargs):

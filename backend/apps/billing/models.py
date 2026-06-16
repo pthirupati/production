@@ -79,9 +79,9 @@ class TechnologySubscription(models.Model):
         unique_together = ("user", "technology")
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["user", "is_active"]),
-            models.Index(fields=["subscription_id"]),
-            models.Index(fields=["is_active", "expires_at"]),
+            models.Index(fields=["user", "is_active"], name="billing_tec_user_id_706c8d_idx"),
+            models.Index(fields=["subscription_id"], name="billing_tec_subscri_084dfb_idx"),
+            models.Index(fields=["is_active", "expires_at"], name="techsub_active_expires_idx"),
         ]
 
     def __str__(self):
@@ -149,9 +149,9 @@ class PaymentTransaction(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["user", "-created_at"]),
-            models.Index(fields=["status"]),
-            models.Index(fields=["gateway_order_id"]),
+            models.Index(fields=["user", "-created_at"], name="billing_pay_user_created_idx"),
+            models.Index(fields=["status"], name="billing_pay_status_idx"),
+            models.Index(fields=["gateway_order_id"], name="billing_pay_gateway_order_idx"),
         ]
 
     def __str__(self):
@@ -221,8 +221,8 @@ class SubscriptionInvoice(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["user", "-created_at"]),
-            models.Index(fields=["invoice_number"]),
+            models.Index(fields=["user", "-created_at"], name="billing_sub_user_id_idx"),
+            models.Index(fields=["invoice_number"], name="billing_sub_invoice_num_idx"),
         ]
 
     def __str__(self):

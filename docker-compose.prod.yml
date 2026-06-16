@@ -224,28 +224,27 @@ services:
     restart: unless-stopped
 
   pgbouncer:
-    image: bitnami/pgbouncer:1.22.1
+    image: edoburu/pgbouncer:latest
     container_name: fixitlab_pgbouncer
     environment:
-      - POSTGRESQL_HOST=database
-      - POSTGRESQL_PORT=5432
-      - POSTGRESQL_USERNAME=${POSTGRES_USER:-fixitlab}
-      - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRESQL_DATABASE=${POSTGRES_DB:-fixitlab}
-      - PGBOUNCER_DATABASE=${POSTGRES_DB:-fixitlab}
-      - PGBOUNCER_POOL_MODE=transaction
-      - PGBOUNCER_MAX_CLIENT_CONN=1000
-      - PGBOUNCER_DEFAULT_POOL_SIZE=25
-      - PGBOUNCER_SERVER_IDLE_TIMEOUT=600
-      - PGBOUNCER_CLIENT_IDLE_TIMEOUT=0
-      - PGBOUNCER_IGNORE_STARTUP_PARAMETERS=extra_float_digits
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-fixitlab}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB:-fixitlab}
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=1000
+      - DEFAULT_POOL_SIZE=25
+      - SERVER_IDLE_TIMEOUT=600
+      - CLIENT_IDLE_TIMEOUT=0
+      - IGNORE_STARTUP_PARAMETERS=extra_float_digits
     networks:
       - fixitlab_net
     depends_on:
       database:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U ${POSTGRES_USER:-fixitlab}"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
       interval: 10s
       timeout: 5s
       retries: 5
