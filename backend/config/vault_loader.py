@@ -40,6 +40,9 @@ def load_vault_secrets() -> None:
         return
 
     vault_addr = os.environ.get("VAULT_ADDR", "http://vault:8200")
+    # Host-rendered env uses 127.0.0.1; inside Docker reach Vault by service name.
+    if "127.0.0.1" in vault_addr and os.path.exists("/.dockerenv"):
+        vault_addr = "http://vault:8200"
     kv_path = os.environ.get("VAULT_KV_PATH", "secret/fixitlab/config")
     vault_override = os.environ.get("VAULT_OVERRIDE", "").lower() in ("1", "true", "yes")
 

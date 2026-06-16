@@ -150,6 +150,19 @@ fi
 
 echo "[env] OK — $(grep -c '^[A-Z]' "$OUT" || true) variables loaded"
 
+# Container runtime overrides (host-side Vault CLI uses 127.0.0.1)
+if grep -q '^VAULT_ENABLED=true' "$OUT" 2>/dev/null; then
+  if grep -q '^VAULT_ADDR=' "$OUT"; then
+    sed -i.bak 's|^VAULT_ADDR=.*|VAULT_ADDR=http://vault:8200|' "$OUT" && rm -f "${OUT}.bak"
+  else
+    echo "VAULT_ADDR=http://vault:8200" >> "$OUT"
+  fi
+fi
+# Django migrations need a direct Postgres session — not pgBouncer transaction pool
+if grep -q '^POSTGRES_HOST=pgbouncer' "$OUT" 2>/dev/null; then
+  sed -i.bak 's|^POSTGRES_HOST=pgbouncer|POSTGRES_HOST=database|' "$OUT" && rm -f "${OUT}.bak"
+fi
+
 # Docker Compose interpolates ${VAR} from .env in project root (not .env.production).
 # Keep both in sync so redis/rabbitmq passwords match backend env_file.
 COMPOSE_ENV="$ROOT/.env"

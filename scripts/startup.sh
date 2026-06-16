@@ -11,7 +11,7 @@ done
 echo "[startup] Database is ready"
 
 echo "[startup] Running migrations..."
-python manage.py migrate --noinput
+flock -x -w 180 /tmp/fixitlab-migrate.lock python manage.py migrate --noinput
 
 echo "[startup] Collecting static files..."
 python manage.py collectstatic --noinput
