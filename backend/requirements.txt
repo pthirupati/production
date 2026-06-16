@@ -6,7 +6,7 @@ django-cors-headers>=4.3
 
 # Database
 psycopg2-binary>=2.9
-django-redis>=5.4
+django-redis>=7.0.0
 
 # Auth
 djangorestframework-simplejwt>=5.5.1
