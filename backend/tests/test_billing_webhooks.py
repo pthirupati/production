@@ -169,13 +169,23 @@ class BillingWebhookTests(TestCase):
         with patch.object(stripe.Webhook, 'construct_event', return_value=event):
             with patch.object(stripe.checkout.Session, 'retrieve', return_value=stripe_session):
                 with patch('apps.billing.models.PaymentTransaction.objects', new=mock_mgr2):
-                    with override_settings(STRIPE_WEBHOOK_SECRET='whsec_test', STRIPE_SECRET_KEY='sk_test'):
-                        url = reverse('stripe_webhook')
-                        resp = self.client.post(url, data=payload, content_type='application/json', HTTP_STRIPE_SIGNATURE='t=1,v1=signature')
-                        self.assertEqual(resp.status_code, 200)
+                    with patch(
+                        'apps.billing.payment_controller.PaymentService._activate_subscription'
+                    ):
+                        with override_settings(STRIPE_WEBHOOK_SECRET='whsec_test', STRIPE_SECRET_KEY='sk_test'):
+                            url = reverse('stripe_webhook')
+                            resp = self.client.post(
+                                url,
+                                data=payload,
+                                content_type='application/json',
+                                HTTP_STRIPE_SIGNATURE='t=1,v1=signature',
+                            )
+                            self.assertEqual(resp.status_code, 200)
 
-                        self.assertEqual(fake_tx2.status, 'success')
-                        self.assertTrue(fake_tx2.gateway_payment_id in ('pi_test_123', 'cs_test_123'))
+                            self.assertEqual(fake_tx2.status, 'success')
+                            self.assertTrue(
+                                fake_tx2.gateway_payment_id in ('pi_test_123', 'cs_test_123')
+                            )
 
 
 @override_settings(
