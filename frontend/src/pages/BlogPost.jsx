@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { Clock, ArrowLeft, Tag, User, Calendar, ChevronRight } from 'lucide-react'
+import DOMPurify from 'dompurify'
 import api from '../api/client'
 import { getCategoryClass } from '../data/blogFallback'
 
@@ -655,7 +656,7 @@ export default function BlogPost() {
       // Inline code
       text = text.replace(/`([^`]+)`/g, '<code class="bg-surface-800 text-accent-cyan px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
 
-      return text
+      return DOMPurify.sanitize(text)
     }
 
     for (let i = 0; i < lines.length; i++) {

@@ -23,7 +23,7 @@ def _verify_webhook_secret(request) -> bool:
     """Verify Jira webhook via HMAC-SHA256 signature or shared secret."""
     secret = getattr(settings, "JIRA_WEBHOOK_SECRET", "") or ""
     if not secret:
-        return settings.DEBUG
+        return False
 
     body = request.body or b""
     sig_header = (
@@ -38,8 +38,8 @@ def _verify_webhook_secret(request) -> bool:
         if hmac.compare_digest(expected, sig_header):
             return True
 
-    provided = request.GET.get("secret") or request.headers.get("X-FixitLab-Webhook-Secret", "")
-    return provided == secret
+    header_secret = request.headers.get("X-FixitLab-Webhook-Secret", "")
+    return header_secret == secret
 
 
 def _find_ticket(issue_key: str):

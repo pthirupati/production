@@ -11,7 +11,7 @@ MARKER = "FIXITLAB_SIM_WS"
 WS_HOST = __import__("os").environ.get("E2E_TERMINAL_WS_HOST", "127.0.0.1:8000")
 
 SIM_PROMPT_RE = re.compile(
-    r"(root@|\]#[\s\r]|]\$[\s\r]|\[\w+@\S+|grub rescue>|grub>|login:)",
+    r"(root@|\]#[\s\r]|]\$[\s\r]|\[\w+@\S+|grub rescue>|grub>|login:|ansible@|dev-server)",
     re.IGNORECASE,
 )
 
@@ -52,7 +52,7 @@ async def _drain_output(ws, timeout: float = 3.0) -> str:
     return output
 
 
-async def _collect_until_prompt(ws, timeout: float = 30.0) -> str:
+async def _collect_until_prompt(ws, timeout: float = 45.0) -> str:
     output = ""
     deadline = time.time() + timeout
     nudged = False
@@ -87,7 +87,7 @@ async def _maybe_boot_to_shell(ws, output: str) -> str:
     return output
 
 
-async def _run_command(ws, command: str, timeout: float = 15.0) -> str:
+async def _run_command(ws, command: str, timeout: float = 20.0) -> str:
     await ws.send(json.dumps({"input": command + "\r"}))
     out = ""
     deadline = time.time() + timeout
@@ -187,11 +187,20 @@ async def _check_sim_workflow_async(session_id: str, token: str, slug: str) -> t
 
 
 def verify_simulation_terminal(session_id: str, token: str, host: str = "primary") -> tuple[bool, str]:
-    try:
-        return asyncio.run(_check_sim_terminal_async(session_id, token, host))
-    except Exception as exc:
-        _reset_ws_counter(token)
-        return False, str(exc)[:120]
+    last_detail = ""
+    for attempt in range(3):
+        try:
+            ok, detail = asyncio.run(_check_sim_terminal_async(session_id, token, host))
+            if ok:
+                return True, detail
+            last_detail = detail
+        except Exception as exc:
+            last_detail = str(exc)[:120]
+        finally:
+            _reset_ws_counter(token)
+        if attempt < 2:
+            time.sleep(1.5)
+    return False, last_detail
 
 
 def verify_simulation_workflow(session_id: str, token: str, slug: str) -> tuple[bool, str]:

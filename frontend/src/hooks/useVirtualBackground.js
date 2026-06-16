@@ -177,7 +177,7 @@ export function useVirtualBackground({ videoRef, stream, backgroundId, enabled }
       cancelled = true
       stopLoop()
     }
-  }, [enabled, stream, backgroundId, needsSegmentation, bg, videoRef, stopLoop])
+  }, [enabled, stream, backgroundId, needsSegmentation, videoRef, stopLoop])
 
   return { canvasRef, ready, loading, needsSegmentation, bg }
 }

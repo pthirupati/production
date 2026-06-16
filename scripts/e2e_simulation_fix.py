@@ -93,6 +93,9 @@ def apply_simulation_fix(session) -> tuple[bool, str]:
             return True, "nginx fixed"
 
         if "useradd" in slug:
+            shell.run(
+                "sed -i 's/corrupt::99999:99999:bad:\\/bad:\\/bin\\/bash//' /etc/passwd"
+            )
             shell.run("useradd -m appuser")
             return True, "useradd fixed"
 
@@ -111,6 +114,7 @@ def apply_simulation_fix(session) -> tuple[bool, str]:
 
         if "ansible" in slug:
             shell.run("ssh-copy-id root@web1")
+            shell.run("ssh-copy-id root@web2")
             return True, "ssh key fixed"
 
         if "ssh-stop" in slug or "sshd-down" in slug:

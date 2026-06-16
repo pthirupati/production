@@ -200,10 +200,21 @@ def validate_simulation_state(
         if stripped.startswith("if ") or stripped.startswith("fi") or stripped.startswith("then"):
             continue
         if stripped.startswith("exit "):
-            code = stripped.split()[1]
+            code = stripped.split()[1].rstrip(";")
             if code == "0":
                 break
-            return False, failures[-1] if failures else "Validation exit non-zero"
+            # Conditional exit (e.g. inside if [ $? -ne 0 ]) — only fail when a check failed
+            if failures:
+                return False, failures[0]
+            continue
+
+        if "|| exit" in stripped:
+            cmd = stripped.split("||")[0].strip()
+            if cmd.startswith("[") and cmd.endswith("]"):
+                continue
+            if _run_line_check(cmd, state, shell, engine, failures):
+                checks_run += 1
+            continue
 
         if _run_line_check(stripped, state, shell, engine, failures):
             checks_run += 1

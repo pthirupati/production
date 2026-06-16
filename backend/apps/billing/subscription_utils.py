@@ -139,6 +139,34 @@ def activate_technology_subscription(sub, *, renew=False):
     sub.save(update_fields=["is_active", "payment_verified", "expires_at", "renewal_reminder_at"])
 
 
+def get_or_create_technology_subscription(user, technology, *, defaults=None):
+    """
+    Atomically get or create a per-technology subscription.
+    Uses select_for_update to prevent duplicate rows under concurrent payment confirmations.
+    """
+    from django.db import IntegrityError, transaction
+    from .models import TechnologySubscription
+
+    defaults = dict(defaults or {})
+    with transaction.atomic():
+        existing = (
+            TechnologySubscription.objects.select_for_update()
+            .filter(user=user, technology=technology)
+            .first()
+        )
+        if existing:
+            return existing, False
+        try:
+            sub = TechnologySubscription.objects.create(
+                user=user,
+                technology=technology,
+                **defaults,
+            )
+            return sub, True
+        except IntegrityError:
+            return TechnologySubscription.objects.get(user=user, technology=technology), False
+
+
 def grant_complimentary_access(user, enabled: bool = True, *, granted_by=None):
     from apps.accounts.models import Profile
 

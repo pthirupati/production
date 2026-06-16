@@ -129,7 +129,9 @@ export default function MainLayout() {
   )
 
   useEffect(() => {
-    api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
+    api.get('/config/').then(res => setPlatformConfig(res.data)).catch((err) => {
+      console.error('Failed to load platform config:', err)
+    })
   }, [])
 
   const isLabRoute = location.pathname.startsWith('/lab/')

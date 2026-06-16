@@ -31,16 +31,28 @@ export default function SessionReplay() {
 
   const renderUpToTime = useCallback((targetTime) => {
     if (!replay?.events || !terminalRef.current) return
-    let html = ''
+    let text = ''
     for (const evt of replay.events) {
       if (evt[0] > targetTime) break
       if (evt[1] === 'o') {
-        // Output event — convert ANSI to plain text (basic)
-        html += evt[2].replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        text += evt[2]
       }
     }
-    outputRef.current = html
-    terminalRef.current.innerHTML = `<pre style="margin:0;white-space:pre-wrap;word-break:break-all;font-family:monospace;font-size:13px;line-height:1.5;color:#e2e8f0;">${html}</pre>`
+    outputRef.current = text
+    let pre = terminalRef.current.querySelector('pre')
+    if (!pre) {
+      pre = document.createElement('pre')
+      pre.style.margin = '0'
+      pre.style.whiteSpace = 'pre-wrap'
+      pre.style.wordBreak = 'break-all'
+      pre.style.fontFamily = 'monospace'
+      pre.style.fontSize = '13px'
+      pre.style.lineHeight = '1.5'
+      pre.style.color = '#e2e8f0'
+      terminalRef.current.textContent = ''
+      terminalRef.current.appendChild(pre)
+    }
+    pre.textContent = text
     terminalRef.current.scrollTop = terminalRef.current.scrollHeight
   }, [replay])
 

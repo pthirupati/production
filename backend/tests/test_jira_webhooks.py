@@ -56,12 +56,13 @@ class JiraWebhookTests(TestCase):
         ticket = UserScenarioJiraTicket.objects.get(issue_key="FIXIT-99")
         self.assertEqual(ticket.jira_status, "Done")
 
-    def test_webhook_updates_status(self):
+    def test_webhook_updates_status_via_header_secret(self):
         client = Client()
         resp = client.post(
-            "/api/jira/webhooks/?secret=test-secret",
+            "/api/jira/webhooks/",
             data='{"webhookEvent":"jira:issue_updated","issue":{"key":"FIXIT-99","fields":{"status":{"name":"Done"}}}}',
             content_type="application/json",
+            HTTP_X_FIXITLAB_WEBHOOK_SECRET="test-secret",
         )
         self.assertEqual(resp.status_code, 200)
         ticket = UserScenarioJiraTicket.objects.get(issue_key="FIXIT-99")

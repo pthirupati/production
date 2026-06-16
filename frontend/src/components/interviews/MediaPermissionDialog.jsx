@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Mic, Video, Shield } from 'lucide-react'
 
 const COPY = {
@@ -19,6 +20,49 @@ const COPY = {
 }
 
 export default function MediaPermissionDialog({ open, type = 'both', onAllow, onBlock, loading = false }) {
+  const dialogRef = useRef(null)
+  const previousFocus = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    previousFocus.current = document.activeElement
+    const dialog = dialogRef.current
+    if (dialog) dialog.focus()
+
+    const handleKey = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onBlock()
+        return
+      }
+      if (e.key === 'Tab' && dialog) {
+        const focusable = dialog.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKey)
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.removeEventListener('keydown', handleKey)
+      document.body.style.overflow = ''
+      previousFocus.current?.focus()
+    }
+  }, [open, onBlock])
+
   if (!open) return null
 
   const copy = COPY[type] || COPY.both
@@ -26,30 +70,33 @@ export default function MediaPermissionDialog({ open, type = 'both', onAllow, on
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div
-        className="w-full max-w-md rounded-2xl border border-surface-700 bg-surface-900 shadow-2xl animate-fade-in"
+        ref={dialogRef}
+        tabIndex={-1}
+        className="w-full max-w-md rounded-2xl border border-surface-700 bg-surface-900 shadow-2xl animate-fade-in outline-none"
         role="dialog"
         aria-labelledby="media-permission-title"
+        aria-describedby="media-permission-desc"
         aria-modal="true"
       >
         <div className="p-6 text-center border-b border-surface-800">
           <div className="flex justify-center gap-3 mb-4">
             {(copy.icon === 'both' || copy.icon === 'video') && (
               <div className="w-12 h-12 rounded-full bg-indigo-500/15 flex items-center justify-center">
-                <Video size={22} className="text-indigo-300" />
+                <Video size={22} className="text-indigo-300" aria-hidden="true" />
               </div>
             )}
             {(copy.icon === 'both' || copy.icon === 'audio') && (
               <div className="w-12 h-12 rounded-full bg-cyan-500/15 flex items-center justify-center">
-                <Mic size={22} className="text-cyan-300" />
+                <Mic size={22} className="text-cyan-300" aria-hidden="true" />
               </div>
             )}
           </div>
           <h2 id="media-permission-title" className="text-lg font-semibold text-white">
             {copy.title}
           </h2>
-          <p className="text-sm text-surface-400 mt-2 leading-relaxed">{copy.body}</p>
+          <p id="media-permission-desc" className="text-sm text-surface-400 mt-2 leading-relaxed">{copy.body}</p>
           <p className="text-xs text-surface-500 mt-3 flex items-center justify-center gap-1.5">
-            <Shield size={12} />
+            <Shield size={12} aria-hidden="true" />
             After you click Allow, your browser will ask you to confirm — choose Allow there too.
           </p>
         </div>

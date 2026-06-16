@@ -101,6 +101,34 @@ exit 0
         passed, msg = validate_simulation_state(sim.state, self.NGINX_CHECK)
         self.assertTrue(passed, msg)
 
+    def test_real_check_sh_script_passes_after_fix(self):
+        """check.sh uses if/exit 1 blocks — parser must not treat those as unconditional failures."""
+        check_sh = """#!/bin/bash
+nginx -t 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo "FAIL: nginx configuration is invalid"
+    exit 1
+fi
+if ! pgrep -x nginx > /dev/null 2>&1; then
+    echo "FAIL: nginx is not running"
+    exit 1
+fi
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80 2>/dev/null)
+if [ "$HTTP_CODE" != "200" ]; then
+    echo "FAIL: nginx not responding on port 80 (got HTTP $HTTP_CODE)"
+    exit 1
+fi
+echo "PASS"
+exit 0
+"""
+        sim = BaseRHELSimulator(scenario_slug="sim-rhel-broken-nginx")
+        passed, msg = validate_simulation_state(sim.state, check_sh)
+        self.assertFalse(passed)
+        sim.shell.run("sed -i 's/listn/listen/' /etc/nginx/sites-enabled/default")
+        sim.shell.run("systemctl start nginx")
+        passed, msg = validate_simulation_state(sim.state, check_sh)
+        self.assertTrue(passed, msg)
+
     def test_useradd_validation(self):
         sim = BaseRHELSimulator(scenario_slug="sim-rhel-broken-useradd")
         passed, _ = validate_simulation_state(sim.state, self.USERADD_CHECK)

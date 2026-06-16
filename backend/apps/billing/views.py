@@ -815,7 +815,11 @@ class TechnologySubscribeView(APIView):
             )
 
         # Check if already subscribed (active and not expired)
-        from .subscription_utils import activate_technology_subscription, is_tech_subscription_active
+        from .subscription_utils import (
+            activate_technology_subscription,
+            get_or_create_technology_subscription,
+            is_tech_subscription_active,
+        )
 
         existing = TechnologySubscription.objects.filter(
             user=request.user, technology=technology
@@ -836,16 +840,25 @@ class TechnologySubscribeView(APIView):
             activate_technology_subscription(tech_sub, renew=True)
             sub_id = tech_sub.subscription_id
         else:
-            # Generate unique subscription ID
             sub_id = TechnologySubscription.generate_subscription_id(
                 technology.name, request.user.username
             )
-            tech_sub = TechnologySubscription.objects.create(
-                user=request.user,
-                technology=technology,
-                subscription_id=sub_id,
-                amount=amount,
+            tech_sub, created = get_or_create_technology_subscription(
+                request.user,
+                technology,
+                defaults={
+                    "subscription_id": sub_id,
+                    "amount": amount,
+                },
             )
+            if not created and is_tech_subscription_active(tech_sub):
+                return Response(
+                    {"error": "Already subscribed to this technology", "subscription_id": tech_sub.subscription_id},
+                    status=http_status.HTTP_409_CONFLICT,
+                )
+            if not tech_sub.subscription_id:
+                tech_sub.subscription_id = sub_id
+            tech_sub.amount = amount
             activate_technology_subscription(tech_sub, renew=True)
 
         # Get user profile info
@@ -1205,11 +1218,16 @@ class ConfirmPaymentView(APIView):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
-        # Check if already subscribed (race condition guard)
+        from .subscription_utils import (
+            activate_technology_subscription,
+            get_or_create_technology_subscription,
+            is_tech_subscription_active,
+        )
+
         existing = TechnologySubscription.objects.filter(
             user=request.user, technology=technology, is_active=True
         ).first()
-        if existing:
+        if existing and is_tech_subscription_active(existing):
             cache.delete(cache_key)
             return Response(
                 {"error": "Already subscribed", "subscription_id": existing.subscription_id},
@@ -1221,15 +1239,26 @@ class ConfirmPaymentView(APIView):
             technology.name, request.user.username
         )
 
-        # Create subscription
-        tech_sub = TechnologySubscription.objects.create(
-            user=request.user,
-            technology=technology,
-            subscription_id=sub_id,
-            amount=amount,
-            is_active=True,
-            payment_verified=True,
+        tech_sub, created = get_or_create_technology_subscription(
+            request.user,
+            technology,
+            defaults={
+                "subscription_id": sub_id,
+                "amount": amount,
+                "is_active": True,
+                "payment_verified": True,
+            },
         )
+        if not created and is_tech_subscription_active(tech_sub):
+            cache.delete(cache_key)
+            return Response(
+                {"error": "Already subscribed", "subscription_id": tech_sub.subscription_id},
+                status=http_status.HTTP_409_CONFLICT,
+            )
+        if not tech_sub.subscription_id:
+            tech_sub.subscription_id = sub_id
+        tech_sub.amount = amount
+        activate_technology_subscription(tech_sub, renew=True)
 
         # Delete the token so it can't be reused
         cache.delete(cache_key)

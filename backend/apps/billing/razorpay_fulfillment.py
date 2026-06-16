@@ -72,7 +72,7 @@ def fulfill_technology_subscription(
     Idempotent — safe for verify API and webhook.
     """
     from .models import TechnologySubscription
-    from .subscription_utils import activate_technology_subscription
+    from .subscription_utils import activate_technology_subscription, get_or_create_technology_subscription
 
     existing = TechnologySubscription.objects.filter(
         user=user,
@@ -89,15 +89,27 @@ def fulfill_technology_subscription(
             )
         return existing, False
 
-    sub, _ = TechnologySubscription.objects.get_or_create(
-        user=user,
-        technology=technology,
+    sub_id = TechnologySubscription.generate_subscription_id(technology.name, user.username)
+    sub, created = get_or_create_technology_subscription(
+        user,
+        technology,
         defaults={
+            "subscription_id": sub_id,
             "amount": amount,
             "is_active": False,
             "payment_verified": False,
         },
     )
+    if not created and sub.is_active and sub.payment_verified:
+        if transaction and transaction.status != "success":
+            transaction.tech_subscription = sub
+            transaction.mark_success(
+                gateway_payment_id=razorpay_payment_id,
+                gateway_response=payment_payload or transaction.gateway_response,
+            )
+        return sub, False
+    if not sub.subscription_id:
+        sub.subscription_id = sub_id
     sub.amount = amount
     activate_technology_subscription(sub, renew=True)
 

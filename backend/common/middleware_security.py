@@ -40,23 +40,27 @@ class JWTSessionValidationMiddleware(MiddlewareMixin):
         token = auth_header[7:]  # Remove 'Bearer ' prefix
         
         try:
-            # Decode JWT without verification first (just to get user_id and jti)
-            # The rest_framework_simplejwt authentication class will verify the token
-            decoded = jwt.decode(
-                token,
-                options={"verify_signature": False}  # Will be verified by DRF
-            )
-            
-            user_id = decoded.get('user_id')
-            jti = decoded.get('jti')
-            
-            if user_id and jti:
-                # Store in request for later validation
-                request.jwt_user_id = user_id
-                request.jwt_jti = jti
+            jwt_settings = getattr(settings, "SIMPLE_JWT", {})
+            algorithm = jwt_settings.get("ALGORITHM", "HS256")
+            verify_key = jwt_settings.get("VERIFYING_KEY") or jwt_settings.get("SIGNING_KEY")
+            if verify_key:
+                decoded = jwt.decode(
+                    token,
+                    verify_key,
+                    algorithms=[algorithm],
+                    options={"verify_exp": True},
+                )
+                user_id = decoded.get('user_id')
+                jti = decoded.get('jti')
+                
+                if user_id and jti:
+                    request.jwt_user_id = user_id
+                    request.jwt_jti = jti
+            else:
+                logger.debug("JWT signing key not configured — skipping session pre-check")
                 
         except Exception as e:
-            # Token decoding failed - let DRF handle authentication
+            # Token verification failed - let DRF handle authentication
             logger.debug(f"JWT decode error: {e}")
         
         return None

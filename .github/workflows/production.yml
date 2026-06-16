@@ -56,6 +56,7 @@ jobs:
     name: Stop platform
     if: inputs.action == 'stop'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: production
     steps:
       - name: Stop containers on server
@@ -80,6 +81,7 @@ jobs:
     name: Create server
     if: inputs.action == 'launch' && inputs.create_server
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: production
     permissions:
       contents: write
@@ -144,6 +146,7 @@ jobs:
       always() &&
       (needs.create-server.result == 'skipped' || needs.create-server.result == 'success')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:15
@@ -186,6 +189,7 @@ jobs:
       always() &&
       (needs.create-server.result == 'skipped' || needs.create-server.result == 'success')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -206,6 +210,7 @@ jobs:
       (needs.test-backend.result == 'skipped' || needs.test-backend.result == 'success') &&
       (needs.test-frontend.result == 'skipped' || needs.test-frontend.result == 'success')
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     environment: production
     outputs:
       prod_host: ${{ steps.host.outputs.host }}
