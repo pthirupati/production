@@ -442,7 +442,7 @@ export default function AdminSettings() {
             <textarea
               className="input-field w-full min-h-[80px]"
               value={supportBot.support_bot_welcome_message}
-              onChange={e => setSupportBot(s => ({ ...s, support_bot_welcome_message: e.target.value })}
+              onChange={e => setSupportBot(s => ({ ...s, support_bot_welcome_message: e.target.value }))}
               placeholder="Leave empty for default welcome text"
             />
           </div>
@@ -509,6 +509,7 @@ export default function AdminSettings() {
               const result = await adminApi.updateConfig({ ...emailForm, ...supportBot })
               setConfig(result)
               toast.success('Support assistant settings saved')
+              window.dispatchEvent(new CustomEvent('fixitlab-support-config-changed'))
             } catch {
               toast.error('Failed to save support bot settings')
             } finally {
