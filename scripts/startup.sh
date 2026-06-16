@@ -11,7 +11,16 @@ done
 echo "[startup] Database is ready"
 
 echo "[startup] Running migrations..."
-flock -x -w 180 /tmp/fixitlab-migrate.lock python manage.py migrate --noinput
+python - <<'PY'
+import fcntl
+import subprocess
+import sys
+
+lock_path = "/tmp/fixitlab-migrate.lock"
+with open(lock_path, "w") as lock_file:
+    fcntl.flock(lock_file, fcntl.LOCK_EX)
+    subprocess.check_call([sys.executable, "manage.py", "migrate", "--noinput"])
+PY
 
 echo "[startup] Collecting static files..."
 python manage.py collectstatic --noinput
