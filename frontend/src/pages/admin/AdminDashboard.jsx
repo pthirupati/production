@@ -8,7 +8,8 @@ import {
   Mail, Server, RefreshCw, Globe,
   Clock, UserPlus, Play, CheckCircle, XOctagon,
   Send, Database, Wifi, MessageSquare, Cpu,
-  DollarSign, UserCheck, AlertTriangle, Wrench
+  DollarSign, UserCheck, AlertTriangle, Wrench,
+  RotateCcw, ArrowUpRight, ShieldCheck
 } from 'lucide-react'
 
 function HealthBadge({ status }) {
@@ -29,7 +30,27 @@ const SERVICE_ICONS = {
   'Email': Mail,
   'RabbitMQ': MessageSquare,
   'Celery Workers': Activity,
-  'Vault': Server,
+  'Vault': ShieldCheck,
+}
+
+const CONTAINER_SERVICE_ICONS = {
+  database: Database,
+  redis: Cpu,
+  rabbitmq: MessageSquare,
+  vault: ShieldCheck,
+  backend: Server,
+  frontend: Globe,
+  gateway: Wifi,
+  celery: Activity,
+  pgbouncer: Database,
+}
+
+function containerIcon(name) {
+  const n = (name || '').toLowerCase()
+  for (const [k, Icon] of Object.entries(CONTAINER_SERVICE_ICONS)) {
+    if (n.includes(k)) return Icon
+  }
+  return Server
 }
 
 const ACTIVITY_ICONS = {
@@ -192,22 +213,31 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             {healthServices.map(({ name, key }) => {
               const svc = health?.[key] || {}
-              const isHealthy = svc.status === 'healthy' || (key === 'vault' && svc.status === 'degraded')
+              const isDegraded = svc.status === 'degraded'
+              const isHealthy = svc.status === 'healthy' || (key === 'vault' && isDegraded)
               const Icon = SERVICE_ICONS[name] || Server
+              const borderClass = !isHealthy
+                ? 'bg-accent-red/5 border border-accent-red/10'
+                : isDegraded
+                  ? 'bg-accent-amber/5 border border-accent-amber/10'
+                  : 'bg-accent-green/5 border border-accent-green/10'
+              const iconClass = !isHealthy ? 'bg-accent-red/10' : isDegraded ? 'bg-accent-amber/10' : 'bg-accent-green/10'
+              const textClass = !isHealthy ? 'text-accent-red' : isDegraded ? 'text-accent-amber' : 'text-accent-green'
               return (
-                <div key={name} className={`flex items-start gap-3 p-3 rounded-lg transition-all ${
-                  isHealthy
-                    ? 'bg-accent-green/5 border border-accent-green/10'
-                    : 'bg-accent-red/5 border border-accent-red/10'
-                }`}>
-                  <div className={`mt-0.5 p-1.5 rounded-lg ${isHealthy ? 'bg-accent-green/10' : 'bg-accent-red/10'}`}>
-                    <Icon size={16} className={isHealthy ? 'text-accent-green' : 'text-accent-red'} />
+                <div key={name} className={`flex items-start gap-3 p-3 rounded-lg transition-all ${borderClass}`}>
+                  <div className={`mt-0.5 p-1.5 rounded-lg ${iconClass}`}>
+                    <Icon size={16} className={textClass} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-white">{name}</p>
-                    <p className={`text-xs mt-0.5 ${isHealthy ? 'text-accent-green' : 'text-accent-red'}`}>
+                    <p className={`text-xs mt-0.5 ${textClass}`}>
                       {svc.status || 'unknown'}
                     </p>
+                    {key === 'vault' && svc.secrets_loaded != null && (
+                      <p className={`text-[10px] mt-0.5 ${svc.secrets_loaded ? 'text-accent-green' : 'text-surface-500'}`}>
+                        {svc.secrets_loaded ? 'secrets loaded' : 'env file mode'}
+                      </p>
+                    )}
                     {svc.details && (
                       <p className="text-[10px] text-surface-500 mt-0.5 truncate">{svc.details}</p>
                     )}
@@ -286,56 +316,118 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Container Health */}
+      {/* System Container Health */}
       {containers.length > 0 && (
         <div className="glass-card p-6">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-            <Server size={18} className="text-accent-purple" />
-            Container Status
-            <span className="text-xs font-normal text-surface-500 ml-2">({containers.length} containers)</span>
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-surface-500 text-xs uppercase tracking-wider">
-                  <th className="pb-3 pr-4">Container</th>
-                  <th className="pb-3 pr-4">Status</th>
-                  <th className="pb-3 pr-4">Health</th>
-                  <th className="pb-3 pr-4">Image</th>
-                  <th className="pb-3">Uptime</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-800/50">
-                {containers.map((c, i) => {
-                  const isUp = c.status === 'running'
-                  const isHealthy = c.health === 'healthy' || c.health === 'none'
-                  return (
-                    <tr key={i} className="hover:bg-surface-800/20 transition-colors">
-                      <td className="py-2.5 pr-4">
-                        <span className="font-medium text-white">{c.name}</span>
-                      </td>
-                      <td className="py-2.5 pr-4">
-                        <span className={`inline-flex items-center gap-1.5 text-xs ${isUp ? 'text-accent-green' : 'text-accent-red'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${isUp ? 'bg-accent-green animate-pulse' : 'bg-accent-red'}`} />
-                          {c.status}
-                        </span>
-                      </td>
-                      <td className="py-2.5 pr-4">
-                        <HealthBadge status={isUp && isHealthy ? 'healthy' : 'unhealthy'} />
-                      </td>
-                      <td className="py-2.5 pr-4">
-                        <span className="text-xs text-surface-400 font-mono truncate block max-w-[200px]">{c.image}</span>
-                      </td>
-                      <td className="py-2.5">
-                        <span className="text-xs text-surface-500">
-                          {c.up_since ? formatUptime(c.up_since) : '—'}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Server size={18} className="text-accent-purple" />
+              System Containers
+              <span className="text-xs font-normal text-surface-500 ml-1">
+                ({containers.filter(c => c.status === 'running').length}/{containers.length} running)
+              </span>
+            </h2>
+            <Link to="/admin/monitoring"
+              className="flex items-center gap-1 text-xs text-accent-cyan hover:underline">
+              Full monitoring <ArrowUpRight size={12} />
+            </Link>
+          </div>
+
+          {/* Summary bar */}
+          {(() => {
+            const healthy = containers.filter(c => c.status === 'running' && (c.health === 'healthy' || c.health === 'none')).length
+            const degraded = containers.filter(c => c.status === 'running' && c.health && c.health !== 'healthy' && c.health !== 'none').length
+            const down = containers.filter(c => c.status !== 'running').length
+            const restarting = containers.reduce((sum, c) => sum + (c.restart_count || 0), 0)
+            return (
+              <div className="flex flex-wrap gap-3 mb-5 pb-4 border-b border-surface-800/50">
+                <span className="flex items-center gap-1.5 text-sm text-accent-green">
+                  <CheckCircle2 size={14} /> {healthy} healthy
+                </span>
+                {degraded > 0 && (
+                  <span className="flex items-center gap-1.5 text-sm text-accent-amber">
+                    <AlertCircle size={14} /> {degraded} degraded
+                  </span>
+                )}
+                {down > 0 && (
+                  <span className="flex items-center gap-1.5 text-sm text-accent-red">
+                    <XCircle size={14} /> {down} down
+                  </span>
+                )}
+                {restarting > 0 && (
+                  <span className="flex items-center gap-1.5 text-sm text-accent-amber ml-auto">
+                    <RotateCcw size={13} /> {restarting} total restarts
+                  </span>
+                )}
+              </div>
+            )
+          })()}
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {containers.map((c, i) => {
+              const isUp = c.status === 'running'
+              const isHealthy = !isUp ? false : (c.health === 'healthy' || c.health === 'none' || !c.health)
+              const isDegraded = isUp && c.health && c.health !== 'healthy' && c.health !== 'none'
+              const Icon = containerIcon(c.name)
+
+              const borderColor = !isUp ? 'border-accent-red/20 bg-accent-red/5'
+                : isDegraded ? 'border-accent-amber/20 bg-accent-amber/5'
+                : 'border-accent-green/10 bg-accent-green/5'
+
+              const dotColor = !isUp ? 'bg-accent-red'
+                : isDegraded ? 'bg-accent-amber animate-pulse'
+                : 'bg-accent-green animate-pulse'
+
+              const textColor = !isUp ? 'text-accent-red'
+                : isDegraded ? 'text-accent-amber'
+                : 'text-accent-green'
+
+              return (
+                <div key={i} className={`rounded-lg border p-3 ${borderColor}`}>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
+                      <Icon size={14} className={textColor} />
+                      <span className="text-xs font-medium text-white truncate">
+                        {c.name.replace('fixitlab_', '')}
+                      </span>
+                    </div>
+                    {c.restart_count > 0 && (
+                      <span className="flex items-center gap-0.5 text-[10px] text-accent-amber shrink-0" title="Restart count">
+                        <RotateCcw size={10} /> {c.restart_count}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-surface-500">Status</span>
+                      <span className={`font-medium ${textColor}`}>
+                        {isDegraded ? c.health : c.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-surface-500">Uptime</span>
+                      <span className="text-surface-300">
+                        {c.up_since && isUp ? formatUptime(c.up_since) : '—'}
+                      </span>
+                    </div>
+                    {c.mem_mb != null && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-surface-500">Mem</span>
+                        <span className="text-surface-300">{c.mem_mb} MB</span>
+                      </div>
+                    )}
+                    {!isUp && c.exit_code != null && c.exit_code !== 0 && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-surface-500">Exit</span>
+                        <span className="text-accent-red font-mono">{c.exit_code}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

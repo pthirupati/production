@@ -16,6 +16,11 @@ _env_file = _env_root / ".env.production" if (_env_root / ".env.production").exi
 if _env_file.exists():
     environ.Env.read_env(str(_env_file))
 
+# Vault — inject KV secrets into os.environ before any env() calls
+# No-op when VAULT_ENABLED is not set; graceful fallback if Vault unreachable.
+from config.vault_loader import load_vault_secrets  # noqa: E402
+load_vault_secrets()
+
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 

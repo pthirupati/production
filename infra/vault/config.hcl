@@ -5,11 +5,13 @@ storage "file" {
   path = "/vault/data"
 }
 
+# Main API — accessible from all containers on fixitlab_net
 listener "tcp" {
-  address     = "127.0.0.1:8200"
+  address     = "0.0.0.0:8200"
   tls_disable = 1
 }
 
+# Prometheus metrics — localhost only (unauthenticated, internal only)
 listener "tcp" {
   address     = "127.0.0.1:8201"
   tls_disable = 1
@@ -23,7 +25,8 @@ telemetry {
   disable_hostname            = true
 }
 
-api_addr = "http://127.0.0.1:8200"
+# Advertise the internal Docker hostname so other containers can reach Vault
+api_addr = "http://vault:8200"
 
 default_lease_ttl = "768h"
 max_lease_ttl     = "8760h"

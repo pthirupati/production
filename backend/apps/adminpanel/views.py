@@ -1108,42 +1108,64 @@ class AdminSystemHealthView(APIView):
             return {"status": "unhealthy", "error": str(e)}
 
     def _check_vault(self):
-        """HashiCorp Vault container + metrics listener (optional when VAULT_ENABLED)."""
-        vault_enabled = str(getattr(settings, "VAULT_ENABLED", "") or "").lower() in ("1", "true", "yes", "on")
-        if not vault_enabled and not os.environ.get("VAULT_ENABLED"):
-            return {"status": "healthy", "details": "Vault disabled", "optional": True}
+        """HashiCorp Vault container + secrets integration status."""
+        vault_enabled = str(getattr(settings, "VAULT_ENABLED", "") or os.environ.get("VAULT_ENABLED", "")).lower() in ("1", "true", "yes", "on")
+        secrets_loaded = False
+
+        # Check whether vault_loader already injected secrets this process startup
+        try:
+            from config.vault_loader import _VAULT_LOADED
+            secrets_loaded = _VAULT_LOADED
+        except Exception:
+            pass
+
+        if not vault_enabled:
+            return {
+                "status": "healthy",
+                "details": "Vault disabled — using env file for secrets",
+                "optional": True,
+                "secrets_loaded": False,
+            }
+
         try:
             import subprocess
 
             status = subprocess.run(
                 ["docker", "inspect", "-f", "{{.State.Status}}", "fixitlab_vault"],
-                capture_output=True,
-                text=True,
-                timeout=8,
+                capture_output=True, text=True, timeout=8,
             )
             if status.returncode != 0:
-                return {"status": "unhealthy", "error": "Vault container not found"}
+                return {"status": "unhealthy", "error": "Vault container not found", "secrets_loaded": secrets_loaded}
             state = (status.stdout or "").strip()
             if state != "running":
-                return {"status": "unhealthy", "error": f"Vault container {state}"}
+                return {"status": "unhealthy", "error": f"Vault container {state}", "secrets_loaded": secrets_loaded}
 
-            metrics = subprocess.run(
-                [
-                    "docker", "run", "--rm", "--network", "container:fixitlab_vault",
-                    "curlimages/curl:8.5.0", "-sf",
-                    "http://127.0.0.1:8201/v1/sys/metrics?format=prometheus",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=15,
-            )
-            metrics_ok = metrics.returncode == 0 and "vault" in (metrics.stdout or "").lower()
+            # Try live Vault API check via hvac
+            try:
+                import hvac
+                vault_addr = os.environ.get("VAULT_ADDR", "http://vault:8200")
+                client = hvac.Client(url=vault_addr, timeout=3)
+                sys_health = client.sys.read_health_status(method="GET")
+                initialized = sys_health.get("initialized", False)
+                sealed = sys_health.get("sealed", False)
+                return {
+                    "status": "healthy" if (initialized and not sealed) else "degraded",
+                    "details": f"Vault running, initialized={initialized}, sealed={sealed}",
+                    "secrets_loaded": secrets_loaded,
+                    "initialized": initialized,
+                    "sealed": sealed,
+                }
+            except Exception:
+                pass
+
+            # Fallback: container is running, no API response
             return {
-                "status": "healthy" if metrics_ok else "degraded",
-                "details": "Vault running, Prometheus metrics OK" if metrics_ok else "Vault running (metrics pending)",
+                "status": "degraded",
+                "details": "Vault container running (API unreachable — check VAULT_ADDR)",
+                "secrets_loaded": secrets_loaded,
             }
         except Exception as e:
-            return {"status": "unhealthy", "error": str(e)}
+            return {"status": "unhealthy", "error": str(e), "secrets_loaded": secrets_loaded}
 
     def _check_containers(self):
         """Get health status of platform Docker containers (not ephemeral lab containers)."""
@@ -1172,14 +1194,33 @@ class AdminSystemHealthView(APIView):
                 if not is_platform:
                     continue
 
-                health = c.attrs.get("State", {}).get("Health", {})
-                health_status = health.get("Status", "none")
+                state = c.attrs.get("State", {})
+                health_obj = state.get("Health", {})
+                health_status = health_obj.get("Status", "none")
+                restart_count = c.attrs.get("RestartCount", 0)
+                exit_code = state.get("ExitCode", 0)
+
+                # Lightweight memory snapshot (no blocking stream)
+                mem_mb = None
+                try:
+                    if c.status == "running":
+                        raw = c.stats(stream=False)
+                        mem = raw.get("memory_stats", {})
+                        usage = mem.get("usage", 0)
+                        cache = mem.get("stats", {}).get("cache", 0)
+                        mem_mb = round((usage - cache) / (1024 * 1024), 1)
+                except Exception:
+                    pass
+
                 result.append({
                     "name": c.name,
                     "status": c.status,
                     "health": health_status,
                     "image": c.image.tags[0] if c.image.tags else str(c.image.id)[:20],
-                    "up_since": c.attrs.get("State", {}).get("StartedAt", ""),
+                    "up_since": state.get("StartedAt", ""),
+                    "restart_count": restart_count,
+                    "exit_code": exit_code if c.status != "running" else None,
+                    "mem_mb": mem_mb,
                 })
             return sorted(result, key=lambda x: x["name"])
         except Exception as e:
@@ -2146,6 +2187,9 @@ class AdminMonitoringContainersView(APIView):
                 "user": labels.get("fixitlab.user", ""),
                 "host_role": labels.get("fixitlab.host_role", ""),
                 "created": c.attrs.get("Created", ""),
+                "restart_count": c.attrs.get("RestartCount", 0),
+                "exit_code": state.get("ExitCode", 0) if c.status != "running" else None,
+                "up_since": state.get("StartedAt", ""),
             })
 
         for c in client.containers.list(all=True, filters={"label": "fixitlab.session_id"}):
