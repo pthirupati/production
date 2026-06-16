@@ -307,8 +307,8 @@ class AccountLifecycleEvent(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["user", "event_type"]),
-            models.Index(fields=["email", "event_type"]),
+            models.Index(fields=["user", "event_type"], name="accounts_ac_user_id_8f3c2a_idx"),
+            models.Index(fields=["email", "event_type"], name="accounts_ac_email_4d1b9e_idx"),
         ]
 
     def __str__(self):

@@ -1,12 +1,12 @@
 # Core
-Django>=5.0,<6.0
+Django>=6.0.6,<7.0
 djangorestframework>=3.15
 django-environ>=0.11
 django-cors-headers>=4.3
 
 # Database
 psycopg2-binary>=2.9
-django-redis>=5.4
+django-redis>=7.0.0
 
 # Auth
 djangorestframework-simplejwt>=5.5.1
@@ -17,12 +17,12 @@ argon2-cffi>=23.1
 channels>=4.0
 channels-redis>=4.3.0
 daphne>=4.2.2
-websockets>=12.0
+websockets>=16.0
 
 # Async tasks
-celery>=5.3
+celery>=5.6.3
 django-celery-results>=2.5
-django-celery-beat>=2.6
+django-celery-beat>=2.9.0
 kombu>=5.6.2
 
 # Docker SDK (lab provisioning)
@@ -36,7 +36,7 @@ requests>=2.31
 # Resume parsing (optional PDF)
 pypdf>=4.0
 razorpay>=1.4
-stripe>=8.0,<14.0
+stripe>=15.2.1,<16.0
 
 # Monitoring & observability
 sentry-sdk[django]>=2.63.0
@@ -62,6 +62,6 @@ Pillow>=10.0
 
 # Email (Gmail API over HTTPS — works when SMTP ports are blocked)
 google-api-python-client>=2.100
-google-auth>=2.23
-google-auth-httplib2>=0.2
+google-auth>=2.55.0
+google-auth-httplib2>=0.4.0
 
