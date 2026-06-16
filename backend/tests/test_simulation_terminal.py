@@ -124,6 +124,9 @@ class BootSequenceTests(SimpleTestCase):
     def test_bash_postcheck_requires_reboot(self):
         from apps.labs.provisioner.simulation.rhel_shell import RHELShell
         shell = RHELShell(scenario_slug="sim-rhel-patching")
+        shell.state.ops_backup_taken = True
+        shell.state.ops_db_stopped = True
+        shell.state.ops_app_stopped = True
         shell.run("bash /opt/fixitlab/precheck.sh")
         shell.run("dnf update -y")
         out = shell.run("bash /opt/fixitlab/postcheck.sh")

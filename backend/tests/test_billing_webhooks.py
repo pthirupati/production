@@ -110,6 +110,11 @@ class BillingWebhookTests(TestCase):
                 self.gateway_payment_id = None
                 self.tech_subscription = None
                 self.plan = None
+                self.gateway_response = {}
+
+            def mark_failed(self, message=""):
+                self.status = "failed"
+                return
 
             def refresh_from_db(self):
                 return
@@ -128,8 +133,6 @@ class BillingWebhookTests(TestCase):
         from unittest.mock import patch, MagicMock
         mock_filter2 = MagicMock()
         mock_filter2.first.return_value = fake_tx2
-        mock_qs2 = MagicMock()
-        mock_qs2.select_for_update.return_value.get.return_value = fake_tx2
         # Stripe constructs event with id and type and data.object
         event = {
             'id': 'evt_test_1',
@@ -151,7 +154,9 @@ class BillingWebhookTests(TestCase):
 
         mock_mgr2 = MagicMock()
         mock_mgr2.filter.return_value = mock_filter2
-        mock_mgr2.select_for_update.return_value = mock_qs2.select_for_update.return_value
+        select_lock = MagicMock()
+        select_lock.get.return_value = fake_tx2
+        mock_mgr2.select_for_update.return_value = select_lock
 
         # Also patch retrieve to return a valid session with amount_total and payment_intent
         from types import SimpleNamespace

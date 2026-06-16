@@ -20,7 +20,7 @@ class MarketingNudgeTests(TestCase):
         self.user.last_login = timezone.now()
         self.user.save(update_fields=["last_login"])
 
-    @patch("apps.notifications.marketing_service.queue_user_email", return_value=True)
+    @patch("apps.notifications.email_helpers.queue_user_email", return_value=True)
     def test_technology_nudge_respects_cadence(self, mock_queue):
         from apps.notifications.marketing_service import (
             eligible_technology_subscribe_nudge,
@@ -41,7 +41,7 @@ class MarketingNudgeTests(TestCase):
         )
         self.assertTrue(eligible_technology_subscribe_nudge(self.user))
 
-    @patch("apps.notifications.marketing_service.queue_user_email", return_value=True)
+    @patch("apps.notifications.email_helpers.queue_user_email", return_value=True)
     def test_interview_sample_nudge_after_completion(self, mock_queue):
         from apps.interviews.models import InterviewCampaign, InterviewRound
         from apps.notifications.marketing_service import (
