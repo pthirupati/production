@@ -163,7 +163,7 @@ class EngineTests(SimpleTestCase):
         out = boot._handle_boot("boot")
         self.assertIn("login", out.lower())
         boot._handle_boot("root")
-        boot._handle_boot("password")
+        boot._handle_boot("redhat")
         out = boot._handle_boot("systemctl status sshd")
         self.assertIn("sshd", out)
 

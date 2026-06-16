@@ -19,6 +19,8 @@ def apply_scenario_preset(slug: str, state: RHELOSState) -> None:
         _preset_gpu_fallen_off(state)
     elif "ansible" in slug:
         _preset_ansible_control(state)
+    elif "patch" in slug:
+        _preset_patching(state)
     elif "boot" in slug or "grub" in slug:
         _preset_boot_issue(state)
 
@@ -151,6 +153,27 @@ def _preset_firewalld_blocked(state: RHELOSState) -> None:
     state.firewall.permanent["public"] = {"services": ["ssh", "dhcpv6-client"], "ports": []}
 
 
+def _preset_patching(state: RHELOSState) -> None:
+    from .boot_sequence import OLD_KERNEL
+    state.kernel = OLD_KERNEL
+    state.patching_done = False
+    state.precheck_ran = False
+    state.postcheck_ran = False
+    state.rebooted_after_patch = False
+    state._write_file(
+        "/opt/fixitlab/PRECHECK_BASELINE",
+        f"kernel={OLD_KERNEL}\npatching_done=False\nrebooted=False\n",
+    )
+    state._write_file(
+        "/opt/fixitlab/precheck.sh",
+        "#!/bin/bash\n# Records pre-patch baseline\necho kernel=$(uname -r)\n",
+    )
+    state._write_file(
+        "/opt/fixitlab/postcheck.sh",
+        "#!/bin/bash\n# Verifies post-patch state matches baseline\nuname -r\n",
+    )
+
+
 _PRESETS: dict[str, callable] = {
     "broken-nginx": _preset_broken_nginx,
     "sim-broken-nginx": _preset_broken_nginx,
@@ -172,4 +195,6 @@ _PRESETS: dict[str, callable] = {
     "sim-postgres-refused": _preset_postgres_down,
     "sim-html-nginx-root": _preset_wrong_nginx_root,
     "sim-rhel-firewalld-port": _preset_firewalld_blocked,
+    "sim-rhel-patching": _preset_patching,
+    "rhel-patching": _preset_patching,
 }

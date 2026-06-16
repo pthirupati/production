@@ -101,7 +101,11 @@ exit 0
 """
 
 CANONICAL_PATCHING_CHECK = """#!/bin/bash
-dnf check-update
+/opt/fixitlab/precheck.sh
+dnf update -y
+reboot
+uname -r
+/opt/fixitlab/postcheck.sh
 exit 0
 """
 
@@ -364,6 +368,35 @@ def _run_line_check(
     if "dnf check-update" in stripped or "yum check-update" in stripped:
         if not getattr(state, "patching_done", False):
             failures.append("system patching not completed")
+        return True
+
+    if "precheck.sh" in stripped or "/opt/fixitlab/precheck" in stripped:
+        if not getattr(state, "precheck_ran", False):
+            failures.append("precheck script was not run")
+        return True
+
+    if "postcheck.sh" in stripped or "/opt/fixitlab/postcheck" in stripped:
+        if not getattr(state, "postcheck_ran", False):
+            failures.append("postcheck script was not run")
+        return True
+
+    if stripped.startswith("uname -r") or "uname -r" in stripped:
+        from .boot_sequence import NEW_KERNEL
+        if not getattr(state, "rebooted_after_patch", False):
+            failures.append("system was not rebooted after patching")
+            return True
+        if state.kernel != NEW_KERNEL:
+            failures.append(f"expected kernel {NEW_KERNEL}, got {state.kernel}")
+        return True
+
+    if "dnf update" in stripped or "yum update" in stripped:
+        if not getattr(state, "patching_done", False):
+            failures.append("dnf update was not applied")
+        return True
+
+    if stripped == "reboot" or stripped.endswith(" reboot"):
+        if not getattr(state, "rebooted_after_patch", False):
+            failures.append("reboot after patching required")
         return True
 
     if "ipmitool power status" in stripped:

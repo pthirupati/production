@@ -72,6 +72,9 @@ class RHELOSState:
         self.mbr_fixed: bool = False
         self.kernel_fixed: bool = False
         self.patching_done: bool = False
+        self.precheck_ran: bool = False
+        self.postcheck_ran: bool = False
+        self.rebooted_after_patch: bool = False
         self.editor = None  # EditorSession when nano/vi active
         from .lvm_state import LVMState
         from .firewall_state import FirewallState

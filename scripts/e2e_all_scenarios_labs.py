@@ -46,6 +46,11 @@ from e2e_dynamic_catalog import db_refresh, setup_all_test_users
 from e2e_scenario_fix import apply_scenario_fix, fix_script_path
 
 try:
+    from e2e_simulation_fix import apply_simulation_fix
+except ImportError:
+    apply_simulation_fix = None
+
+try:
     from e2e_terminal import verify_lab_terminal
 except ImportError:
     verify_lab_terminal = None
@@ -227,10 +232,12 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c, *, test_
         if getattr(st, "status_code", 0) == 200:
             stats.ok(f"{label} replay API")
 
+        is_sim = (sess_a.provider or "") == "simulation" or getattr(scenario, "lab_mode", "") == "simulation"
         if (
             not SKIP_TERMINAL
             and verify_lab_terminal
             and sess_a
+            and not is_sim
             and (sess_a.provider or "docker") == "docker"
             and sess_a.container_id
         ):
@@ -249,10 +256,16 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c, *, test_
             else:
                 stats.fail(f"{label} terminal WebSocket", detail[:80])
 
-        # Apply fix.sh then validate — must pass when fix script exists
+        # Apply fix.sh (docker) or simulation fix, then validate
         db_refresh()
         sess_a = LabSession.objects.filter(id=sid_a).first()
-        if has_fix and sess_a:
+        if is_sim and sess_a and apply_simulation_fix:
+            ok, detail = apply_simulation_fix(sess_a)
+            if ok:
+                stats.ok(f"{label} simulation fix")
+            else:
+                stats.fail(f"{label} simulation fix", detail[:80])
+        elif has_fix and sess_a:
             ok, detail = apply_scenario_fix(sess_a)
             if ok:
                 stats.ok(f"{label} apply fix.sh")
@@ -264,9 +277,9 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c, *, test_
         passed = vdata.get("passed")
         if getattr(st, "status_code", 0) not in (200, 400, 500):
             stats.fail(f"{label} validate API", str(vdata)[:60])
-        elif has_fix and not passed:
+        elif (has_fix or is_sim) and not passed:
             stats.fail(f"{label} validate PASS", (vdata.get("output") or str(vdata))[:80])
-        elif has_fix and passed:
+        elif (has_fix or is_sim) and passed:
             stats.ok(f"{label} validate PASS")
             db_refresh()
             sess_a = LabSession.objects.filter(id=sid_a).first()

@@ -175,6 +175,8 @@ class RHELShell:
             "virsh": self._cmd_virsh,
             "esxcli": self._cmd_esxcli,
             "vmware-toolbox-cmd": self._cmd_vmware,
+            "reboot": self._cmd_reboot,
+            "shutdown": self._cmd_shutdown,
         }
 
         fn = dispatch.get(cmd)
@@ -418,6 +420,8 @@ class RHELShell:
             return svc.active if svc.active == "active" else "inactive"
         if action == "daemon-reload":
             return ""
+        if action == "reboot":
+            return self._cmd_reboot(p)
         if action == "list-units":
             lines = [f"  {n}.service  {s.active}  {s.description}" for n, s in self.state.services.items()]
             return "\n".join(lines)
@@ -690,15 +694,21 @@ class RHELShell:
             if getattr(self.state, "patching_done", False):
                 return "Nothing to do. Complete!"
             self.state.patching_done = True
-            from .boot_sequence import PATCHING_OUTPUT
-            return PATCHING_OUTPUT
+            engine = getattr(self, "_engine", None)
+            if engine and engine.boot:
+                engine.boot.patching_done = True
+            from .boot_sequence import PATCHING_OUTPUT, NEW_KERNEL, OLD_KERNEL
+            return PATCHING_OUTPUT.format(old_kernel=OLD_KERNEL, new_kernel=NEW_KERNEL)
         if "repolist" in line:
             return "repo id                    status\nrhel-9-base                enabled"
         return "dnf: command completed (simulation)"
 
     def _cmd_rpm(self, p: list[str]) -> str:
         if "-qa" in p or "-q" in p:
-            return "kernel-5.14.0-362.el9.x86_64\nglibc-2.34-100.el9.x86_64\nsystemd-252-13.el9.x86_64"
+            k = self.state.kernel
+            if "kernel" in line if (line := " ".join(p)) else "":
+                return f"kernel-{k}"
+            return f"kernel-{k}\nglibc-2.34-100.el9.x86_64\nsystemd-252-13.el9.x86_64"
         return "rpm: OK"
 
     def _cmd_docker(self, p: list[str]) -> str:
@@ -855,17 +865,39 @@ class RHELShell:
         return "Installation finished. No error reported."
 
     def _cmd_bash(self, p: list[str]) -> str:
-        if len(p) > 1 and not p[1].startswith("-"):
-            script = self.state.read_file(p[1])
-            if script:
-                for line in script.splitlines():
-                    if line.strip() and not line.strip().startswith("#"):
-                        out = self.run(line.strip())
-                        if out:
-                            return out
-                return ""
-            return f"bash: {p[1]}: No such file or directory"
-        return ""
+        if len(p) <= 1 or p[1].startswith("-"):
+            return ""
+        path = self.state.resolve_path(p[1])
+        if "precheck" in path:
+            self.state.precheck_ran = True
+            baseline = self.state.read_file("/opt/fixitlab/PRECHECK_BASELINE") or ""
+            return (
+                "=== FixitLab pre-patch baseline ===\n"
+                f"{baseline.strip()}\n"
+                "Precheck recorded. Apply dnf update -y then reboot."
+            )
+        if "postcheck" in path:
+            self.state.postcheck_ran = True
+            if not self.state.precheck_ran:
+                return "POSTCHECK FAILED: run /opt/fixitlab/precheck.sh first"
+            if not self.state.patching_done:
+                return "POSTCHECK FAILED: apply dnf update -y first"
+            if not self.state.rebooted_after_patch:
+                return "POSTCHECK FAILED: reboot required after patching"
+            from .boot_sequence import NEW_KERNEL
+            if self.state.kernel != NEW_KERNEL:
+                return f"POSTCHECK FAILED: expected kernel {NEW_KERNEL}, got {self.state.kernel}"
+            return "POSTCHECK PASSED: kernel and package state match baseline"
+        script = self.state.read_file(p[1])
+        if script:
+            outputs = []
+            for line in script.splitlines():
+                if line.strip() and not line.strip().startswith("#"):
+                    out = self.run(line.strip())
+                    if out:
+                        outputs.append(out)
+            return "\n".join(outputs)
+        return f"bash: {p[1]}: No such file or directory"
 
     def _cmd_nano(self, p: list[str]) -> str:
         if len(p) < 2:
