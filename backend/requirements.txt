@@ -45,7 +45,7 @@ structlog>=24.1
 # Security
 django-ratelimit>=4.1
 django-filter>=24.1
-drf-spectacular>=0.27
+drf-spectacular>=0.29.0
 
 # Server
 gunicorn>=22.0
