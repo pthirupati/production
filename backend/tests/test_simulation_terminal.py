@@ -72,6 +72,25 @@ class BootSequenceTests(SimpleTestCase):
         ok, msg = validate_simulation_state(shell.state, script, engine=engine)
         self.assertTrue(ok, msg)
 
+    def test_lvm_requires_jira_disk(self):
+        engine = UnifiedSimulationEngine(scenario_slug="sim-rhel-lvm-extend", simulation_type="rhel")
+        shell = engine.shell
+        out = shell.run("pvcreate /dev/sdb")
+        self.assertIn("storage", out.lower())
+        shell.state.storage_disk_provisioned = True
+        shell.state.lvm.provision_disk("/dev/sdb")
+        out = shell.run("pvcreate /dev/sdb")
+        self.assertNotIn("storage team", out.lower())
+
+    def test_network_nic_validation(self):
+        from apps.labs.provisioner.simulation.ops_state import apply_team_ops_action
+
+        engine = UnifiedSimulationEngine(scenario_slug="sim-rhel-network-nic", simulation_type="rhel")
+        apply_team_ops_action(engine, "network_nic_added", "sim-rhel-network-nic")
+        script = resolve_simulation_validation_script("sim-rhel-network-nic", "true")
+        ok, msg = validate_simulation_state(engine.shell.state, script, engine=engine)
+        self.assertTrue(ok, msg)
+
     def test_initramfs_fix_with_dracut(self):
         boot = UnifiedSimulationEngine(scenario_slug="sim-rhel-initramfs-dracut", simulation_type="rhel")
         out = boot._handle_boot("dracut -f")

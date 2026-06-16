@@ -77,6 +77,18 @@ const platformFeatures = [
     ],
   },
   {
+    icon: MessageSquare,
+    title: 'FixitLab Assistant (Help bot)',
+    color: 'teal',
+    desc: 'Separate from Jira bots — a floating platform guide for subscriptions, launching labs, interviews, and support contacts.',
+    bullets: [
+      'Click Help on any page — popup chat with typing indicator and quick topics',
+      'Answers platform how-to only; Jira ticket and @team questions stay in the lab Jira panel',
+      'Users can hide or disable from Profile; admins control welcome text and FAQ in Platform Settings',
+      'Jira customer bot + @team bots handle incident details, patching prep, disks, and NICs inside labs',
+    ],
+  },
+  {
     icon: Brain,
     title: 'AI Interview Studio',
     color: 'indigo',

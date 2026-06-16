@@ -23,9 +23,16 @@ def test_generate_launch_lab_reply():
 
 
 @pytest.mark.django_db
-def test_generate_jira_reply():
+def test_jira_questions_redirect_to_lab_panel():
+    result = generate_support_reply("@backup team please stop database for patching")
+    assert "Jira panel" in result["reply"] or "Jira ticket" in result["reply"]
+    assert "precheck" not in result["reply"].lower() or "belongs" in result["reply"].lower()
+
+
+@pytest.mark.django_db
+def test_generate_jira_reply_redirects_not_explains():
     result = generate_support_reply("How does Jira work during labs?")
-    assert "jira" in result["reply"].lower() or "team" in result["reply"].lower()
+    assert "Jira panel" in result["reply"] or "Jira ticket" in result["reply"]
 
 
 @pytest.mark.django_db

@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { interviewsApi } from '../api/interviews'
-import { subscriptionApi } from '../api/subscriptions'
-import { useAuthStore } from '../store/authStore'
+import { interviewsApi } from '../../api/interviews'
+import { subscriptionApi } from '../../api/subscriptions'
+import { useAuthStore } from '../../store/authStore'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import {
   Mic, Video, Calendar, Trophy, ChevronRight, Sparkles, Clock, Award, Plus,

@@ -1,4 +1,4 @@
-"""Rule-based FixitLab support assistant — answers common how-to questions."""
+"""Rule-based FixitLab support assistant — platform help only (not Jira ticket ops)."""
 
 from __future__ import annotations
 
@@ -10,15 +10,47 @@ from django.conf import settings
 DEFAULT_QUICK_TOPICS = [
     {"label": "Launch a lab", "prompt": "How do I launch a lab?"},
     {"label": "Subscribe", "prompt": "How do I subscribe to a technology?"},
-    {"label": "Jira in labs", "prompt": "How does Jira work during simulation labs?"},
-    {"label": "Patching workflow", "prompt": "How do I coordinate patching with Jira teams?"},
+    {"label": "Interviews", "prompt": "How do mock interviews work?"},
     {"label": "Contact support", "prompt": "Who do I contact for help?"},
 ]
 
 DEFAULT_WELCOME = (
-    "Hi! I'm the FixitLab Assistant. Ask me how to use the platform — launching labs, "
-    "subscriptions, Jira workflows, interviews, or who to contact for an issue."
+    "Hi! I'm the FixitLab Assistant — your platform guide for subscriptions, launching labs, "
+    "interviews, certificates, and who to contact.\n\n"
+    "Lab ticket questions (customer impact, @team mentions, patching, disks, NICs) belong in "
+    "the Jira panel inside your lab session — not here."
 )
+
+JIRA_LAB_REDIRECT = (
+    "That belongs in your lab's Jira ticket — use the Jira panel in the lab runner, not this assistant.\n\n"
+    "Inside the ticket you can:\n"
+    "• Ask the customer bot about impact, timeline, symptoms, or logs\n"
+    "• Mention @backup team, @database team, @application team for patching prep\n"
+    "• Mention @storage team to provision disks or @network team for NIC/IP\n\n"
+    "Team bots reply after ~30 seconds and update the simulated server. "
+    "Then continue in the terminal."
+)
+
+# Topics handled only by Jira bots inside an active lab session.
+_JIRA_LAB_KEYWORDS = (
+    "jira", "ticket", "incident", "change window", "@backup", "@database", "@application",
+    "@storage", "@network", "customer bot", "team bot", "backup team", "database team",
+    "application team", "storage team", "network team", "patching workflow", "precheck",
+    "postcheck", "mount filesystem", "mount -a", "fdisk", "pvcreate", "lvextend",
+    "secondary ip", "nic ", "proceeding with patch", "stop database", "stop application",
+    "start database", "start application", "take backup", "rescan", "scsi",
+)
+
+
+def _is_jira_lab_question(text: str, page_path: str = "") -> bool:
+    low = text.lower()
+    if any(kw in low for kw in _JIRA_LAB_KEYWORDS):
+        return True
+    if "/lab/" in (page_path or "") and any(
+        w in low for w in ("patch", "reboot", "disk", "lvm", "network", "team", "ticket")
+    ):
+        return True
+    return False
 
 
 def _support_email() -> str:
@@ -69,17 +101,11 @@ def _match_custom_faq(text: str, custom_faq: list) -> Optional[str]:
 
 def _suggestions_for_context(text: str) -> list[str]:
     low = text.lower()
-    if any(w in low for w in ("jira", "ticket", "patch", "team")):
-        return [
-            "How do I coordinate patching with Jira teams?",
-            "How does the Jira customer bot work?",
-            "Who do I contact for help?",
-        ]
-    if any(w in low for w in ("lab", "terminal", "scenario")):
+    if any(w in low for w in ("lab", "terminal", "scenario", "validate")):
         return [
             "How do I launch a lab?",
             "What if validation fails?",
-            "How do I use hints?",
+            "Who do I contact for help?",
         ]
     return [
         "How do I subscribe to a technology?",
@@ -103,13 +129,24 @@ def generate_support_reply(
     low = text.lower()
     support = _support_email()
     payment = _payment_email()
+    delay = int(row.support_bot_typing_delay_ms or 1200)
+
+    if _is_jira_lab_question(text, page_path):
+        return {
+            "reply": JIRA_LAB_REDIRECT,
+            "suggestions": [
+                "How do I launch a lab?",
+                "Who do I contact for help?",
+            ],
+            "typing_delay_ms": delay,
+        }
 
     custom = _match_custom_faq(text, custom_faq)
     if custom:
         return {
             "reply": custom,
             "suggestions": _suggestions_for_context(text),
-            "typing_delay_ms": int(row.support_bot_typing_delay_ms or 1200),
+            "typing_delay_ms": delay,
         }
 
     if not text or any(w in low for w in ("hello", "hi", "hey", "help", "start")):
@@ -119,131 +156,98 @@ def generate_support_reply(
         return {
             "reply": welcome,
             "suggestions": [t["prompt"] for t in (row.support_bot_quick_topics or DEFAULT_QUICK_TOPICS)[:4]],
-            "typing_delay_ms": int(row.support_bot_typing_delay_ms or 1200),
+            "typing_delay_ms": delay,
         }
 
     if any(w in low for w in ("launch", "start lab", "open lab", "begin lab", "how to lab")):
         reply = (
-            "**Launching a lab**\n"
-            "1. Go to **Technologies** in the sidebar and pick a stack (e.g. Linux).\n"
-            "2. Open a scenario and click **Start Lab** (subscription required for most scenarios).\n"
+            "Launching a lab\n"
+            "1. Go to Technologies in the sidebar and pick a stack (e.g. Linux).\n"
+            "2. Open a scenario and click Start Lab (subscription required for most scenarios).\n"
             "3. Use the embedded terminal — commands run on a simulated server.\n"
-            "4. Complete objectives, run validation, then **Stop Lab** when finished.\n\n"
-            "Demo scenarios are available without a subscription from the scenario page."
+            "4. Complete objectives, run Validate, then Stop Lab when finished.\n\n"
+            "During the lab, open the Jira panel for ticket and team coordination."
         )
     elif any(w in low for w in ("subscribe", "subscription", "pricing", "pay", "purchase", "renew")):
-        pay_line = f"\nBilling questions: **{payment}**" if payment else ""
+        pay_line = f"\nBilling questions: {payment}" if payment else ""
         reply = (
-            "**Subscriptions**\n"
-            "• Subscriptions are **per technology** — pay only for stacks you need.\n"
-            "• Open **Pricing** or **Subscriptions** to view plans and renew.\n"
+            "Subscriptions\n"
+            "• Subscriptions are per technology — pay only for stacks you need.\n"
+            "• Open Pricing or Subscriptions to view plans and renew.\n"
             "• After payment, scenarios for that technology unlock immediately.\n"
-            f"• Support: **{support}**{pay_line}"
-        )
-    elif any(w in low for w in ("jira", "ticket", "incident", "change window")):
-        reply = (
-            "**Jira in FixitLab**\n"
-            "• Each scenario can have a simulated Jira ticket with customer notes.\n"
-            "• Comment on the ticket to ask the **customer bot** about impact, timeline, or symptoms.\n"
-            "• Mention **@backup team**, **@database team**, **@application team** for patching prep.\n"
-            "• Mention **@storage team** to provision disks (LVM labs) or **@network team** for NIC/IP.\n"
-            "• Team bots reply after ~30 seconds and update the lab environment — then continue in the terminal.\n\n"
-            "The original Jira customer bot still works for non-team questions."
-        )
-    elif any(w in low for w in ("patch", "patching", "reboot", "yum update", "dnf update")):
-        reply = (
-            "**Patching workflow (realistic simulation)**\n"
-            "1. In Jira, ask **@backup team**, **@database team**, and **@application team** to stop services and take backup.\n"
-            "2. Wait for bot confirmations (~30s), then run **precheck** in the terminal.\n"
-            "3. Apply patches, **reboot**, run **postcheck**.\n"
-            "4. If apps fail to start, check Jira — you may need to fix mounts (`mount -a`) before asking teams to start again.\n"
-            "5. Ask teams to **start** database and application in Jira when done."
-        )
-    elif any(w in low for w in ("lvm", "disk", "storage", "extend", "volume")):
-        reply = (
-            "**Disk / LVM labs**\n"
-            "• Request a new disk in Jira: mention **@storage team** to add/attach a disk.\n"
-            "• After the bot confirms (~30s), verify with `fdisk -l` or `lsblk` in the terminal.\n"
-            "• If the disk is missing, rescan SCSI (`echo 1 > /sys/class/scsi_host/.../scan`) or ask storage again in Jira.\n"
-            "• Then create PV/VG/LV and extend filesystems as the scenario requires."
-        )
-    elif any(w in low for w in ("network", "nic", "ip addr", "vlan", "interface")):
-        reply = (
-            "**Network labs**\n"
-            "• Ask **@network team** in Jira to add a NIC or secondary IP.\n"
-            "• After confirmation, verify with `ip addr` or `nmcli` in the terminal.\n"
-            "• Configure interfaces per scenario objectives, then validate."
+            f"• Support: {support}{pay_line}"
         )
     elif any(w in low for w in ("interview", "mock interview", "voice", "camera", "mic")):
         reply = (
-            "**AI Interview Studio**\n"
-            "• Open **Interviews** from the sidebar (or /mock-interviews when logged out).\n"
+            "AI Interview Studio\n"
+            "• Open Interviews from the sidebar (or /mock-interviews when logged out).\n"
             "• Upload a resume, pick rounds, and allow microphone (and camera when required).\n"
-            "• Plans are separate from technology lab subscriptions — see **Pricing**.\n"
-            "• Certificates verify at **Verify Certificate** (`FIXIT-INT-…` IDs)."
+            "• Plans are separate from technology lab subscriptions — see Pricing.\n"
+            "• Certificates verify at Verify Certificate (FIXIT-INT-… IDs)."
         )
     elif any(w in low for w in ("contact", "email", "support", "who to", "reach", "issue", "bug", "problem")):
-        pay_line = f"\n• **Payments / refunds:** {payment}" if payment else ""
+        pay_line = f"\n• Payments / refunds: {payment}" if payment else ""
         reply = (
-            "**Who to contact**\n"
-            f"• **General support & labs:** {support}\n"
+            "Who to contact\n"
+            f"• General support & labs: {support}\n"
             f"{pay_line}\n"
-            "• **In-app:** Community forum, FAQ page, or this assistant.\n"
-            "• **Account:** Profile → notification preferences or delete account.\n\n"
-            "For lab-specific blockers, include scenario name and what you tried in the terminal."
+            "• In-app: Community forum, FAQ page, or this assistant (platform questions only).\n"
+            "• Account: Profile → notification preferences or delete account.\n\n"
+            "For active lab incidents, use the Jira panel in your lab session."
         )
     elif any(w in low for w in ("validation", "validate", "pass", "check solution", "verify lab")):
         reply = (
-            "**Validation**\n"
-            "• Run the scenario's validate command or click **Validate** in the lab UI.\n"
-            "• Ensure all objectives are met (services up, config correct, Jira steps done if required).\n"
-            "• Patching labs need precheck/postcheck and team coordination in Jira.\n"
-            "• Review hints if stuck — limited hints per scenario."
+            "Validation\n"
+            "• Click Validate in the lab UI when objectives are complete.\n"
+            "• The checker runs terminal state plus any scenario requirements.\n"
+            "• Use hints if stuck — limited hints per scenario.\n"
+            "• Ticket/team steps must be done in the Jira panel before validation can pass."
         )
     elif any(w in low for w in ("hint", "stuck", "clue")):
         reply = (
-            "**Hints**\n"
+            "Hints\n"
             "• Each scenario has a limited number of hints.\n"
             "• Open the hints panel in the lab runner — progressive hints avoid spoiling the full answer.\n"
             "• After time expires you can view the solution explanation."
         )
     elif any(w in low for w in ("certificate", "achievement", "badge")):
         reply = (
-            "**Certificates & achievements**\n"
+            "Certificates & achievements\n"
             "• Complete scenarios to earn achievements and technology progress.\n"
-            "• Interview campaigns issue **FIXIT-INT** certificates when all rounds pass.\n"
-            "• Verify any certificate at **Verify Certificate** in the menu."
+            "• Interview campaigns issue FIXIT-INT certificates when all rounds pass.\n"
+            "• Verify any certificate at Verify Certificate in the menu."
         )
     elif any(w in low for w in ("disable", "turn off", "hide bot", "stop bot")):
         reply = (
-            "**Hide this assistant**\n"
-            "• Click the **X** on the chat panel or the floating bot button to minimize.\n"
-            "• To disable permanently: **Profile → Preferences → FixitLab Assistant** and turn it off.\n"
+            "Hide this assistant\n"
+            "• Click X on the chat panel or the floating Help button to minimize.\n"
+            "• To disable permanently: Profile → FixitLab Assistant toggle.\n"
             "• Admins can disable the bot platform-wide in Admin → Platform Settings."
         )
     elif any(w in low for w in ("technology", "technologies", "browse", "catalog")):
         reply = (
-            "**Technologies**\n"
-            "• Sidebar → **Technologies** lists all stacks (Linux, networking, etc.).\n"
+            "Technologies\n"
+            "• Sidebar → Technologies lists all stacks (Linux, networking, etc.).\n"
             "• Each technology page shows scenarios by difficulty.\n"
             "• Subscribe to unlock full scenario access for that stack."
         )
     elif any(w in low for w in ("team", "organization", "invite", "org")):
         reply = (
-            "**My Team**\n"
-            "• Sidebar → **My Team** for organization invites and member analytics (if your org uses FixitLab).\n"
+            "My Team\n"
+            "• Sidebar → My Team for organization invites and member analytics.\n"
             "• Managers can track learner progress; learners use their own accounts."
         )
     elif page_path and "/lab/" in page_path:
         reply = (
-            "You're in a lab session. Use the terminal for commands, the Jira panel for ticket/team coordination, "
-            "and **Validate** when objectives are complete. Ask me about Jira teams, patching, disks, or validation."
+            "You're in a lab session. Use the terminal for commands and Validate when done. "
+            "For ticket updates, customer questions, or @team coordination, use the Jira panel — not this assistant."
         )
     else:
         reply = (
-            f"I'm not sure about that specific question. Try asking about:\n"
-            "• Launching labs • Subscriptions • Jira & team bots • Patching • LVM/disk • Network • Interviews\n\n"
-            f"Or email **{support}** with details and we'll help you directly."
+            "I'm not sure about that. I help with platform usage:\n"
+            "• Launching labs • Subscriptions • Interviews • Certificates • Contacts\n\n"
+            f"For lab ticket/team questions, use the Jira panel in your lab. "
+            f"Or email {support} for human support."
         )
 
     reply = re.sub(r"\*\*([^*]+)\*\*", r"\1", reply)
@@ -251,5 +255,5 @@ def generate_support_reply(
     return {
         "reply": reply,
         "suggestions": _suggestions_for_context(text),
-        "typing_delay_ms": int(row.support_bot_typing_delay_ms or 1200),
+        "typing_delay_ms": delay,
     }

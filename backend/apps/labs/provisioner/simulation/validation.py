@@ -109,6 +109,11 @@ uname -r
 exit 0
 """
 
+CANONICAL_NETWORK_NIC_CHECK = """#!/bin/bash
+ip addr show dev eth0 | grep -q 10.0.0.20
+exit 0
+"""
+
 CANONICAL_BAREMETAL_CHECK = """#!/bin/bash
 ipmitool power status | grep -qi on
 exit 0
@@ -156,6 +161,7 @@ def resolve_simulation_validation_script(scenario_slug: str, validation_script: 
         (lambda s: "pip" in s or ("python" in s and "shell" not in s), CANONICAL_PYTHON_CHECK),
         (lambda s: "bash" in s or "shell-script" in s or "unbound" in s, CANONICAL_SHELL_CHECK),
         (lambda s: "lvm" in s, CANONICAL_LVM_CHECK),
+        (lambda s: "network-nic" in s, CANONICAL_NETWORK_NIC_CHECK),
         (lambda s: "initramfs" in s or "dracut" in s, CANONICAL_INITRAMFS_CHECK),
         (lambda s: "grub" in s or "mbr" in s or "kernel-panic" in s or "kernel" in s or "boot" in s, CANONICAL_GRUB_CHECK),
         (lambda s: "patch" in s, CANONICAL_PATCHING_CHECK),
@@ -358,7 +364,7 @@ def _run_line_check(
 
     if "ip addr" in stripped or "10.0.0.20" in stripped:
         slug = (state.scenario_slug or "").lower()
-        if "network-nic" in slug or "network-nic" in slug:
+        if "network-nic" in slug:
             if not getattr(state, "network_nic_provisioned", True):
                 failures.append("secondary IP not provisioned — request @network team in Jira")
             elif "10.0.0.20" not in state.format_ip_addr():
@@ -390,11 +396,25 @@ def _run_line_check(
         return True
 
     if "precheck.sh" in stripped or "/opt/fixitlab/precheck" in stripped:
+        slug = (state.scenario_slug or "").lower()
+        if "patch" in slug:
+            from .ops_state import ops_ready_for_patching
+            if not ops_ready_for_patching(state):
+                failures.append(
+                    "change window not ready — coordinate @backup @database @application teams in Jira first"
+                )
+                return True
         if not getattr(state, "precheck_ran", False):
             failures.append("precheck script was not run")
         return True
 
     if "postcheck.sh" in stripped or "/opt/fixitlab/postcheck" in stripped:
+        slug = (state.scenario_slug or "").lower()
+        if "patch" in slug and not getattr(state, "ops_services_restarted", False):
+            failures.append(
+                "services not restored — ask @database team and @application team to start in Jira"
+            )
+            return True
         if not getattr(state, "postcheck_ran", False):
             failures.append("postcheck script was not run")
         return True

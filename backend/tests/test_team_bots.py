@@ -41,6 +41,22 @@ class TeamMentionTests(SimpleTestCase):
         actions = resolve_team_actions(text, teams, "sim-rhel-patching")
         self.assertEqual(actions[0][1], "database_started")
 
+    def test_network_nic_action(self):
+        text = "@network team please add secondary IP 10.0.0.20/24"
+        teams = parse_team_mentions(text)
+        actions = resolve_team_actions(text, teams, "sim-rhel-network-nic")
+        self.assertEqual(actions[0][1], "network_nic_added")
+
+    def test_mount_failure_reply(self):
+        from apps.jira_integration.team_bots import build_mount_failure_reply
+
+        class FakeTicket:
+            pass
+
+        author, msg = build_mount_failure_reply(FakeTicket())
+        self.assertIn("mount", msg.lower())
+        self.assertIn("mount -a", msg.lower())
+
 
 class TeamReplyTextTests(SimpleTestCase):
     def test_consolidated_stop_reply(self):

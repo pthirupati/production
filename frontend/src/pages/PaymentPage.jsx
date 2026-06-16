@@ -585,8 +585,6 @@ export default function PaymentPage() {
                       <p className="text-[10px] text-surface-500 mt-1.5">
                         Razorpay opens a secure checkout — your bank or UPI app will verify the payment with OTP or PIN, same as PhonePe or bank transfer.
                       </p>
-                        A payment request will be sent to your UPI app for approval.
-                      </p>
                     </div>
                     <div className="flex items-center gap-3 p-3 bg-surface-800/40 rounded-lg border border-surface-700/20">
                       <div className="flex gap-2">
