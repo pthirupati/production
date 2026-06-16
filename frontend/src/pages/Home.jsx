@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import InterviewDemoWidget from '../components/InterviewDemoWidget'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
+import { useDataStore } from '../store/dataStore'
 import { scenarioApi } from '../api/scenarios'
 import api from '../api/client'
 import { PlatformBanners } from '../components/PlatformBanners'
@@ -53,6 +54,7 @@ const trustedBy = [
 export default function Home() {
   const { isAuthenticated } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
+  const getTechnologies = useDataStore(s => s.getTechnologies)
   const [technologies, setTechnologies] = useState([])
   const [stats, setStats] = useState({})
   const [platformConfig, setPlatformConfig] = useState(null)
@@ -60,7 +62,7 @@ export default function Home() {
   const [activeTestimonial, setActiveTestimonial] = useState(0)
 
   useEffect(() => {
-    scenarioApi.getTechnologies().then(setTechnologies).catch(() => {})
+    getTechnologies().then(setTechnologies).catch(() => {})
     scenarioApi.getPlatformStats().then(setStats).catch(() => {})
     api.get('/config/').then(res => {
       setPlatformConfig(res.data)

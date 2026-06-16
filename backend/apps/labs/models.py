@@ -96,6 +96,10 @@ class LabSession(models.Model):
         default=3600, help_text="Max duration in seconds"
     )
     started_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(
+        null=True, blank=True, db_index=True,
+        help_text="Computed: started_at + duration_limit seconds. Used for efficient expiry filtering."
+    )
     ended_at = models.DateTimeField(null=True, blank=True)
 
     # Jira integration
@@ -132,7 +136,14 @@ class LabSession(models.Model):
             models.Index(fields=["user", "started_at"]),  # daily count queries
             models.Index(fields=["instance_id"]),  # cleanup lookups
             models.Index(fields=["container_id"]),  # cleanup lookups
+            models.Index(fields=["status", "expires_at"]),  # expiry cleanup queries
         ]
+
+    def save(self, *args, **kwargs):
+        if self.started_at and self.duration_limit:
+            from datetime import timedelta
+            self.expires_at = self.started_at + timedelta(seconds=self.duration_limit)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.user} - {self.scenario.slug} ({self.status})"

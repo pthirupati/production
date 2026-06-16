@@ -28,66 +28,135 @@ def cleanup_expired_labs():
     terminated = 0
 
     # ── 1. Clean up expired RUNNING sessions (iterate in chunks to avoid OOM) ──
-    expired_sessions = LabSession.objects.filter(status="RUNNING").select_related("scenario", "user").iterator(chunk_size=200)
-    for session in expired_sessions:
-        if session.is_expired:
-            logger.info(f"Terminating expired session {session.id} (provider: {session.provider})")
-            resource_id = session.container_id or session.instance_id
-            if resource_id:
-                try:
-                    provisioner = get_provisioner(session.provider or "docker")
-                    provisioner.terminate(resource_id, session_id=str(session.id))
-                except Exception as e:
-                    logger.error(f"Error terminating resource: {e}")
-
-            session.status = "EXPIRED"
-            session.ended_at = timezone.now()
-            session.save()
-            terminated += 1
-
+    from django.utils import timezone as tz
+    now = tz.now()
+    # Filter by expires_at for sessions that have it set (new sessions after migration)
+    # Fall back to Python check for legacy sessions without expires_at
+    sessions_with_expiry = LabSession.objects.filter(
+        status="RUNNING", expires_at__lte=now
+    ).select_related("scenario", "user").iterator(chunk_size=200)
+    for session in sessions_with_expiry:
+        logger.info(f"Terminating expired session {session.id} (provider: {session.provider})")
+        resource_id = session.container_id or session.instance_id
+        if resource_id:
             try:
-                from apps.jira_integration.sync import sync_lab_expired
-                sync_lab_expired(session)
+                provisioner = get_provisioner(session.provider or "docker")
+                provisioner.terminate(resource_id, session_id=str(session.id))
             except Exception as e:
-                logger.warning(f"Jira sync on lab expiry failed: {e}")
+                logger.error(f"Error terminating resource: {e}")
 
-            # Notify user about expired lab
+        session.status = "EXPIRED"
+        session.ended_at = timezone.now()
+        session.save()
+        terminated += 1
+
+        try:
+            from apps.jira_integration.sync import sync_lab_expired
+            sync_lab_expired(session)
+        except Exception as e:
+            logger.warning(f"Jira sync on lab expiry failed: {e}")
+
+        # Notify user about expired lab
+        try:
+            from apps.notifications.tasks import create_in_app_notification
+            from apps.notifications.models import NotificationPreference
+            from apps.notifications.email_helpers import queue_user_email
+            from django.contrib.auth import get_user_model
+
+            User = get_user_model()
+            user = User.objects.get(id=session.user_id)
+            prefs = NotificationPreference.get_for_user(user)
+
+            if prefs.should_notify_inapp("lab_expired"):
+                create_in_app_notification.delay(
+                    user_id=session.user_id,
+                    notification_type="lab_expired",
+                    title=f"Lab Expired: {session.scenario.title}",
+                    message=f"Your lab session expired after {session.duration_limit // 60} minutes. You can try again anytime!",
+                    metadata={"scenario_slug": session.scenario.slug},
+                )
+
+            if prefs.should_email("lab_expired"):
+                from django.conf import settings as django_settings
+
+                queue_user_email(
+                    user,
+                    subject=f"FixitLab: Lab Session Expired — {session.scenario.title}",
+                    template="emails/lab_expired.html",
+                    context={
+                        "username": user.username,
+                        "scenario_title": session.scenario.title,
+                        "duration_minutes": session.duration_limit // 60,
+                        "scenarios_url": f"{django_settings.FRONTEND_URL}/scenarios",
+                    },
+                    email_type="lab_expired",
+                )
+        except Exception as e:
+            logger.warning(f"Failed to notify user about expired lab: {e}")
+
+    # Legacy sessions without expires_at: fall back to Python check
+    legacy_sessions = LabSession.objects.filter(
+        status="RUNNING", expires_at__isnull=True
+    ).select_related("scenario", "user").iterator(chunk_size=200)
+    for session in legacy_sessions:
+        if not session.is_expired:
+            continue
+        logger.info(f"Terminating expired legacy session {session.id} (provider: {session.provider})")
+        resource_id = session.container_id or session.instance_id
+        if resource_id:
             try:
-                from apps.notifications.tasks import create_in_app_notification
-                from apps.notifications.models import NotificationPreference
-                from apps.notifications.email_helpers import queue_user_email
-                from django.contrib.auth import get_user_model
-
-                User = get_user_model()
-                user = User.objects.get(id=session.user_id)
-                prefs = NotificationPreference.get_for_user(user)
-
-                if prefs.should_notify_inapp("lab_expired"):
-                    create_in_app_notification.delay(
-                        user_id=session.user_id,
-                        notification_type="lab_expired",
-                        title=f"Lab Expired: {session.scenario.title}",
-                        message=f"Your lab session expired after {session.duration_limit // 60} minutes. You can try again anytime!",
-                        metadata={"scenario_slug": session.scenario.slug},
-                    )
-
-                if prefs.should_email("lab_expired"):
-                    from django.conf import settings as django_settings
-
-                    queue_user_email(
-                        user,
-                        subject=f"FixitLab: Lab Session Expired — {session.scenario.title}",
-                        template="emails/lab_expired.html",
-                        context={
-                            "username": user.username,
-                            "scenario_title": session.scenario.title,
-                            "duration_minutes": session.duration_limit // 60,
-                            "scenarios_url": f"{django_settings.FRONTEND_URL}/scenarios",
-                        },
-                        email_type="lab_expired",
-                    )
+                provisioner = get_provisioner(session.provider or "docker")
+                provisioner.terminate(resource_id, session_id=str(session.id))
             except Exception as e:
-                logger.warning(f"Failed to notify user about expired lab: {e}")
+                logger.error(f"Error terminating resource: {e}")
+
+        session.status = "EXPIRED"
+        session.ended_at = timezone.now()
+        session.save()
+        terminated += 1
+
+        try:
+            from apps.jira_integration.sync import sync_lab_expired
+            sync_lab_expired(session)
+        except Exception as e:
+            logger.warning(f"Jira sync on lab expiry failed: {e}")
+
+        try:
+            from apps.notifications.tasks import create_in_app_notification
+            from apps.notifications.models import NotificationPreference
+            from apps.notifications.email_helpers import queue_user_email
+            from django.contrib.auth import get_user_model
+
+            User = get_user_model()
+            user = User.objects.get(id=session.user_id)
+            prefs = NotificationPreference.get_for_user(user)
+
+            if prefs.should_notify_inapp("lab_expired"):
+                create_in_app_notification.delay(
+                    user_id=session.user_id,
+                    notification_type="lab_expired",
+                    title=f"Lab Expired: {session.scenario.title}",
+                    message=f"Your lab session expired after {session.duration_limit // 60} minutes. You can try again anytime!",
+                    metadata={"scenario_slug": session.scenario.slug},
+                )
+
+            if prefs.should_email("lab_expired"):
+                from django.conf import settings as django_settings
+
+                queue_user_email(
+                    user,
+                    subject=f"FixitLab: Lab Session Expired — {session.scenario.title}",
+                    template="emails/lab_expired.html",
+                    context={
+                        "username": user.username,
+                        "scenario_title": session.scenario.title,
+                        "duration_minutes": session.duration_limit // 60,
+                        "scenarios_url": f"{django_settings.FRONTEND_URL}/scenarios",
+                    },
+                    email_type="lab_expired",
+                )
+        except Exception as e:
+            logger.warning(f"Failed to notify user about expired lab: {e}")
 
     # ── 2. Clean up stuck PROVISIONING sessions (>10 minutes) ──
     stuck_cutoff = timezone.now() - timedelta(minutes=10)
@@ -303,6 +372,43 @@ def provision_cloud_lab(self, session_id):
             pass
 
         return {"status": "failed", "error": str(e)}
+
+
+@shared_task(
+    bind=True,
+    name="celery_app.tasks.provision_docker_lab",
+    queue="provisioning",
+    max_retries=2,
+    default_retry_delay=5,
+)
+def provision_docker_lab(self, session_id: str):
+    """Provision a Docker/simulation lab asynchronously."""
+    from apps.labs.models import LabSession
+    from apps.labs.provisioner import get_provisioner
+
+    try:
+        session = LabSession.objects.select_related("scenario").get(id=session_id)
+    except LabSession.DoesNotExist:
+        logger.error("provision_docker_lab: session %s not found", session_id)
+        return
+
+    if session.status not in ("PROVISIONING",):
+        logger.info("provision_docker_lab: session %s already in status %s, skipping", session_id, session.status)
+        return
+
+    try:
+        provisioner = get_provisioner(session.provider or "docker")
+        resource_id, resource_name = provisioner.provision(session)
+        session.container_id = resource_id
+        session.container_name = resource_name
+        session.status = "RUNNING"
+        session.save(update_fields=["container_id", "container_name", "status"])
+        logger.info("provision_docker_lab: session %s running (container %s)", session_id, resource_id)
+    except Exception as exc:
+        logger.error("provision_docker_lab: provisioning failed for session %s: %s", session_id, exc)
+        session.status = "FAILED"
+        session.save(update_fields=["status"])
+        raise self.retry(exc=exc)
 
 
 @shared_task

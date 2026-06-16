@@ -41,5 +41,9 @@ CELERY_BEAT_SCHEDULE = {
         "task": "celery_app.tasks.process_inactive_accounts",
         "schedule": crontab(hour=5, minute=0),  # 5:00 AM UTC daily
     },
+    "fail-stuck-payment-transactions": {
+        "task": "billing.fail_stuck_payment_transactions",
+        "schedule": crontab(minute="*/30"),  # every 30 minutes
+    },
 }
 

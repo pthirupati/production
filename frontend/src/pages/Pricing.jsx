@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
-import { scenarioApi } from '../api/scenarios'
+import { useDataStore } from '../store/dataStore'
 import { subscriptionApi } from '../api/subscriptions'
 import { interviewsApi } from '../api/interviews'
 import api from '../api/client'
@@ -53,6 +53,7 @@ const paidFeatures = [
 export default function Pricing() {
   const { isAuthenticated, user } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
+  const getTechnologies = useDataStore(s => s.getTechnologies)
   const [technologies, setTechnologies] = useState([])
   const [mySubscriptions, setMySubscriptions] = useState([])
   const [subscribing, setSubscribing] = useState(null)
@@ -122,7 +123,7 @@ export default function Pricing() {
 
   // Load technologies and subscriptions
   useEffect(() => {
-    scenarioApi.getTechnologies().then(setTechnologies).catch(() => {})
+    getTechnologies().then(setTechnologies).catch(() => {})
     interviewsApi.getPlans().then(d => setInterviewPlans(d.plans || [])).catch(() => {})
     if (isAuthenticated) {
       subscriptionApi.getMySubscriptions()

@@ -34,6 +34,10 @@ def record_attempt(user, scenario, score, completed=False, time_seconds=None, hi
 
     progress.save()
 
+    # Invalidate the cached progress for this user
+    from django.core.cache import cache as _cache
+    _cache.delete(f"user_progress:{user.id}")
+
     # Check and award achievements after recording
     if completed:
         check_achievements(user, scenario, score, time_seconds, hints_used)
@@ -53,10 +57,26 @@ def check_achievements(user, scenario, score, time_seconds, hints_used):
             awarded.append(achievement_type)
             logger.info(f"Achievement awarded: {achievement_type} to {user.username}")
 
-    # First Solve
-    completed_count = UserScenarioProgress.objects.filter(
-        user=user, completed=True
-    ).count()
+    # Pre-aggregate all needed counts in 2 queries instead of N+1
+    from apps.question_bank.models import Scenario as ScenarioModel
+    from django.db.models import Count
+
+    # 1 query: per-difficulty completed count for this user
+    diff_done_map = {
+        row["scenario__difficulty"]: row["cnt"]
+        for row in UserScenarioProgress.objects.filter(user=user, completed=True)
+        .values("scenario__difficulty")
+        .annotate(cnt=Count("id"))
+    }
+    completed_count = sum(diff_done_map.values())
+
+    # 1 query: total active scenarios per difficulty
+    diff_total_map = {
+        row["difficulty"]: row["cnt"]
+        for row in ScenarioModel.objects.filter(is_active=True)
+        .values("difficulty")
+        .annotate(cnt=Count("id"))
+    }
 
     if completed_count >= 1:
         _award("first_solve")
@@ -82,16 +102,8 @@ def check_achievements(user, scenario, score, time_seconds, hints_used):
     # Difficulty mastery — completed all scenarios of a difficulty level
     difficulty = getattr(scenario, "difficulty", None)
     if difficulty:
-        from apps.question_bank.models import Scenario as ScenarioModel
-        total_of_difficulty = ScenarioModel.objects.filter(
-            difficulty=difficulty, is_active=True
-        ).count()
-        completed_of_difficulty = UserScenarioProgress.objects.filter(
-            user=user,
-            completed=True,
-            scenario__difficulty=difficulty,
-            scenario__is_active=True,
-        ).count()
+        total_of_difficulty = diff_total_map.get(difficulty, 0)
+        completed_of_difficulty = diff_done_map.get(difficulty, 0)
         if total_of_difficulty > 0 and completed_of_difficulty >= total_of_difficulty:
             mastery_map = {"easy": "easy_master", "medium": "medium_master", "hard": "hard_master"}
             achievement_key = mastery_map.get(difficulty)

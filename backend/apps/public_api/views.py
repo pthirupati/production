@@ -16,7 +16,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Q, Count, Avg, Sum, F, Exists, OuterRef, Value, BooleanField
 
-from common.throttles import LabStartThrottle
+from common.throttles import LabStartThrottle, StrictAnonRateThrottle
 from common.api_security import require_authentication
 
 from apps.question_bank.models import Scenario, Technology, Tag, Bookmark
@@ -174,6 +174,7 @@ class TechnologyDetailView(APIView):
 
 class ScenariosListView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         qs = Scenario.objects.filter(is_active=True).select_related(
@@ -312,6 +313,7 @@ class ScenarioDetailView(APIView):
 
 class CategoriesListView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         cached = cache.get("categories_list")
@@ -331,6 +333,7 @@ class CategoriesListView(APIView):
 class TagsListView(APIView):
     """List all tags with scenario counts."""
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         cached = cache.get("tags_list")
@@ -552,31 +555,25 @@ class StartLabView(APIView):
                 response_data = {**serializer.data, **jira_info}
                 return Response(response_data, status=status.HTTP_201_CREATED)
 
-            # Docker and simulation labs: provision synchronously (instant)
-            resource_id, resource_name = provisioner.provision(session)
+            # Docker and simulation labs: provision asynchronously via Celery
+            from celery_app.tasks import provision_docker_lab
+            provision_docker_lab.delay(str(session.id))
 
-            session.container_id = resource_id
-            session.container_name = resource_name
-            session.status = "RUNNING"
-            session.save()
-
-            # Record attempt — reset completed flag so the user must
-            # re-solve from scratch on every new lab launch
+            # Record attempt eagerly so the user sees it immediately
             progress, _ = UserScenarioProgress.objects.get_or_create(
                 user=request.user, scenario=scenario
             )
             progress.attempts += 1
-            progress.completed = False     # Reset: user must re-solve
+            progress.completed = False
             progress.completed_at = None
             progress.save()
 
-            # Update scenario stats
             Scenario.objects.filter(pk=scenario.pk).update(
                 attempts_count=F("attempts_count") + 1
             )
 
-            jira_info = mask_jira_url_for_user(sync_lab_started(session), request.user)
             serializer = LabSessionSerializer(session, context={"request": request})
+            jira_info = mask_jira_url_for_user(sync_lab_started(session), request.user)
             response_data = {**serializer.data, **jira_info}
             return Response(response_data, status=status.HTTP_201_CREATED)
 
@@ -995,6 +992,11 @@ class UserProgressView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        cache_key = f"user_progress:{request.user.id}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         progress = UserScenarioProgress.objects.filter(
             user=request.user
         ).select_related("scenario", "scenario__technology")
@@ -1066,7 +1068,7 @@ class UserProgressView(APIView):
             .order_by("-started_at")[:10]
         )
 
-        return Response({
+        result = {
             "summary": {
                 "total_scenarios": total_scenarios,
                 "completed": completed,
@@ -1088,7 +1090,9 @@ class UserProgressView(APIView):
                 }
                 for s in recent
             ],
-        })
+        }
+        cache.set(cache_key, result, 60)
+        return Response(result)
 
 
 class UserAchievementsView(APIView):
@@ -1113,6 +1117,7 @@ class UserAchievementsView(APIView):
 
 class LeaderboardView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         tech_id = request.query_params.get("technology")
@@ -1174,6 +1179,7 @@ class LeaderboardView(APIView):
 class PlatformStatsView(APIView):
     """Public stats for the landing page."""
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         cached = cache.get("platform_stats")

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { scenarioApi } from '../api/scenarios'
+import { useDataStore } from '../store/dataStore'
 import {
   Server, Cloud, Globe, Monitor, Database, Cpu,
   ArrowRight, Layers, Shield
@@ -31,11 +31,12 @@ const techColors = {
 
 export default function Technologies() {
   const navigate = useNavigate()
+  const getTechnologies = useDataStore(s => s.getTechnologies)
   const [technologies, setTechnologies] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    scenarioApi.getTechnologies()
+    getTechnologies()
       .then(setTechnologies)
       .catch(() => toast.error('Failed to load technologies'))
       .finally(() => setLoading(false))
