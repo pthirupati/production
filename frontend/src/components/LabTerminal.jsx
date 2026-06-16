@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, memo } from 'react'
+import { useEffect, useRef, useState, useCallback, memo, forwardRef, useImperativeHandle } from 'react'
 import { useAuthStore } from '../store/authStore'
 
 const WS_NO_RECONNECT = new Set([1000, 4001, 4003, 4004, 4005, 4008, 4500])
@@ -26,7 +26,7 @@ function LabTerminal({
   welcomeHint = '',
   layoutKey,
   onReady,
-}) {
+}, ref) {
   const mountElRef = useRef(null)
   const [mountReady, setMountReady] = useState(false)
   const mountRef = useCallback((node) => {
@@ -47,6 +47,21 @@ function LabTerminal({
   const isMobileRef = useRef(isMobile)
   isMobileRef.current = isMobile
   const maxReconnectAttempts = 10
+
+  useImperativeHandle(ref, () => ({
+    sendCommand(text) {
+      const ws = wsRef.current
+      if (!ws || ws.readyState !== WebSocket.OPEN || !text) return false
+      for (const ch of text) {
+        ws.send(JSON.stringify({ input: ch }))
+      }
+      ws.send(JSON.stringify({ input: '\r' }))
+      return true
+    },
+    isConnected() {
+      return wsRef.current?.readyState === WebSocket.OPEN
+    },
+  }), [])
 
   useEffect(() => {
     const mountNode = mountElRef.current
@@ -320,4 +335,4 @@ function terminalPropsEqual(prev, next) {
     && ps.instance_id === ns.instance_id
 }
 
-export default memo(LabTerminal, terminalPropsEqual)
+export default memo(forwardRef(LabTerminal), terminalPropsEqual)

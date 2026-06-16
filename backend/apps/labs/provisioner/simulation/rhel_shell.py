@@ -564,11 +564,7 @@ class RHELShell:
         return f"--------------e------- {f}"
 
     def _cmd_df(self, p: list[str]) -> str:
-        return (
-            "Filesystem     1K-blocks    Used Available Use% Mounted on\n"
-            "/dev/sda1       52428800 8388608  44040192  17% /\n"
-            "tmpfs            4026532       0   4026532   0% /dev/shm"
-        )
+        return self.state.lvm.format_df()
 
     def _cmd_free(self, p: list[str]) -> str:
         return "               total        used        free      shared  buff/cache   available\nMem:        16384000     2048000    12000000       64000     2336000    14000000\nSwap:        4194300           0     4194300"
@@ -1019,10 +1015,13 @@ class RHELShell:
         return "COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME\nsshd      412 root    3u  IPv4  12345      0t0  TCP *:22 (LISTEN)"
 
     def _cmd_mount(self, p: list[str]) -> str:
-        return "/dev/sda1 on / type xfs (rw,relatime)\n/dev/sda2 on /boot type xfs (rw,relatime)"
+        return self.state.lvm.format_mount()
 
     def _cmd_fdisk(self, p: list[str]) -> str:
-        return "Disk /dev/sda: 50 GiB\nDevice     Boot   Start      End  Sectors  Size Id Type\n/dev/sda1  *       2048 104857566 104855519   50G 83 Linux"
+        if len(p) > 1 and p[1] == "-l":
+            return self.state.lvm.format_fdisk()
+        dev = p[-1] if len(p) > 1 else "/dev/sda"
+        return self.state.lvm.format_fdisk() if dev.startswith("/dev/sd") else f"fdisk: cannot open {dev}"
 
     def _cmd_virsh(self, p: list[str]) -> str:
         if len(p) > 1 and p[1] == "list":

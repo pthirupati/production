@@ -114,6 +114,11 @@ ipmitool power status | grep -qi on
 exit 0
 """
 
+CANONICAL_SSHD_CHECK = """#!/bin/bash
+systemctl is-active sshd
+exit 0
+"""
+
 
 def is_trivial_validation_script(script: str) -> bool:
     """True when script would always pass without checking lab state."""
@@ -154,6 +159,7 @@ def resolve_simulation_validation_script(scenario_slug: str, validation_script: 
         (lambda s: "initramfs" in s or "dracut" in s, CANONICAL_INITRAMFS_CHECK),
         (lambda s: "grub" in s or "mbr" in s or "kernel-panic" in s or "kernel" in s or "boot" in s, CANONICAL_GRUB_CHECK),
         (lambda s: "patch" in s, CANONICAL_PATCHING_CHECK),
+        (lambda s: "ssh-stop" in s or "sshd-down" in s, CANONICAL_SSHD_CHECK),
         (lambda s: "ipmi" in s or "baremetal" in s or "vmware" in s, CANONICAL_BAREMETAL_CHECK),
     ]
     for pred, canonical in rules:
@@ -403,6 +409,12 @@ def _run_line_check(
         power = getattr(engine, "_power_state", "on") if engine else "on"
         if str(power).lower() not in ("on", "up"):
             failures.append("host power is off")
+        return True
+
+    if "is-active sshd" in stripped or "systemctl is-active sshd" in stripped:
+        svc = state.services.get("sshd")
+        if not svc or svc.active != "active":
+            failures.append("sshd is not active")
         return True
 
     return False

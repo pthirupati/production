@@ -27,6 +27,25 @@ logger = logging.getLogger(__name__)
 
 
 def _build_lab_hosts(scenario, resource_id: str, sim_type: str) -> list[dict]:
+    slug = (getattr(scenario, "slug", "") or "").lower()
+    if "ssh-stop" in slug or "sshd-down" in slug:
+        return [
+            {
+                "name": "primary",
+                "role": "Server (console)",
+                "container_id": resource_id,
+                "ip": "10.0.0.10",
+                "ssh_user": "root",
+            },
+            {
+                "name": "ssh_client",
+                "role": "SSH Client",
+                "container_id": resource_id,
+                "ip": "10.0.0.5",
+                "ssh_user": "labuser",
+                "ssh_targets": [{"name": "primary", "ip": "10.0.0.10", "user": "root"}],
+            },
+        ]
     lab_hosts = []
     if sim_type == "ansible" or getattr(scenario, "requires_companion_hosts", False):
         if sim_type == "ansible":
@@ -89,6 +108,15 @@ def _apply_companion_host_state(shell, host_key: str, host_meta: dict, slug: str
             shell.state.services["sshd"].sub_state = "dead"
 
 
+def _apply_initial_host_state(engine, slug: str) -> None:
+    low = (slug or "").lower()
+    if "ssh-stop" in low or "sshd-down" in low:
+        svc = engine.shell.state.services.get("sshd")
+        if svc:
+            svc.active = "inactive"
+            svc.sub_state = "dead"
+
+
 def ensure_sim_session(lab_session) -> dict | None:
     """Re-register in-memory simulation state after worker restart."""
     session_id = str(lab_session.id)
@@ -104,7 +132,18 @@ def ensure_sim_session(lab_session) -> dict | None:
     raw_type = getattr(scenario, "simulation_type", "generic") or "generic"
     sim_type = normalize_sim_type(raw_type)
     slug = scenario.slug
-    engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
+    snapshot = getattr(lab_session, "simulation_snapshot", None) or {}
+    if snapshot and snapshot.get("version") == 1:
+        from .simulation.sim_persistence import restore_engine
+        restored = restore_engine(snapshot)
+        if restored:
+            engine = restored
+        else:
+            engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
+            _apply_initial_host_state(engine, slug)
+    else:
+        engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
+        _apply_initial_host_state(engine, slug)
     lab_hosts = lab_session.lab_hosts or _build_lab_hosts(scenario, resource_id, sim_type)
     if len(lab_hosts) >= 2 and not any(h.get("name") == "ssh_client" for h in lab_hosts):
         lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
@@ -163,6 +202,7 @@ class SimulationProvisioner:
         slug = scenario.slug
 
         engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
+        _apply_initial_host_state(engine, slug)
         resource_id = f"sim-{uuid.uuid4().hex[:12]}"
 
         lab_hosts = _build_lab_hosts(scenario, resource_id, sim_type)

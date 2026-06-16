@@ -328,6 +328,11 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
                     if cmd and len(cmd) < 2000 and self.lab_session:
                         await self._save_command(cmd)
+                        if self.provider_type == "simulation":
+                            from apps.labs.provisioner.simulation.sim_persistence import persist_session_snapshot
+                            await asyncio.to_thread(
+                                persist_session_snapshot, str(self.lab_session.id)
+                            )
 
                 await asyncio.to_thread(self.raw_socket.send, input_bytes)
 

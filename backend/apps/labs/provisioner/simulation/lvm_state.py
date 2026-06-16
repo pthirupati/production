@@ -72,7 +72,13 @@ class LVMState:
         lv = self.lvs.get(key)
         if not lv:
             return False, f"  Logical volume {lv_path} not found"
-        lv.size = size.replace("+", "").replace("L", "g") if size else "50.00g"
+        if size and size.startswith("+"):
+            old_kb = self._size_to_kb(lv.size)
+            add_kb = self._size_to_kb(size[1:])
+            new_kb = old_kb + add_kb
+            lv.size = f"{new_kb // (1024 * 1024)}.00g"
+        elif size:
+            lv.size = size.replace("+", "").replace("L", "g") if size else "50.00g"
         return True, f"  Logical volume {lv.lv_path} successfully resized."
 
     def format_pvs(self) -> str:
@@ -92,3 +98,53 @@ class LVMState:
         for key, lv in self.lvs.items():
             lines.append(f"  {lv.name:<4} {lv.vg:<4} -wi-ao---- {lv.size:>5}                                                     ")
         return "\n".join(lines)
+
+    def format_df(self) -> str:
+        lines = ["Filesystem                        1K-blocks    Used Available Use% Mounted on"]
+        seen = set()
+        for lv in self.lvs.values():
+            if not lv.mount or lv.mount == "[SWAP]":
+                continue
+            path = lv.lv_path or f"/dev/mapper/{lv.vg}-{lv.name}"
+            size_k = self._size_to_kb(lv.size)
+            used = int(size_k * 0.17)
+            avail = size_k - used
+            lines.append(
+                f"{path:<32} {size_k:>10} {used:>8} {avail:>10}  17% {lv.mount}"
+            )
+            seen.add(lv.mount)
+        if "/" not in seen:
+            lines.append("/dev/mapper/rhel-root              52428800 8388608  44040192  17% /")
+        lines.append("tmpfs                              4026532       0   4026532   0% /dev/shm")
+        return "\n".join(lines)
+
+    def format_mount(self) -> str:
+        lines = []
+        for lv in self.lvs.values():
+            if lv.mount and lv.mount != "[SWAP]":
+                path = lv.lv_path or f"/dev/mapper/{lv.vg}-{lv.name}"
+                lines.append(f"{path} on {lv.mount} type xfs (rw,relatime)")
+        if not lines:
+            lines.append("/dev/mapper/rhel-root on / type xfs (rw,relatime)")
+        lines.append("/dev/sda2 on /boot type xfs (rw,relatime)")
+        return "\n".join(lines)
+
+    def format_fdisk(self) -> str:
+        lines = [
+            "Disk /dev/sda: 50 GiB",
+            "Device     Boot   Start      End  Sectors  Size Id Type",
+            "/dev/sda1  *       2048 104857566 104855519   50G 83 Linux",
+        ]
+        for dev, pv in self.pvs.items():
+            if dev.startswith("/dev/sd") and dev not in ("/dev/sda1", "/dev/sda2"):
+                lines.append(f"{dev:<10}        2048 104857566 104855519   50G 83 Linux")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _size_to_kb(size: str) -> int:
+        s = (size or "40g").lower().replace(" ", "")
+        if s.endswith("g"):
+            return int(float(s[:-1]) * 1024 * 1024)
+        if s.endswith("m"):
+            return int(float(s[:-1]) * 1024)
+        return 52428800

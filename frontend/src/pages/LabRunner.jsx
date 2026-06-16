@@ -14,6 +14,7 @@ import JiraTicketPanel from '../components/JiraTicketPanel'
 import JiraTicketLink from '../components/JiraTicketLink'
 import LabTerminal from '../components/LabTerminal'
 import SimLabTips from '../components/SimLabTips'
+import SimLabQuickActions from '../components/SimLabQuickActions'
 import useLabShortcuts from '../hooks/useLabShortcuts'
 import { useIsMobile } from '../hooks/useMediaQuery'
 
@@ -86,6 +87,7 @@ export default function LabRunner() {
   const [jiraTransitioning, setJiraTransitioning] = useState(false)
   const [closingIn, setClosingIn] = useState(null)
   const [terminalHost, setTerminalHost] = useState('primary')
+  const terminalRefs = useRef({})
   const [sshClientTarget, setSshClientTarget] = useState(null)
 
   const TOAST = {}
@@ -626,6 +628,25 @@ export default function LabRunner() {
 
   const useDualPane = Boolean(scenario.dual_terminal && labHosts.length >= 2)
   const dualHosts = useDualPane ? labHosts.slice(0, 2) : []
+  const isSimulationLab = session?.provider === 'simulation' || scenario.lab_mode === 'simulation'
+
+  const sendSimCommand = useCallback((cmd, host) => {
+    const targetHost = host || terminalHost
+    const run = () => {
+      const term = terminalRefs.current[targetHost]
+      if (!term?.sendCommand?.(cmd)) {
+        toast.error('Terminal not ready — wait for connection')
+        return
+      }
+      toast.success(`Sent: ${cmd.split('\n')[0].slice(0, 42)}`, { duration: 2000 })
+    }
+    if (targetHost !== terminalHost) {
+      setTerminalHost(targetHost)
+      setTimeout(run, 450)
+    } else {
+      run()
+    }
+  }, [terminalHost])
   const remoteSshTargets = labHosts.filter(h => h.ip && h.name !== 'primary' && h.name !== 'ssh_client')
   const hasSshClient = labHosts.some(h => h.name === 'ssh_client')
   const openSshClient = (host) => {
@@ -946,6 +967,14 @@ export default function LabRunner() {
           {useDualPane && (
             <span className="text-accent-purple font-medium mr-1">Dual terminal</span>
           )}
+          {isSimulationLab && (
+            <SimLabQuickActions
+              scenario={scenario}
+              labHosts={labHosts}
+              activeHost={terminalHost}
+              onSendCommand={sendSimCommand}
+            />
+          )}
           {!useDualPane && labHosts.length > 1 && (
             <span className="text-surface-500 mr-0.5 hidden sm:inline">Shell:</span>
           )}
@@ -1010,6 +1039,7 @@ export default function LabRunner() {
               {dualHosts.map(h => (
                 <LabTerminal
                   key={h.name}
+                  ref={(el) => { terminalRefs.current[h.name] = el }}
                   sessionId={sessionId}
                   session={terminalSession}
                   hostKey={h.name}
@@ -1025,6 +1055,7 @@ export default function LabRunner() {
           {!useDualPane && !sshClientTarget && (
             <LabTerminal
               key={`${sessionId}:${terminalHost}`}
+              ref={(el) => { terminalRefs.current[terminalHost] = el }}
               sessionId={sessionId}
               session={terminalSession}
               hostKey={terminalHost}
@@ -1047,6 +1078,7 @@ export default function LabRunner() {
                 <button type="button" onClick={() => setSshClientTarget(null)} className="text-[10px] text-surface-400 hover:text-white">Close</button>
               </div>
               <LabTerminal
+                ref={(el) => { terminalRefs.current.ssh_client = el }}
                 sessionId={sessionId}
                 session={terminalSession}
                 hostKey="ssh_client"

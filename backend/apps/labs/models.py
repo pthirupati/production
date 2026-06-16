@@ -118,6 +118,12 @@ class LabSession(models.Model):
         help_text="[{name, role, container_id, ip, ssh_user}] for SSH/SCP/NFS scenarios",
     )
 
+    simulation_snapshot = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Persisted in-memory simulation engine state for worker restarts",
+    )
+
     class Meta:
         ordering = ["-started_at"]
         indexes = [

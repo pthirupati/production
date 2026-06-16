@@ -81,6 +81,10 @@ def apply_simulation_fix(session) -> tuple[bool, str]:
             shell.run("ssh-copy-id root@web1")
             return True, "ssh key fixed"
 
+        if "ssh-stop" in slug or "sshd-down" in slug:
+            shell.run("systemctl start sshd")
+            return True, "sshd started"
+
         if "firewalld" in slug:
             shell.run("firewall-cmd --permanent --add-service=http")
             shell.run("firewall-cmd --reload")

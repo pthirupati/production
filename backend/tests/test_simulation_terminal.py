@@ -118,3 +118,21 @@ class BootSequenceTests(SimpleTestCase):
         shell.run("ip addr add 10.0.0.99/24 dev eth0")
         out = shell.run("ip addr")
         self.assertIn("10.0.0.99", out)
+
+    def test_lvm_df_reflects_extend(self):
+        from apps.labs.provisioner.simulation.rhel_shell import RHELShell
+        shell = RHELShell(scenario_slug="sim-rhel-lvm-extend")
+        shell.run("vgextend rhel /dev/sdb")
+        shell.run("lvextend -L +5G /dev/rhel/root")
+        out = shell.run("df -h")
+        self.assertIn("rhel-root", out)
+
+    def test_sim_snapshot_roundtrip(self):
+        from apps.labs.provisioner.simulation.sim_persistence import snapshot_engine, restore_engine
+        from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
+        engine = UnifiedSimulationEngine(scenario_slug="sim-rhel-patching", simulation_type="rhel")
+        engine.shell.run("dnf update -y")
+        snap = snapshot_engine(engine)
+        restored = restore_engine(snap)
+        self.assertIsNotNone(restored)
+        self.assertTrue(restored.shell.state.patching_done)
