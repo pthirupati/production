@@ -31,14 +31,15 @@ if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; th
   [ -n "$VAULT_CFG_HASH" ] && echo "$VAULT_CFG_HASH" > "$VAULT_CFG_MARKER"
 fi
 
+# Networks must exist before Vault seed/render and compose up
+docker network inspect fixitlab_labs >/dev/null 2>&1 || docker network create fixitlab_labs
+docker network inspect fixitlab_net >/dev/null 2>&1 || docker network create fixitlab_net
+
 bash "$ROOT/scripts/sync-production-env.sh" "$ROOT/.env.production"
 ENV_FILE=".env.production"
 
 echo "=== FixitLab Platform START ==="
 echo "Compose: $COMPOSE_FILE | Env: $ENV_FILE"
-
-# Lab network is external to compose (shared by per-user lab containers)
-docker network inspect fixitlab_labs >/dev/null 2>&1 || docker network create fixitlab_labs
 
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
 

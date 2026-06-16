@@ -75,7 +75,11 @@ if [ -n "${PRODUCTION_ENV_B64:-}" ] && _vault_ready; then
   chmod 600 "$TMP_SEED"
   _seed_vault_from_file "$TMP_SEED"
   rm -f "$TMP_SEED"
-  bash "$ROOT/scripts/vault/render-env.sh" "$OUT"
+  if ! bash "$ROOT/scripts/vault/render-env.sh" "$OUT"; then
+    echo "[env] WARN: Vault render failed — falling back to PRODUCTION_ENV_B64"
+    echo "$PRODUCTION_ENV_B64" | base64 -d > "$OUT"
+    chmod 600 "$OUT"
+  fi
 elif _vault_ready; then
   echo "[env] Rendering .env.production from HashiCorp Vault"
   bash "$ROOT/scripts/vault/render-env.sh" "$OUT"

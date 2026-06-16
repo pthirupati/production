@@ -8,6 +8,10 @@ include:
 
 services:
 
+  vault:
+    networks:
+      - fixitlab_net
+
   gateway:
     build:
       context: ./gateway
