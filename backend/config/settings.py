@@ -351,6 +351,7 @@ CELERY_TASK_ROUTES = {
     "billing.fail_stuck_payment_transactions": {"queue": "maintenance"},
     "billing.retry_invoice_creation": {"queue": "default"},
     "apps.notifications.tasks.*": {"queue": "notifications"},
+    "audit.create_log": {"queue": "default"},
 }
 
 # Celery Beat

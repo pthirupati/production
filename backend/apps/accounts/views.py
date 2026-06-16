@@ -1053,11 +1053,19 @@ class LabHistoryView(APIView):
 
     def get(self, request):
         from apps.labs.models import LabSession
-        sessions = (
+        page = int(request.query_params.get("page", 1))
+        page_size = min(int(request.query_params.get("page_size", 20)), 100)
+        start = (page - 1) * page_size
+        end = start + page_size
+
+        qs = (
             LabSession.objects.filter(user=request.user)
             .select_related("scenario")
-            .order_by("-started_at")[:50]
+            .order_by("-started_at")
         )
+        total = qs.count()
+        sessions = qs[start:end]
+
         data = []
         for s in sessions:
             data.append({
@@ -1072,7 +1080,13 @@ class LabHistoryView(APIView):
                 "score": s.score,
                 "hints_used": s.hints_used,
             })
-        return Response({"history": data})
+        return Response({
+            "history": data,
+            "count": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (total + page_size - 1) // page_size),
+        })
 
 
 class SearchView(APIView):

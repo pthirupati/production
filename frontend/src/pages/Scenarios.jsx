@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { scenarioApi } from '../api/scenarios'
 import { useAuthStore } from '../store/authStore'
+import { useDataStore } from '../store/dataStore'
 import {
   Search, CheckCircle2, Server, Clock, Wrench, Play, Skull,
   BookmarkPlus, Bookmark, Filter, X, Hash, ChevronDown, Trophy, Lock
@@ -25,6 +26,7 @@ const difficultyConfig = {
 export default function Scenarios() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { isAuthenticated } = useAuthStore()
+  const getTechnologies = useDataStore(s => s.getTechnologies)
   const [scenarios, setScenarios] = useState([])
   const [totalCount, setTotalCount] = useState(0)
   const [technologies, setTechnologies] = useState([])
@@ -63,7 +65,7 @@ export default function Scenarios() {
   const hasFilters = Object.values(filters).some(Boolean)
 
   useEffect(() => {
-    scenarioApi.getTechnologies().then(setTechnologies).catch(console.error)
+    getTechnologies().then(techs => setTechnologies(techs)).catch(console.error)
     scenarioApi.getTags().then(setTags).catch(() => {})
   }, [])
 

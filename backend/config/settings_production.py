@@ -37,7 +37,7 @@ DATABASES = {
         'PASSWORD': env("POSTGRES_PASSWORD"),
         'HOST': env("POSTGRES_HOST"),
         'PORT': env("POSTGRES_PORT", default="5432"),
-        'CONN_MAX_AGE': 600,
+        'CONN_MAX_AGE': 0,  # pgBouncer transaction mode requires no persistent connections
         'CONN_HEALTH_CHECKS': True,
         'OPTIONS': {
             'sslmode': 'require',  # Require SSL for production
@@ -155,7 +155,7 @@ LOGGING = {
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": f"redis://{env('REDIS_HOST', default='redis')}:{env('REDIS_PORT', default='6379')}/0",
+        "LOCATION": f"redis://{env('REDIS_HOST', default='redis')}:{env('REDIS_PORT', default='6379')}/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "PASSWORD": env("REDIS_PASSWORD", default=None),
@@ -321,7 +321,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(env("REDIS_HOST", default="redis"), int(env("REDIS_PORT", default="6379")))],
+            "hosts": [{"address": (env("REDIS_HOST", default="redis"), int(env("REDIS_PORT", default="6379"))), "db": 3}],
         },
     }
 }

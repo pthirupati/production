@@ -4,8 +4,8 @@ import {
   Send, Edit3, Trash2, Pin, Lock, Filter, X, Clock, ImagePlus, Flag
 } from 'lucide-react'
 import { communityApi } from '../api/community'
-import { scenarioApi } from '../api/scenarios'
 import { useAuthStore } from '../store/authStore'
+import { useDataStore } from '../store/dataStore'
 import toast from 'react-hot-toast'
 import { resolveMediaUrl, IMAGE_UPLOAD_HINTS } from '../utils/mediaUrl'
 import Pagination from '../components/Pagination'
@@ -25,6 +25,7 @@ function timeAgo(dateStr) {
 export default function Community() {
   const { user } = useAuthStore()
   const isAdmin = user?.is_staff
+  const getTechnologies = useDataStore(s => s.getTechnologies)
 
   const [threads, setThreads] = useState([])
   const [threadCount, setThreadCount] = useState(0)
@@ -72,7 +73,7 @@ export default function Community() {
 
   useEffect(() => {
     fetchThreads()
-    scenarioApi.getTechnologies().then(setTechnologies).catch(() => {})
+    getTechnologies().then(techs => setTechnologies(techs)).catch(() => {})
   }, [fetchThreads])
 
   // Live updates for open thread (poll every 4s)

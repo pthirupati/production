@@ -46,8 +46,9 @@ class AuditMiddleware:
 
             action = self._resolve_action(request)
             try:
-                AuditLog.objects.create(
-                    user=request.user,
+                from apps.audit.tasks import create_audit_log
+                create_audit_log.delay(
+                    user_id=request.user.id,
                     action=action,
                     resource=request.path,
                     metadata={
@@ -58,7 +59,7 @@ class AuditMiddleware:
                     user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
                 )
             except Exception as e:
-                logger.warning(f"Audit log failed: {e}")
+                logger.warning(f"Audit log dispatch failed: {e}")
 
         return response
 

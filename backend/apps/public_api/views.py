@@ -5,6 +5,7 @@ Technologies, scenarios, labs, bookmarks, progress, leaderboard.
 ⚠️ PRODUCTION SECURITY: All endpoints require authentication except whitelisted public endpoints
 """
 import logging
+import os
 from django.core.cache import cache
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -111,53 +112,62 @@ class TechnologyDetailView(APIView):
                 tech_data["learning_path_progress"] = get_learning_path_progress(request.user, tech)
             return Response({"technology": tech_data, "scenarios": [], "coming_soon": True})
 
-        scenarios = Scenario.objects.filter(
-            technology=tech, is_active=True
-        ).select_related("technology").prefetch_related("tags")
+        # Cache the anonymous scenario list (metadata only, no per-user data)
+        cache_key = f"tech_detail_anon:{slug}"
+        base = cache.get(cache_key)
+        if base is None:
+            scenarios = Scenario.objects.filter(
+                technology=tech, is_active=True
+            ).select_related("technology").prefetch_related("tags")
 
-        # Annotate bookmarks if authed
-        if request.user.is_authenticated:
-            scenarios = scenarios.annotate(
-                is_bookmarked=Exists(
-                    Bookmark.objects.filter(user=request.user, scenario=OuterRef("pk"))
-                )
+            tech_data = TechnologySerializer(tech).data
+            tech_data["scenario_count"] = scenarios.count()
+
+            difficulty_counts = {}
+            for d in ["easy", "medium", "hard"]:
+                difficulty_counts[d] = scenarios.filter(difficulty=d).count()
+            tech_data["difficulty_counts"] = difficulty_counts
+
+            tech_data["categories"] = list(
+                scenarios.values_list("category", flat=True).distinct().order_by("category")
             )
 
-        tech_data = TechnologySerializer(tech).data
-        tech_data["scenario_count"] = scenarios.count()
+            scenario_data = ScenarioListSerializer(scenarios, many=True).data
+            subscribed_anon = _get_subscribed_tech_ids(None)
+            _mark_accessible(scenario_data, subscribed_anon)
 
-        # Group by difficulty
-        difficulty_counts = {}
-        for d in ["easy", "medium", "hard"]:
-            difficulty_counts[d] = scenarios.filter(difficulty=d).count()
-        tech_data["difficulty_counts"] = difficulty_counts
+            base = {"technology": tech_data, "scenarios": scenario_data}
+            cache.set(cache_key, base, 60)  # 60s for anonymous base
 
-        # Categories in this tech
-        tech_data["categories"] = list(
-            scenarios.values_list("category", flat=True).distinct().order_by("category")
-        )
+        if not request.user.is_authenticated:
+            return Response(base)
 
-        if request.user.is_authenticated:
-            from apps.progress.learning_path import get_learning_path_progress
-            tech_data["learning_path_progress"] = get_learning_path_progress(request.user, tech)
+        # Deep-copy to avoid mutating the cached dict
+        import copy
+        tech_data = copy.deepcopy(base["technology"])
+        scenario_data = copy.deepcopy(base["scenarios"])
 
-        scenario_data = ScenarioListSerializer(scenarios, many=True).data
+        # Overlay per-user: bookmarks, progress, learning path
+        from apps.progress.learning_path import get_learning_path_progress
+        tech_data["learning_path_progress"] = get_learning_path_progress(request.user, tech)
 
-        # Overlay progress
-        if request.user.is_authenticated:
-            progress_map = {
-                p.scenario_id: {
-                    "completed": p.completed, "attempts": p.attempts,
-                    "best_score": p.best_score, "best_time": p.best_time,
-                }
-                for p in UserScenarioProgress.objects.filter(user=request.user)
+        progress_map = {
+            p.scenario_id: {
+                "completed": p.completed, "attempts": p.attempts,
+                "best_score": p.best_score, "best_time": p.best_time,
             }
-            for item in scenario_data:
-                item["user_progress"] = progress_map.get(item["id"])
-
-        # Mark subscription access
-        subscribed = _get_subscribed_tech_ids(request.user if request.user.is_authenticated else None)
+            for p in UserScenarioProgress.objects.filter(user=request.user, scenario__technology=tech)
+        }
+        bookmark_ids = set(
+            Bookmark.objects.filter(user=request.user, scenario__technology=tech)
+            .values_list("scenario_id", flat=True)
+        )
+        subscribed = _get_subscribed_tech_ids(request.user)
         _mark_accessible(scenario_data, subscribed)
+
+        for item in scenario_data:
+            item["user_progress"] = progress_map.get(item["id"])
+            item["is_bookmarked"] = item["id"] in bookmark_ids
 
         return Response({"technology": tech_data, "scenarios": scenario_data})
 
@@ -437,6 +447,23 @@ class StartLabView(APIView):
                     "usage": plan_info["usage"],
                 },
                 status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Hard limit on simultaneously RUNNING/PROVISIONING labs per user
+        max_concurrent = int(os.environ.get("MAX_CONCURRENT_LABS_PER_USER", "2"))
+        active_count = LabSession.objects.filter(
+            user=request.user,
+            status__in=["RUNNING", "PROVISIONING"],
+        ).count()
+        if active_count >= max_concurrent:
+            return Response(
+                {
+                    "error": f"You already have {active_count} active lab(s) running. "
+                             f"Stop an existing lab before starting a new one.",
+                    "active_labs": active_count,
+                    "max_concurrent": max_concurrent,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
         # ── Cross-tab sync: resume existing active lab for SAME scenario ──
@@ -1126,9 +1153,19 @@ class LeaderboardView(APIView):
                     user_rank = entry
                     break
 
+        page = int(request.query_params.get("page", 1))
+        page_size = min(int(request.query_params.get("page_size", 20)), 100)
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated = cached_data[start:end]
+
         return Response({
-            "leaderboard": cached_data,
+            "leaderboard": paginated,
             "user_rank": user_rank,
+            "count": len(cached_data),
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (len(cached_data) + page_size - 1) // page_size),
         })
 
 

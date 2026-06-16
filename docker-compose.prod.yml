@@ -62,10 +62,13 @@ services:
       - .env.production
     environment:
       TERMINAL_MAX_WS_PER_USER: ${TERMINAL_MAX_WS_PER_USER:-20}
+      # pgBouncer connection — set PGBOUNCER_HOST and PGBOUNCER_PORT in .env.production
+      # PGBOUNCER_HOST=pgbouncer
+      # PGBOUNCER_PORT=5432
     depends_on:
       vault:
         condition: service_healthy
-      database:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -103,6 +106,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:
@@ -136,6 +141,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:
@@ -168,6 +175,8 @@ services:
       - .env.production
     depends_on:
       backend:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -212,6 +221,35 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    restart: unless-stopped
+
+  pgbouncer:
+    image: bitnami/pgbouncer:1.22.1
+    container_name: fixitlab_pgbouncer
+    environment:
+      - POSTGRESQL_HOST=database
+      - POSTGRESQL_PORT=5432
+      - POSTGRESQL_USERNAME=${POSTGRES_USER:-fixitlab}
+      - POSTGRESQL_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRESQL_DATABASE=${POSTGRES_DB:-fixitlab}
+      - PGBOUNCER_DATABASE=${POSTGRES_DB:-fixitlab}
+      - PGBOUNCER_POOL_MODE=transaction
+      - PGBOUNCER_MAX_CLIENT_CONN=1000
+      - PGBOUNCER_DEFAULT_POOL_SIZE=25
+      - PGBOUNCER_SERVER_IDLE_TIMEOUT=600
+      - PGBOUNCER_CLIENT_IDLE_TIMEOUT=0
+      - PGBOUNCER_IGNORE_STARTUP_PARAMETERS=extra_float_digits
+    networks:
+      - fixitlab_net
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U ${POSTGRES_USER:-fixitlab}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
 
   database:

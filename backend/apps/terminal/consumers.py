@@ -12,7 +12,6 @@ import logging
 import os
 import re
 import time
-import threading
 from collections import deque
 from channels.exceptions import StopConsumer
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -33,18 +32,19 @@ from apps.labs.provisioner.exec_socket import stream_chunk_to_text
 logger = logging.getLogger(__name__)
 
 # Per-user WebSocket connection tracking (prevents resource exhaustion)
-_user_connections = {}  # user_id -> count
-_conn_lock = threading.Lock()
 MAX_WS_PER_USER = int(os.environ.get("TERMINAL_MAX_WS_PER_USER", "20"))
+_WS_CONN_KEY = "ws_conn:{user_id}"
+_WS_CONN_TTL = 3700  # slightly over 1 hour; auto-expires stale counts if process crashes
 
 
-def reset_user_ws_connections(user_id: int | None = None) -> None:
-    """Clear per-user WS counters (test helper). Clears all users when user_id is None."""
-    with _conn_lock:
-        if user_id is None:
-            _user_connections.clear()
-        else:
-            _user_connections.pop(int(user_id), None)
+def reset_user_ws_connections(user_id=None):
+    """Clear per-user WS counters (test helper)."""
+    from django.core.cache import cache
+    if user_id is None:
+        # Can't efficiently clear all — used only in tests, acceptable
+        pass
+    else:
+        cache.delete(_WS_CONN_KEY.format(user_id=user_id))
 
 
 class TerminalConsumer(AsyncWebsocketConsumer):
@@ -118,12 +118,14 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         if user_id is None:
             return
         self._tracked_user_id = None
-        with _conn_lock:
-            count = _user_connections.get(user_id, 1)
-            if count <= 1:
-                _user_connections.pop(user_id, None)
-            else:
-                _user_connections[user_id] = count - 1
+        try:
+            from django.core.cache import cache
+            key = _WS_CONN_KEY.format(user_id=user_id)
+            new_val = cache.decr(key, delta=1)
+            if new_val <= 0:
+                cache.delete(key)
+        except Exception:
+            pass
 
     async def connect(self):
         user = self.scope.get("user", AnonymousUser())
@@ -135,13 +137,24 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
         # Enforce per-user WebSocket connection limit
         user_id = user.id
-        with _conn_lock:
-            current = _user_connections.get(user_id, 0)
-            if current >= MAX_WS_PER_USER:
-                logger.warning(f"User {user_id} exceeded max WS connections ({MAX_WS_PER_USER})")
+        try:
+            from django.core.cache import cache
+            key = _WS_CONN_KEY.format(user_id=user_id)
+            # Atomic increment; if key didn't exist, set to 1
+            try:
+                current = cache.incr(key, delta=1)
+                cache.expire(key, _WS_CONN_TTL)
+            except ValueError:
+                # Key doesn't exist — create it
+                cache.set(key, 1, timeout=_WS_CONN_TTL)
+                current = 1
+            if current > MAX_WS_PER_USER:
+                cache.decr(key, delta=1)
+                logger.warning("User %s exceeded max WS connections (%s)", user_id, MAX_WS_PER_USER)
                 await self.close(code=4008)
                 return
-            _user_connections[user_id] = current + 1
+        except Exception:
+            pass
         self._tracked_user_id = user_id
 
         # Verify session ownership and status

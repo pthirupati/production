@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { labApi } from '../api/labs'
-import { scenarioApi } from '../api/scenarios'
 import { useAuthStore } from '../store/authStore'
+import { useDataStore } from '../store/dataStore'
 import { Trophy, Medal, Crown, Star, Clock, TrendingUp } from 'lucide-react'
 import Pagination from '../components/Pagination'
 import StickyPageToolbar from '../components/StickyPageToolbar'
@@ -10,6 +10,7 @@ const PAGE_SIZE = 20
 
 export default function Leaderboard() {
   const { user } = useAuthStore()
+  const getTechnologies = useDataStore(s => s.getTechnologies)
   const [data, setData] = useState({ leaderboard: [], user_rank: null })
   const [technologies, setTechnologies] = useState([])
   const [selectedTech, setSelectedTech] = useState('')
@@ -17,7 +18,7 @@ export default function Leaderboard() {
   const [page, setPage] = useState(1)
 
   useEffect(() => {
-    scenarioApi.getTechnologies().then(setTechnologies).catch(console.error)
+    getTechnologies().then(techs => setTechnologies(techs)).catch(console.error)
   }, [])
 
   useEffect(() => {

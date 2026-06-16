@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [subscriptions, setSubscriptions] = useState([])
   const [complimentaryAccess, setComplimentaryAccess] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [cancelModal, setCancelModal] = useState(null)
   const [cancelling, setCancelling] = useState(false)
   const [jiraTickets, setJiraTickets] = useState([])
@@ -44,6 +45,7 @@ export default function Dashboard() {
       api.get('/notifications/').catch(() => ({ data: { results: [] } })),
       import('../api/interviews').then(m => m.interviewsApi.getEntitlement()).catch(() => null),
     ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes, interviewEnt]) => {
+      if (!prog) setLoadError(true)
       setProgress(prog)
       setAchievements(ach)
       setActiveLabs(labs.filter(l => l.status === 'RUNNING'))
@@ -113,6 +115,18 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-8 relative">
       <OnboardingTour />
+
+      {loadError && (
+        <div className="text-center py-8">
+          <p className="text-red-400 mb-3">Failed to load dashboard data.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Reload
+          </button>
+        </div>
+      )}
 
       {/* ═══ HERO HEADER ═══ */}
       <div className="relative overflow-hidden glass-card p-6 sm:p-8 gradient-border animate-slide-up">
