@@ -39,7 +39,7 @@ razorpay>=1.4
 stripe>=8.0,<14.0
 
 # Monitoring & observability
-sentry-sdk[django]>=1.40
+sentry-sdk[django]>=2.63.0
 structlog>=24.1
 
 # Security
