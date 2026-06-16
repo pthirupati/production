@@ -50,6 +50,7 @@ class EmailDispatchTest(APITestCase):
         mock_thread.assert_called_once()
         mock_thread.return_value.start.assert_called_once()
 
+    @override_settings(SKIP_EMAIL_TESTS=False)
     @patch("apps.notifications.email._deliver", return_value="smtp")
     def test_send_email_logs_success(self, mock_deliver):
         from apps.notifications.email import send_email
@@ -63,6 +64,7 @@ class EmailDispatchTest(APITestCase):
         self.assertTrue(ok)
         self.assertTrue(EmailLog.objects.filter(to_email="user@test.com", status="sent").exists())
 
+    @override_settings(SKIP_EMAIL_TESTS=False)
     @patch("apps.notifications.email._deliver")
     def test_send_email_logs_failure(self, mock_deliver):
         mock_deliver.side_effect = RuntimeError("SMTP blocked")
