@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import re
-
 
 def score_answer(question, answer_text: str, metadata: dict | None = None) -> dict:
-    """Heuristic scoring 0–100 with feedback hints."""
+    """Richer scoring using interview_ai.compute_answer_scores — 100% free, no APIs."""
+    from apps.interviews.services.interview_ai import compute_answer_scores
+
     text = (answer_text or "").strip()
     meta = metadata or {}
+
     if not text:
         return {
             "score": 0,
@@ -16,39 +17,31 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
             "feedback": "No response recorded — we moved on to keep the interview on schedule.",
         }
 
-    low = text.lower()
-    word_count = len(text.split())
-    keywords = question.expected_keywords if question else []
-    keyword_hits = sum(1 for kw in keywords if kw.lower() in low)
+    round_type = meta.get("round_type", "technical")
+    keywords = list(question.expected_keywords) if question and question.expected_keywords else []
 
-    base = min(40, word_count * 2)
-    keyword_score = min(35, keyword_hits * 12)
-    structure_bonus = 10 if any(x in low for x in ("first", "then", "because", "for example")) else 0
-    command_bonus = 0
+    breakdown = compute_answer_scores(
+        candidate_answer=text,
+        question_text=(question.question_text if question else ""),
+        round_type=round_type,
+        expected_keywords=keywords or None,
+    )
+
+    score = breakdown["composite_score"]
     if meta.get("command_validated"):
-        command_bonus = 15
-
-    score = min(100, base + keyword_score + structure_bonus + command_bonus)
-
-    if word_count < 8:
-        quality = "brief"
-        feedback = "You answered quickly — I'd want more depth on approach and trade-offs in a real panel."
-    elif score >= 75:
-        quality = "strong"
-        feedback = "Solid structure. A senior interviewer might still probe edge cases or failure modes next."
-    elif score >= 50:
-        quality = "adequate"
-        feedback = "Reasonable direction. Sharpen with specifics: metrics, commands, or past incident examples."
-    else:
-        quality = "weak"
-        feedback = "The answer missed key signals we'd expect at this level — revisit fundamentals and real examples."
+        score = min(100, score + 15)
 
     return {
         "score": round(score, 1),
-        "quality": quality,
-        "feedback": feedback,
-        "keyword_hits": keyword_hits,
-        "word_count": word_count,
+        "quality": breakdown["quality"],
+        "feedback": breakdown["feedback"],
+        "keyword_hits": round(breakdown["keyword_hit_rate"] * len(keywords)) if keywords else 0,
+        "word_count": breakdown["word_count"],
+        "depth_score": breakdown["depth_score"],
+        "concrete_score": breakdown["concrete_score"],
+        "star_score": breakdown["star_score"],
+        "star_coverage": breakdown["star_coverage"],
+        "topic_detected": breakdown["topic_detected"],
     }
 
 

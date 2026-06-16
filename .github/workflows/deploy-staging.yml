@@ -1,0 +1,216 @@
+# deploy-staging.yml — Auto-deploy to staging on merge to main
+# Steps: build Docker images, push to registry, deploy to staging,
+#        run smoke E2E, auto-rollback on failure
+name: Deploy — Staging
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/fixitlab
+
+jobs:
+  # ─── Build + push Docker images ───────────────────────────────────────────
+  build:
+    name: Build & push Docker images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      sha_short: ${{ steps.sha.outputs.sha_short }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Short SHA
+        id: sha
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=staging-latest
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:staging-latest
+          cache-to: type=inline
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          file: frontend/Dockerfile.prod
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${{ steps.sha.outputs.sha_short }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:staging-latest
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:staging-latest
+          cache-to: type=inline
+
+  # ─── Django unit tests (gate before staging deploy) ───────────────────────
+  test-backend:
+    name: Backend unit tests (gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fixitlab_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-backend
+      - name: Migrate + test
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/fixitlab_test
+          JIRA_SIMULATION_MODE: "False"
+          SKIP_EMAIL_TESTS: "true"
+        run: |
+          python manage.py migrate --run-syncdb
+          python manage.py test tests --verbosity=1 --parallel
+
+  # ─── Deploy to staging ────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build, test-backend]
+    environment:
+      name: staging
+      url: ${{ secrets.STAGING_SITE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.STAGING_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+
+      - name: Record pre-deploy state (for rollback)
+        id: pre_deploy
+        run: |
+          PREV=$(ssh -i ~/.ssh/id_ed25519 ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_HOST }} \
+            "cd /opt/fixitlab && git rev-parse HEAD")
+          echo "prev_sha=$PREV" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to staging server
+        run: |
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_HOST }} \
+            "cd /opt/fixitlab && \
+             git pull origin main && \
+             IMAGE_TAG=${{ needs.build.outputs.sha_short }} \
+             bash scripts/ci-remote-platform.sh deploy"
+
+      - name: Wait for staging health (90s)
+        id: health
+        env:
+          STAGING_URL: ${{ secrets.STAGING_BASE_URL }}
+        run: |
+          for i in $(seq 1 18); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_URL}/api/health/" || echo "000")
+            [ "$STATUS" = "200" ] && { echo "Healthy"; echo "healthy=true" >> "$GITHUB_OUTPUT"; exit 0; }
+            echo "Attempt $i — $STATUS"; sleep 5
+          done
+          echo "healthy=false" >> "$GITHUB_OUTPUT"
+          exit 1
+
+      - name: Rollback on unhealthy deploy
+        if: failure() && steps.health.outputs.healthy == 'false'
+        run: |
+          echo "Deploy unhealthy — rolling back to ${{ steps.pre_deploy.outputs.prev_sha }}"
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_HOST }} \
+            "cd /opt/fixitlab && \
+             git checkout ${{ steps.pre_deploy.outputs.prev_sha }} && \
+             bash scripts/ci-remote-platform.sh deploy"
+
+  # ─── Smoke test against staging post-deploy ───────────────────────────────
+  smoke:
+    name: Smoke test (post-deploy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [deploy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install --save-dev @playwright/test
+          npx playwright install chromium --with-deps
+      - name: Run smoke tests
+        env:
+          BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          SITE_URL: ${{ secrets.STAGING_SITE_URL }}
+          SUPERUSER_EMAIL: ${{ secrets.STAGING_SUPERUSER_EMAIL }}
+          SUPERUSER_PASSWORD: ${{ secrets.STAGING_SUPERUSER_PASSWORD }}
+          E2E_SKIP_EMAIL: "true"
+          E2E_SKIP_LAB: "0"
+        run: |
+          npx playwright test tests/e2e/smoke/ \
+            --reporter=html \
+            --output=playwright-smoke-results \
+            --timeout=60000
+      - name: Upload smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-smoke-report-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 7
+
+  notify:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: [build, deploy, smoke]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine status
+        id: status
+        run: |
+          RESULTS="${{ needs.build.result }} ${{ needs.deploy.result }} ${{ needs.smoke.result }}"
+          echo "$RESULTS" | grep -qE "failure|cancelled" && echo "status=failure" >> "$GITHUB_OUTPUT" || echo "status=success" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/notify-slack
+        with:
+          status: ${{ steps.status.outputs.status }}
+          workflow: "Deploy Staging (${{ github.sha }})"
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

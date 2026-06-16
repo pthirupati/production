@@ -1,0 +1,116 @@
+# e2e-smoke.yml — Critical-path smoke test (~10 min)
+# Triggers: merge to main (post-deploy verification)
+# Runs against staging environment using Playwright
+# Covers: login, start lab, complete scenario, payment flow
+name: E2E Smoke
+
+on:
+  workflow_run:
+    workflows: ["FixitLab Production"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL to test against (default: staging)"
+        required: false
+        default: ""
+      site_url:
+        description: "Public site URL for SPA routes"
+        required: false
+        default: ""
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  smoke:
+    name: Critical path E2E smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Only run if the triggering workflow succeeded (when triggered by workflow_run)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node for Playwright
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Playwright + dependencies
+        run: |
+          npm init -y
+          npm install --save-dev @playwright/test
+          npx playwright install chromium --with-deps
+
+      - name: Resolve target URLs
+        id: urls
+        run: |
+          BASE="${{ github.event.inputs.base_url || secrets.STAGING_BASE_URL }}"
+          SITE="${{ github.event.inputs.site_url || secrets.STAGING_SITE_URL }}"
+          echo "base_url=${BASE}" >> "$GITHUB_OUTPUT"
+          echo "site_url=${SITE}" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for staging health (up to 60s)
+        env:
+          BASE_URL: ${{ steps.urls.outputs.base_url }}
+        run: |
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/api/health/" || echo "000")
+            if [ "$STATUS" = "200" ]; then echo "Healthy"; break; fi
+            echo "Attempt $i — status $STATUS, retrying in 5s…"
+            sleep 5
+          done
+          [ "$STATUS" = "200" ] || { echo "Staging not healthy after 60s"; exit 1; }
+
+      - name: Run Playwright smoke tests
+        env:
+          BASE_URL: ${{ steps.urls.outputs.base_url }}
+          SITE_URL: ${{ steps.urls.outputs.site_url }}
+          SUPERUSER_EMAIL: ${{ secrets.STAGING_SUPERUSER_EMAIL }}
+          SUPERUSER_PASSWORD: ${{ secrets.STAGING_SUPERUSER_PASSWORD }}
+          E2E_SKIP_LAB: "0"
+          E2E_SKIP_EMAIL: "true"
+          E2E_ISOLATION_ONCE: "1"
+          PLAYWRIGHT_HTML_REPORT: playwright-report
+        run: |
+          npx playwright test tests/e2e/smoke/ \
+            --reporter=html \
+            --output=playwright-results \
+            --timeout=60000
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-smoke-report-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshots-${{ github.run_id }}
+          path: playwright-results/
+          retention-days: 7
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: ./.github/actions/notify-slack
+        with:
+          status: failure
+          workflow: "E2E Smoke"
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on success
+        if: success()
+        uses: ./.github/actions/notify-slack
+        with:
+          status: success
+          workflow: "E2E Smoke"
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

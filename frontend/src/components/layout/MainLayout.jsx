@@ -163,10 +163,25 @@ export default function MainLayout() {
 
   return (
     <div className="h-screen flex overflow-hidden bg-surface-950 relative">
+      {/* ═══ GLOBAL IMMERSIVE BACKGROUND ═══ */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute inset-0 bg-mesh-gradient opacity-80" />
-        <div className="glow-orb-cyan absolute -top-40 -right-40 animate-float" />
-        <div className="glow-orb-purple absolute bottom-0 -left-40 animate-float-delayed" />
+        <div className="absolute inset-0 aurora-bg" />
+        <div className="dash-orb dash-orb-1" />
+        <div className="dash-orb dash-orb-2" />
+        <div className="dash-orb dash-orb-3" />
+        <div className="dash-orb dash-orb-4" />
+        <div className="absolute bottom-0 left-0 right-0 h-[35vh] perspective-grid" />
+        <div className="light-beam light-beam-1" />
+        <div className="light-beam light-beam-2" />
+        <div className="light-beam light-beam-3" />
+        {[...Array(12)].map((_, i) => (
+          <div key={i} className="dash-particle" style={{
+            width: `${2 + (i % 3)}px`, height: `${2 + (i % 3)}px`,
+            top: `${5 + (i * 8) % 90}%`, left: `${3 + (i * 9.1) % 94}%`,
+            animationDelay: `${i * 0.5}s`, animationDuration: `${7 + (i % 5) * 1.5}s`,
+          }} />
+        ))}
+        <div className="absolute inset-0 hex-grid opacity-[0.012]" />
       </div>
 
       {/* Desktop sidebar — fixed height, nav scrolls internally */}

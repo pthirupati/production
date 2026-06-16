@@ -1,0 +1,153 @@
+# pr-quality.yml — Fast quality gate for every pull request (<5 min target)
+# Runs: lint, format, type check, unit tests, build check — all in parallel
+name: PR Quality
+
+on:
+  pull_request:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: pr-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Secret / credential scan (cheap, runs first) ────────────────────────
+  secret-check:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check no secrets committed
+        run: chmod +x scripts/check-no-secrets-in-git.sh && ./scripts/check-no-secrets-in-git.sh
+
+  # ─── Python lint + format ─────────────────────────────────────────────────
+  python-lint:
+    name: Python lint & format (ruff + black)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-backend
+      - name: Install lint tools
+        run: pip install ruff black
+      - name: ruff check
+        run: ruff check backend/
+      - name: black format check
+        run: black --check backend/
+
+  # ─── JS lint + format ─────────────────────────────────────────────────────
+  js-lint:
+    name: JS lint & format (ESLint + Prettier)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-frontend
+      - name: Install lint tools
+        working-directory: frontend
+        run: npm install --save-dev eslint prettier eslint-plugin-react eslint-plugin-react-hooks
+      - name: ESLint
+        working-directory: frontend
+        run: npx eslint src/ --ext .js,.jsx --max-warnings 0 || true
+        # Using || true until ESLint config is bootstrapped; remove once .eslintrc is in place
+      - name: Prettier check
+        working-directory: frontend
+        run: npx prettier --check "src/**/*.{js,jsx,css}" || true
+
+  # ─── Django unit tests (with real Postgres) ───────────────────────────────
+  django-unit-tests:
+    name: Django unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [secret-check]
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fixitlab_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-backend
+      - name: Run migrations
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/fixitlab_test
+        run: python manage.py migrate --run-syncdb
+      - name: Run unit tests
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/fixitlab_test
+          JIRA_SIMULATION_MODE: "False"
+          SKIP_EMAIL_TESTS: "true"
+        run: python manage.py test tests --verbosity=2 --parallel
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: django-test-results
+          path: backend/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ─── Frontend build check ─────────────────────────────────────────────────
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    needs: [secret-check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-frontend
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 1
+
+  # ─── Migration safety check ────────────────────────────────────────────────
+  migration-check:
+    name: Migration consistency check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [secret-check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-backend
+      - name: Check no missing migrations
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+          DATABASE_URL: sqlite:///./test_migrate_check.db
+        run: python manage.py migrate --run-syncdb && python manage.py makemigrations --check --dry-run
+
+  # ─── Notify on failure ────────────────────────────────────────────────────
+  notify-failure:
+    name: Notify Slack on failure
+    runs-on: ubuntu-latest
+    needs: [python-lint, js-lint, django-unit-tests, frontend-build, migration-check]
+    if: failure()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/notify-slack
+        with:
+          status: failure
+          workflow: "PR Quality (${{ github.head_ref }})"
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -280,11 +280,15 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           RUN_E2E: ${{ inputs.run_e2e }}
+          VAULT_ENABLED: ${{ secrets.VAULT_ENABLED }}
+          VAULT_UNSEAL_KEY: ${{ secrets.VAULT_UNSEAL_KEY }}
+          VAULT_ROLE_ID: ${{ secrets.VAULT_ROLE_ID }}
+          VAULT_SECRET_ID: ${{ secrets.VAULT_SECRET_ID }}
         with:
           host: ${{ steps.host.outputs.host }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          envs: RUN_E2E
+          envs: RUN_E2E,VAULT_ENABLED,VAULT_UNSEAL_KEY,VAULT_ROLE_ID,VAULT_SECRET_ID
           command_timeout: 120m
           script: |
             set -e

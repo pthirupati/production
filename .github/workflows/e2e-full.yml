@@ -1,0 +1,140 @@
+# e2e-full.yml — Comprehensive nightly E2E (~45 min)
+# Covers: all pages, all user flows, interview (mocked AI), billing,
+#         admin panel, community, lab runner, concurrent users
+name: E2E — Full
+
+on:
+  schedule:
+    # Nightly at 01:00 UTC
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "API base URL (default: production)"
+        required: false
+        default: ""
+      site_url:
+        description: "Public site URL"
+        required: false
+        default: ""
+      skip_cleanup:
+        description: "Skip cleanup (debug)"
+        type: boolean
+        default: false
+      git_ref:
+        description: "Git ref on production server"
+        type: string
+        default: main
+
+concurrency:
+  group: e2e-full
+  cancel-in-progress: false
+
+jobs:
+  # ─── Full tab coverage E2E (via existing scripts) ─────────────────────────
+  full-tab-coverage:
+    name: Full tab coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.git_ref || 'main' }}
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.PROD_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+
+      - name: Run full E2E via SSH
+        timeout-minutes: 35
+        env:
+          SKIP_CLEANUP: ${{ github.event.inputs.skip_cleanup == 'true' && '1' || '0' }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_HOST }} \
+            "cd /opt/fixitlab && \
+             RUN_FULL_E2E=true \
+             E2E_SKIP_CLEANUP=${SKIP_CLEANUP} \
+             bash scripts/run-full-e2e.sh 2>&1 | tee /tmp/e2e-full-$(date +%Y%m%d-%H%M%S).log; \
+             exit \${PIPESTATUS[0]}"
+
+      - name: Fetch logs
+        if: always()
+        run: |
+          scp -i ~/.ssh/id_ed25519 \
+            "${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_HOST }}:/tmp/e2e-full-*.log" \
+            ./e2e-full-output.log || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-full-logs-${{ github.run_id }}
+          path: e2e-full-output.log
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # ─── Playwright full site navigation ─────────────────────────────────────
+  playwright-full:
+    name: Playwright full site
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install --save-dev @playwright/test
+          npx playwright install chromium firefox --with-deps
+      - name: Run full Playwright suite
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || secrets.PROD_BASE_URL }}
+          SITE_URL: ${{ github.event.inputs.site_url || secrets.PROD_SITE_URL }}
+          SUPERUSER_EMAIL: ${{ secrets.PROD_SUPERUSER_EMAIL }}
+          SUPERUSER_PASSWORD: ${{ secrets.PROD_SUPERUSER_PASSWORD }}
+        run: |
+          npx playwright test tests/e2e/ \
+            --reporter=html \
+            --output=playwright-full-results \
+            --timeout=60000 \
+            --workers=4
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-full-report-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 14
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-full-screenshots-${{ github.run_id }}
+          path: playwright-full-results/
+          retention-days: 14
+
+  notify:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: [full-tab-coverage, playwright-full]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine status
+        id: status
+        run: |
+          if [[ "${{ needs.full-tab-coverage.result }}" == "success" && "${{ needs.playwright-full.result }}" == "success" ]]; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: ./.github/actions/notify-slack
+        with:
+          status: ${{ steps.status.outputs.status }}
+          workflow: "E2E Full (nightly)"
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -1,0 +1,172 @@
+# health-check.yml — Production heartbeat every 30 minutes
+# Checks: /api/health/ HTTP 200, key public endpoints, critical API contract
+# Alerts: Slack + GitHub issue on repeated failure
+name: Health Check
+
+on:
+  schedule:
+    # Every 30 minutes
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Override production base URL"
+        required: false
+        default: ""
+
+concurrency:
+  group: health-check
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: Production health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      status: ${{ steps.check.outputs.status }}
+      failed_checks: ${{ steps.check.outputs.failed_checks }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run health checks
+        id: check
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || secrets.PROD_BASE_URL }}
+        run: |
+          FAILED=""
+          PASS=0
+          FAIL=0
+
+          check() {
+            local label="$1"
+            local url="$2"
+            local expected="${3:-200}"
+            local status
+            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" 2>/dev/null || echo "000")
+            if [ "$status" = "$expected" ]; then
+              echo "  PASS [$status] $label"
+              PASS=$((PASS+1))
+            else
+              echo "  FAIL [$status != $expected] $label — $url"
+              FAIL=$((FAIL+1))
+              FAILED="$FAILED $label"
+            fi
+          }
+
+          echo "=== FixitLab Production Health Check ==="
+          echo "Target: $BASE_URL"
+          echo ""
+
+          # Core health
+          check "api/health"              "$BASE_URL/api/health/"
+          check "api/stats"               "$BASE_URL/api/stats/"
+          check "api/technologies"        "$BASE_URL/api/technologies/"
+          check "api/scenarios"           "$BASE_URL/api/scenarios/"
+          check "api/config"              "$BASE_URL/api/config/"
+          check "api/leaderboard"         "$BASE_URL/api/leaderboard/"
+          check "api/interviews/plans"    "$BASE_URL/api/interviews/plans/"
+
+          echo ""
+          echo "Results: $PASS passed, $FAIL failed"
+
+          if [ $FAIL -gt 0 ]; then
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+            echo "failed_checks=$FAILED" >> "$GITHUB_OUTPUT"
+            exit 1
+          else
+            echo "status=success" >> "$GITHUB_OUTPUT"
+            echo "failed_checks=" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ─── Alert on failure ─────────────────────────────────────────────────────
+  alert:
+    name: Alert on failure
+    runs-on: ubuntu-latest
+    needs: [health]
+    if: failure()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Slack alert
+        uses: ./.github/actions/notify-slack
+        with:
+          status: failure
+          workflow: "Health Check — PRODUCTION DOWN"
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Create GitHub issue on repeated failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `[ALERT] Production health check failed — ${new Date().toISOString()}`;
+            const body = [
+              `## Production Health Check Failure`,
+              ``,
+              `**Time:** ${new Date().toISOString()}`,
+              `**Failed checks:** \`${{ needs.health.outputs.failed_checks }}\``,
+              `**Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`,
+              ``,
+              `Please investigate immediately.`,
+            ].join('\n');
+
+            // Check if an open alert issue already exists (avoid spam)
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'health-alert',
+            });
+
+            if (issues.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['health-alert', 'P0'],
+              });
+              console.log('Created health alert issue');
+            } else {
+              // Comment on existing issue instead
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues.data[0].number,
+                body: `Still failing at ${new Date().toISOString()}. Failed: \`${{ needs.health.outputs.failed_checks }}\``,
+              });
+              console.log('Commented on existing health alert issue');
+            }
+
+  # ─── Auto-close issue when healthy again ─────────────────────────────────
+  resolve:
+    name: Resolve alert issue on recovery
+    runs-on: ubuntu-latest
+    needs: [health]
+    if: success()
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'health-alert',
+            });
+
+            for (const issue of issues.data) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `Resolved at ${new Date().toISOString()} — health checks passing again.`,
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+              });
+            }

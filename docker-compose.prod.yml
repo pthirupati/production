@@ -2,6 +2,10 @@
 # Deploy on a single VPS with SSL via Let's Encrypt
 # Usage: docker compose -f docker-compose.prod.yml up -d
 
+# HashiCorp Vault — production secrets (127.0.0.1 only, not published to host)
+include:
+  - path: docker-compose.vault.yml
+
 services:
 
   gateway:
@@ -59,6 +63,8 @@ services:
     environment:
       TERMINAL_MAX_WS_PER_USER: ${TERMINAL_MAX_WS_PER_USER:-20}
     depends_on:
+      vault:
+        condition: service_healthy
       database:
         condition: service_healthy
       redis:

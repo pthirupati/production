@@ -115,27 +115,6 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto space-y-8 relative">
       <OnboardingTour />
 
-      {/* ═══ IMMERSIVE BACKGROUND ═══ */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute inset-0 aurora-bg" />
-        <div className="dash-orb dash-orb-1" />
-        <div className="dash-orb dash-orb-2" />
-        <div className="dash-orb dash-orb-3" />
-        <div className="dash-orb dash-orb-4" />
-        <div className="absolute bottom-0 left-0 right-0 h-[35vh] perspective-grid" />
-        <div className="light-beam light-beam-1" />
-        <div className="light-beam light-beam-2" />
-        <div className="light-beam light-beam-3" />
-        {[...Array(18)].map((_, i) => (
-          <div key={i} className="dash-particle" style={{
-            width: `${2 + (i % 4)}px`, height: `${2 + (i % 4)}px`,
-            top: `${5 + (i * 5) % 90}%`, left: `${3 + (i * 7.3) % 94}%`,
-            animationDelay: `${i * 0.4}s`, animationDuration: `${6 + (i % 5) * 1.5}s`,
-          }} />
-        ))}
-        <div className="absolute inset-0 hex-grid opacity-[0.015]" />
-      </div>
-
       {/* ═══ HERO HEADER ═══ */}
       <StickyPageToolbar>
       <div className="relative overflow-hidden glass-card p-6 sm:p-8 gradient-border animate-slide-up">

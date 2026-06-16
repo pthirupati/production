@@ -1,0 +1,167 @@
+# e2e-billing.yml — Billing-specific E2E (on demand + nightly)
+# Covers: Stripe checkout, Razorpay checkout, subscription management,
+#         coupon application, refund flow, billing admin panel
+name: E2E — Billing
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "API base URL"
+        required: false
+        default: ""
+      site_url:
+        description: "Public site URL"
+        required: false
+        default: ""
+      skip_cleanup:
+        description: "Skip cleanup (debug)"
+        type: boolean
+        default: false
+  schedule:
+    # Nightly at 04:00 UTC
+    - cron: "0 4 * * *"
+
+concurrency:
+  group: e2e-billing
+  cancel-in-progress: false
+
+jobs:
+  # ─── Billing unit tests (webhooks + coupon logic) ─────────────────────────
+  billing-unit:
+    name: Billing unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fixitlab_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-backend
+      - name: Migrate
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/fixitlab_test
+        run: python manage.py migrate --run-syncdb
+      - name: Billing-specific unit tests
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/fixitlab_test
+          JIRA_SIMULATION_MODE: "False"
+          SKIP_EMAIL_TESTS: "true"
+        run: |
+          python manage.py test \
+            tests.test_billing_webhooks \
+            tests.test_coupons \
+            --verbosity=2
+
+  # ─── Billing E2E via tab coverage (Stripe test mode) ─────────────────────
+  billing-e2e:
+    name: Billing E2E (Stripe test mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [billing-unit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-backend
+      - name: Resolve URLs
+        id: urls
+        run: |
+          echo "base_url=${{ github.event.inputs.base_url || secrets.STAGING_BASE_URL }}" >> "$GITHUB_OUTPUT"
+          echo "site_url=${{ github.event.inputs.site_url || secrets.STAGING_SITE_URL }}" >> "$GITHUB_OUTPUT"
+      - name: Wait for health
+        env:
+          BASE_URL: ${{ steps.urls.outputs.base_url }}
+        run: |
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/api/health/" || echo "000")
+            [ "$STATUS" = "200" ] && break
+            echo "Attempt $i — $STATUS"; sleep 5
+          done
+          [ "$STATUS" = "200" ] || exit 1
+      - name: Run billing E2E (tab coverage subset)
+        env:
+          BASE_URL: ${{ steps.urls.outputs.base_url }}
+          SITE_URL: ${{ steps.urls.outputs.site_url }}
+          SUPERUSER_EMAIL: ${{ secrets.STAGING_SUPERUSER_EMAIL }}
+          SUPERUSER_PASSWORD: ${{ secrets.STAGING_SUPERUSER_PASSWORD }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_TEST_KEY_ID }}
+          RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_TEST_KEY_SECRET }}
+          E2E_SKIP_EMAIL: "true"
+          E2E_SKIP_CLEANUP: ${{ github.event.inputs.skip_cleanup == 'true' && '1' || '0' }}
+          # Run only billing tab
+          E2E_TABS: "billing"
+        run: python scripts/e2e_production_test.py
+
+  # ─── Playwright billing UI ────────────────────────────────────────────────
+  billing-playwright:
+    name: Billing UI (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install --save-dev @playwright/test
+          npx playwright install chromium --with-deps
+      - name: Run billing Playwright suite
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || secrets.STAGING_BASE_URL }}
+          SITE_URL: ${{ github.event.inputs.site_url || secrets.STAGING_SITE_URL }}
+          SUPERUSER_EMAIL: ${{ secrets.STAGING_SUPERUSER_EMAIL }}
+          SUPERUSER_PASSWORD: ${{ secrets.STAGING_SUPERUSER_PASSWORD }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_TEST_PUBLISHABLE_KEY }}
+        run: |
+          npx playwright test tests/e2e/billing/ \
+            --reporter=html \
+            --output=playwright-billing-results \
+            --timeout=60000
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-billing-report-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 14
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: billing-screenshots-${{ github.run_id }}
+          path: playwright-billing-results/
+          retention-days: 14
+
+  notify:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: [billing-unit, billing-e2e, billing-playwright]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine status
+        id: status
+        run: |
+          RESULTS="${{ needs.billing-unit.result }} ${{ needs.billing-e2e.result }} ${{ needs.billing-playwright.result }}"
+          echo "$RESULTS" | grep -qE "failure|cancelled" && echo "status=failure" >> "$GITHUB_OUTPUT" || echo "status=success" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/notify-slack
+        with:
+          status: ${{ steps.status.outputs.status }}
+          workflow: "E2E Billing"
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

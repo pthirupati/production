@@ -18,6 +18,23 @@ write_env() {
   chmod 600 "$OUT"
 }
 
+_load_vault_approle() {
+  local approle="${VAULT_APPROLE_FILE:-$ROOT/deploy/vault-approle.env}"
+  if [ -f "$approle" ]; then
+    # shellcheck disable=SC1090
+    source "$approle"
+    export VAULT_ROLE_ID="${VAULT_ROLE_ID:-}"
+    export VAULT_SECRET_ID="${VAULT_SECRET_ID:-}"
+    export VAULT_UNSEAL_KEY="${VAULT_UNSEAL_KEY:-}"
+    export VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
+  fi
+  if _env_true "${VAULT_ENABLED:-}"; then
+    export VAULT_ENABLED=true
+  fi
+}
+
+_load_vault_approle
+
 _vault_ready() {
   _env_true "${VAULT_ENABLED:-}" \
     && [ -n "${VAULT_ROLE_ID:-}" ] \
@@ -51,15 +68,15 @@ _seed_vault_from_file() {
   fi
 }
 
-if [ -n "${PRODUCTION_ENV_B64:-}" ]; then
+if [ -n "${PRODUCTION_ENV_B64:-}" ] && _vault_ready; then
+  echo "[env] Vault enabled — seeding KV from PRODUCTION_ENV_B64 then rendering (not writing plaintext)"
   TMP_SEED="$(mktemp)"
   echo "$PRODUCTION_ENV_B64" | base64 -d > "$TMP_SEED"
   chmod 600 "$TMP_SEED"
   _seed_vault_from_file "$TMP_SEED"
   rm -f "$TMP_SEED"
-fi
-
-if _vault_ready; then
+  bash "$ROOT/scripts/vault/render-env.sh" "$OUT"
+elif _vault_ready; then
   echo "[env] Rendering .env.production from HashiCorp Vault"
   bash "$ROOT/scripts/vault/render-env.sh" "$OUT"
 elif [ -n "${PRODUCTION_ENV_B64:-}" ]; then

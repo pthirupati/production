@@ -1,39 +1,311 @@
-"""FixitLab native interview AI — 100% free, rule-based, no external APIs."""
+"""FixitLab native interview AI — 100% free, no external APIs.
+
+Provides:
+- Rich contextual follow-ups based on answer quality and topic
+- Keyword-based STAR framework scoring
+- Domain-specific question banks (DevOps, SRE, Kubernetes, Linux, Cloud, etc.)
+- Adaptive difficulty based on conversation history
+"""
 
 from __future__ import annotations
 
 import random
+import re
 
 
-_REACTIONS_STRONG = [
-    "Right — and in production, how would you prove that quickly?",
-    "Okay, I hear you. What would break first if we scaled that 10x?",
-    "That's a solid line of thinking. What metric would you watch after the change?",
+# ---------------------------------------------------------------------------
+# Keyword banks for semantic scoring (free alternative to embeddings)
+# ---------------------------------------------------------------------------
+
+_STAR_SITUATION = [
+    "when", "we had", "there was", "the team", "our system", "at my previous", "at my current",
+    "during", "last year", "incident", "project", "we were", "our org", "the scenario",
+    "i was working", "my team was", "we needed",
 ]
-_REACTIONS_WEAK = [
-    "I'd want a bit more depth there — walk me through your mental checklist.",
-    "Help me understand the sequence — what do you check first, second?",
-    "Let's slow down — what's the failure mode you're most worried about?",
+_STAR_TASK = [
+    "i was responsible", "my role was", "i needed to", "i had to", "it was my job",
+    "i was tasked", "my goal was", "the requirement", "we needed to", "i owned",
+    "i led the", "i was the lead",
 ]
-_REACTIONS_BRIEF = [
-    "Short answer — can you expand with a real incident or example?",
-    "I didn't catch the full picture — what tools or commands would you use?",
+_STAR_ACTION = [
+    "i did", "i wrote", "i deployed", "i configured", "i implemented", "i fixed",
+    "i created", "i ran", "i set up", "i built", "i automated", "i migrated",
+    "i used", "i applied", "i changed", "i added", "i modified", "i investigated",
+    "i analyzed", "i collaborated", "i coordinated", "i reached out", "i escalated",
+    "i documented", "kubectl", "terraform", "ansible", "helm", "systemctl",
+    "grep", "awk", "sed", "bash", "python", "git", "docker", "aws", "gcp", "azure",
 ]
-_REACTIONS_SKIPPED = [
-    "No worries, let's keep moving —",
-    "We'll come back to that theme later — for now,",
-]
-_CASUAL_HR = [
-    "By the way, how's the team culture where you are now?",
-    "What would make you say yes to an offer in the next month?",
-    "Any constraints on relocation or remote work we should know?",
-]
-_ITIL_NUDGES = [
-    "Where does that sit with change management — normal, standard, or emergency?",
-    "Who owns the SLA clock when vendors are in the blast radius?",
-    "How do you document the incident timeline for a postmortem?",
+_STAR_RESULT = [
+    "as a result", "the outcome", "we reduced", "we improved", "latency dropped",
+    "error rate", "uptime went", "saved", "faster", "resolved", "fixed",
+    "mitigated", "the team was", "users reported", "the system", "postmortem",
+    "we shipped", "we went from", "we achieved", "the fix worked", "zero downtime",
+    "successful", "recovered", "deployed", "launched", "cut costs",
 ]
 
+_TECHNICAL_DEPTH = [
+    "because", "the reason", "tradeoff", "alternative", "we considered",
+    "instead of", "compared to", "bottleneck", "root cause", "underlying",
+    "specifically", "technically", "internally", "the way it works",
+    "under the hood", "the algorithm", "complexity", "race condition",
+    "idempotent", "eventual consistency", "cap theorem", "backpressure",
+    "circuit breaker", "retry logic", "exponential backoff", "sla", "rto", "rpo",
+    "metrics", "dashboards", "alerting", "oncall", "runbook", "postmortem",
+]
+
+_CONCRETE_EVIDENCE = [
+    "%", "second", "millisecond", "request", "query", "pod", "node",
+    "gb", "mb", "tps", "rps", "99th percentile", "p99", "p95", "p50",
+    "container", "replica", "namespace", "instance", "cluster", "endpoint",
+    "region", "availability zone", "cidr", "cpu", "memory", "disk",
+]
+
+
+# ---------------------------------------------------------------------------
+# Rich reaction banks — contextual, persona-aware
+# ---------------------------------------------------------------------------
+
+_REACTIONS = {
+    "strong": [
+        "Right — now let me stress-test that. What breaks first when traffic doubles?",
+        "Good instinct. How do you know that approach worked — what metric confirmed it?",
+        "I like the direction. Walk me through how you'd do that with zero downtime.",
+        "Solid. What would you do differently if you were starting from scratch today?",
+        "That's the right call. How do you communicate that decision to a non-technical stakeholder?",
+        "Good. Now scale that — how does your approach hold at 100x the load?",
+        "Exactly. What's the rollback plan if something goes sideways mid-deploy?",
+        "Nice. How would you automate that so the next engineer doesn't face the same problem?",
+        "That's solid thinking. What's the observability story — how do you know it's healthy?",
+    ],
+    "strong_streak": [
+        "You're on a roll. Let me push harder — describe the nastiest edge case you've actually hit.",
+        "Strong answers. I want to see you handle ambiguity — what if requirements changed mid-incident?",
+        "Impressive depth. Walk me through a time this approach actually failed you.",
+        "You clearly know this space. Tell me about the most complex system you've debugged recently.",
+        "Excellent. Now challenge your own answer — what's the weakest assumption in what you just said?",
+    ],
+    "weak": [
+        "I'd want a bit more depth there. Walk me through the exact commands or steps you'd run.",
+        "Help me understand your mental model — what's the failure mode you're most worried about?",
+        "Let's slow down. What would you check first, before touching anything?",
+        "I'm not quite seeing the technical path. How would you confirm your hypothesis before acting?",
+        "Can you be more specific? What tool, command, or metric would tell you you're on the right track?",
+        "Let's unpack that. What does 'it was slow' actually mean — what signal did you see?",
+        "I need more. Walk me through your checklist — what do you verify in what order?",
+    ],
+    "brief": [
+        "Short answer — can you expand? I'd love a real example from your experience.",
+        "Tell me more. What was the actual command or config change you made?",
+        "Walk me through the specifics. What did your monitoring show before you acted?",
+        "I need more detail. What was the impact, and how did you measure improvement?",
+        "That's a start. Give me the full picture — what happened before, during, and after.",
+    ],
+    "skipped": [
+        "No worries — let's move on.",
+        "Okay, we can come back to that later. Next question:",
+        "Got it, let's keep pace —",
+    ],
+    "missing_star_s": [
+        "Tell me more about the context first. What was the situation — what system, what team size?",
+        "Set the scene for me — what was the environment when this happened?",
+        "I want to understand the setup. What was going wrong before you got involved?",
+    ],
+    "missing_star_a": [
+        "I hear the problem — what did you specifically do to address it, step by step?",
+        "What were your actual steps? Walk me through them sequentially.",
+        "Tell me exactly what you did. Start with: 'First, I...'",
+    ],
+    "missing_star_r": [
+        "What was the outcome? How did you know the fix actually worked?",
+        "What happened after — did it hold, or did you need to iterate?",
+        "How did you measure success? Give me a number if you can.",
+    ],
+}
+
+_ROUND_NUDGES = {
+    "hr": [
+        "By the way, what does your ideal team culture look like?",
+        "What would make you say yes to an offer in the next few weeks?",
+        "How important is remote flexibility to you in your next role?",
+        "What's driving your search right now — growth, compensation, tech stack?",
+        "Where do you see yourself in two years if this role went well?",
+    ],
+    "manager": [
+        "How would you prioritize that against three other P1 incidents happening simultaneously?",
+        "When do you escalate versus handle it yourself — what's your threshold?",
+        "How do you write the incident postmortem so it's actually useful?",
+        "How do you keep a cross-functional team aligned during a prolonged outage?",
+        "What does 'blameless postmortem' actually mean to you in practice?",
+    ],
+    "behavioral": [
+        "Let me probe the result — what metric improved, and by how much?",
+        "What did you learn from that experience that you carry forward today?",
+        "If you could redo that situation, what would you do differently?",
+    ],
+    "devops_debug": [
+        "What does your rollback plan look like before you make that change?",
+        "Have you checked whether this might be a dependency or a platform issue?",
+        "What did the runbook say to do — and did you follow it or deviate?",
+    ],
+    "sre_oncall": [
+        "Have you updated the incident channel? Stakeholders need status every 15 minutes.",
+        "What's your hypothesis about root cause — and how do you test it safely in prod?",
+        "Is this worth a severity-1 page, or can it wait for business hours?",
+    ],
+}
+
+_TOPIC_FOLLOWUPS = {
+    "kubernetes": [
+        "What happens to that pod during a node eviction event?",
+        "How does your approach change if you can't use privileged containers?",
+        "Walk me through debugging a CrashLoopBackOff with only kubectl.",
+        "How do you handle secrets rotation in a running Kubernetes cluster?",
+        "What's your strategy for managing Helm chart upgrades safely in production?",
+    ],
+    "docker": [
+        "How do you keep image layers small in a CI/CD context?",
+        "What's your strategy for handling long-running containers that leak memory?",
+        "How do you debug a container that exits immediately after starting?",
+        "How do you manage multi-stage builds for compiled languages?",
+    ],
+    "nginx": [
+        "How do you handle a zero-downtime nginx config reload?",
+        "Walk me through diagnosing a 502 that only happens under load.",
+        "How would you limit request rate per client without losing legitimate traffic?",
+        "How do you set up mutual TLS termination at the nginx reverse proxy layer?",
+    ],
+    "linux": [
+        "How do you find which process is consuming the most file descriptors?",
+        "A server's load average is 80 but CPU is only 15% — what's going on?",
+        "Walk me through diagnosing a 'disk full' that's not showing full on df.",
+        "How do you troubleshoot a process that's stuck in 'D' state?",
+    ],
+    "monitoring": [
+        "How do you prevent alert fatigue in a noisy Prometheus setup?",
+        "Walk me through setting up SLIs and SLOs for a payment service.",
+        "When would you use a gauge vs counter vs histogram in Prometheus?",
+        "How do you handle cardinality explosions in your metrics?",
+    ],
+    "aws": [
+        "How do you handle an Auto Scaling group stuck with unhealthy instances?",
+        "Walk me through your strategy for cross-region failover with RTO under 5 minutes.",
+        "How do you audit IAM permissions in an account with 300+ roles?",
+        "What's your approach to managing AWS costs without slowing development?",
+    ],
+    "terraform": [
+        "How do you handle a Terraform state file that's locked or corrupted?",
+        "What's your strategy for managing Terraform across 50 microservices?",
+        "How do you test Terraform changes safely before applying to production?",
+        "How do you handle drift between Terraform state and actual infrastructure?",
+    ],
+    "ci_cd": [
+        "How do you handle a CI pipeline that's grown to over 30 minutes?",
+        "What's your strategy for rolling back a bad release automatically?",
+        "How do you enforce compliance checks in CI without blocking developers?",
+        "How do you manage secrets in a CI/CD pipeline securely?",
+    ],
+    "python": [
+        "How do you debug a Python service that's leaking memory over hours?",
+        "Walk me through your approach to profiling a slow Django endpoint.",
+        "How do you handle thread safety in a Python microservice?",
+        "What's your strategy for managing Python dependencies in production?",
+    ],
+    "ansible": [
+        "How do you handle an Ansible playbook on 200 hosts — some idempotent, some not?",
+        "What's your strategy for secret management in Ansible without Vault?",
+        "How do you test Ansible roles in CI without a real inventory?",
+        "How do you handle partial failures in a large Ansible run?",
+    ],
+    "security": [
+        "How do you detect lateral movement after a credential leak?",
+        "Walk me through your incident response for a suspected container escape.",
+        "How do you enforce least-privilege in a microservices environment?",
+        "How do you handle a CVE that affects a critical production dependency?",
+    ],
+    "database": [
+        "How do you perform a zero-downtime schema migration on a 500GB table?",
+        "What's your strategy for debugging slow queries in production?",
+        "Walk me through your backup and restore verification process.",
+        "How do you handle replication lag in a high-write PostgreSQL setup?",
+    ],
+}
+
+_GENERIC_FOLLOWUPS = [
+    "Let me push on that — what's the failure scenario you haven't mentioned yet?",
+    "How would you prove to a skeptical senior engineer that this is the right call?",
+    "Walk me through your runbook for this. What's step-by-step?",
+    "What's the monitoring or alerting you'd set up to catch this earlier next time?",
+    "If you had to teach this to a junior engineer, how would you explain it in two minutes?",
+    "What assumptions are you making here that could be wrong?",
+    "How does this hold up if you're managing this across three different cloud providers?",
+    "What's the compliance or security angle you'd want to verify before going to production?",
+    "What would you do if that approach failed at step three?",
+]
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _score_star_coverage(answer: str) -> dict[str, bool]:
+    low = answer.lower()
+    return {
+        "situation": any(k in low for k in _STAR_SITUATION),
+        "task": any(k in low for k in _STAR_TASK),
+        "action": any(k in low for k in _STAR_ACTION),
+        "result": any(k in low for k in _STAR_RESULT),
+    }
+
+
+def _detect_topic(text: str) -> str | None:
+    low = text.lower()
+    topic_keywords = {
+        "kubernetes": ["kubernetes", "k8s", "kubectl", "pod", "deployment", "helm", "namespace", "ingress"],
+        "docker": ["docker", "container", "dockerfile", "image", "registry", "compose"],
+        "nginx": ["nginx", "reverse proxy", "upstream", "ssl termination", "load balance"],
+        "linux": ["linux", "systemd", "kernel", "cgroup", "process", "inode", "socket", "file descriptor"],
+        "monitoring": ["prometheus", "grafana", "alertmanager", "metrics", "slo", "sli", "error rate"],
+        "aws": ["aws", "ec2", "s3", "rds", "cloudwatch", "iam", "vpc", "lambda", "eks"],
+        "terraform": ["terraform", "tfstate", "provider", "resource", "plan apply", "module"],
+        "ci_cd": ["ci/cd", "pipeline", "github actions", "jenkins", "gitlab", "argocd", "deployment"],
+        "python": ["python", "django", "flask", "fastapi", "asyncio", "pip", "celery"],
+        "ansible": ["ansible", "playbook", "inventory", "roles", "handler", "task"],
+        "security": ["security", "vulnerability", "cve", "secret", "credential", "iam", "rbac", "privilege"],
+        "database": ["database", "postgres", "mysql", "mongodb", "redis", "migration", "schema"],
+    }
+    scores = {t: sum(1 for k in kws if k in low) for t, kws in topic_keywords.items()}
+    best = max(scores, key=lambda t: scores[t])
+    return best if scores[best] >= 2 else None
+
+
+def _assess_quality(answer: str, question: str = "") -> str:
+    if not answer or len(answer.strip()) < 20:
+        return "skipped"
+    word_count = len(answer.split())
+    if word_count < 30:
+        return "brief"
+    low = answer.lower()
+    depth_hits = sum(1 for k in _TECHNICAL_DEPTH if k in low)
+    concrete_hits = sum(1 for k in _CONCRETE_EVIDENCE if k in low)
+    action_hits = sum(1 for k in _STAR_ACTION if k in low)
+    result_hits = sum(1 for k in _STAR_RESULT if k in low)
+    score = (
+        min(depth_hits, 4) * 2
+        + min(concrete_hits, 4) * 2
+        + min(action_hits, 5) * 1
+        + min(result_hits, 3) * 1.5
+        + min(word_count / 80, 2) * 1
+    )
+    if score >= 8:
+        return "strong"
+    if score >= 4:
+        return "adequate"
+    return "weak"
+
+
+# ---------------------------------------------------------------------------
+# Main public API
+# ---------------------------------------------------------------------------
 
 def generate_interviewer_reply(
     *,
@@ -46,47 +318,139 @@ def generate_interviewer_reply(
     conversation_tail: list[dict],
     strong_streak: int = 0,
 ) -> str:
-    """Natural interviewer follow-up without any paid LLM."""
-    quality = score_hint.get("quality", "adequate")
+    """
+    Generate a natural, context-aware interviewer follow-up.
+    100% free — no external LLM or paid API required.
+    """
+    quality = score_hint.get("quality") or _assess_quality(candidate_answer, question_text)
     company = profile_snapshot.get("current_company") or "your current org"
     role = profile_snapshot.get("target_role") or profile_snapshot.get("experience_level", "mid")
 
+    # STAR gap detection for behavioral/HR rounds
+    if round_type in ("behavioral", "hr") and candidate_answer and len(candidate_answer) > 40:
+        star = _score_star_coverage(candidate_answer)
+        missing = [k for k, v in star.items() if not v]
+        if quality != "skipped" and len(missing) >= 2:
+            if "situation" in missing:
+                return random.choice(_REACTIONS["missing_star_s"])
+            if "action" in missing:
+                return random.choice(_REACTIONS["missing_star_a"])
+            if "result" in missing:
+                return random.choice(_REACTIONS["missing_star_r"])
+
+    # Base reaction selection
     if quality == "skipped":
-        base = random.choice(_REACTIONS_SKIPPED)
-    elif quality == "strong":
-        base = random.choice(_REACTIONS_STRONG)
-        if strong_streak >= 5:
-            base = (
-                "Let me push harder — what's the nastiest edge case you've seen with this, "
-                f"especially at {company}?"
-            )
+        return random.choice(_REACTIONS["skipped"])
+    if quality == "strong":
+        base = random.choice(_REACTIONS["strong_streak"] if strong_streak >= 4 else _REACTIONS["strong"])
     elif quality == "weak":
-        base = random.choice(_REACTIONS_WEAK)
+        base = random.choice(_REACTIONS["weak"])
     elif quality == "brief":
-        base = random.choice(_REACTIONS_BRIEF)
+        base = random.choice(_REACTIONS["brief"])
     else:
-        base = score_hint.get("feedback", "Tell me more about how you'd validate that.")
+        base = score_hint.get("feedback") or random.choice(_REACTIONS["strong"])
 
-    if round_type == "hr" and random.random() < 0.35:
-        return f"{base} {random.choice(_CASUAL_HR)}"
+    # Topic-specific follow-up (40% chance)
+    combined = f"{question_text} {candidate_answer}"
+    topic = _detect_topic(combined)
+    if topic and random.random() < 0.40:
+        followup = random.choice(_TOPIC_FOLLOWUPS.get(topic, _GENERIC_FOLLOWUPS))
+        return f"{base} {followup}"
 
-    if round_type == "manager" and random.random() < 0.4:
-        return f"{base} {random.choice(_ITIL_NUDGES)}"
+    # Round-type nudges (35% chance)
+    nudges = _ROUND_NUDGES.get(round_type, [])
+    if nudges and random.random() < 0.35:
+        return f"{base} {random.choice(nudges)}"
 
-    if "resume" in (candidate_answer or "").lower() or "my experience" in (candidate_answer or "").lower():
+    # Resume/experience reference
+    if candidate_answer and re.search(r"\b(resume|cv|previous|my experience|i worked at)\b", candidate_answer, re.I):
         return (
-            f"{base} Your resume mentions {role} work — how does that tie to what you just described?"
+            f"{base} Your {role} background sounds relevant — "
+            f"how would you apply that on a new team where everything is set up differently?"
         )
 
-    if candidate_answer and "?" in candidate_answer[-80:]:
+    # Candidate asked a question back
+    if candidate_answer and candidate_answer.rstrip().endswith("?"):
         return (
-            f"Good question. Briefly: it depends on blast radius and rollback — "
-            f"but back to you: how would you de-risk that in the first 15 minutes?"
+            "Good question. The short answer is it depends on blast radius and rollback strategy. "
+            "But let me flip it back: how have you actually made that call before?"
         )
 
-    follow_templates = [
-        f"{base} If this happened on a Friday evening at {company}, what's step one?",
-        f"{base} What would you log so the next engineer isn't guessing?",
-        f"{persona_name} here — {base.lower()}",
-    ]
-    return random.choice(follow_templates)
+    # Company-personalized follow-up (15% chance)
+    if random.random() < 0.15 and company != "your current org":
+        return f"{base} At a company like {company}, what constraints would change your approach?"
+
+    return f"{base} {random.choice(_GENERIC_FOLLOWUPS)}"
+
+
+# ---------------------------------------------------------------------------
+# Score breakdown (used by scoring engine)
+# ---------------------------------------------------------------------------
+
+def compute_answer_scores(
+    *,
+    candidate_answer: str,
+    question_text: str,
+    round_type: str,
+    expected_keywords: list[str] | None = None,
+) -> dict:
+    """Return structured score breakdown — fully free, no external API."""
+    quality = _assess_quality(candidate_answer, question_text)
+    star = _score_star_coverage(candidate_answer)
+    topic = _detect_topic(f"{question_text} {candidate_answer}")
+    word_count = len(candidate_answer.split()) if candidate_answer else 0
+    low = (candidate_answer or "").lower()
+
+    depth_score = min(100, sum(1 for k in _TECHNICAL_DEPTH if k in low) * 12)
+    concrete_score = min(100, sum(1 for k in _CONCRETE_EVIDENCE if k in low) * 15)
+    star_score = round(sum(star.values()) / 4 * 100)
+    length_score = min(100, word_count * 1.5) if word_count < 70 else min(100, word_count * 0.8)
+
+    expected_hit_rate = 0.0
+    if expected_keywords:
+        hits = sum(1 for k in expected_keywords if k.lower() in low)
+        expected_hit_rate = hits / len(expected_keywords)
+
+    if round_type in ("behavioral", "hr"):
+        composite = depth_score * 0.20 + concrete_score * 0.15 + star_score * 0.45 + length_score * 0.20
+    elif round_type in ("system_design", "live_coding"):
+        composite = depth_score * 0.45 + concrete_score * 0.35 + star_score * 0.05 + length_score * 0.15
+    else:
+        composite = depth_score * 0.35 + concrete_score * 0.30 + star_score * 0.15 + length_score * 0.20
+
+    if expected_keywords:
+        composite = composite * 0.7 + expected_hit_rate * 100 * 0.3
+
+    return {
+        "quality": quality,
+        "composite_score": round(min(100, max(0, composite))),
+        "depth_score": depth_score,
+        "concrete_score": concrete_score,
+        "star_score": star_score,
+        "star_coverage": star,
+        "word_count": word_count,
+        "topic_detected": topic,
+        "keyword_hit_rate": round(expected_hit_rate, 2),
+        "feedback": _generate_feedback(quality, star, topic, round_type),
+    }
+
+
+def _generate_feedback(quality: str, star: dict, topic: str | None, round_type: str) -> str:
+    if quality == "skipped":
+        return "No answer provided."
+    if quality == "strong":
+        return "Strong, detailed response with technical depth and concrete evidence."
+    if quality == "brief":
+        return "Answer was too brief — add specific examples, commands, or metrics."
+    if quality == "weak":
+        missing = [k.capitalize() for k, v in star.items() if not v]
+        base = "Answer lacked technical specificity. "
+        if missing and round_type in ("behavioral", "hr"):
+            base += f"Missing STAR components: {', '.join(missing)}. "
+        if topic:
+            base += f"Expand on the {topic} aspect with concrete steps or data."
+        return base.strip()
+    missing = [k.capitalize() for k, v in star.items() if not v]
+    if missing and round_type in ("behavioral", "hr"):
+        return f"Good answer. Consider adding: {', '.join(missing)} for a complete STAR response."
+    return "Adequate response — add specific data points or metrics to strengthen it."

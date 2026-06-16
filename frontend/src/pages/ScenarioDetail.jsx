@@ -6,6 +6,7 @@ import { ratingsApi } from '../api/ratings'
 import { jiraApi } from '../api/jira'
 import ScenarioIssueBar from '../components/ScenarioIssueBar'
 import JiraTeamGuide from '../components/JiraTeamGuide'
+import StickyPageToolbar from '../components/StickyPageToolbar'
 import { useAuthStore } from '../store/authStore'
 import {
   Clock, Target, Lightbulb, Play, CheckCircle2,
@@ -243,11 +244,11 @@ export default function ScenarioDetail() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 animate-fade-in pb-8">
-      <div className="sticky top-0 z-20 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 py-3 mb-2 bg-surface-950/92 backdrop-blur-xl border-b border-surface-800/50">
-        <Link to="/scenarios" className="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-white transition-colors mb-2">
+      <StickyPageToolbar>
+        <Link to="/scenarios" className="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-white transition-colors">
           <ArrowLeft size={14} /> All Scenarios
         </Link>
-        <div className="flex items-start justify-between gap-3 min-w-0">
+        <div className="flex items-start justify-between gap-3 min-w-0 mt-1.5">
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-bold text-white truncate">{scenario.title}</h1>
             <p className="text-xs text-surface-500 mt-0.5 truncate">{scenario.technology_name || scenario.category}</p>
@@ -256,7 +257,7 @@ export default function ScenarioDetail() {
             {typeInfo.label}
           </span>
         </div>
-      </div>
+      </StickyPageToolbar>
 
       {/* Issue / Jira bar — top only, no duplicate panel below */}
       <ScenarioIssueBar
@@ -271,7 +272,9 @@ export default function ScenarioDetail() {
       )}
 
       {/* Hero */}
-      <div className="glass-card p-6 lg:p-8">
+      <div className="relative overflow-hidden glass-card gradient-border p-6 lg:p-8">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/6 via-transparent to-accent-purple/6 pointer-events-none" />
+        <div className="relative">
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <span className={`badge-${scenario.difficulty}`}>{scenario.difficulty}</span>
           <span className={`px-2 py-0.5 rounded text-xs font-medium border flex items-center gap-1 ${
@@ -339,6 +342,7 @@ export default function ScenarioDetail() {
           {activeLabSession && (
             <p className="text-xs text-accent-cyan">Active lab running — resume to continue where you left off.</p>
           )}
+        </div>
         </div>
       </div>
 

@@ -9,6 +9,7 @@ from .billing_views import (
 from .gdpr_views import InterviewDeleteResumeView, InterviewExportTranscriptsView
 from .join_views import UserPendingJoinRequestsView, UserRespondJoinRequestView
 from .voice_views import InterviewVoiceConfigView
+from . import tts_views, stt_views
 from .views import (
     CandidateProfileView,
     InterviewCampaignDetailView,
@@ -60,4 +61,9 @@ urlpatterns = [
     path("voice/config/", InterviewVoiceConfigView.as_view()),
     path("rounds/<uuid:round_id>/join-requests/", UserPendingJoinRequestsView.as_view()),
     path("join-requests/<uuid:request_id>/respond/", UserRespondJoinRequestView.as_view()),
+    # TTS/STT API endpoints (added with LLM upgrade)
+    path("tts/config/", tts_views.TTSConfigView.as_view(), name="tts-config"),
+    path("tts/synthesize/", tts_views.TTSSynthesizeView.as_view(), name="tts-synthesize"),
+    path("stt/config/", stt_views.STTConfigView.as_view(), name="stt-config"),
+    path("stt/transcribe/", stt_views.STTTranscribeView.as_view(), name="stt-transcribe"),
 ]

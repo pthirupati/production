@@ -1,0 +1,147 @@
+# e2e-interviews.yml — Interview Studio E2E (on demand)
+# Covers: public plans, voice config, admin panel, campaign CRUD,
+#         entitlement flow, media permissions (mocked), scorecard
+name: E2E — Interviews
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "API base URL"
+        required: false
+        default: ""
+      site_url:
+        description: "Public site URL"
+        required: false
+        default: ""
+      skip_cleanup:
+        description: "Skip test data cleanup (debug only)"
+        type: boolean
+        default: false
+  schedule:
+    # Nightly at 02:00 UTC
+    - cron: "0 2 * * *"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: e2e-interviews
+  cancel-in-progress: false
+
+jobs:
+  # ─── API-level interview E2E (runs via existing e2e_interviews.py) ────────
+  interview-api-e2e:
+    name: Interview API E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-python-backend
+
+      - name: Resolve target URLs
+        id: urls
+        run: |
+          BASE="${{ github.event.inputs.base_url || secrets.STAGING_BASE_URL }}"
+          SITE="${{ github.event.inputs.site_url || secrets.STAGING_SITE_URL }}"
+          echo "base_url=${BASE}" >> "$GITHUB_OUTPUT"
+          echo "site_url=${SITE}" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for API health
+        env:
+          BASE_URL: ${{ steps.urls.outputs.base_url }}
+        run: |
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/api/health/" || echo "000")
+            [ "$STATUS" = "200" ] && { echo "Healthy"; break; }
+            echo "Attempt $i — $STATUS"; sleep 5
+          done
+          [ "$STATUS" = "200" ] || exit 1
+
+      - name: Run interview E2E script
+        env:
+          BASE_URL: ${{ steps.urls.outputs.base_url }}
+          SITE_URL: ${{ steps.urls.outputs.site_url }}
+          SUPERUSER_EMAIL: ${{ secrets.STAGING_SUPERUSER_EMAIL }}
+          SUPERUSER_PASSWORD: ${{ secrets.STAGING_SUPERUSER_PASSWORD }}
+          E2E_SKIP_EMAIL: "true"
+          E2E_SKIP_CLEANUP: ${{ github.event.inputs.skip_cleanup == 'true' && '1' || '0' }}
+        run: python scripts/e2e_interviews.py
+
+  # ─── Playwright UI tests — interview room rendering + media ───────────────
+  interview-ui-playwright:
+    name: Interview UI (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node for Playwright
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install --save-dev @playwright/test
+          npx playwright install chromium --with-deps
+
+      - name: Resolve target URLs
+        id: urls
+        run: |
+          BASE="${{ github.event.inputs.base_url || secrets.STAGING_BASE_URL }}"
+          SITE="${{ github.event.inputs.site_url || secrets.STAGING_SITE_URL }}"
+          echo "base_url=${BASE}" >> "$GITHUB_OUTPUT"
+          echo "site_url=${SITE}" >> "$GITHUB_OUTPUT"
+
+      - name: Run interview Playwright suite
+        env:
+          BASE_URL: ${{ steps.urls.outputs.base_url }}
+          SITE_URL: ${{ steps.urls.outputs.site_url }}
+          SUPERUSER_EMAIL: ${{ secrets.STAGING_SUPERUSER_EMAIL }}
+          SUPERUSER_PASSWORD: ${{ secrets.STAGING_SUPERUSER_PASSWORD }}
+        run: |
+          npx playwright test tests/e2e/interviews/ \
+            --reporter=html \
+            --output=playwright-interview-results \
+            --timeout=60000
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-interview-report-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: interview-screenshots-${{ github.run_id }}
+          path: playwright-interview-results/
+          retention-days: 14
+
+  # ─── Aggregate result + notify ────────────────────────────────────────────
+  notify:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: [interview-api-e2e, interview-ui-playwright]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine overall status
+        id: status
+        run: |
+          if [[ "${{ needs.interview-api-e2e.result }}" == "success" && "${{ needs.interview-ui-playwright.result }}" == "success" ]]; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: ./.github/actions/notify-slack
+        with:
+          status: ${{ steps.status.outputs.status }}
+          workflow: "E2E Interviews"
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

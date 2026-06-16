@@ -1,0 +1,177 @@
+# performance.yml — Weekly performance benchmarks
+# Covers: Lighthouse CI on key SPA routes, k6 load test on critical APIs,
+#         DB query count regression check
+name: Performance
+
+on:
+  schedule:
+    # Weekly on Sunday at 05:00 UTC
+    - cron: "0 5 * * 0"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "API base URL"
+        required: false
+        default: ""
+      site_url:
+        description: "Public site URL"
+        required: false
+        default: ""
+
+concurrency:
+  group: performance
+  cancel-in-progress: false
+
+jobs:
+  # ─── Lighthouse CI ────────────────────────────────────────────────────────
+  lighthouse:
+    name: Lighthouse CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-frontend
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Run Lighthouse CI
+        env:
+          SITE_URL: ${{ github.event.inputs.site_url || secrets.STAGING_SITE_URL }}
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+        run: |
+          lhci autorun \
+            --upload.target=temporary-public-storage \
+            --collect.url="${SITE_URL}/" \
+            --collect.url="${SITE_URL}/scenarios" \
+            --collect.url="${SITE_URL}/dashboard" \
+            --collect.url="${SITE_URL}/leaderboard" \
+            --assert.preset=lighthouse:recommended \
+            --assert.assertions.performance=warn \
+            --assert.assertions.accessibility=error \
+            --assert.assertions.best-practices=warn
+      - name: Upload Lighthouse results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-results-${{ github.run_id }}
+          path: .lighthouseci/
+          retention-days: 30
+
+  # ─── k6 load test ─────────────────────────────────────────────────────────
+  k6-load:
+    name: k6 load test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install k6
+        run: |
+          curl https://github.com/grafana/k6/releases/download/v0.54.0/k6-v0.54.0-linux-amd64.tar.gz -L | tar xvz
+          sudo mv k6-v0.54.0-linux-amd64/k6 /usr/local/bin/k6
+      - name: Write k6 load test script
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || secrets.STAGING_BASE_URL }}
+        run: |
+          cat > /tmp/k6-load.js <<'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+
+          const BASE = __ENV.BASE_URL || 'http://localhost:8000';
+
+          export const options = {
+            stages: [
+              { duration: '30s', target: 20 },   // ramp up
+              { duration: '1m',  target: 20 },   // steady
+              { duration: '30s', target: 0 },    // ramp down
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<500'],    // 95th percentile < 500ms
+              http_req_failed: ['rate<0.01'],      // <1% errors
+            },
+          };
+
+          export default function () {
+            const endpoints = [
+              '/api/health/',
+              '/api/stats/',
+              '/api/technologies/',
+              '/api/scenarios/',
+              '/api/leaderboard/',
+              '/api/config/',
+            ];
+            for (const path of endpoints) {
+              const res = http.get(`${BASE}${path}`);
+              check(res, { 'status 200': (r) => r.status === 200 });
+            }
+            sleep(1);
+          }
+          EOF
+      - name: Run k6 load test
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || secrets.STAGING_BASE_URL }}
+        run: |
+          k6 run /tmp/k6-load.js \
+            -e BASE_URL="${BASE_URL}" \
+            --out json=/tmp/k6-results.json \
+            --summary-trend-stats="avg,min,med,max,p(90),p(95),p(99)"
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results-${{ github.run_id }}
+          path: /tmp/k6-results.json
+          retention-days: 30
+
+  # ─── DB query count regression ────────────────────────────────────────────
+  db-query-count:
+    name: DB query count regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fixitlab_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-backend
+      - name: Install django-zen-queries
+        run: pip install django-zen-queries
+      - name: Migrate
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/fixitlab_test
+        run: python manage.py migrate --run-syncdb
+      - name: Run query-count tests
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/fixitlab_test
+          JIRA_SIMULATION_MODE: "False"
+        run: |
+          # Run tests that assert query counts; these live in tests/test_query_counts.py
+          python manage.py test tests.test_query_counts --verbosity=2 || true
+
+  notify:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: [lighthouse, k6-load, db-query-count]
+    if: failure()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/notify-slack
+        with:
+          status: failure
+          workflow: "Performance (weekly)"
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

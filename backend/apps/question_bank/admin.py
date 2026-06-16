@@ -1,18 +1,289 @@
-from django.contrib import admin
-from .models import Scenario, Technology
+"""
+Question bank admin — Technology, Scenario, Tag.
+"""
+import csv
 
+from django.contrib import admin, messages
+from django.http import HttpResponse
+from django.utils.html import format_html
+
+from .models import Scenario, Tag, Technology
+
+
+# ---------------------------------------------------------------------------
+# Inlines
+# ---------------------------------------------------------------------------
+
+class ScenarioInline(admin.TabularInline):
+    model = Scenario
+    fields = ("slug", "title", "difficulty", "scenario_type", "is_active")
+    readonly_fields = ("slug",)
+    extra = 0
+    show_change_link = True
+    can_delete = False
+
+
+# ---------------------------------------------------------------------------
+# Technology Admin
+# ---------------------------------------------------------------------------
 
 @admin.register(Technology)
 class TechnologyAdmin(admin.ModelAdmin):
-    list_display = ("name", "is_active", "created_at")
-    list_filter = ("is_active",)
-    search_fields = ("name",)
+    list_display = (
+        "name",
+        "slug",
+        "price_inr",
+        "scenario_count",
+        "is_active",
+        "coming_soon",
+        "order",
+        "created_at",
+    )
+    list_filter = ("is_active", "coming_soon")
+    search_fields = ("name", "slug")
+    readonly_fields = ("slug", "created_at")
+    prepopulated_fields = {}  # slug is auto-generated on save
+    list_editable = ("is_active", "coming_soon", "order")
+    ordering = ("order", "name")
+    inlines = [ScenarioInline]
+    actions = ["action_activate", "action_deactivate", "action_mark_coming_soon", "action_export_csv"]
+
+    @admin.display(description="Price (INR)")
+    def price_inr(self, obj):
+        return f"₹{obj.price}"
+
+    @admin.display(description="Scenarios")
+    def scenario_count(self, obj):
+        total = obj.scenarios.count()
+        active = obj.scenarios.filter(is_active=True).count()
+        return format_html("{} <small style='color:grey'>({} active)</small>", total, active)
+
+    @admin.action(description="Activate selected technologies")
+    def action_activate(self, request, queryset):
+        queryset.update(is_active=True, coming_soon=False)
+        self.message_user(request, "Technologies activated.", messages.SUCCESS)
+
+    @admin.action(description="Deactivate selected technologies")
+    def action_deactivate(self, request, queryset):
+        queryset.update(is_active=False)
+        self.message_user(request, "Technologies deactivated.", messages.WARNING)
+
+    @admin.action(description="Mark as coming soon")
+    def action_mark_coming_soon(self, request, queryset):
+        queryset.update(coming_soon=True)
+        self.message_user(request, "Marked as coming soon.", messages.SUCCESS)
+
+    @admin.action(description="Export selected technologies to CSV")
+    def action_export_csv(self, request, queryset):
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="technologies.csv"'
+        writer = csv.writer(response)
+        writer.writerow(["id", "name", "slug", "price", "is_active", "coming_soon", "scenario_count"])
+        for t in queryset.annotate_scenario_count() if hasattr(queryset, "annotate_scenario_count") else queryset:
+            writer.writerow([t.id, t.name, t.slug, t.price, t.is_active, t.coming_soon, t.scenarios.count()])
+        return response
+
+
+# ---------------------------------------------------------------------------
+# Tag Admin
+# ---------------------------------------------------------------------------
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "scenario_count")
+    search_fields = ("name", "slug")
+    readonly_fields = ("slug",)
+
+    @admin.display(description="Scenarios")
+    def scenario_count(self, obj):
+        return obj.scenarios.count()
+
+
+# ---------------------------------------------------------------------------
+# Hint Inline (used inside ScenarioAdmin)
+# ---------------------------------------------------------------------------
+
+class HintInlineForScenario(admin.TabularInline):
+    # Import here to avoid circular import
+    from apps.hints.models import Hint
+    model = Hint
+    fields = ("order", "content", "penalty", "is_active")
+    extra = 1
+    ordering = ("order",)
+
+
+# ---------------------------------------------------------------------------
+# Scenario Admin
+# ---------------------------------------------------------------------------
+
+class DifficultyFilter(admin.SimpleListFilter):
+    title = "difficulty"
+    parameter_name = "difficulty"
+
+    def lookups(self, request, model_admin):
+        return Scenario.DIFFICULTY_CHOICES
+
+    def queryset(self, qs, value):
+        if value:
+            return qs.filter(difficulty=value)
+        return qs
+
+
+class InfraTypeFilter(admin.SimpleListFilter):
+    title = "infrastructure"
+    parameter_name = "infra"
+
+    def lookups(self, request, model_admin):
+        return Scenario.INFRA_CHOICES
+
+    def queryset(self, qs, value):
+        if value:
+            return qs.filter(infrastructure_type=value)
+        return qs
+
+
+class LabModeFilter(admin.SimpleListFilter):
+    title = "lab mode"
+    parameter_name = "lab_mode"
+
+    def lookups(self, request, model_admin):
+        return Scenario.LAB_MODE_CHOICES
+
+    def queryset(self, qs, value):
+        if value:
+            return qs.filter(lab_mode=value)
+        return qs
 
 
 @admin.register(Scenario)
 class ScenarioAdmin(admin.ModelAdmin):
-    list_display = ("title", "technology", "category", "difficulty", "is_active")
-    list_filter = ("technology", "category", "difficulty", "is_active")
-    search_fields = ("title", "slug")
+    list_display = (
+        "title",
+        "technology",
+        "difficulty_badge",
+        "scenario_type",
+        "lab_mode",
+        "infrastructure_type",
+        "is_active",
+        "session_count",
+        "completion_rate",
+    )
+    list_filter = (
+        "technology",
+        DifficultyFilter,
+        "scenario_type",
+        "is_active",
+        InfraTypeFilter,
+        LabModeFilter,
+        "requires_companion_hosts",
+        "dual_terminal",
+    )
+    search_fields = ("title", "slug", "category", "description")
     prepopulated_fields = {"slug": ("title",)}
+    filter_horizontal = ("tags",)
+    readonly_fields = ("slug",)
+    list_select_related = ("technology",)
+    list_per_page = 50
+    date_hierarchy = None
+    ordering = ("technology", "difficulty", "title")
+    inlines = [HintInlineForScenario]
+    actions = [
+        "action_activate",
+        "action_deactivate",
+        "action_export_csv",
+        "action_set_docker",
+        "action_set_simulation",
+    ]
+    fieldsets = (
+        ("Identity", {
+            "fields": ("slug", "title", "subtitle", "technology", "category", "tags"),
+        }),
+        ("Difficulty & Type", {
+            "fields": ("difficulty", "scenario_type", "is_active"),
+        }),
+        ("Content", {
+            "fields": ("description", "objectives", "initial_state", "solution_explanation"),
+        }),
+        ("Infrastructure", {
+            "fields": (
+                "lab_mode", "infrastructure_type",
+                "docker_image", "docker_privileged",
+                "cloud_setup_script", "cloud_ami", "cloud_image",
+                "requires_companion_hosts", "dual_terminal",
+            ),
+            "classes": ("collapse",),
+        }),
+        ("Simulation", {
+            "fields": ("simulation_type",),
+            "classes": ("collapse",),
+        }),
+        ("Validation", {
+            "fields": ("validation_script", "blocked_commands"),
+            "classes": ("collapse",),
+        }),
+        ("Jira", {
+            "fields": ("jira_priority", "jira_issue_template"),
+            "classes": ("collapse",),
+        }),
+    )
 
+    @admin.display(description="Difficulty")
+    def difficulty_badge(self, obj):
+        colors = {"easy": "green", "medium": "orange", "hard": "red"}
+        return format_html(
+            '<span style="color:{};font-weight:bold;">{}</span>',
+            colors.get(obj.difficulty, "black"),
+            obj.get_difficulty_display(),
+        )
+
+    @admin.display(description="Sessions")
+    def session_count(self, obj):
+        return obj.lab_sessions.count()
+
+    @admin.display(description="Completion %")
+    def completion_rate(self, obj):
+        total = obj.lab_sessions.count()
+        if not total:
+            return "—"
+        completed = obj.lab_sessions.filter(status="COMPLETED").count()
+        pct = int(completed / total * 100)
+        color = "green" if pct >= 50 else "orange" if pct >= 25 else "red"
+        return format_html('<span style="color:{}">{}%</span>', color, pct)
+
+    @admin.action(description="Activate selected scenarios")
+    def action_activate(self, request, queryset):
+        count = queryset.update(is_active=True)
+        self.message_user(request, f"Activated {count} scenario(s).", messages.SUCCESS)
+
+    @admin.action(description="Deactivate selected scenarios")
+    def action_deactivate(self, request, queryset):
+        count = queryset.update(is_active=False)
+        self.message_user(request, f"Deactivated {count} scenario(s).", messages.WARNING)
+
+    @admin.action(description="Set lab mode to docker")
+    def action_set_docker(self, request, queryset):
+        queryset.update(lab_mode="docker")
+        self.message_user(request, "Lab mode set to docker.", messages.SUCCESS)
+
+    @admin.action(description="Set lab mode to simulation")
+    def action_set_simulation(self, request, queryset):
+        queryset.update(lab_mode="simulation")
+        self.message_user(request, "Lab mode set to simulation.", messages.SUCCESS)
+
+    @admin.action(description="Export selected scenarios to CSV")
+    def action_export_csv(self, request, queryset):
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="scenarios.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            "slug", "title", "technology", "difficulty", "scenario_type",
+            "lab_mode", "infrastructure_type", "is_active", "session_count",
+        ])
+        for s in queryset.select_related("technology"):
+            writer.writerow([
+                s.slug, s.title, s.technology.name,
+                s.difficulty, s.scenario_type, s.lab_mode,
+                s.infrastructure_type, s.is_active,
+                s.lab_sessions.count(),
+            ])
+        return response
