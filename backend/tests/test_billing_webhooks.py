@@ -89,7 +89,9 @@ class BillingWebhookTests(TestCase):
         signature = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
 
         with patch('apps.billing.models.PaymentTransaction.objects', new=mock_mgr):
-            with override_settings(RAZORPAY_KEY_SECRET=secret):
+            # RAZORPAY_WEBHOOK_SECRET must be set — the webhook handler uses this
+            # to verify signatures (separate from RAZORPAY_KEY_SECRET).
+            with override_settings(RAZORPAY_KEY_SECRET=secret, RAZORPAY_WEBHOOK_SECRET=secret):
                 url = reverse('razorpay_webhook')
                 resp = self.client.post(url, data=payload, content_type='application/json', HTTP_X_RAZORPAY_SIGNATURE=signature)
                 self.assertEqual(resp.status_code, 200)

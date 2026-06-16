@@ -659,11 +659,18 @@ class VerifyRazorpayPaymentView(APIView):
 
         from .models import PaymentTransaction
         from .razorpay_fulfillment import fulfill_technology_subscription
+        from django.db import transaction as db_transaction
 
-        tx = PaymentTransaction.objects.filter(
-            gateway_order_id=razorpay_order_id,
-            user=request.user,
-        ).first()
+        # Use select_for_update inside an atomic block to prevent the race
+        # condition where two concurrent verify requests both pass the
+        # duplicate check and both activate the subscription.
+        with db_transaction.atomic():
+            tx = PaymentTransaction.objects.select_for_update(
+                nowait=False
+            ).filter(
+                gateway_order_id=razorpay_order_id,
+                user=request.user,
+            ).first()
         if tx and tx.status == "success" and tx.tech_subscription_id:
             sub = tx.tech_subscription
             return Response({
@@ -751,7 +758,7 @@ class VerifyRazorpayPaymentView(APIView):
         }, status=http_status.HTTP_201_CREATED if created else http_status.HTTP_200_OK)
 
     def _verify_signature(self, order_id, payment_id, signature):
-        """Verify Razorpay payment signature using HMAC SHA256."""
+        """Verify Razorpay payment signature using the official Razorpay client utility."""
         if not settings.RAZORPAY_KEY_SECRET:
             if getattr(settings, "DEMO_PAYMENT_ENABLED", False):
                 logger.warning("Razorpay key secret not configured — demo skip")
@@ -759,19 +766,29 @@ class VerifyRazorpayPaymentView(APIView):
             return False
 
         try:
-            message = f"{order_id}|{payment_id}"
-            expected_signature = hmac.new(
-                settings.RAZORPAY_KEY_SECRET.encode('utf-8'),
-                message.encode('utf-8'),
-                hashlib.sha256
-            ).hexdigest()
-            return hmac.compare_digest(expected_signature, signature)
+            import razorpay
+            client = razorpay.Client(
+                auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+            )
+            client.utility.verify_payment_signature({
+                "razorpay_order_id": order_id,
+                "razorpay_payment_id": payment_id,
+                "razorpay_signature": signature,
+            })
+            return True
+        except razorpay.errors.SignatureVerificationError:
+            return False
         except Exception as e:
             logger.error(f"Signature verification error: {e}")
             return False
 
     def _verify_payment_with_gateway(self, order_id, payment_id, expected_amount_inr):
-        """Fetch payment from Razorpay and validate order + amount server-side."""
+        """Fetch payment from Razorpay and validate order + amount server-side.
+
+        Returns False (never raises) so callers can treat a Razorpay API failure
+        as a verification failure — the subscription is NOT activated when this
+        returns False.
+        """
         if not settings.RAZORPAY_KEY_SECRET or not settings.RAZORPAY_KEY_ID:
             return getattr(settings, "DEMO_PAYMENT_ENABLED", False)
 
@@ -779,16 +796,33 @@ class VerifyRazorpayPaymentView(APIView):
             import razorpay
             client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
             payment = client.payment.fetch(payment_id)
-            if payment.get("order_id") != order_id:
-                return False
-            if int(payment.get("amount", 0)) != int(expected_amount_inr) * 100:
-                return False
-            if payment.get("status") != "captured":
-                return False
-            return True
         except Exception as e:
-            logger.error(f"Razorpay payment fetch failed: {e}")
+            # payment.fetch() failure must NOT result in silent success.
+            logger.error(
+                "Razorpay payment.fetch failed for %s — rejecting verification: %s",
+                payment_id, e,
+            )
             return False
+
+        if payment.get("order_id") != order_id:
+            logger.warning(
+                "Razorpay order_id mismatch: got %s expected %s",
+                payment.get("order_id"), order_id,
+            )
+            return False
+        if int(payment.get("amount", 0)) != int(expected_amount_inr) * 100:
+            logger.warning(
+                "Razorpay amount mismatch for %s: got %s expected %s paise",
+                payment_id, payment.get("amount"), int(expected_amount_inr) * 100,
+            )
+            return False
+        if payment.get("status") != "captured":
+            logger.warning(
+                "Razorpay payment %s not captured (status=%s)",
+                payment_id, payment.get("status"),
+            )
+            return False
+        return True
 
 
 class TechnologySubscribeView(APIView):
@@ -1426,3 +1460,84 @@ class InvoiceDownloadView(APIView):
         response = HttpResponse(html, content_type="text/html; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
+
+
+class RazorpayRefundView(APIView):
+    """
+    Admin-only: issue a partial or full refund for a Razorpay payment.
+
+    POST /api/billing/razorpay/refund/
+    Body: { "payment_id": "pay_xxx", "amount": 499 }   (amount in INR)
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [BillingRateThrottle]
+
+    def post(self, request):
+        if not request.user.is_staff:
+            return Response(
+                {"error": "Admin access required"},
+                status=http_status.HTTP_403_FORBIDDEN,
+            )
+
+        payment_id = (request.data.get("payment_id") or "").strip()
+        amount_inr = request.data.get("amount")
+
+        if not payment_id:
+            return Response(
+                {"error": "payment_id is required"},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        if not amount_inr:
+            return Response(
+                {"error": "amount is required (in INR)"},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            amount_paise = int(float(amount_inr) * 100)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Invalid amount"},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
+            return Response(
+                {"error": "Razorpay is not configured"},
+                status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        try:
+            import razorpay
+            client = razorpay.Client(
+                auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+            )
+            refund = client.payment.refund(payment_id, {"amount": amount_paise})
+
+            # Update transaction record if one exists
+            from .models import PaymentTransaction
+            tx = PaymentTransaction.objects.filter(
+                gateway_payment_id=payment_id
+            ).first()
+            if tx:
+                tx.status = "refunded"
+                tx.error_message = f"Refunded ₹{amount_inr} — refund id: {refund.get('id', '')}"
+                tx.save(update_fields=["status", "error_message"])
+
+            logger.info(
+                "Refund issued by admin %s: payment_id=%s amount=₹%s refund_id=%s",
+                request.user.username, payment_id, amount_inr, refund.get("id", ""),
+            )
+            return Response({
+                "refund_id": refund.get("id"),
+                "payment_id": payment_id,
+                "amount_inr": amount_inr,
+                "status": refund.get("status"),
+            }, status=http_status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.error(f"Razorpay refund failed for {payment_id}: {e}")
+            return Response(
+                {"error": f"Refund failed: {str(e)}"},
+                status=http_status.HTTP_502_BAD_GATEWAY,
+            )

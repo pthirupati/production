@@ -327,8 +327,16 @@ class RazorpayWebhookView(APIView):
             payload = request.body
             signature = request.META.get("HTTP_X_RAZORPAY_SIGNATURE", "")
 
-            # Verify webhook signature
-            if not self._verify_webhook_signature(payload, signature):
+            # Verify webhook signature.
+            # _verify_webhook_signature returns:
+            #   None  → webhook secret not configured (log + return 200 to stop retries)
+            #   False → signature present but invalid (reject with 401)
+            #   True  → valid
+            sig_result = self._verify_webhook_signature(payload, signature)
+            if sig_result is None:
+                # Secret not configured — acknowledge to stop Razorpay retry loop
+                return Response({"status": "webhook_secret_not_configured"}, status=http_status.HTTP_200_OK)
+            if not sig_result:
                 logger.warning("Invalid Razorpay webhook signature")
                 return Response(
                     {"error": "Invalid signature"},
@@ -370,10 +378,21 @@ class RazorpayWebhookView(APIView):
             )
 
     def _verify_webhook_signature(self, payload, signature):
-        """Verify Razorpay webhook signature."""
-        secret = getattr(settings, "RAZORPAY_WEBHOOK_SECRET", "") or settings.RAZORPAY_KEY_SECRET
+        """Verify Razorpay webhook signature using RAZORPAY_WEBHOOK_SECRET.
+
+        IMPORTANT: The webhook secret is separate from RAZORPAY_KEY_SECRET.
+        Do NOT fall back to the key secret — they are different credentials.
+        If the webhook secret is not configured, return None so the caller
+        can return HTTP 200 (to stop Razorpay retries) while logging the error.
+        """
+        secret = getattr(settings, "RAZORPAY_WEBHOOK_SECRET", "")
         if not secret:
-            return False
+            logger.error(
+                "RAZORPAY_WEBHOOK_SECRET is not configured — webhook signature "
+                "cannot be verified. Set the env var to the secret configured "
+                "in the Razorpay dashboard."
+            )
+            return None  # None signals 'unconfigured', distinct from False ('bad sig')
 
         expected_sig = hmac.new(
             secret.encode(),
@@ -405,7 +424,9 @@ class RazorpayWebhookView(APIView):
         try:
             payment_data = event.get("payload", {}).get("payment", {}).get("entity", {})
             order_id = payment_data.get("order_id", "")
-            reason = payment_data.get("vpa", "") or "Payment declined"
+            # error_description is the correct Razorpay field for failure reason
+            error_obj = payment_data.get("error_description", "")
+            reason = error_obj or payment_data.get("description", "") or "Payment declined"
 
             transaction = PaymentTransaction.objects.filter(
                 gateway_order_id=order_id

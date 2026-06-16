@@ -19,6 +19,8 @@ urlpatterns = [
     path("gateway-status/", views.PaymentGatewayStatusView.as_view(), name="gateway_status"),
     path("razorpay/order/", views.CreateRazorpayOrderView.as_view(), name="razorpay_create_order"),
     path("razorpay/verify/", views.VerifyRazorpayPaymentView.as_view(), name="razorpay_verify"),
+    # Admin-only refund endpoint
+    path("razorpay/refund/", views.RazorpayRefundView.as_view(), name="razorpay_refund"),
     path("coupon/validate/", views.ValidateCouponView.as_view(), name="coupon_validate"),
     path("confirm-payment/", views.ConfirmPaymentView.as_view(), name="confirm_payment"),
     path("subscribe/technology/", views.TechnologySubscribeView.as_view(), name="tech_subscribe"),

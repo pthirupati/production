@@ -98,6 +98,7 @@ def fulfill_technology_subscription(
             "amount": amount,
             "is_active": False,
             "payment_verified": False,
+            "payment_method": "razorpay",
         },
     )
     if not created and sub.is_active and sub.payment_verified:
@@ -111,6 +112,10 @@ def fulfill_technology_subscription(
     if not sub.subscription_id:
         sub.subscription_id = sub_id
     sub.amount = amount
+    # Ensure payment_method is set when activating via Razorpay
+    if not sub.payment_method:
+        sub.payment_method = "razorpay"
+        sub.save(update_fields=["payment_method"])
     activate_technology_subscription(sub, renew=True)
 
     if coupon_applied:
@@ -128,6 +133,17 @@ def fulfill_technology_subscription(
             create_invoice_for_transaction(transaction)
         except Exception as exc:
             logger.warning("Invoice creation failed for tx %s: %s", transaction.id, exc)
+            try:
+                from .tasks import retry_invoice_creation
+                retry_invoice_creation.apply_async(
+                    args=[str(transaction.id)],
+                    countdown=60,
+                )
+            except Exception as task_err:
+                logger.error(
+                    "Could not queue invoice retry for tx %s: %s",
+                    transaction.id, task_err,
+                )
 
     send_technology_subscription_emails(user, technology, sub.subscription_id, amount)
     return sub, True
@@ -233,6 +249,17 @@ def fulfill_interview_plan_payment(
             create_invoice_for_transaction(transaction)
         except Exception as exc:
             logger.warning("Interview invoice failed for tx %s: %s", transaction.id, exc)
+            try:
+                from .tasks import retry_invoice_creation
+                retry_invoice_creation.apply_async(
+                    args=[str(transaction.id)],
+                    countdown=60,
+                )
+            except Exception as task_err:
+                logger.error(
+                    "Could not queue invoice retry for tx %s: %s",
+                    transaction.id, task_err,
+                )
 
     send_interview_subscription_email(user, tier, ent)
     return ent, True

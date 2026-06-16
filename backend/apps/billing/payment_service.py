@@ -10,8 +10,6 @@ Handles:
 """
 
 import logging
-import hashlib
-import hmac
 from decimal import Decimal
 from django.conf import settings
 from django.utils import timezone
@@ -130,58 +128,78 @@ class PaymentService:
             raise PaymentServiceException("Razorpay is not configured")
 
         try:
-            message = f"{order_id}|{payment_id}"
-            expected_signature = hmac.new(
-                settings.RAZORPAY_KEY_SECRET.encode("utf-8"),
-                message.encode("utf-8"),
-                hashlib.sha256,
-            ).hexdigest()
-
-            if not hmac.compare_digest(signature, expected_signature):
-                logger.error(f"Invalid Razorpay signature for payment {payment_id}")
-                return False, "Invalid payment signature"
-
-            # Get transaction
-            try:
-                transaction = PaymentTransaction.objects.get(
-                    gateway_order_id=order_id,
-                    user=self.user
-                )
-            except PaymentTransaction.DoesNotExist:
-                logger.error(f"Transaction not found for order {order_id}")
-                return False, "Transaction not found"
-
-            # Fetch payment details from Razorpay
+            # Use Razorpay client utility for signature verification to avoid
+            # any manual HMAC implementation bugs.
             client = razorpay.Client(
                 auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
             )
-            payment = client.payment.fetch(payment_id)
+            try:
+                client.utility.verify_payment_signature({
+                    "razorpay_order_id": order_id,
+                    "razorpay_payment_id": payment_id,
+                    "razorpay_signature": signature,
+                })
+            except razorpay.errors.SignatureVerificationError:
+                logger.error(f"Invalid Razorpay signature for payment {payment_id}")
+                return False, "Invalid payment signature"
 
-            # Validate payment amount and currency
-            if payment["amount"] != int(transaction.amount * 100):
-                logger.error(f"Amount mismatch for payment {payment_id}")
-                return False, "Amount mismatch"
+            # Get transaction with select_for_update to prevent race conditions
+            # between concurrent verify calls for the same order.
+            from django.db import transaction as db_transaction
+            with db_transaction.atomic():
+                try:
+                    transaction = PaymentTransaction.objects.select_for_update(
+                        nowait=False
+                    ).get(
+                        gateway_order_id=order_id,
+                        user=self.user
+                    )
+                except PaymentTransaction.DoesNotExist:
+                    logger.error(f"Transaction not found for order {order_id}")
+                    return False, "Transaction not found"
 
-            if payment["currency"] != transaction.currency:
-                logger.error(f"Currency mismatch for payment {payment_id}")
-                return False, "Currency mismatch"
+                # Idempotency: if already verified, skip re-activation
+                if transaction.status == "success":
+                    logger.info(f"Payment {payment_id} already verified for tx {transaction.id}")
+                    return True, "Payment already verified"
 
-            if payment["status"] != "captured":
-                logger.warning(f"Payment not captured: {payment['status']}")
-                return False, f"Payment status: {payment['status']}"
+                # Fetch payment details from Razorpay — must succeed; do not
+                # fall through silently if the fetch raises.
+                try:
+                    payment = client.payment.fetch(payment_id)
+                except Exception as fetch_err:
+                    logger.error(f"Razorpay payment.fetch failed for {payment_id}: {fetch_err}")
+                    raise PaymentServiceException(
+                        f"Could not retrieve payment details from Razorpay: {fetch_err}"
+                    )
 
-            # Mark transaction as successful
-            transaction.mark_success(
-                gateway_payment_id=payment_id,
-                gateway_response=payment
-            )
+                # Validate payment amount and currency
+                if payment.get("amount") != int(transaction.amount * 100):
+                    logger.error(f"Amount mismatch for payment {payment_id}")
+                    return False, "Amount mismatch"
 
-            # CRITICAL: Activate subscription ONLY after verification
-            self._activate_subscription(transaction)
+                if payment.get("currency") != transaction.currency:
+                    logger.error(f"Currency mismatch for payment {payment_id}")
+                    return False, "Currency mismatch"
+
+                if payment.get("status") != "captured":
+                    logger.warning(f"Payment not captured: {payment.get('status')}")
+                    return False, f"Payment status: {payment.get('status')}"
+
+                # Mark transaction as successful
+                transaction.mark_success(
+                    gateway_payment_id=payment_id,
+                    gateway_response=payment
+                )
+
+                # CRITICAL: Activate subscription ONLY after verification
+                self._activate_subscription(transaction)
 
             logger.info(f"Payment verified successfully for transaction {transaction.id}")
             return True, "Payment verified"
 
+        except PaymentServiceException:
+            raise
         except Exception as e:
             logger.error(f"Razorpay verification failed: {e}")
             raise PaymentServiceException(f"Verification failed: {str(e)}")
@@ -286,6 +304,21 @@ class PaymentService:
             create_invoice_for_transaction(transaction)
         except Exception as e:
             logger.warning(f"Invoice creation failed for tx {transaction.id}: {e}")
+            # Queue a Celery retry so the user always receives a receipt.
+            try:
+                from .tasks import retry_invoice_creation
+                retry_invoice_creation.apply_async(
+                    args=[str(transaction.id)],
+                    countdown=60,  # retry after 60 seconds
+                )
+                logger.info(
+                    "Queued invoice retry for tx %s", transaction.id
+                )
+            except Exception as task_err:
+                logger.error(
+                    "Could not queue invoice retry for tx %s: %s",
+                    transaction.id, task_err,
+                )
 
     def check_gateway_configured(self):
         """Check if any payment gateway is configured."""

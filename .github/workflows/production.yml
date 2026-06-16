@@ -3,8 +3,28 @@
 # GitHub → Actions → FixitLab Production → Run workflow
 #
 #   launch + create_server  →  new DO droplet, secrets, DNS, tests, deploy, verify
-#   launch / deploy         →  tests, deploy, health + E2E verify (in deploy job)
+#   launch / deploy         →  parallel tests → deploy → parallel verify/e2e → cleanup → summary
 #   stop                    →  stop containers (database volume preserved)
+#
+# Parallel architecture:
+#   create-server [optional]
+#       ↓
+#   test-frontend  ←── parallel ──→  test-backend
+#       ↓                                 ↓
+#             deploy (git pull + start + build images)
+#                         ↓
+#   ┌──────────────────────────────────────────────────────────┐
+#   │ All run PARALLEL after deploy succeeds:                  │
+#   │  verify-health  (docker ps, container health, /health)   │
+#   │  test-units     (Django unit tests in backend container) │
+#   │  e2e-labs       (all-scenarios lab provisioning test)    │
+#   │  e2e-api        (internal + external API E2E)            │
+#   │  e2e-interviews (interview studio E2E)                   │
+#   └──────────────────────────────────────────────────────────┘
+#                         ↓
+#   cleanup [if: always() — runs even if parallel jobs fail]
+#                         ↓
+#   summary [if: always() — collects all job results]
 
 name: FixitLab Production
 
@@ -52,6 +72,9 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ─────────────────────────────────────────────────────────────
+  # STOP — separate job, only for action == 'stop'
+  # ─────────────────────────────────────────────────────────────
   stop:
     name: Stop platform
     if: inputs.action == 'stop'
@@ -77,6 +100,9 @@ jobs:
 
       - run: echo "Platform stopped. Database volume fixitlab_db_data is preserved." >> "$GITHUB_STEP_SUMMARY"
 
+  # ─────────────────────────────────────────────────────────────
+  # CREATE-SERVER — optional, launch + create_server only
+  # ─────────────────────────────────────────────────────────────
   create-server:
     name: Create server
     if: inputs.action == 'launch' && inputs.create_server
@@ -137,6 +163,33 @@ jobs:
           git diff --cached --quiet || git commit -m "ci: production droplet ${{ steps.droplet.outputs.public_ip }}"
           git push origin HEAD:main || true
 
+  # ─────────────────────────────────────────────────────────────
+  # TEST-FRONTEND — parallel with test-backend
+  # ─────────────────────────────────────────────────────────────
+  test-frontend:
+    name: Test frontend
+    needs: [create-server]
+    if: |
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      inputs.run_tests &&
+      always() &&
+      (needs.create-server.result == 'skipped' || needs.create-server.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install and build
+        run: npm ci && npm run build
+        working-directory: frontend
+
+  # ─────────────────────────────────────────────────────────────
+  # TEST-BACKEND — parallel with test-frontend
+  # ─────────────────────────────────────────────────────────────
   test-backend:
     name: Test backend
     needs: [create-server]
@@ -172,7 +225,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r backend/requirements.txt
-      - working-directory: backend
+      - name: Migrate and test
+        working-directory: backend
         env:
           DJANGO_SETTINGS_MODULE: config.test_settings
           JIRA_SIMULATION_MODE: "False"
@@ -180,26 +234,9 @@ jobs:
           python manage.py migrate --run-syncdb
           python manage.py test tests --verbosity=2
 
-  test-frontend:
-    name: Test frontend
-    needs: [create-server]
-    if: |
-      (inputs.action == 'launch' || inputs.action == 'deploy') &&
-      inputs.run_tests &&
-      always() &&
-      (needs.create-server.result == 'skipped' || needs.create-server.result == 'success')
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci && npm run build
-        working-directory: frontend
-
+  # ─────────────────────────────────────────────────────────────
+  # DEPLOY — git pull + start platform + build scenario images
+  # ─────────────────────────────────────────────────────────────
   deploy:
     name: Deploy and start application
     needs: [create-server, test-backend, test-frontend]
@@ -210,7 +247,7 @@ jobs:
       (needs.test-backend.result == 'skipped' || needs.test-backend.result == 'success') &&
       (needs.test-frontend.result == 'skipped' || needs.test-frontend.result == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 55
     environment: production
     outputs:
       prod_host: ${{ steps.host.outputs.host }}
@@ -226,7 +263,7 @@ jobs:
           fi
           echo "host=$H" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy and start platform
+      - name: Pull and deploy
         uses: appleboy/ssh-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -241,7 +278,7 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           envs: GITHUB_TOKEN,PRODUCTION_ENV_B64,BUILD_SCENARIOS,VAULT_ENABLED,VAULT_UNSEAL_KEY,VAULT_ROLE_ID,VAULT_SECRET_ID
-          command_timeout: 120m
+          command_timeout: 50m
           script: |
             set -e
             REPO="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
@@ -260,64 +297,239 @@ jobs:
             export BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
             ./scripts/ci-remote-platform.sh deploy
 
-      - name: Quick public health (GitHub runner)
-        if: inputs.action == 'launch' || inputs.action == 'deploy'
+      - name: Quick public health
         run: |
           HOST="${{ steps.host.outputs.host }}"
           echo "Checking http://${HOST}/health ..."
           for i in $(seq 1 20); do
             if curl -sf --max-time 10 -H "Host: fixitlab.in" "http://${HOST}/health" | grep -q ok; then
-              echo "Public health OK"
+              echo "Public health OK (attempt ${i})"
               exit 0
             fi
+            echo "Attempt ${i}/20 — retrying in 5s..."
             sleep 5
           done
-          echo "ERROR: Public health check failed on http://${HOST}/health"
+          echo "ERROR: Public health check failed after 20 attempts on http://${HOST}/health"
           exit 1
 
-      - name: Full server verification (images, labs, E2E)
-        if: inputs.action == 'launch' || inputs.action == 'deploy'
+  # ─────────────────────────────────────────────────────────────
+  # VERIFY-HEALTH — docker ps + container health + log snapshot
+  # Runs in parallel with test-units, e2e-* after deploy
+  # ─────────────────────────────────────────────────────────────
+  verify-health:
+    name: Verify container health
+    needs: [deploy]
+    if: |
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Check container health and collect logs
         uses: appleboy/ssh-action@v1
-        env:
-          RUN_E2E: ${{ inputs.run_e2e }}
-          VAULT_ENABLED: ${{ secrets.VAULT_ENABLED }}
-          VAULT_UNSEAL_KEY: ${{ secrets.VAULT_UNSEAL_KEY }}
-          VAULT_ROLE_ID: ${{ secrets.VAULT_ROLE_ID }}
-          VAULT_SECRET_ID: ${{ secrets.VAULT_SECRET_ID }}
         with:
-          host: ${{ steps.host.outputs.host }}
+          host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          envs: RUN_E2E,VAULT_ENABLED,VAULT_UNSEAL_KEY,VAULT_ROLE_ID,VAULT_SECRET_ID
-          command_timeout: 120m
+          command_timeout: 10m
           script: |
             set -e
             cd /opt/fixitlab
-            chmod +x scripts/ci-post-deploy-verify.sh scripts/run-full-e2e.sh \
-              scripts/validate-scenario-images.sh scripts/validate-scenario-labs.py \
-              scripts/cleanup-test-data.py 2>/dev/null || true
-            export RUN_E2E="${RUN_E2E:-true}"
-            ./scripts/ci-post-deploy-verify.sh
 
-      - name: Cleanup E2E test data (always)
-        if: always() && (inputs.action == 'launch' || inputs.action == 'deploy')
+            echo "=== Container status ==="
+            docker compose -f docker-compose.prod.yml --env-file .env.production ps
+
+            echo ""
+            echo "=== Checking for unhealthy containers ==="
+            UNHEALTHY=$(docker compose -f docker-compose.prod.yml --env-file .env.production ps \
+              | grep -i 'unhealthy' || true)
+
+            if [ -n "$UNHEALTHY" ]; then
+              echo "ERROR: Unhealthy containers detected:"
+              echo "$UNHEALTHY"
+              exit 1
+            fi
+            echo "All containers healthy."
+
+            echo ""
+            echo "=== Last 100 log lines per service ==="
+            for SVC in backend gateway celery_worker celery_beat celery_provisioning; do
+              echo "--- ${SVC} ---"
+              docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=100 "$SVC" 2>/dev/null || true
+              echo ""
+            done
+
+      - name: Write health summary
+        if: always()
+        run: |
+          {
+            echo "## verify-health"
+            echo "Container health check and log snapshot completed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ─────────────────────────────────────────────────────────────
+  # TEST-UNITS — Django unit tests inside the running container
+  # ─────────────────────────────────────────────────────────────
+  test-units:
+    name: Unit tests (production container)
+    needs: [deploy]
+    if: |
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Run Django unit tests
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ steps.host.outputs.host }}
+          host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           command_timeout: 15m
           script: |
+            set -e
             cd /opt/fixitlab
-            if [ "${E2E_SKIP_CLEANUP:-0}" = "1" ]; then
-              echo "Cleanup skipped (E2E_SKIP_CLEANUP=1)"
-              exit 0
-            fi
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
-              python /scripts/cleanup-test-data.py || true
+              python manage.py test \
+                tests.test_jira_webhooks \
+                tests.test_api_security \
+                tests.test_billing_webhooks \
+                --settings=config.test_settings \
+                --verbosity=2
 
-      - name: Summary
-        if: always() && (inputs.action == 'launch' || inputs.action == 'deploy')
+  # ─────────────────────────────────────────────────────────────
+  # E2E-LABS — all-scenarios lab provisioning test
+  # ─────────────────────────────────────────────────────────────
+  e2e-labs:
+    name: E2E — lab provisioning (all scenarios)
+    needs: [deploy]
+    if: |
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      inputs.run_e2e &&
+      needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    steps:
+      - name: Run all-scenarios lab E2E
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 40m
+          script: |
+            set -e
+            cd /opt/fixitlab
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              env E2E_SKIP_LAB=0 E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 TERMINAL_MAX_WS_PER_USER=64 \
+              python /scripts/e2e_all_scenarios_labs.py
+
+  # ─────────────────────────────────────────────────────────────
+  # E2E-API — internal (bypass nginx) + external (through gateway)
+  # ─────────────────────────────────────────────────────────────
+  e2e-api:
+    name: E2E — API (internal + external)
+    needs: [deploy]
+    if: |
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      inputs.run_e2e &&
+      needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - name: Internal API E2E (bypass nginx)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 20m
+          script: |
+            set -e
+            cd /opt/fixitlab
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              env E2E_SKIP_LAB=0 RUN_FULL_E2E=1 E2E_SKIP_DUPLICATE_LABS=1 E2E_SKIP_CLEANUP=1 \
+              python /scripts/e2e_production_test.py
+
+      - name: External API E2E (through gateway)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 20m
+          script: |
+            set -e
+            cd /opt/fixitlab
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              env BASE_URL=https://fixitlab.in E2E_SKIP_LAB=0 RUN_FULL_E2E=1 \
+              python /scripts/e2e_production_test.py
+
+  # ─────────────────────────────────────────────────────────────
+  # E2E-INTERVIEWS — interview studio E2E
+  # ─────────────────────────────────────────────────────────────
+  e2e-interviews:
+    name: E2E — interview studio
+    needs: [deploy]
+    if: |
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      inputs.run_e2e &&
+      needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Run interview studio E2E
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            set -e
+            cd /opt/fixitlab
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              python /scripts/e2e_interviews.py
+
+  # ─────────────────────────────────────────────────────────────
+  # CLEANUP — always runs after all post-deploy jobs finish
+  # ─────────────────────────────────────────────────────────────
+  cleanup:
+    name: Cleanup E2E test data
+    needs: [deploy, verify-health, test-units, e2e-labs, e2e-api, e2e-interviews]
+    if: always() && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Remove E2E test users and data
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            cd /opt/fixitlab
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              python /scripts/cleanup-test-data.py || echo "WARN: cleanup completed with warnings"
+
+  # ─────────────────────────────────────────────────────────────
+  # SUMMARY — collects all job results
+  # ─────────────────────────────────────────────────────────────
+  summary:
+    name: Pipeline summary
+    needs: [deploy, verify-health, test-units, e2e-labs, e2e-api, e2e-interviews, cleanup]
+    if: always() && (inputs.action == 'launch' || inputs.action == 'deploy')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Write pipeline summary
         run: |
           {
             echo "## FixitLab Production — complete"
@@ -325,9 +537,21 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| Action | \`${{ inputs.action }}\` |"
-            echo "| Host | \`${{ steps.host.outputs.host }}\` |"
+            echo "| Host | \`${{ secrets.PROD_HOST }}\` |"
             echo "| Branch | \`${{ inputs.git_ref }}\` |"
             echo "| Build scenarios | \`${{ inputs.build_scenarios }}\` |"
             echo "| E2E verify | \`${{ inputs.run_e2e }}\` |"
             echo "| Site | https://fixitlab.in |"
+            echo ""
+            echo "## Job results"
+            echo ""
+            echo "| Job | Result |"
+            echo "|---|---|"
+            echo "| deploy | \`${{ needs.deploy.result }}\` |"
+            echo "| verify-health | \`${{ needs.verify-health.result }}\` |"
+            echo "| test-units | \`${{ needs.test-units.result }}\` |"
+            echo "| e2e-labs | \`${{ needs.e2e-labs.result }}\` |"
+            echo "| e2e-api | \`${{ needs.e2e-api.result }}\` |"
+            echo "| e2e-interviews | \`${{ needs.e2e-interviews.result }}\` |"
+            echo "| cleanup | \`${{ needs.cleanup.result }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
