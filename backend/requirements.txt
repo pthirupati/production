@@ -36,7 +36,7 @@ requests>=2.31
 # Resume parsing (optional PDF)
 pypdf>=4.0
 razorpay>=1.4
-stripe>=8.0,<14.0
+stripe>=15.2.1,<16.0
 
 # Monitoring & observability
 sentry-sdk[django]>=2.63.0
