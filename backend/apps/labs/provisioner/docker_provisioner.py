@@ -431,6 +431,9 @@ class DockerProvisioner:
                     privileged=False,
                 )
 
+            if os.environ.get("DOCKER_CONTAINER_DISK_LIMIT"):
+                run_kwargs["storage_opt"] = {"size": os.environ.get("DOCKER_CONTAINER_DISK_LIMIT")}
+
             container = self.client.containers.run(**run_kwargs)
 
             # Wait for container to be ready

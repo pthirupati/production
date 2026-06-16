@@ -203,7 +203,7 @@ function LabTerminal({
           const max1006Retries = isSim ? 4 : 3
           if (e.code === 1006 && reconnectAttempts.current < max1006Retries) {
             reconnectAttempts.current++
-            const delay = Math.min(1500 * reconnectAttempts.current, 5000)
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 30000)
             term.write('\r\n\x1b[1;33mConnection interrupted — retrying...\x1b[0m\r\n')
             reconnectTimerRef.current = setTimeout(connectWs, delay)
             return
@@ -219,7 +219,7 @@ function LabTerminal({
               bindEnterRetry('\r\n\x1b[1;31mConnection lost.\x1b[0m Press Enter to retry.\x1b[0m\r\n')
               return
             }
-            const delay = isCloud ? 3000 : isSim ? 1000 : 2000
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 30000)
             if (!isSim) {
               term.write(`\r\n\x1b[1;33mReconnecting in ${Math.round(delay / 1000)}s... (${reconnectAttempts.current}/${maxReconnectAttempts})\x1b[0m\r\n`)
             }

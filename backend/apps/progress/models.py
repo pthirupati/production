@@ -26,6 +26,11 @@ class UserScenarioProgress(models.Model):
 
     class Meta:
         unique_together = ("user", "scenario")
+        indexes = [
+            models.Index(fields=["user", "completed"]),
+            models.Index(fields=["scenario", "completed"]),
+            models.Index(fields=["completed", "best_score"]),
+        ]
 
     def __str__(self):
         return f"{self.user} - {self.scenario.slug}"

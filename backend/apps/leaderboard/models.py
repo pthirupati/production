@@ -24,6 +24,10 @@ class LeaderboardEntry(models.Model):
     class Meta:
         unique_together = ("user", "scenario")
         ordering = ["rank"]
+        indexes = [
+            models.Index(fields=["rank"]),
+            models.Index(fields=["scenario", "rank"]),
+        ]
 
     def __str__(self):
         return f"{self.user} - {self.score}"

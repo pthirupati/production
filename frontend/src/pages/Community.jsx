@@ -34,7 +34,13 @@ export default function Community() {
   const [loading, setLoading] = useState(true)
   const [showNewThread, setShowNewThread] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchInput, setSearchInput] = useState(searchQuery)
   const [techFilter, setTechFilter] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchInput), 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   // New thread form
   const [newTitle, setNewTitle] = useState('')
@@ -351,8 +357,8 @@ const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😂', '🚀', '👀
             type="text"
             placeholder="Search threads..."
             className="input-field pl-10 w-full"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
         <select

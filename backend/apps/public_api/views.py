@@ -208,7 +208,17 @@ class ScenariosListView(APIView):
                 )
             )
 
-        serializer = ScenarioListSerializer(qs, many=True)
+        # Pagination
+        from rest_framework.pagination import PageNumberPagination
+        paginator = PageNumberPagination()
+        paginator.page_size = int(request.query_params.get("page_size", 50))
+        paginator.page_size_query_param = "page_size"
+        paginator.max_page_size = 200
+        page = paginator.paginate_queryset(qs, request)
+        if page is None:
+            page = list(qs)
+
+        serializer = ScenarioListSerializer(page, many=True)
         data = serializer.data
 
         # Overlay user progress
@@ -227,7 +237,7 @@ class ScenariosListView(APIView):
         subscribed = _get_subscribed_tech_ids(request.user if request.user.is_authenticated else None)
         _mark_accessible(data, subscribed)
 
-        return Response(data)
+        return paginator.get_paginated_response(data)
 
 
 class ScenarioDetailView(APIView):
@@ -607,6 +617,53 @@ class StopLabView(APIView):
         })
 
 
+class RestartLabView(APIView):
+    """POST /api/labs/<session_id>/restart/ — restart a crashed/stuck lab container."""
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [LabStartThrottle]
+
+    def post(self, request, session_id):
+        session = get_object_or_404(
+            LabSession.objects.select_related("scenario"),
+            id=session_id,
+            user=request.user,
+        )
+
+        if session.status not in ("RUNNING", "FAILED"):
+            return Response(
+                {"error": f"Cannot restart a lab in '{session.status}' status. Stop the lab first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Terminate old container
+        try:
+            provisioner = DockerProvisioner()
+            provisioner.terminate(session)
+        except Exception as exc:
+            logger.warning("Restart: terminate old container failed (may already be gone): %s", exc)
+
+        # Re-provision
+        session.container_id = None
+        session.status = "PROVISIONING"
+        session.save(update_fields=["container_id", "status"])
+
+        try:
+            provisioner = DockerProvisioner()
+            provisioner.provision(session)
+            session.status = "RUNNING"
+            session.save(update_fields=["status"])
+        except Exception as exc:
+            session.status = "FAILED"
+            session.save(update_fields=["status"])
+            logger.error("Lab restart failed for session %s: %s", session_id, exc)
+            return Response(
+                {"error": "Lab restart failed. Please stop and start a new session."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response({"status": "restarted", "session_id": str(session.id)})
+
+
 class ValidateLabView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -917,33 +974,57 @@ class UserProgressView(APIView):
 
         total_scenarios = Scenario.objects.filter(is_active=True).count()
         completed = progress.filter(completed=True).count()
-        total_attempts = sum(p.attempts for p in progress)
+        total_attempts = progress.aggregate(total=Sum("attempts"))["total"] or 0
         avg_score = progress.filter(completed=True).aggregate(avg=Avg("best_score"))["avg"] or 0
 
-        # Per-technology progress
+        # Per-technology progress — single annotated query instead of N+1 loop
+        from django.db.models import Count, Sum, Avg, Q as DjQ
+        techs_qs = Technology.objects.filter(is_active=True).annotate(
+            tech_total=Count(
+                "scenarios",
+                filter=DjQ(scenarios__is_active=True),
+                distinct=True,
+            ),
+        )
+        # Build completed count and avg_score per tech from already-loaded progress queryset
+        user_progress_by_tech: dict[int, list] = {}
+        for p in progress.filter(completed=True).select_related("scenario__technology"):
+            tid = p.scenario.technology_id
+            user_progress_by_tech.setdefault(tid, []).append(p.best_score)
+
         tech_progress = {}
-        for tech in Technology.objects.filter(is_active=True):
-            tech_total = Scenario.objects.filter(technology=tech, is_active=True).count()
-            tech_completed = progress.filter(scenario__technology=tech, completed=True).count()
-            tech_scores = list(
-                progress.filter(scenario__technology=tech, completed=True)
-                .values_list("best_score", flat=True)
-            )
+        for tech in techs_qs:
+            scores = user_progress_by_tech.get(tech.id, [])
             tech_progress[tech.name] = {
-                "total": tech_total,
-                "completed": tech_completed,
-                "avg_score": round(sum(tech_scores) / len(tech_scores), 1) if tech_scores else 0,
+                "total": tech.tech_total,
+                "completed": len(scores),
+                "avg_score": round(sum(scores) / len(scores), 1) if scores else 0,
                 "slug": tech.slug,
                 "icon": tech.icon,
                 "color": tech.color,
             }
 
-        # Per-difficulty progress
-        diff_progress = {}
-        for d in ["easy", "medium", "hard"]:
-            diff_total = Scenario.objects.filter(is_active=True, difficulty=d).count()
-            diff_completed = progress.filter(scenario__difficulty=d, completed=True).count()
-            diff_progress[d] = {"total": diff_total, "completed": diff_completed}
+        # Per-difficulty — two annotated aggregations instead of 6 queries
+        from django.db.models import Count as DjCount
+        diff_totals = {
+            row["difficulty"]: row["cnt"]
+            for row in Scenario.objects.filter(is_active=True)
+            .values("difficulty")
+            .annotate(cnt=DjCount("id"))
+        }
+        diff_done = {
+            row["scenario__difficulty"]: row["cnt"]
+            for row in progress.filter(completed=True)
+            .values("scenario__difficulty")
+            .annotate(cnt=DjCount("id"))
+        }
+        diff_progress = {
+            d: {
+                "total": diff_totals.get(d, 0),
+                "completed": diff_done.get(d, 0),
+            }
+            for d in ["easy", "medium", "hard"]
+        }
 
         # Achievements
         achievements = list(
@@ -1036,7 +1117,7 @@ class LeaderboardView(APIView):
                     "scenarios_completed": entry["scenarios_completed"],
                     "avg_time": round(entry["avg_time"] or 0),
                 })
-            cache.set(cache_key, cached_data, 60)  # 1 min
+            cache.set(cache_key, cached_data, 300)  # 5 min
 
         user_rank = None
         if request.user.is_authenticated:

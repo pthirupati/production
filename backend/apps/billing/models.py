@@ -81,6 +81,7 @@ class TechnologySubscription(models.Model):
         indexes = [
             models.Index(fields=["user", "is_active"]),
             models.Index(fields=["subscription_id"]),
+            models.Index(fields=["is_active", "expires_at"]),
         ]
 
     def __str__(self):

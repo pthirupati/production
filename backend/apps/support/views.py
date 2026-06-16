@@ -2,6 +2,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.throttles import StrictAnonRateThrottle
 from .service import generate_support_reply, support_bot_config
 
 
@@ -28,6 +29,7 @@ class SupportBotChatView(APIView):
     """POST /api/support/chat/ — message in, assistant reply out."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def post(self, request):
         config = support_bot_config()

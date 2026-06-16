@@ -202,8 +202,8 @@ class DemoActivateInterviewPlanView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        if not getattr(settings, "DEMO_PAYMENT_ENABLED", False) and not request.user.is_staff:
-            return Response({"error": "Demo activation disabled"}, status=403)
+        if not request.user.is_staff:
+            return Response({"error": "Admin access required"}, status=403)
         plan_code = (request.data.get("plan_code") or "pro").lower()
         tier = InterviewPlanTier.objects.filter(code=plan_code, is_active=True).first()
         if not tier:

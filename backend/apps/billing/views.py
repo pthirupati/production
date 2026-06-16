@@ -34,7 +34,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Q as models_Q
 from django.utils import timezone
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
@@ -167,6 +168,13 @@ class StripeWebhookView(APIView):
 
         event_type = event["type"]
         data = event["data"]["object"]
+
+        # Idempotency: skip duplicate webhook deliveries
+        from django.core.cache import cache as _cache
+        _idem_key = f"stripe_webhook_legacy:{event['id']}"
+        if not _cache.add(_idem_key, True, timeout=86400):
+            logger.info("Duplicate Stripe webhook (legacy) ignored: %s", event['id'])
+            return Response({"status": "duplicate"})
 
         logger.info(f"Stripe webhook received: {event_type}")
 
@@ -1017,16 +1025,10 @@ class UserTechSubscriptionsView(APIView):
 
 class SubscriptionLogsView(APIView):
     """Admin-only: Get all subscription logs with filters and currency conversion."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
 
     def get(self, request):
         from common.currency import get_price_in_currency, get_usd_to_inr_rate
-
-        if not request.user.is_staff:
-            return Response(
-                {"error": "Admin access required"},
-                status=http_status.HTTP_403_FORBIDDEN,
-            )
 
         # Filters
         tech_filter = request.query_params.get("technology", "").strip()
@@ -1448,13 +1450,14 @@ class InvoiceDownloadView(APIView):
         from .models import SubscriptionInvoice
         from .invoice_service import render_invoice_html
 
-        try:
-            invoice = SubscriptionInvoice.objects.select_related("user").get(pk=invoice_id)
-        except SubscriptionInvoice.DoesNotExist:
-            return Response({"error": "Invoice not found"}, status=http_status.HTTP_404_NOT_FOUND)
-
-        if invoice.user_id != request.user.id and not request.user.is_staff:
-            return Response({"error": "Forbidden"}, status=http_status.HTTP_403_FORBIDDEN)
+        if request.user.is_staff:
+            invoice = get_object_or_404(SubscriptionInvoice.objects.select_related("user"), pk=invoice_id)
+        else:
+            invoice = get_object_or_404(
+                SubscriptionInvoice.objects.select_related("user"),
+                pk=invoice_id,
+                user=request.user,
+            )
 
         html = render_invoice_html(invoice)
         filename = f"{invoice.invoice_number}.html"
@@ -1470,16 +1473,10 @@ class RazorpayRefundView(APIView):
     POST /api/billing/razorpay/refund/
     Body: { "payment_id": "pay_xxx", "amount": 499 }   (amount in INR)
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
     throttle_classes = [BillingRateThrottle]
 
     def post(self, request):
-        if not request.user.is_staff:
-            return Response(
-                {"error": "Admin access required"},
-                status=http_status.HTTP_403_FORBIDDEN,
-            )
-
         payment_id = (request.data.get("payment_id") or "").strip()
         amount_inr = request.data.get("amount")
 

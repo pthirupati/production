@@ -37,7 +37,7 @@ class InterviewExportTranscriptsView(APIView):
         ).order_by("-created_at")
 
         export = {
-            "user_id": request.user_id,
+            "user_id": request.user.id,
             "exported_at": __import__("django.utils.timezone", fromlist=["timezone"]).timezone.now().isoformat(),
             "campaigns": [],
         }

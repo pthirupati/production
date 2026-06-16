@@ -176,6 +176,10 @@ class Scenario(models.Model):
 
     class Meta:
         ordering = ["technology", "difficulty", "title"]
+        indexes = [
+            models.Index(fields=["is_active", "technology"]),
+            models.Index(fields=["is_active", "difficulty"]),
+        ]
 
     @property
     def completion_rate(self):

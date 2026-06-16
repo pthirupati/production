@@ -347,9 +347,21 @@ class RazorpayWebhookView(APIView):
             event_type = event.get("event", "")
             event_id = event.get("id") or event.get("event_id", "")
 
+            # Reject events older than 5 minutes to prevent replay attacks
+            import time as _time
+            event_ts = event.get("created_at")
+            if event_ts:
+                age_seconds = _time.time() - int(event_ts)
+                if age_seconds > 300:
+                    logger.warning(
+                        "Razorpay webhook too old (%ds), possible replay: %s",
+                        int(age_seconds), event_id,
+                    )
+                    return Response({"status": "stale_event"}, status=http_status.HTTP_200_OK)
+
             if event_id:
                 cache_key = f"razorpay_webhook:{event_id}"
-                if not cache.add(cache_key, True, timeout=60 * 60):
+                if not cache.add(cache_key, True, timeout=86400):
                     logger.info("Duplicate Razorpay webhook ignored: %s", event_id)
                     return Response({"status": "duplicate"})
 

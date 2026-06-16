@@ -308,11 +308,12 @@ CHANNEL_LAYERS = {
             "hosts": [
                 {
                     "address": (_channels_redis_host, _channels_redis_port),
+                    "db": 3,
                     **({"password": _channels_redis_password} if _channels_redis_password else {}),
                 }
-            ] if _channels_redis_password else [(_channels_redis_host, _channels_redis_port)],
-            "capacity": 1500,  # Max messages per channel before oldest dropped
-            "expiry": 60,  # Message expiry in seconds
+            ] if _channels_redis_password else [{"address": (_channels_redis_host, _channels_redis_port), "db": 3}],
+            "capacity": 1500,
+            "expiry": 60,
         },
     }
 }
@@ -341,6 +342,14 @@ CELERY_TASK_ROUTES = {
     "celery_app.tasks.cleanup_expired_labs": {"queue": "maintenance"},
     "celery_app.tasks.cleanup_orphaned_containers": {"queue": "maintenance"},
     "celery_app.tasks.recalculate_leaderboard": {"queue": "maintenance"},
+    "celery_app.tasks.cleanup_expired_otps": {"queue": "maintenance"},
+    "celery_app.tasks.cleanup_expired_tokens": {"queue": "maintenance"},
+    "celery_app.tasks.cleanup_old_notifications": {"queue": "maintenance"},
+    "celery_app.tasks.process_subscription_expiry": {"queue": "maintenance"},
+    "celery_app.tasks.send_marketing_nurture_emails": {"queue": "maintenance"},
+    "celery_app.tasks.process_inactive_accounts": {"queue": "maintenance"},
+    "billing.fail_stuck_payment_transactions": {"queue": "maintenance"},
+    "billing.retry_invoice_creation": {"queue": "default"},
     "apps.notifications.tasks.*": {"queue": "notifications"},
 }
 

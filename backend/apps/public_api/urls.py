@@ -10,6 +10,7 @@ from .views import (
     BookmarkView,
     StartLabView,
     StopLabView,
+    RestartLabView,
     ValidateLabView,
     ActiveLabsView,
     LabSessionStatusView,
@@ -48,6 +49,7 @@ urlpatterns = [
     # Labs
     path("labs/<int:scenario_id>/start/", StartLabView.as_view()),
     path("labs/<uuid:session_id>/stop/", StopLabView.as_view()),
+    path("labs/<uuid:session_id>/restart/", RestartLabView.as_view(), name="lab-restart"),
     path("labs/<uuid:session_id>/validate/", ValidateLabView.as_view()),
     path("labs/<uuid:session_id>/hints/", LabHintsView.as_view()),
     path("labs/<uuid:session_id>/ai-hint/", LabAiHintView.as_view()),

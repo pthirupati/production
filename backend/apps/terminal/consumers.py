@@ -13,6 +13,7 @@ import os
 import re
 import time
 import threading
+from collections import deque
 from channels.exceptions import StopConsumer
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
@@ -88,7 +89,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         self.provider_type = "docker"  # docker | aws_ec2 | digitalocean
         # Command history recording
         self._input_buffer = ""
-        self._recording_events = []
+        self._recording_events = deque(maxlen=5000)
         self._session_start_time = None
         self._tracked_user_id = None  # For per-user connection counting
         self._blocked_patterns = []
@@ -176,7 +177,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
         # Initialize recording
         self._session_start_time = time.time()
-        self._recording_events = []
+        self._recording_events = deque(maxlen=5000)
 
         # For cloud labs, show a connecting message since SSH may take a moment
         is_cloud = self.provider_type not in ("docker", "simulation")
@@ -704,8 +705,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         """Save the session recording for replay."""
         try:
             duration = time.time() - self._session_start_time if self._session_start_time else 0
-            # Limit recording to 5000 events to prevent huge DB entries
-            events = self._recording_events[:5000]
+            # deque is already capped at 5000 events; convert to list for serialization
+            events = list(self._recording_events)
             SessionRecording.objects.update_or_create(
                 session=self.lab_session,
                 defaults={

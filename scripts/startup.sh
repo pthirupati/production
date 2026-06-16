@@ -24,5 +24,13 @@ fi
 # Ensure argon2 password hasher is available (required for registration)
 python -c "import argon2" 2>/dev/null || pip install -q argon2-cffi
 
-echo "[startup] Starting Daphne on :8000"
-exec daphne -b 0.0.0.0 -p 8000 config.asgi:application
+WORKERS=${UVICORN_WORKERS:-4}
+echo "[startup] Starting uvicorn with ${WORKERS} workers on :8000"
+exec uvicorn config.asgi:application \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --workers "${WORKERS}" \
+  --loop uvloop \
+  --http h11 \
+  --timeout-keep-alive 75 \
+  --log-level warning
