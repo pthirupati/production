@@ -1007,11 +1007,10 @@ class UserProgressView(APIView):
         avg_score = progress.filter(completed=True).aggregate(avg=Avg("best_score"))["avg"] or 0
 
         # Per-technology progress — single annotated query instead of N+1 loop
-        from django.db.models import Count, Sum, Avg, Q as DjQ
         techs_qs = Technology.objects.filter(is_active=True).annotate(
             tech_total=Count(
                 "scenarios",
-                filter=DjQ(scenarios__is_active=True),
+                filter=Q(scenarios__is_active=True),
                 distinct=True,
             ),
         )
@@ -1034,18 +1033,17 @@ class UserProgressView(APIView):
             }
 
         # Per-difficulty — two annotated aggregations instead of 6 queries
-        from django.db.models import Count as DjCount
         diff_totals = {
             row["difficulty"]: row["cnt"]
             for row in Scenario.objects.filter(is_active=True)
             .values("difficulty")
-            .annotate(cnt=DjCount("id"))
+            .annotate(cnt=Count("id"))
         }
         diff_done = {
             row["scenario__difficulty"]: row["cnt"]
             for row in progress.filter(completed=True)
             .values("scenario__difficulty")
-            .annotate(cnt=DjCount("id"))
+            .annotate(cnt=Count("id"))
         }
         diff_progress = {
             d: {

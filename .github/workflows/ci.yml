@@ -4,6 +4,12 @@ name: CI Tests
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_email_tests:
+        description: "Skip email sending in tests (uncheck to test real email delivery)"
+        type: boolean
+        default: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -38,6 +44,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.test_settings
           JIRA_SIMULATION_MODE: "False"
+          SKIP_EMAIL_TESTS: ${{ inputs.skip_email_tests == 'false' && 'false' || 'true' }}
         run: |
           python manage.py migrate --run-syncdb
           python manage.py test tests --verbosity=1

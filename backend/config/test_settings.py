@@ -33,16 +33,31 @@ DEBUG = True
 
 # CI uses the Postgres service container (avoids flaky SQLite "database table is locked").
 if os.environ.get("GITHUB_ACTIONS") == "true":
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": "fixitlab_test",
-            "USER": "postgres",
-            "PASSWORD": "postgres",
-            "HOST": "127.0.0.1",
-            "PORT": "5432",
+    _db_url = os.environ.get("DATABASE_URL", "")
+    if _db_url:
+        from urllib.parse import urlparse as _urlparse
+        _u = _urlparse(_db_url)
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": _u.path.lstrip("/"),
+                "USER": _u.username or "postgres",
+                "PASSWORD": _u.password or "postgres",
+                "HOST": _u.hostname or "127.0.0.1",
+                "PORT": str(_u.port or 5432),
+            }
         }
-    }
+    else:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": "fixitlab_test",
+                "USER": "postgres",
+                "PASSWORD": "postgres",
+                "HOST": "127.0.0.1",
+                "PORT": "5432",
+            }
+        }
 else:
     DATABASES = {
         "default": {
