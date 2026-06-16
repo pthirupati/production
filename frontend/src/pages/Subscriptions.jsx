@@ -7,9 +7,12 @@ import {
   AlertTriangle, CheckCircle2, Clock, IndianRupee, Tag,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { SkeletonCard } from '../components/Skeleton'
+import PageHeader from '../components/PageHeader'
 
-function StatusBadge({ active, expired, label }) {
+function StatusBadge({ active, expired, subscribed, label }) {
+  if (subscribed) {
+    return <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Subscribed</span>
+  }
   if (expired) {
     return <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent-red/10 text-accent-red border border-accent-red/20">Expired</span>
   }
@@ -74,19 +77,15 @@ export default function Subscriptions() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <CreditCard className="text-accent-cyan" size={24} /> My Subscriptions
-          </h1>
-          <p className="text-sm text-surface-400 mt-1">
-            Technology access, interview plans, payment history, and invoices in one place.
-          </p>
-        </div>
-        <button type="button" onClick={load} className="btn-secondary text-sm flex items-center gap-2">
+      <PageHeader
+        title="My Subscriptions"
+        subtitle="Technology access, interview plans, payment history, and invoices in one place."
+        icon={CreditCard}
+      >
+        <button type="button" onClick={load} className="btn-secondary text-sm flex items-center gap-2 whitespace-nowrap">
           <RefreshCw size={14} /> Refresh
         </button>
-      </div>
+      </PageHeader>
 
       {/* Interview subscription */}
       <section className="glass-card p-6 border border-indigo-500/20">
@@ -100,7 +99,12 @@ export default function Subscriptions() {
               <p className="text-xs text-surface-500">1-year plan · interview attempts (full campaigns, not rounds)</p>
             </div>
           </div>
-          <StatusBadge active={interview?.is_active} expired={interview?.expired} />
+          <StatusBadge
+            active={interview?.is_active}
+            expired={interview?.expired}
+            subscribed={interview?.is_subscribed}
+            label={interview?.plan_code === 'free' ? 'Free access' : 'Active'}
+          />
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
@@ -168,7 +172,12 @@ export default function Subscriptions() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-medium text-white">{sub.technology}</p>
-                    <StatusBadge active={sub.is_active} expired={!sub.is_active && sub.expires_at} />
+                    <StatusBadge
+                      active={sub.is_active || sub.has_access}
+                      expired={sub.is_expired}
+                      subscribed={sub.is_active && sub.payment_verified}
+                      label={sub.in_grace_period ? 'Grace period' : 'Active'}
+                    />
                   </div>
                   <p className="text-xs text-surface-500 font-mono mt-0.5">{sub.subscription_id}</p>
                   <p className="text-xs text-surface-500 mt-1">

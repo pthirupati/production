@@ -582,6 +582,24 @@ export default function LabRunner() {
     }
   }, [session?.status, session?.provider, session?.container_id, session?.instance_id])
 
+  const sendSimCommand = useCallback((cmd, host) => {
+    const targetHost = host || terminalHost
+    const run = () => {
+      const term = terminalRefs.current[targetHost]
+      if (!term?.sendCommand?.(cmd)) {
+        toast.error('Terminal not ready — wait for connection')
+        return
+      }
+      toast.success(`Sent: ${cmd.split('\n')[0].slice(0, 42)}`, { duration: 2000 })
+    }
+    if (targetHost !== terminalHost) {
+      setTerminalHost(targetHost)
+      setTimeout(run, 450)
+    } else {
+      run()
+    }
+  }, [terminalHost])
+
   if (loading || provisioning) {
     const cloudSteps = [
       { label: 'Launching cloud server', done: provisioningStep >= 1 },
@@ -653,23 +671,6 @@ export default function LabRunner() {
   const dualHosts = useDualPane ? labHosts.slice(0, 2) : []
   const isSimulationLab = session?.provider === 'simulation' || scenario.lab_mode === 'simulation'
 
-  const sendSimCommand = useCallback((cmd, host) => {
-    const targetHost = host || terminalHost
-    const run = () => {
-      const term = terminalRefs.current[targetHost]
-      if (!term?.sendCommand?.(cmd)) {
-        toast.error('Terminal not ready — wait for connection')
-        return
-      }
-      toast.success(`Sent: ${cmd.split('\n')[0].slice(0, 42)}`, { duration: 2000 })
-    }
-    if (targetHost !== terminalHost) {
-      setTerminalHost(targetHost)
-      setTimeout(run, 450)
-    } else {
-      run()
-    }
-  }, [terminalHost])
   const remoteSshTargets = labHosts.filter(h => h.ip && h.name !== 'primary' && h.name !== 'ssh_client')
   const hasSshClient = labHosts.some(h => h.name === 'ssh_client')
   const openSshClient = (host) => {

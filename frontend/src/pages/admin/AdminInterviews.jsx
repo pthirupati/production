@@ -299,6 +299,30 @@ export default function AdminInterviews() {
             </label>
           ))}
           <p className="text-xs text-surface-500">Voice engine: browser (free Web Speech API)</p>
+          {voices.length > 0 && (
+            <label className="block text-xs text-surface-400">
+              Default interviewer voice
+              <select
+                value={voices.find(v => v.is_default)?.code || voices[0]?.code || ''}
+                onChange={async e => {
+                  const voice = voices.find(v => v.code === e.target.value)
+                  if (!voice) return
+                  try {
+                    await adminApi.updateInterviewVoice(voice.id, { ...voice, is_default: true })
+                    toast.success('Default voice updated')
+                    reload()
+                  } catch {
+                    toast.error('Could not update default voice')
+                  }
+                }}
+                className="input-field block mt-1 w-full max-w-xs text-xs"
+              >
+                {voices.filter(v => v.is_active).map(v => (
+                  <option key={v.id} value={v.code}>{v.label} ({v.region})</option>
+                ))}
+              </select>
+            </label>
+          )}
           <button type="button" onClick={saveSettings} disabled={saving} className="btn-primary text-sm">
             {saving ? 'Saving…' : 'Save settings'}
           </button>
@@ -307,6 +331,10 @@ export default function AdminInterviews() {
 
       {tab === 'pricing' && (
         <div className="space-y-4">
+          <p className="text-xs text-surface-500">Set INR prices and interview limits per plan tier.</p>
+          {tiers.length === 0 && (
+            <p className="text-sm text-amber-400">No tiers loaded — run seed_interview_data on the server.</p>
+          )}
           {tiers.map(tier => (
             <div key={tier.id} className="glass-card p-4 border border-surface-800">
               <div className="flex flex-wrap gap-3 items-end">
@@ -391,7 +419,7 @@ export default function AdminInterviews() {
       {tab === 'voices' && (
         <div className="space-y-2">
           <p className="text-xs text-surface-500 mb-2">
-            Browser voices — Indian, UK, US male/female. No paid TTS APIs.
+            Browser voices — Indian, UK, US male/female. Set default accent for new interviews.
           </p>
           {voices.map(v => (
             <div key={v.id} className="glass-card p-3 border border-surface-800 text-xs flex flex-wrap gap-3 items-center">
@@ -401,6 +429,40 @@ export default function AdminInterviews() {
               <span className="text-indigo-400 font-mono">{v.browser_voice_hint || 'auto'}</span>
               {v.is_default && <span className="text-emerald-400">default</span>}
               {!v.is_active && <span className="text-red-400">inactive</span>}
+              <div className="ml-auto flex gap-2">
+                {!v.is_default && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await adminApi.updateInterviewVoice(v.id, { ...v, is_default: true })
+                        toast.success(`${v.label} set as default`)
+                        reload()
+                      } catch {
+                        toast.error('Could not set default voice')
+                      }
+                    }}
+                    className="btn-secondary text-[10px] py-1 px-2"
+                  >
+                    Set default
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await adminApi.updateInterviewVoice(v.id, { ...v, is_active: !v.is_active })
+                      toast.success(v.is_active ? 'Voice disabled' : 'Voice enabled')
+                      reload()
+                    } catch {
+                      toast.error('Could not update voice')
+                    }
+                  }}
+                  className="btn-secondary text-[10px] py-1 px-2"
+                >
+                  {v.is_active ? 'Disable' : 'Enable'}
+                </button>
+              </div>
             </div>
           ))}
         </div>

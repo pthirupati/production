@@ -581,3 +581,30 @@ def send_marketing_nurture_emails():
     logger.info("Marketing nurture emails: %s", result)
     return result
 
+
+@shared_task
+def reset_jira_ticket_after_lab_close(session_id: str) -> dict:
+    """Clear simulated Jira comments/history and reopen ticket 2 min after lab ends."""
+    from apps.labs.models import LabSession
+    from apps.jira_integration.simulated import reset_ticket_to_open, use_simulated_jira
+    from apps.jira_integration.models import UserScenarioJiraTicket
+
+    session = LabSession.objects.filter(pk=session_id).select_related("user").first()
+    if not session or not session.jira_issue_key:
+        return {"skipped": "no_session"}
+    if session.status in ("RUNNING", "PROVISIONING"):
+        return {"skipped": "lab_active"}
+
+    ticket = UserScenarioJiraTicket.objects.filter(
+        user=session.user,
+        issue_key=session.jira_issue_key,
+    ).first()
+    if not ticket:
+        return {"skipped": "no_ticket"}
+
+    if use_simulated_jira():
+        reset_ticket_to_open(ticket)
+        logger.info("Jira ticket %s reset to open after lab %s closed", ticket.issue_key, session_id)
+        return {"reset": ticket.issue_key}
+    return {"skipped": "real_jira"}
+

@@ -11,6 +11,39 @@ from apps.interviews.services.interview_settings import ensure_staff_entitlement
 from apps.interviews.services.sample_interview import sample_available_for_user
 
 
+def ensure_interview_defaults() -> None:
+    """Lazy seed for plan tiers and platform settings when DB was not seeded yet."""
+    if InterviewPlanTier.objects.filter(code="free", is_active=True).exists():
+        return
+    try:
+        from apps.interviews.management.commands.seed_interview_data import DEFAULT_TIERS
+        from apps.interviews.models import InterviewPlatformSettings
+        from apps.interviews.services.voice_service import _default_voices
+        from apps.interviews.models import InterviewVoiceOption
+
+        for t in DEFAULT_TIERS:
+            InterviewPlanTier.objects.update_or_create(code=t["code"], defaults=t)
+        InterviewPlatformSettings.objects.get_or_create(pk=1)
+        for i, v in enumerate(_default_voices()):
+            InterviewVoiceOption.objects.update_or_create(
+                code=v["code"],
+                defaults={
+                    "label": v["label"],
+                    "locale": v["locale"],
+                    "gender": v["gender"],
+                    "region": v["region"],
+                    "browser_voice_hint": v["browser_voice_hint"],
+                    "pitch": v["pitch"],
+                    "rate": v["rate"],
+                    "is_default": v["is_default"],
+                    "is_active": True,
+                    "order": i,
+                },
+            )
+    except Exception:
+        pass
+
+
 def get_or_create_entitlement(user):
     ent, _ = InterviewEntitlement.objects.get_or_create(user=user)
     ensure_staff_entitlement(user)
@@ -32,6 +65,7 @@ def refresh_entitlement_status(ent: InterviewEntitlement) -> None:
 def user_has_interview_access(user) -> bool:
     if not user or not user.is_authenticated:
         return False
+    ensure_interview_defaults()
     platform = get_platform_settings()
     if not platform.enabled:
         return user.is_staff or user.is_superuser
@@ -41,7 +75,7 @@ def user_has_interview_access(user) -> bool:
     ent = InterviewEntitlement.objects.filter(user=user).first()
     if not ent:
         free = InterviewPlanTier.objects.filter(code="free", is_active=True).first()
-        return bool(free)
+        return bool(free) or platform.free_campaigns_per_month > 0
     refresh_entitlement_status(ent)
     if ent.is_admin_granted_free or ent.is_complimentary:
         return True
@@ -50,11 +84,14 @@ def user_has_interview_access(user) -> bool:
             return False
         return ent.interviews_remaining > 0
     free = InterviewPlanTier.objects.filter(code="free", is_active=True).first()
-    return bool(free)
+    if free:
+        return True
+    return platform.free_campaigns_per_month > 0
 
 
 def consume_interview_credit(user) -> bool:
     """Consume one interview attempt (full campaign), not per round."""
+    ensure_interview_defaults()
     ensure_staff_entitlement(user)
     if user.is_staff or user.is_superuser:
         return True
@@ -143,6 +180,13 @@ def get_entitlement_payload(user) -> dict:
         "uses_paid_apis": False,
         "voice_engine": platform.voice_engine,
         "renewal_required": expired or (remaining <= 0 and not unlimited and ent.plan_tier_id),
+        "is_subscribed": bool(
+            ent.plan_tier_id
+            and ent.plan_tier.code in ("pro", "premium")
+            and ent.is_active
+            and not expired
+            and not unlimited
+        ),
         "sample_available": sample_available_for_user(user),
         "sample_interview_used": ent.sample_interview_used,
         "sample_duration_minutes": get_platform_settings().sample_duration_minutes,

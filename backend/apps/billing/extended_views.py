@@ -40,6 +40,7 @@ def _interview_subscription_payload(user) -> dict:
         "period_end": ent.get("period_end"),
         "billing_period_days": ent.get("billing_period_days", 365),
         "max_rounds": tier.get("max_rounds"),
+        "is_subscribed": ent.get("is_subscribed", False),
     }
 
 

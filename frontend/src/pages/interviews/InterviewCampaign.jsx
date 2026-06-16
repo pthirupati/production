@@ -10,6 +10,9 @@ export default function InterviewCampaign() {
   const [campaign, setCampaign] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const [rescheduleRoundId, setRescheduleRoundId] = useState(null)
+  const [rescheduleAt, setRescheduleAt] = useState('')
+
   const load = () => {
     interviewsApi.getCampaign(campaignId)
       .then(setCampaign)
@@ -19,14 +22,26 @@ export default function InterviewCampaign() {
 
   useEffect(() => { load() }, [campaignId])
 
-  const scheduleRound = async (round) => {
+  const scheduleRound = async (round, at) => {
     try {
-      const dt = new Date(Date.now() + 3600000).toISOString()
+      const dt = at || new Date(Date.now() + 3600000).toISOString()
       await interviewsApi.scheduleRound(round.id, dt)
       toast.success('Round scheduled — check your email')
+      setRescheduleRoundId(null)
       load()
     } catch (e) {
       toast.error(e.response?.data?.error || 'Could not schedule')
+    }
+  }
+
+  const cancelCampaign = async () => {
+    if (!window.confirm('Cancel this entire interview campaign?')) return
+    try {
+      await interviewsApi.cancelCampaign(campaignId)
+      toast.success('Interview cancelled')
+      navigate('/interviews')
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Could not cancel')
     }
   }
 
@@ -45,6 +60,11 @@ export default function InterviewCampaign() {
         <p className="text-sm text-surface-400">
           {campaign.is_sample ? 'Free sample' : `${campaign.round_count} rounds`} · {campaign.experience_level}
         </p>
+        {!campaign.is_sample && campaign.status !== 'cancelled' && campaign.status !== 'completed' && (
+          <button type="button" onClick={cancelCampaign} className="text-xs text-red-400 hover:text-red-300 mt-2">
+            Cancel interview
+          </button>
+        )}
         {campaign.is_sample && (
           <p className="text-xs text-cyan-400 mt-2">
             One-time preview — start the room when ready. No scheduling needed.
@@ -104,12 +124,47 @@ export default function InterviewCampaign() {
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {canSchedule && round.status === 'schedulable' && !isSample && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => scheduleRound(round)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-surface-600 text-surface-300 hover:bg-surface-800"
+                    >
+                      <Calendar size={12} /> Schedule (+1h)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRescheduleRoundId(rescheduleRoundId === round.id ? null : round.id)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-surface-600 text-surface-300 hover:bg-surface-800"
+                    >
+                      <Calendar size={12} /> Pick time
+                    </button>
+                  </>
+                )}
+                {rescheduleRoundId === round.id && (
+                  <div className="w-full flex gap-2 items-center mt-2">
+                    <input
+                      type="datetime-local"
+                      value={rescheduleAt}
+                      onChange={e => setRescheduleAt(e.target.value)}
+                      className="input-field text-xs flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => scheduleRound(round, rescheduleAt ? new Date(rescheduleAt).toISOString() : null)}
+                      className="btn-primary text-xs"
+                    >
+                      Save
+                    </button>
+                  </div>
+                )}
+                {round.status === 'scheduled' && round.scheduled_at && !isSample && (
                   <button
                     type="button"
-                    onClick={() => scheduleRound(round)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-surface-600 text-surface-300 hover:bg-surface-800"
+                    onClick={() => setRescheduleRoundId(rescheduleRoundId === round.id ? null : round.id)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border border-amber-500/40 text-amber-300"
                   >
-                    <Calendar size={12} /> Schedule
+                    <Calendar size={12} /> Reschedule
                   </button>
                 )}
                 {canStart && !locked && (

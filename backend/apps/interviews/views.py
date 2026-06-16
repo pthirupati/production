@@ -37,7 +37,7 @@ from apps.interviews.services.entitlements import (
     user_has_interview_access,
 )
 from apps.interviews.services import engine
-from apps.interviews.services.resume_parser import extract_text_from_upload, parse_resume_text
+from apps.interviews.services.resume_parser import extract_text_from_upload, parse_resume_text, build_profile_from_inputs
 
 
 class InterviewPlansView(APIView):
@@ -85,6 +85,19 @@ class CandidateProfileView(APIView):
         ser.save()
         if profile.resume_file and not profile.resume_parsed:
             profile.resume_parsed = parse_resume_text(profile.resume_text)
+            profile.save(update_fields=["resume_parsed"])
+        elif not profile.resume_file and not (profile.resume_parsed or {}).get("has_resume"):
+            tech_name = ""
+            if profile.primary_technology_id:
+                tech_name = getattr(profile.primary_technology, "name", "") or ""
+            profile.resume_parsed = build_profile_from_inputs(
+                target_role=profile.target_role,
+                experience_level=profile.experience_level,
+                years_experience=profile.years_experience,
+                current_company=profile.current_company,
+                secondary_technologies=profile.secondary_technologies or [],
+                primary_technology_name=tech_name,
+            )
             profile.save(update_fields=["resume_parsed"])
         return Response(CandidateProfileSerializer(profile).data)
 
@@ -193,6 +206,25 @@ class InterviewCampaignDetailView(APIView):
             user=request.user,
         )
         return Response(InterviewCampaignDetailSerializer(campaign).data)
+
+    def delete(self, request, campaign_id):
+        campaign = get_object_or_404(InterviewCampaign, id=campaign_id, user=request.user)
+        if campaign.status in ("completed", "cancelled"):
+            return Response({"error": "Campaign already finished"}, status=400)
+        campaign.status = "cancelled"
+        campaign.save(update_fields=["status", "updated_at"])
+        campaign.rounds.exclude(status__in=("passed", "completed")).update(status="abandoned")
+        try:
+            from apps.notifications.tasks import send_notification_email
+            send_notification_email.delay(
+                subject=f"Interview cancelled — {campaign.title}",
+                to_email=request.user.email,
+                template="emails/interview_cancelled.html",
+                context={"campaign_title": campaign.title},
+            )
+        except Exception:
+            pass
+        return Response({"status": "cancelled", "id": str(campaign.id)})
 
 
 class InterviewRoundScheduleView(APIView):

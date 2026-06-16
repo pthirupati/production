@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import api from '../../api/client'
 import { Upload, ChevronRight, ChevronLeft, User, Briefcase } from 'lucide-react'
@@ -76,6 +76,10 @@ export default function InterviewSetup() {
   }
 
   const launch = async () => {
+    if (!form.target_role?.trim() && !form.primary_technology) {
+      toast.error('Add a target role or primary technology to personalize questions')
+      return
+    }
     if (!(await saveProfile())) return
     try {
       const campaign = await interviewsApi.createCampaign({
@@ -94,8 +98,11 @@ export default function InterviewSetup() {
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-white">Interview setup</h1>
-        <p className="text-sm text-surface-400 mt-1">We'll personalize questions from your resume and inputs.</p>
+        <Link to="/interviews" className="text-xs text-surface-500 hover:text-white">← Interview Studio</Link>
+        <h1 className="text-2xl font-bold text-white mt-2">Interview setup</h1>
+        <p className="text-sm text-surface-400 mt-1">
+          Resume is optional — we personalize from your career inputs and technology selections.
+        </p>
       </div>
 
       <div className="flex gap-2">
@@ -111,7 +118,7 @@ export default function InterviewSetup() {
         <div className="glass-card p-6 space-y-4 border border-surface-800">
           <label className="block">
             <span className="text-sm text-surface-300 flex items-center gap-2 mb-2">
-              <Upload size={16} /> Upload resume (PDF preferred)
+              <Upload size={16} /> Upload resume (optional — PDF preferred)
             </span>
             <input
               type="file"
@@ -121,7 +128,7 @@ export default function InterviewSetup() {
             />
           </label>
           <p className="text-xs text-surface-500">
-            We extract skills and experience to tailor technical and behavioral questions.{' '}
+            Without a resume we analyze your role, experience level, and technology picks to tailor questions.{' '}
             <a href="/privacy" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">Privacy policy</a>
           </p>
           {voices.length > 0 && (

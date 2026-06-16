@@ -93,6 +93,16 @@ def run_interview_e2e(s: Suite) -> None:
     st, ent = api("GET", "/api/interviews/entitlement/", token=user_token)
     s.record("GET user entitlement", st == 200, st)
 
+    st, grant = api("POST", "/api/admin/interviews/entitlements/", token=admin_token, data={
+        "email": user_email,
+        "grant_free": True,
+    })
+    s.record("Admin grant free interview", st == 200, st, err_msg(grant))
+
+    st, ent2 = api("GET", "/api/interviews/entitlement/", token=user_token)
+    free_ok = st == 200 and (ent2.get("is_admin_granted_free") or ent2.get("is_complimentary"))
+    s.record("User has admin-granted free", free_ok, st)
+
     st, camp = api("POST", "/api/interviews/campaigns/", token=user_token, data={"round_count": 3})
     s.record("POST create campaign", st in (200, 201), st, err_msg(camp))
 
@@ -105,16 +115,6 @@ def run_interview_e2e(s: Suite) -> None:
             round_id = rounds[0]["id"]
             st, _ = api("GET", f"/api/interviews/rounds/{round_id}/join-requests/", token=user_token)
             s.record("GET join-requests (candidate)", st == 200, st)
-
-    st, grant = api("POST", "/api/admin/interviews/entitlements/", token=admin_token, data={
-        "email": user_email,
-        "grant_free": True,
-    })
-    s.record("Admin grant free interview", st == 200, st, err_msg(grant))
-
-    st, ent2 = api("GET", "/api/interviews/entitlement/", token=user_token)
-    free_ok = st == 200 and (ent2.get("is_admin_granted_free") or ent2.get("is_complimentary"))
-    s.record("User has admin-granted free", free_ok, st)
 
 
 def main() -> int:

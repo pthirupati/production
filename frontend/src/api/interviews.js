@@ -31,6 +31,9 @@ export const interviewsApi = {
   createCampaign(payload) {
     return api.post('/interviews/campaigns/', payload).then(r => r.data)
   },
+  cancelCampaign(id) {
+    return api.delete(`/interviews/campaigns/${id}/`).then(r => r.data)
+  },
   getCampaign(id) {
     return api.get(`/interviews/campaigns/${id}/`).then(r => r.data)
   },

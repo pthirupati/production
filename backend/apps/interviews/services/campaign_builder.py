@@ -40,9 +40,15 @@ PERSONAS = {
 
 def create_campaign_rounds(campaign: InterviewCampaign) -> list[InterviewRound]:
     plan = ROUND_PLAN.get(campaign.round_count, ROUND_PLAN[3])
+    profile_voice = None
+    snap = campaign.profile_snapshot or {}
+    if isinstance(snap, dict):
+        profile_voice = snap.get("voice_id")
     rounds = []
     for idx, (rtype, duration, title) in enumerate(plan, start=1):
         persona, voice = PERSONAS.get(rtype, PERSONAS["technical"])
+        if profile_voice and profile_voice not in ("default", ""):
+            voice = profile_voice
         status = "schedulable" if idx == 1 else "locked"
         rounds.append(
             InterviewRound(

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import { adminApi } from '../../api/admin'
 import { useInterviewVoice } from '../../hooks/useInterviewVoice'
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Clock, MessageSquare, Terminal,
-  Volume2, Plus, ExternalLink, Loader2,
+  Volume2, Plus, ExternalLink, Loader2, ArrowLeft, Calendar, X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -33,8 +33,16 @@ export default function InterviewRoom() {
   const [joinRequests, setJoinRequests] = useState([])
   const [observerMode, setObserverMode] = useState(!!observerToken)
   const [consentAccepted, setConsentAccepted] = useState(false)
+  const [showReschedule, setShowReschedule] = useState(false)
+  const [rescheduleAt, setRescheduleAt] = useState('')
 
   const endsAt = round?.ends_at ? new Date(round.ends_at).getTime() : null
+
+  useEffect(() => {
+    if (!preflight && streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current
+    }
+  }, [preflight, started])
 
   useEffect(() => {
     if (observerToken) {
@@ -81,11 +89,44 @@ export default function InterviewRoom() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       streamRef.current = stream
-      if (videoRef.current) videoRef.current.srcObject = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play().catch(() => {})
+      }
       setMicOn(true)
       setCameraOn(true)
+    } catch (err) {
+      toast.error(err?.message || 'Allow camera and microphone to continue')
+    }
+  }
+
+  const cancelInterview = async () => {
+    if (!window.confirm('Cancel this interview round?')) return
+    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+    try {
+      if (round?.campaign_id) {
+        await interviewsApi.cancelCampaign(round.campaign_id)
+        toast.success('Interview cancelled — confirmation email sent')
+      }
     } catch {
-      toast.error('Allow camera and microphone to continue')
+      toast.error('Could not cancel interview')
+    }
+    navigate('/interviews')
+  }
+
+  const rescheduleRound = async () => {
+    if (!rescheduleAt) {
+      toast.error('Pick a date and time')
+      return
+    }
+    try {
+      await interviewsApi.scheduleRound(roundId, new Date(rescheduleAt).toISOString())
+      toast.success('Round rescheduled — check your email')
+      setShowReschedule(false)
+      const updated = await interviewsApi.getRound(roundId)
+      setRound(updated)
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Could not reschedule')
     }
   }
 
@@ -246,6 +287,14 @@ export default function InterviewRoom() {
   if (preflight) {
     return (
       <div className="max-w-lg mx-auto p-8 space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between gap-2">
+          <Link to={`/interviews/campaign/${round.campaign_id || ''}`} className="text-xs text-surface-500 hover:text-white inline-flex items-center gap-1">
+            <ArrowLeft size={14} /> Back
+          </Link>
+          <button type="button" onClick={cancelInterview} className="text-xs text-red-400 hover:text-red-300 inline-flex items-center gap-1">
+            <X size={14} /> Cancel
+          </button>
+        </div>
         <h1 className="text-xl font-bold text-white">Pre-interview check</h1>
         {round.is_sample && (
           <p className="text-xs text-cyan-400 font-medium">Free sample — {round.duration_minutes} minutes only</p>
@@ -286,7 +335,25 @@ export default function InterviewRoom() {
           <button type="button" onClick={enableMedia} className="btn-primary text-sm flex-1">
             Enable camera & mic
           </button>
+          {!round.is_sample && (
+            <button type="button" onClick={() => setShowReschedule(s => !s)} className="btn-secondary text-sm">
+              <Calendar size={14} className="inline mr-1" /> Reschedule
+            </button>
+          )}
         </div>
+        {showReschedule && (
+          <div className="flex gap-2 items-center">
+            <input
+              type="datetime-local"
+              value={rescheduleAt}
+              onChange={e => setRescheduleAt(e.target.value)}
+              className="input-field text-xs flex-1"
+            />
+            <button type="button" onClick={rescheduleRound} className="btn-secondary text-xs whitespace-nowrap">
+              Save
+            </button>
+          </div>
+        )}
         <button
           type="button"
           disabled={!micOn || !cameraOn || !consentAccepted}
@@ -301,25 +368,47 @@ export default function InterviewRoom() {
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-surface-950">
-      <header className="flex items-center justify-between px-4 py-2 border-b border-surface-800 bg-surface-900/80">
-        <div>
+      <header className="flex items-center justify-between px-4 py-2 border-b border-surface-800 bg-surface-900/80 gap-2 overflow-x-auto">
+        <div className="min-w-0 shrink">
+          <Link to={`/interviews/campaign/${round.campaign_id || ''}`} className="text-[10px] text-surface-500 hover:text-white inline-flex items-center gap-1">
+            <ArrowLeft size={12} /> Back
+          </Link>
           <p className="text-xs text-indigo-400">{round.persona_name}</p>
-          <p className="text-sm font-medium text-white">{round.title}</p>
+          <p className="text-sm font-medium text-white truncate">{round.title}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <span className="text-sm font-mono text-amber-400 flex items-center gap-1">
             <Clock size={14} /> {fmt(timeLeft)}
           </span>
           {!round.is_sample && (
-            <button type="button" onClick={extend} className="text-xs text-surface-400 hover:text-white flex items-center gap-1">
-              <Plus size={12} /> 10m
-            </button>
+            <>
+              <button type="button" onClick={() => setShowReschedule(s => !s)} className="text-xs text-surface-400 hover:text-white flex items-center gap-1">
+                <Calendar size={12} /> Reschedule
+              </button>
+              <button type="button" onClick={extend} className="text-xs text-surface-400 hover:text-white flex items-center gap-1">
+                <Plus size={12} /> 10m
+              </button>
+            </>
           )}
-          <button type="button" onClick={endInterview} className="p-2 rounded-lg bg-red-500/20 text-red-400">
+          <button type="button" onClick={cancelInterview} className="p-2 rounded-lg bg-surface-800 text-surface-400 hover:text-white" title="Cancel interview">
+            <X size={16} />
+          </button>
+          <button type="button" onClick={endInterview} className="p-2 rounded-lg bg-red-500/20 text-red-400" title="End round">
             <PhoneOff size={16} />
           </button>
         </div>
       </header>
+      {showReschedule && (
+        <div className="px-4 py-2 border-b border-surface-800 bg-surface-900/50 flex gap-2 items-center">
+          <input
+            type="datetime-local"
+            value={rescheduleAt}
+            onChange={e => setRescheduleAt(e.target.value)}
+            className="input-field text-xs flex-1 max-w-xs"
+          />
+          <button type="button" onClick={rescheduleRound} className="btn-secondary text-xs">Save schedule</button>
+        </div>
+      )}
 
       <div className="flex-1 grid lg:grid-cols-3 gap-0 min-h-0">
         <div className="lg:col-span-2 flex flex-col min-h-0 border-r border-surface-800">
@@ -330,7 +419,12 @@ export default function InterviewRoom() {
                 type="button"
                 onClick={() => {
                   const t = streamRef.current?.getAudioTracks()[0]
-                  if (t) { t.enabled = !t.enabled; setMicOn(t.enabled) }
+                  if (!t) {
+                    enableMedia()
+                    return
+                  }
+                  t.enabled = !t.enabled
+                  setMicOn(t.enabled)
                 }}
                 className={`p-2 rounded-full ${micOn ? 'bg-surface-800/90 text-white' : 'bg-red-500/90 text-white'}`}
               >
@@ -340,7 +434,12 @@ export default function InterviewRoom() {
                 type="button"
                 onClick={() => {
                   const t = streamRef.current?.getVideoTracks()[0]
-                  if (t) { t.enabled = !t.enabled; setCameraOn(t.enabled) }
+                  if (!t) {
+                    enableMedia()
+                    return
+                  }
+                  t.enabled = !t.enabled
+                  setCameraOn(t.enabled)
                 }}
                 className={`p-2 rounded-full ${cameraOn ? 'bg-surface-800/90 text-white' : 'bg-red-500/90 text-white'}`}
               >

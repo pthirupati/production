@@ -86,3 +86,32 @@ def parse_resume_text(text: str) -> dict:
         "word_count": len((text or "").split()),
         "has_resume": bool(text and len(text.strip()) > 50),
     }
+
+
+def build_profile_from_inputs(
+    *,
+    target_role: str = "",
+    experience_level: str = "mid",
+    years_experience: int = 0,
+    current_company: str = "",
+    secondary_technologies: list | None = None,
+    primary_technology_name: str = "",
+) -> dict:
+    """Build resume_parsed hints from form selections when no resume file is uploaded."""
+    skills = [s.lower() for s in (secondary_technologies or []) if s]
+    if primary_technology_name:
+        skills.insert(0, primary_technology_name.lower())
+    roles = [target_role.lower()] if target_role else []
+    if experience_level:
+        roles.append(f"{experience_level} engineer")
+    summary_parts = [p for p in [target_role, current_company, primary_technology_name] if p]
+    synthetic_text = " ".join(summary_parts + skills)
+    return {
+        "skills_detected": sorted(set(skills))[:30],
+        "years_experience_hint": years_experience or 0,
+        "companies_mentioned": [current_company] if current_company else [],
+        "roles_mentioned": roles[:5],
+        "word_count": len(synthetic_text.split()),
+        "has_resume": False,
+        "source": "form_inputs",
+    }

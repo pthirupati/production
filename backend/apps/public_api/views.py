@@ -589,6 +589,11 @@ class StopLabView(APIView):
 
         session.mark_terminated()
         sync_lab_stopped(session, reason="Lab stopped by user")
+        try:
+            from apps.jira_integration.simulated import schedule_jira_reset_after_lab_close
+            schedule_jira_reset_after_lab_close(session)
+        except Exception as e:
+            logger.warning(f"Jira reset schedule failed: {e}")
 
         # For cloud labs, return the provider so frontend can decide
         # whether to poll for full termination
@@ -663,6 +668,11 @@ class ValidateLabView(APIView):
                 session.save(update_fields=["validation_passed", "score", "status", "ended_at"])
 
                 sync_lab_completed(session, score=score, time_taken=int(elapsed))
+                try:
+                    from apps.jira_integration.simulated import schedule_jira_reset_after_lab_close
+                    schedule_jira_reset_after_lab_close(session)
+                except Exception as e:
+                    logger.warning(f"Jira reset schedule failed: {e}")
 
                 from apps.jira_integration.helpers import is_jira_closed
                 from apps.jira_integration.models import UserScenarioJiraTicket

@@ -115,6 +115,29 @@ def _clear_ticket_history(ticket: UserScenarioJiraTicket) -> None:
     JiraTicketLog.objects.filter(issue_key=ticket.issue_key).delete()
 
 
+def reset_ticket_to_open(ticket: UserScenarioJiraTicket) -> None:
+    """Clear Jira history and set ticket back to open (To Do) after lab ends."""
+    _clear_ticket_history(ticket)
+    ticket.jira_status = "To Do"
+    ticket.last_session = None
+    ticket.save(update_fields=["jira_status", "last_session", "updated_at"])
+
+
+def schedule_jira_reset_after_lab_close(session) -> None:
+    """Schedule comment/history clear + open status 2 minutes after lab close."""
+    if not session or not session.jira_issue_key:
+        return
+    try:
+        from celery_app.tasks import reset_jira_ticket_after_lab_close
+
+        reset_jira_ticket_after_lab_close.apply_async(
+            args=[str(session.id)],
+            countdown=120,
+        )
+    except Exception as exc:
+        logger.warning("Could not schedule Jira reset for session %s: %s", session.id, exc)
+
+
 def sync_lab_started(session) -> dict:
     scenario = session.scenario
     user = session.user
