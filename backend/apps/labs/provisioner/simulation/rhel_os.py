@@ -75,7 +75,13 @@ class RHELOSState:
         self.precheck_ran: bool = False
         self.postcheck_ran: bool = False
         self.rebooted_after_patch: bool = False
+        self.emergency_mode: bool = False
+        self.fstab_valid: bool = True
         self.editor = None  # EditorSession when nano/vi active
+        self.network_ifs: dict[str, dict] = {
+            "lo": {"up": True, "addrs": ["127.0.0.1/8"]},
+            "eth0": {"up": True, "addrs": ["10.0.0.10/24"]},
+        }
         from .lvm_state import LVMState
         from .firewall_state import FirewallState
         self.lvm = LVMState()
@@ -243,7 +249,31 @@ class RHELOSState:
         other.pid_counter = self.pid_counter
         other.lvm = copy.deepcopy(self.lvm)
         other.firewall = copy.deepcopy(self.firewall)
+        other.network_ifs = copy.deepcopy(self.network_ifs)
+        other.emergency_mode = self.emergency_mode
+        other.fstab_valid = self.fstab_valid
         other.editor = None
         other._write_file("/etc/hostname", hostname + "\n")
         other.env["HOSTNAME"] = hostname
         return other
+
+    def set_host_ip(self, ip: str, iface: str = "eth0") -> None:
+        if iface not in self.network_ifs:
+            self.network_ifs[iface] = {"up": True, "addrs": []}
+        self.network_ifs[iface]["addrs"] = [f"{ip}/24" if "/" not in ip else ip]
+
+    def format_ip_addr(self) -> str:
+        lines = []
+        for idx, (name, data) in enumerate(self.network_ifs.items(), 1):
+            flags = "LOOPBACK,UP" if name == "lo" else "BROADCAST,UP"
+            if not data.get("up", True):
+                flags = "BROADCAST"
+            mtu = 65536 if name == "lo" else 1500
+            lines.append(f"{idx}: {name}: <{flags}> mtu {mtu}")
+            for addr in data.get("addrs", []):
+                if name == "lo":
+                    lines.append(f"    inet {addr.split('/')[0]}/8 scope host {name}")
+                else:
+                    ip, _, prefix = addr.partition("/")
+                    lines.append(f"    inet {ip}/{prefix or '24'} brd {ip.rsplit('.', 1)[0]}.255 scope global {name}")
+        return "\n".join(lines)

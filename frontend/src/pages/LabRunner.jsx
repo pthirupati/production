@@ -13,6 +13,7 @@ import { ConfirmDialog } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
 import JiraTicketLink from '../components/JiraTicketLink'
 import LabTerminal from '../components/LabTerminal'
+import SimLabTips from '../components/SimLabTips'
 import useLabShortcuts from '../hooks/useLabShortcuts'
 import { useIsMobile } from '../hooks/useMediaQuery'
 
@@ -762,6 +763,10 @@ export default function LabRunner() {
                         {scenario.initial_state}
                       </div>
                     </div>
+                  )}
+
+                  {(scenario.lab_mode === 'simulation' || session?.provider === 'simulation') && (
+                    <SimLabTips scenario={scenario} />
                   )}
 
                   {/* Reminder to stop lab */}

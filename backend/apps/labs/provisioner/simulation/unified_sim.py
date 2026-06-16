@@ -198,9 +198,17 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
 
     def _handle_shell(self, line: str) -> str:
         if self.boot and not self.boot.logged_in and self.boot.phase in (
-            "grub", "grub_edit", "grub_rescue", "login", "password_wait", "mbr", "booting", "initramfs", "panic",
+            "grub", "grub_edit", "grub_rescue", "login", "password_wait", "emergency",
+            "mbr", "booting", "initramfs", "panic",
         ):
             return self._handle_boot(line)
+        if self.boot and self.boot.phase == "emergency_shell" and self.boot.logged_in:
+            low = line.strip().lower()
+            if low in ("reboot", "systemctl reboot", "init 6", "shutdown -r now"):
+                if self.boot.initramfs_fixed or self.shell.state.fstab_valid:
+                    self.shell.state.emergency_mode = False
+                    return self._reboot_from_shell()
+                return "\r\n\x1b[1;31mFix /etc/fstab or run dracut -f before reboot.\x1b[0m\r\n"
         low = line.strip().lower()
         if low in ("reboot", "systemctl reboot", "init 6", "shutdown -r now", "shutdown -r now"):
             return self._reboot_from_shell()
@@ -242,12 +250,20 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
             return "System halted — fix boot issue then reboot"
         if self.boot.phase == "login":
             return self.boot.handle_login(line)
+        if self.boot.phase == "emergency":
+            return self.boot.handle_login(line)
         if self.boot.phase == "password_wait":
             if not self.boot.verify_password(line):
-                self.boot.phase = "login"
+                self.boot.phase = "login" if self.boot.issue != "fstab" else "emergency"
                 self.boot.username = ""
                 return "\r\nLogin incorrect\r\nrhel-sim login: "
             self.boot.logged_in = True
+            if self.boot.phase == "password_wait" and self.boot.issue == "fstab":
+                self.boot.phase = "emergency_shell"
+                self.shell.state.emergency_mode = True
+                self.shell.state.set_prompt_user(self.boot.username or "root")
+                self._sync_boot_to_state()
+                return self.boot.complete_emergency_login()
             self.boot.phase = "shell"
             self.shell.state.set_prompt_user(self.boot.username or "root")
             self._sync_boot_to_state()

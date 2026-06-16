@@ -111,3 +111,10 @@ class BootSequenceTests(SimpleTestCase):
         state.patching_done = True
         out = state.reboot()
         self.assertIn(NEW_KERNEL, out)
+
+    def test_ip_addr_add(self):
+        from apps.labs.provisioner.simulation.rhel_shell import RHELShell
+        shell = RHELShell()
+        shell.run("ip addr add 10.0.0.99/24 dev eth0")
+        out = shell.run("ip addr")
+        self.assertIn("10.0.0.99", out)

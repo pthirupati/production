@@ -65,6 +65,21 @@ GRUB loading, please wait...
 Error 15: File not found
 """
 
+EMERGENCY_BOOT = """\
+[    4.881102] systemd[1]: Cannot open access to console, the root account is locked.
+[    4.991331] systemd[1]: Emergency mode started.
+Give root password for maintenance
+(or press Control-D to continue boot):
+"""
+
+EMERGENCY_SHELL = """\
+\r\n\x1b[1;33m*** Emergency mode ***\x1b[0m\r\n
+The system is in emergency mode due to a filesystem or fstab issue.
+Logs: journalctl -xb | less
+Fix /etc/fstab or run dracut -f, then \x1b[1;33mreboot\x1b[0m.
+Suggested: cat /etc/fstab — verify UUIDs match blkid output.
+"""
+
 PATCHING_OUTPUT = """\
 Updating Subscription Management repositories.
 Last metadata expiration check: 0:00:01 ago on Fri 14 Jun 2026 10:00:00 AM UTC.
@@ -150,6 +165,8 @@ class BootState:
             self.start_at_shell = True
             self.logged_in = True
             self.phase = "shell"
+        elif "fstab" in s or "emergency" in s:
+            self.issue = "fstab"
 
     def sync_kernel_paths(self) -> None:
         self.initrd_path = f"/initramfs-{self.kernel}.img"
@@ -194,6 +211,12 @@ class BootState:
         if self.issue == "initramfs" and not self.initramfs_fixed:
             self.phase = "initramfs"
             return INITRAMFS_DRACUT_FAIL.replace("\n", "\r\n")
+
+        if self.issue == "fstab" and not self.initramfs_fixed:
+            self.phase = "emergency"
+            out = KERNEL_BOOT_OK.format(kernel=self.kernel).replace("\n", "\r\n")
+            out += EMERGENCY_BOOT.replace("\n", "\r\n")
+            return out
 
         if self.issue == "kernel_panic" and not self.kernel_fixed:
             self.phase = "panic"
@@ -294,6 +317,11 @@ class BootState:
             return password.strip() == DEFAULT_PASSWORD
         return bool(password.strip())
 
+    def complete_emergency_login(self) -> str:
+        self.logged_in = True
+        self.phase = "emergency_shell"
+        return EMERGENCY_SHELL
+
     def complete_login(self) -> str:
         self.logged_in = True
         self.phase = "shell"
@@ -321,6 +349,9 @@ class BootState:
                 f"dracut: Generating initramfs for kernel {self.kernel}...\r\n"
                 "dracut: initramfs generation complete"
             )
+        if "fstab" in low and ("uuid=" in low or "/ " in low):
+            self.initramfs_fixed = True
+            return "fstab entry updated (simulated)"
         if "grub2-mkconfig" in low:
             self.grub_fixed = True
             return "Generating grub configuration file ... done"

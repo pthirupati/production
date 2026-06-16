@@ -386,6 +386,20 @@ class RHELShell:
         action = p[1]
         unit = p[2] if len(p) > 2 else ""
         unit = unit.replace(".service", "")
+
+        if action in ("emergency", "rescue"):
+            self.state.emergency_mode = True
+            engine = getattr(self, "_engine", None)
+            if engine and engine.boot:
+                engine.boot.phase = "emergency"
+                engine.boot.logged_in = True
+                engine.boot.username = "root"
+            return (
+                "You are in emergency mode. After logging in, type \"journalctl -xb\" to view\n"
+                "system logs, \"systemctl reboot\" to reboot, or \"exit\" to continue bootup.\n"
+                "Give root password for maintenance (or type Control-D to continue): "
+            )
+
         svc = self.state.services.get(unit)
         if not svc and action not in ("daemon-reload", "list-units"):
             return f"Unit {unit}.service could not be found."
@@ -617,8 +631,30 @@ class RHELShell:
 
     def _cmd_ip(self, p: list[str]) -> str:
         if len(p) > 1 and p[1] == "addr":
-            return "1: lo: <LOOPBACK,UP> mtu 65536\n    inet 127.0.0.1/8 scope host lo\n2: eth0: <BROADCAST,UP> mtu 1500\n    inet 10.0.0.10/24 brd 10.0.0.255 scope global eth0"
-        return "Usage: ip addr"
+            if len(p) > 2 and p[2] == "add" and len(p) > 3:
+                addr = p[3]
+                dev = "eth0"
+                if "dev" in p:
+                    dev = p[p.index("dev") + 1]
+                if dev not in self.state.network_ifs:
+                    self.state.network_ifs[dev] = {"up": True, "addrs": []}
+                if addr not in self.state.network_ifs[dev]["addrs"]:
+                    self.state.network_ifs[dev]["addrs"].append(addr)
+                return ""
+            return self.state.format_ip_addr()
+        if len(p) > 1 and p[1] == "link" and len(p) > 2:
+            if p[2] == "set" and len(p) > 3:
+                dev = p[3]
+                if dev not in self.state.network_ifs:
+                    self.state.network_ifs[dev] = {"up": True, "addrs": []}
+                if "up" in p:
+                    self.state.network_ifs[dev]["up"] = True
+                if "down" in p:
+                    self.state.network_ifs[dev]["up"] = False
+                return ""
+        if len(p) > 1 and p[1] == "route" and (len(p) < 3 or p[2] == "show"):
+            return "default via 10.0.0.1 dev eth0 proto static\n10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.10"
+        return "Usage: ip addr | ip link set dev eth0 up | ip route show"
 
     def _cmd_ss(self, p: list[str]) -> str:
         return "Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port\nu_str ESTAB  0      0      * 22                * *\n"
@@ -690,7 +726,7 @@ class RHELShell:
 
     def _cmd_dnf(self, p: list[str]) -> str:
         line = " ".join(p)
-        if any(x in line for x in ("update", "upgrade", "install")):
+        if any(x in line for x in ("update", "upgrade")):
             if getattr(self.state, "patching_done", False):
                 return "Nothing to do. Complete!"
             self.state.patching_done = True
@@ -699,14 +735,25 @@ class RHELShell:
                 engine.boot.patching_done = True
             from .boot_sequence import PATCHING_OUTPUT, NEW_KERNEL, OLD_KERNEL
             return PATCHING_OUTPUT.format(old_kernel=OLD_KERNEL, new_kernel=NEW_KERNEL)
+        if "install" in line:
+            pkg = p[-1] if len(p) > 2 else "package"
+            return f"Last metadata expiration check: 0:00:01 ago\nInstalling:\n {pkg}    x86_64    simulated    rhel-9-base\nComplete!"
+        if "remove" in line:
+            return "Removed (simulated)."
         if "repolist" in line:
             return "repo id                    status\nrhel-9-base                enabled"
         return "dnf: command completed (simulation)"
 
     def _cmd_rpm(self, p: list[str]) -> str:
+        line = " ".join(p)
+        if "-i" in p or "--install" in p or "-U" in p or "--upgrade" in p:
+            pkg = p[-1] if p[-1] not in ("-i", "-U", "--install", "--upgrade") else "package"
+            return f"Preparing...\n   1:{pkg}\n   2:Complete!"
+        if "-e" in p or "--erase" in p:
+            return "Removed (simulated)."
         if "-qa" in p or "-q" in p:
             k = self.state.kernel
-            if "kernel" in line if (line := " ".join(p)) else "":
+            if "kernel" in line:
                 return f"kernel-{k}"
             return f"kernel-{k}\nglibc-2.34-100.el9.x86_64\nsystemd-252-13.el9.x86_64"
         return "rpm: OK"
@@ -1004,16 +1051,20 @@ class RHELShell:
         if not host_key:
             return f"ssh: connect to host {host} port 22: Connection refused"
         engine = getattr(self, "_engine", None)
-        if engine:
-            remote = engine.state.clone_for_host(host_key)
-            remote.set_prompt_user(user if user in remote.users else "root")
-            self.state = remote
-            self.state.hostname = host_key
-            return (
-                f"Warning: Permanently added '{host}' (ED25519) to the list of known hosts.\r\n"
-                f"Last login: {time.strftime('%a %b %d %H:%M:%S %Y')} from 10.0.0.5"
-            )
-        return f"Connected to {user}@{host}"
+        remote = engine.state.clone_for_host(host_key) if engine else self.state.clone_for_host(host_key)
+        meta = getattr(self, "_host_names", {}).get(host) or getattr(self, "_host_names", {}).get(host_key) or {}
+        if isinstance(meta, dict) and meta.get("ip"):
+            remote.set_host_ip(meta["ip"])
+        sshd = remote.services.get("sshd")
+        if sshd and sshd.active != "active":
+            return f"ssh: connect to host {host} port 22: Connection refused"
+        remote.set_prompt_user(user if user in remote.users else "root")
+        self.state = remote
+        self.state.hostname = host_key
+        return (
+            f"Warning: Permanently added '{host}' (ED25519) to the list of known hosts.\r\n"
+            f"Last login: {time.strftime('%a %b %d %H:%M:%S %Y')} from 10.0.0.5"
+        )
 
     def _cmd_scp(self, p: list[str]) -> str:
         if len(p) < 3:

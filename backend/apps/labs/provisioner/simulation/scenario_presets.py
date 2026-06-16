@@ -116,6 +116,7 @@ def _preset_dual_host_db(state: RHELOSState) -> None:
 
 def _preset_initramfs(state: RHELOSState) -> None:
     state.initramfs_fixed = False
+    state.fstab_valid = False
     state._write_file("/etc/fstab", "UUID=bad-uuid / xfs defaults 0 0\n")
 
 

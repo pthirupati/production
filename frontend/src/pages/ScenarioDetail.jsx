@@ -4,12 +4,12 @@ import { scenarioApi } from '../api/scenarios'
 import { labApi } from '../api/labs'
 import { ratingsApi } from '../api/ratings'
 import { jiraApi } from '../api/jira'
-import JiraTicketPanel from '../components/JiraTicketPanel'
+import ScenarioIssueBar from '../components/ScenarioIssueBar'
 import { useAuthStore } from '../store/authStore'
 import {
   Clock, Target, Lightbulb, Play, CheckCircle2,
   Wrench, Skull, ArrowLeft, BookmarkPlus, Bookmark,
-  Users, BarChart3, Hash, Award, Lock, Eye, Zap, Star, Send, ExternalLink
+  Users, BarChart3, Hash, Award, Lock, Eye, Zap, Star, Send
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -17,6 +17,15 @@ const typeConfig = {
   fix: { icon: Wrench, label: 'Fix', desc: 'Find and fix the broken service' },
   do:  { icon: Play, label: 'Do', desc: 'Complete the given task' },
   hack: { icon: Skull, label: 'Hack', desc: 'Exploit a vulnerability or find a flag' },
+}
+
+function StatPill({ icon: Icon, children }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm text-surface-400 whitespace-nowrap">
+      <Icon size={14} className="text-surface-500 shrink-0" />
+      {children}
+    </span>
+  )
 }
 
 export default function ScenarioDetail() {
@@ -36,16 +45,34 @@ export default function ScenarioDetail() {
   const [submittingRating, setSubmittingRating] = useState(false)
   const [jiraTicket, setJiraTicket] = useState(null)
   const [jiraComments, setJiraComments] = useState([])
-  const [jiraActivity, setJiraActivity] = useState([])
   const [activeLabSession, setActiveLabSession] = useState(null)
 
+  const loadJiraTicket = (scenarioId, accessible) => {
+    if (!isAuthenticated || !scenarioId || accessible === false) {
+      setJiraTicket(null)
+      setJiraComments([])
+      return
+    }
+    jiraApi.ensureScenarioTicket(scenarioId)
+      .then(res => {
+        setJiraTicket(res.data?.ticket || null)
+        setJiraComments(res.data?.recent_comments || [])
+      })
+      .catch(err => {
+        if (err.response?.status === 403) {
+          setJiraTicket(null)
+          setJiraComments([])
+          return
+        }
+        setJiraTicket(null)
+        setJiraComments([])
+      })
+  }
+
   useEffect(() => {
-    // Show lab expired toast if redirected from LabRunner timeout
     if (location.state?.labExpired) {
       toast('Lab time completed — the environment has been terminated. You can try again anytime!', {
-        icon: '⏰',
-        duration: 7000,
-        closeButton: true,
+        icon: '⏰', duration: 7000, closeButton: true,
       })
       window.history.replaceState({}, '')
     }
@@ -62,16 +89,7 @@ export default function ScenarioDetail() {
     scenarioApi.getScenarioDetail(slug)
       .then(data => {
         setScenario(data)
-        if (isAuthenticated && data?.id) {
-          jiraApi.ensureScenarioTicket(data.id)
-            .then(res => {
-              setJiraTicket(res.data?.ticket || null)
-              setJiraComments(res.data?.recent_comments || [])
-              setJiraActivity(res.data?.activity || [])
-            })
-            .catch(() => { setJiraTicket(null); setJiraComments([]); setJiraActivity([]) })
-        }
-        // Fetch ratings for this scenario
+        loadJiraTicket(data?.id, data?.is_accessible)
         ratingsApi.getRatings({ type: 'scenario', scenario: data.id })
           .then(r => setRatings(r.ratings || r.results || []))
           .catch(() => {})
@@ -101,17 +119,9 @@ export default function ScenarioDetail() {
       const session = await labApi.startLab(scenario.id)
       if (session.jira_reset) {
         toast(`Fresh attempt #${session.jira_run_count || 1} — ticket history cleared`, {
-          icon: '🔄',
-          duration: 5000,
-          closeButton: true,
+          icon: '🔄', duration: 5000, closeButton: true,
         })
-        jiraApi.getScenarioTicket(scenario.id, { details: 1 })
-          .then(res => {
-            setJiraTicket(res.data?.ticket || null)
-            setJiraComments(res.data?.recent_comments || [])
-            setJiraActivity(res.data?.activity || [])
-          })
-          .catch(() => {})
+        loadJiraTicket(scenario.id, scenario.is_accessible)
       } else if (session.jira_issue_key) {
         setJiraTicket({
           issue_key: session.jira_issue_key,
@@ -122,9 +132,7 @@ export default function ScenarioDetail() {
       }
       if (session.resumed) {
         toast('You already have an active lab for this scenario — reconnecting...', {
-          icon: '🔄',
-          duration: 4000,
-          closeButton: true,
+          icon: '🔄', duration: 4000, closeButton: true,
         })
       } else if (session.status === 'PROVISIONING') {
         toast('Launching cloud server — please wait...', { icon: '☁️', duration: 5000, closeButton: true })
@@ -142,9 +150,7 @@ export default function ScenarioDetail() {
       } else {
         const msg = data?.error || 'Failed to start lab'
         toast.error(msg)
-        if (data?.session_id) {
-          navigate(`/lab/${data.session_id}`)
-        }
+        if (data?.session_id) navigate(`/lab/${data.session_id}`)
       }
     } finally {
       setStarting(false)
@@ -168,7 +174,6 @@ export default function ScenarioDetail() {
       await ratingsApi.submitRating({ ratingType: 'scenario', scenario: scenario.id, score: userRating, review: reviewText })
       toast.success('Rating submitted!')
       setReviewText('')
-      // Refresh ratings
       const r = await ratingsApi.getRatings({ type: 'scenario', scenario: scenario.id })
       setRatings(r.ratings || r.results || [])
     } catch (err) {
@@ -182,23 +187,8 @@ export default function ScenarioDetail() {
     <div className="max-w-4xl mx-auto space-y-6 animate-pulse">
       <div className="h-4 w-32 bg-surface-800 rounded" />
       <div className="glass-card p-8 space-y-4">
-        <div className="flex gap-2">
-          <div className="h-6 w-16 bg-surface-700 rounded-full" />
-          <div className="h-6 w-20 bg-surface-700 rounded-full" />
-        </div>
         <div className="h-8 w-3/4 bg-surface-800 rounded" />
         <div className="h-4 w-1/2 bg-surface-800 rounded" />
-        <div className="flex gap-4 mt-4">
-          <div className="h-10 w-24 bg-surface-700 rounded-lg" />
-          <div className="h-10 w-24 bg-surface-700 rounded-lg" />
-          <div className="h-10 w-24 bg-surface-700 rounded-lg" />
-        </div>
-      </div>
-      <div className="glass-card p-8 space-y-3">
-        <div className="h-6 w-40 bg-surface-800 rounded" />
-        <div className="h-4 w-full bg-surface-800 rounded" />
-        <div className="h-4 w-5/6 bg-surface-800 rounded" />
-        <div className="h-4 w-2/3 bg-surface-800 rounded" />
       </div>
     </div>
   )
@@ -216,80 +206,107 @@ export default function ScenarioDetail() {
   const timeMinutes = Math.floor((scenario.time_limit || 900) / 60)
   const userCompleted = scenario.user_progress?.completed
   const objectives = Array.isArray(scenario.objectives) ? scenario.objectives : []
+  const solveRate = scenario.attempts_count > 0
+    ? Math.round(scenario.completions_count / Math.max(scenario.attempts_count, 1) * 100)
+    : null
+  const avgRating = ratings.length
+    ? (ratings.reduce((s, r) => s + (r.score || 0), 0) / ratings.length).toFixed(1)
+    : null
+
+  const startButton = (
+    <button
+      onClick={handleStartLab}
+      disabled={starting || !!limitInfo || scenario.is_accessible === false}
+      className="btn-primary w-full sm:w-auto px-8 py-3.5 text-base flex items-center justify-center gap-2.5 disabled:opacity-50"
+    >
+      {starting ? (
+        <>
+          <div className="w-5 h-5 border-2 border-surface-950 border-t-transparent rounded-full animate-spin" />
+          {scenario.infrastructure_type && scenario.infrastructure_type !== 'docker'
+            ? 'Launching cloud server...'
+            : 'Provisioning lab...'}
+        </>
+      ) : activeLabSession ? (
+        <>
+          <Play size={18} />
+          Resume Lab
+        </>
+      ) : (
+        <>
+          <Play size={18} />
+          {userCompleted ? 'Launch Again' : 'Start Challenge'}
+        </>
+      )}
+    </button>
+  )
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5 animate-fade-in">
-      {/* Back link */}
+    <div className="max-w-4xl mx-auto space-y-5 animate-fade-in pb-8">
       <Link to="/scenarios" className="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-white transition-colors">
         <ArrowLeft size={14} /> All Scenarios
       </Link>
 
-      {/* Header card */}
+      {/* Issue / Jira bar — top only, no duplicate panel below */}
+      <ScenarioIssueBar
+        scenario={scenario}
+        jiraTicket={jiraTicket}
+        jiraComments={jiraComments}
+        isAuthenticated={isAuthenticated}
+      />
+
+      {/* Hero */}
       <div className="glass-card p-6 lg:p-8">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            {/* Badges row */}
-            <div className="flex items-center gap-2 flex-wrap mb-3">
-              <span className={`badge-${scenario.difficulty}`}>{scenario.difficulty}</span>
-              <span className={`px-2 py-0.5 rounded text-xs font-medium border flex items-center gap-1 ${
-                scenario.scenario_type === 'hack' ? 'bg-accent-red/10 text-accent-red border-accent-red/20'
-                : scenario.scenario_type === 'do' ? 'bg-accent-green/10 text-accent-green border-accent-green/20'
-                : 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20'
-              }`}>
-                <TypeIcon size={11} /> {typeInfo.label}
-              </span>
-              <span className="bg-surface-700/50 px-2 py-0.5 rounded text-xs text-surface-400">
-                {scenario.category}
-              </span>
-              {scenario.technology && (
-                <span className="bg-accent-cyan/5 text-accent-cyan px-2 py-0.5 rounded text-xs border border-accent-cyan/10">
-                  {scenario.technology.name}
-                </span>
-              )}
-              {scenario.is_free && (
-                <span className="bg-accent-green/10 text-accent-green px-2 py-0.5 rounded text-xs border border-accent-green/20">
-                  Free
-                </span>
-              )}
-            </div>
-
-            <h1 className="text-2xl lg:text-3xl font-bold text-white mb-1">{scenario.title}</h1>
-            {scenario.subtitle && (
-              <p className="text-surface-400 text-sm">{scenario.subtitle}</p>
-            )}
-
-            {/* Stats row */}
-            <div className="flex items-center gap-5 text-sm text-surface-400 mt-4">
-              <span className="flex items-center gap-1.5"><Clock size={14} /> {timeMinutes} min</span>
-              <span className="flex items-center gap-1.5"><Target size={14} /> {scenario.max_score} pts max</span>
-              <span className="flex items-center gap-1.5"><Lightbulb size={14} /> {scenario.hints_count || 0} hints</span>
-              {scenario.attempts_count > 0 && (
-                <span className="flex items-center gap-1.5"><Users size={14} /> {scenario.attempts_count} attempts</span>
-              )}
-              {scenario.completions_count > 0 && (
-                <span className="flex items-center gap-1.5"><BarChart3 size={14} /> {Math.round(scenario.completions_count / Math.max(scenario.attempts_count, 1) * 100)}% solve rate</span>
-              )}
-            </div>
-          </div>
-
-          {/* Right side — status & bookmark */}
-          <div className="flex flex-col items-end gap-2">
-            {userCompleted && (
-              <div className="flex items-center gap-2 text-accent-green bg-accent-green/10 border border-accent-green/20 rounded-lg px-3 py-1.5">
-                <CheckCircle2 size={16} />
-                <span className="text-sm font-semibold">Solved</span>
-              </div>
-            )}
-            <button onClick={handleBookmark} className="text-surface-500 hover:text-accent-amber transition-colors p-1">
-              {scenario.is_bookmarked
-                ? <Bookmark size={20} className="text-accent-amber fill-accent-amber" />
-                : <BookmarkPlus size={20} />
-              }
-            </button>
-          </div>
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span className={`badge-${scenario.difficulty}`}>{scenario.difficulty}</span>
+          <span className={`px-2 py-0.5 rounded text-xs font-medium border flex items-center gap-1 ${
+            scenario.scenario_type === 'hack' ? 'bg-accent-red/10 text-accent-red border-accent-red/20'
+            : scenario.scenario_type === 'do' ? 'bg-accent-green/10 text-accent-green border-accent-green/20'
+            : 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20'
+          }`}>
+            <TypeIcon size={11} /> {typeInfo.label}
+          </span>
+          {scenario.category && (
+            <span className="bg-surface-700/50 px-2 py-0.5 rounded text-xs text-surface-400">{scenario.category}</span>
+          )}
+          {scenario.technology && (
+            <span className="bg-accent-cyan/5 text-accent-cyan px-2 py-0.5 rounded text-xs border border-accent-cyan/10">
+              {scenario.technology.name}
+            </span>
+          )}
+          {scenario.is_free && (
+            <span className="bg-accent-green/10 text-accent-green px-2 py-0.5 rounded text-xs border border-accent-green/20">Free</span>
+          )}
+          {userCompleted && (
+            <span className="flex items-center gap-1 text-accent-green bg-accent-green/10 border border-accent-green/20 rounded-lg px-2 py-0.5 text-xs font-semibold ml-auto">
+              <CheckCircle2 size={13} /> Solved
+            </span>
+          )}
+          <button onClick={handleBookmark} className="text-surface-500 hover:text-accent-amber transition-colors p-1 ml-auto sm:ml-0">
+            {scenario.is_bookmarked
+              ? <Bookmark size={18} className="text-accent-amber fill-accent-amber" />
+              : <BookmarkPlus size={18} />}
+          </button>
         </div>
 
-        {/* Tags */}
+        <h1 className="text-2xl lg:text-3xl font-bold text-white mb-4">{scenario.title}</h1>
+        {scenario.subtitle && <p className="text-surface-400 text-sm mb-4">{scenario.subtitle}</p>}
+
+        {/* Stats row — matches reference layout */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-3 border-y border-surface-800/80">
+          <StatPill icon={Clock}>{timeMinutes} min</StatPill>
+          <StatPill icon={Target}>{scenario.max_score} pts max</StatPill>
+          <StatPill icon={Lightbulb}>{scenario.hints_count || 0} hints</StatPill>
+          {scenario.attempts_count > 0 && (
+            <StatPill icon={Users}>{scenario.attempts_count} attempts</StatPill>
+          )}
+          {solveRate != null && (
+            <StatPill icon={BarChart3}>{solveRate}% solve rate</StatPill>
+          )}
+          {avgRating && (
+            <StatPill icon={Star}>{avgRating} avg rating</StatPill>
+          )}
+        </div>
+
         {scenario.tags?.length > 0 && (
           <div className="flex gap-2 mt-4 flex-wrap">
             {scenario.tags.map(tag => (
@@ -301,7 +318,44 @@ export default function ScenarioDetail() {
             ))}
           </div>
         )}
+
+        <div className="mt-5 flex flex-col sm:flex-row gap-3 sm:items-center">
+          {startButton}
+          {activeLabSession && (
+            <p className="text-xs text-accent-cyan">Active lab running — resume to continue where you left off.</p>
+          )}
+        </div>
       </div>
+
+      {/* Banners */}
+      {limitInfo && (
+        <div className="glass-card p-5 border-accent-amber/20 bg-accent-amber/5">
+          <h3 className="text-base font-semibold text-white mb-1">Daily Limit Reached</h3>
+          <p className="text-sm text-surface-400 mb-3">
+            You've used {limitInfo.usage?.labs_today} of {limitInfo.plan?.max_labs_per_day} labs today on the {limitInfo.plan?.name} plan.
+          </p>
+          <Link to="/pricing" className="btn-primary text-sm px-4 py-2 inline-flex items-center gap-1.5">
+            <Zap size={14} /> Upgrade to Pro
+          </Link>
+        </div>
+      )}
+
+      {scenario.is_accessible === false && (
+        <div className="glass-card p-5 border-accent-purple/20 bg-accent-purple/5">
+          <div className="flex items-start gap-3">
+            <Lock size={18} className="text-accent-purple mt-0.5" />
+            <div>
+              <h3 className="text-base font-semibold text-white mb-1">Subscription Required</h3>
+              <p className="text-sm text-surface-400 mb-3">
+                Subscribe to <span className="text-white font-medium">{scenario.technology?.name}</span> to start this lab and open the incident ticket.
+              </p>
+              <Link to="/pricing" className="btn-primary text-sm px-4 py-2 inline-flex items-center gap-1.5">
+                <Zap size={14} /> View Pricing
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Description */}
       <div className="glass-card p-6">
@@ -309,14 +363,14 @@ export default function ScenarioDetail() {
         <p className="text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">{scenario.description}</p>
       </div>
 
-      {/* Objectives */}
+      {/* Expected outcome */}
       {objectives.length > 0 && (
         <div className="glass-card p-6">
           <h2 className="text-base font-semibold text-white mb-3">Expected outcome</h2>
           <ul className="space-y-2">
             {objectives.map((obj, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
-                <Target size={14} className="text-accent-cyan mt-0.5 shrink-0" />
+                <CheckCircle2 size={14} className="text-accent-cyan mt-0.5 shrink-0" />
                 <span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span>
               </li>
             ))}
@@ -324,7 +378,7 @@ export default function ScenarioDetail() {
         </div>
       )}
 
-      {/* Initial State */}
+      {/* Initial state */}
       {scenario.initial_state && (
         <div className="glass-card p-6">
           <h2 className="text-base font-semibold text-white mb-3">Initial State</h2>
@@ -334,36 +388,38 @@ export default function ScenarioDetail() {
         </div>
       )}
 
-      {/* User Progress */}
+      {/* Your progress */}
       {scenario.user_progress && (
         <div className="glass-card p-6">
           <h2 className="text-base font-semibold text-white mb-4">Your Progress</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-surface-800/50 rounded-lg p-3">
-              <p className="text-xl font-bold text-white">{scenario.user_progress.attempts}</p>
-              <p className="text-xs text-surface-400">Attempts</p>
+            <div className="bg-surface-800/50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-white">{scenario.user_progress.attempts}</p>
+              <p className="text-xs text-surface-400 mt-0.5">Attempts</p>
             </div>
-            <div className="bg-surface-800/50 rounded-lg p-3">
-              <p className="text-xl font-bold text-accent-amber">{scenario.user_progress.best_score}</p>
-              <p className="text-xs text-surface-400">Best Score</p>
+            <div className="bg-surface-800/50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-accent-amber">{scenario.user_progress.best_score || 0}</p>
+              <p className="text-xs text-surface-400 mt-0.5">Best Score</p>
             </div>
-            <div className="bg-surface-800/50 rounded-lg p-3">
-              <p className="text-xl font-bold text-white">
-                {scenario.user_progress.best_time ? `${Math.floor(scenario.user_progress.best_time / 60)}m ${scenario.user_progress.best_time % 60}s` : '—'}
+            <div className="bg-surface-800/50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-white">
+                {scenario.user_progress.best_time
+                  ? `${Math.floor(scenario.user_progress.best_time / 60)}m ${scenario.user_progress.best_time % 60}s`
+                  : '—'}
               </p>
-              <p className="text-xs text-surface-400">Best Time</p>
+              <p className="text-xs text-surface-400 mt-0.5">Best Time</p>
             </div>
-            <div className="bg-surface-800/50 rounded-lg p-3">
-              <p className={`text-xl font-bold ${userCompleted ? 'text-accent-green' : 'text-surface-500'}`}>
+            <div className="bg-surface-800/50 rounded-lg p-3 text-center">
+              <p className={`text-2xl font-bold ${userCompleted ? 'text-accent-green' : 'text-surface-500'}`}>
                 {userCompleted ? 'Yes' : 'No'}
               </p>
-              <p className="text-xs text-surface-400">Completed</p>
+              <p className="text-xs text-surface-400 mt-0.5">Completed</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Solution — only after solving */}
+      {/* Solution */}
       {userCompleted && scenario.solution_explanation && (
         <div className="glass-card p-6 border border-accent-green/10">
           <button
@@ -375,60 +431,13 @@ export default function ScenarioDetail() {
           </button>
           {showSolution && (
             <div className="mt-4 pt-4 border-t border-surface-800">
-              <p className="text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">
-                {scenario.solution_explanation}
-              </p>
+              <p className="text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">{scenario.solution_explanation}</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Daily Limit Reached Banner */}
-      {limitInfo && (
-        <div className="glass-card p-6 border-accent-amber/20 bg-accent-amber/5 animate-slide-up">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-accent-amber/10 flex items-center justify-center shrink-0">
-              <Zap size={20} className="text-accent-amber" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-base font-semibold text-white mb-1">Daily Limit Reached</h3>
-              <p className="text-sm text-surface-400 mb-3">
-                You've used {limitInfo.usage?.labs_today} of {limitInfo.plan?.max_labs_per_day} labs today on the <span className="text-white font-medium">{limitInfo.plan?.name}</span> plan. Your limit resets at midnight UTC.
-              </p>
-              <div className="flex gap-3">
-                <Link to="/pricing" className="btn-primary text-sm px-4 py-2 flex items-center gap-1.5">
-                  <Zap size={14} /> Upgrade to Pro
-                </Link>
-                <button onClick={() => setLimitInfo(null)} className="text-sm text-surface-500 hover:text-surface-300 transition-colors px-3">
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Subscription Required Banner */}
-      {scenario.is_accessible === false && (
-        <div className="glass-card p-6 border-accent-purple/20 bg-accent-purple/5 animate-slide-up">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-accent-purple/10 flex items-center justify-center shrink-0">
-              <Lock size={20} className="text-accent-purple" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-base font-semibold text-white mb-1">Subscription Required</h3>
-              <p className="text-sm text-surface-400 mb-3">
-                This scenario requires an active subscription for <span className="text-white font-medium">{scenario.technology?.name}</span>. Subscribe to unlock all scenarios for this technology.
-              </p>
-              <Link to="/pricing" className="btn-primary text-sm px-4 py-2 inline-flex items-center gap-1.5">
-                <Zap size={14} /> View Pricing
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Ratings & Reviews */}
+      {/* Ratings */}
       <div className="glass-card p-6">
         <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
           <Star size={16} className="text-accent-amber" /> Ratings & Reviews
@@ -437,7 +446,6 @@ export default function ScenarioDetail() {
           )}
         </h2>
 
-        {/* Submit Rating */}
         {isAuthenticated && (
           <div className="bg-surface-800/50 rounded-lg p-4 mb-4">
             <p className="text-sm text-surface-300 mb-2">Rate this scenario</p>
@@ -450,19 +458,9 @@ export default function ScenarioDetail() {
                   onClick={() => setUserRating(star)}
                   className="p-0.5 transition-transform hover:scale-110"
                 >
-                  <Star
-                    size={24}
-                    className={`transition-colors ${
-                      star <= (hoverRating || userRating)
-                        ? 'text-accent-amber fill-accent-amber'
-                        : 'text-surface-600'
-                    }`}
-                  />
+                  <Star size={24} className={star <= (hoverRating || userRating) ? 'text-accent-amber fill-accent-amber' : 'text-surface-600'} />
                 </button>
               ))}
-              {userRating > 0 && (
-                <span className="text-sm text-surface-400 ml-2">{userRating}/5</span>
-              )}
             </div>
             <div className="flex gap-2">
               <input
@@ -483,11 +481,10 @@ export default function ScenarioDetail() {
           </div>
         )}
 
-        {/* Existing Reviews */}
         {ratings.length === 0 ? (
           <p className="text-sm text-surface-500 text-center py-3">No reviews yet. Be the first to rate!</p>
         ) : (
-          <div className="space-y-3 max-h-60 overflow-y-auto">
+          <div className="space-y-3 max-h-72 overflow-y-auto">
             {ratings.slice(0, 10).map((r, i) => (
               <div key={i} className="flex items-start gap-3 py-2 border-b border-surface-800/50 last:border-0">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-cyan to-brand-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
@@ -510,67 +507,15 @@ export default function ScenarioDetail() {
         )}
       </div>
 
-      {/* Jira incident ticket (realistic workflow) */}
-      {jiraTicket?.issue_key && (
-        <JiraTicketPanel
-          ticket={jiraTicket}
-          comments={jiraComments}
-          activity={jiraActivity}
-          labInfoMode={!!activeLabSession || starting}
-          hideHistory={!!activeLabSession || starting}
-          hideComments={!!activeLabSession || starting}
-          hideStatus={!!activeLabSession || starting}
-          onTransition={!(activeLabSession || starting) ? async (status) => {
-            try {
-              const res = await jiraApi.transitionIssue(jiraTicket.issue_key, status)
-              setJiraTicket(res.data)
-              setJiraComments(res.data?.comments || [])
-              setJiraActivity(res.data?.activity || [])
-              toast.success(`Ticket moved to ${status}`)
-            } catch (err) {
-              toast.error(err.response?.data?.error || 'Failed to update ticket')
-            }
-          } : undefined}
-          onComment={!(activeLabSession || starting) ? async (text) => {
-            try {
-              const res = await jiraApi.addComment(jiraTicket.issue_key, text)
-              setJiraTicket(res.data)
-              setJiraComments(res.data?.comments || [])
-              toast.success('Customer replied')
-            } catch (err) {
-              toast.error(err.response?.data?.error || 'Failed to post comment')
-            }
-          } : undefined}
-        />
-      )}
-
-      {/* Start Lab button */}
-      <div className="flex gap-3">
-        <button
-          onClick={handleStartLab}
-          disabled={starting || !!limitInfo || scenario.is_accessible === false}
-          className="btn-primary flex-1 py-4 text-lg flex items-center justify-center gap-3 disabled:opacity-50"
-        >
-          {starting ? (
-            <>
-              <div className="w-5 h-5 border-2 border-surface-950 border-t-transparent rounded-full animate-spin" />
-              {scenario.infrastructure_type && scenario.infrastructure_type !== 'docker'
-                ? 'Launching cloud server...'
-                : 'Provisioning lab environment...'}
-            </>
-          ) : (
-            <>
-              <Play size={20} />
-              {userCompleted ? 'Launch Again (Fresh Environment)' : 'Start Challenge'}
-            </>
-          )}
-        </button>
+      {/* Bottom CTA */}
+      <div className="flex flex-col items-center gap-2 pt-2">
+        {startButton}
+        {userCompleted && (
+          <p className="text-xs text-surface-500 text-center">
+            Each launch creates a fresh environment. Your solved badge resets until you pass validation again.
+          </p>
+        )}
       </div>
-      {userCompleted && (
-        <p className="text-xs text-surface-500 text-center -mt-2">
-          Each launch creates a fresh broken environment. Your previous "Solved" status will reset until you solve it again.
-        </p>
-      )}
     </div>
   )
 }

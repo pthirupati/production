@@ -7,9 +7,24 @@ from rest_framework.views import APIView
 
 from apps.question_bank.models import Scenario
 
+from apps.billing.subscription_utils import user_has_technology_access, user_has_complimentary_access
+
 from .models import JiraCommentLog, UserScenarioJiraTicket
 from .helpers import is_jira_closed, resolve_jira_issue_url
 from .sync import ensure_scenario_ticket
+
+
+def _user_can_open_scenario_jira(user, scenario: Scenario) -> bool:
+    """Jira incident details require the same access as starting the lab."""
+    if not user or not user.is_authenticated:
+        return False
+    if user_has_complimentary_access(user):
+        return True
+    if scenario.is_free:
+        return True
+    if not scenario.technology_id:
+        return True
+    return user_has_technology_access(user, scenario.technology_id)
 
 
 def _sync_ticket_status(ticket, client=None):
@@ -132,6 +147,17 @@ class ScenarioJiraTicketView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, scenario_id):
+        scenario = get_object_or_404(Scenario, pk=scenario_id, is_active=True)
+        if not _user_can_open_scenario_jira(request.user, scenario):
+            return Response(
+                {
+                    "ticket": None,
+                    "recent_comments": [],
+                    "code": "SUBSCRIPTION_REQUIRED",
+                    "error": "Subscribe to this technology to open the incident ticket.",
+                },
+                status=403,
+            )
         ticket = UserScenarioJiraTicket.objects.filter(
             user=request.user, scenario_id=scenario_id
         ).first()
@@ -143,6 +169,16 @@ class ScenarioJiraTicketView(APIView):
     def post(self, request, scenario_id):
         """Ensure a Jira ticket exists for this user+scenario (create if missing)."""
         scenario = get_object_or_404(Scenario, pk=scenario_id, is_active=True)
+        if not _user_can_open_scenario_jira(request.user, scenario):
+            return Response(
+                {
+                    "ticket": None,
+                    "recent_comments": [],
+                    "code": "SUBSCRIPTION_REQUIRED",
+                    "error": "Subscribe to this technology to open the incident ticket.",
+                },
+                status=403,
+            )
         result = ensure_scenario_ticket(request.user, scenario)
         if not result.get("jira_enabled"):
             return Response(

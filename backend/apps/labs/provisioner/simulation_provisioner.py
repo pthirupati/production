@@ -69,6 +69,26 @@ def _attach_ssh_client_host(lab_hosts: list[dict], resource_id: str) -> list[dic
     return hosts
 
 
+def _wire_engine_hosts(engine, entry: dict) -> None:
+    """Attach multi-host SSH map to primary shell."""
+    hosts = entry.get("state", {}).get("hosts", {})
+    host_ips = entry.get("state", {}).get("host_ips", {})
+    engine.shell._host_ips = host_ips  # noqa: SLF001
+    engine.shell._host_names = hosts  # noqa: SLF001
+    engine.shell._engine = engine  # noqa: SLF001
+
+
+def _apply_companion_host_state(shell, host_key: str, host_meta: dict, slug: str) -> None:
+    ip = host_meta.get("ip")
+    if ip:
+        shell.state.set_host_ip(ip)
+    low = slug.lower()
+    if "ssh-stop" in low or "sshd-down" in low:
+        if host_key == "primary" and "sshd" in shell.state.services:
+            shell.state.services["sshd"].active = "inactive"
+            shell.state.services["sshd"].sub_state = "dead"
+
+
 def ensure_sim_session(lab_session) -> dict | None:
     """Re-register in-memory simulation state after worker restart."""
     session_id = str(lab_session.id)
@@ -102,6 +122,9 @@ def ensure_sim_session(lab_session) -> dict | None:
             "validation_marker": f"/opt/fixitlab/sim-valid-{slug}",
         },
     )
+    entry = get_sim_session(session_id)
+    if entry:
+        _wire_engine_hosts(engine, entry)
     logger.info("Rehydrated simulation session %s resource=%s", session_id, resource_id)
     return get_sim_session(session_id)
 
@@ -164,6 +187,9 @@ class SimulationProvisioner:
                 "validation_marker": f"/opt/fixitlab/sim-valid-{slug}",
             },
         )
+        entry = get_sim_session(str(lab_session.id))
+        if entry:
+            _wire_engine_hosts(engine, entry)
 
         logger.info("Simulation lab %s persona=%s resource=%s", lab_session.id, sim_type, resource_id)
         return resource_id, f"sim-{slug}"
@@ -222,6 +248,7 @@ class SimulationProvisioner:
 
         if hk not in ("primary", "") and hk != "primary":
             hostname = hk
+            host_meta = entry["state"].get("hosts", {}).get(hk, {})
             companion_state = engine.state.clone_for_host(hostname)
             shell = RHELShell(
                 state=companion_state,
@@ -231,6 +258,7 @@ class SimulationProvisioner:
             shell._host_ips = entry["state"].get("host_ips", {})
             shell._host_names = entry["state"].get("hosts", {})
             shell._engine = engine
+            _apply_companion_host_state(shell, hk, host_meta, entry["state"].get("scenario_slug", ""))
             register_modules(engine, shell)
 
             def get_ed():
@@ -252,6 +280,7 @@ class SimulationProvisioner:
                 clear_editor=clear_ed,
             )
         else:
+            _wire_engine_hosts(engine, entry)
             holder = engine.create_stream()
 
         entry.setdefault("streams", {})[stream_key] = holder

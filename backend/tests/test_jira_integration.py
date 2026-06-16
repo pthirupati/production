@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
+from rest_framework.test import APIClient
 
 from apps.jira_integration.models import JiraTicketLog, UserScenarioJiraTicket
 from apps.jira_integration.sync import (
@@ -200,3 +201,29 @@ class JiraSyncEnabledTests(TestCase):
                 user=self.user, scenario=self.scenario, issue_key="FIXIT-200"
             ).exists()
         )
+
+
+@override_settings(JIRA_ENABLED=True, JIRA_SIMULATION_MODE=True)
+class JiraSubscriptionGateTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="nosub", email="n@t.com", password="pass12345")
+        self.tech = Technology.objects.create(name="Gated Tech", icon="terminal")
+        self.scenario = Scenario.objects.create(
+            title="Gated Scenario",
+            slug="gated-scenario",
+            technology=self.tech,
+            description="Test",
+            is_active=True,
+            is_free=False,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_ensure_ticket_blocked_without_subscription(self):
+        resp = self.client.post(f"/api/jira/tickets/scenario/{self.scenario.id}/")
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.json().get("code"), "SUBSCRIPTION_REQUIRED")
+
+    def test_get_ticket_blocked_without_subscription(self):
+        resp = self.client.get(f"/api/jira/tickets/scenario/{self.scenario.id}/")
+        self.assertEqual(resp.status_code, 403)
