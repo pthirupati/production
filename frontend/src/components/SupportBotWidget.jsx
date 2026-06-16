@@ -1,0 +1,279 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useLocation } from 'react-router-dom'
+import { Bot, X, Send, Minimize2, MessageCircle } from 'lucide-react'
+import { supportApi } from '../api/support'
+import { useAuthStore } from '../store/authStore'
+
+const STORAGE_KEY = 'fixitlab_support_bot_hidden'
+
+function TypingIndicator({ name }) {
+  return (
+    <div className="flex items-start gap-2 max-w-[90%]">
+      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center shrink-0">
+        <Bot size={14} className="text-white" />
+      </div>
+      <div className="bg-surface-800/90 border border-surface-700/50 rounded-2xl rounded-tl-sm px-4 py-3">
+        <p className="text-xs text-surface-500 mb-1.5">{name} is typing</p>
+        <div className="flex gap-1">
+          <span className="w-2 h-2 rounded-full bg-accent-cyan/70 animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-2 h-2 rounded-full bg-accent-cyan/70 animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-2 h-2 rounded-full bg-accent-cyan/70 animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BotMessage({ text, name }) {
+  return (
+    <div className="flex items-start gap-2 max-w-[92%]">
+      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center shrink-0 mt-0.5">
+        <Bot size={14} className="text-white" />
+      </div>
+      <div className="bg-surface-800/90 border border-surface-700/50 rounded-2xl rounded-tl-sm px-4 py-2.5">
+        <p className="text-[10px] text-accent-cyan/80 font-medium mb-1">{name}</p>
+        <p className="text-sm text-surface-200 whitespace-pre-wrap leading-relaxed">{text}</p>
+      </div>
+    </div>
+  )
+}
+
+function UserMessage({ text }) {
+  return (
+    <div className="flex justify-end">
+      <div className="max-w-[85%] bg-accent-cyan/15 border border-accent-cyan/25 rounded-2xl rounded-tr-sm px-4 py-2.5">
+        <p className="text-sm text-surface-100 whitespace-pre-wrap">{text}</p>
+      </div>
+    </div>
+  )
+}
+
+export default function SupportBotWidget() {
+  const { pathname } = useLocation()
+  const { isAuthenticated } = useAuthStore()
+  const [config, setConfig] = useState(null)
+  const [open, setOpen] = useState(false)
+  const [fabHidden, setFabHidden] = useState(() => localStorage.getItem(STORAGE_KEY) === '1')
+  const [messages, setMessages] = useState([])
+  const [input, setInput] = useState('')
+  const [typing, setTyping] = useState(false)
+  const [suggestions, setSuggestions] = useState([])
+  const [sending, setSending] = useState(false)
+  const scrollRef = useRef(null)
+  const inputRef = useRef(null)
+
+  const loadConfig = useCallback(() => {
+    supportApi.getConfig()
+      .then((data) => {
+        setConfig(data)
+        if (data.enabled && data.welcome_message && messages.length === 0) {
+          setMessages([{ role: 'bot', text: data.welcome_message }])
+          setSuggestions(data.quick_topics?.map((t) => t.prompt) || [])
+        }
+      })
+      .catch(() => setConfig({ enabled: false }))
+  }, [messages.length])
+
+  useEffect(() => {
+    loadConfig()
+  }, [isAuthenticated, loadConfig])
+
+  useEffect(() => {
+    const onConfigChange = () => loadConfig()
+    window.addEventListener('fixitlab-support-config-changed', onConfigChange)
+    return () => window.removeEventListener('fixitlab-support-config-changed', onConfigChange)
+  }, [loadConfig])
+
+  useEffect(() => {
+    const onOpen = () => {
+      setFabHidden(false)
+      localStorage.removeItem(STORAGE_KEY)
+      setOpen(true)
+    }
+    window.addEventListener('fixitlab-support-open', onOpen)
+    return () => window.removeEventListener('fixitlab-support-open', onOpen)
+  }, [])
+
+  useEffect(() => {
+    if (open && inputRef.current) {
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }, [open])
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  }, [messages, typing, open])
+
+  const sendMessage = async (text) => {
+    const trimmed = (text || '').trim()
+    if (!trimmed || sending || !config?.enabled) return
+
+    setMessages((prev) => [...prev, { role: 'user', text: trimmed }])
+    setInput('')
+    setSuggestions([])
+    setSending(true)
+    setTyping(true)
+
+    try {
+      const delay = config.typing_delay_ms || 1200
+      const [result] = await Promise.all([
+        supportApi.sendMessage(trimmed, pathname),
+        new Promise((r) => setTimeout(r, delay)),
+      ])
+      setTyping(false)
+      setMessages((prev) => [...prev, { role: 'bot', text: result.reply }])
+      if (result.suggestions?.length) {
+        setSuggestions(result.suggestions)
+      }
+    } catch (err) {
+      setTyping(false)
+      const msg = err.response?.data?.error || 'Sorry, I could not reach support right now. Try FAQ or email support.'
+      setMessages((prev) => [...prev, { role: 'bot', text: msg }])
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const hideFab = () => {
+    setOpen(false)
+    setFabHidden(true)
+    localStorage.setItem(STORAGE_KEY, '1')
+  }
+
+  if (!config?.enabled) return null
+
+  const botName = config.name || 'FixitLab Assistant'
+
+  return (
+    <>
+      {/* Chat panel */}
+      {open && (
+        <div
+          className="fixed bottom-20 right-4 sm:right-6 z-[60] w-[min(100vw-2rem,380px)] h-[min(70vh,520px)] flex flex-col rounded-2xl border border-surface-700/60 bg-surface-900/98 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden"
+          role="dialog"
+          aria-label={`${botName} chat`}
+        >
+          <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-surface-700/50 bg-surface-800/50">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center shadow-lg shadow-accent-cyan/20">
+                <Bot size={18} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-white truncate">{botName}</p>
+                <p className="text-[10px] text-surface-500">Platform help & how-to</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-700/50 transition-colors"
+                aria-label="Minimize chat"
+              >
+                <Minimize2 size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={hideFab}
+                className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-700/50 transition-colors"
+                aria-label="Hide support assistant"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
+            {messages.map((m, i) =>
+              m.role === 'user' ? (
+                <UserMessage key={i} text={m.text} />
+              ) : (
+                <BotMessage key={i} text={m.text} name={botName} />
+              )
+            )}
+            {typing && <TypingIndicator name={botName} />}
+          </div>
+
+          {suggestions.length > 0 && !typing && (
+            <div className="shrink-0 px-3 pb-2 flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => sendMessage(s)}
+                  disabled={sending}
+                  className="text-[11px] px-2.5 py-1 rounded-full border border-surface-600/60 text-surface-300 hover:border-accent-cyan/40 hover:text-accent-cyan transition-colors"
+                >
+                  {s.length > 42 ? `${s.slice(0, 40)}…` : s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <form
+            className="shrink-0 p-3 border-t border-surface-700/50 bg-surface-900/80"
+            onSubmit={(e) => {
+              e.preventDefault()
+              sendMessage(input)
+            }}
+          >
+            <div className="flex gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask how to use FixitLab…"
+                disabled={sending}
+                className="input-field flex-1 text-sm py-2.5"
+                aria-label="Message to support assistant"
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || sending}
+                className="btn-primary px-3 py-2 disabled:opacity-40"
+                aria-label="Send message"
+              >
+                <Send size={16} />
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Floating launcher */}
+      {!fabHidden && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className={`fixed bottom-4 right-4 sm:right-6 z-[59] flex items-center gap-2 pl-3 pr-4 py-3 rounded-full shadow-xl transition-all ${
+            open
+              ? 'bg-surface-800 border border-surface-600 text-surface-200'
+              : 'bg-gradient-to-r from-accent-cyan to-accent-blue text-white shadow-accent-cyan/30 hover:scale-105'
+          }`}
+          aria-label={open ? 'Close support chat' : 'Open support assistant'}
+          aria-expanded={open}
+        >
+          {open ? <X size={20} /> : <MessageCircle size={20} />}
+          {!open && <span className="text-sm font-medium pr-0.5">Help</span>}
+        </button>
+      )}
+
+      {fabHidden && (
+        <button
+          type="button"
+          onClick={() => {
+            setFabHidden(false)
+            localStorage.removeItem(STORAGE_KEY)
+            setOpen(true)
+          }}
+          className="fixed bottom-4 right-4 z-[58] p-2.5 rounded-full bg-surface-800/90 border border-surface-600/50 text-surface-400 hover:text-accent-cyan transition-colors"
+          aria-label="Show support assistant"
+          title="Show help assistant"
+        >
+          <Bot size={18} />
+        </button>
+      )}
+    </>
+  )
+}

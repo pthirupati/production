@@ -393,6 +393,7 @@ class UserProfileView(APIView):
                 }
                 for s in social
             ],
+            "support_bot_enabled": profile.support_bot_enabled if profile else True,
         })
 
     def put(self, request):
@@ -425,6 +426,8 @@ class UserProfileView(APIView):
         country = request.data.get("country")
         if country is not None:
             profile.country = country
+        if "support_bot_enabled" in request.data:
+            profile.support_bot_enabled = bool(request.data.get("support_bot_enabled"))
         profile.save()
 
         return Response({
@@ -434,6 +437,7 @@ class UserProfileView(APIView):
             "last_name": user.last_name,
             "phone_number": profile.phone_number,
             "country": profile.country,
+            "support_bot_enabled": profile.support_bot_enabled,
         })
 
 

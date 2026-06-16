@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { Wrench, AlertTriangle, Save, ToggleLeft, ToggleRight, Mail, Settings, Trash2 } from 'lucide-react'
+import { Wrench, AlertTriangle, Save, ToggleLeft, ToggleRight, Mail, Settings, Trash2, Bot } from 'lucide-react'
 import { IMAGE_UPLOAD_HINTS } from '../../utils/mediaUrl'
+import toast from 'react-hot-toast'
 
 export default function AdminSettings() {
   const [maintenance, setMaintenance] = useState({ maintenance_mode: false, maintenance_message: '' })
@@ -13,6 +14,15 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showInactive, setShowInactive] = useState(false)
+  const [supportBot, setSupportBot] = useState({
+    support_bot_enabled: true,
+    support_bot_name: 'FixitLab Assistant',
+    support_bot_welcome_message: '',
+    support_bot_typing_delay_ms: 1200,
+    support_bot_quick_topics: [],
+    support_bot_custom_faq: [],
+  })
+  const [faqDraft, setFaqDraft] = useState({ keywords: '', answer: '' })
 
   useEffect(() => {
     loadData()
@@ -35,6 +45,14 @@ export default function AdminSettings() {
       if (configData?.theme_colors) {
         setThemeColors(prev => ({ ...prev, ...configData.theme_colors }))
       }
+      setSupportBot({
+        support_bot_enabled: configData?.support_bot_enabled !== false,
+        support_bot_name: configData?.support_bot_name || 'FixitLab Assistant',
+        support_bot_welcome_message: configData?.support_bot_welcome_message || '',
+        support_bot_typing_delay_ms: configData?.support_bot_typing_delay_ms || 1200,
+        support_bot_quick_topics: configData?.support_bot_quick_topics || [],
+        support_bot_custom_faq: configData?.support_bot_custom_faq || [],
+      })
     } catch {
       toast.error('Failed to load settings')
     } finally {
@@ -374,6 +392,133 @@ export default function AdminSettings() {
             ))}
           </ul>
         )}
+      </div>
+
+      {/* Support assistant bot */}
+      <div className="glass-card p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Bot size={20} className="text-accent-cyan" />
+            <div>
+              <h2 className="font-semibold text-lg">FixitLab Assistant</h2>
+              <p className="text-sm text-surface-400">Floating help bot — how to use labs, Jira, subscriptions, and contacts</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSupportBot(s => ({ ...s, support_bot_enabled: !s.support_bot_enabled }))}
+            className="flex items-center gap-2"
+          >
+            {supportBot.support_bot_enabled ? (
+              <ToggleRight size={36} className="text-accent-cyan" />
+            ) : (
+              <ToggleLeft size={36} className="text-surface-500" />
+            )}
+          </button>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium mb-1">Bot name</label>
+            <input
+              className="input-field w-full"
+              value={supportBot.support_bot_name}
+              onChange={e => setSupportBot(s => ({ ...s, support_bot_name: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Typing delay (ms)</label>
+            <input
+              type="number"
+              min={300}
+              max={5000}
+              className="input-field w-full"
+              value={supportBot.support_bot_typing_delay_ms}
+              onChange={e => setSupportBot(s => ({ ...s, support_bot_typing_delay_ms: Number(e.target.value) || 1200 }))}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium mb-1">Welcome message</label>
+            <textarea
+              className="input-field w-full min-h-[80px]"
+              value={supportBot.support_bot_welcome_message}
+              onChange={e => setSupportBot(s => ({ ...s, support_bot_welcome_message: e.target.value })}
+              placeholder="Leave empty for default welcome text"
+            />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-medium text-surface-300 mb-2">Custom FAQ entries</h3>
+          <div className="grid sm:grid-cols-2 gap-2 mb-2">
+            <input
+              className="input-field"
+              placeholder="Keywords (comma-separated)"
+              value={faqDraft.keywords}
+              onChange={e => setFaqDraft(d => ({ ...d, keywords: e.target.value }))}
+            />
+            <input
+              className="input-field"
+              placeholder="Answer text"
+              value={faqDraft.answer}
+              onChange={e => setFaqDraft(d => ({ ...d, answer: e.target.value }))}
+            />
+          </div>
+          <button
+            type="button"
+            className="btn-secondary text-sm mb-3"
+            onClick={() => {
+              if (!faqDraft.answer.trim()) { toast.error('Answer required'); return }
+              const keywords = faqDraft.keywords.split(',').map(k => k.trim()).filter(Boolean)
+              setSupportBot(s => ({
+                ...s,
+                support_bot_custom_faq: [...(s.support_bot_custom_faq || []), { keywords, answer: faqDraft.answer.trim() }],
+              }))
+              setFaqDraft({ keywords: '', answer: '' })
+            }}
+          >
+            Add FAQ entry
+          </button>
+          {(supportBot.support_bot_custom_faq || []).length > 0 && (
+            <ul className="text-sm space-y-2">
+              {supportBot.support_bot_custom_faq.map((entry, i) => (
+                <li key={i} className="flex justify-between gap-2 p-2 rounded-lg bg-surface-800/40 border border-surface-700/40">
+                  <span className="text-surface-400 truncate">{(entry.keywords || []).join(', ')} → {entry.answer?.slice(0, 60)}…</span>
+                  <button
+                    type="button"
+                    className="text-surface-500 hover:text-red-400 shrink-0"
+                    onClick={() => setSupportBot(s => ({
+                      ...s,
+                      support_bot_custom_faq: s.support_bot_custom_faq.filter((_, j) => j !== i),
+                    }))}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <button
+          type="button"
+          disabled={saving}
+          onClick={async () => {
+            setSaving(true)
+            try {
+              const result = await adminApi.updateConfig({ ...emailForm, ...supportBot })
+              setConfig(result)
+              toast.success('Support assistant settings saved')
+            } catch {
+              toast.error('Failed to save support bot settings')
+            } finally {
+              setSaving(false)
+            }
+          }}
+          className="btn-primary text-sm flex items-center gap-1"
+        >
+          <Save size={14} /> Save assistant settings
+        </button>
       </div>
 
       {/* Inactive Users */}

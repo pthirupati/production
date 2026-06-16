@@ -1,8 +1,9 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useThemeStore } from '../../store/themeStore'
 import { useAuthStore } from '../../store/authStore'
-import { Sun, Moon, Terminal, Menu, X } from 'lucide-react'
+import { Sun, Moon, Terminal, Menu, X, Bot } from 'lucide-react'
 import { useState } from 'react'
+import SupportBotWidget from '../SupportBotWidget'
 
 const navLinkClass = (active) =>
   active
@@ -33,6 +34,13 @@ export default function PublicLayout({ children }) {
             <Link to="/pricing" className={`${navLinkClass(pathname === '/pricing')} hidden sm:block`}>Pricing</Link>
             <Link to="/blog" className={`${navLinkClass(onBlog)} hidden sm:block`}>Blog</Link>
             <Link to="/faq" className={`${navLinkClass(pathname === '/faq')} hidden sm:block`}>FAQ</Link>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('fixitlab-support-open'))}
+              className={`${navLinkClass(false)} hidden sm:inline-flex items-center gap-1`}
+            >
+              <Bot size={14} /> Help
+            </button>
             <Link to="/verify-certificate" className={`${navLinkClass(pathname === '/verify-certificate')} hidden sm:block`}>Verify Certificate</Link>
             <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-surface-800 transition-colors">
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -125,6 +133,7 @@ export default function PublicLayout({ children }) {
           </div>
         </div>
       </footer>
+      <SupportBotWidget />
     </div>
   )
 }

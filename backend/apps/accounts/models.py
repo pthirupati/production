@@ -36,6 +36,10 @@ class Profile(models.Model):
         default=False,
         help_text="Admin-granted free access to all technologies",
     )
+    support_bot_enabled = models.BooleanField(
+        default=True,
+        help_text="Show the floating FixitLab support assistant",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

@@ -100,7 +100,18 @@ def public_config_payload() -> dict:
         "platform_stats": _platform_stats(),
         "image_upload_specs": image_specs_for_api(),
         **_interview_public_config(),
+        **_support_bot_public_config(),
     }
+
+
+def _support_bot_public_config() -> dict:
+    try:
+        from apps.support.service import support_bot_config
+
+        cfg = support_bot_config()
+        return {"support_bot": {"enabled": cfg["enabled"], "name": cfg["name"]}}
+    except Exception:
+        return {"support_bot": {"enabled": True, "name": "FixitLab Assistant"}}
 
 
 def _interview_public_config() -> dict:
@@ -162,6 +173,12 @@ def admin_config_payload() -> dict:
         "image_upload_specs": image_specs_for_api(),
         "lab_provider": settings.LAB_PROVIDER,
         "max_lab_duration": settings.LAB_MAX_DURATION_MINUTES,
+        "support_bot_enabled": row.support_bot_enabled,
+        "support_bot_name": row.support_bot_name or "FixitLab Assistant",
+        "support_bot_welcome_message": row.support_bot_welcome_message or "",
+        "support_bot_quick_topics": row.support_bot_quick_topics or [],
+        "support_bot_custom_faq": row.support_bot_custom_faq or [],
+        "support_bot_typing_delay_ms": row.support_bot_typing_delay_ms or 1200,
     }
 
 

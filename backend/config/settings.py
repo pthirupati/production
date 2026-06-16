@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "apps.ratings",
     "apps.jira_integration",
     "apps.interviews",
+    "apps.support",
 ]
 
 # --------------------------------------------------

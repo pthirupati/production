@@ -2,10 +2,11 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useThemeStore } from '../../store/themeStore'
 import {
-  LayoutDashboard, Target, Trophy, User, LogOut, Shield, Menu, X, Bookmark, Layers, Sun, Moon, History, Award, MessageSquare, Search, Mic2, CreditCard,
+  LayoutDashboard, Target, Trophy, User, LogOut, Shield, Menu, X, Bookmark, Layers, Sun, Moon, History, Award, MessageSquare, Search, Mic2, CreditCard, Bot,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import NotificationBell from './NotificationBell'
+import SupportBotWidget from '../SupportBotWidget'
 import api from '../../api/client'
 import { PlatformBanners } from '../PlatformBanners'
 
@@ -23,6 +24,10 @@ const navItems = [
   { path: '/team', icon: Shield, label: 'My Team' },
   { path: '/profile', icon: User, label: 'Profile' },
 ]
+
+function openSupportBot() {
+  window.dispatchEvent(new CustomEvent('fixitlab-support-open'))
+}
 
 function SidebarContent({ navVisible, location, user, theme, toggleTheme, handleLogout, onNavClick }) {
   return (
@@ -51,6 +56,15 @@ function SidebarContent({ navVisible, location, user, theme, toggleTheme, handle
             {label}
           </Link>
         ))}
+
+        <button
+          type="button"
+          onClick={() => { openSupportBot(); onNavClick?.() }}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all w-full text-surface-400 hover:text-surface-100 hover:bg-surface-800/50"
+        >
+          <Bot size={18} aria-hidden="true" />
+          Help & Support
+        </button>
 
         {user?.is_staff && (
           <>
@@ -251,6 +265,7 @@ export default function MainLayout() {
           <Outlet />
         </main>
       </div>
+      <SupportBotWidget />
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { authApi } from '../api/auth'
 import { labApi } from '../api/labs'
 import { subscriptionApi } from '../api/subscriptions'
 import api from '../api/client'
-import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download, Github, Users, Trash2, Mic2 } from 'lucide-react'
+import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download, Github, Users, Trash2, Mic2, Bot } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { startOAuth } from '../utils/oauth'
 import { validators } from '../utils/validators'
@@ -39,6 +39,7 @@ export default function Profile() {
   const [deletePassword, setDeletePassword] = useState('')
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [hasUsablePassword, setHasUsablePassword] = useState(true)
+  const [supportBotEnabled, setSupportBotEnabled] = useState(true)
 
   // Load full profile data including phone number
   useEffect(() => {
@@ -64,6 +65,7 @@ export default function Profile() {
       setInvoices(invData?.invoices || [])
       setSocialAccounts(profileData.social_accounts || [])
       setHasUsablePassword(profileData.has_usable_password !== false)
+      setSupportBotEnabled(profileData.support_bot_enabled !== false)
       setOrganizations(unified?.organizations || [])
       setInterviewProfile(intProfile)
     }).catch(console.error)
@@ -324,6 +326,37 @@ export default function Profile() {
           <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Bell size={18} className="text-accent-amber" /> Notification Preferences
           </h2>
+          <div className="space-y-4 mb-6 pb-6 border-b border-surface-700/40">
+            <label className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 hover:bg-surface-800 transition-colors cursor-pointer group">
+              <div>
+                <p className="text-sm text-white font-medium flex items-center gap-2">
+                  <Bot size={14} className="text-accent-cyan" /> FixitLab Assistant
+                </p>
+                <p className="text-xs text-surface-500">Floating help bot for how-to questions, labs, Jira, and support contacts</p>
+              </div>
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={supportBotEnabled}
+                  onChange={async () => {
+                    const next = !supportBotEnabled
+                    setSupportBotEnabled(next)
+                    try {
+                      await authApi.updateProfile({ support_bot_enabled: next })
+                      toast.success(next ? 'Help assistant enabled' : 'Help assistant disabled')
+                      window.dispatchEvent(new CustomEvent('fixitlab-support-config-changed'))
+                    } catch {
+                      setSupportBotEnabled(supportBotEnabled)
+                      toast.error('Failed to update preference')
+                    }
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-5 bg-surface-700 peer-checked:bg-accent-cyan rounded-full transition-colors" />
+                <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5" />
+              </div>
+            </label>
+          </div>
           <div className="space-y-4">
             <div>
               <h3 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Email Notifications</h3>

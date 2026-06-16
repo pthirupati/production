@@ -78,6 +78,9 @@ urlpatterns = [
     # Jira integration (webhooks + ticket status)
     path("api/jira/", include("apps.jira_integration.urls")),
 
+    # Floating support assistant
+    path("api/support/", include("apps.support.urls")),
+
     # AI Interview Studio
     path("api/interviews/", include("apps.interviews.urls")),
 

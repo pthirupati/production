@@ -2024,6 +2024,21 @@ class AdminConfigView(APIView):
             row.theme_colors = request.data.get("theme_colors") or {}
         if "changelog" in request.data:
             row.changelog = request.data.get("changelog") or []
+        if "support_bot_enabled" in request.data:
+            row.support_bot_enabled = bool(request.data.get("support_bot_enabled"))
+        if "support_bot_name" in request.data:
+            row.support_bot_name = (request.data.get("support_bot_name") or "")[:80]
+        if "support_bot_welcome_message" in request.data:
+            row.support_bot_welcome_message = request.data.get("support_bot_welcome_message") or ""
+        if "support_bot_quick_topics" in request.data:
+            row.support_bot_quick_topics = request.data.get("support_bot_quick_topics") or []
+        if "support_bot_custom_faq" in request.data:
+            row.support_bot_custom_faq = request.data.get("support_bot_custom_faq") or []
+        if "support_bot_typing_delay_ms" in request.data:
+            try:
+                row.support_bot_typing_delay_ms = max(300, min(5000, int(request.data.get("support_bot_typing_delay_ms") or 1200)))
+            except (TypeError, ValueError):
+                row.support_bot_typing_delay_ms = 1200
         row.save()
         persist_config_snapshot(row)
         cache.delete("public_platform_stats")

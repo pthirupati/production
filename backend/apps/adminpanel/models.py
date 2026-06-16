@@ -36,6 +36,17 @@ class PlatformSettings(models.Model):
         help_text="Platform changelog entries shown on About page",
     )
 
+    support_bot_enabled = models.BooleanField(default=True)
+    support_bot_name = models.CharField(max_length=80, blank=True, default="FixitLab Assistant")
+    support_bot_welcome_message = models.TextField(blank=True, default="")
+    support_bot_quick_topics = models.JSONField(default=list, blank=True)
+    support_bot_custom_faq = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of {"keywords": ["disk"], "answer": "..."}',
+    )
+    support_bot_typing_delay_ms = models.PositiveIntegerField(default=1200)
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
