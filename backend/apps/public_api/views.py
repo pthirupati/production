@@ -1130,6 +1130,7 @@ class UserProgressView(APIView):
                     "started_at": s.started_at.isoformat(),
                 }
                 for s in recent
+                if s.scenario_id is not None and s.scenario is not None
             ],
         }
         cache.set(cache_key, result, 60)

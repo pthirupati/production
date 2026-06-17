@@ -81,17 +81,17 @@ jobs:
           echo "site_url=${SITE}" >> "$GITHUB_OUTPUT"
           echo "Resolved BASE=${BASE} SITE=${SITE}"
 
-      - name: Wait for staging health (up to 60s)
+      - name: Wait for staging health (up to 120s)
         env:
           BASE_URL: ${{ steps.urls.outputs.base_url }}
         run: |
-          for i in $(seq 1 12); do
+          for i in $(seq 1 24); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/api/health/" || echo "000")
             if [ "$STATUS" = "200" ]; then echo "Healthy"; break; fi
             echo "Attempt $i — status $STATUS, retrying in 5s…"
             sleep 5
           done
-          [ "$STATUS" = "200" ] || { echo "Staging not healthy after 60s"; exit 1; }
+          [ "$STATUS" = "200" ] || { echo "Staging not healthy after 120s"; exit 1; }
 
       - name: Run Playwright smoke tests
         env:

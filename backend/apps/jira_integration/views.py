@@ -66,6 +66,8 @@ class UserJiraTicketsView(APIView):
         open_tickets = []
         closed_tickets = []
         for t in tickets_qs:
+            if t.scenario is None:
+                continue
             status = _sync_ticket_status(t, client) if live_sync else (t.jira_status or "")
             entry = {
                 "issue_key": t.issue_key,

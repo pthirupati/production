@@ -885,6 +885,8 @@ def run_full_ui_coverage(s, token: str, email: str, password: str, refresh: str 
     run_profile_tab(s, token)
     run_notifications_tab(s, token)
     run_billing_all_options(s, token)
+    from e2e_production_test import clear_rate_limit_cache
+    clear_rate_limit_cache()
     run_billing_subscribe_cancel_user(s, token)
     run_community_full(s, token)
     run_lab_runner_all_tabs(s, token, scenario)
