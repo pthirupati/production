@@ -54,12 +54,86 @@ const PHASE_DURATION = 13000
 const STEP = { INTRO: 0, ASKING: 2000, ANSWERING: 5500, EVALUATING: 9000, SCORED: 11000 }
 
 /* ── Voice wave bars ── */
-const INTERVIEWER_PORTRAIT =
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=640&h=480&q=80'
 const CANDIDATE_PORTRAIT =
   'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=640&h=480&q=80'
+const AI_BOT_AVATAR =
+  'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=400&h=400&q=80'
 
-/* ── Realistic video-call participant tile ── */
+/* ── AI interviewer tile — distinct from human video feed ── */
+function AIBotVideoTile({ speaking, label, sublabel, accentColor }) {
+  return (
+    <div
+      className="relative rounded-xl overflow-hidden aspect-[4/3] border-2 transition-all duration-500 bg-surface-950"
+      style={{
+        borderColor: speaking ? accentColor : 'rgba(71,85,105,0.45)',
+        boxShadow: speaking ? `0 0 32px ${accentColor}40` : undefined,
+      }}
+    >
+      <div
+        className="absolute inset-0 transition-opacity duration-700"
+        style={{
+          background: `radial-gradient(ellipse at 50% 35%, ${accentColor}28 0%, rgb(15 23 42) 55%, rgb(4 8 26) 100%)`,
+        }}
+      />
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTTAgNDBINDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNnKSIvPjwvc3ZnPg==')] opacity-40 pointer-events-none" />
+      {[1, 2, 3].map((ring) => (
+        <div
+          key={ring}
+          className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 rounded-full border pointer-events-none"
+          style={{
+            width: `${48 + ring * 28}%`,
+            height: `${48 + ring * 28}%`,
+            borderColor: `${accentColor}${speaking ? '35' : '18'}`,
+            animation: speaking ? `ai-ring-pulse ${1.8 + ring * 0.4}s ease-in-out infinite` : 'none',
+            animationDelay: `${ring * 0.25}s`,
+          }}
+        />
+      ))}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
+        <div
+          className={`relative transition-transform duration-[900ms] ease-out ${speaking ? 'scale-105' : 'scale-100'}`}
+        >
+          <div
+            className="absolute -inset-3 rounded-full blur-xl opacity-60 pointer-events-none"
+            style={{ background: accentColor }}
+          />
+          <div className="relative w-[72px] h-[72px] sm:w-[84px] sm:h-[84px] rounded-full overflow-hidden ring-2 ring-white/20 shadow-2xl">
+            <img src={AI_BOT_AVATAR} alt="AI interviewer avatar" className="w-full h-full object-cover" loading="lazy" />
+            <div
+              className="absolute inset-0 mix-blend-color pointer-events-none"
+              style={{ background: `${accentColor}55` }}
+            />
+          </div>
+          <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-surface-950 border border-white/20 flex items-center justify-center shadow-lg">
+            <Brain size={14} style={{ color: accentColor }} />
+          </div>
+        </div>
+        {speaking && (
+          <div className="mt-4 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 backdrop-blur-sm border border-white/10">
+            <Volume2 size={10} style={{ color: accentColor }} />
+            <VoiceWave active color={accentColor} bars={5} />
+          </div>
+        )}
+      </div>
+      <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/55 backdrop-blur-md border border-cyan-500/30 text-[9px] font-semibold text-cyan-300">
+        <Brain size={9} />
+        <span>AI Interviewer</span>
+      </div>
+      <div className="absolute top-2 right-2 text-[8px] font-medium px-1.5 py-0.5 rounded bg-black/45 text-cyan-300/90 backdrop-blur-sm">
+        LIVE AI
+      </div>
+      <div className="absolute bottom-2 left-2 right-2">
+        <p className="text-[10px] font-semibold text-white truncate drop-shadow">{label}</p>
+        {sublabel && <p className="text-[8px] text-white/60 truncate">{sublabel}</p>}
+      </div>
+      <div
+        className="absolute inset-0 opacity-[0.05] pointer-events-none mix-blend-overlay interview-scanlines"
+        aria-hidden="true"
+      />
+    </div>
+  )
+}
+/* ── Human video-call participant tile ── */
 function VideoParticipant({ src, alt, speaking, label, sublabel, accentColor, badge }) {
   return (
     <div
@@ -73,7 +147,7 @@ function VideoParticipant({ src, alt, speaking, label, sublabel, accentColor, ba
         src={src}
         alt={alt}
         className={`absolute inset-0 w-full h-full object-cover transition-transform duration-[1200ms] ease-out ${
-          speaking ? 'scale-[1.06]' : 'scale-100'
+          speaking ? 'scale-[1.08] interview-speaking-drift' : 'scale-100'
         }`}
         loading="lazy"
       />
@@ -242,19 +316,11 @@ export default function InterviewDemoWidget() {
 
         {/* VIDEO CALL GRID */}
         <div className="grid grid-cols-2 gap-2 p-3">
-          <VideoParticipant
-            src={INTERVIEWER_PORTRAIT}
-            alt={`${demo.persona} AI interviewer`}
+          <AIBotVideoTile
             speaking={interviewerSpeaking}
             label={demo.persona}
             sublabel={demo.role}
             accentColor={demo.glowColor}
-            badge={
-              <>
-                <Brain size={9} className="text-accent-cyan" />
-                <span>AI Interviewer</span>
-              </>
-            }
           />
           {camOff ? (
             <div className="relative rounded-xl overflow-hidden aspect-[4/3] border-2 border-surface-700/50 bg-surface-900 flex flex-col items-center justify-center gap-2">

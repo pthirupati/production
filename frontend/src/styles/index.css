@@ -353,6 +353,31 @@ body::after {
   to   { transform: scaleY(1.0); opacity: 1.0; }
 }
 
+@keyframes ai-ring-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.35; }
+  50% { transform: translate(-50%, -50%) scale(1.06); opacity: 0.75; }
+}
+
+@keyframes interview-speaking-drift {
+  0%, 100% { transform: scale(1.08) translate(0, 0); }
+  33% { transform: scale(1.08) translate(0.4%, -0.3%); }
+  66% { transform: scale(1.08) translate(-0.3%, 0.2%); }
+}
+
+.interview-speaking-drift {
+  animation: interview-speaking-drift 4s ease-in-out infinite;
+}
+
+.interview-scanlines {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.9) 2px,
+    rgba(255, 255, 255, 0.9) 3px
+  );
+}
+
 .gradient-border {
   position: relative;
 }
@@ -549,8 +574,9 @@ body::after {
     @apply bg-surface-950 text-surface-100 font-sans antialiased;
   }
 
-  h1, h2, h3, .font-display {
-    @apply font-display tracking-tight;
+  h1, h2, h3 {
+    font-family: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+    @apply tracking-tight;
   }
 
   *:focus-visible {

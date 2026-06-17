@@ -93,7 +93,7 @@ export default function Home() {
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center shadow-lg shadow-accent-cyan/25 group-hover:shadow-accent-cyan/40 transition-shadow">
                 <Terminal size={18} className="text-white" />
               </div>
-              <span className="text-xl font-bold text-white tracking-tight">FixitLab</span>
+              <span className="text-xl font-bold font-display text-white tracking-tight">FixitLab</span>
             </Link>
 
             {/* Desktop nav links */}
@@ -499,7 +499,7 @@ export default function Home() {
                 <Mic2 size={13} className="animate-pulse" /> AI Interview Studio
               </div>
 
-              <h2 className="text-4xl lg:text-5xl font-black text-white mb-6 leading-tight">
+              <h2 className="font-display text-4xl lg:text-5xl font-black text-white mb-6 leading-tight">
                 Get Hired Faster with<br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-purple via-accent-cyan to-accent-pink">
                   Face-to-Face AI Interviews
