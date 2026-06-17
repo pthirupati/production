@@ -1,18 +1,41 @@
 # e2e-smoke.yml — Critical-path smoke test (~10 min)
-# Triggers: merge to main (post-deploy verification)
-# Runs against staging environment using Playwright
+# Called as a reusable workflow by production.yml after deploy (runs inline, not as a separate run).
+# Can also be triggered manually.
 # Covers: login, start lab, complete scenario, payment flow
 name: E2E Smoke
 
 on:
-  workflow_run:
-    workflows: ["FixitLab Production"]
-    types: [completed]
-    branches: [main]
+  workflow_call:
+    inputs:
+      base_url:
+        description: "Base URL to test against"
+        required: false
+        type: string
+        default: ""
+      site_url:
+        description: "Public site URL for SPA routes"
+        required: false
+        type: string
+        default: ""
+    secrets:
+      PRODUCTION_BASE_URL:
+        required: false
+      PRODUCTION_SITE_URL:
+        required: false
+      STAGING_BASE_URL:
+        required: false
+      STAGING_SITE_URL:
+        required: false
+      STAGING_SUPERUSER_EMAIL:
+        required: false
+      STAGING_SUPERUSER_PASSWORD:
+        required: false
+      SLACK_WEBHOOK_URL:
+        required: false
   workflow_dispatch:
     inputs:
       base_url:
-        description: "Base URL to test against (default: staging)"
+        description: "Base URL to test against (default: production)"
         required: false
         default: ""
       site_url:
@@ -28,10 +51,6 @@ jobs:
     name: Critical path E2E smoke
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Only run if the triggering workflow succeeded (when triggered by workflow_run)
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
 
     steps:
       - uses: actions/checkout@v4
@@ -50,13 +69,12 @@ jobs:
       - name: Resolve target URLs
         id: urls
         run: |
-          BASE="${{ github.event.inputs.base_url }}"
-          SITE="${{ github.event.inputs.site_url }}"
-          if [ -z "$BASE" ]; then BASE="${{ secrets.STAGING_BASE_URL }}"; fi
-          if [ -z "$SITE" ]; then SITE="${{ secrets.STAGING_SITE_URL }}"; fi
-          # Post-deploy workflow_run: no inputs; fall back to production
+          BASE="${{ inputs.base_url }}"
+          SITE="${{ inputs.site_url }}"
           if [ -z "$BASE" ]; then BASE="${{ secrets.PRODUCTION_BASE_URL }}"; fi
           if [ -z "$SITE" ]; then SITE="${{ secrets.PRODUCTION_SITE_URL }}"; fi
+          if [ -z "$BASE" ]; then BASE="${{ secrets.STAGING_BASE_URL }}"; fi
+          if [ -z "$SITE" ]; then SITE="${{ secrets.STAGING_SITE_URL }}"; fi
           if [ -z "$BASE" ]; then BASE="https://fixitlab.in"; fi
           if [ -z "$SITE" ]; then SITE="https://fixitlab.in"; fi
           echo "base_url=${BASE}" >> "$GITHUB_OUTPUT"

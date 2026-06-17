@@ -497,11 +497,23 @@ jobs:
               python /scripts/e2e_interviews.py
 
   # ─────────────────────────────────────────────────────────────
+  # E2E SMOKE — reusable workflow, runs inline (no separate run)
+  # ─────────────────────────────────────────────────────────────
+  smoke:
+    name: E2E smoke
+    needs: [deploy]
+    if: >
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      needs.deploy.result == 'success'
+    uses: ./.github/workflows/e2e-smoke.yml
+    secrets: inherit
+
+  # ─────────────────────────────────────────────────────────────
   # CLEANUP — always runs after all post-deploy jobs finish
   # ─────────────────────────────────────────────────────────────
   cleanup:
     name: Cleanup E2E test data
-    needs: [deploy, verify-health, test-units, e2e-labs, e2e-api, e2e-interviews]
+    needs: [deploy, verify-health, test-units, e2e-labs, e2e-api, e2e-interviews, smoke]
     if: always() && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -524,7 +536,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   summary:
     name: Pipeline summary
-    needs: [deploy, verify-health, test-units, e2e-labs, e2e-api, e2e-interviews, cleanup]
+    needs: [deploy, verify-health, test-units, e2e-labs, e2e-api, e2e-interviews, smoke, cleanup]
     if: always() && (inputs.action == 'launch' || inputs.action == 'deploy')
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -553,5 +565,6 @@ jobs:
             echo "| e2e-labs | \`${{ needs.e2e-labs.result }}\` |"
             echo "| e2e-api | \`${{ needs.e2e-api.result }}\` |"
             echo "| e2e-interviews | \`${{ needs.e2e-interviews.result }}\` |"
+            echo "| smoke | \`${{ needs.smoke.result }}\` |"
             echo "| cleanup | \`${{ needs.cleanup.result }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"

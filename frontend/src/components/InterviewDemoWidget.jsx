@@ -1,61 +1,67 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Mic, Star, CheckCircle, Brain, Zap, Shield, ChevronRight } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, Phone, Star, CheckCircle, Brain, Zap, Shield, ChevronRight, Volume2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 const DEMO_SCRIPT = [
   {
-    phase: 'Technical Round',
+    phase: 'Technical Round 1',
     persona: 'Aria',
+    role: 'Senior SRE · Google',
     question: 'A production server is showing high load average but low CPU usage. Walk me through your diagnostic approach.',
-    answer: 'I\'d start by running uptime to check load numbers, then iostat -x to check I/O wait. High load with low CPU usually points to I/O blocking — stale NFS mounts, failing disk, or a process stuck in D state. I\'d use ps aux to find D-state processes and dmesg for hardware errors.',
+    answer: 'I\'d check I/O wait with iostat -x. High load + low CPU usually means disk or NFS blocking — stale mounts, failing disk, or D-state processes.',
     scores: { situation: true, task: true, action: true, result: true },
     score: 91,
-    keywords: ['iostat', 'I/O wait', 'D-state', 'dmesg', 'NFS'],
-    feedback: 'Excellent systematic approach — STAR-structured and technically precise.',
+    keywords: ['iostat', 'I/O wait', 'D-state', 'dmesg'],
+    feedback: 'Excellent systematic approach — technically precise.',
+    avatarColor: 'from-accent-cyan to-accent-blue',
+    initials: 'AR',
   },
   {
     phase: 'Behavioral Round',
     persona: 'Nova',
-    question: 'Tell me about a time you had to fix a critical production outage under pressure. What was your process?',
-    answer: 'During a black Friday event, our Redis cluster went down causing 100% checkout failures. I immediately formed a war room, rolled back the recent config change, and restored service in 8 minutes. We then implemented proper sentinel failover to prevent recurrence.',
+    role: 'Engineering Manager · AWS',
+    question: 'Tell me about a critical production outage you fixed under pressure. What was your process?',
+    answer: 'Black Friday — Redis cluster failed, 100% checkout errors. I formed a war room, rolled back the config change, restored in 8 minutes, then added sentinel failover.',
     scores: { situation: true, task: true, action: true, result: true },
     score: 88,
-    keywords: ['war room', 'rollback', 'failover', 'sentinel', 'incident'],
-    feedback: 'Strong STAR response with quantified impact and preventive follow-up.',
+    keywords: ['war room', 'rollback', 'failover', 'sentinel'],
+    feedback: 'Strong STAR with quantified impact and preventive follow-up.',
+    avatarColor: 'from-accent-purple to-accent-pink',
+    initials: 'NV',
   },
   {
     phase: 'System Design',
     persona: 'Atlas',
+    role: 'Principal Engineer · Meta',
     question: 'How would you design a highly available NFS solution for 500+ Linux servers?',
-    answer: 'I\'d use a clustered NFS with Pacemaker and DRBD for HA, or leverage cloud-native solutions like AWS EFS or Azure Files. Key considerations: active-passive failover under 30s, client-side _netdev and soft mount options, monitoring with alerting on stale mounts, and autofs for on-demand mounting.',
+    answer: 'Pacemaker + DRBD for HA, or AWS EFS. Key: active-passive failover under 30s, soft mount options, autofs for on-demand, and mount alerts.',
     scores: { situation: true, task: true, action: true, result: false },
     score: 79,
-    keywords: ['Pacemaker', 'DRBD', 'EFS', 'autofs', '_netdev', 'failover'],
-    feedback: 'Good design — add specifics on recovery time objectives and capacity planning.',
+    keywords: ['Pacemaker', 'DRBD', 'EFS', 'autofs'],
+    feedback: 'Good design — add recovery time objectives and capacity planning.',
+    avatarColor: 'from-accent-amber to-accent-green',
+    initials: 'AT',
   },
 ]
 
-const BOT_AVATARS = {
-  Aria:  { color: 'from-accent-cyan to-accent-blue',   initials: 'AR', ring: 'border-accent-cyan/50' },
-  Nova:  { color: 'from-accent-purple to-accent-pink', initials: 'NV', ring: 'border-accent-purple/50' },
-  Atlas: { color: 'from-accent-amber to-accent-green', initials: 'AT', ring: 'border-accent-amber/50' },
-}
+const PHASE_DURATION = 13000
+const STEP = { INTRO: 0, ASKING: 2000, ANSWERING: 5500, EVALUATING: 9000, SCORED: 11000 }
 
-function VoiceWave({ active, color = '#06b6d4' }) {
-  const bars = [3, 5, 4, 7, 6, 8, 5, 4, 6, 3, 7, 5]
+function VoiceWave({ active, color = '#06b6d4', bars = 8 }) {
+  const heights = [3, 5, 7, 9, 8, 6, 4, 5, 7, 6, 8, 4]
   return (
-    <div className="flex items-center gap-[2px] h-6">
-      {bars.map((h, i) => (
+    <div className="flex items-center gap-[2px] h-5">
+      {Array.from({ length: bars }).map((_, i) => (
         <div
           key={i}
           className="rounded-full transition-all"
           style={{
             width: 3,
-            height: active ? `${h * 3}px` : '3px',
+            height: active ? `${heights[i % heights.length] * 2.5}px` : '3px',
             background: color,
-            opacity: active ? 0.85 : 0.3,
-            animation: active ? `voice-bar 0.8s ease-in-out infinite alternate` : 'none',
-            animationDelay: `${i * 0.07}s`,
+            opacity: active ? 0.9 : 0.25,
+            animation: active ? `voice-bar 0.7s ease-in-out infinite alternate` : 'none',
+            animationDelay: `${i * 0.08}s`,
           }}
         />
       ))}
@@ -63,259 +69,257 @@ function VoiceWave({ active, color = '#06b6d4' }) {
   )
 }
 
-function ScoreBar({ label, value, color, delay = 0 }) {
-  const [w, setW] = useState(0)
-  useEffect(() => {
-    const t = setTimeout(() => setW(value), delay)
-    return () => clearTimeout(t)
-  }, [value, delay])
+function ScoreBadge({ score }) {
+  const color = score >= 85 ? '#10b981' : score >= 70 ? '#f59e0b' : '#ef4444'
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="text-surface-400 w-14 shrink-0">{label}</span>
-      <div className="flex-1 h-1.5 bg-surface-800 rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${w}%`, background: color }} />
+    <div className="flex items-center gap-1.5">
+      <div className="relative w-10 h-10">
+        <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+          <circle cx="18" cy="18" r="15" fill="none" stroke="rgb(30 41 59)" strokeWidth="3" />
+          <circle
+            cx="18" cy="18" r="15" fill="none"
+            stroke={color} strokeWidth="3"
+            strokeDasharray={`${(score / 100) * 94} 94`}
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black" style={{ color }}>{score}</span>
       </div>
-      <span className="text-surface-300 w-6 text-right font-mono">{Math.round(w)}</span>
     </div>
   )
 }
-
-function StarIndicator({ label, present }) {
-  return (
-    <div className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-      present
-        ? 'bg-accent-green/15 border-accent-green/30 text-accent-green'
-        : 'bg-surface-800 border-surface-700 text-surface-500'
-    }`}>
-      {present ? <CheckCircle size={9} /> : <div className="w-2 h-2 rounded-full border border-surface-500" />}
-      {label}
-    </div>
-  )
-}
-
-// Typewriter hook
-function useTypewriter(text, speed = 22, active = false) {
-  const [displayed, setDisplayed] = useState('')
-  useEffect(() => {
-    if (!active) { setDisplayed(''); return }
-    setDisplayed('')
-    let i = 0
-    const interval = setInterval(() => {
-      i++
-      setDisplayed(text.slice(0, i))
-      if (i >= text.length) clearInterval(interval)
-    }, speed)
-    return () => clearInterval(interval)
-  }, [text, speed, active])
-  return displayed
-}
-
-const PHASE_DURATION = 12000 // ms per interview exchange
-const STEP = { BOT_SPEAKING: 0, USER_ANSWERING: 2500, EVALUATING: 6500, SCORED: 8500 }
 
 export default function InterviewDemoWidget() {
   const [scene, setScene] = useState(0)
-  const [step, setStep] = useState(STEP.BOT_SPEAKING)
-  const [hovered, setHovered] = useState(false)
+  const [step, setStep] = useState(STEP.INTRO)
   const [playing, setPlaying] = useState(true)
-  const phaseRef = useRef(null)
-  const stepRef = useRef(null)
+  const [camOff, setCamOff] = useState(false)
 
   const advance = useCallback(() => {
     setScene(s => (s + 1) % DEMO_SCRIPT.length)
-    setStep(STEP.BOT_SPEAKING)
+    setStep(STEP.INTRO)
   }, [])
 
   useEffect(() => {
     if (!playing) return
     const steps = [
-      { at: STEP.USER_ANSWERING, fn: () => setStep(STEP.USER_ANSWERING) },
-      { at: STEP.EVALUATING,     fn: () => setStep(STEP.EVALUATING) },
-      { at: STEP.SCORED,         fn: () => setStep(STEP.SCORED) },
-      { at: PHASE_DURATION,      fn: advance },
+      { at: STEP.ASKING,     fn: () => setStep(STEP.ASKING) },
+      { at: STEP.ANSWERING,  fn: () => setStep(STEP.ANSWERING) },
+      { at: STEP.EVALUATING, fn: () => setStep(STEP.EVALUATING) },
+      { at: STEP.SCORED,     fn: () => setStep(STEP.SCORED) },
+      { at: PHASE_DURATION,  fn: advance },
     ]
     const timers = steps.map(({ at, fn }) => setTimeout(fn, at))
     return () => timers.forEach(clearTimeout)
   }, [scene, playing, advance])
 
   const demo = DEMO_SCRIPT[scene]
-  const avatar = BOT_AVATARS[demo.persona]
-  const botSpeaking = step === STEP.BOT_SPEAKING
-  const userAnswering = step === STEP.USER_ANSWERING
+  const interviewerSpeaking = step === STEP.ASKING
+  const userSpeaking = step === STEP.ANSWERING
   const evaluating = step === STEP.EVALUATING
   const scored = step === STEP.SCORED
 
-  const questionText = useTypewriter(demo.question, 18, botSpeaking || userAnswering || evaluating || scored)
-  const answerText   = useTypewriter(demo.answer, 12, userAnswering || evaluating || scored)
-
-  const scoreColor = demo.score >= 85 ? '#10b981' : demo.score >= 70 ? '#f59e0b' : '#ef4444'
-
   return (
-    <div
-      className="relative rounded-2xl overflow-hidden"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {/* Glow halo */}
+    <div className="relative rounded-2xl overflow-hidden">
+      {/* Ambient glow */}
       <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-accent-purple/20 via-accent-cyan/10 to-accent-pink/15 blur-2xl pointer-events-none animate-pulse-glow" />
 
-      <div className="relative glass-card gradient-border card-3d overflow-hidden">
-        {/* Header bar */}
-        <div className="flex items-center justify-between px-4 py-3 bg-surface-900/80 border-b border-surface-700/50">
+      <div className="relative glass-card gradient-border overflow-hidden">
+        {/* Title bar */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-surface-950/80 border-b border-surface-700/50">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-accent-red/80" />
             <div className="w-2.5 h-2.5 rounded-full bg-accent-amber/80" />
             <div className="w-2.5 h-2.5 rounded-full bg-accent-green/80" />
-            <span className="ml-2 text-xs text-surface-400 font-mono">FixitLab AI Interview Studio</span>
+            <span className="ml-2 text-xs text-surface-400 font-mono">FixitLab · AI Interview Studio</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs">
-              {DEMO_SCRIPT.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => { setScene(i); setStep(STEP.BOT_SPEAKING) }}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${i === scene ? 'bg-accent-cyan scale-125' : 'bg-surface-600 hover:bg-surface-400'}`}
-                />
-              ))}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-red/15 border border-accent-red/30">
+              <div className="w-1.5 h-1.5 rounded-full bg-accent-red animate-pulse" />
+              <span className="text-[9px] text-accent-red font-bold uppercase">Live</span>
             </div>
             <button
               onClick={() => setPlaying(p => !p)}
-              className="text-xs text-surface-400 hover:text-white transition-colors px-2 py-0.5 rounded border border-surface-700 hover:border-accent-cyan/50"
+              className="text-xs text-surface-500 hover:text-white transition-colors px-2 py-0.5 rounded border border-surface-700 hover:border-surface-500"
             >
               {playing ? '⏸' : '▶'}
             </button>
           </div>
         </div>
 
-        {/* Phase badge */}
-        <div className="px-4 pt-3 pb-0">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border"
-            style={{ background: 'rgb(139 92 246 / 0.12)', borderColor: 'rgb(139 92 246 / 0.3)', color: 'rgb(139 92 246)' }}>
-            <Brain size={10} /> {demo.phase}
+        {/* Phase label */}
+        <div className="flex items-center justify-between px-4 pt-2.5 pb-0">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border bg-accent-purple/10 border-accent-purple/30 text-accent-purple">
+            <Brain size={9} /> {demo.phase}
+          </div>
+          <div className="flex gap-1.5">
+            {DEMO_SCRIPT.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => { setScene(i); setStep(STEP.INTRO) }}
+                className={`w-1.5 h-1.5 rounded-full transition-all ${i === scene ? 'bg-accent-cyan scale-125' : 'bg-surface-600 hover:bg-surface-400'}`}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Chat area */}
-        <div className="p-4 space-y-4 min-h-[260px]">
-          {/* Bot message */}
-          <div className={`flex gap-3 transition-all duration-500 ${botSpeaking || userAnswering || evaluating || scored ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
-            <div className="shrink-0">
-              <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${avatar.color} flex items-center justify-center text-white text-xs font-bold border-2 ${avatar.ring} shadow-lg`}>
-                {avatar.initials}
+        {/* VIDEO CALL GRID */}
+        <div className="grid grid-cols-2 gap-2 p-3">
+          {/* AI Interviewer tile */}
+          <div className={`relative rounded-xl overflow-hidden bg-surface-950 aspect-[4/3] border-2 transition-all duration-500 ${
+            interviewerSpeaking ? 'border-accent-cyan shadow-lg shadow-accent-cyan/20' : 'border-surface-700/50'
+          }`}>
+            {/* Gradient "face" background */}
+            <div className={`absolute inset-0 bg-gradient-to-br ${demo.avatarColor} opacity-20`} />
+            <div className="absolute inset-0 bg-surface-950/60" />
+
+            {/* Avatar face */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+              <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${demo.avatarColor} flex items-center justify-center shadow-xl border-2 border-white/20`}>
+                <span className="text-white text-lg font-black">{demo.initials}</span>
+              </div>
+              {/* Face lines — simulated video feed effect */}
+              <div className="space-y-1 text-center">
+                <p className="text-[11px] font-semibold text-white">{demo.persona}</p>
+                <p className="text-[9px] text-surface-400">{demo.role}</p>
               </div>
             </div>
+
+            {/* Speaking indicator + voice wave */}
+            {interviewerSpeaking && (
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+                <div className="bg-surface-950/90 rounded-full px-2 py-1 flex items-center gap-1.5">
+                  <Volume2 size={9} className="text-accent-cyan" />
+                  <VoiceWave active color="#06b6d4" bars={8} />
+                </div>
+              </div>
+            )}
+
+            {/* Name tag */}
+            <div className="absolute bottom-2 left-2 text-[9px] text-white/70 font-medium bg-black/40 px-1.5 py-0.5 rounded">
+              {demo.persona} — AI
+            </div>
+          </div>
+
+          {/* User tile */}
+          <div className={`relative rounded-xl overflow-hidden bg-surface-950 aspect-[4/3] border-2 transition-all duration-500 ${
+            userSpeaking ? 'border-accent-purple shadow-lg shadow-accent-purple/20' : 'border-surface-700/50'
+          }`}>
+            {camOff ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-surface-900">
+                <VideoOff size={24} className="text-surface-600" />
+                <p className="text-[10px] text-surface-500">Camera off</p>
+              </div>
+            ) : (
+              <>
+                <div className="absolute inset-0 bg-gradient-to-br from-accent-blue/20 to-accent-purple/20" />
+                <div className="absolute inset-0 bg-surface-950/50" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-accent-blue/80 to-accent-purple/80 flex items-center justify-center shadow-xl border-2 border-white/20">
+                    <span className="text-white text-lg font-black">ME</span>
+                  </div>
+                  <p className="text-[10px] text-surface-400">Candidate</p>
+                </div>
+              </>
+            )}
+
+            {/* Mic + speaking indicator */}
+            {userSpeaking && (
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+                <div className="bg-surface-950/90 rounded-full px-2 py-1 flex items-center gap-1.5">
+                  <Mic size={9} className="text-accent-purple animate-pulse" />
+                  <VoiceWave active color="#8b5cf6" bars={8} />
+                </div>
+              </div>
+            )}
+
+            <div className="absolute bottom-2 left-2 text-[9px] text-white/70 font-medium bg-black/40 px-1.5 py-0.5 rounded">
+              You
+            </div>
+          </div>
+        </div>
+
+        {/* Question / Answer transcript */}
+        <div className="mx-3 mb-2 bg-surface-950/60 rounded-xl border border-surface-700/40 px-3 py-2.5 min-h-[56px]">
+          {step === STEP.INTRO && (
+            <p className="text-[11px] text-surface-500 italic text-center pt-1">Connecting to interview session…</p>
+          )}
+          {interviewerSpeaking && (
+            <div>
+              <p className="text-[9px] text-accent-cyan font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Volume2 size={8} /> {demo.persona} is asking
+              </p>
+              <p className="text-[11px] text-surface-200 leading-relaxed line-clamp-2">{demo.question}</p>
+            </div>
+          )}
+          {(userSpeaking || evaluating || scored) && (
+            <div>
+              <p className="text-[9px] text-accent-purple font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Mic size={8} /> {userSpeaking ? 'You are answering' : 'Your answer'}
+              </p>
+              <p className="text-[11px] text-surface-300 leading-relaxed line-clamp-2">{demo.answer}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Evaluation / Score overlay */}
+        {evaluating && !scored && (
+          <div className="mx-3 mb-2 px-3 py-2 bg-accent-amber/8 border border-accent-amber/20 rounded-xl flex items-center gap-2 text-xs text-accent-amber">
+            <div className="w-3 h-3 border-2 border-accent-amber border-t-transparent rounded-full animate-spin shrink-0" />
+            Analyzing STAR framework, keywords, technical depth…
+          </div>
+        )}
+
+        {scored && (
+          <div className="mx-3 mb-2 glass-card p-3 border border-surface-700/50 flex items-start gap-3 animate-slide-up">
+            <ScoreBadge score={demo.score} />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-semibold text-white">{demo.persona}</span>
-                <span className="text-[10px] text-surface-500">AI Interviewer</span>
-                {botSpeaking && (
-                  <div className="flex items-center gap-1 text-[9px] text-accent-cyan bg-accent-cyan/10 px-1.5 py-0.5 rounded-full border border-accent-cyan/20">
-                    <div className="w-1.5 h-1.5 rounded-full bg-accent-cyan animate-pulse" /> Speaking
-                  </div>
-                )}
+              <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                {Object.entries(demo.scores).map(([k, v]) => (
+                  <span key={k} className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex items-center gap-0.5 ${
+                    v ? 'bg-accent-green/10 border-accent-green/30 text-accent-green' : 'bg-surface-800 border-surface-700 text-surface-500'
+                  }`}>
+                    {v && <CheckCircle size={7} />}{k.charAt(0).toUpperCase() + k.slice(1)}
+                  </span>
+                ))}
               </div>
-              <div className="bg-surface-800/60 rounded-xl rounded-tl-sm px-3 py-2.5 text-sm text-surface-200 leading-relaxed border border-surface-700/40">
-                {questionText}
-                {botSpeaking && questionText.length < demo.question.length && (
-                  <span className="inline-block w-0.5 h-4 bg-accent-cyan ml-0.5 animate-pulse" />
-                )}
+              <div className="flex flex-wrap gap-1 mb-1.5">
+                {demo.keywords.map(kw => (
+                  <span key={kw} className="text-[9px] bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20 px-1.5 py-0.5 rounded-full">{kw}</span>
+                ))}
               </div>
-              {botSpeaking && <VoiceWave active className="mt-2 ml-1" color="rgb(6 182 212)" />}
+              <p className="text-[10px] text-surface-400 italic">{demo.feedback}</p>
             </div>
           </div>
+        )}
 
-          {/* User response */}
-          {(userAnswering || evaluating || scored) && (
-            <div className="flex gap-3 flex-row-reverse transition-all duration-500 animate-slide-up">
-              <div className="shrink-0">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-blue/80 to-accent-purple/80 flex items-center justify-center text-white text-xs font-bold border-2 border-accent-blue/40 shadow-lg">
-                  ME
-                </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-row-reverse">
-                  <span className="text-xs font-semibold text-white">You</span>
-                  {userAnswering && !evaluating && (
-                    <div className="flex items-center gap-1 text-[9px] text-accent-purple bg-accent-purple/10 px-1.5 py-0.5 rounded-full border border-accent-purple/20">
-                      <Mic size={8} className="animate-pulse" /> Recording
-                    </div>
-                  )}
-                </div>
-                <div className="bg-surface-800/40 rounded-xl rounded-tr-sm px-3 py-2.5 text-sm text-surface-300 leading-relaxed border border-surface-700/30">
-                  {answerText}
-                  {userAnswering && answerText.length < demo.answer.length && (
-                    <span className="inline-block w-0.5 h-4 bg-accent-purple ml-0.5 animate-pulse" />
-                  )}
-                </div>
-                {userAnswering && (
-                  <div className="mt-2 flex justify-end mr-1">
-                    <VoiceWave active color="rgb(139 92 246)" />
-                  </div>
-                )}
-              </div>
+        {/* Bottom controls bar */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-surface-700/30 bg-surface-950/60">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCamOff(v => !v)}
+              title="Toggle camera"
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                camOff ? 'bg-accent-red/20 text-accent-red border border-accent-red/30' : 'bg-surface-800 text-surface-400 border border-surface-700 hover:text-white'
+              }`}
+            >
+              {camOff ? <VideoOff size={12} /> : <Video size={12} />}
+            </button>
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center border ${
+              userSpeaking ? 'bg-accent-purple/20 text-accent-purple border-accent-purple/30' : 'bg-surface-800 text-surface-400 border-surface-700'
+            }`}>
+              {userSpeaking ? <Mic size={12} className="animate-pulse" /> : <MicOff size={12} />}
             </div>
-          )}
-
-          {/* Evaluation in progress */}
-          {evaluating && !scored && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-accent-amber/8 border border-accent-amber/20 rounded-xl text-xs text-accent-amber animate-slide-up">
-              <div className="w-3 h-3 border-2 border-accent-amber border-t-transparent rounded-full animate-spin" />
-              Analyzing STAR framework, keywords, and technical depth…
+            <div className="w-7 h-7 rounded-full bg-accent-red flex items-center justify-center">
+              <Phone size={12} className="text-white rotate-[135deg]" />
             </div>
-          )}
-
-          {/* Score card */}
-          {scored && (
-            <div className="glass-card p-4 border border-surface-700/50 space-y-3 animate-slide-up">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <Zap size={14} className="text-accent-cyan" /> AI Evaluation
-                </div>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="text-2xl font-black tabular-nums"
-                    style={{ color: scoreColor }}
-                  >
-                    {demo.score}
-                  </div>
-                  <span className="text-surface-500 text-xs">/100</span>
-                </div>
-              </div>
-
-              {/* STAR badges */}
-              <div className="flex flex-wrap gap-1.5">
-                {Object.entries(demo.scores).map(([k, v]) => (
-                  <StarIndicator key={k} label={k.charAt(0).toUpperCase() + k.slice(1)} present={v} />
-                ))}
-              </div>
-
-              {/* Keyword hits */}
-              <div className="flex flex-wrap gap-1">
-                {demo.keywords.map(kw => (
-                  <span key={kw} className="text-[10px] bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20 px-2 py-0.5 rounded-full">{kw}</span>
-                ))}
-              </div>
-
-              {/* Score bars */}
-              <div className="space-y-1.5 pt-1">
-                <ScoreBar label="Depth"    value={demo.score - 3}  color="#06b6d4" delay={100} />
-                <ScoreBar label="Evidence" value={demo.score - 5}  color="#8b5cf6" delay={200} />
-                <ScoreBar label="STAR"     value={Object.values(demo.scores).filter(Boolean).length * 25} color="#10b981" delay={300} />
-              </div>
-
-              <p className="text-xs text-surface-400 italic border-t border-surface-700/40 pt-2">{demo.feedback}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-surface-700/30 bg-surface-900/40 flex items-center justify-between">
+          </div>
           <div className="flex items-center gap-2 text-xs text-surface-500">
-            <Shield size={11} className="text-accent-green" />
-            100% Free · No API keys · Browser-native AI
+            <Shield size={10} className="text-accent-green" />
+            <span className="text-[10px]">Free · No API</span>
           </div>
           <Link
-            to="/interview-hub"
+            to="/interviews"
             className="flex items-center gap-1 text-xs text-accent-cyan hover:text-white font-semibold transition-colors group"
           >
             Try Live <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
@@ -326,7 +330,7 @@ export default function InterviewDemoWidget() {
       {/* Floating badges */}
       <div className="absolute -top-3 -right-3 bg-surface-900/95 backdrop-blur-xl border border-accent-green/30 rounded-xl px-3 py-1.5 text-xs text-accent-green font-bold flex items-center gap-1.5 shadow-lg shadow-accent-green/10">
         <div className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
-        AI Interview Live
+        Video Interview Live
       </div>
       <div className="absolute -bottom-3 -left-3 bg-surface-900/95 backdrop-blur-xl border border-accent-purple/30 rounded-xl px-3 py-1.5 text-xs text-accent-purple font-bold flex items-center gap-1.5 shadow-lg">
         <Star size={10} fill="currentColor" />

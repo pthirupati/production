@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/PageHeader'
+import { SkeletonCard } from '../components/Skeleton'
 
 function StatusBadge({ active, expired, subscribed, label }) {
   if (subscribed) {

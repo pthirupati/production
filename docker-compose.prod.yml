@@ -125,7 +125,7 @@ services:
       - fixitlab_net
       - fixitlab_labs
     healthcheck:
-      test: ["CMD", "celery", "-A", "config", "inspect", "ping", "-d", "default@localhost", "--timeout", "10"]
+      test: ["CMD-SHELL", "celery -A config inspect ping --timeout 10 2>/dev/null | grep -q 'pong'"]
       interval: 30s
       timeout: 15s
       retries: 3
@@ -160,7 +160,7 @@ services:
       - fixitlab_net
       - fixitlab_labs
     healthcheck:
-      test: ["CMD", "celery", "-A", "config", "inspect", "ping", "-d", "default@localhost", "--timeout", "10"]
+      test: ["CMD-SHELL", "celery -A config inspect ping --timeout 10 2>/dev/null | grep -q 'pong'"]
       interval: 30s
       timeout: 15s
       retries: 3
@@ -195,7 +195,7 @@ services:
       - fixitlab_net
       - fixitlab_labs
     healthcheck:
-      test: ["CMD", "celery", "-A", "config", "inspect", "ping", "-d", "default@localhost", "--timeout", "10"]
+      test: ["CMD-SHELL", "celery -A config inspect ping --timeout 10 2>/dev/null | grep -q 'pong'"]
       interval: 30s
       timeout: 15s
       retries: 3

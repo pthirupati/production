@@ -1148,9 +1148,18 @@ class AdminSystemHealthView(APIView):
                 sys_health = client.sys.read_health_status(method="GET")
                 initialized = sys_health.get("initialized", False)
                 sealed = sys_health.get("sealed", False)
+                if not initialized:
+                    status_str = "degraded"
+                    detail = "Vault not initialized — run sync-production-env.sh"
+                elif sealed:
+                    status_str = "degraded"
+                    detail = "Vault is sealed — run: vault operator unseal (or re-deploy to auto-unseal)"
+                else:
+                    status_str = "healthy"
+                    detail = "Vault unsealed and ready"
                 return {
-                    "status": "healthy" if (initialized and not sealed) else "degraded",
-                    "details": f"Vault running, initialized={initialized}, sealed={sealed}",
+                    "status": status_str,
+                    "details": detail,
                     "secrets_loaded": secrets_loaded,
                     "initialized": initialized,
                     "sealed": sealed,
@@ -1158,10 +1167,10 @@ class AdminSystemHealthView(APIView):
             except Exception:
                 pass
 
-            # Fallback: container is running, no API response
+            # Fallback: container running but API unreachable
             return {
                 "status": "degraded",
-                "details": "Vault container running (API unreachable — check VAULT_ADDR)",
+                "details": "Vault container running but API unreachable — check VAULT_ADDR network config",
                 "secrets_loaded": secrets_loaded,
             }
         except Exception as e:
@@ -2156,7 +2165,8 @@ class AdminMonitoringContainersView(APIView):
 
     SYSTEM_NAME_HINTS = (
         "backend", "frontend", "gateway", "redis", "postgres", "database",
-        "rabbitmq", "celery", "certbot", "nginx", "vault", "fixitlab_vault",
+        "rabbitmq", "celery", "certbot", "nginx", "vault", "pgbouncer",
+        "fixitlab_vault", "fixitlab_db", "fixitlab_redis", "fixitlab_rabbitmq",
     )
 
     def get(self, request):
@@ -2197,7 +2207,12 @@ class AdminMonitoringContainersView(APIView):
 
         for c in client.containers.list(all=True):
             name = (c.name or "").lower()
-            if any(h in name for h in self.SYSTEM_NAME_HINTS):
+            image_str = " ".join(c.image.tags or [str(c.image.id)[:12]]).lower()
+            is_system = any(h in name for h in self.SYSTEM_NAME_HINTS)
+            # Also catch vault by image (hashicorp/vault)
+            if not is_system and "vault" in image_str:
+                is_system = True
+            if is_system:
                 add_container(c, "system")
 
         if kind_filter != "all":

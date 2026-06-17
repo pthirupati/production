@@ -43,6 +43,14 @@ echo "Compose: $COMPOSE_FILE | Env: $ENV_FILE"
 
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
 
+# Always unseal Vault after containers start (Vault always starts sealed after restart)
+if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; then
+  echo "Auto-unsealing Vault..."
+  for _i in $(seq 1 12); do
+    bash "$ROOT/scripts/vault/unseal.sh" 2>/dev/null && break || sleep 5
+  done
+fi
+
 # Recreate app workers when env file changes so containers pick up new secrets
 ENV_HASH="$(md5sum "$ENV_FILE" 2>/dev/null | awk '{print $1}' || md5 -q "$ENV_FILE" 2>/dev/null || true)"
 ENV_HASH_FILE="/tmp/fixitlab-env-hash"

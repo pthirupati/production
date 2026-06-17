@@ -220,16 +220,19 @@ export default function MainLayout() {
 
       {/* Main column — only this area scrolls */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 relative z-10">
-        <header className="sticky top-0 shrink-0 z-40 border-b border-surface-700/50 bg-surface-900/95 backdrop-blur-xl overflow-x-auto">
-          <div className="min-w-max lg:min-w-0">
-          <div className="lg:hidden flex items-center gap-3 px-4 py-3">
-            <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-surface-400" aria-label="Toggle menu">
-              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-            <span className="font-bold text-white">FixitLab</span>
+        <header className="sticky top-0 shrink-0 z-40 border-b border-surface-700/50 bg-surface-900 backdrop-blur-xl">
+          {/* Mobile toggle + banners — horizontal scroll wrapper only for this row */}
+          <div className="overflow-x-auto">
+            <div className="min-w-max lg:min-w-0">
+              <div className="lg:hidden flex items-center gap-3 px-4 py-3">
+                <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-surface-400" aria-label="Toggle menu">
+                  {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+                </button>
+                <span className="font-bold text-white">FixitLab</span>
+              </div>
+              <PlatformBanners config={platformConfig} showMaintenance={!isLabRoute} showPromo={false} />
+            </div>
           </div>
-
-          <PlatformBanners config={platformConfig} showMaintenance={!isLabRoute} showPromo={false} />
 
           {!isLabRoute && (
             <div className="px-3 sm:px-6 lg:px-8 py-3 border-t border-surface-800/50" ref={searchRef}>
@@ -277,7 +280,6 @@ export default function MainLayout() {
               </div>
             </div>
           )}
-          </div>
         </header>
 
         <main className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${isLabRoute ? 'p-0' : 'p-3 sm:p-6 lg:p-8'}`} role="main">

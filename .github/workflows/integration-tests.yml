@@ -5,8 +5,7 @@ name: Integration Tests
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -64,7 +63,6 @@ jobs:
         run: |
           python manage.py test tests \
             --verbosity=2 \
-            --parallel \
             --keepdb
       - name: Upload coverage report
         if: always()
