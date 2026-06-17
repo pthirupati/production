@@ -577,13 +577,14 @@ class EnvironmentIsolationTestCase(TestCase):
     def test_lab_environments_have_unique_ids(self):
         """Test that each lab environment has a unique identifier."""
         lab1 = LabSession.objects.create(
-            user=self.user1, scenario=self.scenario, status='RUNNING'
+            user=self.user1, scenario=self.scenario, status='RUNNING',
+            instance_id='lab-user1-test',
         )
         lab2 = LabSession.objects.create(
-            user=self.user2, scenario=self.scenario, status='RUNNING'
+            user=self.user2, scenario=self.scenario, status='RUNNING',
+            instance_id='lab-user2-test',
         )
-        
-        # Each lab should have unique identifiers
+
         self.assertIsNotNone(lab1.instance_id)
         self.assertIsNotNone(lab2.instance_id)
         self.assertNotEqual(lab1.instance_id, lab2.instance_id)

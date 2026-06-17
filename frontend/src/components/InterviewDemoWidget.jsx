@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Mic, MicOff, Video, VideoOff, Phone, Star, CheckCircle, Brain, Zap, Shield, ChevronRight, Volume2 } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Mic, MicOff, Video, VideoOff, Phone, Star, CheckCircle, Brain, Shield, ChevronRight, Volume2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 const DEMO_SCRIPT = [
@@ -13,7 +13,9 @@ const DEMO_SCRIPT = [
     score: 91,
     keywords: ['iostat', 'I/O wait', 'D-state', 'dmesg'],
     feedback: 'Excellent systematic approach — technically precise.',
-    avatarColor: 'from-accent-cyan to-accent-blue',
+    glowColor: '#06b6d4',
+    glowName: 'cyan',
+    bgGrad: 'from-cyan-900/40 to-slate-950',
     initials: 'AR',
   },
   {
@@ -26,7 +28,9 @@ const DEMO_SCRIPT = [
     score: 88,
     keywords: ['war room', 'rollback', 'failover', 'sentinel'],
     feedback: 'Strong STAR with quantified impact and preventive follow-up.',
-    avatarColor: 'from-accent-purple to-accent-pink',
+    glowColor: '#8b5cf6',
+    glowName: 'purple',
+    bgGrad: 'from-purple-900/40 to-slate-950',
     initials: 'NV',
   },
   {
@@ -39,7 +43,9 @@ const DEMO_SCRIPT = [
     score: 79,
     keywords: ['Pacemaker', 'DRBD', 'EFS', 'autofs'],
     feedback: 'Good design — add recovery time objectives and capacity planning.',
-    avatarColor: 'from-accent-amber to-accent-green',
+    glowColor: '#f59e0b',
+    glowName: 'amber',
+    bgGrad: 'from-amber-900/30 to-slate-950',
     initials: 'AT',
   },
 ]
@@ -47,6 +53,206 @@ const DEMO_SCRIPT = [
 const PHASE_DURATION = 13000
 const STEP = { INTRO: 0, ASKING: 2000, ANSWERING: 5500, EVALUATING: 9000, SCORED: 11000 }
 
+/* ── Animated mouth hook ── */
+function useMouthAnim(speaking) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!speaking) { setOpen(false); return }
+    const t = setInterval(() => setOpen(o => !o), 200)
+    return () => clearInterval(t)
+  }, [speaking])
+  return open
+}
+
+/* ── AI interviewer face ── */
+function AIFace({ speaking, glowColor = '#06b6d4' }) {
+  const open = useMouthAnim(speaking)
+  const [scan, setScan] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setScan(s => (s + 1) % 100), 80)
+    return () => clearInterval(t)
+  }, [])
+  const scanY = 28 + (scan / 100) * 72
+
+  return (
+    <svg viewBox="0 0 120 130" xmlns="http://www.w3.org/2000/svg" className="w-full h-full" aria-hidden="true">
+      <defs>
+        <radialGradient id={`aiHead${glowColor.replace('#', '')}`} cx="50%" cy="38%" r="68%">
+          <stop offset="0%" stopColor="#182c46" />
+          <stop offset="100%" stopColor="#0b1220" />
+        </radialGradient>
+        <radialGradient id={`eyeG${glowColor.replace('#', '')}`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={glowColor} stopOpacity="1" />
+          <stop offset="80%" stopColor={glowColor} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={glowColor} stopOpacity="0" />
+        </radialGradient>
+        <filter id="faceGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="2.5" result="blur" />
+          <feFlood floodColor={glowColor} floodOpacity="0.6" result="color" />
+          <feComposite in="color" in2="blur" operator="in" result="shadow" />
+          <feMerge><feMergeNode in="shadow" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+
+      {/* Head shell */}
+      <ellipse cx="60" cy="62" rx="46" ry="50" fill={`url(#aiHead${glowColor.replace('#', '')})`} />
+      {/* Outer ring border glow */}
+      <ellipse cx="60" cy="62" rx="46" ry="50" fill="none" stroke={glowColor} strokeWidth="1" opacity={speaking ? 0.6 : 0.2} />
+
+      {/* Circuit traces */}
+      <line x1="14" y1="46" x2="26" y2="46" stroke={glowColor} strokeWidth="0.8" opacity="0.25" />
+      <line x1="26" y1="46" x2="26" y2="36" stroke={glowColor} strokeWidth="0.8" opacity="0.25" />
+      <circle cx="26" cy="36" r="1.5" fill={glowColor} opacity="0.3" />
+      <line x1="94" y1="50" x2="106" y2="50" stroke={glowColor} strokeWidth="0.8" opacity="0.25" />
+      <line x1="94" y1="72" x2="110" y2="72" stroke={glowColor} strokeWidth="0.8" opacity="0.25" />
+      <circle cx="110" cy="72" r="1.5" fill={glowColor} opacity="0.3" />
+      <line x1="34" y1="28" x2="52" y2="28" stroke={glowColor} strokeWidth="0.6" opacity="0.15" />
+      <line x1="68" y1="28" x2="86" y2="28" stroke={glowColor} strokeWidth="0.6" opacity="0.15" />
+
+      {/* Eye sockets (hexagonal) */}
+      <polygon points="36,52 42,46 52,46 58,52 52,58 42,58" fill="#0c1825" stroke={glowColor} strokeWidth="1.2" opacity="0.7" filter="url(#faceGlow)" />
+      <polygon points="62,52 68,46 78,46 84,52 78,58 68,58" fill="#0c1825" stroke={glowColor} strokeWidth="1.2" opacity="0.7" filter="url(#faceGlow)" />
+
+      {/* Eye irises */}
+      <circle cx="47" cy="52" r="5" fill={`url(#eyeG${glowColor.replace('#', '')})`} />
+      <circle cx="47" cy="52" r="2.5" fill={glowColor} opacity="0.95" />
+      <circle cx="48.5" cy="50.5" r="1" fill="white" opacity="0.7" />
+
+      <circle cx="73" cy="52" r="5" fill={`url(#eyeG${glowColor.replace('#', '')})`} />
+      <circle cx="73" cy="52" r="2.5" fill={glowColor} opacity="0.95" />
+      <circle cx="74.5" cy="50.5" r="1" fill="white" opacity="0.7" />
+
+      {/* Scanning eye blink rings */}
+      {speaking && (
+        <>
+          <circle cx="47" cy="52" r="7" fill="none" stroke={glowColor} strokeWidth="0.8" opacity="0.4" />
+          <circle cx="73" cy="52" r="7" fill="none" stroke={glowColor} strokeWidth="0.8" opacity="0.4" />
+        </>
+      )}
+
+      {/* Nose ridge */}
+      <line x1="60" y1="62" x2="60" y2="69" stroke={glowColor} strokeWidth="1.2" opacity="0.35" />
+      <circle cx="57" cy="70" r="1.2" fill={glowColor} opacity="0.3" />
+      <circle cx="63" cy="70" r="1.2" fill={glowColor} opacity="0.3" />
+
+      {/* Mouth */}
+      {open ? (
+        <>
+          <path d="M 44 80 Q 60 90 76 80" fill="#091522" stroke={glowColor} strokeWidth="1.5" strokeLinecap="round" />
+          <ellipse cx="60" cy="84" rx="10" ry="4.5" fill={glowColor} opacity="0.18" />
+          <line x1="50" y1="83" x2="70" y2="83" stroke={glowColor} strokeWidth="0.6" opacity="0.5" />
+        </>
+      ) : (
+        <path d="M 44 80 Q 60 85 76 80" fill="none" stroke={glowColor} strokeWidth="1.5" strokeLinecap="round" />
+      )}
+
+      {/* Chin data strip */}
+      <rect x="45" y="100" width="30" height="4" rx="2" fill={glowColor} opacity="0.12" />
+      <rect x="45" y="100" width={`${30 * (scan / 100)}`} height="4" rx="2" fill={glowColor} opacity="0.35" />
+
+      {/* Moving scan line */}
+      <line x1="14" y1={scanY} x2="106" y2={scanY} stroke={glowColor} strokeWidth="0.7" opacity={0.04 + (speaking ? 0.06 : 0)} />
+
+      {/* Status ring at chin */}
+      <circle cx="60" cy="116" r="4" fill={glowColor} opacity={speaking ? 0.9 : 0.5} />
+      <circle cx="60" cy="116" r="7" fill="none" stroke={glowColor} strokeWidth="0.8" opacity={speaking ? 0.5 : 0.2} />
+    </svg>
+  )
+}
+
+/* ── Human candidate face ── */
+function HumanFace({ speaking }) {
+  const open = useMouthAnim(speaking)
+  return (
+    <svg viewBox="0 0 120 140" xmlns="http://www.w3.org/2000/svg" className="w-full h-full" aria-hidden="true">
+      <defs>
+        <radialGradient id="skinGrad" cx="50%" cy="38%" r="68%">
+          <stop offset="0%" stopColor="#d4956a" />
+          <stop offset="100%" stopColor="#b36e42" />
+        </radialGradient>
+        <radialGradient id="hairGrad" cx="50%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#4a2c17" />
+          <stop offset="100%" stopColor="#2d1a0e" />
+        </radialGradient>
+      </defs>
+
+      {/* Shoulders / clothing */}
+      <path d="M -5 145 Q 22 118 50 122 Q 60 124 70 122 Q 98 118 125 145 Z" fill="#1e3a8a" />
+      {/* Collar */}
+      <path d="M 48 124 L 55 134 L 60 131 L 65 134 L 72 124" fill="#1d3580" stroke="#2a4ca8" strokeWidth="0.8" />
+      {/* Neck */}
+      <rect x="49" y="110" width="22" height="16" rx="5" fill="#c2855a" />
+
+      {/* Ears */}
+      <ellipse cx="15" cy="70" rx="8" ry="10" fill="#c2855a" />
+      <ellipse cx="15" cy="70" rx="5" ry="7" fill="#b5714a" opacity="0.6" />
+      <ellipse cx="105" cy="70" rx="8" ry="10" fill="#c2855a" />
+      <ellipse cx="105" cy="70" rx="5" ry="7" fill="#b5714a" opacity="0.6" />
+
+      {/* Head */}
+      <ellipse cx="60" cy="66" rx="45" ry="53" fill="url(#skinGrad)" />
+
+      {/* Hair top */}
+      <path d="M 15 60 Q 15 14 60 13 Q 105 14 105 60 L 100 42 Q 96 17 60 17 Q 24 17 20 42 Z" fill="url(#hairGrad)" />
+      {/* Hair sides */}
+      <path d="M 15 60 Q 12 40 17 28 Q 22 18 20 42 Z" fill="url(#hairGrad)" />
+      <path d="M 105 60 Q 108 40 103 28 Q 98 18 100 42 Z" fill="url(#hairGrad)" />
+
+      {/* Eyebrows */}
+      <path d="M 35 54 Q 44 50 54 53" fill="none" stroke="#3d2010" strokeWidth="2.8" strokeLinecap="round" />
+      <path d="M 66 53 Q 76 50 85 54" fill="none" stroke="#3d2010" strokeWidth="2.8" strokeLinecap="round" />
+
+      {/* Eye whites */}
+      <ellipse cx="44" cy="65" rx="9.5" ry="7.5" fill="white" />
+      <ellipse cx="76" cy="65" rx="9.5" ry="7.5" fill="white" />
+      {/* Eyelid shadow */}
+      <ellipse cx="44" cy="62" rx="9.5" ry="4" fill="#c2855a" opacity="0.25" />
+      <ellipse cx="76" cy="62" rx="9.5" ry="4" fill="#c2855a" opacity="0.25" />
+      {/* Irises */}
+      <circle cx="45" cy="65" r="5.5" fill="#3d2010" />
+      <circle cx="77" cy="65" r="5.5" fill="#3d2010" />
+      {/* Pupils */}
+      <circle cx="46" cy="65" r="3" fill="#0d0705" />
+      <circle cx="78" cy="65" r="3" fill="#0d0705" />
+      {/* Eye shine */}
+      <circle cx="48" cy="62.5" r="1.8" fill="white" opacity="0.75" />
+      <circle cx="80" cy="62.5" r="1.8" fill="white" opacity="0.75" />
+      {/* Lower lash line */}
+      <path d="M 35 69 Q 44 72 53 69" fill="none" stroke="#3d2010" strokeWidth="0.8" opacity="0.4" />
+      <path d="M 67 69 Q 76 72 85 69" fill="none" stroke="#3d2010" strokeWidth="0.8" opacity="0.4" />
+
+      {/* Nose */}
+      <path d="M 57 74 L 54 83 Q 60 87 66 83 L 63 74" fill="none" stroke="#a0614a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <ellipse cx="55.5" cy="84" rx="3" ry="2" fill="#b5714a" opacity="0.4" />
+      <ellipse cx="64.5" cy="84" rx="3" ry="2" fill="#b5714a" opacity="0.4" />
+
+      {/* Lips */}
+      {open ? (
+        <>
+          {/* Upper lip */}
+          <path d="M 45 96 Q 52 93 60 95 Q 68 93 75 96 Q 68 98 60 97 Q 52 98 45 96 Z" fill="#c26050" />
+          {/* Mouth opening */}
+          <ellipse cx="60" cy="100" rx="12" ry="5.5" fill="#7a2020" />
+          {/* Teeth */}
+          <ellipse cx="60" cy="97" rx="10" ry="3" fill="#f5f0ec" opacity="0.9" />
+          {/* Lower lip */}
+          <path d="M 45 96 Q 60 108 75 96" fill="#d4705a" opacity="0.7" />
+        </>
+      ) : (
+        <>
+          <path d="M 45 96 Q 52 93 60 95 Q 68 93 75 96 Q 68 100 60 99 Q 52 100 45 96 Z" fill="#c26050" />
+          <path d="M 45 96 Q 60 104 75 96" fill="none" stroke="#a04038" strokeWidth="1.2" />
+        </>
+      )}
+
+      {/* Cheek blush */}
+      <ellipse cx="30" cy="76" rx="11" ry="7" fill="#ff6644" opacity="0.14" />
+      <ellipse cx="90" cy="76" rx="11" ry="7" fill="#ff6644" opacity="0.14" />
+    </svg>
+  )
+}
+
+/* ── Voice wave bars ── */
 function VoiceWave({ active, color = '#06b6d4', bars = 8 }) {
   const heights = [3, 5, 7, 9, 8, 6, 4, 5, 7, 6, 8, 4]
   return (
@@ -69,6 +275,7 @@ function VoiceWave({ active, color = '#06b6d4', bars = 8 }) {
   )
 }
 
+/* ── Circular score badge ── */
 function ScoreBadge({ score }) {
   const color = score >= 85 ? '#10b981' : score >= 70 ? '#f59e0b' : '#ef4444'
   return (
@@ -89,6 +296,7 @@ function ScoreBadge({ score }) {
   )
 }
 
+/* ── Main widget ── */
 export default function InterviewDemoWidget() {
   const [scene, setScene] = useState(0)
   const [step, setStep] = useState(STEP.INTRO)
@@ -122,7 +330,10 @@ export default function InterviewDemoWidget() {
   return (
     <div className="relative rounded-2xl overflow-hidden">
       {/* Ambient glow */}
-      <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-accent-purple/20 via-accent-cyan/10 to-accent-pink/15 blur-2xl pointer-events-none animate-pulse-glow" />
+      <div
+        className="absolute -inset-4 rounded-3xl blur-2xl pointer-events-none opacity-60"
+        style={{ background: `radial-gradient(ellipse at 50% 50%, ${demo.glowColor}25 0%, transparent 70%)` }}
+      />
 
       <div className="relative glass-card gradient-border overflow-hidden">
         {/* Title bar */}
@@ -147,17 +358,26 @@ export default function InterviewDemoWidget() {
           </div>
         </div>
 
-        {/* Phase label */}
+        {/* Phase label + scene dots */}
         <div className="flex items-center justify-between px-4 pt-2.5 pb-0">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border bg-accent-purple/10 border-accent-purple/30 text-accent-purple">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border" style={{
+            background: `${demo.glowColor}15`,
+            borderColor: `${demo.glowColor}40`,
+            color: demo.glowColor,
+          }}>
             <Brain size={9} /> {demo.phase}
           </div>
           <div className="flex gap-1.5">
-            {DEMO_SCRIPT.map((_, i) => (
+            {DEMO_SCRIPT.map((d, i) => (
               <button
                 key={i}
                 onClick={() => { setScene(i); setStep(STEP.INTRO) }}
-                className={`w-1.5 h-1.5 rounded-full transition-all ${i === scene ? 'bg-accent-cyan scale-125' : 'bg-surface-600 hover:bg-surface-400'}`}
+                className="w-1.5 h-1.5 rounded-full transition-all"
+                style={{
+                  background: i === scene ? d.glowColor : undefined,
+                  transform: i === scene ? 'scale(1.3)' : undefined,
+                  backgroundColor: i === scene ? undefined : '#475569',
+                }}
               />
             ))}
           </div>
@@ -166,45 +386,60 @@ export default function InterviewDemoWidget() {
         {/* VIDEO CALL GRID */}
         <div className="grid grid-cols-2 gap-2 p-3">
           {/* AI Interviewer tile */}
-          <div className={`relative rounded-xl overflow-hidden bg-surface-950 aspect-[4/3] border-2 transition-all duration-500 ${
-            interviewerSpeaking ? 'border-accent-cyan shadow-lg shadow-accent-cyan/20' : 'border-surface-700/50'
-          }`}>
-            {/* Gradient "face" background */}
-            <div className={`absolute inset-0 bg-gradient-to-br ${demo.avatarColor} opacity-20`} />
-            <div className="absolute inset-0 bg-surface-950/60" />
+          <div
+            className="relative rounded-xl overflow-hidden aspect-[4/3] border-2 transition-all duration-500"
+            style={{
+              background: 'linear-gradient(135deg, #0f1f35 0%, #0b1220 100%)',
+              borderColor: interviewerSpeaking ? demo.glowColor : 'rgba(71,85,105,0.5)',
+              boxShadow: interviewerSpeaking ? `0 0 20px ${demo.glowColor}40` : undefined,
+            }}
+          >
+            {/* Hex grid overlay */}
+            <div className="absolute inset-0 opacity-[0.04]" style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='28'%3E%3Cpath d='M12 1 L23 7 L23 21 L12 27 L1 21 L1 7 Z' fill='none' stroke='%2306b6d4' stroke-width='0.5'/%3E%3C/svg%3E")`,
+              backgroundSize: '24px 28px',
+            }} />
 
-            {/* Avatar face */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-              <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${demo.avatarColor} flex items-center justify-center shadow-xl border-2 border-white/20`}>
-                <span className="text-white text-lg font-black">{demo.initials}</span>
-              </div>
-              {/* Face lines — simulated video feed effect */}
-              <div className="space-y-1 text-center">
-                <p className="text-[11px] font-semibold text-white">{demo.persona}</p>
-                <p className="text-[9px] text-surface-400">{demo.role}</p>
-              </div>
+            {/* AI face SVG */}
+            <div className="absolute inset-0 flex items-center justify-center p-2">
+              <AIFace speaking={interviewerSpeaking} glowColor={demo.glowColor} />
             </div>
 
-            {/* Speaking indicator + voice wave */}
+            {/* Speaking glow overlay */}
+            {interviewerSpeaking && (
+              <div className="absolute inset-0 pointer-events-none rounded-xl"
+                style={{ boxShadow: `inset 0 0 20px ${demo.glowColor}20` }} />
+            )}
+
+            {/* Voice wave */}
             {interviewerSpeaking && (
               <div className="absolute bottom-2 left-0 right-0 flex justify-center">
                 <div className="bg-surface-950/90 rounded-full px-2 py-1 flex items-center gap-1.5">
-                  <Volume2 size={9} className="text-accent-cyan" />
-                  <VoiceWave active color="#06b6d4" bars={8} />
+                  <Volume2 size={9} style={{ color: demo.glowColor }} />
+                  <VoiceWave active color={demo.glowColor} bars={8} />
                 </div>
               </div>
             )}
 
             {/* Name tag */}
-            <div className="absolute bottom-2 left-2 text-[9px] text-white/70 font-medium bg-black/40 px-1.5 py-0.5 rounded">
-              {demo.persona} — AI
+            <div className="absolute bottom-2 left-2 text-[9px] text-white/70 font-medium bg-black/50 px-1.5 py-0.5 rounded backdrop-blur-sm">
+              {demo.persona} · AI
+            </div>
+            <div className="absolute top-2 right-2 text-[8px] font-medium px-1.5 py-0.5 rounded"
+              style={{ background: `${demo.glowColor}25`, color: demo.glowColor }}>
+              HD
             </div>
           </div>
 
-          {/* User tile */}
-          <div className={`relative rounded-xl overflow-hidden bg-surface-950 aspect-[4/3] border-2 transition-all duration-500 ${
-            userSpeaking ? 'border-accent-purple shadow-lg shadow-accent-purple/20' : 'border-surface-700/50'
-          }`}>
+          {/* Candidate tile */}
+          <div
+            className="relative rounded-xl overflow-hidden aspect-[4/3] border-2 transition-all duration-500"
+            style={{
+              background: 'linear-gradient(135deg, #1a2035 0%, #111827 100%)',
+              borderColor: userSpeaking ? '#8b5cf6' : 'rgba(71,85,105,0.5)',
+              boxShadow: userSpeaking ? `0 0 20px #8b5cf640` : undefined,
+            }}
+          >
             {camOff ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-surface-900">
                 <VideoOff size={24} className="text-surface-600" />
@@ -212,18 +447,18 @@ export default function InterviewDemoWidget() {
               </div>
             ) : (
               <>
-                <div className="absolute inset-0 bg-gradient-to-br from-accent-blue/20 to-accent-purple/20" />
-                <div className="absolute inset-0 bg-surface-950/50" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-accent-blue/80 to-accent-purple/80 flex items-center justify-center shadow-xl border-2 border-white/20">
-                    <span className="text-white text-lg font-black">ME</span>
-                  </div>
-                  <p className="text-[10px] text-surface-400">Candidate</p>
+                {/* Bokeh bg */}
+                <div className="absolute inset-0 opacity-30"
+                  style={{ background: 'radial-gradient(ellipse at 60% 30%, #3730a320 0%, transparent 60%), radial-gradient(ellipse at 30% 70%, #7c3aed20 0%, transparent 50%)' }} />
+
+                {/* Human face */}
+                <div className="absolute inset-0 flex items-center justify-center p-1">
+                  <HumanFace speaking={userSpeaking} />
                 </div>
               </>
             )}
 
-            {/* Mic + speaking indicator */}
+            {/* Voice wave */}
             {userSpeaking && (
               <div className="absolute bottom-2 left-0 right-0 flex justify-center">
                 <div className="bg-surface-950/90 rounded-full px-2 py-1 flex items-center gap-1.5">
@@ -233,20 +468,23 @@ export default function InterviewDemoWidget() {
               </div>
             )}
 
-            <div className="absolute bottom-2 left-2 text-[9px] text-white/70 font-medium bg-black/40 px-1.5 py-0.5 rounded">
+            <div className="absolute bottom-2 left-2 text-[9px] text-white/70 font-medium bg-black/50 px-1.5 py-0.5 rounded backdrop-blur-sm">
               You
+            </div>
+            <div className="absolute top-2 right-2 text-[8px] font-medium px-1.5 py-0.5 rounded bg-accent-green/20 text-accent-green">
+              {userSpeaking ? 'MIC ON' : 'READY'}
             </div>
           </div>
         </div>
 
-        {/* Question / Answer transcript */}
+        {/* Transcript area */}
         <div className="mx-3 mb-2 bg-surface-950/60 rounded-xl border border-surface-700/40 px-3 py-2.5 min-h-[56px]">
           {step === STEP.INTRO && (
             <p className="text-[11px] text-surface-500 italic text-center pt-1">Connecting to interview session…</p>
           )}
           {interviewerSpeaking && (
             <div>
-              <p className="text-[9px] text-accent-cyan font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+              <p className="text-[9px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1" style={{ color: demo.glowColor }}>
                 <Volume2 size={8} /> {demo.persona} is asking
               </p>
               <p className="text-[11px] text-surface-200 leading-relaxed line-clamp-2">{demo.question}</p>
@@ -262,7 +500,7 @@ export default function InterviewDemoWidget() {
           )}
         </div>
 
-        {/* Evaluation / Score overlay */}
+        {/* Evaluation spinner */}
         {evaluating && !scored && (
           <div className="mx-3 mb-2 px-3 py-2 bg-accent-amber/8 border border-accent-amber/20 rounded-xl flex items-center gap-2 text-xs text-accent-amber">
             <div className="w-3 h-3 border-2 border-accent-amber border-t-transparent rounded-full animate-spin shrink-0" />
@@ -270,6 +508,7 @@ export default function InterviewDemoWidget() {
           </div>
         )}
 
+        {/* Score card */}
         {scored && (
           <div className="mx-3 mb-2 glass-card p-3 border border-surface-700/50 flex items-start gap-3 animate-slide-up">
             <ScoreBadge score={demo.score} />
@@ -285,7 +524,11 @@ export default function InterviewDemoWidget() {
               </div>
               <div className="flex flex-wrap gap-1 mb-1.5">
                 {demo.keywords.map(kw => (
-                  <span key={kw} className="text-[9px] bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20 px-1.5 py-0.5 rounded-full">{kw}</span>
+                  <span key={kw} className="text-[9px] border px-1.5 py-0.5 rounded-full" style={{
+                    background: `${demo.glowColor}12`,
+                    borderColor: `${demo.glowColor}30`,
+                    color: demo.glowColor,
+                  }}>{kw}</span>
                 ))}
               </div>
               <p className="text-[10px] text-surface-400 italic">{demo.feedback}</p>
@@ -293,7 +536,7 @@ export default function InterviewDemoWidget() {
           </div>
         )}
 
-        {/* Bottom controls bar */}
+        {/* Bottom controls */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-surface-700/30 bg-surface-950/60">
           <div className="flex items-center gap-2">
             <button
@@ -330,7 +573,7 @@ export default function InterviewDemoWidget() {
       {/* Floating badges */}
       <div className="absolute -top-3 -right-3 bg-surface-900/95 backdrop-blur-xl border border-accent-green/30 rounded-xl px-3 py-1.5 text-xs text-accent-green font-bold flex items-center gap-1.5 shadow-lg shadow-accent-green/10">
         <div className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
-        Video Interview Live
+        Face-to-Face AI
       </div>
       <div className="absolute -bottom-3 -left-3 bg-surface-900/95 backdrop-blur-xl border border-accent-purple/30 rounded-xl px-3 py-1.5 text-xs text-accent-purple font-bold flex items-center gap-1.5 shadow-lg">
         <Star size={10} fill="currentColor" />

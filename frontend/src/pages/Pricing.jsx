@@ -3,7 +3,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import {
   Check, ArrowRight, Zap, Crown, Loader2, Sun, Moon, Server, Globe,
   Monitor, Database, Cpu, Shield, Lock, Sparkles, ShoppingCart, X,
-  IndianRupee, DollarSign, BadgeCheck, ChevronRight,
+  IndianRupee, DollarSign, BadgeCheck, ChevronRight, ChevronDown,
   RefreshCw, ShieldCheck, AlertTriangle, Mic2,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
@@ -16,7 +16,16 @@ import { PlatformBanners } from '../components/PlatformBanners'
 import { PUBLIC_NAV_LINKS } from '../constants/publicNav'
 import toast from 'react-hot-toast'
 
-const techIcons = { Linux: Server, Docker: Monitor, Networking: Globe, 'Web Servers': Globe, Databases: Database, AWS: Cpu, Kubernetes: Cpu, Security: Shield }
+const techIcons = {
+  Linux: Server,
+  Docker: Monitor,
+  Networking: Globe,
+  'Web Servers': Globe,
+  Databases: Database,
+  AWS: Cpu,
+  Kubernetes: Cpu,
+  Security: Shield,
+}
 
 const techColors = {
   Linux: { from: 'from-amber-500', to: 'to-orange-600', bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', shadow: 'shadow-amber-500/10' },
@@ -29,7 +38,14 @@ const techColors = {
   Security: { from: 'from-red-500', to: 'to-rose-600', bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20', shadow: 'shadow-red-500/10' },
 }
 
-const defaultColor = { from: 'from-accent-cyan', to: 'to-accent-blue', bg: 'bg-accent-cyan/10', text: 'text-accent-cyan', border: 'border-accent-cyan/20', shadow: 'shadow-accent-cyan/10' }
+const defaultColor = {
+  from: 'from-accent-cyan',
+  to: 'to-accent-blue',
+  bg: 'bg-accent-cyan/10',
+  text: 'text-accent-cyan',
+  border: 'border-accent-cyan/20',
+  shadow: 'shadow-accent-cyan/10',
+}
 
 const freeFeatures = [
   'Demo scenarios for every technology',
@@ -50,6 +66,65 @@ const paidFeatures = [
   'Team / enterprise seat licensing (contact sales)',
 ]
 
+const FAQ_ITEMS = [
+  {
+    q: 'How does per-technology pricing work?',
+    a: 'You subscribe to individual technologies (e.g., Linux, Docker). Each subscription gives you 1-year access to all scenarios, hints, and the certificate for that technology.',
+  },
+  {
+    q: 'How do interview plans work?',
+    a: 'Interview Studio plans are billed yearly. Pro and Premium include 10 full mock interview attempts per year with multi-round voice interviews and reports. Prices are configured by admins.',
+  },
+  {
+    q: 'What can I access for free?',
+    a: 'Free users get demo scenarios for every technology, one interview sample, community forum, leaderboard, and basic progress tracking.',
+  },
+  {
+    q: 'Can I subscribe to multiple technologies at once?',
+    a: 'Yes! Use "Add to Cart" for each technology, then "Subscribe All" in the cart panel.',
+  },
+  {
+    q: 'Will I get a certificate?',
+    a: 'Yes — technology completion certificates and FIXIT-INT interview certificates are verifiable on the Verify Certificate page.',
+  },
+  {
+    q: 'Are prices per month or per year?',
+    a: 'All subscriptions are yearly (1-year access from purchase). Interview plan prices shown are per year, not per month.',
+  },
+  {
+    q: 'Can admins grant free access?',
+    a: 'Yes. Admins can grant complimentary technology and interview access to any user from the admin panel. Staff members get free interview access by default.',
+  },
+]
+
+function FAQAccordion({ items }) {
+  const [open, setOpen] = useState(null)
+  return (
+    <div className="space-y-3">
+      {items.map(({ q, a }, i) => (
+        <div key={i} className={`glass-card border transition-all duration-200 ${open === i ? 'border-accent-cyan/20' : 'hover:border-surface-600/60'}`}>
+          <button
+            type="button"
+            onClick={() => setOpen(open === i ? null : i)}
+            className="w-full flex items-center justify-between px-5 py-4 text-left gap-4"
+          >
+            <span className={`text-sm font-semibold transition-colors ${open === i ? 'text-accent-cyan' : 'text-white'}`}>{q}</span>
+            <ChevronDown
+              size={16}
+              className={`text-surface-400 shrink-0 transition-transform duration-200 ${open === i ? 'rotate-180 text-accent-cyan' : ''}`}
+            />
+          </button>
+          {open === i && (
+            <div className="px-5 pb-4">
+              <p className="text-sm text-surface-400 leading-relaxed">{a}</p>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Pricing() {
   const { isAuthenticated, user } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
@@ -60,12 +135,10 @@ export default function Pricing() {
   const [searchParams] = useSearchParams()
   const navigateTo = useNavigate()
 
-  // Currency state — default USD per user request
   const [currency, setCurrency] = useState('USD')
   const [exchangeRate, setExchangeRate] = useState(null)
   const [rateLoading, setRateLoading] = useState(true)
 
-  // Cart state for multi-tech subscribe
   const [cart, setCart] = useState([])
   const [showCart, setShowCart] = useState(false)
   const [gatewayDown, setGatewayDown] = useState(false)
@@ -84,7 +157,6 @@ export default function Pricing() {
     api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
   }, [])
 
-  // Fetch live exchange rate on mount
   useEffect(() => {
     const fetchRate = async () => {
       setRateLoading(true)
@@ -100,7 +172,6 @@ export default function Pricing() {
     fetchRate()
   }, [])
 
-  // Detect user country from profile and set default currency
   useEffect(() => {
     if (user) {
       const fetchProfile = async () => {
@@ -121,7 +192,6 @@ export default function Pricing() {
     }
   }, [user])
 
-  // Load technologies and subscriptions
   useEffect(() => {
     getTechnologies().then(setTechnologies).catch(() => {})
     interviewsApi.getPlans().then(d => setInterviewPlans(d.plans || [])).catch(() => {})
@@ -151,17 +221,15 @@ export default function Pricing() {
     }
   }, [searchParams])
 
-  const isSubscribed = (techName) => {
-    return mySubscriptions.some(s => s.technology?.name === techName && s.is_active)
-  }
+  const isSubscribed = (techName) =>
+    mySubscriptions.some(s => s.technology?.name === techName && s.is_active)
 
-  // Convert INR price to display price — ACTUAL CONVERSION using live rate
   const getDisplayPrice = useCallback((priceINR) => {
     if (currency === 'USD' && exchangeRate && exchangeRate > 0) {
       const usd = (priceINR / exchangeRate).toFixed(2)
       return { amount: parseFloat(usd), display: `$${usd}`, symbol: '$' }
     }
-    return { amount: priceINR, display: `\u20B9${priceINR}`, symbol: '\u20B9' }
+    return { amount: priceINR, display: `₹${priceINR}`, symbol: '₹' }
   }, [currency, exchangeRate])
 
   const isInCart = (techId) => cart.some(item => item.id === techId)
@@ -177,9 +245,7 @@ export default function Pricing() {
     setCart(prev => prev.filter(item => item.id !== techId))
   }
 
-  const cartTotal = useMemo(() => {
-    return cart.reduce((sum, tech) => sum + (tech.price || 499), 0)
-  }, [cart])
+  const cartTotal = useMemo(() => cart.reduce((sum, tech) => sum + (tech.price || 499), 0), [cart])
 
   const handleInterviewSubscribe = async (plan) => {
     if (!isAuthenticated) {
@@ -231,7 +297,7 @@ export default function Pricing() {
 
   const handleSubscribe = async (tech) => {
     if (!isAuthenticated) {
-      toast('Please sign in first to subscribe.', { icon: '\uD83D\uDD12' })
+      toast('Please sign in first to subscribe.', { icon: '🔒' })
       return
     }
     if (gatewayDown) {
@@ -265,12 +331,10 @@ export default function Pricing() {
       if (appliedCoupon?.code || couponCode.trim()) {
         params.set('coupon', appliedCoupon?.code || couponCode.trim())
       }
-
       if (orderData.order_id) {
         params.set('order_id', orderData.order_id)
         params.set('razorpay_key', orderData.razorpay_key_id || '')
       }
-
       if (currency === 'USD' && exchangeRate) {
         const usdAmount = ((orderData.amount || tech.price || 499) / exchangeRate).toFixed(2)
         params.set('display_currency', 'USD')
@@ -289,11 +353,10 @@ export default function Pricing() {
 
   const handleBatchSubscribe = async () => {
     if (!isAuthenticated) {
-      toast('Please sign in first to subscribe.', { icon: '\uD83D\uDD12' })
+      toast('Please sign in first to subscribe.', { icon: '🔒' })
       return
     }
     if (cart.length === 0) return
-
     if (cart.length === 1) {
       handleSubscribe(cart[0])
       return
@@ -329,92 +392,89 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-surface-950 relative overflow-hidden">
-      {/* Animated background orbs */}
+      {/* Background orbs */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-20 left-[10%] w-[500px] h-[500px] bg-accent-cyan/[0.03] rounded-full blur-[120px] animate-float" />
-        <div className="absolute bottom-20 right-[10%] w-[400px] h-[400px] bg-accent-purple/[0.04] rounded-full blur-[100px] animate-float-delayed" />
+        <div className="absolute bottom-20 right-[10%] w-[400px] h-[400px] bg-accent-purple/[0.04] rounded-full blur-[100px] animate-float" style={{ animationDelay: '2s' }} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/[0.02] rounded-full blur-[150px]" />
       </div>
 
-      {/* Navbar + offer/maintenance banners */}
+      {/* Navbar */}
       <div className="sticky top-0 z-50 relative">
-      <nav className="border-b border-surface-800/50 backdrop-blur-xl bg-surface-950/90">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-brand-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">F</span>
+        <nav className="border-b border-surface-800/50 backdrop-blur-xl bg-surface-950/90">
+          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-blue-600 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">F</span>
+              </div>
+              <span className="text-xl font-bold text-white">FixitLab</span>
+            </Link>
+            <div className="hidden md:flex items-center gap-4 overflow-x-auto max-w-[65vw] pb-1">
+              {PUBLIC_NAV_LINKS.map(({ to, label }) => (
+                <Link key={to} to={to} className="text-sm text-surface-400 hover:text-white transition-colors relative group whitespace-nowrap shrink-0">
+                  {label}
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-accent-cyan to-accent-purple group-hover:w-full transition-all duration-300" />
+                </Link>
+              ))}
             </div>
-            <span className="text-xl font-bold text-white">FixitLab</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-4 overflow-x-auto max-w-[65vw] pb-1">
-            {PUBLIC_NAV_LINKS.map(({ to, label }) => (
-              <Link key={to} to={to} className="text-sm text-surface-400 hover:text-white transition-colors relative group whitespace-nowrap shrink-0">
-                {label}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-accent-cyan to-accent-purple group-hover:w-full transition-all duration-300" />
-              </Link>
-            ))}
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Currency Toggle */}
-            <div className="flex bg-surface-800/60 rounded-lg border border-surface-700/40 overflow-hidden">
+            <div className="flex items-center gap-3">
+              {/* Currency toggle */}
+              <div className="flex bg-surface-800/60 rounded-lg border border-surface-700/40 overflow-hidden">
+                <button
+                  onClick={() => setCurrency('INR')}
+                  className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 transition-all ${currency === 'INR' ? 'bg-accent-cyan/20 text-accent-cyan' : 'text-surface-400 hover:text-surface-200'}`}
+                >
+                  <IndianRupee size={12} /> INR
+                </button>
+                <button
+                  onClick={() => setCurrency('USD')}
+                  className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 transition-all ${currency === 'USD' ? 'bg-accent-cyan/20 text-accent-cyan' : 'text-surface-400 hover:text-surface-200'}`}
+                >
+                  <DollarSign size={12} /> USD
+                </button>
+              </div>
+
+              {/* Cart button */}
+              {cart.length > 0 && (
+                <button
+                  onClick={() => setShowCart(!showCart)}
+                  className="relative p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800/50 transition-all"
+                >
+                  <ShoppingCart size={18} />
+                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-cyan text-[10px] font-bold text-white flex items-center justify-center">
+                    {cart.length}
+                  </span>
+                </button>
+              )}
+
               <button
-                onClick={() => setCurrency('INR')}
-                className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 transition-all ${
-                  currency === 'INR'
-                    ? 'bg-accent-cyan/20 text-accent-cyan'
-                    : 'text-surface-400 hover:text-surface-200'
-                }`}
+                onClick={toggleTheme}
+                className="p-2 rounded-lg text-surface-400 hover:text-surface-100 hover:bg-surface-800 transition-all"
+                aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
               >
-                <IndianRupee size={12} /> INR
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
               </button>
-              <button
-                onClick={() => setCurrency('USD')}
-                className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 transition-all ${
-                  currency === 'USD'
-                    ? 'bg-accent-cyan/20 text-accent-cyan'
-                    : 'text-surface-400 hover:text-surface-200'
-                }`}
-              >
-                <DollarSign size={12} /> USD
-              </button>
+              {isAuthenticated ? (
+                <Link to="/dashboard" className="text-sm text-surface-300 hover:text-surface-100">Dashboard</Link>
+              ) : (
+                <Link to="/login" className="text-sm text-surface-300 hover:text-surface-100">Sign In</Link>
+              )}
             </div>
-
-            {/* Cart Button */}
-            {cart.length > 0 && (
-              <button
-                onClick={() => setShowCart(!showCart)}
-                className="relative p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800/50 transition-all"
-              >
-                <ShoppingCart size={18} />
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-cyan text-[10px] font-bold text-white flex items-center justify-center animate-scale-in">
-                  {cart.length}
-                </span>
-              </button>
-            )}
-
-            <button onClick={toggleTheme}
-              className="p-2 rounded-lg text-surface-400 hover:text-surface-100 hover:bg-surface-800 transition-all"
-              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            {isAuthenticated ? (
-              <Link to="/dashboard" className="text-sm text-surface-300 hover:text-surface-100">Dashboard</Link>
-            ) : (
-              <Link to="/login" className="text-sm text-surface-300 hover:text-surface-100">Sign In</Link>
-            )}
           </div>
-        </div>
-      </nav>
-      <PlatformBanners config={platformConfig} showMaintenance showPromo />
+        </nav>
+        <PlatformBanners config={platformConfig} showMaintenance showPromo />
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 relative z-10">
+
+        {/* Gateway warning */}
         {gatewayDown && (
-          <div className="mb-8 rounded-lg border border-accent-amber/30 bg-accent-amber/10 px-4 py-3 text-sm text-accent-amber flex items-start gap-2">
+          <div className="mb-8 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400 flex items-start gap-2">
             <AlertTriangle size={18} className="shrink-0 mt-0.5" />
             <span>{gatewayMessage || 'Payment gateway is unavailable. Free scenarios still work.'}</span>
           </div>
         )}
+
         {/* Promo code */}
         {isAuthenticated && !gatewayDown && (
           <div className="mb-8 max-w-md mx-auto flex gap-2">
@@ -452,43 +512,43 @@ export default function Pricing() {
         )}
         {appliedCoupon && (
           <p className="text-center text-sm text-accent-green mb-6">
-            Coupon {appliedCoupon.code} applied — ₹{appliedCoupon.discount_saved} off at checkout
+            Coupon {appliedCoupon.code} applied — &#x20B9;{appliedCoupon.discount_saved} off at checkout
           </p>
         )}
-        {/* Hero */}
-        <div className="text-center mb-14 relative">
-          <div className="relative">
-            <div className="inline-flex items-center gap-2 bg-accent-cyan/10 border border-accent-cyan/20 rounded-full px-4 py-1.5 text-sm text-accent-cyan mb-6 animate-fade-in">
-              <Sparkles size={14} className="animate-pulse" /> Technology + Interview Studio
-            </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-white via-cyan-300 to-accent-purple bg-clip-text text-transparent animate-slide-up">
-              Simple Yearly Pricing
-            </h1>
-            <p className="text-surface-400 text-lg max-w-2xl mx-auto animate-fade-in">
-              Subscribe per technology for lab scenarios, or choose an AI Interview Studio plan — both billed yearly with admin-controlled prices.
-            </p>
-            <div className="flex flex-wrap justify-center gap-3 mt-6">
-              <a href="#technology-pricing" className="btn-secondary text-sm">Technology labs</a>
-              <a href="#interview-plans" className="btn-primary text-sm inline-flex items-center gap-1"><Mic2 size={14} /> Interview plans</a>
-            </div>
 
-            {/* Exchange rate indicator */}
-            {currency === 'USD' && exchangeRate && (
-              <div className="inline-flex items-center gap-2 mt-4 px-3 py-1.5 bg-surface-800/50 rounded-full border border-surface-700/30 animate-fade-in">
-                <RefreshCw size={12} className={`text-accent-cyan ${rateLoading ? 'animate-spin' : ''}`} />
-                <span className="text-xs text-surface-400">
-                  Live rate: 1 USD = {'\u20B9'}{exchangeRate.toFixed(2)}
-                </span>
-                <span className="text-[10px] text-surface-500">(updated hourly)</span>
-              </div>
-            )}
+        {/* Hero */}
+        <div className="text-center mb-14 animate-fade-in">
+          <div className="inline-flex items-center gap-2 bg-accent-cyan/10 border border-accent-cyan/20 rounded-full px-4 py-1.5 text-sm text-accent-cyan mb-6">
+            <Sparkles size={14} className="animate-pulse" /> Technology + Interview Studio
           </div>
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-white via-cyan-300 to-purple-400 bg-clip-text text-transparent animate-slide-up">
+            Simple Yearly Pricing
+          </h1>
+          <p className="text-surface-400 text-lg max-w-2xl mx-auto animate-fade-in">
+            Subscribe per technology for lab scenarios, or choose an AI Interview Studio plan — both billed yearly with admin-controlled prices.
+          </p>
+          <div className="flex flex-wrap justify-center gap-3 mt-6">
+            <a href="#technology-pricing" className="btn-secondary text-sm">Technology labs</a>
+            <a href="#interview-plans" className="btn-primary text-sm inline-flex items-center gap-1">
+              <Mic2 size={14} /> Interview plans
+            </a>
+          </div>
+          {currency === 'USD' && exchangeRate && (
+            <div className="inline-flex items-center gap-2 mt-4 px-3 py-1.5 bg-surface-800/50 rounded-full border border-surface-700/30 animate-fade-in">
+              <RefreshCw size={12} className={`text-accent-cyan ${rateLoading ? 'animate-spin' : ''}`} />
+              <span className="text-xs text-surface-400">
+                Live rate: 1 USD = &#x20B9;{exchangeRate.toFixed(2)}
+              </span>
+              <span className="text-[10px] text-surface-500">(updated hourly)</span>
+            </div>
+          )}
         </div>
 
         {/* Free vs Paid comparison */}
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-16">
+          {/* Free */}
           <div className="glass-card p-8 hover:border-surface-600/40 transition-all duration-500 group">
-            <div className="flex items-center gap-3 mb-5">
+            <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl bg-surface-700 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                 <Zap size={20} className="text-surface-300" />
               </div>
@@ -497,6 +557,7 @@ export default function Pricing() {
                 <p className="text-sm text-surface-400">Always free, no credit card</p>
               </div>
             </div>
+            <p className="text-2xl font-extrabold text-white mb-5 mt-3">&#x20B9;0 <span className="text-sm font-normal text-surface-500">forever</span></p>
             <ul className="space-y-3">
               {freeFeatures.map(f => (
                 <li key={f} className="flex items-center gap-3 text-sm text-surface-300">
@@ -504,10 +565,17 @@ export default function Pricing() {
                 </li>
               ))}
             </ul>
+            <div className="mt-6">
+              <Link to="/register" className="btn-secondary w-full text-center block py-2.5 text-sm">
+                Get started free
+              </Link>
+            </div>
           </div>
+
+          {/* Paid */}
           <div className="glass-card p-8 border-accent-cyan/20 bg-gradient-to-br from-accent-cyan/5 to-transparent hover:border-accent-cyan/40 transition-all duration-500 group hover:shadow-lg hover:shadow-accent-cyan/5">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-brand-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                 <Crown size={20} className="text-white" />
               </div>
               <div>
@@ -515,6 +583,7 @@ export default function Pricing() {
                 <p className="text-sm text-accent-cyan">1-year access per technology</p>
               </div>
             </div>
+            <p className="text-sm text-surface-400 mt-3 mb-5">From &#x20B9;499/yr per technology</p>
             <ul className="space-y-3">
               {paidFeatures.map(f => (
                 <li key={f} className="flex items-center gap-3 text-sm text-surface-300">
@@ -522,18 +591,24 @@ export default function Pricing() {
                 </li>
               ))}
             </ul>
+            <div className="mt-6">
+              <a href="#technology-pricing" className="btn-primary w-full text-center block py-2.5 text-sm">
+                Browse technologies <ArrowRight size={14} className="inline ml-1" />
+              </a>
+            </div>
           </div>
         </div>
 
         {/* Technology pricing grid */}
-        <h2 id="technology-pricing" className="text-2xl font-bold text-white text-center mb-3 scroll-mt-24">Technology Subscriptions</h2>
-        <p className="text-surface-400 text-center mb-2">1-year access per technology · prices set by admin</p>
-        <p className="text-surface-400 text-center mb-8 flex items-center justify-center gap-2">
-          <ShoppingCart size={14} />
-          Select multiple technologies and subscribe at once
+        <h2 id="technology-pricing" className="text-2xl font-bold text-white text-center mb-2 scroll-mt-24">
+          Technology Subscriptions
+        </h2>
+        <p className="text-surface-400 text-center mb-2 text-sm">1-year access per technology &middot; prices set by admin</p>
+        <p className="text-surface-500 text-center mb-8 flex items-center justify-center gap-2 text-sm">
+          <ShoppingCart size={14} /> Select multiple technologies and subscribe at once
         </p>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-6xl mx-auto mb-16">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 max-w-6xl mx-auto mb-20">
           {technologies.map((tech) => {
             const Icon = techIcons[tech.name] || Server
             const colors = techColors[tech.name] || defaultColor
@@ -541,37 +616,36 @@ export default function Pricing() {
             const priceDisplay = getDisplayPrice(priceINR)
             const subscribed = isSubscribed(tech.name)
             const inCart = isInCart(tech.id)
+
             return (
-              <div key={tech.id}
-                className={`relative glass-card p-6 transition-all duration-500 hover:-translate-y-1 hover:shadow-xl group ${
+              <div
+                key={tech.id}
+                className={`relative glass-card p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group ${
                   subscribed
-                    ? 'border-accent-green/30 bg-accent-green/5'
+                    ? 'border-emerald-500/30 bg-emerald-500/5'
                     : inCart
                     ? `${colors.border} bg-gradient-to-br ${colors.bg} to-transparent`
                     : `hover:${colors.border} hover:shadow-lg ${colors.shadow}`
                 }`}
               >
-                {/* Popular badge for AWS */}
                 {tech.name === 'AWS' && !subscribed && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 text-[10px] font-bold text-white uppercase tracking-wider shadow-lg">
                     Popular
                   </div>
                 )}
 
-                {/* Cart indicator */}
                 {inCart && (
                   <div className="absolute top-3 right-3">
-                    <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${colors.from} ${colors.to} flex items-center justify-center animate-scale-in`}>
+                    <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${colors.from} ${colors.to} flex items-center justify-center`}>
                       <Check size={12} className="text-white" />
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 ${
-                    subscribed ? 'bg-accent-green/20' : colors.bg
-                  }`}>
-                    <Icon size={24} className={subscribed ? 'text-accent-green' : colors.text} />
+                {/* Icon + name */}
+                <div className="flex items-center gap-3 mb-5">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 ${subscribed ? 'bg-emerald-500/20' : colors.bg}`}>
+                    <Icon size={24} className={subscribed ? 'text-emerald-400' : colors.text} />
                   </div>
                   <div>
                     <h3 className="font-bold text-white">{tech.name}</h3>
@@ -579,6 +653,7 @@ export default function Pricing() {
                   </div>
                 </div>
 
+                {/* Price */}
                 <div className="mb-1">
                   {rateLoading && currency === 'USD' ? (
                     <span className="text-2xl font-extrabold text-surface-500 animate-pulse">Loading...</span>
@@ -589,17 +664,15 @@ export default function Pricing() {
                     </>
                   )}
                 </div>
-
-                {/* Show original INR price when displaying USD */}
                 {currency === 'USD' && !rateLoading && (
                   <p className="text-xs text-surface-500 mb-4 flex items-center gap-1">
-                    <IndianRupee size={10} />
-                    {'\u20B9'}{priceINR} INR
+                    <IndianRupee size={10} /> &#x20B9;{priceINR} INR
                   </p>
                 )}
                 {(currency === 'INR' || rateLoading) && <div className="mb-4" />}
 
-                <ul className="space-y-2 mb-6 text-sm">
+                {/* Feature list */}
+                <ul className="space-y-2 mb-6 text-sm flex-1">
                   <li className="flex items-center gap-2 text-surface-300">
                     <Check size={14} className="text-accent-green shrink-0" /> All {tech.name} scenarios
                   </li>
@@ -611,14 +684,15 @@ export default function Pricing() {
                   </li>
                 </ul>
 
+                {/* Action */}
                 {subscribed ? (
-                  <div className="w-full py-2.5 rounded-lg font-semibold text-center bg-accent-green/10 text-accent-green border border-accent-green/20 flex items-center justify-center gap-2">
+                  <div className="w-full py-2.5 rounded-lg font-semibold text-center bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center gap-2">
                     <Crown size={16} /> Subscribed
                   </div>
                 ) : inCart ? (
                   <button
                     onClick={() => removeFromCart(tech.id)}
-                    className="w-full py-2.5 rounded-lg font-semibold text-center border border-accent-red/30 text-accent-red hover:bg-accent-red/10 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-2.5 rounded-lg font-semibold text-center border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-all flex items-center justify-center gap-2"
                   >
                     <X size={14} /> Remove from Cart
                   </button>
@@ -651,89 +725,130 @@ export default function Pricing() {
       </div>
 
       {/* Interview Studio plans */}
-      <section id="interview-plans" className="max-w-6xl mx-auto px-4 py-16 border-t border-surface-800/50 scroll-mt-24">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-white flex items-center justify-center gap-2">
-            <Mic2 className="text-indigo-400" size={22} />
-            AI Interview Studio
+      <section id="interview-plans" className="max-w-6xl mx-auto px-4 py-16 border-t border-surface-800/50 scroll-mt-24 relative z-10">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full px-4 py-1.5 text-sm text-indigo-400 mb-4">
+            <Sparkles size={13} className="animate-pulse" />
+            <span className="font-semibold">AI-powered</span>
+          </div>
+          <h2 className="text-2xl font-bold text-white flex items-center justify-center gap-2 mb-2">
+            <Mic2 className="text-indigo-400" size={22} /> AI Interview Studio
           </h2>
-          <p className="text-sm text-surface-400 mt-2 max-w-xl mx-auto">
-            Yearly mock interview plans — admin sets prices in Admin → Interviews → Pricing. 10 full interview attempts per year on paid tiers.
+          <p className="text-sm text-surface-400 max-w-xl mx-auto">
+            Yearly mock interview plans — admin sets prices in Admin &rarr; Interviews &rarr; Pricing. 10 full interview attempts per year on paid tiers.
           </p>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-4xl mx-auto">
           {(interviewPlans.length ? interviewPlans : [
-            { code: 'free', name: 'Free mini', price_inr: 0, interviews_per_month: 1, max_rounds: 1, description: '1 sample per month' },
+            { code: 'free', name: 'Free Mini', price_inr: 0, interviews_per_month: 1, max_rounds: 1, description: '1 sample per month' },
             { code: 'pro', name: 'Interview Pro', price_inr: 999, interviews_per_month: 10, max_rounds: 3, description: 'Voice + reports' },
             { code: 'premium', name: 'Interview Premium', price_inr: 2499, interviews_per_month: 10, max_rounds: 5, description: 'Certificate + 5 rounds' },
           ]).filter(p => p.is_active !== false).map(plan => {
             const priceINR = Number(plan.price_inr || 0)
             const priceDisplay = getDisplayPrice(priceINR)
             const subscribed = isInterviewSubscribed(plan)
+            const isPro = plan.code === 'pro'
+
             return (
-              <div key={plan.code} className={`glass-card p-5 border text-center ${plan.code === 'pro' ? 'border-indigo-500/40 bg-indigo-500/5' : 'border-surface-800'}`}>
-                <p className="text-sm font-medium text-white">{plan.name}</p>
-                <p className="text-2xl font-bold text-indigo-300 mt-1">
-                  {priceDisplay.display}
-                  <span className="text-xs text-surface-500 font-normal">/year</span>
-                </p>
-                <p className="text-xs text-surface-500 mt-2">
-                  {plan.interviews_per_month || 10} attempts/yr · up to {plan.max_rounds} rounds
-                </p>
-                {plan.description && <p className="text-[10px] text-surface-600 mt-1">{plan.description}</p>}
-                <div className="mt-4">
-                  {subscribed ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-emerald-400"><BadgeCheck size={14} /> Subscribed</span>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={subscribingInterview === plan.code}
-                      onClick={() => handleInterviewSubscribe(plan)}
-                      className="w-full btn-primary text-sm py-2 disabled:opacity-50"
-                    >
-                      {subscribingInterview === plan.code ? (
-                        <Loader2 size={14} className="animate-spin inline" />
-                      ) : plan.code === 'free' ? 'Start free' : (
-                        <span className="inline-flex items-center gap-1 justify-center"><ShoppingCart size={14} /> Subscribe</span>
-                      )}
-                    </button>
+              <div
+                key={plan.code}
+                className={`relative glass-card p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 ${
+                  isPro
+                    ? 'border-indigo-500/40 bg-indigo-500/5 shadow-lg shadow-indigo-500/10'
+                    : 'hover:border-surface-600/60'
+                }`}
+              >
+                {isPro && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-[10px] font-bold text-white uppercase tracking-wider shadow-lg">
+                    Most Popular
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isPro ? 'bg-indigo-500/20' : 'bg-surface-700/60'}`}>
+                    <Mic2 size={20} className={isPro ? 'text-indigo-400' : 'text-surface-400'} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-white text-sm">{plan.name}</p>
+                    <p className="text-[10px] text-surface-500 mt-0.5">{plan.description}</p>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <span className="text-3xl font-extrabold text-white">{priceDisplay.display}</span>
+                  <span className="text-surface-500 text-sm ml-1">/year</span>
+                  {currency === 'USD' && priceINR > 0 && !rateLoading && (
+                    <p className="text-xs text-surface-500 mt-1">&#x20B9;{priceINR} INR</p>
                   )}
                 </div>
+
+                <ul className="space-y-2 mb-6 flex-1 text-sm">
+                  <li className="flex items-center gap-2 text-surface-300">
+                    <Check size={14} className="text-indigo-400 shrink-0" />
+                    {plan.interviews_per_month || 1} attempt{(plan.interviews_per_month || 1) > 1 ? 's' : ''}/yr
+                  </li>
+                  <li className="flex items-center gap-2 text-surface-300">
+                    <Check size={14} className="text-indigo-400 shrink-0" />
+                    Up to {plan.max_rounds} round{plan.max_rounds > 1 ? 's' : ''}
+                  </li>
+                  {plan.code !== 'free' && (
+                    <li className="flex items-center gap-2 text-surface-300">
+                      <Check size={14} className="text-indigo-400 shrink-0" />
+                      STAR-scored feedback report
+                    </li>
+                  )}
+                  {plan.code === 'premium' && (
+                    <li className="flex items-center gap-2 text-surface-300">
+                      <Check size={14} className="text-indigo-400 shrink-0" />
+                      FIXIT-INT LinkedIn certificate
+                    </li>
+                  )}
+                </ul>
+
+                {subscribed ? (
+                  <span className="inline-flex items-center justify-center gap-1.5 text-sm text-emerald-400 py-2.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                    <BadgeCheck size={16} /> Subscribed
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={subscribingInterview === plan.code}
+                    onClick={() => handleInterviewSubscribe(plan)}
+                    className={`w-full text-sm py-2.5 disabled:opacity-50 flex items-center justify-center gap-2 rounded-lg font-semibold transition-all ${
+                      isPro ? 'btn-primary' : 'btn-secondary'
+                    }`}
+                  >
+                    {subscribingInterview === plan.code ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : plan.code === 'free' ? (
+                      'Start free'
+                    ) : (
+                      <><ShoppingCart size={14} /> Subscribe</>
+                    )}
+                  </button>
+                )}
               </div>
             )
           })}
         </div>
+
         <p className="text-center mt-6 text-xs text-surface-500">
           Interview billing is separate from technology lab subscriptions.
         </p>
       </section>
 
-      {/* FAQ — bottom of page */}
-      <section className="max-w-2xl mx-auto px-4 pb-16">
-        <h2 className="text-xl font-bold text-white text-center mb-6">Frequently Asked Questions</h2>
-        <div className="space-y-4">
-          {[
-            { q: 'How does per-technology pricing work?', a: 'You subscribe to individual technologies (e.g., Linux, Docker). Each subscription gives you 1-year access to all scenarios, hints, and the certificate for that technology.' },
-            { q: 'How do interview plans work?', a: 'Interview Studio plans are billed yearly. Pro and Premium include 10 full mock interview attempts per year with multi-round voice interviews and reports. Prices are configured by admins.' },
-            { q: 'What can I access for free?', a: 'Free users get demo scenarios for every technology, one interview sample, community forum, leaderboard, and basic progress tracking.' },
-            { q: 'Can I subscribe to multiple technologies at once?', a: 'Yes! Use "Add to Cart" for each technology, then "Subscribe All" in the cart panel.' },
-            { q: 'Will I get a certificate?', a: 'Yes — technology completion certificates and FIXIT-INT interview certificates are verifiable on the Verify Certificate page.' },
-            { q: 'Are prices per month or per year?', a: 'All subscriptions are yearly (1-year access from purchase). Interview plan prices shown are per year, not per month.' },
-          ].map(({ q, a }) => (
-            <div key={q} className="glass-card p-5 hover:border-accent-cyan/20 transition-all group">
-              <h3 className="text-sm font-semibold text-white mb-1.5 group-hover:text-accent-cyan transition-colors">{q}</h3>
-              <p className="text-sm text-surface-400 leading-relaxed">{a}</p>
-            </div>
-          ))}
-        </div>
+      {/* FAQ accordion */}
+      <section className="max-w-2xl mx-auto px-4 pb-20 relative z-10">
+        <h2 className="text-2xl font-bold text-white text-center mb-8">Frequently Asked Questions</h2>
+        <FAQAccordion items={FAQ_ITEMS} />
       </section>
 
       {/* Floating Cart Panel */}
       {showCart && cart.length > 0 && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCart(false)} />
-
-          <div className="relative w-full max-w-md bg-surface-900 border-l border-surface-700/50 h-full overflow-y-auto animate-slide-in-right shadow-2xl">
+          <div className="relative w-full max-w-md bg-surface-900 border-l border-surface-700/50 h-full overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-surface-900/95 backdrop-blur-xl border-b border-surface-700/30 p-5 flex items-center justify-between z-10">
               <div className="flex items-center gap-2">
                 <ShoppingCart size={18} className="text-accent-cyan" />
@@ -762,10 +877,10 @@ export default function Pricing() {
                     <div className="text-right shrink-0">
                       <p className="font-bold text-white text-sm">{priceDisplay.display}</p>
                       {currency === 'USD' && (
-                        <p className="text-[10px] text-surface-500">{'\u20B9'}{priceINR}</p>
+                        <p className="text-[10px] text-surface-500">&#x20B9;{priceINR}</p>
                       )}
                     </div>
-                    <button onClick={() => removeFromCart(tech.id)} className="p-1 text-surface-500 hover:text-accent-red transition-colors shrink-0">
+                    <button onClick={() => removeFromCart(tech.id)} className="p-1 text-surface-500 hover:text-red-400 transition-colors shrink-0">
                       <X size={14} />
                     </button>
                   </div>
@@ -782,7 +897,6 @@ export default function Pricing() {
                   </p>
                 </div>
               )}
-
               <div className="space-y-2">
                 <div className="flex justify-between text-sm text-surface-400">
                   <span>{cart.length} technolog{cart.length > 1 ? 'ies' : 'y'}</span>
@@ -791,7 +905,7 @@ export default function Pricing() {
                 {currency === 'USD' && (
                   <div className="flex justify-between text-xs text-surface-500">
                     <span>INR equivalent</span>
-                    <span>{'\u20B9'}{cartTotal}</span>
+                    <span>&#x20B9;{cartTotal}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-white font-bold text-lg pt-2 border-t border-surface-700/30">
@@ -799,7 +913,6 @@ export default function Pricing() {
                   <span>{getDisplayPrice(cartTotal).display}</span>
                 </div>
               </div>
-
               <button
                 onClick={handleBatchSubscribe}
                 disabled={batchProcessing}
@@ -811,7 +924,6 @@ export default function Pricing() {
                   <><Lock size={16} /> Subscribe All ({cart.length})</>
                 )}
               </button>
-
               <div className="flex items-center justify-center gap-1.5 text-xs text-surface-500">
                 <ShieldCheck size={12} className="text-accent-green" />
                 <span>Secure payment via Razorpay</span>

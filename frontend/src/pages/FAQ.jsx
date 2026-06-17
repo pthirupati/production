@@ -1,6 +1,18 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
-import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import {
+  HelpCircle, ChevronDown, Search, X,
+  Rocket, CreditCard, Terminal, Brain, Award, UserCircle
+} from 'lucide-react'
+
+const CATEGORY_META = {
+  'Getting Started':         { icon: Rocket,     color: 'text-accent-cyan',   bg: 'bg-accent-cyan/10',   border: 'border-accent-cyan/20'   },
+  'Subscriptions & Pricing': { icon: CreditCard, color: 'text-accent-green',  bg: 'bg-accent-green/10',  border: 'border-accent-green/20'  },
+  'Labs & Scenarios':        { icon: Terminal,   color: 'text-accent-purple', bg: 'bg-accent-purple/10', border: 'border-accent-purple/20' },
+  'AI Interview Studio':     { icon: Brain,      color: 'text-accent-blue',   bg: 'bg-accent-blue/10',   border: 'border-accent-blue/20'   },
+  'Certificates':            { icon: Award,      color: 'text-accent-amber',  bg: 'bg-accent-amber/10',  border: 'border-accent-amber/20'  },
+  'Account & Support':       { icon: UserCircle, color: 'text-accent-pink',   bg: 'bg-accent-pink/10',   border: 'border-accent-pink/20'   },
+}
 
 const FAQ_ITEMS = [
   {
@@ -9,11 +21,10 @@ const FAQ_ITEMS = [
       {
         q: 'What is FixitLab?',
         a: 'FixitLab is a hands-on learning platform where you practice real-world technology skills in live terminal environments. From Linux and networking to Docker, databases, cloud, and security — connect to real environments, solve challenges, and learn by doing.',
-
       },
       {
         q: 'How do I get started?',
-        a: 'Sign up for a free account, browse available scenarios, and start a lab. You\'ll get a live terminal connected to a broken server. Diagnose the issue and fix it within the time limit.',
+        a: "Sign up for a free account, browse available scenarios, and start a lab. You'll get a live terminal connected to a broken server. Diagnose the issue and fix it within the time limit.",
       },
       {
         q: 'What technologies are available?',
@@ -50,7 +61,7 @@ const FAQ_ITEMS = [
         a: 'Most labs have a time limit of 15-30 minutes. The time limit varies by scenario difficulty. Your progress is saved even if the timer expires.',
       },
       {
-        q: 'What happens if I can\'t solve a scenario?',
+        q: "What happens if I can't solve a scenario?",
         a: 'You can use hints (limited per scenario) to get guidance. After the timer expires, you can view the full solution explanation.',
       },
       {
@@ -97,7 +108,7 @@ const FAQ_ITEMS = [
     items: [
       {
         q: 'How do I earn a technology certificate?',
-        a: 'Complete ALL scenarios within a technology and you\'ll be able to download a certificate. You must be a paid subscriber of that technology.',
+        a: "Complete ALL scenarios within a technology and you'll be able to download a certificate. You must be a paid subscriber of that technology.",
       },
       {
         q: 'How do I earn an interview certificate?',
@@ -127,54 +138,139 @@ const FAQ_ITEMS = [
 function FAQItem({ question, answer }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="glass-card overflow-hidden">
+    <div className={`glass-card overflow-hidden transition-all duration-200 ${open ? 'border-accent-cyan/30' : ''}`}>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-4 text-left hover:bg-surface-800/50 transition-colors"
+        className="w-full flex items-center justify-between p-5 text-left gap-4 hover:bg-surface-800/30 transition-colors group"
       >
-        <span className="font-medium pr-4">{question}</span>
-        {open ? <ChevronUp size={18} className="text-surface-400 shrink-0" /> : <ChevronDown size={18} className="text-surface-400 shrink-0" />}
+        <span className="font-medium text-white group-hover:text-accent-cyan transition-colors leading-snug">{question}</span>
+        <span className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 ${open ? 'bg-accent-cyan/20 text-accent-cyan rotate-180' : 'bg-surface-700/60 text-surface-400'}`}>
+          <ChevronDown size={16} />
+        </span>
       </button>
-      {open && (
-        <div className="px-4 pb-4 text-sm text-surface-300 border-t border-surface-700/50 pt-3">
-          {answer}
+      <div className={`overflow-hidden transition-all duration-300 ${open ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}>
+        <div className="px-5 pb-5 pt-0 text-sm text-surface-300 border-t border-surface-700/40 leading-relaxed">
+          <div className="pt-4">{answer}</div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
 export default function FAQ() {
+  const [search, setSearch] = useState('')
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return FAQ_ITEMS
+    return FAQ_ITEMS.map(cat => ({
+      ...cat,
+      items: cat.items.filter(
+        item => item.q.toLowerCase().includes(q) || item.a.toLowerCase().includes(q)
+      ),
+    })).filter(cat => cat.items.length > 0)
+  }, [search])
+
+  const totalResults = filtered.reduce((n, c) => n + c.items.length, 0)
+
   return (
     <PublicLayout>
-      <div className="max-w-4xl mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
-            <HelpCircle size={32} className="text-cyan-400" />
+      {/* ── Hero ──────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden py-20">
+        <div className="absolute inset-0 hero-grid opacity-40 pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-accent-cyan/6 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-3xl mx-auto px-6 text-center relative animate-fade-in">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-accent-cyan/20 to-accent-blue/20 border border-accent-cyan/20 flex items-center justify-center">
+            <HelpCircle size={30} className="text-accent-cyan" />
           </div>
-          <h1 className="text-4xl font-bold mb-2">Frequently Asked Questions</h1>
-          <p className="text-surface-400">Find answers to common questions about FixitLab</p>
-        </div>
+          <h1 className="text-5xl font-extrabold text-white mb-3 tracking-tight">
+            Frequently Asked{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan to-accent-blue">
+              Questions
+            </span>
+          </h1>
+          <p className="text-surface-400 mb-8 text-lg">Find answers to common questions about FixitLab</p>
 
-        <div className="space-y-8">
-          {FAQ_ITEMS.map((category) => (
-            <div key={category.category}>
-              <h2 className="text-lg font-bold mb-3 text-cyan-400">{category.category}</h2>
-              <div className="space-y-2">
-                {category.items.map((item) => (
-                  <FAQItem key={item.q} question={item.q} answer={item.a} />
-                ))}
-              </div>
-            </div>
-          ))}
+          {/* Search input */}
+          <div className="relative max-w-xl mx-auto">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search questions..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="input-field pl-11 pr-11 py-3 w-full text-base"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-md text-surface-400 hover:text-white hover:bg-surface-700 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {search && (
+            <p className="text-sm text-surface-500 mt-3">
+              {totalResults === 0
+                ? 'No results found'
+                : `${totalResults} result${totalResults !== 1 ? 's' : ''} for "${search}"`}
+            </p>
+          )}
         </div>
+      </section>
 
-        <div className="mt-12 text-center glass-card p-8">
-          <h3 className="text-xl font-bold mb-2">Still have questions?</h3>
-          <p className="text-surface-400 mb-4">Our support team is here to help.</p>
-          <a href="mailto:fixitlab.techsupport@gmail.com" className="btn-primary inline-flex items-center gap-2">
-            Contact Support
-          </a>
+      {/* ── FAQ body ──────────────────────────────────────────── */}
+      <div className="max-w-4xl mx-auto px-6 pb-24 animate-slide-up">
+        {filtered.length === 0 ? (
+          <div className="glass-card p-12 text-center">
+            <HelpCircle size={40} className="text-surface-500 mx-auto mb-3" />
+            <p className="text-surface-400">No questions match your search. Try different keywords.</p>
+            <button onClick={() => setSearch('')} className="btn-secondary mt-4 text-sm">Clear search</button>
+          </div>
+        ) : (
+          <div className="space-y-10">
+            {filtered.map((cat) => {
+              const meta = CATEGORY_META[cat.category] || {
+                icon: HelpCircle,
+                color: 'text-accent-cyan',
+                bg: 'bg-accent-cyan/10',
+                border: 'border-accent-cyan/20',
+              }
+              const Icon = meta.icon
+              return (
+                <div key={cat.category}>
+                  {/* Category header */}
+                  <div className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-xl ${meta.bg} border ${meta.border} mb-4`}>
+                    <Icon size={16} className={meta.color} />
+                    <h2 className={`text-sm font-bold ${meta.color}`}>{cat.category}</h2>
+                    <span className={`ml-1 px-1.5 py-0.5 text-xs rounded-md bg-surface-900/60 ${meta.color} font-medium`}>
+                      {cat.items.length}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {cat.items.map((item) => (
+                      <FAQItem key={item.q} question={item.q} answer={item.a} />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* CTA card */}
+        <div className="mt-14 gradient-border glass-card p-8 text-center relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/5 via-transparent to-accent-purple/5 rounded-xl pointer-events-none" />
+          <div className="relative">
+            <HelpCircle size={28} className="text-accent-cyan mx-auto mb-3" />
+            <h3 className="text-xl font-bold text-white mb-2">Still have questions?</h3>
+            <p className="text-surface-400 mb-5 text-sm">Our support team is here to help. Typically responds within 24 hours.</p>
+            <a href="mailto:fixitlab.techsupport@gmail.com" className="btn-primary inline-flex items-center gap-2">
+              Contact Support
+            </a>
+          </div>
         </div>
       </div>
     </PublicLayout>

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import PublicLayout from '../components/layout/PublicLayout'
 import {
   Terminal, Shield, Cloud, Server, Users, Award, Target,
   Zap, ArrowRight, Globe, Heart, Code, Cpu, BookOpen,
@@ -12,43 +13,51 @@ const team = [
     name: 'Thirupathi P.',
     role: 'Founder & Lead Engineer',
     bio: 'Full-stack engineer passionate about hands-on tech education. Built FixitLab to make real-world technology skills accessible to everyone.',
-    color: 'accent-cyan',
+    gradient: 'from-accent-cyan/20 to-accent-blue/10',
+    border: 'border-accent-cyan/20',
+    textColor: 'text-accent-cyan',
   },
   {
     name: 'Platform Team',
     role: 'Engineering',
     bio: 'A talented team building the infrastructure that powers thousands of lab sessions. Docker, Kubernetes, AWS, and more.',
-    color: 'accent-green',
+    gradient: 'from-accent-green/20 to-accent-cyan/10',
+    border: 'border-accent-green/20',
+    textColor: 'text-accent-green',
   },
   {
     name: 'Content Team',
     role: 'Scenario Design',
     bio: 'Engineers and developers crafting realistic challenges from real-world incidents across Linux, cloud, databases, and more.',
-    color: 'accent-purple',
+    gradient: 'from-accent-purple/20 to-accent-pink/10',
+    border: 'border-accent-purple/20',
+    textColor: 'text-accent-purple',
   },
   {
     name: 'Community',
     role: 'Contributors',
     bio: 'Open-source contributors and beta testers who shape the platform with feedback, scenarios, and improvements.',
-    color: 'accent-amber',
+    gradient: 'from-accent-amber/20 to-accent-red/10',
+    border: 'border-accent-amber/20',
+    textColor: 'text-accent-amber',
   },
 ]
 
 const milestones = [
-  { year: '2025', title: 'Idea Born', desc: 'Concept for a hands-on troubleshooting platform started from real hiring pain points.' },
-  { year: '2025', title: 'MVP Launch', desc: 'First Docker-based scenarios went live with Nginx, Cron, and DNS challenges.' },
-  { year: '2026', title: 'Cloud Labs', desc: 'Added AWS EC2 and DigitalOcean support for advanced scenarios needing real servers.' },
-  { year: '2026', title: 'Jira & Teams', desc: 'Incident tickets per learner, Jira bot sync, org invites, member analytics, and AI interview coaching.' },
-  { year: '2026', title: 'Growing Fast', desc: 'Expanded catalog across Linux, cloud, K8s, and simulations — full admin, billing, and certificate flows.' },
+  { year: '2025', title: 'Idea Born', desc: 'Concept for a hands-on troubleshooting platform started from real hiring pain points.', icon: Brain, color: 'text-accent-purple', bg: 'bg-accent-purple/10', border: 'border-accent-purple/20' },
+  { year: '2025', title: 'MVP Launch', desc: 'First Docker-based scenarios went live with Nginx, Cron, and DNS challenges.', icon: Terminal, color: 'text-accent-cyan', bg: 'bg-accent-cyan/10', border: 'border-accent-cyan/20' },
+  { year: '2026', title: 'Cloud Labs', desc: 'Added AWS EC2 and DigitalOcean support for advanced scenarios needing real servers.', icon: Cloud, color: 'text-accent-blue', bg: 'bg-accent-blue/10', border: 'border-accent-blue/20' },
+  { year: '2026', title: 'Jira & Teams', desc: 'Incident tickets per learner, Jira bot sync, org invites, member analytics, and AI interview coaching.', icon: Ticket, color: 'text-accent-green', bg: 'bg-accent-green/10', border: 'border-accent-green/20' },
+  { year: '2026', title: 'Growing Fast', desc: 'Expanded catalog across Linux, cloud, K8s, and simulations — full admin, billing, and certificate flows.', icon: Zap, color: 'text-accent-amber', bg: 'bg-accent-amber/10', border: 'border-accent-amber/20' },
 ]
 
 const values = [
-  { icon: Terminal, title: 'Learn by Doing', desc: 'We believe the best way to learn is by breaking things and fixing them — not reading docs.' },
-  { icon: Shield, title: 'Safe to Fail', desc: 'Every lab is an isolated sandbox (Docker, EC2, or DO). Sessions auto-expire in 15 minutes by default.' },
-  { icon: Heart, title: 'Accessible', desc: 'Free tier for everyone. Promo coupons, teams for enterprise, and OAuth sign-up.' },
-  { icon: Globe, title: 'Global Community', desc: 'Engineers share threads with screenshots, vote on solutions, and compete on leaderboards.' },
-  { icon: Code, title: 'Real Environments', desc: 'Docker containers, AWS EC2, and DigitalOcean droplets — plus unified RHEL simulations.' },
-  { icon: Zap, title: 'Instant Feedback', desc: 'Auto-validation checks your fix inside the environment. Know if you solved it immediately.' },
+  { icon: Terminal, title: 'Learn by Doing', desc: 'We believe the best way to learn is by breaking things and fixing them — not reading docs.', color: 'text-accent-cyan', bg: 'bg-accent-cyan/10 group-hover:bg-accent-cyan/20' },
+  { icon: Shield, title: 'Safe to Fail', desc: 'Every lab is an isolated sandbox (Docker, EC2, or DO). Sessions auto-expire in 15 minutes by default.', color: 'text-accent-green', bg: 'bg-accent-green/10 group-hover:bg-accent-green/20' },
+  { icon: Heart, title: 'Accessible', desc: 'Free tier for everyone. Promo coupons, teams for enterprise, and OAuth sign-up.', color: 'text-accent-pink', bg: 'bg-accent-pink/10 group-hover:bg-accent-pink/20' },
+  { icon: Globe, title: 'Global Community', desc: 'Engineers share threads with screenshots, vote on solutions, and compete on leaderboards.', color: 'text-accent-blue', bg: 'bg-accent-blue/10 group-hover:bg-accent-blue/20' },
+  { icon: Code, title: 'Real Environments', desc: 'Docker containers, AWS EC2, and DigitalOcean droplets — plus unified RHEL simulations.', color: 'text-accent-purple', bg: 'bg-accent-purple/10 group-hover:bg-accent-purple/20' },
+  { icon: Zap, title: 'Instant Feedback', desc: 'Auto-validation checks your fix inside the environment. Know if you solved it immediately.', color: 'text-accent-amber', bg: 'bg-accent-amber/10 group-hover:bg-accent-amber/20' },
 ]
 
 const platformFeatures = [
@@ -170,76 +179,73 @@ const platformFeatures = [
 ]
 
 const whoItsFor = [
-  { icon: GraduationCap, title: 'Students & career switchers', desc: 'Build muscle memory on real shells instead of only watching videos.' },
-  { icon: Target, title: 'Interview candidates', desc: 'Mock Interview Studio for voice panels, plus timed Fix / Build / Hack labs and Jira tickets for on-call prep.' },
-  { icon: Server, title: 'DevOps & SRE teams', desc: 'Run team drills on broken Nginx, DNS, K8s, or cloud misconfigs in minutes.' },
-  { icon: Layers, title: 'Hiring managers', desc: 'Assign scenarios, review completion data, and optionally sync incidents to Jira.' },
+  { icon: GraduationCap, title: 'Students & career switchers', desc: 'Build muscle memory on real shells instead of only watching videos.', color: 'text-accent-cyan', bg: 'bg-accent-cyan/10' },
+  { icon: Target, title: 'Interview candidates', desc: 'Mock Interview Studio for voice panels, plus timed Fix / Build / Hack labs and Jira tickets for on-call prep.', color: 'text-accent-purple', bg: 'bg-accent-purple/10' },
+  { icon: Server, title: 'DevOps & SRE teams', desc: 'Run team drills on broken Nginx, DNS, K8s, or cloud misconfigs in minutes.', color: 'text-accent-green', bg: 'bg-accent-green/10' },
+  { icon: Layers, title: 'Hiring managers', desc: 'Assign scenarios, review completion data, and optionally sync incidents to Jira.', color: 'text-accent-amber', bg: 'bg-accent-amber/10' },
 ]
+
+const colorMap = {
+  blue:   { bg: 'bg-accent-blue/10 group-hover:bg-accent-blue/20',     text: 'text-accent-blue'   },
+  cyan:   { bg: 'bg-accent-cyan/10 group-hover:bg-accent-cyan/20',     text: 'text-accent-cyan'   },
+  teal:   { bg: 'bg-accent-cyan/10 group-hover:bg-accent-cyan/20',     text: 'text-accent-cyan'   },
+  indigo: { bg: 'bg-accent-blue/10 group-hover:bg-accent-blue/20',     text: 'text-accent-blue'   },
+  purple: { bg: 'bg-accent-purple/10 group-hover:bg-accent-purple/20', text: 'text-accent-purple' },
+  green:  { bg: 'bg-accent-green/10 group-hover:bg-accent-green/20',   text: 'text-accent-green'  },
+  amber:  { bg: 'bg-accent-amber/10 group-hover:bg-accent-amber/20',   text: 'text-accent-amber'  },
+}
 
 export default function About() {
   return (
-    <div className="min-h-screen bg-surface-950">
-      {/* Nav */}
-      <nav className="border-b border-surface-800/50 backdrop-blur-xl sticky top-0 z-50 bg-surface-950/90">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-cyan to-brand-600 flex items-center justify-center shadow-lg shadow-accent-cyan/20">
-              <Terminal size={18} className="text-white" />
-            </div>
-            <span className="text-xl font-bold text-white tracking-tight">FixitLab</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-6">
-            <Link to="/scenarios" className="text-sm text-surface-400 hover:text-white transition-colors">Scenarios</Link>
-            <Link to="/mock-interviews" className="text-sm text-surface-400 hover:text-white transition-colors">Interviews</Link>
-            <Link to="/pricing" className="text-sm text-surface-400 hover:text-white transition-colors">Pricing</Link>
-            <Link to="/blog" className="text-sm text-surface-400 hover:text-white transition-colors">Blog</Link>
-            <Link to="/about" className="text-sm text-white font-medium">About</Link>
-          </div>
-          <Link to="/register" className="btn-primary text-sm px-5">Get Started Free</Link>
-        </div>
-      </nav>
+    <PublicLayout>
+      {/* ── Hero ──────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden py-28">
+        <div className="absolute inset-0 hero-grid opacity-50 pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-accent-purple/8 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[400px] bg-accent-cyan/6 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 opacity-[0.03]"
-            style={{ backgroundImage: 'linear-gradient(rgb(var(--a-cyan)) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--a-cyan)) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-accent-purple/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-accent-cyan/5 rounded-full blur-3xl" />
-        </div>
-
-        <div className="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center relative">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-purple/10 border border-accent-purple/20 text-accent-purple text-sm mb-6">
+        <div className="max-w-4xl mx-auto px-6 text-center relative animate-fade-in">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-purple/10 border border-accent-purple/20 text-accent-purple text-sm mb-8">
             <Heart size={14} />
             Our Mission
           </div>
-          <h1 className="text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] mb-6">
+          <h1 className="text-5xl lg:text-7xl font-extrabold text-white leading-[1.05] mb-6 tracking-tight">
             Master Technology
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan via-brand-400 to-accent-purple">
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple">
               Through Practice
             </span>
           </h1>
-          <p className="text-lg text-surface-400 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-xl text-surface-400 max-w-2xl mx-auto leading-relaxed mb-10">
             FixitLab was built by engineers who were tired of theoretical learning.
             We believe the best way to master any technology is to actually use it —
             on real infrastructure, with real problems, and real consequences.
           </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link to="/register" className="btn-primary text-base px-8 py-3 inline-flex items-center gap-2 shadow-lg shadow-accent-cyan/20">
+              Start for Free <ArrowRight size={16} />
+            </Link>
+            <Link to="/scenarios" className="btn-secondary text-base px-8 py-3 inline-flex items-center gap-2">
+              Browse Challenges
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="border-y border-surface-800/50 bg-surface-900/30">
+      {/* ── Stats bar ─────────────────────────────────────────── */}
+      <section className="border-y border-surface-800/50 bg-surface-900/40 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-6 py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: '9+', label: 'Scenarios', icon: Target },
-              { value: '3+', label: 'Technologies', icon: Cpu },
-              { value: '3', label: 'Cloud Providers', icon: Cloud },
-              { value: '24/7', label: 'Availability', icon: CheckCircle2 },
-            ].map(({ value, label, icon: Icon }) => (
-              <div key={label}>
-                <Icon size={24} className="text-accent-cyan mx-auto mb-2" />
-                <p className="text-3xl font-bold text-white">{value}</p>
+              { value: '9+',   label: 'Scenarios',       icon: Target,       color: 'text-accent-cyan'   },
+              { value: '3+',   label: 'Technologies',    icon: Cpu,          color: 'text-accent-purple' },
+              { value: '3',    label: 'Cloud Providers', icon: Cloud,        color: 'text-accent-blue'   },
+              { value: '24/7', label: 'Availability',    icon: CheckCircle2, color: 'text-accent-green'  },
+            ].map(({ value, label, icon: Icon, color }) => (
+              <div key={label} className="group">
+                <div className="w-12 h-12 rounded-xl bg-surface-800 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                  <Icon size={22} className={color} />
+                </div>
+                <p className="text-3xl font-extrabold text-white mb-1">{value}</p>
                 <p className="text-sm text-surface-400">{label}</p>
               </div>
             ))}
@@ -247,17 +253,23 @@ export default function About() {
         </div>
       </section>
 
-      {/* Our Values */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <h2 className="text-3xl font-bold text-white text-center mb-3">What We Believe</h2>
-        <p className="text-surface-400 text-center mb-12 max-w-xl mx-auto">
-          These principles guide every feature we build and every scenario we design.
-        </p>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {values.map(({ icon: Icon, title, desc }) => (
+      {/* ── Values ────────────────────────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-6 py-24 animate-slide-up">
+        <div className="text-center mb-14">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-cyan/10 border border-accent-cyan/20 text-accent-cyan text-sm mb-4">
+            <Sparkles size={14} />
+            Core Principles
+          </div>
+          <h2 className="text-4xl font-bold text-white mb-3">What We Believe</h2>
+          <p className="text-surface-400 max-w-xl mx-auto leading-relaxed">
+            These principles guide every feature we build and every scenario we design.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {values.map(({ icon: Icon, title, desc, color, bg }) => (
             <div key={title} className="glass-card-hover p-6 group">
-              <div className="w-12 h-12 rounded-xl bg-accent-cyan/10 flex items-center justify-center mb-4 group-hover:bg-accent-cyan/20 transition-colors">
-                <Icon size={24} className="text-accent-cyan" />
+              <div className={`w-12 h-12 rounded-xl ${bg} flex items-center justify-center mb-4 transition-colors`}>
+                <Icon size={22} className={color} />
               </div>
               <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
               <p className="text-sm text-surface-400 leading-relaxed">{desc}</p>
@@ -266,47 +278,102 @@ export default function About() {
         </div>
       </section>
 
-      {/* Platform capabilities — features not fully covered on Home */}
-      <section className="bg-surface-900/30 border-y border-surface-800/50">
-        <div className="max-w-7xl mx-auto px-6 py-20">
+      {/* ── Timeline / Milestones ─────────────────────────────── */}
+      <section className="bg-surface-900/40 border-y border-surface-800/50">
+        <div className="max-w-4xl mx-auto px-6 py-24">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-amber/10 border border-accent-amber/20 text-accent-amber text-sm mb-4">
+              <GitBranch size={14} />
+              Our Journey
+            </div>
+            <h2 className="text-4xl font-bold text-white">From Idea to Platform</h2>
+          </div>
+
+          <div className="relative">
+            {/* Vertical line */}
+            <div className="absolute left-[2.5rem] top-4 bottom-4 w-px bg-gradient-to-b from-accent-cyan/40 via-accent-purple/40 to-accent-amber/40 hidden md:block" />
+            <div className="space-y-8">
+              {milestones.map(({ year, title, desc, icon: Icon, color, bg, border }, i) => (
+                <div key={i} className="flex gap-5 items-start">
+                  {/* Year + icon dot */}
+                  <div className="shrink-0 hidden md:flex flex-col items-center gap-1 w-20 pt-1">
+                    <span className={`text-xs font-bold ${color} mb-1`}>{year}</span>
+                    <div className={`w-9 h-9 rounded-xl ${bg} border ${border} flex items-center justify-center z-10`}>
+                      <Icon size={16} className={color} />
+                    </div>
+                  </div>
+                  {/* Card */}
+                  <div className="glass-card-hover p-5 flex-1">
+                    <div className="flex items-center gap-2 mb-2 md:hidden">
+                      <Icon size={14} className={color} />
+                      <span className={`text-xs font-bold ${color}`}>{year}</span>
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-1">{title}</h3>
+                    <p className="text-sm text-surface-400 leading-relaxed">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Team ──────────────────────────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-6 py-24">
+        <div className="text-center mb-14">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-green/10 border border-accent-green/20 text-accent-green text-sm mb-4">
+            <Users size={14} />
+            The People
+          </div>
+          <h2 className="text-4xl font-bold text-white mb-3">The Team</h2>
+          <p className="text-surface-400 max-w-xl mx-auto">
+            FixitLab is built by a small, focused team that cares deeply about hands-on technology education.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+          {team.map(({ name, role, bio, gradient, border, textColor }) => (
+            <div key={name} className="glass-card-hover p-6 text-center group">
+              <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${gradient} border ${border} flex items-center justify-center mx-auto mb-5 group-hover:scale-110 transition-transform duration-300`}>
+                <span className={`text-2xl font-extrabold ${textColor}`}>
+                  {name.split(' ').map(w => w[0]).join('')}
+                </span>
+              </div>
+              <h3 className="text-base font-semibold text-white mb-1">{name}</h3>
+              <p className={`text-xs ${textColor} font-semibold mb-3 uppercase tracking-wide`}>{role}</p>
+              <p className="text-sm text-surface-400 leading-relaxed">{bio}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Platform Features ─────────────────────────────────── */}
+      <section className="bg-surface-900/40 border-y border-surface-800/50">
+        <div className="max-w-7xl mx-auto px-6 py-24">
           <div className="text-center mb-14">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-cyan/10 border border-accent-cyan/20 text-accent-cyan text-sm mb-4">
               <Sparkles size={14} />
               Full platform tour
             </div>
-            <h2 className="text-3xl font-bold text-white mb-3">Everything FixitLab Offers</h2>
+            <h2 className="text-4xl font-bold text-white mb-3">Everything FixitLab Offers</h2>
             <p className="text-surface-400 max-w-2xl mx-auto leading-relaxed">
               Beyond launching a terminal — FixitLab combines incident workflows, AI coaching,
               team analytics, and community learning. Here is what you get when you browse, sign up, or assign labs to your team.
             </p>
           </div>
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="grid lg:grid-cols-2 gap-5">
             {platformFeatures.map(({ icon: Icon, title, desc, bullets, color }) => {
-              const iconBg = {
-                blue: 'bg-blue-500/10 group-hover:bg-blue-500/20',
-                cyan: 'bg-accent-cyan/10 group-hover:bg-accent-cyan/20',
-                purple: 'bg-accent-purple/10 group-hover:bg-accent-purple/20',
-                green: 'bg-accent-green/10 group-hover:bg-accent-green/20',
-                amber: 'bg-accent-amber/10 group-hover:bg-accent-amber/20',
-              }[color] || 'bg-accent-cyan/10'
-              const iconText = {
-                blue: 'text-blue-400',
-                cyan: 'text-accent-cyan',
-                purple: 'text-accent-purple',
-                green: 'text-accent-green',
-                amber: 'text-accent-amber',
-              }[color] || 'text-accent-cyan'
+              const c = colorMap[color] || colorMap.cyan
               return (
                 <div key={title} className="glass-card-hover p-6 group">
-                  <div className={`w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center mb-4 transition-colors`}>
-                    <Icon size={24} className={iconText} />
+                  <div className={`w-12 h-12 rounded-xl ${c.bg} flex items-center justify-center mb-4 transition-colors`}>
+                    <Icon size={22} className={c.text} />
                   </div>
                   <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
                   <p className="text-sm text-surface-400 leading-relaxed mb-4">{desc}</p>
                   <ul className="space-y-2">
                     {bullets.map((b) => (
-                      <li key={b} className="flex gap-2 text-sm text-surface-300">
-                        <CheckCircle2 size={14} className={`${iconText} shrink-0 mt-0.5`} />
+                      <li key={b} className="flex gap-2.5 text-sm text-surface-300">
+                        <CheckCircle2 size={14} className={`${c.text} shrink-0 mt-0.5`} />
                         <span>{b}</span>
                       </li>
                     ))}
@@ -318,17 +385,19 @@ export default function About() {
         </div>
       </section>
 
-      {/* Who it's for */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <h2 className="text-3xl font-bold text-white text-center mb-3">Who Uses FixitLab?</h2>
-        <p className="text-surface-400 text-center mb-12 max-w-xl mx-auto">
-          From solo learners to engineering orgs running structured drills.
-        </p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {whoItsFor.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="glass-card p-5 text-center">
-              <div className="w-11 h-11 rounded-xl bg-surface-800 flex items-center justify-center mx-auto mb-3">
-                <Icon size={22} className="text-accent-cyan" />
+      {/* ── Who it's for ──────────────────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-6 py-24">
+        <div className="text-center mb-14">
+          <h2 className="text-4xl font-bold text-white mb-3">Who Uses FixitLab?</h2>
+          <p className="text-surface-400 max-w-xl mx-auto">
+            From solo learners to engineering orgs running structured drills.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {whoItsFor.map(({ icon: Icon, title, desc, color, bg }) => (
+            <div key={title} className="glass-card-hover p-6 text-center group">
+              <div className={`w-12 h-12 rounded-xl ${bg} flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform`}>
+                <Icon size={22} className={color} />
               </div>
               <h3 className="text-sm font-semibold text-white mb-2">{title}</h3>
               <p className="text-xs text-surface-400 leading-relaxed">{desc}</p>
@@ -351,62 +420,14 @@ export default function About() {
         </div>
       </section>
 
-      {/* The Story / Timeline */}
-      <section className="bg-surface-900/30 border-y border-surface-800/50">
-        <div className="max-w-4xl mx-auto px-6 py-20">
-          <h2 className="text-3xl font-bold text-white text-center mb-12">Our Journey</h2>
-          <div className="relative">
-            {/* Vertical line */}
-            <div className="absolute left-8 top-0 bottom-0 w-px bg-surface-700 hidden md:block" />
-            <div className="space-y-10">
-              {milestones.map(({ year, title, desc }, i) => (
-                <div key={i} className="flex gap-6 items-start">
-                  <div className="shrink-0 w-16 text-right hidden md:block">
-                    <span className="text-sm font-bold text-accent-cyan">{year}</span>
-                  </div>
-                  <div className="shrink-0 w-4 h-4 rounded-full bg-accent-cyan border-4 border-surface-900 relative z-10 mt-1 hidden md:block" />
-                  <div className="glass-card p-5 flex-1">
-                    <span className="text-xs text-accent-cyan font-bold md:hidden">{year}</span>
-                    <h3 className="text-lg font-semibold text-white mt-1">{title}</h3>
-                    <p className="text-sm text-surface-400 mt-1">{desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Team */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <h2 className="text-3xl font-bold text-white text-center mb-3">The Team</h2>
-        <p className="text-surface-400 text-center mb-12 max-w-xl mx-auto">
-          FixitLab is built by a small, focused team that cares deeply about hands-on technology education.
-        </p>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-          {team.map(({ name, role, bio, color }) => (
-            <div key={name} className="glass-card-hover p-6 text-center group">
-              <div className={`w-20 h-20 rounded-2xl bg-${color}/10 border border-${color}/20 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform`}>
-                <span className={`text-2xl font-bold text-${color}`}>
-                  {name.split(' ').map(w => w[0]).join('')}
-                </span>
-              </div>
-              <h3 className="text-base font-semibold text-white">{name}</h3>
-              <p className={`text-xs text-${color} font-medium mb-2`}>{role}</p>
-              <p className="text-sm text-surface-400 leading-relaxed">{bio}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Why FixitLab — no internal stack disclosure */}
-      <section className="bg-surface-900/30 border-y border-surface-800/50">
-        <div className="max-w-5xl mx-auto px-6 py-20">
-          <h2 className="text-3xl font-bold text-white text-center mb-3">Why engineers choose FixitLab</h2>
-          <p className="text-surface-400 text-center mb-12 max-w-2xl mx-auto">
+      {/* ── Why engineers choose FixitLab ─────────────────────── */}
+      <section className="bg-surface-900/40 border-y border-surface-800/50">
+        <div className="max-w-5xl mx-auto px-6 py-24">
+          <h2 className="text-4xl font-bold text-white text-center mb-3">Why engineers choose FixitLab</h2>
+          <p className="text-surface-400 text-center mb-12 max-w-2xl mx-auto leading-relaxed">
             Real environments, structured learning paths, and outcomes you can prove — built for practitioners, not slide decks.
           </p>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
               { title: 'Hands-on labs', desc: 'Break-fix scenarios in isolated environments — the same muscle memory you need on the job.' },
               { title: 'Verifiable progress', desc: 'Certificates, leaderboards, and interview reports you can share with hiring managers.' },
@@ -416,6 +437,7 @@ export default function About() {
               { title: 'Community support', desc: 'Discuss scenarios, share fixes, and learn from peers who have been in the same outage.' },
             ].map(({ title, desc }) => (
               <div key={title} className="glass-card p-5 hover:border-accent-cyan/30 transition-colors">
+                <div className="w-2 h-2 rounded-full bg-accent-cyan mb-3" />
                 <h3 className="text-sm font-semibold text-white mb-2">{title}</h3>
                 <p className="text-xs text-surface-400 leading-relaxed">{desc}</p>
               </div>
@@ -424,49 +446,26 @@ export default function About() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="max-w-4xl mx-auto px-6 py-20 text-center">
-        <div className="glass-card p-12 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/5 to-accent-purple/5" />
+      {/* ── CTA ───────────────────────────────────────────────── */}
+      <section className="max-w-4xl mx-auto px-6 py-24 text-center">
+        <div className="gradient-border glass-card p-12 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/5 via-transparent to-accent-purple/5 rounded-xl pointer-events-none" />
           <div className="relative">
-            <h2 className="text-3xl font-bold text-white mb-4">Ready to start fixing?</h2>
-            <p className="text-surface-400 mb-8 max-w-md mx-auto">
+            <h2 className="text-4xl font-extrabold text-white mb-4">Ready to start fixing?</h2>
+            <p className="text-surface-400 mb-8 max-w-md mx-auto leading-relaxed">
               Join the community of engineers who learn by doing. Free forever.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link to="/register" className="btn-primary text-lg px-10 py-3.5 inline-flex items-center gap-2 shadow-lg shadow-accent-cyan/20">
+              <Link to="/register" className="btn-primary text-base px-10 py-3.5 inline-flex items-center gap-2 shadow-lg shadow-accent-cyan/20">
                 Create Free Account <ArrowRight size={18} />
               </Link>
-              <Link to="/scenarios" className="btn-secondary text-lg px-10 py-3.5 inline-flex items-center gap-2">
+              <Link to="/scenarios" className="btn-secondary text-base px-10 py-3.5 inline-flex items-center gap-2">
                 Browse Challenges
               </Link>
             </div>
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-surface-800/50 bg-surface-900/30">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-brand-600 flex items-center justify-center">
-                <Terminal size={16} className="text-white" />
-              </div>
-              <span className="text-lg font-bold text-white">FixitLab</span>
-            </div>
-            <div className="flex items-center gap-6 text-surface-500">
-              <Link to="/" className="text-sm hover:text-white transition-colors">Home</Link>
-              <Link to="/scenarios" className="text-sm hover:text-white transition-colors">Scenarios</Link>
-              <Link to="/pricing" className="text-sm hover:text-white transition-colors">Pricing</Link>
-              <Link to="/privacy" className="text-sm hover:text-white transition-colors">Privacy</Link>
-              <Link to="/terms" className="text-sm hover:text-white transition-colors">Terms</Link>
-              <Link to="/contact" className="text-sm hover:text-white transition-colors">Contact</Link>
-            </div>
-            <p className="text-xs text-surface-600">&copy; 2026 FixitLab. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </PublicLayout>
   )
 }
