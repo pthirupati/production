@@ -296,6 +296,28 @@ class InterviewRoundStartView(APIView):
             id=round_id,
             campaign__user=request.user,
         )
+
+        if not (request.user.is_staff or request.user.is_superuser):
+            # Platform maintenance check
+            try:
+                from apps.adminpanel.platform_config import is_maintenance_active
+                if is_maintenance_active():
+                    from apps.adminpanel.models import PlatformSettings
+                    row = PlatformSettings.objects.filter(pk=1).first()
+                    msg = (row.maintenance_message if row else None) or "FixitLab is currently under maintenance. Interviews are temporarily unavailable."
+                    return Response({"error": "maintenance", "message": msg}, status=503)
+            except Exception:
+                pass
+            # Interview-specific maintenance check
+            try:
+                from apps.interviews.models import InterviewPlatformSettings
+                isettings = InterviewPlatformSettings.objects.filter(pk=1).first()
+                if isettings and isettings.maintenance_enabled:
+                    msg = isettings.maintenance_message or "Interview Studio is currently under maintenance."
+                    return Response({"error": "interview_maintenance", "message": msg}, status=503)
+            except Exception:
+                pass
+
         if round_obj.status not in ("scheduled", "ready", "schedulable"):
             return Response({"error": "Round not ready to start"}, status=400)
 

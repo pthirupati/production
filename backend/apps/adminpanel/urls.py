@@ -45,6 +45,11 @@ from .views import (
     AdminBlogPostsView,
     AdminBlogPostDetailView,
     AdminCertificatesView,
+    AdminTechnologyMaintenanceView,
+    AdminTechnologySubscribersView,
+    AdminTechnologyEmailView,
+    AdminTechnologyStatsView,
+    AdminInterviewMaintenanceView,
 )
 from apps.interviews.admin_views import (
     AdminInterviewOverviewView,
@@ -84,9 +89,13 @@ urlpatterns = [
     # Maintenance Mode
     path("maintenance/", AdminMaintenanceModeView.as_view()),
 
-    # Technologies CRUD
+    # Technologies CRUD + maintenance + subscriber management
+    path("technologies/stats/", AdminTechnologyStatsView.as_view()),
     path("technologies/", AdminTechnologiesView.as_view()),
     path("technologies/<int:pk>/", AdminTechnologyDetailView.as_view()),
+    path("technologies/<int:pk>/maintenance/", AdminTechnologyMaintenanceView.as_view()),
+    path("technologies/<int:pk>/subscribers/", AdminTechnologySubscribersView.as_view()),
+    path("technologies/<int:pk>/email/", AdminTechnologyEmailView.as_view()),
 
     # Tags CRUD
     path("tags/", AdminTagsView.as_view()),
@@ -154,5 +163,6 @@ urlpatterns = [
     path("interviews/voices/", AdminInterviewVoicesView.as_view()),
     path("interviews/voices/<int:pk>/", AdminInterviewVoiceDetailView.as_view()),
     path("interviews/entitlements/", AdminInterviewEntitlementsView.as_view()),
+    path("interviews/maintenance/", AdminInterviewMaintenanceView.as_view()),
     path("certificates/", AdminCertificatesView.as_view()),
 ]

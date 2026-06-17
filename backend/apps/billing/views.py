@@ -353,6 +353,18 @@ class CreateRazorpayOrderView(APIView):
         from apps.question_bank.models import Technology
         from apps.notifications.tasks import send_payment_error_notification
 
+        # Platform maintenance blocks new payments (admin exempt)
+        if not (request.user.is_staff or request.user.is_superuser):
+            try:
+                from apps.adminpanel.platform_config import is_maintenance_active
+                if is_maintenance_active():
+                    from apps.adminpanel.models import PlatformSettings
+                    row = PlatformSettings.objects.filter(pk=1).first()
+                    msg = (row.maintenance_message if row else None) or "FixitLab is currently under maintenance. Payments are temporarily unavailable."
+                    return Response({"error": "maintenance", "message": msg}, status=503)
+            except Exception:
+                pass
+
         technology_id = request.data.get("technology_id")
         if not technology_id:
             return Response(

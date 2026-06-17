@@ -379,6 +379,11 @@ class InterviewPlatformSettings(models.Model):
         default="browser",
         help_text="browser = free Web Speech API (no paid APIs)",
     )
+    # Maintenance mode — interview feature
+    maintenance_enabled = models.BooleanField(default=False)
+    maintenance_message = models.TextField(blank=True, default="")
+    maintenance_scheduled_start = models.DateTimeField(null=True, blank=True)
+    maintenance_scheduled_end = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

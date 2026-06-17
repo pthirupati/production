@@ -435,6 +435,26 @@ class StartLabView(APIView):
     def post(self, request, scenario_id):
         scenario = get_object_or_404(Scenario, pk=scenario_id, is_active=True)
 
+        is_admin = request.user.is_staff or request.user.is_superuser
+
+        if not is_admin:
+            # Platform-wide maintenance check
+            try:
+                from apps.adminpanel.platform_config import is_maintenance_active
+                if is_maintenance_active():
+                    from apps.adminpanel.models import PlatformSettings
+                    row = PlatformSettings.objects.filter(pk=1).first()
+                    msg = (row.maintenance_message if row else None) or "FixitLab is currently under maintenance. Labs are temporarily unavailable."
+                    return Response({"error": "maintenance", "message": msg}, status=503)
+            except Exception:
+                pass
+
+            # Technology-specific maintenance check
+            tech = scenario.technology
+            if tech and tech.maintenance_enabled:
+                msg = tech.maintenance_message or f"{tech.name} is currently under maintenance and labs are temporarily unavailable."
+                return Response({"error": "tech_maintenance", "message": msg, "technology": tech.name}, status=503)
+
         if getattr(scenario.technology, "coming_soon", False):
             return Response(
                 {"error": "Technology coming soon", "message": f"{scenario.technology.name} is not available yet."},

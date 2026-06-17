@@ -23,6 +23,12 @@ class Technology(models.Model):
     order = models.PositiveIntegerField(default=0, help_text="Display order")
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Maintenance mode — per-technology
+    maintenance_enabled = models.BooleanField(default=False)
+    maintenance_message = models.TextField(blank=True, default="")
+    maintenance_scheduled_start = models.DateTimeField(null=True, blank=True)
+    maintenance_scheduled_end = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ["order", "name"]
         verbose_name_plural = "technologies"

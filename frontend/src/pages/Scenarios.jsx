@@ -486,7 +486,8 @@ export default function Scenarios() {
         </div>
       )}
 
-      {/* ── Results ── */}
+      {/* ── Results ── (isolation-isolate + z-0 keeps cards behind the sticky toolbar) */}
+      <div className="relative isolate">
       {loading ? (
         <div className="glass-card overflow-hidden divide-y divide-surface-800/50">
           {[...Array(8)].map((_, i) => (
@@ -555,6 +556,7 @@ export default function Scenarios() {
           />
         </div>
       )}
+      </div>{/* end isolate wrapper */}
     </div>
   )
 }

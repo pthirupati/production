@@ -432,6 +432,44 @@ export const adminApi = {
     const { data } = await api.get('/admin/interviews/entitlements/')
     return data
   },
+
+  // Technology maintenance
+  async getTechMaintenance(pk) {
+    const { data } = await api.get(`/admin/technologies/${pk}/maintenance/`)
+    return data
+  },
+  async setTechMaintenance(pk, payload) {
+    const { data } = await api.post(`/admin/technologies/${pk}/maintenance/`, payload)
+    return data
+  },
+
+  // Technology subscribers (per-tech)
+  async getTechSubscribers(pk) {
+    const { data } = await api.get(`/admin/technologies/${pk}/subscribers/`)
+    return data
+  },
+
+  // Technology email campaign
+  async sendTechEmail(pk, payload) {
+    const { data } = await api.post(`/admin/technologies/${pk}/email/`, payload)
+    return data
+  },
+
+  // Technology stats overview
+  async getTechStats() {
+    const { data } = await api.get('/admin/technologies/stats/')
+    return data
+  },
+
+  // Interview maintenance
+  async getInterviewMaintenance() {
+    const { data } = await api.get('/admin/interviews/maintenance/')
+    return data
+  },
+  async setInterviewMaintenance(payload) {
+    const { data } = await api.post('/admin/interviews/maintenance/', payload)
+    return data
+  },
 }
 
 /** Trigger a browser download for a Blob */

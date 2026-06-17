@@ -141,6 +141,7 @@ class AdminTechnologiesView(APIView):
         techs = Technology.objects.annotate(
             scenario_count=Count("scenarios"),
             active_scenarios=Count("scenarios", filter=Q(scenarios__is_active=True)),
+            subscriber_count=Count("tech_subscriptions", filter=Q(tech_subscriptions__is_active=True)),
         ).order_by("name")
         data = []
         for t in techs:
@@ -155,8 +156,10 @@ class AdminTechnologiesView(APIView):
                 "order": t.order,
                 "is_active": t.is_active,
                 "coming_soon": t.coming_soon,
+                "maintenance_enabled": t.maintenance_enabled,
                 "scenario_count": t.scenario_count,
                 "active_scenarios": t.active_scenarios,
+                "subscriber_count": t.subscriber_count,
                 "created_at": t.created_at.isoformat(),
             })
         return Response(data)
@@ -198,6 +201,32 @@ class AdminTechnologyDetailView(APIView):
         cascade = str(request.data.get("cascade", request.query_params.get("cascade", ""))).lower() in (
             "1", "true", "yes",
         )
+        force = str(request.data.get("force", request.query_params.get("force", ""))).lower() in (
+            "1", "true", "yes",
+        )
+        confirm_name = request.data.get("confirm_name", "").strip()
+
+        # Check active subscribers
+        active_sub_count = TechnologySubscription.objects.filter(
+            technology=tech, is_active=True
+        ).count()
+        if active_sub_count > 0 and not force:
+            return Response(
+                {
+                    "error": "subscribers_active",
+                    "message": f"This technology has {active_sub_count} active subscriber(s). Force-delete requires typing the technology name to confirm.",
+                    "active_subscriber_count": active_sub_count,
+                    "technology_name": tech.name,
+                },
+                status=409,
+            )
+        if active_sub_count > 0 and force:
+            if confirm_name != tech.name:
+                return Response(
+                    {"error": "Name confirmation does not match. Type the exact technology name to confirm force-delete."},
+                    status=400,
+                )
+
         scenario_count = tech.scenarios.count()
         if scenario_count and not cascade:
             return Response(
@@ -272,6 +301,285 @@ class AdminTagDetailView(APIView):
             return Response({"error": "Not found"}, status=404)
         tag.delete()
         return Response({"message": "Tag deleted"})
+
+
+# ─── Technology Maintenance & Subscriber Management ──────────────────
+
+class AdminTechnologyMaintenanceView(APIView):
+    """Toggle maintenance mode and set message/schedule for a single technology."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request, pk):
+        try:
+            tech = Technology.objects.get(pk=pk)
+        except Technology.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+        return Response({
+            "maintenance_enabled": tech.maintenance_enabled,
+            "maintenance_message": tech.maintenance_message,
+            "maintenance_scheduled_start": tech.maintenance_scheduled_start.isoformat() if tech.maintenance_scheduled_start else None,
+            "maintenance_scheduled_end": tech.maintenance_scheduled_end.isoformat() if tech.maintenance_scheduled_end else None,
+        })
+
+    def post(self, request, pk):
+        from django.utils.dateparse import parse_datetime
+        try:
+            tech = Technology.objects.get(pk=pk)
+        except Technology.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        was_enabled = tech.maintenance_enabled
+        tech.maintenance_enabled = bool(request.data.get("enabled", tech.maintenance_enabled))
+        if "message" in request.data:
+            tech.maintenance_message = request.data["message"]
+        if "scheduled_start" in request.data:
+            val = request.data["scheduled_start"]
+            tech.maintenance_scheduled_start = parse_datetime(val) if val else None
+        if "scheduled_end" in request.data:
+            val = request.data["scheduled_end"]
+            tech.maintenance_scheduled_end = parse_datetime(val) if val else None
+        tech.save()
+
+        from apps.question_bank.cache_utils import invalidate_technologies_cache
+        invalidate_technologies_cache()
+
+        # Notify subscribers if maintenance just turned on
+        if tech.maintenance_enabled and not was_enabled:
+            _notify_tech_maintenance(tech)
+
+        return Response({
+            "maintenance_enabled": tech.maintenance_enabled,
+            "maintenance_message": tech.maintenance_message,
+            "maintenance_scheduled_start": tech.maintenance_scheduled_start.isoformat() if tech.maintenance_scheduled_start else None,
+            "maintenance_scheduled_end": tech.maintenance_scheduled_end.isoformat() if tech.maintenance_scheduled_end else None,
+        })
+
+
+def _notify_tech_maintenance(tech):
+    """Send maintenance email to all active subscribers of this technology."""
+    try:
+        from apps.notifications.email_dispatch import dispatch_notification_email
+        subs = TechnologySubscription.objects.filter(
+            technology=tech, is_active=True
+        ).select_related("user")
+        msg = tech.maintenance_message or f"{tech.name} is currently undergoing maintenance. Labs will be unavailable during this period."
+        for sub in subs:
+            dispatch_notification_email(
+                subject=f"[FixitLab] {tech.name} Maintenance Notice",
+                to_email=sub.user.email,
+                template="emails/maintenance_notice.html",
+                context={
+                    "user": sub.user,
+                    "technology": tech.name,
+                    "maintenance_message": msg,
+                    "maintenance_scheduled_start": tech.maintenance_scheduled_start,
+                    "maintenance_scheduled_end": tech.maintenance_scheduled_end,
+                },
+            )
+    except Exception:
+        pass
+
+
+class AdminTechnologySubscribersView(APIView):
+    """List all subscribers for a specific technology with stats."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request, pk):
+        try:
+            tech = Technology.objects.get(pk=pk)
+        except Technology.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        from django.utils import timezone as tz
+        from apps.billing.subscription_utils import is_tech_subscription_active
+        now = tz.now()
+
+        subs = TechnologySubscription.objects.filter(
+            technology=tech
+        ).select_related("user").order_by("-created_at")
+
+        total_revenue = 0
+        active_count = 0
+        data = []
+        for sub in subs:
+            active = is_tech_subscription_active(sub)
+            if active:
+                active_count += 1
+                total_revenue += float(sub.amount)
+            data.append({
+                "id": str(sub.id),
+                "subscription_id": sub.subscription_id,
+                "user": {
+                    "id": sub.user.id,
+                    "username": sub.user.username,
+                    "email": sub.user.email,
+                    "full_name": sub.user.get_full_name(),
+                    "date_joined": sub.user.date_joined.isoformat(),
+                },
+                "amount": str(sub.amount),
+                "amount_display": f"₹{int(float(sub.amount))}",
+                "payment_verified": sub.payment_verified,
+                "is_active": active,
+                "subscribed_at": sub.created_at.isoformat(),
+                "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+                "days_remaining": max(0, (sub.expires_at - now).days) if sub.expires_at and active else None,
+            })
+
+        # Scenario progress stats per subscriber
+        from apps.progress.models import UserScenarioProgress
+        scenario_ids = list(tech.scenarios.values_list("id", flat=True))
+        progress_qs = UserScenarioProgress.objects.filter(
+            scenario_id__in=scenario_ids, status="completed"
+        ).values("user_id").annotate(completed=Count("id"))
+        progress_map = {p["user_id"]: p["completed"] for p in progress_qs}
+        for entry in data:
+            entry["completed_scenarios"] = progress_map.get(entry["user"]["id"], 0)
+
+        return Response({
+            "technology": {"id": tech.id, "name": tech.name, "slug": tech.slug},
+            "total_subscribers": len(data),
+            "active_count": active_count,
+            "total_revenue": total_revenue,
+            "subscribers": data,
+        })
+
+
+class AdminTechnologyEmailView(APIView):
+    """Send / draft an email campaign to all active subscribers of a technology."""
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request, pk):
+        try:
+            tech = Technology.objects.get(pk=pk)
+        except Technology.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        subject = request.data.get("subject", "").strip()
+        body = request.data.get("body", "").strip()
+        send_now = request.data.get("send_now", True)
+
+        if not subject or not body:
+            return Response({"error": "subject and body are required"}, status=400)
+
+        subs = TechnologySubscription.objects.filter(
+            technology=tech, is_active=True
+        ).select_related("user")
+
+        if not send_now:
+            return Response({"status": "draft_saved", "recipient_count": subs.count()})
+
+        sent = 0
+        failed = 0
+        try:
+            from apps.notifications.email_dispatch import dispatch_notification_email
+            for sub in subs:
+                try:
+                    dispatch_notification_email(
+                        subject=subject,
+                        to_email=sub.user.email,
+                        template="emails/admin_campaign.html",
+                        context={
+                            "user": sub.user,
+                            "technology": tech.name,
+                            "subject": subject,
+                            "body": body,
+                        },
+                    )
+                    sent += 1
+                except Exception:
+                    failed += 1
+        except Exception:
+            failed += subs.count()
+
+        return Response({
+            "status": "sent",
+            "sent": sent,
+            "failed": failed,
+            "recipient_count": subs.count(),
+        })
+
+
+class AdminTechnologyStatsView(APIView):
+    """Per-technology revenue and subscriber stats for the subscriptions overview."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from django.utils import timezone as tz
+        from apps.billing.subscription_utils import is_tech_subscription_active
+        now = tz.now()
+
+        techs = Technology.objects.annotate(
+            total_subs=Count("tech_subscriptions"),
+            active_subs=Count(
+                "tech_subscriptions",
+                filter=Q(tech_subscriptions__is_active=True),
+            ),
+        ).order_by("order", "name")
+
+        result = []
+        for tech in techs:
+            revenue = TechnologySubscription.objects.filter(
+                technology=tech, is_active=True
+            ).aggregate(total=Sum("amount"))["total"] or 0
+            result.append({
+                "id": tech.id,
+                "name": tech.name,
+                "slug": tech.slug,
+                "color": tech.color,
+                "price": str(tech.price),
+                "is_active": tech.is_active,
+                "maintenance_enabled": tech.maintenance_enabled,
+                "total_subscribers": tech.total_subs,
+                "active_subscribers": tech.active_subs,
+                "revenue_inr": float(revenue),
+                "revenue_display": f"₹{int(float(revenue))}",
+            })
+
+        total_revenue = sum(r["revenue_inr"] for r in result)
+        total_active = sum(r["active_subscribers"] for r in result)
+
+        return Response({
+            "technologies": result,
+            "total_revenue_inr": total_revenue,
+            "total_active_subscribers": total_active,
+        })
+
+
+class AdminInterviewMaintenanceView(APIView):
+    """Toggle interview maintenance mode."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.interviews.models import InterviewPlatformSettings
+        settings_row, _ = InterviewPlatformSettings.objects.get_or_create(pk=1)
+        return Response({
+            "maintenance_enabled": settings_row.maintenance_enabled,
+            "maintenance_message": settings_row.maintenance_message,
+            "maintenance_scheduled_start": settings_row.maintenance_scheduled_start.isoformat() if settings_row.maintenance_scheduled_start else None,
+            "maintenance_scheduled_end": settings_row.maintenance_scheduled_end.isoformat() if settings_row.maintenance_scheduled_end else None,
+        })
+
+    def post(self, request):
+        from django.utils.dateparse import parse_datetime
+        from apps.interviews.models import InterviewPlatformSettings
+        settings_row, _ = InterviewPlatformSettings.objects.get_or_create(pk=1)
+        if "enabled" in request.data:
+            settings_row.maintenance_enabled = bool(request.data["enabled"])
+        if "message" in request.data:
+            settings_row.maintenance_message = request.data["message"]
+        if "scheduled_start" in request.data:
+            val = request.data["scheduled_start"]
+            settings_row.maintenance_scheduled_start = parse_datetime(val) if val else None
+        if "scheduled_end" in request.data:
+            val = request.data["scheduled_end"]
+            settings_row.maintenance_scheduled_end = parse_datetime(val) if val else None
+        settings_row.save()
+        return Response({
+            "maintenance_enabled": settings_row.maintenance_enabled,
+            "maintenance_message": settings_row.maintenance_message,
+            "maintenance_scheduled_start": settings_row.maintenance_scheduled_start.isoformat() if settings_row.maintenance_scheduled_start else None,
+            "maintenance_scheduled_end": settings_row.maintenance_scheduled_end.isoformat() if settings_row.maintenance_scheduled_end else None,
+        })
 
 
 # ─── Scenario Management ────────────────────────────────────────────

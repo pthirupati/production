@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { Plus, Edit2, Trash2, X, Save, Cpu, Tag } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Save, Cpu, Tag, WrenchIcon, AlertTriangle, Mail, Users, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const COLOR_OPTIONS = [
@@ -12,17 +12,29 @@ const COLOR_OPTIONS = [
   { value: 'blue', label: 'Blue', class: 'bg-blue-500' },
 ]
 
+const EMPTY_FORM = { name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, order: 0, is_active: true, coming_soon: false }
+
 export default function AdminTechnologies() {
   const [technologies, setTechnologies] = useState([])
   const [tags, setTags] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
-  const [activeTab, setActiveTab] = useState('technologies') // technologies | tags
-  const [form, setForm] = useState({ name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, order: 0, is_active: true, coming_soon: false })
+  const [activeTab, setActiveTab] = useState('technologies')
+  const [form, setForm] = useState(EMPTY_FORM)
   const [tagForm, setTagForm] = useState({ name: '' })
   const [showTagForm, setShowTagForm] = useState(false)
   const [editingTagId, setEditingTagId] = useState(null)
+
+  // Force-delete modal state
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteConfirmName, setDeleteConfirmName] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
+  // Maintenance panel state
+  const [maintenanceTech, setMaintenanceTech] = useState(null)
+  const [maintenanceForm, setMaintenanceForm] = useState({ enabled: false, message: '', scheduled_start: '', scheduled_end: '' })
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -49,7 +61,7 @@ export default function AdminTechnologies() {
         toast.success('Technology created')
       }
       setShowForm(false); setEditingId(null)
-      setForm({ name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, order: 0, is_active: true, coming_soon: false })
+      setForm(EMPTY_FORM)
       loadData()
     } catch (err) { toast.error(err.response?.data?.name?.[0] || 'Save failed') }
   }
@@ -60,18 +72,66 @@ export default function AdminTechnologies() {
   }
 
   const handleDelete = async (tech) => {
-    const count = tech.scenario_count ?? tech.active_scenarios ?? 0
-    const msg = count > 0
-      ? `Delete "${tech.name}" and ALL ${count} scenario(s)? This cannot be undone.`
-      : `Delete technology "${tech.name}"?`
-    if (!confirm(msg)) return
+    setDeleteTarget(tech)
+    setDeleteConfirmName('')
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleteLoading(true)
     try {
-      const res = await adminApi.deleteTechnology(tech.id, { cascade: count > 0 })
+      const count = deleteTarget.scenario_count ?? deleteTarget.active_scenarios ?? 0
+      const subCount = deleteTarget.subscriber_count || 0
+      const payload = { cascade: count > 0 }
+      if (subCount > 0) {
+        payload.force = true
+        payload.confirm_name = deleteConfirmName
+      }
+      const res = await adminApi.deleteTechnology(deleteTarget.id, payload)
       toast.success(res.scenarios_deleted
-        ? `Deleted ${tech.name} and ${res.scenarios_deleted} scenario(s)`
+        ? `Deleted ${deleteTarget.name} and ${res.scenarios_deleted} scenario(s)`
         : 'Technology deleted')
+      setDeleteTarget(null)
+      setDeleteConfirmName('')
       loadData()
-    } catch (err) { toast.error(err.response?.data?.error || 'Cannot delete') }
+    } catch (err) {
+      const errData = err.response?.data
+      if (errData?.error === 'subscribers_active') {
+        // Backend told us about subscribers — already showing the right modal
+        toast.error(errData.message || 'Active subscribers exist')
+      } else {
+        toast.error(errData?.error || 'Cannot delete')
+      }
+    } finally { setDeleteLoading(false) }
+  }
+
+  const openMaintenance = async (tech) => {
+    setMaintenanceTech(tech)
+    try {
+      const data = await adminApi.getTechMaintenance(tech.id)
+      setMaintenanceForm({
+        enabled: data.maintenance_enabled || false,
+        message: data.maintenance_message || '',
+        scheduled_start: data.maintenance_scheduled_start ? data.maintenance_scheduled_start.slice(0, 16) : '',
+        scheduled_end: data.maintenance_scheduled_end ? data.maintenance_scheduled_end.slice(0, 16) : '',
+      })
+    } catch { setMaintenanceForm({ enabled: tech.maintenance_enabled || false, message: '', scheduled_start: '', scheduled_end: '' }) }
+  }
+
+  const saveMaintenance = async () => {
+    if (!maintenanceTech) return
+    setMaintenanceLoading(true)
+    try {
+      await adminApi.setTechMaintenance(maintenanceTech.id, {
+        enabled: maintenanceForm.enabled,
+        message: maintenanceForm.message,
+        scheduled_start: maintenanceForm.scheduled_start || null,
+        scheduled_end: maintenanceForm.scheduled_end || null,
+      })
+      toast.success(maintenanceForm.enabled ? 'Maintenance enabled — subscribers notified' : 'Maintenance disabled')
+      setMaintenanceTech(null)
+      loadData()
+    } catch { toast.error('Failed to save maintenance settings') } finally { setMaintenanceLoading(false) }
   }
 
   // Tag CRUD
@@ -91,15 +151,19 @@ export default function AdminTechnologies() {
   const handleDeleteTag = async (id) => {
     if (!confirm('Delete this tag?')) return
     try { await adminApi.deleteTag(id); toast.success('Deleted'); loadData() }
-    catch (err) { toast.error('Cannot delete') }
+    catch { toast.error('Cannot delete') }
   }
+
+  // Determine if we need name confirmation for delete
+  const needsNameConfirm = deleteTarget && (deleteTarget.subscriber_count || 0) > 0
+  const canConfirmDelete = !needsNameConfirm || deleteConfirmName === deleteTarget?.name
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Technologies & Tags</h1>
-          <p className="text-surface-400 mt-1">Manage technology categories and scenario tags</p>
+          <p className="text-surface-400 mt-1">Manage technology categories, maintenance, and scenario tags</p>
         </div>
       </div>
 
@@ -119,15 +183,16 @@ export default function AdminTechnologies() {
       {activeTab === 'technologies' && (
         <>
           <div className="flex justify-end">
-            <button onClick={() => { setForm({ name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, order: 0, is_active: true, coming_soon: false }); setEditingId(null); setShowForm(true) }}
+            <button onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setShowForm(true) }}
               className="btn-primary flex items-center gap-2">
               <Plus size={16} /> Add Technology
             </button>
           </div>
 
+          {/* Add/Edit form modal */}
           {showForm && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
-              <div className="glass-card p-6 w-full max-w-lg mx-4">
+              <div className="glass-card p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-semibold text-white">{editingId ? 'Edit Technology' : 'New Technology'}</h2>
                   <button onClick={() => setShowForm(false)} className="text-surface-500 hover:text-white"><X size={20} /></button>
@@ -144,7 +209,7 @@ export default function AdminTechnologies() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Icon URL</label>
+                    <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Icon</label>
                     <input value={form.icon} onChange={(e) => setForm(f => ({ ...f, icon: e.target.value }))} className="input-field" />
                   </div>
                   <div>
@@ -178,12 +243,130 @@ export default function AdminTechnologies() {
                     <input type="checkbox" checked={form.is_active} onChange={(e) => setForm(f => ({ ...f, is_active: e.target.checked }))} /> Active
                   </label>
                   <label className="flex items-center gap-2 text-sm text-surface-300 cursor-pointer">
-                    <input type="checkbox" checked={form.coming_soon} onChange={(e) => setForm(f => ({ ...f, coming_soon: e.target.checked }))} /> Coming soon (visible but locked)
+                    <input type="checkbox" checked={form.coming_soon} onChange={(e) => setForm(f => ({ ...f, coming_soon: e.target.checked }))} /> Coming soon
                   </label>
                 </div>
                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-surface-800">
                   <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
                   <button onClick={handleSave} className="btn-primary flex items-center gap-2"><Save size={16} /> {editingId ? 'Update' : 'Create'}</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Force-delete confirmation modal */}
+          {deleteTarget && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
+              <div className="glass-card p-6 w-full max-w-md mx-4 border border-accent-red/30">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-accent-red/10 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle size={20} className="text-accent-red" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">Delete Technology</h2>
+                    <p className="text-xs text-surface-400">This action cannot be undone</p>
+                  </div>
+                </div>
+
+                {needsNameConfirm ? (
+                  <>
+                    <div className="bg-accent-red/5 border border-accent-red/20 rounded-xl p-4 mb-4">
+                      <p className="text-sm text-accent-red font-medium mb-1">
+                        {deleteTarget.subscriber_count} active subscriber(s) will lose access immediately.
+                      </p>
+                      <p className="text-xs text-surface-400">All scenarios under this technology will also be deleted.</p>
+                    </div>
+                    <p className="text-sm text-surface-300 mb-3">
+                      Type <span className="font-mono font-bold text-white bg-surface-700 px-1.5 py-0.5 rounded">{deleteTarget.name}</span> to confirm:
+                    </p>
+                    <input
+                      type="text"
+                      value={deleteConfirmName}
+                      onChange={e => setDeleteConfirmName(e.target.value)}
+                      placeholder={deleteTarget.name}
+                      className="input-field w-full mb-4 font-mono"
+                      autoFocus
+                    />
+                  </>
+                ) : (
+                  <p className="text-sm text-surface-300 mb-4">
+                    Delete <span className="font-semibold text-white">"{deleteTarget.name}"</span>
+                    {(deleteTarget.scenario_count || 0) > 0 && (
+                      <> and all {deleteTarget.scenario_count} scenario(s)</>
+                    )}?
+                  </p>
+                )}
+
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => { setDeleteTarget(null); setDeleteConfirmName('') }} className="btn-secondary" disabled={deleteLoading}>Cancel</button>
+                  <button
+                    onClick={confirmDelete}
+                    disabled={!canConfirmDelete || deleteLoading}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-red/90 hover:bg-accent-red text-white text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 size={14} /> {deleteLoading ? 'Deleting…' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Maintenance panel modal */}
+          {maintenanceTech && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+              <div className="glass-card p-6 w-full max-w-lg mx-4 border border-amber-500/20">
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                      <WrenchIcon size={18} className="text-amber-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-semibold text-white">{maintenanceTech.name} — Maintenance</h2>
+                      <p className="text-xs text-surface-400">Subscribers will be emailed when maintenance is toggled on</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setMaintenanceTech(null)} className="text-surface-500 hover:text-white"><X size={20} /></button>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="flex items-center justify-between p-3 rounded-xl bg-surface-800/60 border border-surface-700/40 cursor-pointer">
+                    <div>
+                      <p className="text-sm font-medium text-white">Enable Maintenance Mode</p>
+                      <p className="text-xs text-surface-500 mt-0.5">Blocks labs and shows message to users</p>
+                    </div>
+                    <div className={`relative w-11 h-6 rounded-full transition-all ${maintenanceForm.enabled ? 'bg-amber-500' : 'bg-surface-700'}`}
+                      onClick={() => setMaintenanceForm(f => ({ ...f, enabled: !f.enabled }))}>
+                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${maintenanceForm.enabled ? 'left-5' : 'left-0.5'}`} />
+                    </div>
+                  </label>
+
+                  <div>
+                    <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Maintenance Message</label>
+                    <textarea
+                      value={maintenanceForm.message}
+                      onChange={e => setMaintenanceForm(f => ({ ...f, message: e.target.value }))}
+                      className="input-field h-20 resize-y"
+                      placeholder="e.g. Scheduled maintenance for database upgrades. Expected downtime: 2 hours."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Scheduled Start</label>
+                      <input type="datetime-local" value={maintenanceForm.scheduled_start} onChange={e => setMaintenanceForm(f => ({ ...f, scheduled_start: e.target.value }))} className="input-field" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Scheduled End</label>
+                      <input type="datetime-local" value={maintenanceForm.scheduled_end} onChange={e => setMaintenanceForm(f => ({ ...f, scheduled_end: e.target.value }))} className="input-field" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-surface-800">
+                  <button onClick={() => setMaintenanceTech(null)} className="btn-secondary">Cancel</button>
+                  <button onClick={saveMaintenance} disabled={maintenanceLoading} className="btn-primary flex items-center gap-2">
+                    <Save size={16} /> {maintenanceLoading ? 'Saving…' : 'Save'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -196,14 +379,22 @@ export default function AdminTechnologies() {
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {technologies.map((tech) => (
-                <div key={tech.id} className="glass-card-hover p-5">
+                <div key={tech.id} className={`glass-card-hover p-5 relative ${tech.maintenance_enabled ? 'border-amber-500/30' : ''}`}>
+                  {tech.maintenance_enabled && (
+                    <div className="absolute top-2 right-2">
+                      <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                        <WrenchIcon size={9} /> Maintenance
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between mb-3">
                     <div className={`w-10 h-10 rounded-xl bg-accent-${tech.color || 'cyan'}/10 flex items-center justify-center`}>
                       <Cpu size={20} className={`text-accent-${tech.color || 'cyan'}`} />
                     </div>
                     <div className="flex gap-1">
-                      <button onClick={() => handleEdit(tech)} className="p-1.5 text-surface-500 hover:text-accent-cyan"><Edit2 size={14} /></button>
-                      <button onClick={() => handleDelete(tech)} className="p-1.5 text-surface-500 hover:text-accent-red"><Trash2 size={14} /></button>
+                      <button onClick={() => openMaintenance(tech)} className="p-1.5 text-surface-500 hover:text-amber-400" title="Maintenance"><WrenchIcon size={14} /></button>
+                      <button onClick={() => handleEdit(tech)} className="p-1.5 text-surface-500 hover:text-accent-cyan" title="Edit"><Edit2 size={14} /></button>
+                      <button onClick={() => handleDelete(tech)} className="p-1.5 text-surface-500 hover:text-accent-red" title="Delete"><Trash2 size={14} /></button>
                     </div>
                   </div>
                   <h3 className="text-lg font-semibold text-white">{tech.name}</h3>
