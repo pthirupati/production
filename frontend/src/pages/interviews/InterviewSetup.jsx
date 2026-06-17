@@ -4,6 +4,7 @@ import { interviewsApi } from '../../api/interviews'
 import api from '../../api/client'
 import { Upload, ChevronRight, ChevronLeft, User, Briefcase, Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { LabelWithHint } from '../../components/FieldHint'
 
 const LEVELS = [
   { id: 'junior', label: 'Junior (0–2 yrs)' },
@@ -38,7 +39,21 @@ export default function InterviewSetup() {
     api.get('/technologies/').then(r => setTechnologies(r.data || [])).catch(() => {})
     interviewsApi.getVoices().then(d => setVoices(d.voices || [])).catch(() => {})
     interviewsApi.getProfile().then(p => {
-      if (p) setForm(f => ({ ...f, ...p, primary_technology: p.primary_technology || '' }))
+      if (!p) return
+      setForm(f => ({
+        ...f,
+        primary_technology: p.primary_technology || '',
+        secondary_technologies: Array.isArray(p.secondary_technologies) ? p.secondary_technologies : [],
+        experience_level: p.experience_level || f.experience_level,
+        years_experience: p.years_experience ?? f.years_experience,
+        current_company: p.current_company || '',
+        current_package_lpa: p.current_package_lpa ?? '',
+        target_role: p.target_role || '',
+        location: p.location || '',
+        notice_period_days: p.notice_period_days ?? '',
+        voice_id: p.voice_id || f.voice_id,
+        round_count: f.round_count,
+      }))
     }).catch(() => {})
   }, [])
 
@@ -66,17 +81,23 @@ export default function InterviewSetup() {
     setCustomTechInput('')
   }
 
+  const profilePayload = () => ({
+    primary_technology: form.primary_technology || null,
+    secondary_technologies: Array.isArray(form.secondary_technologies) ? form.secondary_technologies : [],
+    experience_level: form.experience_level,
+    years_experience: Number(form.years_experience) || 0,
+    current_company: form.current_company || '',
+    current_package_lpa: form.current_package_lpa || null,
+    target_role: form.target_role || '',
+    location: form.location || '',
+    notice_period_days: form.notice_period_days || null,
+    voice_id: form.voice_id || 'indian-female',
+  })
+
   const saveProfile = async () => {
     setSaving(true)
     try {
-      const payload = {
-        ...form,
-        secondary_technologies: JSON.stringify(form.secondary_technologies),
-        primary_technology: form.primary_technology || null,
-        current_package_lpa: form.current_package_lpa || null,
-        notice_period_days: form.notice_period_days || null,
-      }
-      await interviewsApi.updateProfile(payload, resumeFile)
+      await interviewsApi.updateProfile(profilePayload(), resumeFile)
       toast.success('Profile saved')
       return true
     } catch (err) {
@@ -134,24 +155,30 @@ export default function InterviewSetup() {
 
       {step === 0 && (
         <div className="glass-card p-6 space-y-4 border border-surface-800">
-          <label className="block">
-            <span className="text-sm text-surface-300 flex items-center gap-2 mb-2">
-              <Upload size={16} /> Upload resume (optional — PDF preferred)
-            </span>
+          <div className="block">
+            <LabelWithHint
+              label="Upload resume (optional — PDF preferred)"
+              hint="PDF or DOCX up to 5MB. We extract skills and experience to tailor interview questions. You can skip this and rely on career fields instead."
+              className="text-sm text-surface-300 flex items-center gap-2 mb-2"
+            />
             <input
               type="file"
               accept=".pdf,.doc,.docx,.txt"
               onChange={e => setResumeFile(e.target.files?.[0] || null)}
               className="text-sm text-surface-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:text-indigo-300"
             />
-          </label>
+          </div>
           <p className="text-xs text-surface-500">
             Without a resume we analyze your role, experience level, and technology picks to tailor questions.{' '}
             <a href="/privacy" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">Privacy policy</a>
           </p>
           {voices.length > 0 && (
             <label className="block">
-              <span className="text-xs text-surface-400">Interviewer voice accent</span>
+              <LabelWithHint
+                label="Interviewer voice accent"
+                hint="Choose the AI interviewer accent for spoken questions. You can change this before each round."
+                className="text-xs text-surface-400"
+              />
               <select
                 value={form.voice_id}
                 onChange={e => set('voice_id', e.target.value)}
@@ -170,7 +197,11 @@ export default function InterviewSetup() {
         <div className="glass-card p-6 space-y-4 border border-surface-800">
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="block sm:col-span-2">
-              <span className="text-xs text-surface-400">Target role</span>
+              <LabelWithHint
+                label="Target role"
+                hint="Job title you're preparing for, e.g. Senior DevOps Engineer. Used to generate role-specific questions."
+                className="text-xs text-surface-400"
+              />
               <input
                 value={form.target_role}
                 onChange={e => set('target_role', e.target.value)}
@@ -179,7 +210,11 @@ export default function InterviewSetup() {
               />
             </label>
             <label className="block">
-              <span className="text-xs text-surface-400">Primary technology</span>
+              <LabelWithHint
+                label="Primary technology"
+                hint="Main stack for technical rounds. Select from your subscribed technologies or leave empty for general questions."
+                className="text-xs text-surface-400"
+              />
               <select
                 value={form.primary_technology}
                 onChange={e => set('primary_technology', e.target.value)}
@@ -192,7 +227,11 @@ export default function InterviewSetup() {
               </select>
             </label>
             <label className="block">
-              <span className="text-xs text-surface-400">Experience level</span>
+              <LabelWithHint
+                label="Experience level"
+                hint="Junior (0–2 yrs), Mid (3–5), Senior (6–10), or Lead. Adjusts question depth and expectations."
+                className="text-xs text-surface-400"
+              />
               <select
                 value={form.experience_level}
                 onChange={e => set('experience_level', e.target.value)}
@@ -204,7 +243,11 @@ export default function InterviewSetup() {
               </select>
             </label>
             <label className="block">
-              <span className="text-xs text-surface-400">Years of experience</span>
+              <LabelWithHint
+                label="Years of experience"
+                hint="Total professional years in your field. Number only, e.g. 5."
+                className="text-xs text-surface-400"
+              />
               <input
                 type="number"
                 min={0}
@@ -223,7 +266,11 @@ export default function InterviewSetup() {
               />
             </label>
             <label className="block">
-              <span className="text-xs text-surface-400">Package (LPA, optional)</span>
+              <LabelWithHint
+                label="Package (LPA, optional)"
+                hint="Current CTC in Lakhs Per Annum (India). Optional — helps calibrate seniority. Format: 18 or 24.5"
+                className="text-xs text-surface-400"
+              />
               <input
                 value={form.current_package_lpa}
                 onChange={e => set('current_package_lpa', e.target.value)}
@@ -232,7 +279,11 @@ export default function InterviewSetup() {
               />
             </label>
             <label className="block">
-              <span className="text-xs text-surface-400">Notice period (days)</span>
+              <LabelWithHint
+                label="Notice period (days)"
+                hint="Days until you can join a new role. Optional number, e.g. 30 or 90."
+                className="text-xs text-surface-400"
+              />
               <input
                 value={form.notice_period_days}
                 onChange={e => set('notice_period_days', e.target.value)}

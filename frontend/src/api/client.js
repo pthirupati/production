@@ -67,10 +67,11 @@ api.interceptors.response.use(
       )
     }
 
-    // 500+ Server error (skip auth forms — they handle errors locally)
+    // 500+ Server error (skip auth forms and silent bootstrap requests)
     const path = original?.url || ''
     const isAuthRequest = /\/auth\//.test(path)
-    if (error.response.status >= 500 && !isAuthRequest) {
+    const isSilent = original?.silentError === true
+    if (error.response.status >= 500 && !isAuthRequest && !isSilent) {
       const data = error.response.data
       const msg = data?.error || data?.detail || data?.message || 'Server error. Please try again later.'
       toast.error(msg.length > 120 ? msg.slice(0, 120) + '…' : msg, { id: 'server-error', duration: 5000 })

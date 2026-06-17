@@ -15,10 +15,14 @@ export const interviewsApi = {
   },
   updateProfile(data, resumeFile) {
     const form = new FormData()
+    const writable = new Set([
+      'primary_technology', 'secondary_technologies', 'experience_level', 'years_experience',
+      'current_company', 'current_package_lpa', 'target_role', 'target_companies',
+      'voice_id', 'voice_locale', 'location', 'notice_period_days', 'resume_text',
+    ])
     Object.entries(data || {}).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) {
-        form.append(k, typeof v === 'object' ? JSON.stringify(v) : v)
-      }
+      if (!writable.has(k) || v === undefined || v === null) return
+      form.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v))
     })
     if (resumeFile) form.append('resume', resumeFile)
     // Do NOT set Content-Type — browser must set it with the correct multipart boundary

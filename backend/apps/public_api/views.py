@@ -1060,101 +1060,108 @@ class UserProgressView(APIView):
         if cached is not None:
             return Response(cached)
 
-        progress = UserScenarioProgress.objects.filter(
-            user=request.user
-        ).select_related("scenario", "scenario__technology")
+        try:
+            progress = UserScenarioProgress.objects.filter(
+                user=request.user
+            ).select_related("scenario", "scenario__technology")
 
-        total_scenarios = Scenario.objects.filter(is_active=True).count()
-        completed = progress.filter(completed=True).count()
-        total_attempts = progress.aggregate(total=Sum("attempts"))["total"] or 0
-        avg_score = progress.filter(completed=True).aggregate(avg=Avg("best_score"))["avg"] or 0
+            total_scenarios = Scenario.objects.filter(is_active=True).count()
+            completed = progress.filter(completed=True).count()
+            total_attempts = progress.aggregate(total=Sum("attempts"))["total"] or 0
+            avg_score = progress.filter(completed=True).aggregate(avg=Avg("best_score"))["avg"] or 0
 
-        # Per-technology progress — single annotated query instead of N+1 loop
-        techs_qs = Technology.objects.filter(is_active=True).annotate(
-            tech_total=Count(
-                "scenarios",
-                filter=Q(scenarios__is_active=True),
-                distinct=True,
-            ),
-        )
-        # Build completed count and avg_score per tech from already-loaded progress queryset
-        user_progress_by_tech: dict[int, list] = {}
-        for p in progress.filter(completed=True).select_related("scenario__technology"):
-            tid = p.scenario.technology_id
-            user_progress_by_tech.setdefault(tid, []).append(p.best_score)
+            # Per-technology progress — single annotated query instead of N+1 loop
+            techs_qs = Technology.objects.filter(is_active=True).annotate(
+                tech_total=Count(
+                    "scenarios",
+                    filter=Q(scenarios__is_active=True),
+                    distinct=True,
+                ),
+            )
+            # Build completed count and avg_score per tech from already-loaded progress queryset
+            user_progress_by_tech: dict[int, list] = {}
+            for p in progress.filter(completed=True).select_related("scenario__technology"):
+                tid = p.scenario.technology_id
+                user_progress_by_tech.setdefault(tid, []).append(p.best_score)
 
-        tech_progress = {}
-        for tech in techs_qs:
-            scores = user_progress_by_tech.get(tech.id, [])
-            tech_progress[tech.name] = {
-                "total": tech.tech_total,
-                "completed": len(scores),
-                "avg_score": round(sum(scores) / len(scores), 1) if scores else 0,
-                "slug": tech.slug,
-                "icon": tech.icon,
-                "color": tech.color,
-            }
-
-        # Per-difficulty — two annotated aggregations instead of 6 queries
-        diff_totals = {
-            row["difficulty"]: row["cnt"]
-            for row in Scenario.objects.filter(is_active=True)
-            .values("difficulty")
-            .annotate(cnt=Count("id"))
-        }
-        diff_done = {
-            row["scenario__difficulty"]: row["cnt"]
-            for row in progress.filter(completed=True)
-            .values("scenario__difficulty")
-            .annotate(cnt=Count("id"))
-        }
-        diff_progress = {
-            d: {
-                "total": diff_totals.get(d, 0),
-                "completed": diff_done.get(d, 0),
-            }
-            for d in ["easy", "medium", "hard"]
-        }
-
-        # Achievements
-        achievements = list(
-            UserAchievement.objects.filter(user=request.user)
-            .values_list("achievement", flat=True)
-        )
-
-        # Recent activity
-        recent = (
-            LabSession.objects.filter(user=request.user)
-            .select_related("scenario")
-            .order_by("-started_at")[:10]
-        )
-
-        result = {
-            "summary": {
-                "total_scenarios": total_scenarios,
-                "completed": completed,
-                "completion_rate": round(completed / total_scenarios * 100, 1) if total_scenarios else 0,
-                "total_attempts": total_attempts,
-                "average_score": round(avg_score, 1),
-            },
-            "technology_progress": tech_progress,
-            "difficulty_progress": diff_progress,
-            "achievements": achievements,
-            "recent_activity": [
-                {
-                    "scenario_title": s.scenario.title,
-                    "scenario_id": s.scenario.id,
-                    "scenario_slug": s.scenario.slug,
-                    "status": s.status,
-                    "score": s.score,
-                    "started_at": s.started_at.isoformat(),
+            tech_progress = {}
+            for tech in techs_qs:
+                scores = user_progress_by_tech.get(tech.id, [])
+                tech_progress[tech.name] = {
+                    "total": tech.tech_total,
+                    "completed": len(scores),
+                    "avg_score": round(sum(scores) / len(scores), 1) if scores else 0,
+                    "slug": tech.slug,
+                    "icon": tech.icon,
+                    "color": tech.color,
                 }
-                for s in recent
-                if s.scenario_id is not None and s.scenario is not None
-            ],
-        }
-        cache.set(cache_key, result, 60)
-        return Response(result)
+
+            # Per-difficulty — two annotated aggregations instead of 6 queries
+            diff_totals = {
+                row["difficulty"]: row["cnt"]
+                for row in Scenario.objects.filter(is_active=True)
+                .values("difficulty")
+                .annotate(cnt=Count("id"))
+            }
+            diff_done = {
+                row["scenario__difficulty"]: row["cnt"]
+                for row in progress.filter(completed=True)
+                .values("scenario__difficulty")
+                .annotate(cnt=Count("id"))
+            }
+            diff_progress = {
+                d: {
+                    "total": diff_totals.get(d, 0),
+                    "completed": diff_done.get(d, 0),
+                }
+                for d in ["easy", "medium", "hard"]
+            }
+
+            # Achievements
+            achievements = list(
+                UserAchievement.objects.filter(user=request.user)
+                .values_list("achievement", flat=True)
+            )
+
+            # Recent activity
+            recent = (
+                LabSession.objects.filter(user=request.user)
+                .select_related("scenario")
+                .order_by("-started_at")[:10]
+            )
+
+            result = {
+                "summary": {
+                    "total_scenarios": total_scenarios,
+                    "completed": completed,
+                    "completion_rate": round(completed / total_scenarios * 100, 1) if total_scenarios else 0,
+                    "total_attempts": total_attempts,
+                    "average_score": round(avg_score, 1),
+                },
+                "technology_progress": tech_progress,
+                "difficulty_progress": diff_progress,
+                "achievements": achievements,
+                "recent_activity": [
+                    {
+                        "scenario_title": s.scenario.title,
+                        "scenario_id": s.scenario.id,
+                        "scenario_slug": s.scenario.slug,
+                        "status": s.status,
+                        "score": s.score,
+                        "started_at": s.started_at.isoformat(),
+                    }
+                    for s in recent
+                    if s.scenario_id is not None and s.scenario is not None
+                ],
+            }
+            cache.set(cache_key, result, 60)
+            return Response(result)
+        except Exception:
+            logger.exception("user_progress_failed user_id=%s", request.user.id)
+            return Response(
+                {"error": "Could not load progress"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class UserAchievementsView(APIView):

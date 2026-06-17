@@ -22,7 +22,7 @@ export default function PublicLayout({ children }) {
       {/* Navbar */}
       <nav className="fixed top-0 w-full z-50 border-b border-surface-700/50 bg-surface-950/90 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-lg font-bold">
+          <Link to="/" className="flex items-center gap-2 text-lg font-bold font-display tracking-tight">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
               <Terminal size={18} className="text-white" />
             </div>

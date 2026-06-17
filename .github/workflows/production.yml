@@ -438,7 +438,7 @@ jobs:
               python manage.py seed_projects || true
             echo "Scenario count:"
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
-              python -c "from apps.question_bank.models import Scenario; print(Scenario.objects.count(), 'scenarios')" || true
+              python -c "import django; django.setup(); from apps.question_bank.models import Scenario; print(Scenario.objects.count(), 'scenarios')" || true
 
       - name: Run all-scenarios lab E2E
         uses: appleboy/ssh-action@v1

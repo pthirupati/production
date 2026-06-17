@@ -429,7 +429,7 @@ class AdminTechnologySubscribersView(APIView):
         from apps.progress.models import UserScenarioProgress
         scenario_ids = list(tech.scenarios.values_list("id", flat=True))
         progress_qs = UserScenarioProgress.objects.filter(
-            scenario_id__in=scenario_ids, status="completed"
+            scenario_id__in=scenario_ids, completed=True
         ).values("user_id").annotate(completed=Count("id"))
         progress_map = {p["user_id"]: p["completed"] for p in progress_qs}
         for entry in data:
@@ -537,11 +537,22 @@ class AdminTechnologyStatsView(APIView):
 
         total_revenue = sum(r["revenue_inr"] for r in result)
         total_active = sum(r["active_subscribers"] for r in result)
+        maintenance_count = sum(1 for r in result if r.get("maintenance_enabled"))
+        coming_soon_count = Technology.objects.filter(is_active=False).count()
+        total_unique_users = (
+            TechnologySubscription.objects.filter(is_active=True)
+            .values("user_id")
+            .distinct()
+            .count()
+        )
 
         return Response({
             "technologies": result,
             "total_revenue_inr": total_revenue,
             "total_active_subscribers": total_active,
+            "total_unique_subscribers": total_unique_users,
+            "maintenance_technologies": maintenance_count,
+            "coming_soon_technologies": coming_soon_count,
         })
 
 

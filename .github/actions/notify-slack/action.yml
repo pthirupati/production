@@ -54,4 +54,4 @@ runs:
         }
         EOF
         )
-        curl -s -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$WEBHOOK"
+        curl -s -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$WEBHOOK" || true

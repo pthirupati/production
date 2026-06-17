@@ -70,13 +70,20 @@ class CandidateProfileView(APIView):
 
         profile, _ = CandidateProfile.objects.get_or_create(user=request.user)
         data = request.data.copy()
+        if data.get("primary_technology") in ("", "null", "undefined"):
+            data["primary_technology"] = None
         for json_field in ("secondary_technologies", "target_companies", "resume_parsed"):
             raw = data.get(json_field)
             if isinstance(raw, str):
+                raw = raw.strip()
+                if not raw:
+                    data[json_field] = [] if json_field != "resume_parsed" else {}
+                    continue
                 try:
                     data[json_field] = json.loads(raw)
                 except (json.JSONDecodeError, TypeError):
-                    pass
+                    if json_field != "resume_parsed":
+                        data[json_field] = []
         if request.FILES.get("resume"):
             profile.resume_file = request.FILES["resume"]
             text = extract_text_from_upload(request.FILES["resume"])

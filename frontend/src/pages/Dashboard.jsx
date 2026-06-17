@@ -42,7 +42,7 @@ export default function Dashboard() {
       subscriptionApi.getMySubscriptions().catch(() => ({ subscriptions: [] })),
       jiraApi.getUserTickets().catch(() => ({ data: { tickets: [] } })),
       scenarioApi.getBookmarks().catch(() => []),
-      api.get('/notifications/').catch(() => ({ data: { results: [] } })),
+      api.get('/notifications/', { silentError: true }).catch(() => ({ data: { notifications: [] } })),
       import('../api/interviews').then(m => m.interviewsApi.getEntitlement()).catch(() => null),
     ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes, interviewEnt]) => {
       if (!prog) setLoadError(true)
@@ -51,10 +51,10 @@ export default function Dashboard() {
       setActiveLabs(labs.filter(l => l.status === 'RUNNING'))
       setSubscriptions(subs?.subscriptions || [])
       setComplimentaryAccess(subs?.complimentary_access || false)
-      setJiraTickets(jiraRes?.data?.tickets || [])
+      setJiraTickets(jiraRes?.data?.tickets || jiraRes?.tickets || [])
       setBookmarks(Array.isArray(bms) ? bms : [])
-      const notifs = notifRes?.data?.results || notifRes?.data || []
-      setUnreadNotifications(Array.isArray(notifs) ? notifs.filter(n => !n.is_read).length : 0)
+      const notifs = notifRes?.data?.notifications || notifRes?.data?.results || []
+      setUnreadNotifications(Array.isArray(notifs) ? notifs.filter(n => !(n.read ?? n.is_read)).length : 0)
       setInterviewEntitlement(interviewEnt)
     }).finally(() => setLoading(false))
   }, [])

@@ -98,7 +98,7 @@ class LabSession(models.Model):
     started_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(
         null=True, blank=True, db_index=True,
-        help_text="Computed: started_at + duration_limit seconds. Used for efficient expiry filtering."
+        help_text="Computed: started_at + duration_limit seconds.",
     )
     ended_at = models.DateTimeField(null=True, blank=True)
 

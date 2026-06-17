@@ -35,7 +35,7 @@ export const subscriptionApi = {
   },
 
   async getMySubscriptions() {
-    const { data } = await api.get('/billing/subscriptions/')
+    const { data } = await api.get('/billing/subscriptions/', { silentError: true })
     return data
   },
 

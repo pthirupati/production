@@ -53,17 +53,17 @@ export const labApi = {
 
   async getActiveLabs(statusFilter) {
     const params = statusFilter ? `?status=${statusFilter}` : ''
-    const { data } = await api.get(`/labs/active/${params}`)
+    const { data } = await api.get(`/labs/active/${params}`, { silentError: true })
     return data
   },
 
   async getProgress() {
-    const { data } = await api.get('/progress/')
+    const { data } = await api.get('/progress/', { silentError: true })
     return data
   },
 
   async getAchievements() {
-    const { data } = await api.get('/achievements/')
+    const { data } = await api.get('/achievements/', { silentError: true })
     return data
   },
 

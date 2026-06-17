@@ -266,6 +266,18 @@ function TechDetailView({ tech, onBack }) {
           <div className="flex justify-end gap-3 pt-2 border-t border-surface-700/40">
             <button onClick={() => setEmailForm({ subject: '', body: '' })} className="btn-secondary text-sm">Clear</button>
             <button
+              onClick={async () => {
+                try {
+                  const res = await adminApi.sendTechEmail(tech.id, { ...emailForm, send_now: false })
+                  toast.success(`Draft saved for ${res.recipient_count ?? 0} recipients`)
+                } catch { toast.error('Failed to save draft') }
+              }}
+              disabled={!emailForm.subject.trim() || !emailForm.body.trim()}
+              className="btn-secondary text-sm disabled:opacity-50"
+            >
+              Save Draft
+            </button>
+            <button
               onClick={sendEmail}
               disabled={emailSending || !emailForm.subject.trim() || !emailForm.body.trim()}
               className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
@@ -597,11 +609,11 @@ export default function AdminSubscriptions() {
 
       {/* Platform stats strip */}
       {techStats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="glass-card p-4">
             <IndianRupee size={18} className="text-accent-green mb-1" />
             <p className="text-xl font-bold text-accent-green">₹{Math.round(techStats.total_revenue_inr).toLocaleString('en-IN')}</p>
-            <p className="text-xs text-surface-400">Total Revenue (INR)</p>
+            <p className="text-xs text-surface-400">Total Revenue</p>
           </div>
           <div className="glass-card p-4">
             <Users size={18} className="text-accent-cyan mb-1" />
@@ -609,9 +621,24 @@ export default function AdminSubscriptions() {
             <p className="text-xs text-surface-400">Active Subscribers</p>
           </div>
           <div className="glass-card p-4">
+            <UserIcon size={18} className="text-accent-blue mb-1" />
+            <p className="text-xl font-bold text-accent-blue">{techStats.total_unique_subscribers ?? techStats.total_active_subscribers}</p>
+            <p className="text-xs text-surface-400">Unique Users</p>
+          </div>
+          <div className="glass-card p-4">
             <Layers size={18} className="text-accent-purple mb-1" />
             <p className="text-xl font-bold text-accent-purple">{techStats.technologies?.length || 0}</p>
             <p className="text-xs text-surface-400">Technologies</p>
+          </div>
+          <div className="glass-card p-4">
+            <WrenchIcon size={18} className="text-amber-400 mb-1" />
+            <p className="text-xl font-bold text-amber-400">{techStats.maintenance_technologies ?? 0}</p>
+            <p className="text-xs text-surface-400">In Maintenance</p>
+          </div>
+          <div className="glass-card p-4">
+            <Clock size={18} className="text-surface-400 mb-1" />
+            <p className="text-xl font-bold text-surface-300">{techStats.coming_soon_technologies ?? 0}</p>
+            <p className="text-xs text-surface-400">Coming Soon</p>
           </div>
         </div>
       )}

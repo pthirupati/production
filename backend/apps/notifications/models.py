@@ -4,6 +4,7 @@ from django.conf import settings
 
 class EmailLog(models.Model):
     """Track all emails sent by the system for monitoring and debugging."""
+    id = models.BigAutoField(primary_key=True)
     STATUS_CHOICES = [
         ("sent", "Sent"),
         ("failed", "Failed"),
