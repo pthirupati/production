@@ -9,7 +9,7 @@ from apps.question_bank.models import Technology, Project, ProjectTask
 
 PROJECTS = [
     {
-        "technology_slug": "linux",
+        "technology_slug": "linux-administration",
         "title": "Deploy 2-Tier Nginx Web Application",
         "slug": "linux-2tier-nginx",
         "architecture_type": "2tier",
@@ -80,7 +80,7 @@ PROJECTS = [
         ],
     },
     {
-        "technology_slug": "linux",
+        "technology_slug": "linux-administration",
         "title": "Build 3-Tier Architecture: LB + App + Database",
         "slug": "linux-3tier-lb-app-db",
         "architecture_type": "3tier",

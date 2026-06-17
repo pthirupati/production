@@ -22,7 +22,7 @@ TECH_META = {
     "shell-script": {"name": "Shell Scripting", "icon": "terminal", "color": "teal", "order": 18},
     "rhel-linux": {"name": "RHEL Linux", "icon": "hard-drive", "color": "red", "order": 19},
     "simulation": {"name": "Simulation Labs", "icon": "monitor", "color": "cyan", "order": 20},
-    "linux": {"name": "Linux Administration", "icon": "terminal", "color": "cyan", "order": 5},
+    "linux-administration": {"name": "Linux Administration", "icon": "terminal", "color": "cyan", "order": 5},
 }
 
 

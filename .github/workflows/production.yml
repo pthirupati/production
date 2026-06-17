@@ -422,6 +422,24 @@ jobs:
     timeout-minutes: 45
     environment: production
     steps:
+      - name: Reseed scenarios and projects
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/fixitlab
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              python manage.py seed_scenarios --dir /scenarios
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              python manage.py seed_projects || true
+            echo "Scenario count:"
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              python -c "from apps.question_bank.models import Scenario; print(Scenario.objects.count(), 'scenarios')"
+
       - name: Run all-scenarios lab E2E
         uses: appleboy/ssh-action@v1
         with:

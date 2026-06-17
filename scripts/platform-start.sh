@@ -87,6 +87,9 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python 
 echo "Seeding/updating scenarios..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_scenarios --dir /scenarios
 
+echo "Seeding/updating projects..."
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_projects || true
+
 should_build_scenarios() {
   case "${1:-true}" in
     1|true|TRUE|True|yes|YES|on|ON) return 0 ;;
