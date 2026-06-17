@@ -211,7 +211,7 @@ export default function AdminMonitoring() {
   const downSystem = systemContainers.filter(c => c.status !== 'running').length
   const totalRestarts = containers.reduce((s, c) => s + (c.restart_count || 0), 0)
   const unhealthyContainers = containers.filter(c =>
-    c.status !== 'running' || (c.health && c.health !== 'healthy' && c.health !== 'none')
+    c.status !== 'running' || (c.health && c.health !== 'healthy' && c.health !== 'none' && c.health !== 'running')
   )
 
   // All system containers shown in the quick-glance row

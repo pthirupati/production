@@ -31,10 +31,9 @@ export default function useSessionTimeout() {
         return
       }
 
-      // Warn at 5 minutes
+      // Silently refresh at 5 minutes
       if (remaining <= 300 && !warnedRef.current) {
         warnedRef.current = true
-        toast('Your session expires soon. Refreshing...', { icon: '⏰', duration: 4000 })
         doRefresh()
       }
     }
