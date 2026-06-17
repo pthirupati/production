@@ -302,10 +302,15 @@ export default function Scenarios() {
     <div className="max-w-6xl mx-auto space-y-5 animate-fade-in">
 
       {/* ── Page header ── */}
-      <div className="relative overflow-hidden glass-card p-5 sm:p-7 gradient-border">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent-purple/8 via-transparent to-accent-cyan/8 pointer-events-none" />
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900/90 via-surface-900/70 to-surface-800/50 border border-surface-700/40 p-5 sm:p-7">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent-purple/5 via-transparent to-accent-cyan/5 pointer-events-none" />
+        <div className="absolute -top-12 -right-12 w-40 h-40 bg-accent-purple/8 rounded-full blur-3xl pointer-events-none" />
         <div className="relative flex items-start justify-between gap-4 flex-wrap">
           <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Target size={14} className="text-accent-cyan" />
+              <span className="text-xs font-semibold text-accent-cyan/80 uppercase tracking-widest">Challenge Library</span>
+            </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Scenarios</h1>
             <p className="text-surface-400 mt-1 text-sm">
               {loading ? 'Loading…' : `${totalCount} challenge${totalCount !== 1 ? 's' : ''} available`}

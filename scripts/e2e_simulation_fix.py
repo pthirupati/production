@@ -192,6 +192,16 @@ def apply_simulation_fix(session) -> tuple[bool, str]:
             apply_team_ops_action(engine, "network_nic_added", slug)
             return True, "network nic provisioned"
 
+        if "readonly" in slug or ("fs" in slug and "fix" in slug):
+            shell.run("mount -o remount,rw /")
+            state.mount_filesystems_fixed = True
+            return True, "readonly fs remounted rw"
+
+        if "remount" in slug:
+            shell.run("mount -o remount,rw /")
+            state.mount_filesystems_fixed = True
+            return True, "fs remounted"
+
         return False, f"no simulation fix map for {slug}"
     except Exception as exc:
         return False, str(exc)[:200]

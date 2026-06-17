@@ -21,8 +21,9 @@ export const interviewsApi = {
       }
     })
     if (resumeFile) form.append('resume', resumeFile)
+    // Do NOT set Content-Type — browser must set it with the correct multipart boundary
     return api.put('/interviews/profile/', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 'Content-Type': undefined },
     }).then(r => r.data)
   },
   listCampaigns() {

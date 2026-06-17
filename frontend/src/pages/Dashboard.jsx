@@ -129,34 +129,58 @@ export default function Dashboard() {
       )}
 
       {/* ═══ HERO HEADER ═══ */}
-      <div className="relative overflow-hidden glass-card p-6 sm:p-8 gradient-border animate-slide-up">
-        <div className="absolute inset-0 bg-gradient-to-r from-accent-cyan/10 via-transparent to-accent-purple/10" />
-        <div className="absolute inset-0 bg-grid-pattern opacity-20" />
-        <div className="absolute top-0 left-0 right-0 bg-gradient-stripe" />
-        <div className="absolute top-4 right-8 animate-bounce-subtle opacity-60"><Sparkles size={20} className="text-accent-cyan" /></div>
-        <div className="relative flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-white tracking-tight">
-              Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple animate-text-gradient text-glow-cyan">
-                {user?.first_name || user?.username}
-              </span>
-            </h1>
-            <div className="flex items-center gap-4 mt-2">
-              <p className="text-surface-300">Here&apos;s your progress overview</p>
-              {user?.date_joined && (
-                <span className="text-xs text-surface-400 flex items-center gap-1 bg-surface-800/40 px-2 py-0.5 rounded-full">
-                  <Calendar size={12} /> Since {new Date(user.date_joined).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900/90 via-surface-900/70 to-surface-800/50 border border-surface-700/40 p-6 sm:p-8 animate-slide-up">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/5 via-transparent to-accent-purple/5 pointer-events-none" />
+        <div className="absolute inset-0 bg-grid-pattern opacity-[0.07] pointer-events-none" />
+        {/* Subtle glow orbs */}
+        <div className="absolute -top-16 -left-16 w-48 h-48 bg-accent-cyan/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-accent-purple/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative">
+          {/* Top row */}
+          <div className="flex items-start justify-between flex-wrap gap-4 mb-5">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
+                <span className="text-xs font-semibold text-accent-green/80 uppercase tracking-widest">Your Dashboard</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
+                Welcome back,{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple animate-text-gradient">
+                  {user?.first_name || user?.username}
                 </span>
+              </h1>
+              <p className="text-surface-400 text-sm mt-1.5">Track your progress, manage labs, and keep levelling up.</p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {activeLabs.length > 0 && (
+                <Link to={`/lab/${activeLabs[0].id}`} className="btn-primary flex items-center gap-2 shadow-lg shadow-accent-cyan/25 animate-pulse-glow text-sm">
+                  <Play size={15} /> Resume Lab
+                </Link>
               )}
+              <Link to="/subscriptions" className="btn-secondary flex items-center gap-2 text-sm"><CreditCard size={14} /> Subscriptions</Link>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {activeLabs.length > 0 && (
-              <Link to={`/lab/${activeLabs[0].id}`} className="btn-primary flex items-center gap-2 shadow-lg shadow-accent-cyan/25 animate-pulse-glow">
-                <Play size={16} /> Resume Lab
-              </Link>
+
+          {/* Stats strip */}
+          <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-surface-700/40">
+            {[
+              { label: 'Completed', value: stats.completed || 0, color: 'text-accent-green' },
+              { label: 'Avg Score', value: stats.average_score || 0, color: 'text-accent-amber' },
+              { label: 'Active Subs', value: subscriptions.filter(s => s.is_active).length, color: 'text-accent-cyan' },
+              { label: 'Achievements', value: earnedAch.length, color: 'text-accent-purple' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-800/50 border border-surface-700/30">
+                <span className={`text-sm font-bold tabular-nums ${color}`}>{value}</span>
+                <span className="text-xs text-surface-500">{label}</span>
+              </div>
+            ))}
+            {user?.date_joined && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-800/50 border border-surface-700/30 ml-auto">
+                <Calendar size={11} className="text-surface-500" />
+                <span className="text-xs text-surface-500">Since {new Date(user.date_joined).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
+              </div>
             )}
-            <Link to="/subscriptions" className="btn-secondary flex items-center gap-2 text-sm"><CreditCard size={14} /> Subscriptions</Link>
           </div>
         </div>
       </div>

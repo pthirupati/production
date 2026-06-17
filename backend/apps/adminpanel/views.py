@@ -1197,9 +1197,11 @@ class AdminSystemHealthView(APIView):
                     continue
 
                 project = labels.get("com.docker.compose.project", "")
+                # Include containers from any fixitlab compose project (hyphenated or underscore names)
                 is_platform = (
-                    project == "fixitlab-main"
+                    project in ("fixitlab-main", "fixitlab")
                     or c.name.startswith("fixitlab_")
+                    or c.name.startswith("fixitlab-")
                     or c.name in ("fixitlab_db", "fixitlab_redis", "fixitlab_rabbitmq", "fixitlab_vault")
                 )
                 if not is_platform:

@@ -79,8 +79,14 @@ export default function InterviewSetup() {
       await interviewsApi.updateProfile(payload, resumeFile)
       toast.success('Profile saved')
       return true
-    } catch {
-      toast.error('Could not save profile')
+    } catch (err) {
+      const detail = err?.response?.data
+      const msg = typeof detail === 'string'
+        ? detail
+        : detail && typeof detail === 'object'
+          ? Object.values(detail).flat().join(', ').slice(0, 120)
+          : 'Could not save profile'
+      toast.error(msg)
       return false
     } finally {
       setSaving(false)

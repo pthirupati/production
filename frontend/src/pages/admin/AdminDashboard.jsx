@@ -329,19 +329,37 @@ export default function AdminDashboard() {
     <div className="space-y-7 animate-fade-in">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Admin Overview</h1>
-          <p className="text-surface-400 text-sm mt-1">Platform health, monitoring &amp; statistics</p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900/90 via-surface-900/70 to-surface-800/50 border border-surface-700/40 p-6">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent-purple/5 via-transparent to-accent-cyan/5 pointer-events-none" />
+        <div className="relative flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
+              <span className="text-xs font-semibold text-accent-green/80 uppercase tracking-widest">Live Dashboard</span>
+            </div>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Admin Overview</h1>
+            <p className="text-surface-400 text-sm mt-1">Platform health, monitoring &amp; real-time statistics</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-4 px-4 py-2 rounded-xl bg-surface-800/60 border border-surface-700/40 text-xs text-surface-400">
+              <span>{overview?.users?.total?.toLocaleString() || 0} users</span>
+              <span className="w-px h-3 bg-surface-700" />
+              <span>{overview?.scenarios?.active || 0} scenarios</span>
+              <span className="w-px h-3 bg-surface-700" />
+              <span className={health?.overall ? 'text-accent-green' : 'text-accent-red'}>
+                {health?.overall ? '● Operational' : '⚠ Degraded'}
+              </span>
+            </div>
+            <button
+              onClick={() => fetchData(true)}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-800/60 border border-surface-700/40 text-surface-300 hover:text-white hover:border-accent-purple/50 transition-all text-sm disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => fetchData(true)}
-          disabled={refreshing}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-800/50 border border-surface-700 text-surface-300 hover:text-white hover:border-surface-500 transition-all text-sm disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          Refresh
-        </button>
       </div>
 
       {/* ── KPI Stat Cards ── */}
@@ -551,8 +569,8 @@ export default function AdminDashboard() {
           </div>
 
           {(() => {
-            const healthy = containers.filter(c => c.status === 'running' && (c.health === 'healthy' || c.health === 'none')).length
-            const degraded = containers.filter(c => c.status === 'running' && c.health && c.health !== 'healthy' && c.health !== 'none').length
+            const healthy = containers.filter(c => c.status === 'running' && (c.health === 'healthy' || c.health === 'none' || c.health === 'running' || !c.health)).length
+            const degraded = containers.filter(c => c.status === 'running' && c.health && c.health !== 'healthy' && c.health !== 'none' && c.health !== 'running').length
             const down = containers.filter(c => c.status !== 'running').length
             const restarting = containers.reduce((sum, c) => sum + (c.restart_count || 0), 0)
             return (
@@ -582,8 +600,8 @@ export default function AdminDashboard() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {containers.map((c, i) => {
               const isUp = c.status === 'running'
-              const isHealthy = !isUp ? false : (c.health === 'healthy' || c.health === 'none' || !c.health)
-              const isDegraded = isUp && c.health && c.health !== 'healthy' && c.health !== 'none'
+              const isHealthy = !isUp ? false : (c.health === 'healthy' || c.health === 'none' || c.health === 'running' || !c.health)
+              const isDegraded = isUp && c.health && c.health !== 'healthy' && c.health !== 'none' && c.health !== 'running'
               const Icon = containerIcon(c.name)
 
               const cardClass = !isUp
