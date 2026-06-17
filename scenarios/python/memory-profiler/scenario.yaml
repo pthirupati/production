@@ -1,0 +1,22 @@
+title: Memory Leak Profiling
+slug: sim-python-memory-leak
+category: Python Development
+difficulty: hard
+description: 'A long-running Python process grows memory indefinitely. Use tracemalloc or objgraph to find the leak and fix it.'
+initial_state: 'Simulated RHEL 9 server. A long-running Python process grows memory indefinitely. Use tracemalloc or objgraph to find the leak and fix it.'
+lab_mode: simulation
+simulation_type: python
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: python3 -c ''import tracemalloc; tracemalloc.start()'''
+- Verify validation passes
+hints:
+- content: 'Try: python3 -c ''import tracemalloc; tracemalloc.start()'''
+  cost: 10
+  order: 1

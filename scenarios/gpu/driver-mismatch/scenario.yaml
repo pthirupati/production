@@ -1,0 +1,22 @@
+title: CUDA Driver Version Mismatch
+slug: sim-gpu-driver-mismatch
+category: GPU & NVIDIA
+difficulty: easy
+description: 'nvidia-smi reports driver/CUDA version mismatch preventing GPU usage. Identify the versions, install the correct driver, and verify.'
+initial_state: 'Simulated RHEL 9 server. nvidia-smi reports driver/CUDA version mismatch preventing GPU usage. Identify the versions, install the correct driver, and verify.'
+lab_mode: simulation
+simulation_type: gpu
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: nvidia-smi'
+- Verify validation passes
+hints:
+- content: 'Try: nvidia-smi'
+  cost: 10
+  order: 1

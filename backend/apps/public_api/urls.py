@@ -28,6 +28,9 @@ from .views import (
     CertificateVerifyView,
     BlogListView,
     BlogDetailView,
+    ProjectStartView,
+    ProjectTaskUpdateView,
+    ProjectJiraBotView,
 )
 
 urlpatterns = [
@@ -72,4 +75,9 @@ urlpatterns = [
     # Blog CMS (public)
     path("blog/", BlogListView.as_view()),
     path("blog/<slug:slug>/", BlogDetailView.as_view()),
+
+    # Projects
+    path("projects/<int:project_id>/start/", ProjectStartView.as_view()),
+    path("projects/<int:project_id>/tasks/<int:task_id>/update/", ProjectTaskUpdateView.as_view()),
+    path("projects/<int:project_id>/tasks/<int:task_id>/bot/", ProjectJiraBotView.as_view()),
 ]

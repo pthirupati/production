@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.http import HttpResponse
 from django.utils.html import format_html
 
-from .models import Scenario, Tag, Technology
+from .models import Scenario, Tag, Technology, Project, ProjectTask, UserProjectProgress, UserTaskProgress
 
 
 def _clear_technology_caches():
@@ -327,3 +327,38 @@ class ScenarioAdmin(admin.ModelAdmin):
                 s.lab_sessions.count(),
             ])
         return response
+
+
+# ─── Projects Admin ─────────────────────────────────────────────────────────
+
+class ProjectTaskInline(admin.TabularInline):
+    model = ProjectTask
+    extra = 1
+    fields = ("order", "jira_key", "title", "description", "acceptance_criteria", "hint", "depends_on")
+    ordering = ("order",)
+
+
+@admin.register(Project)
+class ProjectAdmin(admin.ModelAdmin):
+    list_display = ("title", "technology", "architecture_type", "difficulty", "estimated_hours", "is_active", "order")
+    list_filter = ("technology", "architecture_type", "difficulty", "is_active")
+    search_fields = ("title", "description")
+    list_editable = ("is_active", "order")
+    prepopulated_fields = {"slug": ("title",)}
+    inlines = [ProjectTaskInline]
+
+
+@admin.register(UserProjectProgress)
+class UserProjectProgressAdmin(admin.ModelAdmin):
+    list_display = ("user", "project", "status", "started_at", "completed_at")
+    list_filter = ("status",)
+    search_fields = ("user__username", "project__title")
+    raw_id_fields = ("user", "project")
+
+
+@admin.register(UserTaskProgress)
+class UserTaskProgressAdmin(admin.ModelAdmin):
+    list_display = ("user", "task", "status", "completed_at")
+    list_filter = ("status",)
+    search_fields = ("user__username", "task__title")
+    raw_id_fields = ("user", "task")

@@ -19,7 +19,7 @@ from django.db.models import Q, Count, Avg, Sum, F, Exists, OuterRef, Value, Boo
 from common.throttles import LabStartThrottle, StrictAnonRateThrottle
 from common.api_security import require_authentication
 
-from apps.question_bank.models import Scenario, Technology, Tag, Bookmark
+from apps.question_bank.models import Scenario, Technology, Tag, Bookmark, Project, ProjectTask, UserProjectProgress, UserTaskProgress
 from apps.question_bank.serializers import (
     TechnologySerializer, ScenarioListSerializer, ScenarioDetailSerializer, TagSerializer
 )
@@ -69,6 +69,47 @@ def _mark_accessible(scenario_data_list, subscribed_tech_ids):
             item["is_accessible"] = tech_id in subscribed_tech_ids
 
 
+def _serialize_projects(tech, user):
+    """Return serialized projects list for a technology, with user progress overlaid."""
+    projects = Project.objects.filter(technology=tech, is_active=True).prefetch_related("tasks").order_by("order")
+    progress_map = {}
+    task_progress_map = {}
+    if user and user.is_authenticated:
+        for upp in UserProjectProgress.objects.filter(user=user, project__technology=tech):
+            progress_map[upp.project_id] = {"status": upp.status, "started_at": str(upp.started_at)}
+        for utp in UserTaskProgress.objects.filter(user=user, task__project__technology=tech):
+            task_progress_map[utp.task_id] = {"status": utp.status}
+    result = []
+    for p in projects:
+        tasks_data = []
+        for t in p.tasks.all():
+            task_item = {
+                "id": t.id,
+                "jira_key": t.jira_key,
+                "title": t.title,
+                "description": t.description,
+                "acceptance_criteria": t.acceptance_criteria,
+                "order": t.order,
+                "depends_on": t.depends_on_id,
+                "user_status": task_progress_map.get(t.id, {}).get("status", "todo"),
+            }
+            tasks_data.append(task_item)
+        result.append({
+            "id": p.id,
+            "title": p.title,
+            "slug": p.slug,
+            "architecture_type": p.architecture_type,
+            "description": p.description,
+            "objectives": p.objectives,
+            "difficulty": p.difficulty,
+            "estimated_hours": p.estimated_hours,
+            "task_count": len(tasks_data),
+            "tasks": tasks_data,
+            "user_progress": progress_map.get(p.id),
+        })
+    return result
+
+
 # ─── Public Endpoints ────────────────────────────────────────────────
 
 class PlatformConfigView(APIView):
@@ -110,7 +151,7 @@ class TechnologyDetailView(APIView):
             if request.user.is_authenticated:
                 from apps.progress.learning_path import get_learning_path_progress
                 tech_data["learning_path_progress"] = get_learning_path_progress(request.user, tech)
-            return Response({"technology": tech_data, "scenarios": [], "coming_soon": True})
+            return Response({"technology": tech_data, "scenarios": [], "projects": [], "coming_soon": True})
 
         # Cache the anonymous scenario list (metadata only, no per-user data)
         cache_key = f"tech_detail_anon:{slug}"
@@ -140,7 +181,7 @@ class TechnologyDetailView(APIView):
             cache.set(cache_key, base, 60)  # 60s for anonymous base
 
         if not request.user.is_authenticated:
-            return Response(base)
+            return Response({**base, "projects": _serialize_projects(tech, None)})
 
         # Deep-copy to avoid mutating the cached dict
         import copy
@@ -169,7 +210,9 @@ class TechnologyDetailView(APIView):
             item["user_progress"] = progress_map.get(item["id"])
             item["is_bookmarked"] = item["id"] in bookmark_ids
 
-        return Response({"technology": tech_data, "scenarios": scenario_data})
+        # Include projects
+        projects = _serialize_projects(tech, request.user if request.user.is_authenticated else None)
+        return Response({"technology": tech_data, "scenarios": scenario_data, "projects": projects})
 
 
 class ScenariosListView(APIView):
@@ -1639,3 +1682,100 @@ class BlogDetailView(APIView):
             "date": (post.published_at or post.created_at).strftime("%B %d, %Y"),
             "readTime": f"{post.read_minutes} min read",
         })
+
+
+# ─── Projects API ─────────────────────────────────────────────────────────────
+
+class ProjectStartView(APIView):
+    """POST — start or resume a project; returns the project with tasks and current user progress."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, project_id):
+        project = get_object_or_404(Project, id=project_id, is_active=True)
+        progress, _ = UserProjectProgress.objects.get_or_create(
+            user=request.user, project=project,
+            defaults={"status": "in_progress"},
+        )
+        # Ensure a UserTaskProgress row exists for every task
+        for task in project.tasks.all():
+            UserTaskProgress.objects.get_or_create(user=request.user, task=task)
+        return Response({
+            "status": progress.status,
+            "started_at": str(progress.started_at),
+            "project_id": project.id,
+        })
+
+
+class ProjectTaskUpdateView(APIView):
+    """POST — update a task's status and optionally attach a screenshot."""
+    permission_classes = [IsAuthenticated]
+    parser_classes_lazy = ["rest_framework.parsers.MultiPartParser", "rest_framework.parsers.JSONParser"]
+
+    def post(self, request, project_id, task_id):
+        from django.utils import timezone as tz
+        task = get_object_or_404(ProjectTask, id=task_id, project_id=project_id)
+        utp, _ = UserTaskProgress.objects.get_or_create(user=request.user, task=task)
+
+        new_status = request.data.get("status", utp.status)
+        if new_status not in ("todo", "in_progress", "done"):
+            return Response({"error": "Invalid status"}, status=400)
+
+        utp.status = new_status
+        utp.notes = request.data.get("notes", utp.notes)
+        if new_status == "done" and not utp.completed_at:
+            utp.completed_at = tz.now()
+        if request.FILES.get("screenshot"):
+            utp.screenshot = request.FILES["screenshot"]
+        utp.save()
+
+        # Check if all tasks done → mark project completed
+        project = task.project
+        all_done = not project.tasks.exclude(
+            id__in=UserTaskProgress.objects.filter(user=request.user, status="done").values_list("task_id", flat=True)
+        ).exists()
+        if all_done:
+            UserProjectProgress.objects.filter(user=request.user, project=project).update(
+                status="completed", completed_at=tz.now()
+            )
+
+        return Response({
+            "task_id": task.id,
+            "status": utp.status,
+            "screenshot_url": utp.screenshot.url if utp.screenshot else None,
+        })
+
+
+class ProjectJiraBotView(APIView):
+    """POST — ask the Jira bot about a project task; supports optional screenshot context."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, project_id, task_id):
+        task = get_object_or_404(ProjectTask, id=task_id, project_id=project_id)
+        message = (request.data.get("message") or "").strip()
+        has_screenshot = bool(request.FILES.get("screenshot"))
+
+        # Free contextual answer based on task data — no external API
+        lines = [
+            f"**{task.jira_key}: {task.title}**",
+            "",
+            task.description,
+        ]
+        if task.acceptance_criteria:
+            lines += ["", "**Acceptance criteria:**", task.acceptance_criteria]
+        if task.hint:
+            lines += ["", f"**Hint:** {task.hint}"]
+        if has_screenshot:
+            # Save screenshot to UserTaskProgress
+            utp, _ = UserTaskProgress.objects.get_or_create(user=request.user, task=task)
+            utp.screenshot = request.FILES["screenshot"]
+            utp.save(update_fields=["screenshot"])
+            lines += ["", "Screenshot received — I can see you've shared your progress. Based on the task above, check the acceptance criteria and make sure all steps are completed."]
+        if message:
+            # Simple keyword matching for contextual hints
+            msg_lower = message.lower()
+            if any(w in msg_lower for w in ("stuck", "help", "how", "what", "where", "hint")):
+                lines += ["", f"**Next step:** {task.hint or 'Re-read the acceptance criteria and check your work step by step.'}"]
+            elif any(w in msg_lower for w in ("done", "finished", "complete", "verify")):
+                lines += ["", "Mark the task as **Done** using the status button. The next ticket will unlock once this one is completed."]
+
+        return Response({"answer": "\n".join(lines), "task": {"id": task.id, "jira_key": task.jira_key}})

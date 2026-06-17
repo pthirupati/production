@@ -1,0 +1,22 @@
+title: Ingress Returns 404
+slug: sim-k8s-ingress-404
+category: Kubernetes
+difficulty: medium
+description: 'An Nginx Ingress rule is in place but all requests return 404. Debug the Ingress annotations, backend service selector, and path rules.'
+initial_state: 'Simulated RHEL 9 server. An Nginx Ingress rule is in place but all requests return 404. Debug the Ingress annotations, backend service selector, and path rules.'
+lab_mode: simulation
+simulation_type: kubernetes
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: kubectl describe ingress app-ingress'
+- Verify validation passes
+hints:
+- content: 'Try: kubectl describe ingress app-ingress'
+  cost: 10
+  order: 1

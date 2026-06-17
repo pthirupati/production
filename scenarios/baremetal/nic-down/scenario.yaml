@@ -1,0 +1,22 @@
+title: NIC Not Coming Up
+slug: sim-bm-nic-down
+category: Bare Metal & IPMI
+difficulty: easy
+description: 'A server''s eth0 interface is DOWN after reboot. Bring the interface up and make the change persistent.'
+initial_state: 'Simulated RHEL 9 server. A server''s eth0 interface is DOWN after reboot. Bring the interface up and make the change persistent.'
+lab_mode: simulation
+simulation_type: baremetal
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: ip link set eth0 up'
+- Verify validation passes
+hints:
+- content: 'Try: ip link set eth0 up'
+  cost: 10
+  order: 1

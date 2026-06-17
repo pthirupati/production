@@ -1,0 +1,22 @@
+title: Circular Import Error
+slug: sim-python-circular-import
+category: Python Development
+difficulty: medium
+description: 'An app raises ImportError due to a circular module dependency. Identify the cycle and refactor to break it.'
+initial_state: 'Simulated RHEL 9 server. An app raises ImportError due to a circular module dependency. Identify the cycle and refactor to break it.'
+lab_mode: simulation
+simulation_type: python
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: refactor circular imports'
+- Verify validation passes
+hints:
+- content: 'Try: python3 -c "import app" to trace the import error'
+  cost: 10
+  order: 1

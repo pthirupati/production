@@ -1,0 +1,22 @@
+title: 'Pod Fails: Missing ConfigMap'
+slug: sim-k8s-configmap-missing
+category: Kubernetes
+difficulty: easy
+description: 'A pod stays in ContainerCreating state because it references a ConfigMap that doesn''t exist. Create the ConfigMap with correct data.'
+initial_state: 'Simulated RHEL 9 server. A pod stays in ContainerCreating state because it references a ConfigMap that doesn''t exist. Create the ConfigMap with correct data.'
+lab_mode: simulation
+simulation_type: kubernetes
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: kubectl describe pod web-app'
+- Verify validation passes
+hints:
+- content: 'Try: kubectl describe pod web-app'
+  cost: 10
+  order: 1

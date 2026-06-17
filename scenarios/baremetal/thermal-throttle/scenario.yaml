@@ -1,0 +1,22 @@
+title: CPU Thermal Throttling
+slug: sim-bm-thermal
+category: Bare Metal & IPMI
+difficulty: medium
+description: 'Server performance is degraded due to CPU thermal throttling. Check IPMI sensor readings, identify overheating cause, and apply fixes.'
+initial_state: 'Simulated RHEL 9 server. Server performance is degraded due to CPU thermal throttling. Check IPMI sensor readings, identify overheating cause, and apply fixes.'
+lab_mode: simulation
+simulation_type: baremetal
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: ipmitool sensor list | grep Temp'
+- Verify validation passes
+hints:
+- content: 'Try: ipmitool sensor list | grep Temp'
+  cost: 10
+  order: 1

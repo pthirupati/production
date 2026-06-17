@@ -1,0 +1,22 @@
+title: Pod Blocked by ResourceQuota
+slug: sim-k8s-resource-quota
+category: Kubernetes
+difficulty: medium
+description: 'A deployment can''t scale up — pods stay Pending because namespace ResourceQuota limits are exceeded. Identify and fix the quota.'
+initial_state: 'Simulated RHEL 9 server. A deployment can''t scale up — pods stay Pending because namespace ResourceQuota limits are exceeded. Identify and fix the quota.'
+lab_mode: simulation
+simulation_type: kubernetes
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: kubectl describe resourcequota'
+- Verify validation passes
+hints:
+- content: 'Try: kubectl describe resourcequota'
+  cost: 10
+  order: 1

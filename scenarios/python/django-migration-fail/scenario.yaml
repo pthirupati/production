@@ -1,0 +1,22 @@
+title: Django Migration Failure
+slug: sim-python-django-migration
+category: Python Development
+difficulty: hard
+description: 'Django management commands fail because a migration has a conflict. Resolve the migration conflict and apply cleanly.'
+initial_state: 'Simulated RHEL 9 server. Django management commands fail because a migration has a conflict. Resolve the migration conflict and apply cleanly.'
+lab_mode: simulation
+simulation_type: python
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: python manage.py showmigrations'
+- Verify validation passes
+hints:
+- content: 'Try: python manage.py showmigrations'
+  cost: 10
+  order: 1

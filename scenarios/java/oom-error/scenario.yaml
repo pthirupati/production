@@ -1,0 +1,22 @@
+title: Java OutOfMemoryError
+slug: sim-java-oom
+category: Java Development
+difficulty: medium
+description: 'A Java app crashes with java.lang.OutOfMemoryError: Java heap space. Increase heap size and identify the leak.'
+initial_state: 'Simulated RHEL 9 server. A Java app crashes with java.lang.OutOfMemoryError: Java heap space. Increase heap size and identify the leak.'
+lab_mode: simulation
+simulation_type: java
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: java -Xmx512m -jar app.jar'
+- Verify validation passes
+hints:
+- content: 'Try: java -Xmx512m -jar app.jar'
+  cost: 10
+  order: 1

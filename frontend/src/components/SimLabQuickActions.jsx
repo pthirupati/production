@@ -68,13 +68,7 @@ export default function SimLabQuickActions({
     )
   }
 
-  if (!actions.length) {
-    actions.push(
-      { label: 'ip addr', icon: Network, cmd: 'ip addr' },
-      { label: 'Services', icon: Server, cmd: 'systemctl list-units --type=service --state=running' },
-      { label: 'df -h', icon: HardDrive, cmd: 'df -h' },
-    )
-  }
+  if (!actions.length) return null
 
   const unique = actions.slice(0, 5)
 

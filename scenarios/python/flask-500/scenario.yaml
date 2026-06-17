@@ -1,0 +1,22 @@
+title: Flask App Returns 500
+slug: sim-python-flask-500
+category: Python Development
+difficulty: medium
+description: 'A Flask app starts but all routes return HTTP 500. Check the app logs, find the misconfigured route handler, and fix it.'
+initial_state: 'Simulated RHEL 9 server. A Flask app starts but all routes return HTTP 500. Check the app logs, find the misconfigured route handler, and fix it.'
+lab_mode: simulation
+simulation_type: python
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: flask run --debug'
+- Verify validation passes
+hints:
+- content: 'Try: flask run --debug'
+  cost: 10
+  order: 1

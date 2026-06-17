@@ -1,0 +1,22 @@
+title: MIG Partition Misconfigured
+slug: sim-gpu-mig
+category: GPU & NVIDIA
+difficulty: hard
+description: 'An A100 GPU has MIG mode enabled but partitions are misconfigured, blocking workloads. Reconfigure MIG profiles and verify workload access.'
+initial_state: 'Simulated RHEL 9 server. An A100 GPU has MIG mode enabled but partitions are misconfigured, blocking workloads. Reconfigure MIG profiles and verify workload access.'
+lab_mode: simulation
+simulation_type: gpu
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: nvidia-smi mig -lgip'
+- Verify validation passes
+hints:
+- content: 'Try: nvidia-smi mig -lgip'
+  cost: 10
+  order: 1

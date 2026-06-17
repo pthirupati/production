@@ -1,0 +1,22 @@
+title: Java Compilation Error
+slug: sim-java-compile-error
+category: Java Development
+difficulty: easy
+description: 'App.java fails to compile with a syntax error. Fix the source file and compile successfully.'
+initial_state: 'Simulated RHEL 9 server. App.java fails to compile with a syntax error. Fix the source file and compile successfully.'
+lab_mode: simulation
+simulation_type: java
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: javac App.java'
+- Verify validation passes
+hints:
+- content: 'Try: javac App.java'
+  cost: 10
+  order: 1

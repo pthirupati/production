@@ -1,0 +1,22 @@
+title: Missing Environment Variable
+slug: sim-python-env-missing
+category: Python Development
+difficulty: easy
+description: 'A Python script crashes with KeyError on os.environ. Export the missing variable in the environment and re-run.'
+initial_state: 'Simulated RHEL 9 server. A Python script crashes with KeyError on os.environ. Export the missing variable in the environment and re-run.'
+lab_mode: simulation
+simulation_type: python
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: export DB_HOST=localhost'
+- Verify validation passes
+hints:
+- content: 'Try: export DB_HOST=localhost'
+  cost: 10
+  order: 1

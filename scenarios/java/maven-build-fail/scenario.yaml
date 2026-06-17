@@ -1,0 +1,22 @@
+title: Maven Build Failure
+slug: sim-java-maven-fail
+category: Java Development
+difficulty: medium
+description: 'mvn package fails with a missing dependency not found in any repository. Fix the pom.xml and build successfully.'
+initial_state: 'Simulated RHEL 9 server. mvn package fails with a missing dependency not found in any repository. Fix the pom.xml and build successfully.'
+lab_mode: simulation
+simulation_type: java
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: mvn dependency:tree'
+- Verify validation passes
+hints:
+- content: 'Try: mvn dependency:tree'
+  cost: 10
+  order: 1

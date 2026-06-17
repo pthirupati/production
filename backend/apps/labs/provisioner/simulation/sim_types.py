@@ -12,6 +12,7 @@ UNIFIED_SIM_TYPES = {
     "database": "Database Simulation",
     "ansible": "Ansible Simulation",
     "python": "Python Simulation",
+    "java": "Java Development Simulation",
 }
 
 _LEGACY_MAP = {
@@ -45,6 +46,7 @@ def hostname_for_type(sim_type: str, slug: str = "") -> str:
         "database": "db-server",
         "ansible": "ansible-control",
         "python": "dev-server",
+        "java": "dev-server",
     }
     if "ansible" in slug:
         return "ansible-control"

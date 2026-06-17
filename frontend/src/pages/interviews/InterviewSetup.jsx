@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import api from '../../api/client'
-import { Upload, ChevronRight, ChevronLeft, User, Briefcase } from 'lucide-react'
+import { Upload, ChevronRight, ChevronLeft, User, Briefcase, Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const LEVELS = [
@@ -32,6 +32,7 @@ export default function InterviewSetup() {
   })
   const [voices, setVoices] = useState([])
   const [saving, setSaving] = useState(false)
+  const [customTechInput, setCustomTechInput] = useState('')
 
   useEffect(() => {
     api.get('/technologies/').then(r => setTechnologies(r.data || [])).catch(() => {})
@@ -55,12 +56,23 @@ export default function InterviewSetup() {
     })
   }
 
+  const addCustomTech = () => {
+    const name = customTechInput.trim()
+    if (!name) return
+    const list = form.secondary_technologies || []
+    if (list.length >= 5) { toast.error('Maximum 5 technologies'); return }
+    if (list.includes(name)) { setCustomTechInput(''); return }
+    setForm(f => ({ ...f, secondary_technologies: [...(f.secondary_technologies || []), name] }))
+    setCustomTechInput('')
+  }
+
   const saveProfile = async () => {
     setSaving(true)
     try {
       const payload = {
         ...form,
         secondary_technologies: JSON.stringify(form.secondary_technologies),
+        primary_technology: form.primary_technology || null,
         current_package_lpa: form.current_package_lpa || null,
         notice_period_days: form.notice_period_days || null,
       }
@@ -223,8 +235,11 @@ export default function InterviewSetup() {
             </label>
           </div>
           <div>
-            <p className="text-xs text-surface-400 mb-2">Other technologies (up to 5)</p>
-            <div className="flex flex-wrap gap-1.5">
+            <p className="text-xs text-surface-400 mb-2">
+              Other technologies (up to 5){' '}
+              <span className="text-surface-600">— {form.secondary_technologies?.length || 0}/5 selected</span>
+            </p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
               {technologies.slice(0, 12).map(t => (
                 <button
                   key={t.id}
@@ -240,6 +255,32 @@ export default function InterviewSetup() {
                 </button>
               ))}
             </div>
+            {/* Custom selected tags */}
+            {form.secondary_technologies?.filter(name => !technologies.some(t => t.name === name)).map(name => (
+              <span key={name} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs border border-cyan-500/40 bg-cyan-500/10 text-cyan-300 mr-1 mb-1">
+                {name}
+                <button type="button" onClick={() => toggleSecondary(name)}><X size={10} /></button>
+              </span>
+            ))}
+            {/* Free-text input for custom technologies */}
+            {(form.secondary_technologies?.length || 0) < 5 && (
+              <div className="flex gap-2 mt-2">
+                <input
+                  value={customTechInput}
+                  onChange={e => setCustomTechInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustomTech())}
+                  placeholder="Type a technology (e.g. Ansible, Terraform…)"
+                  className="input-field text-xs flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={addCustomTech}
+                  className="btn-secondary text-xs inline-flex items-center gap-1 px-3"
+                >
+                  <Plus size={12} /> Add
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

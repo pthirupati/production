@@ -1,0 +1,22 @@
+title: Spring Boot Startup Failure
+slug: sim-java-spring-fail
+category: Java Development
+difficulty: medium
+description: 'A Spring Boot application fails to start with UnsatisfiedDependencyException. Fix the misconfigured bean and restart.'
+initial_state: 'Simulated RHEL 9 server. A Spring Boot application fails to start with UnsatisfiedDependencyException. Fix the misconfigured bean and restart.'
+lab_mode: simulation
+simulation_type: java
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: java -jar app.jar'
+- Verify validation passes
+hints:
+- content: 'Try: java -jar app.jar'
+  cost: 10
+  order: 1

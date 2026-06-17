@@ -1,0 +1,9 @@
+name: Java Development
+slug: java
+icon: code
+color: orange
+description: Java application debugging, JVM tuning, Spring Boot, and build tooling scenarios
+price: 499
+order: 16
+coming_soon: false
+is_active: true

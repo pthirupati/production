@@ -1,0 +1,22 @@
+title: ClassNotFoundException Fix
+slug: sim-java-classpath
+category: Java Development
+difficulty: easy
+description: 'App fails at runtime with ClassNotFoundException. Add the missing JAR to the classpath and re-run.'
+initial_state: 'Simulated RHEL 9 server. App fails at runtime with ClassNotFoundException. Add the missing JAR to the classpath and re-run.'
+lab_mode: simulation
+simulation_type: java
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: java -cp .:lib/* Main'
+- Verify validation passes
+hints:
+- content: 'Try: java -cp .:lib/* Main'
+  cost: 10
+  order: 1

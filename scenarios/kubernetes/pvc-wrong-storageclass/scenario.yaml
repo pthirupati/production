@@ -1,0 +1,22 @@
+title: PVC Stuck — Wrong StorageClass
+slug: sim-k8s-pvc-storageclass
+category: Kubernetes
+difficulty: medium
+description: 'A PersistentVolumeClaim stays in Pending state because the requested StorageClass does not exist. Fix the PVC to use the available storage class.'
+initial_state: 'Simulated RHEL 9 server. A PersistentVolumeClaim stays in Pending state because the requested StorageClass does not exist. Fix the PVC to use the available storage class.'
+lab_mode: simulation
+simulation_type: kubernetes
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: kubectl get storageclass'
+- Verify validation passes
+hints:
+- content: 'Try: kubectl get storageclass'
+  cost: 10
+  order: 1

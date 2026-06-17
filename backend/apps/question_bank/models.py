@@ -136,6 +136,7 @@ class Scenario(models.Model):
         ("database", "Database Simulation"),
         ("ansible", "Ansible Simulation"),
         ("python", "Python Simulation"),
+        ("java", "Java Development Simulation"),
     ]
 
     requires_companion_hosts = models.BooleanField(
@@ -203,4 +204,119 @@ class Bookmark(models.Model):
 
     def __str__(self):
         return f"{self.user} -> {self.scenario.slug}"
+
+
+# ─── Projects ────────────────────────────────────────────────────────────────
+
+class Project(models.Model):
+    """End-to-end guided project: users implement an architecture by following Jira tickets."""
+
+    ARCHITECTURE_CHOICES = [
+        ("2tier", "2-Tier Architecture (Web + DB)"),
+        ("3tier", "3-Tier Architecture (LB + App + DB)"),
+        ("microservices", "Microservices"),
+        ("cicd", "CI/CD Pipeline"),
+        ("custom", "Custom"),
+    ]
+    DIFFICULTY_CHOICES = [
+        ("beginner", "Beginner"),
+        ("intermediate", "Intermediate"),
+        ("advanced", "Advanced"),
+    ]
+
+    technology = models.ForeignKey(Technology, on_delete=models.CASCADE, related_name="projects")
+    title = models.CharField(max_length=200)
+    slug = models.SlugField(unique=True, blank=True)
+    architecture_type = models.CharField(max_length=20, choices=ARCHITECTURE_CHOICES, default="custom")
+    description = models.TextField()
+    objectives = models.JSONField(default=list, blank=True)
+    difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default="intermediate")
+    estimated_hours = models.PositiveIntegerField(default=4)
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "title"]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            base = slugify(f"{self.technology.slug}-{self.title}")
+            self.slug = base
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.technology.name} — {self.title}"
+
+
+class ProjectTask(models.Model):
+    """A single Jira-style ticket within a Project."""
+
+    STATUS_CHOICES = [
+        ("todo", "To Do"),
+        ("in_progress", "In Progress"),
+        ("done", "Done"),
+    ]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="tasks")
+    title = models.CharField(max_length=200)
+    jira_key = models.CharField(max_length=20, help_text="e.g. PROJ-1")
+    description = models.TextField()
+    acceptance_criteria = models.TextField(blank=True)
+    hint = models.TextField(blank=True, help_text="Jira bot hint when user asks for help")
+    order = models.PositiveIntegerField(default=0)
+    depends_on = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="dependents"
+    )
+
+    class Meta:
+        ordering = ["order"]
+        unique_together = ("project", "jira_key")
+
+    def __str__(self):
+        return f"{self.jira_key}: {self.title}"
+
+
+class UserProjectProgress(models.Model):
+    """Track a user's progress through a Project."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="project_progress")
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="user_progress")
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[("in_progress", "In Progress"), ("completed", "Completed")],
+        default="in_progress",
+    )
+
+    class Meta:
+        unique_together = ("user", "project")
+        ordering = ["-started_at"]
+
+    def __str__(self):
+        return f"{self.user} → {self.project}"
+
+
+class UserTaskProgress(models.Model):
+    """Track a user's status on an individual ProjectTask, with optional screenshot."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="task_progress")
+    task = models.ForeignKey(ProjectTask, on_delete=models.CASCADE, related_name="user_progress")
+    status = models.CharField(
+        max_length=20,
+        choices=[("todo", "To Do"), ("in_progress", "In Progress"), ("done", "Done")],
+        default="todo",
+    )
+    screenshot = models.ImageField(upload_to="project_screenshots/%Y/%m/", null=True, blank=True)
+    notes = models.TextField(blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("user", "task")
+        ordering = ["task__order"]
+
+    def __str__(self):
+        return f"{self.user} → {self.task.jira_key} ({self.status})"
 

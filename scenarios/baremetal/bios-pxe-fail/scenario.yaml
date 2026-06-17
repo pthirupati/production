@@ -1,0 +1,22 @@
+title: PXE Boot Failure
+slug: sim-bm-pxe-fail
+category: Bare Metal & IPMI
+difficulty: hard
+description: 'A bare-metal server fails PXE boot with ''No bootable device''. Verify DHCP, TFTP, and the PXE configuration files.'
+initial_state: 'Simulated RHEL 9 server. A bare-metal server fails PXE boot with ''No bootable device''. Verify DHCP, TFTP, and the PXE configuration files.'
+lab_mode: simulation
+simulation_type: baremetal
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: ipmitool chassis bootdev pxe'
+- Verify validation passes
+hints:
+- content: 'Try: ipmitool chassis bootdev pxe'
+  cost: 10
+  order: 1

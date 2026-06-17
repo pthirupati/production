@@ -1,0 +1,22 @@
+title: Broken Virtual Environment
+slug: sim-python-venv-broken
+category: Python Development
+difficulty: medium
+description: 'A Python venv is broken — pip and python3 point to system instead of the venv. Reactivate or recreate the environment and verify the app runs.'
+initial_state: 'Simulated RHEL 9 server. A Python venv is broken — pip and python3 point to system instead of the venv. Reactivate or recreate the environment and verify the app runs.'
+lab_mode: simulation
+simulation_type: python
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: source venv/bin/activate'
+- Verify validation passes
+hints:
+- content: 'Try: source venv/bin/activate'
+  cost: 10
+  order: 1

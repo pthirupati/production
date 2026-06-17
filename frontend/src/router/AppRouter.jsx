@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useState, useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
 
 // Layouts (always loaded)
@@ -80,14 +80,29 @@ function PageLoader() {
   )
 }
 
+function useHydrated() {
+  const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated())
+  useEffect(() => {
+    if (hydrated) return
+    setHydrated(useAuthStore.persist.hasHydrated())
+    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true))
+    return unsub
+  }, [hydrated])
+  return hydrated
+}
+
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthStore()
+  const hydrated = useHydrated()
+  if (!hydrated) return <PageLoader />
   if (!isAuthenticated) return <Navigate to="/login" replace />
   return children
 }
 
 function AdminRoute({ children }) {
   const { isAuthenticated, user } = useAuthStore()
+  const hydrated = useHydrated()
+  if (!hydrated) return <PageLoader />
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!user?.is_staff) return <Navigate to="/dashboard" replace />
   return children

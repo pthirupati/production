@@ -1,0 +1,22 @@
+title: GPU Out of Memory Error
+slug: sim-gpu-oom
+category: GPU & NVIDIA
+difficulty: medium
+description: 'A training job crashes with CUDA out of memory. Identify which process is holding GPU memory, free it, and relaunch with correct batch size.'
+initial_state: 'Simulated RHEL 9 server. A training job crashes with CUDA out of memory. Identify which process is holding GPU memory, free it, and relaunch with correct batch size.'
+lab_mode: simulation
+simulation_type: gpu
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: nvidia-smi --query-compute-apps=pid,used_memory --format=csv'
+- Verify validation passes
+hints:
+- content: 'Try: nvidia-smi --query-compute-apps=pid,used_memory --format=csv'
+  cost: 10
+  order: 1

@@ -71,7 +71,9 @@ api.interceptors.response.use(
     const path = original?.url || ''
     const isAuthRequest = /\/auth\//.test(path)
     if (error.response.status >= 500 && !isAuthRequest) {
-      toast.error('Server error. Please try again later.', { id: 'server-error', duration: 4000 })
+      const data = error.response.data
+      const msg = data?.error || data?.detail || data?.message || 'Server error. Please try again later.'
+      toast.error(msg.length > 120 ? msg.slice(0, 120) + '…' : msg, { id: 'server-error', duration: 5000 })
     }
 
     return Promise.reject(error)

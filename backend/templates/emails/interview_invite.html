@@ -1,17 +1,70 @@
 <!DOCTYPE html>
-<html>
-<body style="font-family: system-ui, sans-serif; background:#0f172a; color:#e2e8f0; padding:24px;">
-  <div style="max-width:560px;margin:0 auto;background:#1e293b;border-radius:12px;padding:24px;border:1px solid #334155;">
-    <h2 style="color:#38bdf8;margin-top:0;">Interview scheduled</h2>
-    <p>Your mock interview round is booked:</p>
-    <ul>
-      <li><strong>{{ round_title }}</strong></li>
-      <li>Interviewer persona: {{ persona }}</li>
-      <li>When: {{ scheduled_at }}</li>
-      <li>Duration: ~{{ duration }} minutes</li>
-    </ul>
-    <p>Before you join: enable <strong>camera and microphone</strong>. The session will end if either stays off for 5 minutes.</p>
-    <a href="{{ join_url }}" style="display:inline-block;margin-top:12px;padding:10px 20px;background:#6366f1;color:#fff;text-decoration:none;border-radius:8px;">Join interview room</a>
-  </div>
-</body>
-</html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Interview Scheduled — FixitLab</title></head>
+<body style="margin:0;padding:0;background-color:#0a0e1a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0e1a;padding:32px 16px;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+  <tr><td style="text-align:center;padding:24px 0 20px;">
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr>
+      <td style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#06b6d4,#8b5cf6);text-align:center;line-height:44px;"><span style="color:#fff;font-weight:800;font-size:20px;">F</span></td>
+      <td style="padding-left:12px;"><span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">FixitLab</span></td>
+    </tr></table>
+  </td></tr>
+  <tr><td>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#141b2d 0%,#1a2235 100%);border-radius:16px;border:1px solid #1e293b;overflow:hidden;">
+      <tr><td style="height:6px;background:linear-gradient(90deg,#06b6d4,#8b5cf6,#ec4899);"></td></tr>
+      <tr><td style="text-align:center;padding:40px 40px 16px;">
+        <div style="display:inline-block;width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,rgba(6,182,212,0.15),rgba(139,92,246,0.15));border:2px solid rgba(6,182,212,0.3);line-height:72px;text-align:center;"><span style="font-size:36px;">&#128197;</span></div>
+      </td></tr>
+      <tr><td style="text-align:center;padding:0 40px 8px;">
+        <h1 style="color:#ffffff;font-size:24px;font-weight:700;margin:0;">Interview round scheduled</h1>
+      </td></tr>
+      <tr><td style="text-align:center;padding:0 40px 28px;">
+        <p style="color:#94a3b8;font-size:15px;line-height:1.6;margin:0;">Your mock interview is booked. Make sure your camera and microphone are ready before you join.</p>
+      </td></tr>
+      <tr><td style="padding:0 32px 24px;">
+        <table width="100%" style="background:#0f172a;border-radius:12px;border:1px solid #1e293b;">
+          <tr>
+            <td style="padding:16px 20px;color:#64748b;font-size:13px;border-bottom:1px solid #1e293b;">Round</td>
+            <td style="padding:16px 20px;color:#e2e8f0;font-size:14px;font-weight:600;text-align:right;border-bottom:1px solid #1e293b;">{{ round_title }}</td>
+          </tr>
+          <tr>
+            <td style="padding:16px 20px;color:#64748b;font-size:13px;border-bottom:1px solid #1e293b;">AI Interviewer</td>
+            <td style="padding:16px 20px;color:#06b6d4;font-size:14px;font-weight:600;text-align:right;border-bottom:1px solid #1e293b;">{{ persona }}</td>
+          </tr>
+          <tr>
+            <td style="padding:16px 20px;color:#64748b;font-size:13px;border-bottom:1px solid #1e293b;">Scheduled at</td>
+            <td style="padding:16px 20px;color:#f59e0b;font-size:14px;font-weight:600;text-align:right;border-bottom:1px solid #1e293b;">{{ scheduled_at }}</td>
+          </tr>
+          <tr>
+            <td style="padding:16px 20px;color:#64748b;font-size:13px;">Duration</td>
+            <td style="padding:16px 20px;color:#e2e8f0;font-size:14px;text-align:right;">~{{ duration }} minutes</td>
+          </tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:0 32px 28px;">
+        <table width="100%" style="background:rgba(245,158,11,0.08);border-radius:10px;border:1px solid rgba(245,158,11,0.2);">
+          <tr><td style="padding:14px 18px;">
+            <p style="color:#fbbf24;font-size:13px;margin:0;font-weight:600;">&#9888;&nbsp; Before you join</p>
+            <p style="color:#94a3b8;font-size:13px;margin:6px 0 0;line-height:1.5;">Enable your <strong style="color:#e2e8f0;">camera and microphone</strong> when prompted. The session exits automatically if either stays off for 5 minutes.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="text-align:center;padding:0 40px 40px;">
+        <a href="{{ join_url }}" style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#06b6d4);color:#ffffff;text-decoration:none;padding:16px 40px;border-radius:12px;font-weight:700;font-size:16px;box-shadow:0 4px 24px rgba(139,92,246,0.35);">Join Interview Room &#8594;</a>
+        <p style="color:#475569;font-size:12px;margin:16px 0 0;">Or copy this link: <span style="color:#94a3b8;">{{ join_url }}</span></p>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="padding:0 40px;"><div style="height:1px;background:linear-gradient(90deg,transparent,#1e293b,transparent);"></div></td></tr>
+  <tr><td style="text-align:center;padding:24px 0 8px;">
+    <p style="color:#64748b;font-size:11px;margin:0;">&#169; 2026 FixitLab &#8212; Learn by Doing.</p>
+    <p style="color:#475569;font-size:11px;margin:8px 0 0;">
+      <a href="https://fixitlab.com/privacy" style="color:#94a3b8;text-decoration:none;">Privacy</a> &#183;
+      <a href="https://fixitlab.com/terms" style="color:#94a3b8;text-decoration:none;">Terms</a> &#183;
+      <a href="mailto:kubelearn464@gmail.com" style="color:#94a3b8;text-decoration:none;">Support</a>
+    </p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>

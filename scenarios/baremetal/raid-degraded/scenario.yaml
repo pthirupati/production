@@ -1,0 +1,22 @@
+title: RAID Array Degraded
+slug: sim-bm-raid-degraded
+category: Bare Metal & IPMI
+difficulty: medium
+description: 'mdadm reports the RAID-1 array /dev/md0 is in a degraded state. Identify the failed disk, add the spare, and rebuild.'
+initial_state: 'Simulated RHEL 9 server. mdadm reports the RAID-1 array /dev/md0 is in a degraded state. Identify the failed disk, add the spare, and rebuild.'
+lab_mode: simulation
+simulation_type: baremetal
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: mdadm --detail /dev/md0'
+- Verify validation passes
+hints:
+- content: 'Try: mdadm --detail /dev/md0'
+  cost: 10
+  order: 1

@@ -222,7 +222,7 @@ class InterviewCampaignDetailView(APIView):
                 subject=f"Interview cancelled — {campaign.title}",
                 to_email=request.user.email,
                 template="emails/interview_cancelled.html",
-                context={"campaign_title": campaign.title},
+                context={"campaign_title": campaign.title, "frontend_url": settings.FRONTEND_URL},
             )
         except Exception:
             pass

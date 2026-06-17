@@ -1,0 +1,22 @@
+title: Disk SMART Failure Warning
+slug: sim-bm-disk-smart
+category: Bare Metal & IPMI
+difficulty: medium
+description: 'SMART monitoring reports a disk is pre-failing. Run a SMART test, identify the failing attribute, and plan disk replacement steps.'
+initial_state: 'Simulated RHEL 9 server. SMART monitoring reports a disk is pre-failing. Run a SMART test, identify the failing attribute, and plan disk replacement steps.'
+lab_mode: simulation
+simulation_type: baremetal
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: smartctl -a /dev/sda'
+- Verify validation passes
+hints:
+- content: 'Try: smartctl -a /dev/sda'
+  cost: 10
+  order: 1

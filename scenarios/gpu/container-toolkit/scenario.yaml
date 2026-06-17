@@ -1,0 +1,22 @@
+title: NVIDIA Container Toolkit Not Found
+slug: sim-gpu-container-toolkit
+category: GPU & NVIDIA
+difficulty: medium
+description: 'Docker containers can''t access the GPU — ''no NVIDIA GPU found''. Install and configure nvidia-container-toolkit correctly.'
+initial_state: 'Simulated RHEL 9 server. Docker containers can''t access the GPU — ''no NVIDIA GPU found''. Install and configure nvidia-container-toolkit correctly.'
+lab_mode: simulation
+simulation_type: gpu
+is_free: false
+jira_priority: Medium
+max_score: 100
+time_limit: 900
+dual_terminal: false
+requires_companion_hosts: false
+objectives:
+- Diagnose the issue
+- 'Apply fix: nvidia-ctk runtime configure --runtime=docker'
+- Verify validation passes
+hints:
+- content: 'Try: nvidia-ctk runtime configure --runtime=docker'
+  cost: 10
+  order: 1
