@@ -157,6 +157,17 @@ if grep -q '^VAULT_ENABLED=true' "$OUT" 2>/dev/null; then
   else
     echo "VAULT_ADDR=http://vault:8200" >> "$OUT"
   fi
+  # AppRole creds are deploy-time secrets — inject for backend/celery Vault loader
+  for key in VAULT_ROLE_ID VAULT_SECRET_ID; do
+    val="${!key:-}"
+    if [ -n "$val" ]; then
+      if grep -q "^${key}=" "$OUT"; then
+        sed -i.bak "s|^${key}=.*|${key}=${val}|" "$OUT" && rm -f "${OUT}.bak"
+      else
+        echo "${key}=${val}" >> "$OUT"
+      fi
+    fi
+  done
 fi
 # Django migrations need a direct Postgres session — not pgBouncer transaction pool
 if grep -q '^POSTGRES_HOST=pgbouncer' "$OUT" 2>/dev/null; then

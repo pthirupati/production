@@ -67,10 +67,10 @@ class EntitlementExpiredFilter(admin.SimpleListFilter):
         now = timezone.now()
         if value == "active":
             return qs.filter(is_active=True).filter(
-                expires_at__isnull=True
-            ) | qs.filter(is_active=True, expires_at__gt=now)
+                period_end__isnull=True
+            ) | qs.filter(is_active=True, period_end__gt=now)
         if value == "expired":
-            return qs.filter(is_active=False) | qs.filter(is_active=True, expires_at__lte=now)
+            return qs.filter(is_active=False) | qs.filter(is_active=True, period_end__lte=now)
         return qs
 
 
@@ -198,11 +198,11 @@ class InterviewCampaignAdmin(admin.ModelAdmin):
 
 class InterviewMessageInline(admin.TabularInline):
     model = InterviewMessage
-    fields = ("role", "content_preview", "timestamp")
-    readonly_fields = ("role", "content_preview", "timestamp")
+    fields = ("role", "content_preview", "created_at")
+    readonly_fields = ("role", "content_preview", "created_at")
     extra = 0
     can_delete = False
-    ordering = ("timestamp",)
+    ordering = ("created_at",)
 
     @admin.display(description="Content")
     def content_preview(self, obj):
@@ -259,24 +259,28 @@ class InterviewQuestionAdmin(admin.ModelAdmin):
         "category",
         "difficulty",
         "technology",
-        "round_type",
+        "round_types_preview",
         "is_active",
         "created_at",
     )
     list_filter = (
         "category",
         "difficulty",
-        "round_type",
         "is_active",
         ("technology", admin.RelatedOnlyFieldListFilter),
     )
-    search_fields = ("content", "expected_answer_summary")
+    search_fields = ("question_text", "slug", "expected_keywords")
     list_per_page = 50
     actions = ["action_activate", "action_deactivate"]
 
     @admin.display(description="Question")
     def content_preview(self, obj):
-        return obj.content[:80] if hasattr(obj, "content") else str(obj)[:80]
+        return obj.question_text[:80]
+
+    @admin.display(description="Round types")
+    def round_types_preview(self, obj):
+        types = obj.round_types or []
+        return ", ".join(types) if types else "—"
 
     @admin.action(description="Activate selected questions")
     def action_activate(self, request, queryset):
@@ -300,20 +304,20 @@ class InterviewEntitlementAdmin(admin.ModelAdmin):
         "plan_tier",
         "interviews_remaining",
         "is_active",
-        "granted_by_admin",
-        "expires_at",
-        "created_at",
+        "is_admin_granted_free",
+        "period_end",
+        "updated_at",
     )
     list_filter = (
         "is_active",
-        "granted_by_admin",
+        "is_admin_granted_free",
         EntitlementExpiredFilter,
         ("plan_tier", admin.RelatedOnlyFieldListFilter),
     )
     search_fields = ("user__username", "user__email")
-    readonly_fields = ("user", "created_at")
+    readonly_fields = ("user", "updated_at")
     list_select_related = ("user", "plan_tier")
-    date_hierarchy = "created_at"
+    date_hierarchy = "updated_at"
     actions = ["action_revoke"]
 
     @admin.action(description="Revoke selected entitlements")
@@ -366,15 +370,15 @@ class InterviewCertificateAdmin(admin.ModelAdmin):
 
 @admin.register(InterviewReport)
 class InterviewReportAdmin(admin.ModelAdmin):
-    list_display = ("round", "overall_score", "outcome", "created_at")
-    list_filter = ("outcome",)
+    list_display = ("round", "overall_score", "passed", "generated_at")
+    list_filter = ("passed",)
     readonly_fields = (
-        "round", "overall_score", "outcome", "strengths",
-        "areas_for_improvement", "detailed_feedback",
-        "category_scores", "recommendation", "created_at",
+        "round", "overall_score", "passed", "strengths",
+        "improvements", "summary",
+        "question_breakdown", "study_plan", "generated_at",
     )
     list_select_related = ("round__campaign__user",)
-    date_hierarchy = "created_at"
+    date_hierarchy = "generated_at"
 
 
 # ---------------------------------------------------------------------------
@@ -383,9 +387,9 @@ class InterviewReportAdmin(admin.ModelAdmin):
 
 @admin.register(InterviewVoiceOption)
 class InterviewVoiceOptionAdmin(admin.ModelAdmin):
-    list_display = ("name", "voice_id", "locale", "is_active")
+    list_display = ("label", "code", "locale", "is_active")
     list_filter = ("is_active", "locale")
-    search_fields = ("name", "voice_id")
+    search_fields = ("label", "code", "browser_voice_hint")
     list_editable = ("is_active",)
 
 
@@ -395,11 +399,11 @@ class InterviewVoiceOptionAdmin(admin.ModelAdmin):
 
 @admin.register(InterviewAdminJoinRequest)
 class InterviewAdminJoinRequestAdmin(admin.ModelAdmin):
-    list_display = ("round", "requester", "status", "created_at")
+    list_display = ("round", "admin_user", "status", "created_at")
     list_filter = ("status",)
-    search_fields = ("requester__username",)
-    readonly_fields = ("round", "requester", "observer_token", "created_at")
-    list_select_related = ("requester", "round")
+    search_fields = ("admin_user__username",)
+    readonly_fields = ("round", "admin_user", "observer_token", "created_at")
+    list_select_related = ("admin_user", "round")
 
 
 # ---------------------------------------------------------------------------
