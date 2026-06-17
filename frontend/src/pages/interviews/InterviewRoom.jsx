@@ -145,11 +145,8 @@ export default function InterviewRoom() {
       toast.error(msg)
       return
     }
-    if ((!needsMic || micState === 'granted') && (!needsCam || camState === 'granted')) {
-      await executeMediaRequest(type)
-      return
-    }
-    setPermissionRequest(type)
+    // Invoke browser permission prompt immediately (Google Meet style).
+    await executeMediaRequest(type)
   }
 
   const enableMic = () => requestMediaAccess('audio')
@@ -464,36 +461,32 @@ export default function InterviewRoom() {
             type="button"
             onClick={enableMedia}
             disabled={mediaLoading}
-            className="btn-primary text-sm flex-1 min-w-[140px] inline-flex items-center justify-center gap-2"
+            className="interview-media-btn interview-media-btn-primary flex-1 min-w-[160px]"
           >
-            {mediaLoading ? <Loader2 size={14} className="animate-spin" /> : <Video size={14} />}
+            {mediaLoading ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />}
             Enable camera & mic
           </button>
           <button
             type="button"
             onClick={enableMic}
             disabled={mediaLoading || micOn}
-            className={`text-sm px-3 py-2 rounded-lg border inline-flex items-center gap-1.5 ${
-              micOn ? 'border-accent-green/40 bg-accent-green/10 text-accent-green' : 'btn-secondary'
-            }`}
+            className={`interview-media-btn ${micOn ? 'interview-media-btn-active' : ''}`}
           >
-            {micOn ? <Mic size={14} /> : <MicOff size={14} />}
+            {micOn ? <Mic size={16} /> : <MicOff size={16} />}
             {micOn ? 'Mic on' : 'Mic only'}
           </button>
           <button
             type="button"
             onClick={enableCamera}
             disabled={mediaLoading || cameraOn}
-            className={`text-sm px-3 py-2 rounded-lg border inline-flex items-center gap-1.5 ${
-              cameraOn ? 'border-accent-green/40 bg-accent-green/10 text-accent-green' : 'btn-secondary'
-            }`}
+            className={`interview-media-btn ${cameraOn ? 'interview-media-btn-active' : ''}`}
           >
-            {cameraOn ? <Video size={14} /> : <VideoOff size={14} />}
+            {cameraOn ? <Video size={16} /> : <VideoOff size={16} />}
             {cameraOn ? 'Camera on' : 'Camera only'}
           </button>
           {!round.is_sample && (
-            <button type="button" onClick={() => setShowReschedule(s => !s)} className="btn-secondary text-sm">
-              <Calendar size={14} className="inline mr-1" /> Reschedule
+            <button type="button" onClick={() => setShowReschedule(s => !s)} className="interview-media-btn">
+              <Calendar size={16} /> Reschedule
             </button>
           )}
         </div>
@@ -514,7 +507,7 @@ export default function InterviewRoom() {
           type="button"
           disabled={!micOn || !cameraOn || !consentAccepted}
           onClick={beginInterview}
-          className="w-full btn-primary py-3 disabled:opacity-40"
+          className="w-full interview-media-btn interview-media-btn-primary py-3.5 text-base disabled:opacity-40"
         >
           I'm ready — start interview
         </button>

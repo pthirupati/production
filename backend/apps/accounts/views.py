@@ -277,6 +277,14 @@ class LoginView(APIView):
         email = serializer.validated_data["email"]
         password = serializer.validated_data["password"]
 
+        client_ip = getattr(request, "client_ip", None) or request.META.get("REMOTE_ADDR", "")
+        try:
+            from apps.adminpanel.security_helpers import is_ip_blocked
+            if is_ip_blocked(client_ip):
+                return Response({"error": "Access denied from this network."}, status=403)
+        except Exception:
+            pass
+
         # Look up user by email, then authenticate by username
         user_obj = User.objects.filter(email=email).first()
         if not user_obj:

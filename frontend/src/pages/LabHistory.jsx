@@ -4,7 +4,7 @@ import { authApi } from '../api/auth'
 import { History, CheckCircle2, XCircle, Clock, ArrowRight, Server, Cloud, Box, Play } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Pagination from '../components/Pagination'
-import StickyPageToolbar from '../components/StickyPageToolbar'
+import CompactPageHeader from '../components/CompactPageHeader'
 
 const PAGE_SIZE = 20
 
@@ -47,21 +47,13 @@ export default function LabHistory() {
   const total = history.length
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <StickyPageToolbar>
-      <div className="relative overflow-hidden glass-card p-6 sm:p-8">
-        <div className="absolute inset-0 bg-gradient-to-r from-accent-cyan/8 via-transparent to-accent-green/8" />
-        <div className="absolute inset-0 bg-dots-pattern opacity-20" />
-        <div className="relative">
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <History size={24} className="text-accent-cyan shrink-0" /> <span className="bg-gradient-to-r from-accent-cyan to-accent-green bg-clip-text text-transparent">Lab History</span>
-          </h1>
-          <p className="text-surface-400 text-sm mt-2">
-            Your past lab sessions and results
-          </p>
-        </div>
-      </div>
-      </StickyPageToolbar>
+    <div className="space-y-4 animate-fade-in">
+      <CompactPageHeader
+        title="Lab History"
+        subtitle={`${total} session${total !== 1 ? 's' : ''} · ${passed} passed`}
+        eyebrow="Your progress"
+        icon={History}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

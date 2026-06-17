@@ -6,7 +6,7 @@ import {
   Server, ArrowRight, Loader2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import StickyPageToolbar from '../components/StickyPageToolbar'
+import CompactPageHeader from '../components/CompactPageHeader'
 
 const typeConfig = {
   fix:  { icon: Wrench, label: 'Fix', color: 'text-accent-cyan' },
@@ -57,18 +57,12 @@ export default function Bookmarks() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
-      <StickyPageToolbar>
-      <div className="relative overflow-hidden glass-card p-6 sm:p-8">
-        <div className="absolute inset-0 bg-gradient-to-r from-accent-cyan/8 via-transparent to-accent-purple/8" />
-        <div className="absolute inset-0 bg-dots-pattern opacity-20" />
-        <div className="relative">
-          <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <Bookmark className="w-7 h-7 text-accent-cyan" /> <span className="bg-gradient-to-r from-accent-cyan to-accent-purple bg-clip-text text-transparent">Bookmarked Scenarios</span>
-            <span className="text-surface-400 text-lg font-normal">({bookmarks.length})</span>
-          </h1>
-        </div>
-      </div>
-      </StickyPageToolbar>
+      <CompactPageHeader
+        title="Bookmarked Scenarios"
+        subtitle={`${bookmarks.length} saved scenario${bookmarks.length !== 1 ? 's' : ''}`}
+        eyebrow="Your library"
+        icon={Bookmark}
+      />
 
       {bookmarks.length === 0 ? (
         <div className="glass-card p-12 text-center">

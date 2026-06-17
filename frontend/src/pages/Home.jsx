@@ -80,18 +80,19 @@ export default function Home() {
       {/* ─── Sticky Navbar ─── */}
       <div className="sticky top-0 z-50">
         <nav className="border-b border-surface-700/30 backdrop-blur-xl bg-surface-950/95">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 grid grid-cols-[auto_1fr_auto] items-center gap-3 sm:gap-4">
 
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2.5 group shrink-0">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center shadow-lg shadow-accent-cyan/25 group-hover:shadow-accent-cyan/40 transition-shadow">
-                <Terminal size={18} className="text-white" />
+            <Link to="/" className="flex items-center gap-2 group shrink-0 z-10">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center shadow-lg shadow-accent-cyan/25 group-hover:shadow-accent-cyan/40 transition-shadow">
+                <Terminal size={16} className="text-white sm:hidden" />
+                <Terminal size={18} className="text-white hidden sm:block" />
               </div>
-              <span className="text-xl font-bold font-display text-white tracking-tight">FixitLab</span>
+              <span className="text-lg sm:text-xl font-bold font-display text-white tracking-tight hidden sm:inline">FixitLab</span>
             </Link>
 
-            {/* Desktop nav — no horizontal scroll bar */}
-            <div className="hidden md:flex items-center justify-center gap-1 flex-1 min-w-0">
+            {/* Desktop nav — centered, wraps on lg+ only */}
+            <div className="hidden lg:flex items-center justify-center gap-0.5 flex-wrap min-w-0">
               {PUBLIC_NAV_LINKS.map(({ to, label }) => (
                 <BubbleNavLink key={to} to={to} active={navActive(to)} size="md">
                   {label}
@@ -100,10 +101,10 @@ export default function Home() {
             </div>
 
             {/* Right actions */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0 z-10">
               <button
                 type="button"
-                className="md:hidden p-2 text-surface-400"
+                className="lg:hidden p-2 text-surface-400"
                 onClick={() => setMobileNavOpen(v => !v)}
                 aria-label="Menu"
               >

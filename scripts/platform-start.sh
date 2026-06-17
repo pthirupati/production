@@ -90,6 +90,9 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python 
 echo "Seeding/updating projects..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_projects || true
 
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+  python /scripts/migrate_jira_to_simulation.py || true
+
 should_build_scenarios() {
   case "${1:-true}" in
     1|true|TRUE|True|yes|YES|on|ON) return 0 ;;

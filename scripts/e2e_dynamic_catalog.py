@@ -117,7 +117,7 @@ def grant_all_technology_subscriptions(user, technologies=None):
         technologies = Technology.objects.filter(is_active=True)
     for tech in technologies:
         sub_id = f"E2E-{user.username[:16]}-{tech.id}-AUTO"
-        TechnologySubscription.objects.get_or_create(
+        sub, _ = TechnologySubscription.objects.get_or_create(
             user=user,
             technology=tech,
             defaults={
@@ -127,6 +127,8 @@ def grant_all_technology_subscriptions(user, technologies=None):
                 "payment_verified": True,
             },
         )
+        from apps.billing.subscription_utils import activate_technology_subscription
+        activate_technology_subscription(sub, renew=True)
 
 
 def setup_all_test_users(n: int = 3):

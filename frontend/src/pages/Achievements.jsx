@@ -10,7 +10,7 @@ import { SkeletonCard } from '../components/Skeleton'
 import toast from 'react-hot-toast'
 import { interviewsApi } from '../api/interviews'
 import { ACHIEVEMENT_META } from '../utils/constants'
-import StickyPageToolbar from '../components/StickyPageToolbar'
+import CompactPageHeader from '../components/CompactPageHeader'
 
 const techIcons = { Linux: Server, Docker: Monitor, Networking: Globe, 'Web Servers': Globe, Databases: Database, AWS: Cpu, Kubernetes: Cpu, Security: Shield }
 
@@ -81,24 +81,12 @@ export default function Achievements() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
-      <StickyPageToolbar>
-      {/* Header */}
-      <div className="relative overflow-hidden glass-card p-6 sm:p-8">
-        <div className="absolute inset-0 bg-gradient-to-r from-accent-amber/8 via-transparent to-accent-purple/8" />
-        <div className="absolute inset-0 bg-dots-pattern opacity-20" />
-        <div className="relative">
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <Trophy className="text-accent-amber shrink-0" size={28} />
-            <span className="bg-gradient-to-r from-accent-amber to-accent-purple bg-clip-text text-transparent">
-              Achievements & Certificates
-            </span>
-          </h1>
-          <p className="text-surface-400 mt-2 text-sm">
-            {earned.length} of {achievements.length} achievements unlocked
-          </p>
-        </div>
-      </div>
-      </StickyPageToolbar>
+      <CompactPageHeader
+        title="Achievements & Certificates"
+        subtitle={`${earned.length} of ${achievements.length} achievements unlocked`}
+        eyebrow="Milestones"
+        icon={Trophy}
+      />
 
       {/* ═══ Technology Certificates Section ═══ */}
       <div>

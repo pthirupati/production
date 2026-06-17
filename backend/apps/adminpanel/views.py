@@ -506,6 +506,9 @@ class AdminTechnologyStatsView(APIView):
     def get(self, request):
         from django.utils import timezone as tz
         from apps.billing.subscription_utils import is_tech_subscription_active
+        from apps.labs.models import LabSession
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
         now = tz.now()
 
         techs = Technology.objects.annotate(
@@ -521,6 +524,19 @@ class AdminTechnologyStatsView(APIView):
             revenue = TechnologySubscription.objects.filter(
                 technology=tech, is_active=True
             ).aggregate(total=Sum("amount"))["total"] or 0
+            paid_user_ids = TechnologySubscription.objects.filter(
+                technology=tech, is_active=True
+            ).values_list("user_id", flat=True)
+            free_users = (
+                User.objects.filter(lab_sessions__scenario__technology=tech)
+                .exclude(id__in=paid_user_ids)
+                .distinct()
+                .count()
+            )
+            complimentary_users = User.objects.filter(
+                profile__complimentary_access=True,
+                lab_sessions__scenario__technology=tech,
+            ).distinct().count()
             result.append({
                 "id": tech.id,
                 "name": tech.name,
@@ -531,6 +547,8 @@ class AdminTechnologyStatsView(APIView):
                 "maintenance_enabled": tech.maintenance_enabled,
                 "total_subscribers": tech.total_subs,
                 "active_subscribers": tech.active_subs,
+                "free_users": free_users,
+                "complimentary_users": complimentary_users,
                 "revenue_inr": float(revenue),
                 "revenue_display": f"₹{int(float(revenue))}",
             })
@@ -545,12 +563,14 @@ class AdminTechnologyStatsView(APIView):
             .distinct()
             .count()
         )
+        total_free_users = User.objects.filter(profile__complimentary_access=True).count()
 
         return Response({
             "technologies": result,
             "total_revenue_inr": total_revenue,
             "total_active_subscribers": total_active,
             "total_unique_subscribers": total_unique_users,
+            "total_free_users": total_free_users,
             "maintenance_technologies": maintenance_count,
             "coming_soon_technologies": coming_soon_count,
         })
@@ -1255,10 +1275,36 @@ class AdminAnalyticsView(APIView):
             .annotate(count=Count("id"))
         )
 
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        new_users = User.objects.filter(date_joined__gte=start_date).count()
+        active_users = User.objects.filter(last_login__gte=start_date).count()
+        completed_labs = LabSession.objects.filter(
+            started_at__gte=start_date, status="COMPLETED"
+        ).count()
+        try:
+            from apps.interviews.models import InterviewCampaign
+            interview_campaigns = InterviewCampaign.objects.filter(created_at__gte=start_date).count()
+        except Exception:
+            interview_campaigns = 0
+        try:
+            from apps.billing.models import TechnologySubscription
+            new_subs = TechnologySubscription.objects.filter(created_at__gte=start_date, is_active=True).count()
+        except Exception:
+            new_subs = 0
+
         payload = {
             "daily_labs": daily_labs,
             "top_scenarios": list(top_scenarios),
             "difficulty_distribution": list(difficulty_stats),
+            "summary": {
+                "new_users": new_users,
+                "active_users": active_users,
+                "completed_labs": completed_labs,
+                "interview_campaigns": interview_campaigns,
+                "new_subscriptions": new_subs,
+                "total_lab_starts": sum(d["count"] for d in daily_labs),
+            },
             "cached_at": now.isoformat(),
         }
         cache.set(cache_key, payload, self.CACHE_TTL)
@@ -2399,6 +2445,31 @@ class AdminConfigView(APIView):
     def post(self, request):
         from apps.adminpanel.platform_config import get_settings_row, persist_config_snapshot, admin_config_payload
 
+        if request.data.get("reset_defaults"):
+            row = get_settings_row()
+            row.primary_email = getattr(settings, "PRIMARY_EMAIL", "") or ""
+            row.payment_email = getattr(settings, "PAYMENT_EMAIL", "") or ""
+            row.support_email = getattr(settings, "SUPPORT_EMAIL", "") or ""
+            row.admin_display_currency = "INR"
+            row.maintenance_enabled = False
+            row.maintenance_message = ""
+            row.promo_banners = []
+            row.promo_banners_enabled = True
+            row.maintenance_banner_enabled = True
+            row.theme_colors = {"cyan": "#06b6d4", "purple": "#a855f7", "amber": "#f59e0b", "green": "#22c55e"}
+            row.support_bot_enabled = True
+            row.support_bot_name = "FixitLab Assistant"
+            row.support_bot_welcome_message = ""
+            row.support_bot_quick_topics = []
+            row.support_bot_custom_faq = []
+            row.support_bot_typing_delay_ms = 1200
+            row.save()
+            persist_config_snapshot(row)
+            settings.MAINTENANCE_MODE = False
+            cache.delete(AdminOverviewView.CACHE_KEY)
+            cache.delete("public_platform_stats")
+            return Response({**admin_config_payload(), "reset": True})
+
         row = get_settings_row()
         for field, key in (
             ("primary_email", "primary_email"),
@@ -2903,6 +2974,33 @@ class AdminSecurityMetricsView(APIView):
 
         otp_failed = AuditLog.objects.filter(action="otp_failed", created_at__gte=since).count()
 
+        detail = request.query_params.get("detail")
+        if detail:
+            action_map = {
+                "login_failed": "login_failed",
+                "login_success": "login",
+                "otp_failed": "otp_failed",
+                "payment_failed": "payment_failed",
+                "lab_resets": "lab_reset",
+                "security_alerts": "security_alert",
+            }
+            action = action_map.get(detail)
+            if action:
+                rows = list(
+                    AuditLog.objects.filter(action=action, created_at__gte=since)
+                    .select_related("user")
+                    .order_by("-created_at")[:100]
+                    .values("id", "action", "resource", "ip_address", "metadata", "created_at", "user__username", "user__email")
+                )
+                return Response({"detail": detail, "rows": rows})
+
+        from apps.adminpanel.security_helpers import get_blocked_ips, get_blocked_countries
+
+        rate_limit_hits = AuditLog.objects.filter(
+            action="security_alert", created_at__gte=since,
+            metadata__contains="rate_limit",
+        ).count()
+
         return Response({
             "period_days": days,
             "login_failed": login_failed,
@@ -2911,9 +3009,42 @@ class AdminSecurityMetricsView(APIView):
             "payment_failed": payment_failed + failed_payments,
             "security_alerts": security_alerts,
             "otp_failed": otp_failed,
+            "rate_limit_hits": rate_limit_hits,
             "email_stats": email_stats,
             "suspicious_ips": suspicious_ips,
             "recent_events": recent_events,
+            "blocked_ips": get_blocked_ips(),
+            "blocked_countries": get_blocked_countries(),
+        })
+
+
+class AdminSecurityActionView(APIView):
+    """Block/unblock IPs or countries from admin Security panel."""
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        from apps.adminpanel.security_helpers import (
+            block_ip, unblock_ip, block_country, unblock_country,
+            get_blocked_ips, get_blocked_countries,
+        )
+        action = request.data.get("action", "")
+        ip = request.data.get("ip", "")
+        country = request.data.get("country", "")
+
+        if action == "block_ip":
+            block_ip(ip)
+        elif action == "unblock_ip":
+            unblock_ip(ip)
+        elif action == "block_country":
+            block_country(country)
+        elif action == "unblock_country":
+            unblock_country(country)
+        else:
+            return Response({"error": "Unknown action"}, status=400)
+
+        return Response({
+            "blocked_ips": get_blocked_ips(),
+            "blocked_countries": get_blocked_countries(),
         })
 
 

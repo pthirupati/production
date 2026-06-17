@@ -814,7 +814,15 @@ def run_admin_all_tabs(s, admin_token: str):
     # Bulk grant free access (revoke immediately to avoid side effects)
     st, users = api("GET", "/api/admin/users/", token=admin_token)
     if st == 200 and isinstance(users, list):
-        test_user = next((u for u in users if not u.get("is_superuser") and not u.get("is_staff")), None)
+        test_user = next(
+            (
+                u for u in users
+                if not u.get("is_superuser")
+                and not u.get("is_staff")
+                and not str(u.get("username", "")).startswith("e2e")
+            ),
+            None,
+        )
         if test_user:
             st_grant, _ = api("POST", "/api/admin/users/bulk/", token=admin_token, data={
                 "action": "grant_free", "user_ids": [test_user["id"]],

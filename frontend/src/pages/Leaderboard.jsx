@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import { useDataStore } from '../store/dataStore'
 import { Trophy, Star, Clock, Crown, Medal, Server } from 'lucide-react'
 import Pagination from '../components/Pagination'
-import StickyPageToolbar from '../components/StickyPageToolbar'
+import CompactPageHeader from '../components/CompactPageHeader'
 import { SkeletonTable } from '../components/Skeleton'
 
 const PAGE_SIZE = 20
@@ -170,54 +170,40 @@ export default function Leaderboard() {
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
 
-      {/* ── Sticky header + tech filters ── */}
-      <StickyPageToolbar>
-        <div className="space-y-3">
-          {/* Page title card */}
-          <div className="relative overflow-hidden glass-card p-5 sm:p-7 gradient-border">
-            <div className="absolute inset-0 bg-gradient-to-r from-accent-amber/8 via-transparent to-accent-cyan/8 pointer-events-none" />
-            <div className="relative flex items-center gap-3">
-              <Trophy size={26} className="text-accent-amber shrink-0" />
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-                  <span className="bg-gradient-to-r from-accent-amber to-accent-cyan bg-clip-text text-transparent">
-                    Leaderboard
-                  </span>
-                </h1>
-                <p className="text-surface-400 text-sm mt-0.5">Top fixers ranked by total score</p>
-              </div>
-            </div>
-          </div>
+      <CompactPageHeader
+        title="Leaderboard"
+        subtitle="Top fixers ranked by total score"
+        eyebrow="Rankings"
+        icon={Trophy}
+      />
 
-          {/* Tech filter chips */}
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setSelectedTech('')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                !selectedTech
-                  ? 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20'
-                  : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
-              }`}
-            >
-              <Trophy size={11} /> Global
-            </button>
-            {technologies.map(tech => (
-              <button
-                key={tech.id}
-                onClick={() => setSelectedTech(selectedTech === String(tech.id) ? '' : String(tech.id))}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                  selectedTech === String(tech.id)
-                    ? 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20'
-                    : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
-                }`}
-              >
-                <Server size={11} />
-                {tech.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      </StickyPageToolbar>
+      {/* Tech filter chips */}
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => setSelectedTech('')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+            !selectedTech
+              ? 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20'
+              : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+          }`}
+        >
+          <Trophy size={11} /> Global
+        </button>
+        {technologies.map(tech => (
+          <button
+            key={tech.id}
+            onClick={() => setSelectedTech(selectedTech === String(tech.id) ? '' : String(tech.id))}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              selectedTech === String(tech.id)
+                ? 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20'
+                : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+            }`}
+          >
+            <Server size={11} />
+            {tech.name}
+          </button>
+        ))}
+      </div>
 
       {/* ── Your rank banner (only if outside top 3) ── */}
       {!loading && data.user_rank && data.user_rank.rank > 3 && (

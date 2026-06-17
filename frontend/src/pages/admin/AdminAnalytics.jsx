@@ -11,7 +11,7 @@ export default function AdminAnalytics() {
   const load = async (refresh = false) => {
     setLoading(true)
     try {
-      const res = await adminApi.getAnalytics(days)
+      const res = await adminApi.getAnalytics(days, refresh)
       setData(res)
       if (refresh) toast.success('Analytics refreshed')
     } catch {
@@ -50,6 +50,24 @@ export default function AdminAnalytics() {
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-accent-cyan" size={32} /></div>
       ) : (
         <>
+          {data?.summary && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                ['New users', data.summary.new_users, 'text-accent-cyan'],
+                ['Active users', data.summary.active_users, 'text-accent-green'],
+                ['Lab starts', data.summary.total_lab_starts, 'text-accent-purple'],
+                ['Completed labs', data.summary.completed_labs, 'text-accent-amber'],
+                ['New subscriptions', data.summary.new_subscriptions, 'text-accent-blue'],
+                ['Interviews', data.summary.interview_campaigns, 'text-accent-pink'],
+              ].map(([label, val, cls]) => (
+                <div key={label} className="glass-card p-4">
+                  <p className={`text-2xl font-bold ${cls}`}>{val ?? 0}</p>
+                  <p className="text-xs text-surface-400 mt-1">{label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="glass-card p-6">
             <h2 className="text-sm font-semibold text-surface-400 uppercase tracking-wider mb-4 flex items-center gap-2">
               <TrendingUp size={16} /> Daily Lab Starts

@@ -387,7 +387,39 @@ body::after {
 }
 .nav-link-idle:hover {
   color: rgb(var(--s-100));
-  background: rgb(var(--s-800) / 0.45);
+  background: rgb(var(--s-800) / 0.55);
+  box-shadow: inset 0 -2px 0 rgb(var(--a-cyan) / 0.35);
+}
+.nav-link-active:hover {
+  color: rgb(var(--s-50));
+  background: rgb(var(--s-800) / 0.75);
+}
+
+/* Interview preflight media buttons */
+.interview-media-btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-surface-600/60 bg-surface-800/60 text-surface-200 transition-all duration-200;
+}
+.interview-media-btn:hover:not(:disabled) {
+  border-color: rgb(var(--a-cyan) / 0.45);
+  background: rgb(var(--s-700) / 0.65);
+  color: white;
+  transform: translateY(-1px);
+}
+.interview-media-btn:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+.interview-media-btn-primary {
+  @apply border-transparent text-white font-semibold;
+  background: linear-gradient(135deg, rgb(var(--a-cyan)), rgb(var(--a-blue)));
+  box-shadow: 0 4px 20px rgb(var(--a-cyan) / 0.25);
+}
+.interview-media-btn-primary:hover:not(:disabled) {
+  box-shadow: 0 6px 28px rgb(var(--a-cyan) / 0.35);
+}
+.interview-media-btn-active {
+  border-color: rgb(var(--a-green) / 0.45);
+  background: rgb(var(--a-green) / 0.12);
+  color: rgb(var(--a-green));
 }
 .nav-link-active {
   color: rgb(var(--s-50));

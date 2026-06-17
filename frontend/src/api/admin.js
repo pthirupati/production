@@ -22,8 +22,9 @@ export const adminApi = {
     return data
   },
 
-  async getAnalytics(days = 30) {
-    const { data } = await api.get(`/admin/analytics/?days=${days}`)
+  async getAnalytics(days = 30, refresh = false) {
+    const q = refresh ? '&refresh=1' : ''
+    const { data } = await api.get(`/admin/analytics/?days=${days}${q}`)
     return data
   },
 
@@ -365,6 +366,21 @@ export const adminApi = {
 
   async getSecurityMetrics(days = 7) {
     const { data } = await api.get(`/admin/security/?days=${days}`)
+    return data
+  },
+
+  async getSecurityDetail(metric, days = 7) {
+    const { data } = await api.get(`/admin/security/?days=${days}&detail=${metric}`)
+    return data
+  },
+
+  async securityAction(payload) {
+    const { data } = await api.post('/admin/security/actions/', payload)
+    return data
+  },
+
+  async resetPlatformSettings() {
+    const { data } = await api.post('/admin/config/', { reset_defaults: true })
     return data
   },
 

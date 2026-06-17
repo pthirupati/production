@@ -32,16 +32,23 @@ function TechStatCard({ tech, onClick }) {
       </div>
       <h3 className="font-semibold text-white text-sm mb-0.5">{tech.name}</h3>
       <p className="text-xs text-surface-500 font-mono">/{tech.slug}</p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-3 gap-2">
         <div className="rounded-lg bg-surface-800/50 p-2 text-center">
           <p className="text-lg font-bold text-accent-cyan">{tech.active_subscribers}</p>
-          <p className="text-[10px] text-surface-500 uppercase tracking-wide">Active</p>
+          <p className="text-[10px] text-surface-500 uppercase tracking-wide">Paid</p>
         </div>
         <div className="rounded-lg bg-surface-800/50 p-2 text-center">
-          <p className="text-lg font-bold text-accent-green">{tech.revenue_display}</p>
+          <p className="text-lg font-bold text-accent-amber">{tech.free_users ?? 0}</p>
+          <p className="text-[10px] text-surface-500 uppercase tracking-wide">Free</p>
+        </div>
+        <div className="rounded-lg bg-surface-800/50 p-2 text-center">
+          <p className="text-lg font-bold text-accent-green">{tech.revenue_display || '₹0'}</p>
           <p className="text-[10px] text-surface-500 uppercase tracking-wide">Revenue</p>
         </div>
       </div>
+      {(tech.complimentary_users ?? 0) > 0 && (
+        <p className="text-[10px] text-accent-purple mt-2">{tech.complimentary_users} complimentary user(s)</p>
+      )}
       <div className="mt-2 flex items-center justify-between text-xs text-surface-500">
         <span>{tech.total_subscribers} total subscribers</span>
         <ChevronRight size={12} />
@@ -609,7 +616,7 @@ export default function AdminSubscriptions() {
 
       {/* Platform stats strip */}
       {techStats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           <div className="glass-card p-4">
             <IndianRupee size={18} className="text-accent-green mb-1" />
             <p className="text-xl font-bold text-accent-green">₹{Math.round(techStats.total_revenue_inr).toLocaleString('en-IN')}</p>
@@ -624,6 +631,11 @@ export default function AdminSubscriptions() {
             <UserIcon size={18} className="text-accent-blue mb-1" />
             <p className="text-xl font-bold text-accent-blue">{techStats.total_unique_subscribers ?? techStats.total_active_subscribers}</p>
             <p className="text-xs text-surface-400">Unique Users</p>
+          </div>
+          <div className="glass-card p-4">
+            <UserIcon size={18} className="text-accent-amber mb-1" />
+            <p className="text-xl font-bold text-accent-amber">{techStats.total_free_users ?? 0}</p>
+            <p className="text-xs text-surface-400">Free / Complimentary</p>
           </div>
           <div className="glass-card p-4">
             <Layers size={18} className="text-accent-purple mb-1" />

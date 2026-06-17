@@ -151,6 +151,28 @@ export default function AdminSettings() {
     }
   }
 
+  const handleResetDefaults = async () => {
+    if (!window.confirm('Reset platform settings to defaults? Maintenance will be turned off and theme colors restored.')) return
+    setSaving(true)
+    try {
+      const result = await adminApi.resetPlatformSettings()
+      setConfig(result)
+      setEmailForm({
+        primary_email: result.primary_email || '',
+        payment_email: result.payment_email || '',
+        support_email: result.support_email || '',
+        admin_display_currency: result.admin_display_currency || 'INR',
+      })
+      if (result.theme_colors) setThemeColors(prev => ({ ...prev, ...result.theme_colors }))
+      setMaintenance(m => ({ ...m, maintenance_mode: false, maintenance_message: '' }))
+      toast.success('Settings reset to defaults')
+    } catch {
+      toast.error('Reset failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -161,12 +183,17 @@ export default function AdminSettings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Settings size={24} className="text-accent-cyan" />
-          Platform Settings
-        </h1>
-        <p className="text-surface-400 mt-1">Maintenance mode, email configuration, and user management</p>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Settings size={24} className="text-accent-cyan" />
+            Platform Settings
+          </h1>
+          <p className="text-surface-400 mt-1">Maintenance mode, email configuration, and user management</p>
+        </div>
+        <button type="button" onClick={handleResetDefaults} disabled={saving} className="btn-secondary text-sm flex items-center gap-2">
+          <Wrench size={14} /> Reset to defaults
+        </button>
       </div>
 
       {/* Maintenance Mode */}

@@ -306,9 +306,7 @@ export default function Scenarios() {
       <div ref={anchorRef} className="h-0 w-full" aria-hidden="true" />
 
       {/* ── Compact sticky search/filters (hides on scroll down) ── */}
-      <StickyPageToolbar
-        className={`mb-4 transition-all duration-300 ${toolbarHidden ? '-translate-y-full opacity-0 pointer-events-none !shadow-none' : ''}`}
-      >
+      <StickyPageToolbar hidden={toolbarHidden} className="mb-3">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 mb-0.5">
