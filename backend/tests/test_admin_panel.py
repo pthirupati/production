@@ -50,7 +50,7 @@ class AdminAccessControlTests(TestCase):
         res = self.client.get('/api/admin/health/')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         data = res.json()
-        self.assertIn('services', data)
+        self.assertIn('database', data)
         self.assertIn('overall', data)
 
     def test_monitoring_containers_requires_staff(self):
@@ -73,12 +73,15 @@ class AdminHealthCheckTests(TestCase):
     def test_health_overall_field_present(self):
         res = self.client.get('/api/admin/health/')
         data = res.json()
-        self.assertIn(data['overall'], ['healthy', 'degraded', 'unhealthy'])
+        self.assertIn('overall', data)
+        self.assertIsInstance(data['overall'], bool)
 
     def test_health_services_are_dict(self):
         res = self.client.get('/api/admin/health/')
         data = res.json()
-        self.assertIsInstance(data['services'], dict)
+        # Services are returned at the top level, not nested under 'services'
+        self.assertIsInstance(data.get('database'), dict)
+        self.assertIsInstance(data.get('redis'), dict)
 
     def test_health_vault_disabled_shows_healthy(self):
         """When VAULT_ENABLED is not set, vault should report healthy (env file mode)."""
@@ -86,7 +89,7 @@ class AdminHealthCheckTests(TestCase):
             res = self.client.get('/api/admin/health/')
             self.assertEqual(res.status_code, status.HTTP_200_OK)
             data = res.json()
-            vault_status = data.get('services', {}).get('vault', {})
+            vault_status = data.get('vault', {})
             if vault_status:
                 self.assertNotEqual(vault_status.get('status'), 'unhealthy',
                     "Vault should not be unhealthy when VAULT_ENABLED is unset — env file mode is expected.")
@@ -95,7 +98,7 @@ class AdminHealthCheckTests(TestCase):
         """Database service should always be healthy in test environment."""
         res = self.client.get('/api/admin/health/')
         data = res.json()
-        db_status = data.get('services', {}).get('Database') or data.get('services', {}).get('database', {})
+        db_status = data.get('database', {})
         if db_status:
             self.assertEqual(db_status.get('status'), 'healthy',
                 "Database should be healthy in test environment.")
