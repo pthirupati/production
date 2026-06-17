@@ -67,7 +67,7 @@ export default function PublicLayout({ children }) {
             FixitLab
           </Link>
 
-          <div className="hidden lg:flex items-center gap-2 overflow-x-auto scrollbar-none flex-1 justify-center max-w-3xl">
+          <div className="hidden lg:flex items-center justify-center gap-0.5 flex-1 min-w-0 px-2">
             {PUBLIC_NAV_LINKS.slice(0, 7).map(({ to, label }) => (
               <BubbleNavLink key={to} to={to} active={isActive(to)} size="md">{label}</BubbleNavLink>
             ))}

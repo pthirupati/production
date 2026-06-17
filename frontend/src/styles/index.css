@@ -378,22 +378,85 @@ body::after {
   );
 }
 
-/* ─── Glass bubble navigation pills ─── */
+/* ─── Primary navigation (editorial / timeless) ─── */
+.nav-link {
+  @apply relative inline-flex items-center justify-center gap-1.5 font-medium whitespace-nowrap rounded-lg transition-all duration-200;
+}
+.nav-link-idle {
+  color: rgb(var(--s-400));
+}
+.nav-link-idle:hover {
+  color: rgb(var(--s-100));
+  background: rgb(var(--s-800) / 0.45);
+}
+.nav-link-active {
+  color: rgb(var(--s-50));
+  background: rgb(var(--s-800) / 0.65);
+}
+.nav-link-active::after {
+  content: '';
+  position: absolute;
+  left: 0.65rem;
+  right: 0.65rem;
+  bottom: 0.35rem;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgb(var(--a-cyan)), rgb(var(--a-blue)));
+}
+
+/* Sidebar navigation */
+.sidebar-nav-link {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200;
+}
+.sidebar-nav-idle {
+  color: rgb(var(--s-400));
+}
+.sidebar-nav-idle:hover {
+  color: rgb(var(--s-100));
+  background: rgb(var(--s-800) / 0.55);
+}
+.sidebar-nav-active {
+  color: rgb(var(--s-50));
+  background: linear-gradient(135deg, rgb(var(--a-cyan) / 0.14), rgb(var(--a-blue) / 0.08));
+  border: 1px solid rgb(var(--a-cyan) / 0.22);
+  box-shadow: inset 3px 0 0 rgb(var(--a-cyan));
+}
+
+[data-theme="light"] .nav-link-idle {
+  color: rgb(var(--s-600));
+}
+[data-theme="light"] .nav-link-idle:hover {
+  color: rgb(var(--s-900));
+  background: rgb(var(--s-200) / 0.7);
+}
+[data-theme="light"] .nav-link-active {
+  color: rgb(var(--s-900));
+  background: rgb(var(--s-100));
+}
+[data-theme="light"] .sidebar-nav-idle {
+  color: rgb(var(--s-600));
+}
+[data-theme="light"] .sidebar-nav-idle:hover {
+  color: rgb(var(--s-900));
+  background: rgb(var(--s-200) / 0.8);
+}
+[data-theme="light"] .sidebar-nav-active {
+  color: rgb(var(--s-900));
+  background: linear-gradient(135deg, rgb(var(--a-cyan) / 0.12), rgb(var(--a-blue) / 0.06));
+}
+
+/* Legacy bubble aliases → map to nav-link for gradual migration */
 .bubble-nav-idle {
   background: rgb(var(--s-800) / 0.45);
-  border: 1px solid rgb(var(--s-700) / 0.55);
-  backdrop-filter: blur(12px);
+  border: 1px solid rgb(var(--s-700) / 0.4);
 }
 .bubble-nav-idle:hover {
-  background: rgb(var(--s-700) / 0.55);
-  border-color: rgb(var(--a-cyan) / 0.35);
-  box-shadow: 0 0 22px rgb(var(--a-cyan) / 0.12);
-  transform: translateY(-1px);
+  border-color: rgb(var(--a-cyan) / 0.25);
+  background: rgb(var(--s-700) / 0.5);
 }
 .bubble-nav-active {
-  background: linear-gradient(135deg, rgb(var(--a-cyan) / 0.22), rgb(var(--a-purple) / 0.18));
-  border: 1px solid rgb(var(--a-cyan) / 0.45);
-  backdrop-filter: blur(16px);
+  background: rgb(var(--s-800) / 0.7);
+  border: 1px solid rgb(var(--a-cyan) / 0.3);
 }
 
 .gradient-border {

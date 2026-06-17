@@ -26,6 +26,10 @@ on:
         required: false
       STAGING_SITE_URL:
         required: false
+      PROD_SUPERUSER_EMAIL:
+        required: false
+      PROD_SUPERUSER_PASSWORD:
+        required: false
       STAGING_SUPERUSER_EMAIL:
         required: false
       STAGING_SUPERUSER_PASSWORD:
@@ -95,12 +99,25 @@ jobs:
           done
           [ "$STATUS" = "200" ] || { echo "Staging not healthy after 120s"; exit 1; }
 
+      - name: Resolve superuser credentials
+        id: superuser
+        run: |
+          EMAIL="${{ secrets.PROD_SUPERUSER_EMAIL }}"
+          PASS="${{ secrets.PROD_SUPERUSER_PASSWORD }}"
+          if [ -z "$EMAIL" ]; then EMAIL="${{ secrets.STAGING_SUPERUSER_EMAIL }}"; fi
+          if [ -z "$PASS" ]; then PASS="${{ secrets.STAGING_SUPERUSER_PASSWORD }}"; fi
+          echo "email=${EMAIL}" >> "$GITHUB_OUTPUT"
+          echo "password=${PASS}" >> "$GITHUB_OUTPUT"
+          if [ -z "$EMAIL" ] || [ -z "$PASS" ]; then
+            echo "WARN: SUPERUSER credentials not configured — auth smoke tests will fail"
+          fi
+
       - name: Run Playwright smoke tests
         env:
           BASE_URL: ${{ steps.urls.outputs.base_url }}
           SITE_URL: ${{ steps.urls.outputs.site_url }}
-          SUPERUSER_EMAIL: ${{ secrets.STAGING_SUPERUSER_EMAIL }}
-          SUPERUSER_PASSWORD: ${{ secrets.STAGING_SUPERUSER_PASSWORD }}
+          SUPERUSER_EMAIL: ${{ steps.superuser.outputs.email }}
+          SUPERUSER_PASSWORD: ${{ steps.superuser.outputs.password }}
           E2E_SKIP_LAB: "0"
           E2E_SKIP_EMAIL: "true"
           E2E_ISOLATION_ONCE: "1"

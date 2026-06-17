@@ -79,8 +79,8 @@ export default function Home() {
 
       {/* ─── Sticky Navbar ─── */}
       <div className="sticky top-0 z-50">
-        <nav className="border-b border-surface-700/30 backdrop-blur-2xl bg-surface-950/90">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+        <nav className="border-b border-surface-700/30 backdrop-blur-xl bg-surface-950/95">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
 
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2.5 group shrink-0">
@@ -90,8 +90,8 @@ export default function Home() {
               <span className="text-xl font-bold font-display text-white tracking-tight">FixitLab</span>
             </Link>
 
-            {/* Desktop nav links */}
-            <div className="hidden md:flex items-center gap-2 overflow-x-auto max-w-[58vw] pb-1 scrollbar-none">
+            {/* Desktop nav — no horizontal scroll bar */}
+            <div className="hidden md:flex items-center justify-center gap-1 flex-1 min-w-0">
               {PUBLIC_NAV_LINKS.map(({ to, label }) => (
                 <BubbleNavLink key={to} to={to} active={navActive(to)} size="md">
                   {label}
@@ -158,7 +158,7 @@ export default function Home() {
           SECTION 1 — HERO
           Left: terminal demo  |  Right: copy + CTAs
       ═══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden min-h-[92vh] flex items-center">
+      <section className="relative overflow-hidden min-h-[min(88vh,920px)] flex items-center">
         {/* Background layers */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 hero-gradient" />
@@ -194,8 +194,8 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 py-20 lg:py-28 relative w-full">
-          <div className="grid lg:grid-cols-2 gap-12 xl:gap-20 items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 relative w-full">
+          <div className="grid lg:grid-cols-2 gap-10 xl:gap-16 items-center">
 
             {/* LEFT col — Terminal demo */}
             <div className="hidden lg:block animate-slide-up">
@@ -246,7 +246,7 @@ export default function Home() {
               </div>
 
               {/* Headline */}
-              <h1 className="text-5xl lg:text-6xl xl:text-[4.25rem] font-black text-white leading-[1.06] mb-6 tracking-tight">
+              <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] font-black text-white leading-[1.08] mb-5 tracking-tight max-w-xl">
                 Master{' '}
                 <span className="relative inline-block">
                   <span
@@ -264,7 +264,7 @@ export default function Home() {
               </h1>
 
               {/* Sub-copy */}
-              <p className="text-lg lg:text-xl text-surface-300 max-w-[480px] mb-10 leading-relaxed">
+              <p className="text-base lg:text-lg text-surface-300 max-w-lg mb-8 leading-relaxed">
                 Practice real-world skills on live environments — Linux, Docker, databases, cloud, networking, and more. Timed challenges, auto-validation, hints, and a global leaderboard.
               </p>
 
@@ -318,12 +318,12 @@ export default function Home() {
       {/* ═══════════════════════════════════════════
           SECTION 3 — CHALLENGE MODES (3 cards)
       ═══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden py-28">
+      <section className="relative overflow-hidden py-20 lg:py-24">
         <div className="absolute inset-0 bg-mesh-gradient" />
         <div className="absolute inset-0 bg-dots-pattern opacity-30 pointer-events-none" />
         <div className="glow-orb-purple absolute -left-40 top-1/3" />
 
-        <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-purple/10 border border-accent-purple/20 text-accent-purple text-xs font-bold uppercase tracking-widest mb-5">
               <Code2 size={13} /> Challenge Modes
@@ -370,12 +370,12 @@ export default function Home() {
           SECTION 4 — TECHNOLOGIES GRID
           Live techs first, coming_soon last with badge
       ═══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden py-28">
+      <section className="relative overflow-hidden py-20 lg:py-24">
         <div className="absolute inset-0 section-gradient" />
         <div className="glow-orb-cyan   absolute -right-40 top-1/2 -translate-y-1/2" />
         <div className="glow-orb-green  absolute -left-40  bottom-0" />
 
-        <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-green/10 border border-accent-green/20 text-accent-green text-xs font-bold uppercase tracking-widest mb-5">
               <Layers size={13} /> Technologies
@@ -443,7 +443,7 @@ export default function Home() {
           Rich purple gradient, face-to-face framing
           Left: copy + bullets  |  Right: InterviewDemoWidget
       ═══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden py-28">
+      <section className="relative overflow-hidden py-20 lg:py-24">
         {/* Deep purple background */}
         <div
           className="absolute inset-0"
@@ -453,7 +453,7 @@ export default function Home() {
         <div className="glow-orb-purple absolute -left-32 top-1/3" style={{ width: '500px', height: '500px' }} />
         <div className="glow-orb-cyan   absolute  right-0  bottom-0" />
 
-        <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="grid lg:grid-cols-2 gap-16 xl:gap-20 items-center">
 
             {/* LEFT — copy */}
@@ -533,13 +533,13 @@ export default function Home() {
           SECTION 6 — FEATURES GRID
           Strict 2×4 on desktop — 8 features, no orphans
       ═══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden py-28">
+      <section className="relative overflow-hidden py-20 lg:py-24">
         <div className="absolute inset-0 section-accent" />
         <div className="absolute inset-0 bg-mesh-gradient-intense opacity-40" />
         <div className="glow-orb-blue absolute left-1/4 top-0" />
         <div className="glow-orb-pink absolute right-0 bottom-0" />
 
-        <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-cyan/10 border border-accent-cyan/20 text-accent-cyan text-xs font-bold uppercase tracking-widest mb-5">
               <Rocket size={13} /> Platform Features
@@ -580,12 +580,12 @@ export default function Home() {
       {/* ═══════════════════════════════════════════
           SECTION 7 — HOW IT WORKS (3 steps)
       ═══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden py-28">
+      <section className="relative overflow-hidden py-20 lg:py-24">
         <div className="absolute inset-0 section-dark" />
         <div className="glow-orb-purple absolute left-1/4 -top-20" />
         <div className="glow-orb-cyan   absolute right-0   bottom-1/4" />
 
-        <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-amber/10 border border-accent-amber/20 text-accent-amber text-xs font-bold uppercase tracking-widest mb-5">
               <GraduationCap size={13} /> How It Works
@@ -649,13 +649,13 @@ export default function Home() {
       {/* ═══════════════════════════════════════════
           SECTION 8 — TESTIMONIALS CAROUSEL
       ═══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden py-28">
+      <section className="relative overflow-hidden py-20 lg:py-24">
         <div className="absolute inset-0 section-dark" />
         <div className="absolute inset-0 bg-dots-pattern opacity-20 pointer-events-none" />
         <div className="glow-orb-pink absolute right-0 top-0" />
         <div className="glow-orb-cyan  absolute left-0  bottom-0" />
 
-        <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-amber/10 border border-accent-amber/20 text-accent-amber text-xs font-bold uppercase tracking-widest mb-5">
               <Star size={13} /> Testimonials
@@ -729,7 +729,7 @@ export default function Home() {
       {/* ═══════════════════════════════════════════
           SECTION 9 — PRICING CTA
       ═══════════════════════════════════════════ */}
-      <section className="py-28 relative">
+      <section className="py-20 lg:py-24 relative">
         <div className="glow-orb-cyan   absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
         <div className="glow-orb-purple absolute -right-20 top-0" />
 
@@ -793,7 +793,7 @@ export default function Home() {
       <footer className="border-t border-surface-700/30 relative overflow-hidden">
         <div className="absolute inset-0 section-dark" />
 
-        <div className="max-w-7xl mx-auto px-6 py-16 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 relative">
           <div className="grid md:grid-cols-5 gap-10">
 
             {/* Brand */}

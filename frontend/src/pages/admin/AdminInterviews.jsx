@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../api/admin'
 import {
-  BarChart3, Users, MessageSquare, CreditCard, Settings, Radio, Mic,
+  BarChart3, Users, MessageSquare, CreditCard, Settings, CalendarClock, Mic,
   Gift, DollarSign, Eye,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const TABS = [
   { id: 'overview', label: 'Analytics', icon: BarChart3 },
-  { id: 'live', label: 'Live & scheduled', icon: Radio },
+  { id: 'live', label: 'Live & scheduled', icon: CalendarClock },
   { id: 'settings', label: 'Platform', icon: Settings },
   { id: 'pricing', label: 'Pricing', icon: DollarSign },
   { id: 'entitlements', label: 'Free access', icon: Gift },
@@ -188,7 +188,7 @@ export default function AdminInterviews() {
         <div className="space-y-6">
           <section>
             <h2 className="text-sm font-semibold text-amber-400 mb-2 flex items-center gap-1">
-              <Radio size={14} /> Live interviews
+              <CalendarClock size={14} /> Live interviews
             </h2>
             {!live.live?.length ? (
               <p className="text-xs text-surface-500">No live sessions right now</p>

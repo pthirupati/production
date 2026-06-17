@@ -72,6 +72,11 @@ class CandidateProfileView(APIView):
         data = request.data.copy()
         if data.get("primary_technology") in ("", "null", "undefined"):
             data["primary_technology"] = None
+        elif data.get("primary_technology") is not None:
+            try:
+                data["primary_technology"] = int(data["primary_technology"])
+            except (TypeError, ValueError):
+                data["primary_technology"] = None
         for empty_field in ("current_package_lpa", "notice_period_days", "years_experience"):
             if data.get(empty_field) in ("", "null", "undefined", None):
                 data[empty_field] = None
@@ -90,18 +95,45 @@ class CandidateProfileView(APIView):
                 data["years_experience"] = int(data["years_experience"])
             except (TypeError, ValueError):
                 data["years_experience"] = 0
-        for json_field in ("secondary_technologies", "target_companies", "resume_parsed"):
-            raw = data.get(json_field)
+
+        def _coerce_json_field(raw, *, expect_list: bool):
+            default = [] if expect_list else {}
+            if raw is None or raw == "":
+                return default
+            if expect_list and isinstance(raw, list):
+                return raw
+            if not expect_list and isinstance(raw, dict):
+                return raw
             if isinstance(raw, str):
                 raw = raw.strip()
                 if not raw:
-                    data[json_field] = [] if json_field != "resume_parsed" else {}
-                    continue
+                    return default
                 try:
-                    data[json_field] = json.loads(raw)
+                    parsed = json.loads(raw)
                 except (json.JSONDecodeError, TypeError):
-                    if json_field != "resume_parsed":
-                        data[json_field] = []
+                    if expect_list and "," in raw:
+                        return [p.strip() for p in raw.split(",") if p.strip()]
+                    return default
+                if expect_list:
+                    if isinstance(parsed, list):
+                        return parsed
+                    if isinstance(parsed, str) and parsed.strip():
+                        return [parsed.strip()]
+                    return default
+                if isinstance(parsed, dict):
+                    return parsed
+                return default
+            if expect_list:
+                return [str(raw).strip()] if str(raw).strip() else default
+            return default
+
+        for json_field, expect_list in (
+            ("secondary_technologies", True),
+            ("target_companies", True),
+            ("resume_parsed", False),
+        ):
+            if json_field in data:
+                data[json_field] = _coerce_json_field(data.get(json_field), expect_list=expect_list)
         if request.FILES.get("resume"):
             profile.resume_file = request.FILES["resume"]
             text = extract_text_from_upload(request.FILES["resume"])

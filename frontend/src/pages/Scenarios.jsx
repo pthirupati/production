@@ -11,6 +11,7 @@ import {
 import toast from 'react-hot-toast'
 import Pagination from '../components/Pagination'
 import StickyPageToolbar from '../components/StickyPageToolbar'
+import { useScrollHideToolbar } from '../hooks/useScrollHideToolbar'
 
 const typeConfig = {
   fix:  { icon: Wrench,  label: 'Fix',  color: 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20',    border: 'border-l-accent-cyan',   glow: 'hover:shadow-[0_0_20px_rgba(6,182,212,0.06)]' },
@@ -298,55 +299,57 @@ export default function Scenarios() {
     if (grouped[s.difficulty]) grouped[s.difficulty].push(s)
   })
 
+  const { hidden: toolbarHidden, anchorRef } = useScrollHideToolbar(96)
+
   return (
     <div className="max-w-6xl mx-auto animate-fade-in">
+      <div ref={anchorRef} className="h-0 w-full" aria-hidden="true" />
 
-      {/* ── Sticky page header + search/filters ── */}
-      <StickyPageToolbar className="mb-5 rounded-b-2xl">
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-surface-900/90 via-surface-900/70 to-surface-800/50 border border-surface-700/40 p-4 sm:p-5 mb-3">
-          <div className="absolute inset-0 bg-gradient-to-br from-accent-purple/5 via-transparent to-accent-cyan/5 pointer-events-none" />
-          <div className="relative flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Target size={14} className="text-accent-cyan" />
-                <span className="text-xs font-semibold text-accent-cyan/80 uppercase tracking-widest">Challenge Library</span>
-              </div>
-              <h1 className="font-display text-2xl sm:text-3xl font-black text-white tracking-tight">Scenarios</h1>
-              <p className="text-surface-400 mt-1 text-sm">
-                {loading ? 'Loading…' : `${totalCount} challenge${totalCount !== 1 ? 's' : ''} available`}
-              </p>
+      {/* ── Compact sticky search/filters (hides on scroll down) ── */}
+      <StickyPageToolbar
+        className={`mb-4 transition-all duration-300 ${toolbarHidden ? '-translate-y-full opacity-0 pointer-events-none !shadow-none' : ''}`}
+      >
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Target size={13} className="text-accent-cyan shrink-0" />
+              <span className="text-[10px] font-semibold text-accent-cyan/80 uppercase tracking-widest">Challenge Library</span>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {Object.entries(difficultyConfig).map(([key, cfg]) => {
-                const count = grouped[key]?.length ?? 0
-                if (!count && !loading) return null
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setFilter('difficulty', filters.difficulty === key ? '' : key)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
-                      filters.difficulty === key ? cfg.badge : 'bubble-nav-idle text-surface-400 border-transparent'
-                    }`}
-                  >
-                    <DifficultyDots difficulty={key} />
-                    {cfg.label}
-                    {!loading && <span className="opacity-50">({count})</span>}
-                  </button>
-                )
-              })}
-            </div>
+            <h1 className="font-display text-xl sm:text-2xl font-bold text-white tracking-tight leading-tight">Scenarios</h1>
+            <p className="text-surface-500 text-xs mt-0.5">
+              {loading ? 'Loading…' : `${totalCount} challenge${totalCount !== 1 ? 's' : ''}`}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {Object.entries(difficultyConfig).map(([key, cfg]) => {
+              const count = grouped[key]?.length ?? 0
+              if (!count && !loading) return null
+              return (
+                <button
+                  key={key}
+                  onClick={() => setFilter('difficulty', filters.difficulty === key ? '' : key)}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border transition-all ${
+                    filters.difficulty === key ? cfg.badge : 'bg-surface-800/60 text-surface-400 border-surface-700/60 hover:text-white'
+                  }`}
+                >
+                  <DifficultyDots difficulty={key} />
+                  {cfg.label}
+                  {!loading && <span className="opacity-50">({count})</span>}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500 pointer-events-none" />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-surface-500 pointer-events-none" />
             <input
               type="text"
               placeholder="Search scenarios…"
               value={filters.search}
               onChange={e => setFilter('search', e.target.value)}
-              className="input-field pl-9 py-2 text-sm w-full"
+              className="input-field pl-8 py-1.5 text-sm w-full"
             />
             {filters.search && (
               <button onClick={() => setFilter('search', '')} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 hover:text-white">

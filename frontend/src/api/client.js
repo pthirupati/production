@@ -8,11 +8,14 @@ const api = axios.create({
   timeout: 30_000, // 30s default timeout
 })
 
-// Attach JWT token
+// Attach JWT token; strip JSON Content-Type for multipart uploads
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
   }
   return config
 })

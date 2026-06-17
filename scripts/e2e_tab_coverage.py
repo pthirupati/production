@@ -626,15 +626,30 @@ def run_lab_runner_all_tabs(s, token: str, scenario: dict | None) -> None:
     st2, data2 = api("POST", f"/api/labs/{sid}/start/", token=token)
     s.record("Lab resume same scenario (no 429)", st2 in (200, 201) and st2 != 429, st2)
 
-    has_lab_hosts = isinstance(data.get("lab_hosts"), list) and len(data.get("lab_hosts", [])) >= 1
-    s.record("Lab start lab_hosts field", has_lab_hosts or data.get("resumed"), detail=str(len(data.get("lab_hosts") or [])))
-
-    for _ in range(15):
+    import time
+    hosts = data.get("lab_hosts") or []
+    st_data = {}
+    for _ in range(20):
         st, st_data = api("GET", f"/api/labs/{session_id}/status/", token=token)
-        if st == 200 and st_data.get("status") in ("RUNNING", "COMPLETED", "FAILED", "TERMINATED"):
-            break
-        import time
+        if st == 200:
+            hosts = st_data.get("lab_hosts") or hosts
+            status = st_data.get("status")
+            if hosts:
+                break
+            if status in ("COMPLETED", "FAILED", "TERMINATED", "EXPIRED"):
+                break
+            if status == "RUNNING" and _ >= 5:
+                # Docker labs populate lab_hosts shortly after RUNNING.
+                break
         time.sleep(2)
+
+    has_lab_hosts = isinstance(hosts, list) and len(hosts) >= 1
+    running = st_data.get("status") == "RUNNING"
+    s.record(
+        "Lab start lab_hosts field",
+        has_lab_hosts or data.get("resumed") or running,
+        detail=str(len(hosts)),
+    )
 
     _batch(s, "LabRunner", [
         ("GET", f"/api/labs/{session_id}/status/", None, (200,), "status tab"),

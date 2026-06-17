@@ -14,21 +14,33 @@ export const interviewsApi = {
     return api.get('/interviews/profile/').then(r => r.data)
   },
   updateProfile(data, resumeFile) {
-    const form = new FormData()
-    const writable = new Set([
-      'primary_technology', 'secondary_technologies', 'experience_level', 'years_experience',
-      'current_company', 'current_package_lpa', 'target_role', 'target_companies',
-      'voice_id', 'voice_locale', 'location', 'notice_period_days', 'resume_text',
-    ])
-    Object.entries(data || {}).forEach(([k, v]) => {
-      if (!writable.has(k) || v === undefined || v === null) return
-      form.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v))
-    })
-    if (resumeFile) form.append('resume', resumeFile)
-    // Do NOT set Content-Type — browser must set it with the correct multipart boundary
-    return api.put('/interviews/profile/', form, {
-      headers: { 'Content-Type': undefined },
-    }).then(r => r.data)
+    const payload = {
+      primary_technology: data.primary_technology || null,
+      secondary_technologies: Array.isArray(data.secondary_technologies) ? data.secondary_technologies : [],
+      experience_level: data.experience_level || 'mid',
+      years_experience: Number(data.years_experience) || 0,
+      current_company: data.current_company || '',
+      current_package_lpa: data.current_package_lpa ?? null,
+      target_role: data.target_role || '',
+      target_companies: Array.isArray(data.target_companies) ? data.target_companies : [],
+      voice_id: data.voice_id || 'indian-female',
+      voice_locale: data.voice_locale || '',
+      location: data.location || '',
+      notice_period_days: data.notice_period_days ?? null,
+      resume_text: data.resume_text || '',
+    }
+
+    if (resumeFile) {
+      const form = new FormData()
+      Object.entries(payload).forEach(([k, v]) => {
+        if (v === undefined || v === null) return
+        form.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v))
+      })
+      form.append('resume', resumeFile)
+      return api.put('/interviews/profile/', form).then(r => r.data)
+    }
+
+    return api.put('/interviews/profile/', payload).then(r => r.data)
   },
   listCampaigns() {
     return api.get('/interviews/campaigns/').then(r => r.data)

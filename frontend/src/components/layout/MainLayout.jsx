@@ -46,10 +46,10 @@ function SidebarContent({ navVisible, location, user, theme, toggleTheme, handle
             to={path}
             onClick={onNavClick}
             aria-current={location.pathname === path ? 'page' : undefined}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+            className={`sidebar-nav-link ${
               location.pathname === path || (path !== '/dashboard' && location.pathname.startsWith(path))
-                ? 'bubble-nav-active text-white shadow-lg shadow-accent-cyan/10'
-                : 'bubble-nav-idle text-surface-400 hover:text-surface-100'
+                ? 'sidebar-nav-active'
+                : 'sidebar-nav-idle'
             }`}
           >
             <Icon size={18} aria-hidden="true" />
@@ -72,10 +72,10 @@ function SidebarContent({ navVisible, location, user, theme, toggleTheme, handle
             <Link
               to="/admin"
               onClick={onNavClick}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+              className={`sidebar-nav-link ${
                 location.pathname.startsWith('/admin')
-                  ? 'bubble-nav-active text-accent-purple shadow-lg shadow-accent-purple/10'
-                  : 'bubble-nav-idle text-surface-400 hover:text-surface-100'
+                  ? 'sidebar-nav-active !border-accent-purple/30 !shadow-[inset_3px_0_0_rgb(var(--a-purple))]'
+                  : 'sidebar-nav-idle'
               }`}
             >
               <Shield size={18} />

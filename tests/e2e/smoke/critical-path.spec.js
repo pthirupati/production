@@ -9,8 +9,9 @@ const SITE_URL = process.env.SITE_URL || 'http://localhost:5173';
 
 test.describe('Critical path smoke', () => {
   // ── Public endpoints ────────────────────────────────────────────────────
-  test('GET /api/health/ returns 200', async ({ page }) => {
-    const resp = await page.request.get(`${BASE_URL}/api/health/`, {
+  test('GET /health returns 200', async ({ page }) => {
+    // Public gateway exposes /health; /api/health/ is blocked from external IPs.
+    const resp = await page.request.get(`${BASE_URL}/health`, {
       headers: { 'X-Forwarded-Proto': 'https' },
     });
     expect(resp.status()).toBe(200);

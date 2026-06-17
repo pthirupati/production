@@ -36,24 +36,25 @@ function formatUptime(startedAt) {
   return `${days}d ${hours % 24}h`
 }
 
-// ─── Sparkline bar chart ──────────────────────────────────────────────────────
+// ─── Smooth trend curve (replaces bar sparkline) ─────────────────────────────
 
-function Sparkline({ color = 'bg-accent-cyan', seed = 0 }) {
-  const heights = Array.from({ length: 6 }, (_, i) => {
-    const val = ((seed * 37 + i * 17) % 70) + 20
-    return Math.min(100, Math.max(20, val))
-  })
-  heights[5] = 92
+function TrendCurve({ color = 'stroke-accent-cyan', seed = 0 }) {
+  const points = Array.from({ length: 8 }, (_, i) => {
+    const y = 18 - (((seed * 37 + i * 17) % 14) + 4)
+    return `${i * 14},${y}`
+  }).join(' ')
   return (
-    <div className="flex items-end gap-0.5 h-8 mt-auto shrink-0">
-      {heights.map((h, i) => (
-        <div
-          key={i}
-          className={`w-2 rounded-sm transition-all ${color} ${i === 5 ? 'opacity-100' : 'opacity-35'}`}
-          style={{ height: `${h}%` }}
-        />
-      ))}
-    </div>
+    <svg viewBox="0 0 98 24" className="w-[72px] h-6 mt-auto shrink-0" aria-hidden="true">
+      <polyline
+        fill="none"
+        className={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+      />
+      <circle cx="98" cy={points.split(' ').pop()?.split(',')[1] || 12} r="2.5" className={`${color} fill-current`} />
+    </svg>
   )
 }
 
@@ -97,7 +98,7 @@ function StatCard({ label, value, sub, delta, deltaSuffix, icon: Icon, color, sp
       </div>
       <div className="flex items-end justify-between gap-2 mt-auto">
         <p className="text-[11px] text-surface-500 leading-snug">{sub}</p>
-        <Sparkline color={sparkColor || 'bg-accent-cyan'} seed={seed || 0} />
+        <TrendCurve color={sparkColor || 'stroke-accent-cyan'} seed={seed || 0} />
       </div>
     </div>
   )
@@ -254,21 +255,21 @@ export default function AdminDashboard() {
       value: (overview?.users?.total || 0).toLocaleString(),
       sub: `${overview?.users?.new_7d || 0} new this week`,
       delta: overview?.users?.new_7d ?? null,
-      icon: Users, color: 'text-accent-cyan', sparkColor: 'bg-accent-cyan', seed: 7,
+      icon: Users, color: 'text-accent-cyan', sparkColor: 'stroke-accent-cyan', seed: 7,
     },
     {
       label: 'Paid Subscribers',
       value: (overview?.users?.paid_subscribers || 0).toLocaleString(),
       sub: `${overview?.users?.inactive_90d || 0} inactive (90d)`,
       delta: null,
-      icon: UserCheck, color: 'text-accent-green', sparkColor: 'bg-accent-green', seed: 13,
+      icon: UserCheck, color: 'text-accent-green', sparkColor: 'stroke-accent-green', seed: 13,
     },
     {
       label: 'Revenue',
       value: `${overview?.revenue?.symbol || '₹'}${(overview?.revenue?.total ?? 0).toLocaleString()}`,
       sub: `${overview?.revenue?.subscriptions_count || 0} active subs · ${overview?.revenue?.currency || currency}`,
       delta: null,
-      icon: DollarSign, color: 'text-accent-amber', sparkColor: 'bg-accent-amber', seed: 23,
+      icon: DollarSign, color: 'text-accent-amber', sparkColor: 'stroke-accent-amber', seed: 23,
     },
     {
       label: 'Active Labs',
@@ -276,14 +277,14 @@ export default function AdminDashboard() {
       sub: `${overview?.labs?.completed_24h || 0} completed today`,
       delta: overview?.labs?.completed_24h ?? null,
       deltaSuffix: ' done',
-      icon: MonitorPlay, color: 'text-accent-purple', sparkColor: 'bg-accent-purple', seed: 5,
+      icon: MonitorPlay, color: 'text-accent-purple', sparkColor: 'stroke-accent-purple', seed: 5,
     },
     {
       label: 'Scenarios',
       value: overview?.scenarios?.active || 0,
       sub: `${overview?.scenarios?.draft || 0} draft`,
       delta: null,
-      icon: Target, color: 'text-accent-cyan', sparkColor: 'bg-accent-cyan', seed: 19,
+      icon: Target, color: 'text-accent-cyan', sparkColor: 'stroke-accent-cyan', seed: 19,
     },
     {
       label: 'Completion Rate',
@@ -291,14 +292,14 @@ export default function AdminDashboard() {
       sub: `Avg score: ${Math.round(overview?.labs?.avg_score || 0)}`,
       delta: overview?.completion_rate ?? null,
       deltaSuffix: '%',
-      icon: TrendingUp, color: 'text-accent-green', sparkColor: 'bg-accent-green', seed: 11,
+      icon: TrendingUp, color: 'text-accent-green', sparkColor: 'stroke-accent-green', seed: 11,
     },
     {
       label: 'Community',
       value: (overview?.community?.threads || 0).toLocaleString(),
       sub: `${overview?.community?.replies || 0} replies`,
       delta: null,
-      icon: MessageSquare, color: 'text-accent-amber', sparkColor: 'bg-accent-amber', seed: 3,
+      icon: MessageSquare, color: 'text-accent-amber', sparkColor: 'stroke-accent-amber', seed: 3,
     },
     {
       label: 'Maintenance',
@@ -334,7 +335,7 @@ export default function AdminDashboard() {
         <div className="relative flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
+              <Activity size={14} className="text-accent-green" />
               <span className="text-xs font-semibold text-accent-green/80 uppercase tracking-widest">Live Dashboard</span>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Admin Overview</h1>

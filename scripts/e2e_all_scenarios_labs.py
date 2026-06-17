@@ -29,6 +29,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from rest_framework.test import APIRequestFactory, force_authenticate
 
+from apps.question_bank.models import Scenario, Technology
 from apps.labs.models import LabSession
 from apps.progress.models import UserScenarioProgress
 from apps.public_api.views import (
@@ -92,6 +93,18 @@ class RunStats:
         print(f"  [SKIP] {name}" + (f" — {detail}" if detail else ""))
 
 
+def _response_data(st) -> dict:
+    data = getattr(st, "data", None)
+    return data if isinstance(data, dict) else {}
+
+
+def _jira_issue_key(st) -> str:
+    ticket = _response_data(st).get("ticket") or {}
+    if isinstance(ticket, dict):
+        return ticket.get("issue_key") or ""
+    return ""
+
+
 def _factory_view(view_cls, method: str, path: str, user, data=None, **kwargs):
     factory = APIRequestFactory()
     if method == "GET":
@@ -141,9 +154,9 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c, *, test_
         ScenarioJiraTicketView, "POST", f"/api/jira/tickets/scenario/{scenario.id}/", user_a,
         scenario_id=scenario.id,
     )
-    jira_a = (getattr(st, "data", {}) or {}).get("ticket", {}).get("issue_key", "")
+    jira_a = _jira_issue_key(st)
     if getattr(st, "status_code", 0) not in (200, 201):
-        stats.fail(f"{label} jira user_a", str(getattr(st, "data", ""))[:60])
+        stats.fail(f"{label} jira user_a", str(_response_data(st))[:60])
     elif not jira_a:
         stats.fail(f"{label} jira user_a", "no issue_key")
     else:
@@ -154,7 +167,7 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c, *, test_
             ScenarioJiraTicketView, "POST", f"/api/jira/tickets/scenario/{scenario.id}/", user_b,
             scenario_id=scenario.id,
         )
-        jira_b = (getattr(st, "data", {}) or {}).get("ticket", {}).get("issue_key", "")
+        jira_b = _jira_issue_key(st)
         if jira_b and jira_a and jira_a == jira_b:
             stats.fail(f"{label} jira isolation", f"shared ticket {jira_a}")
         elif jira_b:
@@ -410,10 +423,15 @@ def main():
         for sc in deployable:
             db_refresh()
             cache.clear()
+            # Re-fetch by slug so FK references stay valid after parallel reseeds.
+            fresh = Scenario.objects.filter(slug=sc.slug, is_active=True).select_related("technology").first()
+            if not fresh:
+                stats.skip(f"[{tech.slug}/{sc.slug}]", "scenario missing after refresh")
+                continue
             do_isolation = ISOLATION_ONCE and not isolation_done and user_b is not None
             try:
                 run_scenario_e2e(
-                    stats, sc, user_a, user_b, user_c,
+                    stats, fresh, user_a, user_b, user_c,
                     test_isolation=do_isolation,
                 )
                 if do_isolation:
