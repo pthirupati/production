@@ -1167,11 +1167,13 @@ class AdminSystemHealthView(APIView):
             except Exception:
                 pass
 
-            # Fallback: container running but API unreachable
+            # Fallback: container running but API unreachable — if env file has secrets this is non-critical
+            env_file_ok = bool(os.environ.get("DJANGO_SECRET_KEY"))
             return {
-                "status": "degraded",
-                "details": "Vault container running but API unreachable — check VAULT_ADDR network config",
-                "secrets_loaded": secrets_loaded,
+                "status": "healthy" if env_file_ok else "degraded",
+                "details": "Vault API unreachable — running in env file mode" if env_file_ok else "Vault container running but API unreachable",
+                "secrets_loaded": env_file_ok,
+                "optional": True,
             }
         except Exception as e:
             return {"status": "unhealthy", "error": str(e), "secrets_loaded": secrets_loaded}
