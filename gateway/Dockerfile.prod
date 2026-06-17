@@ -5,7 +5,7 @@ RUN apk add --no-cache curl openssl
 
 RUN rm /etc/nginx/conf.d/default.conf
 
-COPY nginx.conf /etc/nginx/nginx.conf
+# Site config (rate limits, upstreams, server blocks) — entrypoint picks prod vs bootstrap
 COPY nginx.prod.conf /etc/nginx/templates/nginx.prod.conf
 COPY nginx.http.conf /etc/nginx/templates/nginx.http.conf
 COPY nginx.bootstrap.conf /etc/nginx/templates/nginx.bootstrap.conf
