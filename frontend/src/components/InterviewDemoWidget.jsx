@@ -54,10 +54,7 @@ const PHASE_DURATION = 13000
 const STEP = { INTRO: 0, ASKING: 2000, ANSWERING: 5500, EVALUATING: 9000, SCORED: 11000 }
 
 /* ── Voice wave bars ── */
-const CANDIDATE_PORTRAIT =
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=640&h=480&q=80'
-const AI_BOT_AVATAR =
-  'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=400&h=400&q=80'
+const CANDIDATE_PORTRAIT = null /* inline avatar — no external CDN */
 
 /* ── AI interviewer tile — distinct from human video feed ── */
 function AIBotVideoTile({ speaking, label, sublabel, accentColor }) {
@@ -97,12 +94,8 @@ function AIBotVideoTile({ speaking, label, sublabel, accentColor }) {
             className="absolute -inset-3 rounded-full blur-xl opacity-60 pointer-events-none"
             style={{ background: accentColor }}
           />
-          <div className="relative w-[72px] h-[72px] sm:w-[84px] sm:h-[84px] rounded-full overflow-hidden ring-2 ring-white/20 shadow-2xl">
-            <img src={AI_BOT_AVATAR} alt="AI interviewer avatar" className="w-full h-full object-cover" loading="lazy" />
-            <div
-              className="absolute inset-0 mix-blend-color pointer-events-none"
-              style={{ background: `${accentColor}55` }}
-            />
+          <div className="relative w-[72px] h-[72px] sm:w-[84px] sm:h-[84px] rounded-full overflow-hidden ring-2 ring-cyan-400/40 shadow-2xl bg-gradient-to-br from-slate-800 via-indigo-900 to-cyan-900 flex items-center justify-center">
+            <Brain size={36} className="text-cyan-300" style={{ filter: `drop-shadow(0 0 12px ${accentColor})` }} />
           </div>
           <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-surface-950 border border-white/20 flex items-center justify-center shadow-lg">
             <Brain size={14} style={{ color: accentColor }} />
@@ -134,7 +127,7 @@ function AIBotVideoTile({ speaking, label, sublabel, accentColor }) {
   )
 }
 /* ── Human video-call participant tile ── */
-function VideoParticipant({ src, alt, speaking, label, sublabel, accentColor, badge }) {
+function VideoParticipant({ src, alt, speaking, label, sublabel, accentColor, badge, initials = 'YOU' }) {
   return (
     <div
       className="relative rounded-xl overflow-hidden aspect-[4/3] border-2 transition-all duration-500 bg-surface-950"
@@ -143,14 +136,22 @@ function VideoParticipant({ src, alt, speaking, label, sublabel, accentColor, ba
         boxShadow: speaking ? `0 0 28px ${accentColor}35` : undefined,
       }}
     >
-      <img
-        src={src}
-        alt={alt}
-        className={`absolute inset-0 w-full h-full object-cover transition-transform duration-[1200ms] ease-out ${
-          speaking ? 'scale-[1.08] interview-speaking-drift' : 'scale-100'
-        }`}
-        loading="lazy"
-      />
+      <div className="absolute inset-0 bg-gradient-to-br from-surface-800 via-surface-900 to-indigo-950" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className={`w-[58%] max-w-[140px] aspect-square rounded-full overflow-hidden ring-2 ring-white/15 shadow-2xl transition-transform duration-[900ms] ${
+            speaking ? 'scale-105 interview-speaking-drift' : 'scale-100'
+          }`}
+        >
+          {src ? (
+            <img src={src} alt={alt} className="w-full h-full object-cover" loading="lazy" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-amber-700/80 via-rose-800/70 to-purple-900/80 flex items-center justify-center">
+              <span className="text-2xl sm:text-3xl font-bold text-white/90 tracking-tight">{initials}</span>
+            </div>
+          )}
+        </div>
+      </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/25 pointer-events-none" />
       <div
         className="absolute inset-0 opacity-[0.06] pointer-events-none mix-blend-overlay"
@@ -335,6 +336,7 @@ export default function InterviewDemoWidget() {
               label="You"
               sublabel="Candidate"
               accentColor="#8b5cf6"
+              initials="YOU"
             />
           )}
         </div>

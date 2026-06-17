@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import InterviewDemoWidget from '../components/InterviewDemoWidget'
+import BubbleNavLink from '../components/BubbleNavLink'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { useDataStore } from '../store/dataStore'
@@ -41,15 +42,6 @@ const testimonials = [
   { name: 'Erik Volkov', role: 'Cloud Architect',           company: 'AWS',          text: 'The progressive difficulty and achievement system keeps me coming back. I learn something new every time, even on easy challenges.'                           },
 ]
 
-const trustedBy = [
-  { name: 'Linux',      icon: Server   },
-  { name: 'Docker',     icon: Monitor  },
-  { name: 'Networking', icon: Globe    },
-  { name: 'AWS',        icon: Cloud    },
-  { name: 'Kubernetes', icon: Cpu      },
-  { name: 'Database',   icon: Database },
-]
-
 export default function Home() {
   const { isAuthenticated } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
@@ -78,6 +70,8 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [])
 
+  const { pathname } = useLocation()
+  const navActive = (to) => pathname === to || (to !== '/' && pathname.startsWith(to))
   const techIcons = { Linux: Server, AWS: Cloud, Kubernetes: Cpu, Docker: Monitor, Networking: Globe, 'GPU & NVIDIA': Cpu }
 
   return (
@@ -97,16 +91,11 @@ export default function Home() {
             </Link>
 
             {/* Desktop nav links */}
-            <div className="hidden md:flex items-center gap-5 overflow-x-auto max-w-[60vw] pb-1">
+            <div className="hidden md:flex items-center gap-2 overflow-x-auto max-w-[58vw] pb-1 scrollbar-none">
               {PUBLIC_NAV_LINKS.map(({ to, label }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className="text-sm text-surface-400 hover:text-white transition-colors relative group whitespace-nowrap shrink-0"
-                >
+                <BubbleNavLink key={to} to={to} active={navActive(to)} size="md">
                   {label}
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-accent-cyan to-accent-purple group-hover:w-full transition-all duration-300" />
-                </Link>
+                </BubbleNavLink>
               ))}
             </div>
 
@@ -322,32 +311,6 @@ export default function Home() {
         </div>
       </section>
       {/* ─── end Hero ─── */}
-
-      <div className="bg-gradient-stripe" />
-
-
-      {/* ═══════════════════════════════════════════
-          SECTION 2 — TECH RIBBON
-      ═══════════════════════════════════════════ */}
-      <section className="py-14 relative overflow-hidden">
-        <div className="absolute inset-0 section-dark" />
-        <div className="max-w-7xl mx-auto px-6 relative">
-          <p className="text-center text-xs text-surface-500 uppercase tracking-[0.2em] font-semibold mb-10">
-            Technologies You Can Master
-          </p>
-          <div className="flex items-center justify-center gap-10 flex-wrap">
-            {trustedBy.map(({ name, icon: Icon }) => (
-              <div
-                key={name}
-                className="flex items-center gap-2.5 text-surface-500 hover:text-accent-cyan transition-all duration-300 group cursor-default"
-              >
-                <Icon size={22} className="group-hover:scale-110 transition-transform duration-300" />
-                <span className="text-sm font-semibold tracking-wide">{name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       <div className="bg-gradient-stripe" />
 

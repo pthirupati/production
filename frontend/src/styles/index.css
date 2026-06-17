@@ -378,6 +378,24 @@ body::after {
   );
 }
 
+/* ─── Glass bubble navigation pills ─── */
+.bubble-nav-idle {
+  background: rgb(var(--s-800) / 0.45);
+  border: 1px solid rgb(var(--s-700) / 0.55);
+  backdrop-filter: blur(12px);
+}
+.bubble-nav-idle:hover {
+  background: rgb(var(--s-700) / 0.55);
+  border-color: rgb(var(--a-cyan) / 0.35);
+  box-shadow: 0 0 22px rgb(var(--a-cyan) / 0.12);
+  transform: translateY(-1px);
+}
+.bubble-nav-active {
+  background: linear-gradient(135deg, rgb(var(--a-cyan) / 0.22), rgb(var(--a-purple) / 0.18));
+  border: 1px solid rgb(var(--a-cyan) / 0.45);
+  backdrop-filter: blur(16px);
+}
+
 .gradient-border {
   position: relative;
 }

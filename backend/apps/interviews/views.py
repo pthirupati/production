@@ -72,6 +72,24 @@ class CandidateProfileView(APIView):
         data = request.data.copy()
         if data.get("primary_technology") in ("", "null", "undefined"):
             data["primary_technology"] = None
+        for empty_field in ("current_package_lpa", "notice_period_days", "years_experience"):
+            if data.get(empty_field) in ("", "null", "undefined", None):
+                data[empty_field] = None
+        if data.get("current_package_lpa") is not None:
+            try:
+                data["current_package_lpa"] = str(data["current_package_lpa"]).strip() or None
+            except (TypeError, ValueError):
+                data["current_package_lpa"] = None
+        if data.get("notice_period_days") is not None:
+            try:
+                data["notice_period_days"] = int(data["notice_period_days"])
+            except (TypeError, ValueError):
+                data["notice_period_days"] = None
+        if data.get("years_experience") is not None:
+            try:
+                data["years_experience"] = int(data["years_experience"])
+            except (TypeError, ValueError):
+                data["years_experience"] = 0
         for json_field in ("secondary_technologies", "target_companies", "resume_parsed"):
             raw = data.get(json_field)
             if isinstance(raw, str):

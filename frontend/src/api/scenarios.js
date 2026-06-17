@@ -42,7 +42,7 @@ export const scenarioApi = {
   },
 
   async getBookmarks() {
-    const { data } = await api.get('/bookmarks/')
+    const { data } = await api.get('/bookmarks/', { silentError: true })
     return data
   },
 

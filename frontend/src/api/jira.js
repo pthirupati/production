@@ -1,7 +1,7 @@
 import api from './client'
 
 export const jiraApi = {
-  getUserTickets: () => api.get('/jira/tickets/'),
+  getUserTickets: () => api.get('/jira/tickets/', { silentError: true }),
   getScenarioTicket: (scenarioId, params = {}) =>
     api.get(`/jira/tickets/scenario/${scenarioId}/`, { params }),
   ensureScenarioTicket: (scenarioId) => api.post(`/jira/tickets/scenario/${scenarioId}/`),

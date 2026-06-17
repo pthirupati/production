@@ -46,10 +46,10 @@ function SidebarContent({ navVisible, location, user, theme, toggleTheme, handle
             to={path}
             onClick={onNavClick}
             aria-current={location.pathname === path ? 'page' : undefined}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              location.pathname === path
-                ? 'nav-item-active text-accent-cyan'
-                : 'text-surface-400 hover:text-surface-100 hover:bg-surface-800/50'
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+              location.pathname === path || (path !== '/dashboard' && location.pathname.startsWith(path))
+                ? 'bubble-nav-active text-white shadow-lg shadow-accent-cyan/10'
+                : 'bubble-nav-idle text-surface-400 hover:text-surface-100'
             }`}
           >
             <Icon size={18} aria-hidden="true" />
@@ -72,10 +72,10 @@ function SidebarContent({ navVisible, location, user, theme, toggleTheme, handle
             <Link
               to="/admin"
               onClick={onNavClick}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
                 location.pathname.startsWith('/admin')
-                  ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20'
-                  : 'text-surface-400 hover:text-surface-100 hover:bg-surface-800'
+                  ? 'bubble-nav-active text-accent-purple shadow-lg shadow-accent-purple/10'
+                  : 'bubble-nav-idle text-surface-400 hover:text-surface-100'
               }`}
             >
               <Shield size={18} />
@@ -129,9 +129,7 @@ export default function MainLayout() {
   )
 
   useEffect(() => {
-    api.get('/config/').then(res => setPlatformConfig(res.data)).catch((err) => {
-      console.error('Failed to load platform config:', err)
-    })
+    api.get('/config/', { silentError: true }).then(res => setPlatformConfig(res.data)).catch(() => {})
   }, [])
 
   const isLabRoute = location.pathname.startsWith('/lab/')

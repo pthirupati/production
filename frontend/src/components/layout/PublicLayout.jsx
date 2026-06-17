@@ -5,6 +5,7 @@ import { Sun, Moon, Terminal, Menu, X, Bot } from 'lucide-react'
 import { useState } from 'react'
 import SupportBotWidget from '../SupportBotWidget'
 import { PUBLIC_NAV_LINKS } from '../../constants/publicNav'
+import BubbleNavLink from '../BubbleNavLink'
 
 const navLinkClass = (active) =>
   active
@@ -66,9 +67,9 @@ export default function PublicLayout({ children }) {
             FixitLab
           </Link>
 
-          <div className="hidden lg:flex items-center gap-5 overflow-x-auto scrollbar-none flex-1 justify-center max-w-3xl">
+          <div className="hidden lg:flex items-center gap-2 overflow-x-auto scrollbar-none flex-1 justify-center max-w-3xl">
             {PUBLIC_NAV_LINKS.slice(0, 7).map(({ to, label }) => (
-              <Link key={to} to={to} className={navLinkClass(isActive(to))}>{label}</Link>
+              <BubbleNavLink key={to} to={to} active={isActive(to)} size="md">{label}</BubbleNavLink>
             ))}
           </div>
 

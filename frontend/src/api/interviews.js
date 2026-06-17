@@ -5,7 +5,7 @@ export const interviewsApi = {
     return api.get('/interviews/plans/').then(r => r.data)
   },
   getEntitlement() {
-    return api.get('/interviews/entitlement/').then(r => r.data)
+    return api.get('/interviews/entitlement/', { silentError: true }).then(r => r.data)
   },
   getVoices() {
     return api.get('/interviews/voices/').then(r => r.data)

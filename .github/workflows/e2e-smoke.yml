@@ -86,8 +86,10 @@ jobs:
           BASE_URL: ${{ steps.urls.outputs.base_url }}
         run: |
           for i in $(seq 1 24); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/api/health/" || echo "000")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/health" || echo "000")
             if [ "$STATUS" = "200" ]; then echo "Healthy"; break; fi
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/api/health/" || echo "000")
+            if [ "$STATUS" = "200" ]; then echo "Healthy (api)"; break; fi
             echo "Attempt $i — status $STATUS, retrying in 5s…"
             sleep 5
           done

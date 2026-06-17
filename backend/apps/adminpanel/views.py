@@ -141,7 +141,7 @@ class AdminTechnologiesView(APIView):
         techs = Technology.objects.annotate(
             scenario_count=Count("scenarios"),
             active_scenarios=Count("scenarios", filter=Q(scenarios__is_active=True)),
-            subscriber_count=Count("tech_subscriptions", filter=Q(tech_subscriptions__is_active=True)),
+            subscriber_count=Count("subscriptions", filter=Q(subscriptions__is_active=True)),
         ).order_by("name")
         data = []
         for t in techs:
@@ -509,10 +509,10 @@ class AdminTechnologyStatsView(APIView):
         now = tz.now()
 
         techs = Technology.objects.annotate(
-            total_subs=Count("tech_subscriptions"),
+            total_subs=Count("subscriptions"),
             active_subs=Count(
-                "tech_subscriptions",
-                filter=Q(tech_subscriptions__is_active=True),
+                "subscriptions",
+                filter=Q(subscriptions__is_active=True),
             ),
         ).order_by("order", "name")
 
@@ -538,7 +538,7 @@ class AdminTechnologyStatsView(APIView):
         total_revenue = sum(r["revenue_inr"] for r in result)
         total_active = sum(r["active_subscribers"] for r in result)
         maintenance_count = sum(1 for r in result if r.get("maintenance_enabled"))
-        coming_soon_count = Technology.objects.filter(is_active=False).count()
+        coming_soon_count = Technology.objects.filter(coming_soon=True).count()
         total_unique_users = (
             TechnologySubscription.objects.filter(is_active=True)
             .values("user_id")

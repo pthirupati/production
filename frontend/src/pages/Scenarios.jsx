@@ -299,49 +299,45 @@ export default function Scenarios() {
   })
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5 animate-fade-in">
+    <div className="max-w-6xl mx-auto animate-fade-in">
 
-      {/* ── Page header ── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900/90 via-surface-900/70 to-surface-800/50 border border-surface-700/40 p-5 sm:p-7">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent-purple/5 via-transparent to-accent-cyan/5 pointer-events-none" />
-        <div className="absolute -top-12 -right-12 w-40 h-40 bg-accent-purple/8 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Target size={14} className="text-accent-cyan" />
-              <span className="text-xs font-semibold text-accent-cyan/80 uppercase tracking-widest">Challenge Library</span>
+      {/* ── Sticky page header + search/filters ── */}
+      <StickyPageToolbar className="mb-5 rounded-b-2xl">
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-surface-900/90 via-surface-900/70 to-surface-800/50 border border-surface-700/40 p-4 sm:p-5 mb-3">
+          <div className="absolute inset-0 bg-gradient-to-br from-accent-purple/5 via-transparent to-accent-cyan/5 pointer-events-none" />
+          <div className="relative flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Target size={14} className="text-accent-cyan" />
+                <span className="text-xs font-semibold text-accent-cyan/80 uppercase tracking-widest">Challenge Library</span>
+              </div>
+              <h1 className="font-display text-2xl sm:text-3xl font-black text-white tracking-tight">Scenarios</h1>
+              <p className="text-surface-400 mt-1 text-sm">
+                {loading ? 'Loading…' : `${totalCount} challenge${totalCount !== 1 ? 's' : ''} available`}
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Scenarios</h1>
-            <p className="text-surface-400 mt-1 text-sm">
-              {loading ? 'Loading…' : `${totalCount} challenge${totalCount !== 1 ? 's' : ''} available`}
-            </p>
-          </div>
-
-          {/* Difficulty summary chips */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {Object.entries(difficultyConfig).map(([key, cfg]) => {
-              const count = grouped[key]?.length ?? 0
-              if (!count && !loading) return null
-              return (
-                <button
-                  key={key}
-                  onClick={() => setFilter('difficulty', filters.difficulty === key ? '' : key)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                    filters.difficulty === key ? cfg.badge : 'bg-surface-800 text-surface-400 border-transparent hover:border-surface-700'
-                  }`}
-                >
-                  <DifficultyDots difficulty={key} />
-                  {cfg.label}
-                  {!loading && <span className="opacity-50">({count})</span>}
-                </button>
-              )
-            })}
+            <div className="flex items-center gap-2 flex-wrap">
+              {Object.entries(difficultyConfig).map(([key, cfg]) => {
+                const count = grouped[key]?.length ?? 0
+                if (!count && !loading) return null
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setFilter('difficulty', filters.difficulty === key ? '' : key)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                      filters.difficulty === key ? cfg.badge : 'bubble-nav-idle text-surface-400 border-transparent'
+                    }`}
+                  >
+                    <DifficultyDots difficulty={key} />
+                    {cfg.label}
+                    {!loading && <span className="opacity-50">({count})</span>}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── Sticky search + filter toggle ── */}
-      <StickyPageToolbar>
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500 pointer-events-none" />
@@ -384,7 +380,7 @@ export default function Scenarios() {
         </div>
       </StickyPageToolbar>
 
-      {/* ── Expanded filter panel ── */}
+      <div className="space-y-5 pt-1">
       {showFilters && (
         <div className="glass-card p-5 space-y-5 animate-slide-up border border-surface-700/50">
 
@@ -557,6 +553,7 @@ export default function Scenarios() {
         </div>
       )}
       </div>{/* end isolate wrapper */}
+      </div>{/* end scroll content */}
     </div>
   )
 }
