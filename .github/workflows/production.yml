@@ -63,6 +63,10 @@ on:
         description: "Git branch or tag to deploy"
         type: string
         default: main
+      skip_email:
+        description: "Skip email sending during tests (set SKIP_EMAIL_TESTS=true)"
+        type: boolean
+        default: false
 
 concurrency:
   group: fixitlab-production
@@ -232,6 +236,7 @@ jobs:
           JIRA_SIMULATION_MODE: "False"
         run: |
           python manage.py migrate --run-syncdb
+          SKIP_EMAIL_TESTS="${{ inputs.skip_email && 'true' || 'false' }}" \
           python manage.py test tests --verbosity=2
 
   # ─────────────────────────────────────────────────────────────
@@ -392,6 +397,7 @@ jobs:
             set -e
             cd /opt/fixitlab
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              env SKIP_EMAIL_TESTS="${{ inputs.skip_email && 'true' || 'false' }}" \
               python manage.py test \
                 tests.test_jira_webhooks \
                 tests.test_api_security \
@@ -553,6 +559,7 @@ jobs:
             echo "| Branch | \`${{ inputs.git_ref }}\` |"
             echo "| Build scenarios | \`${{ inputs.build_scenarios }}\` |"
             echo "| E2E verify | \`${{ inputs.run_e2e }}\` |"
+            echo "| Skip email | \`${{ inputs.skip_email }}\` |"
             echo "| Site | https://fixitlab.in |"
             echo ""
             echo "## Job results"

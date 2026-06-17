@@ -11,9 +11,10 @@ import toast from 'react-hot-toast'
 // ─── Icon maps ────────────────────────────────────────────────────────────────
 
 const CONTAINER_ICONS = {
-  database: Database, redis: Cpu, rabbitmq: MessageSquare,
+  database: Database, db: Database, redis: Cpu, rabbitmq: MessageSquare,
   vault: ShieldCheck, backend: Server, frontend: Globe,
   gateway: Wifi, celery: Activity, pgbouncer: Database,
+  flower: Zap, certbot: ShieldCheck, nginx: Globe,
 }
 
 function containerIcon(name) {
@@ -213,8 +214,8 @@ export default function AdminMonitoring() {
     c.status !== 'running' || (c.health && c.health !== 'healthy' && c.health !== 'none')
   )
 
-  // Split for the "system services" section shown above container grid
-  const systemServiceList = systemContainers.slice(0, 8)
+  // All system containers shown in the quick-glance row
+  const systemServiceList = systemContainers
 
   return (
     <div className="space-y-5 sm:space-y-6 animate-fade-in">
@@ -317,7 +318,7 @@ export default function AdminMonitoring() {
             <Zap size={15} className="text-accent-purple" />
             System Services
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-3">
             {systemServiceList.map((c, i) => {
               const isUp = c.status === 'running'
               const isDegraded = isUp && c.health && c.health !== 'healthy' && c.health !== 'none'

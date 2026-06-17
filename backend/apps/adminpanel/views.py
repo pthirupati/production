@@ -2165,7 +2165,7 @@ class AdminMonitoringContainersView(APIView):
 
     SYSTEM_NAME_HINTS = (
         "backend", "frontend", "gateway", "redis", "postgres", "database",
-        "rabbitmq", "celery", "certbot", "nginx", "vault", "pgbouncer",
+        "rabbitmq", "celery", "certbot", "nginx", "vault", "pgbouncer", "flower",
         "fixitlab_vault", "fixitlab_db", "fixitlab_redis", "fixitlab_rabbitmq",
     )
 
