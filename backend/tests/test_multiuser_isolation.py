@@ -70,7 +70,7 @@ class UserIsolationTestCase(APITestCase):
         )
         
         # User1 login and get labs
-        self.client.post('/api/auth/login', {
+        self.client.post('/api/auth/login/', {
             'email': 'user1@test.com', 'password': 'Pass123!'
         }, format='json')
         
@@ -90,7 +90,7 @@ class UserIsolationTestCase(APITestCase):
         )
         
         # User1 tries to access User2's lab session
-        self.client.post('/api/auth/login', {
+        self.client.post('/api/auth/login/', {
             'email': 'user1@test.com', 'password': 'Pass123!'
         }, format='json')
         
@@ -110,7 +110,7 @@ class UserIsolationTestCase(APITestCase):
         )
         
         # User1 tries to update User2's lab score
-        self.client.post('/api/auth/login', {
+        self.client.post('/api/auth/login/', {
             'email': 'user1@test.com', 'password': 'Pass123!'
         }, format='json')
         
@@ -154,7 +154,7 @@ class UserIsolationTestCase(APITestCase):
         Profile.objects.get_or_create(user=self.user2)
         
         # User1 tries to get User2's profile
-        self.client.post('/api/auth/login', {
+        self.client.post('/api/auth/login/', {
             'email': 'user1@test.com', 'password': 'Pass123!'
         }, format='json')
         
@@ -176,7 +176,7 @@ class UserIsolationTestCase(APITestCase):
         )
         
         # User1 tries to get User2's subscription
-        self.client.post('/api/auth/login', {
+        self.client.post('/api/auth/login/', {
             'email': 'user1@test.com', 'password': 'Pass123!'
         }, format='json')
         
@@ -277,7 +277,7 @@ class ConcurrentUserAccessTestCase(TransactionTestCase):
         def login_user(index):
             try:
                 client = APIClient()
-                response = client.post('/api/auth/login', {
+                response = client.post('/api/auth/login/', {
                     'email': f'user{index}@test.com',
                     'password': 'Pass123!'
                 }, format='json')
@@ -312,7 +312,7 @@ class ConcurrentUserAccessTestCase(TransactionTestCase):
             try:
                 client = APIClient()
                 # Login
-                response = client.post('/api/auth/login', {
+                response = client.post('/api/auth/login/', {
                     'email': f'user{index}@test.com',
                     'password': 'Pass123!'
                 }, format='json')
@@ -513,7 +513,7 @@ class DataPrivacyTestCase(APITestCase):
         )
         
         # User1 tries to get lab details
-        self.client.post('/api/auth/login', {
+        self.client.post('/api/auth/login/', {
             'email': 'user1@test.com', 'password': 'Pass123!'
         }, format='json')
         
@@ -529,13 +529,13 @@ class DataPrivacyTestCase(APITestCase):
     def test_session_tokens_are_user_specific(self):
         """Test that session tokens are specific to each user."""
         # User1 login
-        resp1 = self.client.post('/api/auth/login', {
+        resp1 = self.client.post('/api/auth/login/', {
             'email': 'user1@test.com', 'password': 'Pass123!'
         }, format='json')
         token1 = resp1.data['access']
         
         # User2 login
-        resp2 = self.client.post('/api/auth/login', {
+        resp2 = self.client.post('/api/auth/login/', {
             'email': 'user2@test.com', 'password': 'Pass123!'
         }, format='json')
         token2 = resp2.data['access']

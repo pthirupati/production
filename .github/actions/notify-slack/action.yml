@@ -25,6 +25,10 @@ runs:
         BRANCH: ${{ github.ref_name }}
         ACTOR: ${{ github.actor }}
       run: |
+        if [ -z "${WEBHOOK:-}" ]; then
+          echo "Slack webhook not configured — skipping notification"
+          exit 0
+        fi
         if [ "$STATUS" = "success" ]; then
           EMOJI=":white_check_mark:"
           COLOR="good"

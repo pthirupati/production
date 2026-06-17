@@ -44,7 +44,7 @@ class JWTSecurityTestCase(APITestCase):
 
     def test_login_returns_access_token(self):
         """Test that login returns access token with RS256."""
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -55,7 +55,7 @@ class JWTSecurityTestCase(APITestCase):
 
     def test_jwt_token_has_jti_claim(self):
         """Test that JWT includes jti (JWT ID) for revocation tracking."""
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -71,7 +71,7 @@ class JWTSecurityTestCase(APITestCase):
 
     def test_access_token_lifetime_one_hour(self):
         """Test that access token lifetime is 1 hour (not 2 hours)."""
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -90,7 +90,7 @@ class JWTSecurityTestCase(APITestCase):
 
     def test_refresh_token_lifetime_seven_days(self):
         """Test that refresh token lifetime is 7 days."""
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -124,7 +124,7 @@ class DuplicateLoginPreventionTestCase(APITestCase):
     def test_second_login_invalidates_first_session(self):
         """Test that 2nd login invalidates 1st device's session."""
         # Device A: First login
-        response_a = self.client_a.post('/api/auth/login', {
+        response_a = self.client_a.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -136,7 +136,7 @@ class DuplicateLoginPreventionTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
         # Device B: Second login (same user)
-        response_b = self.client_b.post('/api/auth/login', {
+        response_b = self.client_b.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -236,7 +236,7 @@ class APIAuthenticationTestCase(APITestCase):
     def test_authenticated_request_allowed(self):
         """Test that authenticated requests are allowed."""
         # Login to get token
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -287,7 +287,7 @@ class PaymentSecurityTestCase(APITestCase):
     def test_payment_endpoint_with_authentication(self):
         """Test that payment endpoint works with authentication."""
         # Login
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -306,7 +306,7 @@ class PaymentSecurityTestCase(APITestCase):
     def test_server_side_price_validation(self):
         """Test that prices are not trusted from client."""
         # Login
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -364,7 +364,7 @@ class ScenarioPermissionsTestCase(APITestCase):
     def test_free_scenario_accessible_without_subscription(self):
         """Test that free scenarios are accessible to all users."""
         # Login
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -384,7 +384,7 @@ class ScenarioPermissionsTestCase(APITestCase):
     def test_paid_scenario_requires_subscription(self):
         """Test that paid scenarios require subscription."""
         # Login without subscription
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -410,7 +410,7 @@ class ScenarioPermissionsTestCase(APITestCase):
         )
         
         # Login
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -443,7 +443,7 @@ class SecurityHeadersTestCase(APITestCase):
     def test_security_headers_present(self):
         """Test that critical security headers are present."""
         # Login to get a successful response
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -454,7 +454,7 @@ class SecurityHeadersTestCase(APITestCase):
 
     def test_xss_protection_header(self):
         """Test XSS protection header."""
-        response = self.client.post('/api/auth/login', {
+        response = self.client.post('/api/auth/login/', {
             'email': 'test@example.com',
             'password': 'SecurePass123!'
         }, format='json')
@@ -497,7 +497,7 @@ class RateLimitingTestCase(APITestCase):
         """Test that login endpoint has rate limiting."""
         # Make multiple rapid requests
         for i in range(25):  # Try 25 times (beyond 20/min limit)
-            response = self.client.post('/api/auth/login', {
+            response = self.client.post('/api/auth/login/', {
                 'email': f'user{i}@example.com',
                 'password': 'wrongpassword'
             }, format='json')
