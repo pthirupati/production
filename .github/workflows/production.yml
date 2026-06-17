@@ -325,6 +325,7 @@ jobs:
     name: Verify container health
     needs: [deploy]
     if: |
+      always() &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       needs.deploy.result == 'success'
     runs-on: ubuntu-latest
@@ -380,6 +381,7 @@ jobs:
     name: Unit tests (production container)
     needs: [deploy]
     if: |
+      always() &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       needs.deploy.result == 'success'
     runs-on: ubuntu-latest
@@ -412,6 +414,7 @@ jobs:
     name: E2E — lab provisioning (all scenarios)
     needs: [deploy]
     if: |
+      always() &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_e2e &&
       needs.deploy.result == 'success'
@@ -440,6 +443,7 @@ jobs:
     name: E2E — API (internal + external)
     needs: [deploy]
     if: |
+      always() &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_e2e &&
       needs.deploy.result == 'success'
@@ -482,6 +486,7 @@ jobs:
     name: E2E — interview studio
     needs: [deploy]
     if: |
+      always() &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_e2e &&
       needs.deploy.result == 'success'
@@ -509,6 +514,7 @@ jobs:
     name: E2E smoke
     needs: [deploy]
     if: >
+      always() &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       needs.deploy.result == 'success'
     uses: ./.github/workflows/e2e-smoke.yml
