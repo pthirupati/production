@@ -4,9 +4,7 @@
 name: E2E — Full
 
 on:
-  schedule:
-    # Nightly at 01:00 UTC
-    - cron: "0 1 * * *"
+  # schedule removed — all runs are manual only
   workflow_dispatch:
     inputs:
       base_url:

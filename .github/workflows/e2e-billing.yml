@@ -18,9 +18,7 @@ on:
         description: "Skip cleanup (debug)"
         type: boolean
         default: false
-  schedule:
-    # Nightly at 04:00 UTC
-    - cron: "0 4 * * *"
+  # schedule removed — all runs are manual only
 
 concurrency:
   group: e2e-billing

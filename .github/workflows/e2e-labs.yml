@@ -27,9 +27,7 @@ on:
         description: "Only run dual-user isolation on first scenario"
         type: boolean
         default: true
-  schedule:
-    # Nightly at 03:00 UTC
-    - cron: "0 3 * * *"
+  # schedule removed — all runs are manual only
 
 concurrency:
   group: e2e-labs

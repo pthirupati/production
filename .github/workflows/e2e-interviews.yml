@@ -18,9 +18,7 @@ on:
         description: "Skip test data cleanup (debug only)"
         type: boolean
         default: false
-  schedule:
-    # Nightly at 02:00 UTC
-    - cron: "0 2 * * *"
+  # schedule removed — all runs are manual only
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

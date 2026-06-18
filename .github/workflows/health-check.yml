@@ -4,9 +4,7 @@
 name: Health Check
 
 on:
-  schedule:
-    # Every 30 minutes
-    - cron: "*/30 * * * *"
+  # schedule removed — all runs are manual only
   workflow_dispatch:
     inputs:
       base_url:
