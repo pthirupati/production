@@ -1336,6 +1336,28 @@ class UserProgressView(APIView):
                 .order_by("-started_at")[:10]
             )
 
+            # Difficulty auto-progression recommendations
+            completed_slugs = set(progress.filter(completed=True).values_list("scenario__slug", flat=True))
+            recommended = []
+            for tech in Technology.objects.filter(is_active=True).prefetch_related("scenarios"):
+                easy_s = [s for s in tech.scenarios.filter(is_active=True, difficulty="easy")]
+                medium_s = [s for s in tech.scenarios.filter(is_active=True, difficulty="medium")]
+                hard_s = [s for s in tech.scenarios.filter(is_active=True, difficulty="hard")]
+                easy_done = sum(1 for s in easy_s if s.slug in completed_slugs)
+                medium_done = sum(1 for s in medium_s if s.slug in completed_slugs)
+                if easy_s and medium_s and easy_done >= len(easy_s) * 0.8 > 0:
+                    target_pool = hard_s if (medium_done >= len(medium_s) * 0.8) else medium_s
+                else:
+                    target_pool = easy_s or medium_s
+                for s in target_pool:
+                    if s.slug not in completed_slugs:
+                        recommended.append({
+                            "id": s.id, "slug": s.slug, "title": s.title,
+                            "difficulty": s.difficulty, "technology": tech.name,
+                            "technology_slug": tech.slug,
+                        })
+                        break  # one per tech
+
             result = {
                 "summary": {
                     "total_scenarios": total_scenarios,
@@ -1347,6 +1369,7 @@ class UserProgressView(APIView):
                 "technology_progress": tech_progress,
                 "difficulty_progress": diff_progress,
                 "achievements": achievements,
+                "recommended_scenarios": recommended[:8],
                 "recent_activity": [
                     {
                         "scenario_title": s.scenario.title,

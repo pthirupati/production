@@ -214,6 +214,7 @@ export default function Dashboard() {
     : techProgress
   const diffProgress = progress?.difficulty_progress || {}
   const recent = progress?.recent_activity || []
+  const recommended = progress?.recommended_scenarios || []
   const earnedAch = achievements.filter?.(a => a.earned) || []
 
   const statCards = [
@@ -649,6 +650,33 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {recommended.length > 0 && (
+        <div className="glass-card p-5 space-y-3">
+          <h3 className="font-semibold text-white text-sm flex items-center gap-2">
+            <TrendingUp size={16} className="text-accent-cyan" /> Recommended Next
+          </h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+            {recommended.map(s => (
+              <Link
+                key={s.slug}
+                to={`/scenarios/${s.slug}`}
+                className="flex flex-col gap-1 p-3 rounded-lg bg-surface-800/50 border border-surface-700/30 hover:border-accent-cyan/30 hover:bg-surface-800/80 transition-all group"
+              >
+                <span className="text-white text-xs font-medium group-hover:text-accent-cyan transition-colors line-clamp-2">{s.title}</span>
+                <div className="flex items-center gap-1.5 mt-auto pt-1">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                    s.difficulty === 'easy' ? 'bg-accent-green/10 text-accent-green' :
+                    s.difficulty === 'medium' ? 'bg-accent-amber/10 text-accent-amber' :
+                    'bg-accent-red/10 text-accent-red'
+                  }`}>{s.difficulty}</span>
+                  <span className="text-[10px] text-surface-500 truncate">{s.technology}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3">
         <Link to="/technologies" className="btn-primary flex items-center gap-2"><Target size={16} /> Browse Technologies</Link>
