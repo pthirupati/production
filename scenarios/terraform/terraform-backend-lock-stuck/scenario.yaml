@@ -8,7 +8,7 @@ objectives:
   - Identify the stale DynamoDB lock entry and retrieve the LockID from the error message
   - Verify no other Terraform process is actively running before force-unlocking
   - Run terraform force-unlock <LockID> to release the stale lock
-lab_mode: docker
+lab_mode: simulation
 simulation_type: terraform
 time_limit: 1800
 max_score: 100

@@ -8,7 +8,7 @@ objectives:
   - Identify the variable(s) containing secret values in the Terraform configuration
   - Add sensitive = true to each secret variable declaration
   - Run terraform plan and confirm the value is shown as (sensitive value) in the output
-lab_mode: docker
+lab_mode: simulation
 simulation_type: terraform
 time_limit: 1200
 max_score: 100

@@ -9,7 +9,7 @@ objectives:
   - List available workspaces with terraform workspace list
   - Switch to the staging workspace using terraform workspace select
   - Run terraform plan and verify it targets the staging environment
-lab_mode: docker
+lab_mode: simulation
 simulation_type: terraform
 time_limit: 1200
 max_score: 100

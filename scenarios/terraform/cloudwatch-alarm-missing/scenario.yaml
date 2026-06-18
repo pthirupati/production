@@ -7,7 +7,7 @@ initial_state: 'Simulated AWS environment with a CloudWatch alarm attached to an
 objectives:
   - Identify why the CloudWatch alarm stays in OK or INSUFFICIENT_DATA state
   - Fix the metric name, threshold, or period so the alarm reflects actual resource utilization
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 1200
 max_score: 100

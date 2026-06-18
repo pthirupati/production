@@ -13,7 +13,7 @@ objectives:
   - Confirm the Print Spooler service is stopped and identify stuck print jobs
   - Clear the print queue and remove corrupted spool files
   - Restart the Print Spooler and verify printers come back online
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1200
 max_score: 100

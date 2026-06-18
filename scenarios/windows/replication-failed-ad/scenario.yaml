@@ -14,7 +14,7 @@ objectives:
   - Run repadmin diagnostics to identify all replication failures and error codes
   - Fix the underlying cause (network, DNS, lingering objects, or metadata cleanup)
   - Verify all domain controllers are replicating successfully
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 2400
 max_score: 100

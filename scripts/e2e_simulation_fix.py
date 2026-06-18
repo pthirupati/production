@@ -209,6 +209,22 @@ def apply_simulation_fix(session) -> tuple[bool, str]:
             state.myapp_working = True
             return True, "ldconfig conf restored"
 
+        if "terraform" in slug or any(w in slug for w in (
+            "aws-", "cloudwatch", "lambda", "s3-", "eks", "iam-", "ec2-", "elb",
+            "ecr", "rds", "vpc", "kinesis", "sqs", "cloudfront", "secrets-manager",
+        )):
+            state.terraform_fixed = True
+            return True, "terraform/aws issue resolved"
+
+        if any(w in slug for w in (
+            "windows", "win-", "iis", "hyper-v", "kerberos", "gpo", "ntfs", "smb-",
+            "winrm", "wmi", "sql-server", "dhcp-", "replication-", "dns-zone",
+            "ad-user", "certificate-enrollment", "file-server", "gpo-not",
+            "print-spooler", "remote-desktop", "service-dependency", "windows-update",
+        )):
+            state.windows_fixed = True
+            return True, "windows issue resolved"
+
         return False, f"no simulation fix map for {slug}"
     except Exception as exc:
         return False, str(exc)[:200]

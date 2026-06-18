@@ -14,7 +14,7 @@ objectives:
   - Identify the current PowerShell execution policy and scope
   - Set the execution policy to RemoteSigned or Unrestricted as appropriate
   - Verify scripts can run successfully after the policy change
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1200
 max_score: 100

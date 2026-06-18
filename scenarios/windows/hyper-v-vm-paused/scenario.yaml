@@ -14,7 +14,7 @@ objectives:
   - Identify the paused-critical VM and the root cause storage issue
   - Free sufficient disk space on the host to allow the VM to resume
   - Resume the VM and verify it returns to a running state
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1800
 max_score: 100

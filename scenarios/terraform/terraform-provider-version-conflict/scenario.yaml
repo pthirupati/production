@@ -8,7 +8,7 @@ objectives:
   - Run terraform init and read the provider version conflict error to identify the incompatible constraints
   - Update the provider required_version constraints in each module to use a compatible overlapping range
   - Run terraform init successfully and confirm providers are downloaded
-lab_mode: docker
+lab_mode: simulation
 simulation_type: terraform
 time_limit: 1800
 max_score: 100

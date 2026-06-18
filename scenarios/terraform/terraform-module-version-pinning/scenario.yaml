@@ -8,7 +8,7 @@ objectives:
   - Identify the unpinned module source reference in the Terraform configuration
   - Add a version constraint (Registry module) or a specific Git tag ref to the source
   - Run terraform init -upgrade to lock the pinned version into .terraform.lock.hcl
-lab_mode: docker
+lab_mode: simulation
 simulation_type: terraform
 time_limit: 1200
 max_score: 100

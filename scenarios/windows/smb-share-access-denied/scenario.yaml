@@ -14,7 +14,7 @@ objectives:
   - Identify the mismatch between share permissions and NTFS permissions
   - Fix share-level permissions to grant the appropriate groups access
   - Verify SMB connectivity and file access for affected users
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1800
 max_score: 100

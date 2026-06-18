@@ -8,7 +8,7 @@ objectives:
   - Inspect the CloudFront distribution origin configuration and identify the incorrect domain
   - Update the origin domain name to the correct ALB DNS name or S3 bucket endpoint
   - Verify the distribution returns 200 responses after the fix
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 1800
 max_score: 100

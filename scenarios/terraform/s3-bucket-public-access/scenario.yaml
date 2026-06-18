@@ -8,7 +8,7 @@ objectives:
   - Identify the public S3 bucket using the CLI and review its public access settings and bucket policy
   - Enable all four Block Public Access settings on the bucket
   - Remove any bucket policy or ACL entries that grant public read access
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 1200
 max_score: 100

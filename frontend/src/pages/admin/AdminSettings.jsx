@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { Wrench, AlertTriangle, Save, ToggleLeft, ToggleRight, Mail, Settings, Trash2, Bot } from 'lucide-react'
+import { Wrench, AlertTriangle, Save, ToggleLeft, ToggleRight, Mail, Settings, Trash2, Bot, Shield, Eye, EyeOff, RefreshCw, CheckCircle2, KeyRound, Database, Zap, CreditCard } from 'lucide-react'
 import { IMAGE_UPLOAD_HINTS } from '../../utils/mediaUrl'
 import toast from 'react-hot-toast'
 
@@ -23,9 +23,14 @@ export default function AdminSettings() {
     support_bot_custom_faq: [],
   })
   const [faqDraft, setFaqDraft] = useState({ keywords: '', answer: '' })
+  const [envSecrets, setEnvSecrets] = useState(null)
+  const [envEdits, setEnvEdits] = useState({})
+  const [envVisible, setEnvVisible] = useState({})
+  const [envSyncing, setEnvSyncing] = useState(false)
 
   useEffect(() => {
     loadData()
+    adminApi.getEnvSecrets().then(setEnvSecrets).catch(() => {})
   }, [])
 
   const loadData = async () => {
@@ -584,6 +589,115 @@ export default function AdminSettings() {
             </div>
           </div>
         )}
+      </div>
+      {/* ── Environment Secrets & Vault Sync ── */}
+      <div className="glass-card p-5 border border-surface-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield size={16} className="text-indigo-400" />
+            <h2 className="text-sm font-semibold text-white">Environment Secrets</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            {envSecrets?.vault_enabled ? (
+              <span className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle2 size={12} /> Vault connected</span>
+            ) : (
+              <span className="text-xs text-amber-400 flex items-center gap-1"><AlertTriangle size={12} /> Vault not configured</span>
+            )}
+            {envSecrets?.vault_last_updated && (
+              <span className="text-xs text-surface-500">
+                Vault updated {envSecrets.vault_secret_age_days != null ? `${envSecrets.vault_secret_age_days}d ago` : 'recently'}
+              </span>
+            )}
+          </div>
+        </div>
+        <p className="text-xs text-surface-500">
+          Edit values below and click Sync to push to Vault and apply immediately without downtime.
+          Red rows need rotation — credentials older than their threshold or using weak values.
+        </p>
+        {envSecrets?.secrets ? (
+          <div className="space-y-2">
+            {envSecrets.secrets.map(s => {
+              const catIcon = s.category === 'security' ? <KeyRound size={12} />
+                : s.category === 'database' ? <Database size={12} />
+                : s.category === 'cache' ? <Zap size={12} />
+                : s.category === 'payments' ? <CreditCard size={12} />
+                : <Shield size={12} />
+              const needsRot = s.needs_rotation
+              return (
+                <div
+                  key={s.key}
+                  className={`rounded-lg border px-3 py-2.5 ${needsRot ? 'border-red-500/40 bg-red-500/5' : 'border-surface-700 bg-surface-900/50'}`}
+                >
+                  <div className="flex items-start gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-surface-400 min-w-[14px]">{catIcon}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono font-semibold text-white">{s.key}</span>
+                        <span className="text-xs text-surface-500">{s.label}</span>
+                        {needsRot && (
+                          <span className="text-xs text-red-400 flex items-center gap-0.5">
+                            <AlertTriangle size={10} /> {s.rotation_reason}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <div className="relative flex-1 max-w-xs">
+                          <input
+                            type={envVisible[s.key] ? 'text' : 'password'}
+                            placeholder={s.masked || (s.is_set ? '(set — enter new value to rotate)' : 'Not set')}
+                            value={envEdits[s.key] || ''}
+                            onChange={e => setEnvEdits(p => ({ ...p, [s.key]: e.target.value }))}
+                            className={`w-full bg-surface-800 border text-xs rounded px-2.5 py-1.5 font-mono text-white placeholder-surface-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${needsRot ? 'border-red-500/40' : 'border-surface-700'}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setEnvVisible(p => ({ ...p, [s.key]: !p[s.key] }))}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-surface-500 hover:text-white"
+                          >
+                            {envVisible[s.key] ? <EyeOff size={12} /> : <Eye size={12} />}
+                          </button>
+                        </div>
+                        {s.is_set && !envEdits[s.key] && (
+                          <span className="text-xs font-mono text-surface-500">{s.masked}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-surface-500">Loading secrets…</p>
+        )}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            disabled={envSyncing || Object.keys(envEdits).filter(k => envEdits[k]).length === 0}
+            onClick={async () => {
+              const updates = Object.fromEntries(Object.entries(envEdits).filter(([, v]) => v))
+              if (!updates || !Object.keys(updates).length) return
+              setEnvSyncing(true)
+              try {
+                const result = await adminApi.syncEnvSecrets(updates)
+                toast.success(`Synced ${result.synced_keys?.length || 0} secret(s)${result.vault_updated ? ' to Vault' : ''}`)
+                setEnvEdits({})
+                adminApi.getEnvSecrets().then(setEnvSecrets).catch(() => {})
+              } catch {
+                toast.error('Sync failed')
+              } finally {
+                setEnvSyncing(false)
+              }
+            }}
+            className="btn-primary text-xs py-1.5 px-4 flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {envSyncing ? <RefreshCw size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            Sync to Vault
+          </button>
+          <span className="text-xs text-surface-500">
+            {Object.keys(envEdits).filter(k => envEdits[k]).length} change(s) pending
+          </span>
+        </div>
       </div>
     </div>
   )

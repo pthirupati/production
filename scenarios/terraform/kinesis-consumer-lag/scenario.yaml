@@ -8,7 +8,7 @@ objectives:
   - Identify the consumer lag using CloudWatch MillisBehindLatest and GetRecords.IteratorAgeMilliseconds metrics
   - Increase the shard count on the Kinesis stream to meet throughput requirements
   - Optionally increase Lambda concurrency or batch size to improve consumer throughput
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 2400
 max_score: 100

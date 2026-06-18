@@ -7,7 +7,7 @@ initial_state: 'Simulated AWS environment with an EC2 instance and a security gr
 objectives:
   - Identify the security group with the overly permissive SSH rule using the AWS CLI
   - Revoke the 0.0.0.0/0 inbound rule and replace it with a specific CIDR (e.g., your corporate IP range)
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 1200
 max_score: 100

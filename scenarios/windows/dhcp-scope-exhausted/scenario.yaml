@@ -13,7 +13,7 @@ objectives:
   - Identify the exhausted DHCP scope and review current lease utilization
   - Clear stale or expired leases and optionally extend the scope range
   - Verify new clients can successfully obtain DHCP leases
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1800
 max_score: 100

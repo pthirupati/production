@@ -3346,3 +3346,252 @@ class AdminCertificatesView(APIView):
             },
         })
 
+
+# ─── Platform Environment & Vault Sync ───────────────────────────────────────
+
+_MANAGED_ENV_VARS = [
+    {
+        "key": "DJANGO_SECRET_KEY",
+        "label": "Django Secret Key",
+        "category": "security",
+        "rotation_days": 365,
+        "description": "Signs sessions and CSRF tokens.",
+    },
+    {
+        "key": "POSTGRES_PASSWORD",
+        "label": "Database Password",
+        "category": "database",
+        "rotation_days": 90,
+        "description": "PostgreSQL connection password.",
+    },
+    {
+        "key": "REDIS_PASSWORD",
+        "label": "Redis Password",
+        "category": "cache",
+        "rotation_days": 90,
+        "description": "Redis auth password (cache + channels).",
+    },
+    {
+        "key": "STRIPE_SECRET_KEY",
+        "label": "Stripe Secret Key",
+        "category": "payments",
+        "rotation_days": 365,
+        "description": "Stripe payments secret key.",
+    },
+    {
+        "key": "RAZORPAY_KEY_SECRET",
+        "label": "Razorpay Key Secret",
+        "category": "payments",
+        "rotation_days": 365,
+        "description": "Razorpay payments secret.",
+    },
+    {
+        "key": "SMTP_PASSWORD",
+        "label": "SMTP Password",
+        "category": "email",
+        "rotation_days": 365,
+        "description": "Email server password.",
+    },
+    {
+        "key": "ANTHROPIC_API_KEY",
+        "label": "Anthropic API Key",
+        "category": "ai",
+        "rotation_days": 365,
+        "description": "Claude AI API key.",
+    },
+    {
+        "key": "OPENAI_API_KEY",
+        "label": "OpenAI API Key",
+        "category": "ai",
+        "rotation_days": 365,
+        "description": "OpenAI API key (if used).",
+    },
+]
+
+_SUSPECT_VALUE_PATTERNS = (
+    "change-me", "changeme", "secret", "password", "test", "dev-", "local-",
+    "example", "placeholder", "replace-this", "your-key",
+)
+
+
+def _mask_secret(value: str) -> str:
+    """Show last 4 characters only."""
+    if not value:
+        return ""
+    if len(value) <= 4:
+        return "****"
+    return "****" + value[-4:]
+
+
+def _is_suspect(value: str) -> bool:
+    v = (value or "").lower()
+    if len(v) < 16:
+        return True
+    return any(p in v for p in _SUSPECT_VALUE_PATTERNS)
+
+
+def _vault_secret_metadata():
+    """Return (secrets_dict, created_time_iso | None) from Vault KV, or ({}, None)."""
+    vault_enabled = os.environ.get("VAULT_ENABLED", "").lower() in ("1", "true", "yes", "on")
+    if not vault_enabled:
+        return {}, None
+    try:
+        import hvac
+        role_id = os.environ.get("VAULT_ROLE_ID", "").strip()
+        secret_id = os.environ.get("VAULT_SECRET_ID", "").strip()
+        vault_addr = os.environ.get("VAULT_ADDR", "http://vault:8200")
+        if "127.0.0.1" in vault_addr and os.path.exists("/.dockerenv"):
+            vault_addr = "http://vault:8200"
+        kv_path = os.environ.get("VAULT_KV_PATH", "secret/fixitlab/config")
+        client = hvac.Client(url=vault_addr, timeout=5)
+        client.auth.approle.login(role_id=role_id, secret_id=secret_id)
+        parts = kv_path.split("/", 1)
+        mount = parts[0] if len(parts) > 1 else "secret"
+        path = parts[1] if len(parts) > 1 else kv_path
+        resp = client.secrets.kv.v2.read_secret_version(
+            path=path, mount_point=mount, raise_on_deleted_version=True
+        )
+        data = resp["data"]
+        secrets = data.get("data", {})
+        created_time = data.get("metadata", {}).get("created_time")
+        return secrets, created_time
+    except Exception:
+        return {}, None
+
+
+def _vault_write_secrets(updates: dict) -> bool:
+    """Write updated secrets dict to Vault KV. Returns True on success."""
+    vault_enabled = os.environ.get("VAULT_ENABLED", "").lower() in ("1", "true", "yes", "on")
+    if not vault_enabled:
+        return False
+    try:
+        import hvac
+        role_id = os.environ.get("VAULT_ROLE_ID", "").strip()
+        secret_id = os.environ.get("VAULT_SECRET_ID", "").strip()
+        vault_addr = os.environ.get("VAULT_ADDR", "http://vault:8200")
+        if "127.0.0.1" in vault_addr and os.path.exists("/.dockerenv"):
+            vault_addr = "http://vault:8200"
+        kv_path = os.environ.get("VAULT_KV_PATH", "secret/fixitlab/config")
+        client = hvac.Client(url=vault_addr, timeout=5)
+        client.auth.approle.login(role_id=role_id, secret_id=secret_id)
+        parts = kv_path.split("/", 1)
+        mount = parts[0] if len(parts) > 1 else "secret"
+        path = parts[1] if len(parts) > 1 else kv_path
+        # Read current state, merge updates, write back
+        try:
+            resp = client.secrets.kv.v2.read_secret_version(
+                path=path, mount_point=mount, raise_on_deleted_version=True
+            )
+            current = resp["data"]["data"]
+        except Exception:
+            current = {}
+        merged = {**current, **updates}
+        client.secrets.kv.v2.create_or_update_secret(
+            path=path, mount_point=mount, secret=merged
+        )
+        return True
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Vault write failed: %s", exc)
+        return False
+
+
+class AdminEnvSecretsView(APIView):
+    """Read/update platform environment secrets with Vault sync."""
+
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        vault_secrets, vault_created_time = _vault_secret_metadata()
+        vault_enabled = bool(os.environ.get("VAULT_ENABLED", "").lower() in ("1", "true", "yes", "on"))
+
+        age_days = None
+        if vault_created_time:
+            try:
+                from datetime import datetime, timezone as dt_timezone
+                created = datetime.fromisoformat(vault_created_time.rstrip("Z")).replace(tzinfo=dt_timezone.utc)
+                age_days = (timezone.now() - created).days
+            except Exception:
+                pass
+
+        items = []
+        for spec in _MANAGED_ENV_VARS:
+            key = spec["key"]
+            # Prefer Vault value if available; fall back to os.environ
+            value = vault_secrets.get(key) or os.environ.get(key, "")
+            is_set = bool(value.strip())
+            masked = _mask_secret(value) if is_set else ""
+            suspect = _is_suspect(value)
+            rotation_days = spec["rotation_days"]
+            over_age = age_days is not None and age_days > rotation_days
+            needs_rotation = not is_set or suspect or over_age
+            reasons = []
+            if not is_set:
+                reasons.append("Not configured")
+            if suspect:
+                reasons.append("Weak or default value detected")
+            if over_age:
+                reasons.append(f"Last updated {age_days}d ago (recommend every {rotation_days}d)")
+            items.append({
+                "key": key,
+                "label": spec["label"],
+                "category": spec["category"],
+                "description": spec["description"],
+                "is_set": is_set,
+                "masked": masked,
+                "needs_rotation": needs_rotation,
+                "rotation_reason": "; ".join(reasons) if reasons else None,
+                "rotation_days": rotation_days,
+            })
+
+        return Response({
+            "vault_enabled": vault_enabled,
+            "vault_secret_age_days": age_days,
+            "vault_last_updated": vault_created_time,
+            "secrets": items,
+        })
+
+    def post(self, request):
+        """Sync updated secret values to Vault and apply to running process."""
+        updates = request.data.get("updates", {})
+        if not isinstance(updates, dict) or not updates:
+            return Response({"error": "updates dict required"}, status=400)
+
+        # Validate keys — only allow managed vars
+        allowed = {s["key"] for s in _MANAGED_ENV_VARS}
+        invalid = [k for k in updates if k not in allowed]
+        if invalid:
+            return Response({"error": f"Unknown keys: {invalid}"}, status=400)
+
+        # Strip empty values — don't overwrite with blanks
+        clean = {k: v.strip() for k, v in updates.items() if v and v.strip()}
+        if not clean:
+            return Response({"error": "No non-empty values provided"}, status=400)
+
+        vault_ok = _vault_write_secrets(clean)
+
+        # Apply to running process immediately (best-effort)
+        for k, v in clean.items():
+            os.environ[k] = v
+        # Update Django settings for values it reads from env
+        for k, v in clean.items():
+            if hasattr(settings, k):
+                setattr(settings, k, v)
+        # Clear all caches so components re-read settings
+        try:
+            cache.clear()
+        except Exception:
+            pass
+
+        import logging
+        logging.getLogger(__name__).info(
+            "Env secrets updated by %s: %s (vault_ok=%s)",
+            request.user.email, list(clean.keys()), vault_ok,
+        )
+
+        return Response({
+            "synced_keys": list(clean.keys()),
+            "vault_updated": vault_ok,
+            "applied_to_process": True,
+            "note": "Changes applied immediately. Workers will use new values on next startup." if not vault_ok else "Changes saved to Vault and applied to all running workers.",
+        })

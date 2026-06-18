@@ -14,7 +14,7 @@ objectives:
   - Identify the failing service and its dependency chain
   - Start the required dependency services in the correct order
   - Confirm the primary service starts successfully
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1200
 max_score: 100

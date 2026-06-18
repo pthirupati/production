@@ -9,7 +9,7 @@ objectives:
   - List S3 object versions for the state file and identify the last known-good version
   - Restore the previous version as the current state object in S3
   - Run terraform state list to confirm the state is readable again
-lab_mode: docker
+lab_mode: simulation
 simulation_type: terraform
 time_limit: 2400
 max_score: 100

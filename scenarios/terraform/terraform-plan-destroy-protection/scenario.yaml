@@ -8,7 +8,7 @@ objectives:
   - Read the terraform plan output and identify which resources are scheduled for destruction
   - Add a lifecycle { prevent_destroy = true } block to the critical resource to block accidental deletion
   - Investigate whether the change can be made in-place or requires a migration strategy instead
-lab_mode: docker
+lab_mode: simulation
 simulation_type: terraform
 time_limit: 1800
 max_score: 100

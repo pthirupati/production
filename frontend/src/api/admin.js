@@ -266,6 +266,15 @@ export const adminApi = {
     return data
   },
 
+  async getEnvSecrets() {
+    const { data } = await api.get('/admin/env-secrets/', { silentError: true })
+    return data
+  },
+
+  async syncEnvSecrets(updates) {
+    const { data } = await api.post('/admin/env-secrets/sync/', { updates })
+    return data
+  },
 
   async getMonitoringContainers(kind = 'all') {
     const qs = kind && kind !== 'all' ? `?kind=${kind}` : ''

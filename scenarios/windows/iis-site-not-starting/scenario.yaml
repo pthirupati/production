@@ -14,7 +14,7 @@ objectives:
   - Identify why the IIS website cannot start (port conflict or app pool failure)
   - Resolve the binding conflict or fix the application pool configuration
   - Verify the website starts and responds to HTTP requests
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1200
 max_score: 100

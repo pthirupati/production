@@ -8,7 +8,7 @@ objectives:
   - Inspect the DLQ message bodies to understand why processing is failing
   - Fix the Lambda function configuration or code that causes the processing exception
   - Redrive DLQ messages back to the source queue and confirm successful processing
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 1800
 max_score: 100

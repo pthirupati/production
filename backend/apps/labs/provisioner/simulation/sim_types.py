@@ -14,6 +14,8 @@ UNIFIED_SIM_TYPES = {
     "ansible": "Ansible Simulation",
     "python": "Python Simulation",
     "java": "Java Development Simulation",
+    "terraform": "Terraform / AWS IaC Simulation",
+    "windows": "Windows Server Simulation",
 }
 
 _LEGACY_MAP = {
@@ -48,6 +50,8 @@ def hostname_for_type(sim_type: str, slug: str = "") -> str:
         "python": "dev-server",
         "java": "dev-server",
         "vmware": "vcenter-sim",
+        "terraform": "terraform-ws",
+        "windows": "WIN-SRV-SIM",
     }
     if "ansible" in slug:
         return "ansible-control"

@@ -13,7 +13,7 @@ objectives:
   - Identify why certificate enrollment is failing from the CA
   - Fix certificate template permissions and enrollment rights
   - Verify successful certificate enrollment for affected users
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1800
 max_score: 100

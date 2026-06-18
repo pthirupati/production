@@ -51,6 +51,7 @@ from .views import (
     AdminTechnologyEmailView,
     AdminTechnologyStatsView,
     AdminInterviewMaintenanceView,
+    AdminEnvSecretsView,
 )
 from apps.interviews.admin_views import (
     AdminInterviewOverviewView,
@@ -167,4 +168,6 @@ urlpatterns = [
     path("interviews/entitlements/", AdminInterviewEntitlementsView.as_view()),
     path("interviews/maintenance/", AdminInterviewMaintenanceView.as_view()),
     path("certificates/", AdminCertificatesView.as_view()),
+    path("env-secrets/", AdminEnvSecretsView.as_view()),
+    path("env-secrets/sync/", AdminEnvSecretsView.as_view()),
 ]

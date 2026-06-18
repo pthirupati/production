@@ -130,6 +130,16 @@ ldconfig -p 2>/dev/null | grep -q libfixit
 exit 0
 """
 
+CANONICAL_TERRAFORM_CHECK = """#!/bin/bash
+terraform validate
+exit 0
+"""
+
+CANONICAL_WINDOWS_CHECK = """#!/bin/bash
+Get-Service
+exit 0
+"""
+
 
 def is_trivial_validation_script(script: str) -> bool:
     """True when script would always pass without checking lab state."""
@@ -173,6 +183,8 @@ def resolve_simulation_validation_script(scenario_slug: str, validation_script: 
         (lambda s: "patch" in s, CANONICAL_PATCHING_CHECK),
         (lambda s: "ssh-stop" in s or "sshd-down" in s, CANONICAL_SSHD_CHECK),
         (lambda s: "ldconfig" in s or "missing-library" in s, CANONICAL_LDCONFIG_CHECK),
+        (lambda s: "terraform" in s or "aws-" in s or "cloudwatch" in s or "lambda" in s or "s3-" in s or "eks" in s or "iam-" in s or "ec2-" in s or "elb" in s or "ecr" in s or "rds" in s or "vpc" in s or "kinesis" in s or "sqs" in s or "secrets-manager" in s, CANONICAL_TERRAFORM_CHECK),
+        (lambda s: "windows" in s or "win-" in s or "iis" in s or "hyper-v" in s or "kerberos" in s or "gpo" in s or "ntfs" in s or "smb-" in s or "winrm" in s or "wmi" in s or "sql-server" in s or "dhcp-" in s or "replication-" in s or "dns-zone" in s, CANONICAL_WINDOWS_CHECK),
         (lambda s: "ipmi" in s or "baremetal" in s or "vmware" in s, CANONICAL_BAREMETAL_CHECK),
     ]
     for pred, canonical in rules:
@@ -466,6 +478,20 @@ def _run_line_check(
         svc = state.services.get("sshd")
         if not svc or svc.active != "active":
             failures.append("sshd is not active")
+        return True
+
+    if "terraform" in stripped or stripped.startswith("aws "):
+        slug = (state.scenario_slug or "").lower()
+        if "terraform" in slug or "aws" in slug or any(w in slug for w in ("lambda", "eks", "iam", "ec2", "elb", "ecr", "rds", "vpc", "kinesis", "sqs", "s3-", "cloudwatch", "cloudfront", "secrets-manager")):
+            if not getattr(state, "terraform_fixed", False):
+                failures.append("Terraform/AWS issue not resolved — apply the required fix first")
+        return True
+
+    if any(cmd in stripped for cmd in ("Get-Service", "Get-Website", "Start-WebAppPool", "Start-Website", "Get-EventLog", "Get-Process", "Set-Service", "Restart-Service", "netstat", "Get-NetAdapter", "Get-ADUser", "net user", "net localgroup", "ipconfig", "wmic")):
+        slug = (state.scenario_slug or "").lower()
+        if any(w in slug for w in ("windows", "win-", "iis", "hyper-v", "kerberos", "gpo", "ntfs", "smb-", "winrm", "wmi", "sql-server", "dhcp-", "replication-", "dns-zone")):
+            if not getattr(state, "windows_fixed", False):
+                failures.append("Windows issue not resolved — apply the required fix first")
         return True
 
     if "/usr/local/bin/myapp" in stripped or ("ldconfig" in stripped and "libfixit" in stripped):

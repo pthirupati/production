@@ -14,7 +14,7 @@ objectives:
   - Identify WMI errors and verify the repository integrity
   - Rebuild the WMI repository if corrupted
   - Verify WMI queries succeed and monitoring agents reconnect
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1800
 max_score: 100

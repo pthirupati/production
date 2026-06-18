@@ -13,7 +13,7 @@ objectives:
   - Identify which user accounts are locked out in Active Directory
   - Unlock the affected account(s) using PowerShell
   - Review and adjust the account lockout policy appropriately
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1200
 max_score: 100

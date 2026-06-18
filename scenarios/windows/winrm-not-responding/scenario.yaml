@@ -15,7 +15,7 @@ objectives:
   - Diagnose the WinRM configuration issue preventing remote connections
   - Configure WinRM listener and ensure the firewall allows WinRM traffic
   - Verify remote PowerShell sessions work successfully after the fix
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1800
 max_score: 100

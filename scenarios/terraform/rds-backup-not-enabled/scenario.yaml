@@ -7,7 +7,7 @@ initial_state: 'Simulated AWS environment with an RDS MySQL instance where Backu
 objectives:
   - Identify the RDS instance with backups disabled using the AWS CLI
   - Enable automated backups by setting the BackupRetentionPeriod to at least 7 days
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 1200
 max_score: 100

@@ -8,7 +8,7 @@ objectives:
   - Identify which IAM actions are being denied using the CLI error output or IAM policy simulator
   - Attach or create an IAM policy granting the minimum required permissions
   - Confirm the CLI commands succeed after the policy change
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 1200
 max_score: 100

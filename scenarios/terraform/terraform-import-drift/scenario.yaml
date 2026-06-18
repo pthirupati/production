@@ -9,7 +9,7 @@ objectives:
   - Write the matching resource block in the Terraform configuration
   - Run terraform import to bring the resource into state without recreating it
   - Run terraform plan to confirm zero drift after import
-lab_mode: docker
+lab_mode: simulation
 simulation_type: terraform
 time_limit: 1800
 max_score: 100

@@ -14,7 +14,7 @@ objectives:
   - Stop all Windows Update related services
   - Clear the Windows Update cache (SoftwareDistribution folder)
   - Restart services and initiate a fresh Windows Update scan
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1200
 max_score: 100

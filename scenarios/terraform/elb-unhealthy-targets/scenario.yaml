@@ -8,7 +8,7 @@ objectives:
   - Inspect the target group health check configuration and identify the incorrect path
   - Fix the health check path to match the application endpoint
   - Update the EC2 instance security group to allow inbound traffic from the ALB on the correct port
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 1800
 max_score: 100

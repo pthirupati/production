@@ -7,7 +7,7 @@ initial_state: 'Simulated AWS environment with a cost budget defined. The notifi
 objectives:
   - Inspect the AWS Budget notification configuration and identify the missing or broken subscriber
   - Fix the notification so it sends an email alert when actual spend exceeds the defined threshold
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 1200
 max_score: 100

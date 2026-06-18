@@ -8,7 +8,7 @@ objectives:
   - Inspect the node group IAM role and identify the missing managed policies
   - Attach the required policies to the node group IAM role
   - Verify the aws-auth ConfigMap includes the node role ARN and nodes join the cluster
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 2400
 max_score: 100

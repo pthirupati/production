@@ -14,7 +14,7 @@ objectives:
   - Identify the time skew between affected machines and the domain controller
   - Synchronize system clocks using w32tm and restore NTP configuration
   - Clear and renew Kerberos tickets to restore authentication
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1800
 max_score: 100

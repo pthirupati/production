@@ -14,7 +14,7 @@ objectives:
   - Identify the 18456 error state to determine the specific authentication failure
   - Enable Mixed Mode authentication and fix SQL login or user mapping as needed
   - Verify applications can successfully authenticate after the fix
-lab_mode: docker
+lab_mode: simulation
 simulation_type: windows
 time_limit: 1800
 max_score: 100

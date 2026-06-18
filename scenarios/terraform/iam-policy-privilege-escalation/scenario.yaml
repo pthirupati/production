@@ -8,7 +8,7 @@ objectives:
   - Identify the dangerous iam:PassRole + ec2:RunInstances combination in the IAM policy
   - Remove or scope down the iam:PassRole permission to restrict it to specific safe roles only
   - Confirm the user can no longer pass arbitrary roles to EC2 instances
-lab_mode: docker
+lab_mode: simulation
 simulation_type: aws
 time_limit: 2400
 max_score: 100
