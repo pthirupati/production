@@ -1,0 +1,36 @@
+title: Fix Helm Chart Missing Required Values
+slug: helm-chart-failed
+technology: DevOps
+category: Kubernetes
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  A Helm chart deployment is failing because required values are missing from
+  the values.yaml file. The chart requires database.host and database.port
+  to be set but they are absent. The deployment is blocking the release.
+  Add the missing required values and redeploy.
+objectives:
+  - Identify which required values are missing from values.yaml
+  - Add the missing database.host and database.port values
+  - Verify helm install or upgrade succeeds without errors
+initial_state: |
+  Kubernetes cluster with Helm 3 installed. Chart at /opt/helm/myapp-chart.
+  The values.yaml is missing required database.host and database.port entries.
+  Database host should be db.internal and port should be 5432.
+hints:
+  - order: 1
+    cost: 10
+    content: "Try deploying: helm install myapp /opt/helm/myapp-chart to see the error"
+  - order: 2
+    cost: 15
+    content: "Check required values: cat /opt/helm/myapp-chart/values.yaml"
+  - order: 3
+    cost: 20
+    content: "Add to values.yaml under database: section: host: db.internal and port: 5432"
+  - order: 4
+    cost: 25
+    content: "Validate: helm template /opt/helm/myapp-chart then helm install myapp /opt/helm/myapp-chart"

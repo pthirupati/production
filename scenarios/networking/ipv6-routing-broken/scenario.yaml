@@ -1,0 +1,38 @@
+slug: ipv6-routing-broken
+title: "IPv6 Routing Broken — Fix Router Advertisement Config"
+technology: Networking
+category: IPv6
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  IPv6 hosts on the LAN are not receiving Router Advertisements (RA) and therefore
+  cannot autoconfigure their default gateway via SLAAC. The radvd daemon is installed
+  but misconfigured — the AdvSendAdvert flag is off and the prefix advertisement is
+  missing the autoconfiguration flags. IPv6 connectivity to the internet is broken
+  for all hosts on the segment.
+objectives:
+  - Identify that radvd is not sending Router Advertisements
+  - Fix the radvd.conf to enable AdvSendAdvert and autoconfiguration flags
+  - Restart radvd and verify hosts receive RA and a global IPv6 address
+  - Confirm IPv6 default route is installed on a test host
+initial_state: |
+  Ubuntu 22.04 with radvd installed. /etc/radvd.conf has AdvSendAdvert off and
+  AdvAutonomous off on the prefix block. IPv6 forwarding is enabled. Hosts on
+  the LAN have link-local addresses but no global addresses and no default route.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check `systemctl status radvd` and inspect `/etc/radvd.conf`."
+  - order: 2
+    cost: 15
+    content: "Set `AdvSendAdvert on;` in the interface block and `AdvAutonomous on;` in the prefix block."
+  - order: 3
+    cost: 15
+    content: "Restart radvd: `systemctl restart radvd`. Verify with `radvdump` or `tcpdump -i eth1 icmp6`."
+  - order: 4
+    cost: 20
+    content: "On a host, run `ip -6 addr show` — you should see a /64 global address. Check `ip -6 route` for default via."

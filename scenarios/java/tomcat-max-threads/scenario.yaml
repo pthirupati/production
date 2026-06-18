@@ -1,0 +1,43 @@
+---
+slug: tomcat-max-threads
+title: "Tomcat Thread Pool Exhausted — Connections Rejected Under Load"
+technology: Java
+category: Web Servers
+difficulty: medium
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  A Java web application deployed on Tomcat 10.1 is returning HTTP 503 Service
+  Unavailable during load spikes. Tomcat logs show: "All threads (200) are currently
+  busy, waiting." The default maxThreads=200 is insufficient for the current concurrency
+  of approximately 500 simultaneous users. Engineers must tune the Tomcat connector
+  configuration and verify the application handles higher concurrency.
+objectives:
+  - Identify the thread pool exhaustion in Tomcat access and catalina logs
+  - Locate the HTTP connector configuration in server.xml
+  - Increase maxThreads and set acceptCount to handle burst traffic
+  - Restart Tomcat and verify 503 errors are eliminated
+initial_state: |
+  Simulated server. Tomcat 10.1 installed at /opt/tomcat/.
+  Logs at /opt/tomcat/logs/catalina.out show thread saturation.
+  server.xml at /opt/tomcat/conf/server.xml.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run: grep -i 'all threads' /opt/tomcat/logs/catalina.out to see the
+      thread exhaustion messages with timestamps."
+  - order: 2
+    cost: 15
+    content: "In /opt/tomcat/conf/server.xml, find the Connector element on port 8080
+      and add/update: maxThreads='500' minSpareThreads='50' acceptCount='200'
+      connectionTimeout='20000'"
+  - order: 3
+    cost: 20
+    content: "Also consider enabling the NIO2 connector for better async performance:
+      protocol='org.apache.coyote.http11.Http11Nio2Protocol'
+      After editing, restart: /opt/tomcat/bin/shutdown.sh && /opt/tomcat/bin/startup.sh"

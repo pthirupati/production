@@ -1,0 +1,35 @@
+title: Fix Jenkins Job Out of Memory
+slug: jenkins-job-oom
+technology: DevOps
+category: CI/CD
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  Jenkins build jobs are failing with Java OutOfMemoryError. The Jenkins master JVM
+  is running with default heap settings which are too small for the current workload.
+  You need to increase the JVM heap size in the Jenkins startup configuration.
+objectives:
+  - Identify the current JVM heap settings for Jenkins
+  - Increase the JVM heap to at least 2GB (-Xmx2g)
+  - Restart Jenkins and verify the new settings are active
+initial_state: |
+  Ubuntu server with Jenkins installed. Build jobs are failing with OutOfMemoryError.
+  Jenkins configuration is at /etc/default/jenkins. The JVM is currently configured
+  with -Xmx512m which is too small.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check current settings: cat /etc/default/jenkins | grep JAVA_ARGS"
+  - order: 2
+    cost: 15
+    content: "Edit /etc/default/jenkins and find the JAVA_ARGS line"
+  - order: 3
+    cost: 20
+    content: "Change -Xmx512m to -Xmx2g in the JAVA_ARGS variable"
+  - order: 4
+    cost: 25
+    content: "After editing, restart Jenkins: systemctl restart jenkins"

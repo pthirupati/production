@@ -1,0 +1,47 @@
+---
+slug: esxi-ntp-out-of-sync
+title: "ESXi NTP Out of Sync — vCenter Authentication and Log Correlation Broken"
+technology: VMware
+category: Host Management
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  ESXi host esxi-02 has a clock drift of 8 minutes ahead of actual time. This is
+  causing vCenter authentication token validation to fail intermittently (Kerberos
+  requires clocks within 5 minutes), log timestamps to be misaligned in the SIEM,
+  and vSAN health checks to report "Clock skew detected." The NTP client on the
+  host was never configured after the ESXi installation. Engineers must configure
+  and verify NTP synchronization.
+objectives:
+  - Check the current time and NTP status on the ESXi host
+  - Configure the NTP service with reliable NTP servers
+  - Enable and start the NTP service daemon (ntpd)
+  - Verify clock synchronization and that the skew is under 1 second
+initial_state: |
+  VMware vCenter simulation. esxi-02 clock is 8 minutes ahead of UTC.
+  NTP service is not configured or running on esxi-02.
+  SSH access available. NTP servers available: 0.pool.ntp.org, 1.pool.ntp.org.
+hints:
+  - order: 1
+    cost: 10
+    content: "SSH to esxi-02 and check current time: date
+      Check NTP status: esxcli system ntp get
+      Expected output: NTP Service: disabled — no servers configured."
+  - order: 2
+    cost: 15
+    content: "Configure NTP servers: esxcli system ntp set --server 0.pool.ntp.org --server 1.pool.ntp.org
+      Enable NTP: esxcli system ntp set --enabled true
+      Start the service: /etc/init.d/ntpd start
+      Set startup policy: esxcli system ntp set --enabled true"
+  - order: 3
+    cost: 20
+    content: "Verify sync: watch -n5 'ntpq -p' or esxcli system ntp get
+      Look for '*' next to a server (means synced) and offset <1000ms.
+      Also configure via vCenter GUI: Host → Configure → System → Time Configuration
+      → Add NTP servers → Set startup policy to 'Start and stop with host'."

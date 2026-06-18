@@ -1,0 +1,38 @@
+slug: openssl-cert-revoked
+title: "Certificate Revoked — Update CRL and Reconfigure Verification"
+technology: Security
+category: PKI/Certificates
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  The internal CA has revoked a service certificate after a private key compromise.
+  Services that perform CRL checking are now rejecting connections from this service.
+  However, the CRL configured in nginx is outdated — it was last downloaded 30 days
+  ago and doesn't include the revocation. Update the CRL, configure nginx to use
+  the fresh CRL, and ensure CRL checking is properly enforced for client certificates.
+objectives:
+  - Download the current CRL from the internal CA
+  - Convert the CRL to PEM format if necessary
+  - Update the ssl_crl directive in nginx to point to the new CRL
+  - Reload nginx and verify revoked certificates are rejected
+initial_state: |
+  Ubuntu 22.04 with nginx. ssl_crl=/etc/nginx/ssl/ca.crl (outdated, 30 days old).
+  New CRL available at http://ca.internal/crl/latest.crl.
+  A test with a revoked certificate returns 200 instead of 400/403 — not being checked.
+hints:
+  - order: 1
+    cost: 10
+    content: "Download new CRL: `curl -o /tmp/latest.crl http://ca.internal/crl/latest.crl`"
+  - order: 2
+    cost: 15
+    content: "Verify and convert: `openssl crl -in /tmp/latest.crl -inform DER -out /etc/nginx/ssl/ca.crl -outform PEM`"
+  - order: 3
+    cost: 10
+    content: "Check nginx config has: `ssl_verify_client on;` and `ssl_crl /etc/nginx/ssl/ca.crl;`"
+  - order: 4
+    cost: 10
+    content: "Reload: `nginx -t && systemctl reload nginx`. Test with revoked cert — should get 400 Bad Request."

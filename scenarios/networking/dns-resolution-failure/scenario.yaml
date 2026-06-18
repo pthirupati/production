@@ -1,0 +1,37 @@
+slug: dns-resolution-failure
+title: "DNS Resolution Failure — Fix /etc/resolv.conf"
+technology: Networking
+category: DNS
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: true
+description: |
+  After a VM migration, all outbound DNS lookups are failing. Applications that
+  depend on hostname resolution (package managers, monitoring agents, mail delivery)
+  are timing out. Investigation shows /etc/resolv.conf was overwritten with incorrect
+  nameserver entries pointing to a decommissioned internal resolver.
+  Restore the correct configuration so DNS lookups succeed.
+objectives:
+  - Diagnose the DNS resolution failure
+  - Correct /etc/resolv.conf with valid nameserver entries
+  - Verify hostname lookups succeed
+initial_state: |
+  Ubuntu 22.04 with /etc/resolv.conf containing a single nameserver line pointing
+  to 10.0.0.253 (a decommissioned host). `host google.com` and `dig` both fail
+  with SERVFAIL or timeout.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run `cat /etc/resolv.conf` and `dig @8.8.8.8 google.com` to confirm the issue is the configured resolver."
+  - order: 2
+    cost: 15
+    content: "Edit /etc/resolv.conf. Add `nameserver 8.8.8.8` and `nameserver 1.1.1.1` as fallback."
+  - order: 3
+    cost: 10
+    content: "Test with `host google.com` or `nslookup google.com` after saving."
+  - order: 4
+    cost: 20
+    content: "If systemd-resolved is active, use `resolvectl status` and update the DNS via `/etc/systemd/resolved.conf`."

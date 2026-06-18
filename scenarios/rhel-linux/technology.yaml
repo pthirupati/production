@@ -1,6 +1,7 @@
-description: "RHEL Linux simulation labs \u2014 \u20B9499 subscription"
+description: "RHEL Linux simulation labs \u2014 scenarios merged into Linux Administration"
 icon: hard-drive
 name: RHEL Linux
-order: 19
+order: 99
 price: 499
 slug: rhel-linux
+is_active: false

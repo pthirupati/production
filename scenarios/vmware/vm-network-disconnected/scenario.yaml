@@ -1,0 +1,46 @@
+---
+slug: vm-network-disconnected
+title: "VM NIC Disconnected After vCenter Migration — No Network Access"
+technology: VMware
+category: Networking
+difficulty: easy
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  After migrating VM "app-dev-05" to a new ESXi host via vMotion, the VM has lost
+  all network connectivity. The VM is powered on and the guest OS is running, but
+  ping and SSH are failing. Investigation shows the VM's NIC is connected to a
+  virtual switch port group "VM Network" that does not exist on the destination host.
+  The VM's NIC shows as "Disconnected" in the vSphere Client.
+objectives:
+  - Verify the VM's NIC status in vSphere Client settings
+  - Identify the missing port group on the destination ESXi host
+  - Either reconnect the NIC to an existing port group or create the missing one
+  - Verify network connectivity is restored to the VM
+initial_state: |
+  VMware vCenter simulation. app-dev-05 on esxi-02. NIC shows Disconnected.
+  Source host esxi-01 had port group "VM Network" on vSwitch0.
+  esxi-02 has port groups "Management Network" and "VM Network Production" but
+  no "VM Network" port group. VM needs to connect to "VM Network Production".
+hints:
+  - order: 1
+    cost: 10
+    content: "Select app-dev-05 → Edit Settings → Network Adapter 1.
+      The Status will show 'Disconnected' and the Network label will show the
+      missing port group name. You can see the Connect/Disconnect checkbox here."
+  - order: 2
+    cost: 15
+    content: "To fix: in Edit Settings → Network Adapter 1 → Network, click Browse
+      and select 'VM Network Production' from the list of available port groups
+      on the current host. Check the 'Connected' checkbox and click OK."
+  - order: 3
+    cost: 20
+    content: "For a permanent fix, ensure standard port group names are consistent
+      across all ESXi hosts, or use a Distributed Virtual Switch (DVS) which
+      provides uniform port groups across all hosts in a cluster automatically.
+      Test connectivity: open the VM console and ping the default gateway."

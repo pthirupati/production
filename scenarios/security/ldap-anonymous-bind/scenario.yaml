@@ -1,0 +1,37 @@
+title: "LDAP Anonymous Bind — Disable Unauthenticated Directory Access"
+slug: ldap-anonymous-bind
+technology: Security
+category: Hardening
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  An OpenLDAP server on the network is allowing anonymous binds, exposing the
+  full directory tree including employee usernames, email addresses, and
+  department information to any unauthenticated client. Confirm the anonymous
+  bind vulnerability, disable it in the slapd configuration, and verify that
+  unauthenticated queries are now rejected.
+objectives:
+  - Confirm anonymous bind works by querying the LDAP server without credentials
+  - Disable anonymous binds by setting olcDisallows: bind_anon in the cn=config entry
+  - Verify that anonymous ldapsearch now returns an error and requires authentication
+initial_state: |
+  Debian server running OpenLDAP (slapd) with dc=lab,dc=local as the base DN.
+  Anonymous binds are currently allowed by default. ldap-utils is installed.
+  The LDAP admin DN is cn=admin,dc=lab,dc=local with password stored in /root/.ldaprc.
+hints:
+  - order: 1
+    cost: 10
+    content: "Confirm the vulnerability: `ldapsearch -x -H ldap://localhost -b dc=lab,dc=local '(objectClass=*)' cn mail` — it should return results without credentials."
+  - order: 2
+    cost: 15
+    content: "Create an LDIF to disable anonymous bind: set `olcDisallows: bind_anon` in cn=config using `ldapmodify -Y EXTERNAL -H ldapi:///`."
+  - order: 3
+    cost: 20
+    content: "Apply the change: `ldapmodify -Y EXTERNAL -H ldapi:/// -f /tmp/disable-anon.ldif` where the LDIF modifies cn=config with `add: olcDisallows` / `olcDisallows: bind_anon`."
+  - order: 4
+    cost: 25
+    content: "Verify: `ldapsearch -x -H ldap://localhost -b dc=lab,dc=local` should now return `ldap_bind: Inappropriate authentication (48)` or similar error."

@@ -1,0 +1,36 @@
+title: Roll Back a Broken Helm Deployment
+slug: helm-rollback-needed
+technology: DevOps
+category: Kubernetes
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  A helm upgrade for the "myapp" release introduced a broken container image
+  that causes all pods to crash with ImagePullBackOff. The application is down.
+  You need to roll back the Helm release to the previous working version
+  to restore service immediately.
+objectives:
+  - Check the helm release history to identify the last working revision
+  - Roll back the helm release to the previous revision
+  - Verify pods are running after the rollback
+initial_state: |
+  Kubernetes cluster with Helm 3. The "myapp" release in the "production" namespace
+  was upgraded to revision 3 with a broken image tag. Revision 2 was working.
+  Pods are currently in ImagePullBackOff state.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check release history: helm history myapp -n production"
+  - order: 2
+    cost: 15
+    content: "The last working revision is number 2. Roll back to it."
+  - order: 3
+    cost: 20
+    content: "Run: helm rollback myapp 2 -n production"
+  - order: 4
+    cost: 25
+    content: "Watch pods recover: kubectl get pods -n production -w"

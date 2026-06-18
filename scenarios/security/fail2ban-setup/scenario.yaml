@@ -1,0 +1,35 @@
+title: "fail2ban Setup — Protect SSH from Brute-Force Attacks"
+slug: fail2ban-setup
+technology: Security
+category: Hardening
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  A Linux server is exposed to the internet with SSH on port 22 and has no
+  automated brute-force protection in place. fail2ban is installed but not
+  configured. Set up and enable the SSH jail with a ban time of 1 hour,
+  a find time of 10 minutes, and a maximum retry count of 5 failed attempts.
+objectives:
+  - Create /etc/fail2ban/jail.local with an [sshd] jail configured for port 22
+  - Set bantime=3600, findtime=600, and maxretry=5
+  - Enable and start fail2ban, then verify the sshd jail is active
+initial_state: |
+  Ubuntu server with fail2ban installed but unconfigured. SSH is running on
+  port 22 with password authentication enabled. No jail.local file exists yet.
+hints:
+  - order: 1
+    cost: 10
+    content: "Copy the template: `cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local` and then edit the [DEFAULT] and [sshd] sections."
+  - order: 2
+    cost: 15
+    content: "In jail.local under [DEFAULT] set `bantime = 3600`, `findtime = 600`, `maxretry = 5`. Under [sshd] set `enabled = true` and `port = 22`."
+  - order: 3
+    cost: 20
+    content: "Start fail2ban: `systemctl enable --now fail2ban` then check status with `systemctl status fail2ban`."
+  - order: 4
+    cost: 25
+    content: "Verify the jail is active: `fail2ban-client status sshd` — you should see the sshd jail listed with Jail list."

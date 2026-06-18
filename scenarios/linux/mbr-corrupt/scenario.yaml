@@ -1,0 +1,26 @@
+category: Linux Administration
+description: 'GRUB stage1.5 error 15. Reinstall bootloader.
+
+  '
+difficulty: hard
+dual_terminal: false
+hints:
+- content: 'Try: grub2-install /dev/sda'
+  cost: 10
+  order: 1
+initial_state: 'Simulated RHEL 9 server. GRUB stage1.5 error 15. Reinstall bootloader.
+
+  '
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+- Diagnose the issue
+- 'Apply fix: grub2-install /dev/sda'
+- Verify validation passes
+requires_companion_hosts: false
+simulation_type: rhel
+slug: sim-rhel-mbr-corrupt
+time_limit: 900
+title: Corrupt MBR / Bootloader

@@ -1,0 +1,36 @@
+title: Fix Grafana Datasource with No Data
+slug: grafana-dashboard-no-data
+technology: DevOps
+category: Monitoring
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  Grafana dashboards are showing "No data" for all panels. The Prometheus
+  datasource URL in Grafana is misconfigured — it's pointing to an old
+  hostname that no longer resolves. Fix the datasource URL so Grafana
+  can connect to Prometheus and display metrics.
+objectives:
+  - Identify the misconfigured Prometheus datasource in Grafana
+  - Update the datasource URL to the correct Prometheus endpoint
+  - Verify dashboards display data after the fix
+initial_state: |
+  Ubuntu server running Grafana. The Prometheus datasource is configured with
+  URL http://old-prometheus:9090 which is unreachable. The correct Prometheus
+  URL is http://prometheus:9090. Fix the datasource config.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check datasource config: cat /etc/grafana/provisioning/datasources/prometheus.yml"
+  - order: 2
+    cost: 15
+    content: "Look for the url: field — it points to old-prometheus:9090"
+  - order: 3
+    cost: 20
+    content: "Change url: http://old-prometheus:9090 to url: http://prometheus:9090"
+  - order: 4
+    cost: 25
+    content: "Restart Grafana to apply: systemctl restart grafana-server"

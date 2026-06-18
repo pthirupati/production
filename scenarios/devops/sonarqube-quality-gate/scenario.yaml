@@ -1,0 +1,37 @@
+title: Fix SonarQube Quality Gate Code Coverage
+slug: sonarqube-quality-gate
+technology: DevOps
+category: Code Quality
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  The CI pipeline is blocked by a failing SonarQube quality gate. The gate
+  requires 80% code coverage but the project is reporting 0% because the
+  coverage report path in sonar-project.properties is wrong. Fix the path
+  so SonarQube picks up the coverage data.
+objectives:
+  - Identify the incorrect coverage report path in sonar-project.properties
+  - Fix the sonar.coverage.exclusions or sonar.python.coverage.reportPaths
+  - Verify SonarQube analysis reports coverage above the quality gate threshold
+initial_state: |
+  Ubuntu server. Project at /opt/app. sonar-project.properties has
+  sonar.python.coverage.reportPaths=coverage/coverage.xml but coverage
+  report is actually at /opt/app/reports/coverage.xml. The quality gate
+  fails because no coverage data is found.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check current config: cat /opt/app/sonar-project.properties"
+  - order: 2
+    cost: 15
+    content: "Find the actual coverage report: find /opt/app -name coverage.xml"
+  - order: 3
+    cost: 20
+    content: "The coverage file is at reports/coverage.xml not coverage/coverage.xml"
+  - order: 4
+    cost: 25
+    content: "Fix sonar-project.properties: change sonar.python.coverage.reportPaths=coverage/coverage.xml to sonar.python.coverage.reportPaths=reports/coverage.xml"

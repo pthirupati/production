@@ -1,0 +1,37 @@
+title: Detect and Plan Terraform Infrastructure Drift
+slug: terraform-drift-detected
+technology: DevOps
+category: Infrastructure as Code
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  Infrastructure drift has been detected — resources in the cloud no longer match
+  the Terraform state. Someone manually changed a security group rule outside of
+  Terraform. You need to run terraform plan to identify the drift, then decide
+  whether to apply the Terraform config to reconcile the infrastructure.
+objectives:
+  - Run terraform plan to detect infrastructure drift
+  - Identify which resources have drifted from the desired state
+  - Apply terraform to reconcile the drift
+  - Verify terraform plan shows no changes after reconciliation
+initial_state: |
+  Ubuntu server with Terraform installed. Working directory is /opt/terraform/infra.
+  A security group rule was manually added outside of Terraform. The drift
+  is captured in a mock state at /opt/terraform/infra/terraform.tfstate.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run: cd /opt/terraform/infra && terraform plan -detailed-exitcode"
+  - order: 2
+    cost: 15
+    content: "Exit code 2 means drift detected. Look for ~ (update) or - (destroy) resources"
+  - order: 3
+    cost: 20
+    content: "Run terraform apply to reconcile: terraform apply -auto-approve"
+  - order: 4
+    cost: 25
+    content: "After apply, verify no drift: terraform plan -detailed-exitcode should exit 0"

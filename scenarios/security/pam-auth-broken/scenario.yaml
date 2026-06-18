@@ -1,0 +1,38 @@
+title: "PAM Authentication Broken — Fix Misconfigured Login Stack"
+slug: pam-auth-broken
+technology: Security
+category: Hardening
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  After a failed attempt to configure two-factor authentication, the PAM
+  configuration for SSH logins has been left in a broken state. All SSH
+  password authentication attempts now fail with 'Permission denied' even with
+  the correct credentials. Console access still works. You must diagnose the
+  PAM stack misconfiguration in /etc/pam.d/sshd and restore working SSH
+  authentication without disabling security controls.
+objectives:
+  - Identify the misconfiguration in /etc/pam.d/sshd causing authentication failures
+  - Fix the PAM stack so that SSH password authentication works correctly
+  - Verify that SSH login succeeds with valid credentials and fails with invalid ones
+initial_state: |
+  Ubuntu server where a previous admin added a broken pam_google_authenticator
+  line as 'required' in /etc/pam.d/sshd without the module being installed.
+  Console access via the lab terminal is available. sshd is running on port 22.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check the PAM config: `cat /etc/pam.d/sshd` and look for modules that reference missing .so files or have incorrect control flags."
+  - order: 2
+    cost: 15
+    content: "Test auth: `pamtester sshd testuser authenticate` to see the exact PAM error. Look for 'module is unknown' indicating a missing PAM module."
+  - order: 3
+    cost: 20
+    content: "Find the bad line: the `auth required pam_google_authenticator.so` entry is broken. Either remove it or change 'required' to 'optional' if the module is not installed."
+  - order: 4
+    cost: 25
+    content: "After editing /etc/pam.d/sshd, test with `pamtester sshd validuser authenticate` — it should succeed. No sshd restart needed; PAM is read per-auth."

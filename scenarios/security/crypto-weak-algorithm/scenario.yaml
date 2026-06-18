@@ -1,0 +1,37 @@
+title: "Weak Cryptography — Identify and Replace Insecure Algorithms"
+slug: crypto-weak-algorithm
+technology: Security
+category: Cryptography
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  An internal web service is using MD5 for password hashing and a self-signed
+  certificate configured with RC4 cipher suites. A recent security scan flagged
+  both issues as critical. You must update the application config to use bcrypt
+  for password hashing and reconfigure nginx TLS to allow only TLS 1.2+
+  with strong cipher suites.
+objectives:
+  - Identify the weak MD5 hashing call in /opt/webapp/auth.py and replace it with bcrypt
+  - Update /etc/nginx/conf.d/app.conf to set ssl_protocols TLSv1.2 TLSv1.3 and restrict ssl_ciphers to ECDHE+AESGCM
+  - Reload nginx and verify the TLS configuration with openssl s_client
+initial_state: |
+  Ubuntu server running an nginx reverse proxy over a Python Flask app. The app
+  uses hashlib.md5 for passwords. nginx TLS is configured with SSLv3 and RC4.
+  openssl is installed for verification.
+hints:
+  - order: 1
+    cost: 10
+    content: "Find weak crypto: `grep -rn 'md5\|RC4\|SSLv3' /opt/webapp/ /etc/nginx/` to locate all occurrences."
+  - order: 2
+    cost: 15
+    content: "In auth.py replace `hashlib.md5(password.encode()).hexdigest()` with bcrypt: `import bcrypt; bcrypt.hashpw(password.encode(), bcrypt.gensalt())`."
+  - order: 3
+    cost: 20
+    content: "In nginx.conf set `ssl_protocols TLSv1.2 TLSv1.3;` and `ssl_ciphers 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';` then `nginx -t && systemctl reload nginx`."
+  - order: 4
+    cost: 25
+    content: "Verify with `openssl s_client -connect localhost:443 -tls1` — it should fail, confirming TLS 1.0 is disabled."

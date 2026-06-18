@@ -1,0 +1,46 @@
+---
+slug: vcenter-certificate-expired
+title: "vCenter Certificate Expired — Authentication and API Failures"
+technology: VMware
+category: Security
+difficulty: hard
+time_limit: 1800
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Critical
+is_free: false
+description: |
+  vCenter Server certificates have expired, causing: HTTPS connections to show
+  certificate errors, vSphere Client authentication failures, and API calls from
+  automation scripts failing with SSL certificate verification errors. The Machine
+  SSL certificate and STS signing certificates in VMCA expired simultaneously.
+  Engineers must renew the certificates using the vSphere Certificate Manager.
+objectives:
+  - Confirm certificate expiry using openssl and the vCenter management UI
+  - Access the vCenter appliance via SSH
+  - Use certificate-manager to regenerate and replace expired certificates
+  - Verify vSphere Client loads without certificate errors and API calls succeed
+initial_state: |
+  VMware vCenter simulation. vCenter at vcenter.lab.local.
+  SSL cert expired 3 days ago. SSH to VCSA available as root.
+  certificate-manager utility available at /usr/lib/vmware-vmca/bin/certificate-manager.
+hints:
+  - order: 1
+    cost: 10
+    content: "Verify expiry: openssl s_client -connect vcenter.lab.local:443 -servername vcenter.lab.local 2>/dev/null | openssl x509 -noout -dates
+      You will see notAfter showing a past date, confirming the expired cert."
+  - order: 2
+    cost: 15
+    content: "SSH to VCSA and run: /usr/lib/vmware-vmca/bin/certificate-manager
+      Select option 4 (Regenerate a new VMCA Root Certificate and replace all
+      certificates) for a full renewal. This replaces Machine SSL, Solution User,
+      and VMCA root certificates."
+  - order: 3
+    cost: 20
+    content: "After certificate replacement, restart services:
+      service-control --restart --all
+      This can take 10-15 minutes. After restart, verify:
+      openssl s_client -connect vcenter.lab.local:443 2>/dev/null | openssl x509 -noout -dates
+      Confirm notAfter shows a date 2 years in the future."

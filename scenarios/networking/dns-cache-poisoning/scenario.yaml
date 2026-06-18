@@ -1,0 +1,37 @@
+slug: dns-cache-poisoning
+title: "DNS Cache Poisoning — Flush BIND Named Cache"
+technology: Networking
+category: DNS
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  The on-premises BIND named resolver has been serving stale, incorrect A-record
+  answers for a critical internal hostname. A prior cache poisoning attack inserted
+  a malicious IP that was never evicted. Users are being routed to the wrong endpoint.
+  You must identify the bad cached entry, flush the resolver cache, and verify that
+  fresh authoritative answers are now served.
+objectives:
+  - Confirm that named is caching an incorrect IP for the target hostname
+  - Flush the named cache using rndc
+  - Verify the resolver now returns the correct authoritative answer
+initial_state: |
+  BIND 9 named daemon running. The hostname `app.internal` is cached pointing to
+  10.66.66.66 (malicious IP). The authoritative server returns 10.0.1.50. The
+  cached TTL is set to 86400 so the entry will not expire naturally.
+hints:
+  - order: 1
+    cost: 10
+    content: "Use `dig @localhost app.internal` to see the cached response and its TTL."
+  - order: 2
+    cost: 15
+    content: "Run `rndc flushname app.internal` to evict just that record, or `rndc flush` to clear the entire cache."
+  - order: 3
+    cost: 10
+    content: "Verify with `dig @localhost app.internal` — the answer should now be the authoritative IP 10.0.1.50."
+  - order: 4
+    cost: 20
+    content: "To prevent recurrence, set `max-cache-ttl 3600;` in named.conf options and reload with `rndc reconfig`."

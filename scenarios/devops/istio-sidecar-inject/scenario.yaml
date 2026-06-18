@@ -1,0 +1,41 @@
+title: Fix Istio Sidecar Injection Label
+slug: istio-sidecar-inject
+technology: DevOps
+category: Service Mesh
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  Istio sidecar injection is not happening for pods in the "myapp" namespace.
+  The Envoy proxy is not being injected, so mTLS and traffic management
+  policies are not being enforced. The namespace is missing the required
+  istio-injection=enabled label. Fix the namespace label to enable
+  automatic sidecar injection.
+objectives:
+  - Verify that pods in the myapp namespace lack the Istio sidecar
+  - Add the istio-injection=enabled label to the myapp namespace
+  - Roll out new pods to pick up the sidecar injection
+  - Verify pods have the istio-proxy container running
+initial_state: |
+  Kubernetes cluster with Istio installed. The "myapp" namespace exists but
+  does not have the label istio-injection=enabled. Pods lack the Envoy sidecar.
+  The namespace currently has label istio-injection=disabled.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check namespace labels: kubectl get namespace myapp --show-labels"
+  - order: 2
+    cost: 15
+    content: "The label istio-injection=disabled is preventing injection"
+  - order: 3
+    cost: 20
+    content: "Fix: kubectl label namespace myapp istio-injection=enabled --overwrite"
+  - order: 4
+    cost: 25
+    content: "Restart pods: kubectl rollout restart deployment -n myapp"
+  - order: 5
+    cost: 30
+    content: "Verify: kubectl get pods -n myapp -o jsonpath='{.items[*].spec.containers[*].name}'"

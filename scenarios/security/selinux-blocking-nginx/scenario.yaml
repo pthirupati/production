@@ -1,0 +1,39 @@
+slug: selinux-blocking-nginx
+title: "SELinux Blocking Nginx — Fix the Security Context"
+technology: Security
+category: SELinux
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  After deploying nginx to serve files from a custom directory /srv/www, nginx
+  starts but returns 403 Forbidden for all requests. SELinux audit logs show
+  AVC denials for nginx trying to read files. The issue is that /srv/www has the
+  wrong SELinux file context — it needs the httpd_sys_content_t type instead of
+  the default_t currently assigned. Fix the SELinux context to allow nginx to
+  serve the files.
+objectives:
+  - Identify SELinux AVC denials in /var/log/audit/audit.log
+  - Check the file context on /srv/www
+  - Apply the correct httpd_sys_content_t context recursively
+  - Verify nginx can serve files from /srv/www
+initial_state: |
+  RHEL/CentOS 8 with SELinux enforcing. nginx configured to serve from /srv/www.
+  Directory /srv/www has context default_t. nginx returns 403 for all requests.
+  AVC denials appear in audit.log for comm="nginx" path="/srv/www".
+hints:
+  - order: 1
+    cost: 10
+    content: "`ausearch -c nginx --raw | audit2why` shows the denial reason."
+  - order: 2
+    cost: 15
+    content: "Check context: `ls -Z /srv/www` — should show default_t, need httpd_sys_content_t."
+  - order: 3
+    cost: 15
+    content: "Fix context: `semanage fcontext -a -t httpd_sys_content_t '/srv/www(/.*)?'` then `restorecon -Rv /srv/www`"
+  - order: 4
+    cost: 10
+    content: "Verify with `ls -Z /srv/www` and test `curl http://localhost/`."

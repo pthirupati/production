@@ -1,0 +1,38 @@
+title: "Sudo Misconfiguration — Fix Dangerous sudoers Entries"
+slug: sudo-misconfiguration
+technology: Security
+category: Hardening
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  A security audit of /etc/sudoers has found three dangerous misconfigurations:
+  a wildcard rule allowing a service account to run ALL commands, a NOPASSWD
+  entry for a shared developer account, and a deprecated NOEXEC bypass that
+  was commented out incorrectly and is still active. Fix all three issues using
+  visudo without breaking legitimate sudo access for the ops team.
+objectives:
+  - Identify the three dangerous sudoers entries using visudo or sudoers syntax analysis
+  - Restrict the service account (deploy-svc) to only /usr/bin/systemctl restart webapp
+  - Remove the NOPASSWD flag from the shared dev account and fix the NOEXEC bypass
+initial_state: |
+  Ubuntu server where /etc/sudoers contains: `deploy-svc ALL=(ALL) NOPASSWD: ALL`,
+  `%developers ALL=(ALL) NOPASSWD: ALL`, and an uncommented `Defaults env_reset`
+  override that bypasses NOEXEC. The ops group needs sudo access to all commands
+  with password.
+hints:
+  - order: 1
+    cost: 10
+    content: "Audit the file: `sudo visudo -c -f /etc/sudoers` to check syntax, then `cat /etc/sudoers /etc/sudoers.d/*` to see all active rules."
+  - order: 2
+    cost: 15
+    content: "Fix deploy-svc: change `deploy-svc ALL=(ALL) NOPASSWD: ALL` to `deploy-svc ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart webapp` using `visudo`."
+  - order: 3
+    cost: 20
+    content: "Fix the developer group: change `%developers ALL=(ALL) NOPASSWD: ALL` to `%developers ALL=(ALL) ALL` — removing NOPASSWD forces password entry."
+  - order: 4
+    cost: 25
+    content: "Verify: `sudo -l -U deploy-svc` should show only `/usr/bin/systemctl restart webapp`. Test: `sudo -u deploy-svc sudo systemctl restart nginx` should be denied."

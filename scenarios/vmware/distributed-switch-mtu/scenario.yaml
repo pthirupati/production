@@ -1,0 +1,48 @@
+---
+slug: distributed-switch-mtu
+title: "DVS MTU Mismatch — Jumbo Frame Packets Being Dropped"
+technology: VMware
+category: Networking
+difficulty: medium
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  The NFS datastore mounts on all ESXi hosts are experiencing intermittent timeouts
+  and the vSAN network is showing packet loss. Investigation reveals the Distributed
+  Virtual Switch (DVS) MTU is set to the default 1500 bytes, while the NFS storage
+  network and vSAN kernel ports require jumbo frames (MTU 9000). The physical
+  switches already support jumbo frames but the DVS has not been updated to match.
+objectives:
+  - Verify the current DVS MTU setting in vCenter
+  - Check the vmkernel adapters (vmk) MTU settings for NFS and vSAN
+  - Change the DVS MTU to 9000 (jumbo frames)
+  - Update vmkernel adapter MTUs to 9000 and verify NFS/vSAN connectivity
+initial_state: |
+  VMware vCenter simulation. DVS "Production-DVS" MTU: 1500.
+  vmk2 (NFS): MTU 1500. vmk3 (vSAN): MTU 1500. Physical switches: MTU 9000.
+  NFS mounts: /vmfs/volumes/nfs-storage intermittently timing out.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check DVS MTU: Networking → Distributed Switches → Production-DVS
+      → Configure → Properties → MTU shows 1500.
+      Also check vmkernel adapters: each host → Configure → Networking →
+      VMkernel Adapters → select vmk2/vmk3 and check MTU."
+  - order: 2
+    cost: 15
+    content: "Change DVS MTU: right-click Production-DVS → Edit Settings → Advanced
+      → MTU: change from 1500 to 9000. Click OK.
+      This changes the DVS capability but does NOT automatically change vmkernel MTUs."
+  - order: 3
+    cost: 20
+    content: "Update each vmkernel: for each ESXi host, select vmk2 → Edit → MTU: 9000.
+      Repeat for vmk3. Or via ESXi CLI on each host:
+      esxcli network ip interface set -i vmk2 -m 9000
+      esxcli network ip interface set -i vmk3 -m 9000
+      Verify: ping from ESXi with large packets:
+      vmkping -I vmk2 -d -s 8972 <nfs-server-ip>"

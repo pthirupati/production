@@ -1,0 +1,45 @@
+---
+slug: vm-cpu-ready-high
+title: "High VM CPU Ready Time — Application Performance Degraded"
+technology: VMware
+category: Performance
+difficulty: medium
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  A critical application VM "db-prod-01" is experiencing high CPU ready time (over
+  20%), meaning the VM is waiting for physical CPU time that is not available. The
+  ESXi host esxi-01.lab.local is overcommitted with 32 vCPUs across VMs on a host
+  that has only 16 physical CPU threads. Engineers must use vSphere performance
+  charts to diagnose the CPU ready issue and migrate the VM to a less loaded host.
+objectives:
+  - View CPU ready time for db-prod-01 in vSphere performance charts
+  - Identify the host-level CPU utilization and overcommitment ratio
+  - Use vMotion to migrate db-prod-01 to esxi-02.lab.local
+  - Verify CPU ready time drops below 5% after migration
+initial_state: |
+  VMware vCenter simulation. db-prod-01 on esxi-01 showing 22% CPU ready.
+  esxi-01: 16 pCPU threads, 32 vCPUs allocated across all VMs (2:1 overcommit).
+  esxi-02: 16 pCPU threads, 12 vCPUs allocated (0.75:1 — capacity available).
+hints:
+  - order: 1
+    cost: 10
+    content: "In vSphere Client, select db-prod-01 → Monitor → Performance → Advanced
+      Select CPU as metric, then add 'CPU Ready' counter. Change interval to 'Real-time'
+      to see current ready values."
+  - order: 2
+    cost: 15
+    content: "To check host overcommitment: select esxi-01 → Summary tab → look at
+      vCPU to pCPU ratio. Also check: Monitor → Performance → CPU → Usage in MHz
+      to see how saturated the physical CPUs are."
+  - order: 3
+    cost: 20
+    content: "Migrate with vMotion: right-click db-prod-01 → Migrate → Change compute
+      resource only → select esxi-02.lab.local as destination. Schedule during low
+      traffic. After migration, verify CPU ready drops on the performance chart
+      (allow 5 minutes for chart data to populate)."

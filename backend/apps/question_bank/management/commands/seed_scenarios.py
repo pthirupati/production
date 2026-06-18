@@ -11,6 +11,9 @@ from apps.question_bank.models import Technology, Scenario
 from apps.hints.models import Hint
 
 TECH_META = {
+    "linux": {"name": "Linux Administration", "icon": "terminal", "color": "cyan", "order": 5},
+    "networking": {"name": "Networking", "icon": "globe", "color": "blue", "order": 7},
+    "vmware": {"name": "VMware vSphere", "icon": "server", "color": "blue", "order": 8},
     "database": {"name": "Database Administration", "icon": "database", "color": "blue", "order": 10},
     "docker": {"name": "Docker & Containers", "icon": "container", "color": "cyan", "order": 11},
     "ansible": {"name": "Ansible Automation", "icon": "network", "color": "purple", "order": 12},
@@ -18,12 +21,11 @@ TECH_META = {
     "baremetal": {"name": "Bare Metal & IPMI", "icon": "server", "color": "orange", "order": 14},
     "gpu": {"name": "GPU & NVIDIA", "icon": "cpu", "color": "green", "order": 15},
     "python": {"name": "Python Development", "icon": "code", "color": "yellow", "order": 16},
-    "html": {"name": "HTML & Web Servers", "icon": "globe", "color": "pink", "order": 17},
-    "shell-script": {"name": "Shell Scripting", "icon": "terminal", "color": "teal", "order": 18},
-    "rhel-linux": {"name": "RHEL Linux", "icon": "hard-drive", "color": "red", "order": 19},
-    "simulation": {"name": "Simulation Labs", "icon": "monitor", "color": "cyan", "order": 20},
-    "linux-administration": {"name": "Linux Administration", "icon": "terminal", "color": "cyan", "order": 5},
-    "vmware": {"name": "VMware vSphere", "icon": "server", "color": "blue", "order": 8},
+    "java": {"name": "Java Development", "icon": "code", "color": "orange", "order": 17},
+    "html": {"name": "HTML & Web Servers", "icon": "globe", "color": "pink", "order": 18},
+    "shell-script": {"name": "Shell Scripting", "icon": "terminal", "color": "teal", "order": 19},
+    "devops": {"name": "DevOps", "icon": "layers", "color": "purple", "order": 20},
+    "security": {"name": "Security", "icon": "shield", "color": "red", "order": 21},
 }
 
 

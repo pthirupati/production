@@ -1,0 +1,38 @@
+title: Fix Logstash Grok Pattern Parsing Failure
+slug: elk-logstash-parsing
+technology: DevOps
+category: Observability
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  The ELK stack Logstash pipeline is generating _grokparsefailure tags on
+  all incoming log events. The grok pattern in the filter section does not
+  match the actual log format. Fix the grok pattern so logs are correctly
+  parsed and structured fields are extracted.
+objectives:
+  - Identify the broken grok pattern in the Logstash pipeline config
+  - Examine sample logs to understand the actual format
+  - Fix the grok pattern to correctly parse the log entries
+  - Verify Logstash processes logs without _grokparsefailure
+initial_state: |
+  Ubuntu server running Logstash. Pipeline config at /etc/logstash/conf.d/app.conf.
+  Logs at /var/log/app/app.log use format: [2024-01-15 10:30:45] ERROR myapp - Connection timeout
+  But the grok pattern uses %{TIMESTAMP_ISO8601:timestamp} which does not match
+  the bracket-enclosed date format.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check the pipeline: cat /etc/logstash/conf.d/app.conf"
+  - order: 2
+    cost: 15
+    content: "Look at a sample log: tail -5 /var/log/app/app.log"
+  - order: 3
+    cost: 20
+    content: "The log format is: [2024-01-15 10:30:45] LEVEL app - message"
+  - order: 4
+    cost: 25
+    content: "Use pattern: \\[%{TIMESTAMP_ISO8601:timestamp}\\] %{LOGLEVEL:level} %{WORD:app} - %{GREEDYDATA:message}"

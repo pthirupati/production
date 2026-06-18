@@ -137,6 +137,7 @@ export default function AppRouter() {
         <Route path="/jira/:issueKey" element={<ProtectedRoute><JiraTicketPage /></ProtectedRoute>} />
         <Route path="/auth/callback/:provider" element={<OAuthCallback />} />
         <Route path="/vmware/:sessionId" element={<ProtectedRoute><VMwareSimulator /></ProtectedRoute>} />
+        <Route path="/vmware-sim" element={<ProtectedRoute><VMwareSimulator /></ProtectedRoute>} />
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>

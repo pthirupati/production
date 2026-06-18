@@ -1,0 +1,39 @@
+slug: docker-socket-exposed
+title: "Docker Socket Exposed Without Auth — Fix Daemon Config"
+technology: Security
+category: Container Security
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  The Docker daemon is configured to listen on a TCP socket (tcp://0.0.0.0:2375)
+  without TLS authentication, in addition to the default Unix socket. This exposes
+  the Docker API to anyone who can reach the server — effectively giving them
+  root access (since containers can mount the host filesystem). Disable the TCP
+  listener, ensure Docker only listens on the Unix socket, and verify no
+  unauthorized containers were launched.
+objectives:
+  - Identify the TCP listener in /etc/docker/daemon.json or systemd override
+  - Remove the tcp://0.0.0.0:2375 listener from Docker configuration
+  - Restart Docker and verify the TCP port is no longer open
+  - Audit running containers for any launched via the exposed API
+initial_state: |
+  Ubuntu 22.04 with Docker. /etc/docker/daemon.json contains:
+  {"hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"]}.
+  `docker -H tcp://localhost:2375 ps` works without authentication.
+hints:
+  - order: 1
+    cost: 10
+    content: "Verify exposure: `curl http://localhost:2375/version` — returns Docker info without any auth."
+  - order: 2
+    cost: 15
+    content: "Edit /etc/docker/daemon.json — remove the tcp:// entry, keeping only `unix:///var/run/docker.sock`"
+  - order: 3
+    cost: 15
+    content: "Also check systemd override: `cat /etc/systemd/system/docker.service.d/override.conf`"
+  - order: 4
+    cost: 10
+    content: "Reload and restart: `systemctl daemon-reload && systemctl restart docker`. Verify: `ss -tlnp | grep 2375` should be empty."

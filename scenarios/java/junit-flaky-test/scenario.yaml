@@ -1,0 +1,47 @@
+---
+slug: junit-flaky-test
+title: "Flaky JUnit Test — Timezone Assumption Causing CI Failures"
+technology: Java
+category: Testing
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  A JUnit 5 test that validates date formatting is failing intermittently in CI but
+  passing locally. The test uses new Date() and LocalDateTime.now() without specifying
+  a timezone. On the CI server (configured to UTC) the formatted date differs from
+  the expected value which was hardcoded using the developer's local timezone (EST).
+  Engineers must identify the timezone assumption and fix the test to be timezone-safe.
+objectives:
+  - Reproduce the failure by running the test with -Duser.timezone=UTC
+  - Identify the timezone-dependent code in the test
+  - Fix the test to use ZonedDateTime with explicit UTC timezone
+  - Confirm the test passes consistently in both UTC and EST timezones
+initial_state: |
+  Simulated build server. Maven project at /opt/project/.
+  The failing test is at: src/test/java/com/app/DateFormatterTest.java.
+  Run: cd /opt/project && mvn test to see the failure.
+hints:
+  - order: 1
+    cost: 10
+    content: "Reproduce with: cd /opt/project && mvn test -Duser.timezone=UTC
+      You will see the assertion failure showing the expected EST-formatted date
+      vs the actual UTC-formatted date."
+  - order: 2
+    cost: 15
+    content: "In DateFormatterTest.java, find where LocalDateTime.now() or new Date()
+      is called without a timezone. Also check where the expected string is hardcoded.
+      The fix is to pass ZoneOffset.UTC to both the formatter and the expected value."
+  - order: 3
+    cost: 20
+    content: "Replace:
+      LocalDateTime.now()
+      With:
+      LocalDateTime.now(ZoneId.of(\"UTC\"))
+      And update the expected string to use a UTC-formatted value.
+      Also add @BeforeEach: TimeZone.setDefault(TimeZone.getTimeZone(\"UTC\"));"

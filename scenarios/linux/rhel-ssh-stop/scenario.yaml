@@ -1,0 +1,33 @@
+title: "RHEL Simulation: SSH Service Down"
+slug: sim-rhel-ssh-stop
+technology: Linux Administration
+category: Linux Administration
+difficulty: easy
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: rhel
+dual_terminal: true
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  Remote users cannot SSH to the server because sshd is stopped.
+  Use the dual terminals — try SSH from the client pane, fix sshd on the server console, then verify SSH works.
+objectives:
+  - Diagnose SSH connection refused from the SSH client terminal
+  - Start sshd on the server (primary console): systemctl start sshd
+  - Verify SSH login succeeds from the client terminal
+initial_state: |
+  primary (10.0.0.10): root console, sshd inactive
+  ssh_client (10.0.0.5): use ssh root@10.0.0.10 to test remote access
+hints:
+  - order: 1
+    cost: 10
+    content: "From SSH Client: ssh root@10.0.0.10 — expect connection refused."
+  - order: 2
+    cost: 15
+    content: "On Server console: systemctl status sshd then systemctl start sshd"
+  - order: 3
+    cost: 20
+    content: "Retry SSH from client — password is redhat if prompted."

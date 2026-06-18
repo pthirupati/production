@@ -1,0 +1,37 @@
+title: "Docker Escape Attempt — Detect and Harden Container Configuration"
+slug: docker-escape-attempt
+technology: Security
+category: Container Security
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  Security monitoring has detected suspicious activity from a running container
+  that appears to be attempting a privileged escape. The container was launched
+  with --privileged and has /host mounted from the host filesystem. Identify the
+  dangerous container configuration, stop the offending container, and redeploy
+  it with a hardened security profile using --cap-drop and a read-only root.
+objectives:
+  - Identify the privileged container and its dangerous mounts using docker inspect
+  - Stop the offending container and document the security misconfigurations found
+  - Redeploy the container without --privileged, with --cap-drop=ALL --cap-add=NET_BIND_SERVICE, and --read-only
+initial_state: |
+  Docker host with a running container named `webapp` launched with --privileged
+  and -v /:/host. The container image is nginx:alpine. Docker daemon is running
+  with default configuration. Audit logs show unexpected host filesystem access.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run `docker inspect webapp | grep -A5 'Privileged\|Binds\|CapAdd'` to see the dangerous configuration."
+  - order: 2
+    cost: 15
+    content: "Stop the container: `docker stop webapp && docker rm webapp` before redeploying with restricted settings."
+  - order: 3
+    cost: 20
+    content: "Redeploy safely: `docker run -d --name webapp --cap-drop=ALL --cap-add=NET_BIND_SERVICE --read-only --security-opt no-new-privileges nginx:alpine`"
+  - order: 4
+    cost: 25
+    content: "Verify: `docker inspect webapp | grep -E 'Privileged|CapDrop|ReadonlyRootfs'` — Privileged should be false and CapDrop should list ALL."

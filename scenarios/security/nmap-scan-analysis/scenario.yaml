@@ -1,0 +1,37 @@
+title: "Nmap Scan Analysis — Interpret Results and Reduce Attack Surface"
+slug: nmap-scan-analysis
+technology: Security
+category: Forensics
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  A full nmap scan of the production server reveals 14 open ports, many of which
+  are unexpected services left running from a test deployment: rpcbind (111),
+  telnet (23), FTP (21), and an unknown service on port 8888. Your task is to
+  analyze the nmap output, identify the unnecessary services, disable them with
+  systemctl, and produce a report of what was found and removed.
+objectives:
+  - Run a full nmap TCP scan against localhost and save the output to /tmp/nmap-full.txt
+  - Identify all non-essential listening services and stop and disable them with systemctl
+  - Write a summary of removed services and remaining open ports to /tmp/scan-report.txt
+initial_state: |
+  Ubuntu server with multiple services running: sshd (22), nginx (80/443),
+  telnetd (23), vsftpd (21), rpcbind (111), and a test app on 8888. All are
+  active systemd services. nmap is installed and available.
+hints:
+  - order: 1
+    cost: 10
+    content: "Scan all ports: `nmap -sV -p- -oN /tmp/nmap-full.txt 127.0.0.1` — use -sV for service version detection."
+  - order: 2
+    cost: 15
+    content: "Identify service names from open ports: `ss -tlnp` maps port numbers to process names for cross-referencing with nmap output."
+  - order: 3
+    cost: 20
+    content: "Disable unnecessary services: `systemctl stop telnet vsftpd rpcbind && systemctl disable telnet vsftpd rpcbind` to remove them permanently."
+  - order: 4
+    cost: 25
+    content: "Re-scan to confirm: `nmap -p 21,23,111,8888 127.0.0.1` should show all four as closed, leaving only 22, 80, 443 open."

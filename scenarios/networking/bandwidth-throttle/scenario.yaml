@@ -1,0 +1,38 @@
+slug: bandwidth-throttle
+title: "Bandwidth Throttle Too Aggressive — Fix tc qdisc Rate Limit"
+technology: Networking
+category: Traffic Shaping
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  A traffic shaping policy was applied to the uplink interface to limit bandwidth
+  usage. However, the rate was set to 1Mbit/s instead of the intended 100Mbit/s,
+  causing severe throughput degradation for all users. File transfers that should
+  complete in seconds are taking minutes. Fix the tc qdisc configuration to apply
+  the correct 100Mbit/s rate limit.
+objectives:
+  - Identify the current tc qdisc configuration on the uplink interface
+  - Remove the over-aggressive rate limit
+  - Apply the correct 100Mbit/s rate limit
+  - Verify throughput with iperf3 or similar tool
+initial_state: |
+  Ubuntu 22.04. Interface eth0 has a `tc qdisc add dev eth0 root tbf rate 1mbit
+  burst 32kbit latency 400ms` rule applied. Throughput is capped at ~1Mbit/s.
+  The intended policy is 100Mbit/s.
+hints:
+  - order: 1
+    cost: 10
+    content: "Inspect current rules: `tc qdisc show dev eth0` and `tc -s qdisc show dev eth0`."
+  - order: 2
+    cost: 15
+    content: "Remove the current rule: `tc qdisc del dev eth0 root`"
+  - order: 3
+    cost: 15
+    content: "Apply correct rate: `tc qdisc add dev eth0 root tbf rate 100mbit burst 256kbit latency 50ms`"
+  - order: 4
+    cost: 20
+    content: "Test throughput: `iperf3 -c <server>` or `dd if=/dev/zero | nc <host> <port>` and observe transfer speed."

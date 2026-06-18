@@ -1,0 +1,38 @@
+slug: nat-masquerade-broken
+title: "NAT Masquerade Broken — Fix iptables POSTROUTING After Reboot"
+technology: Networking
+category: NAT
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  After a server reboot, hosts on the internal network (192.168.100.0/24) lost
+  internet connectivity. The iptables MASQUERADE rule in the POSTROUTING chain was
+  not persisted to the iptables rules file and was lost on reboot. Additionally,
+  IP forwarding is disabled in the kernel. Restore both the MASQUERADE rule and
+  IP forwarding so internal hosts can reach the internet.
+objectives:
+  - Enable IP forwarding via sysctl
+  - Restore the iptables MASQUERADE rule in the POSTROUTING chain
+  - Persist the iptables rules so they survive future reboots
+  - Verify internal hosts can reach external destinations
+initial_state: |
+  Ubuntu 22.04 router. net.ipv4.ip_forward=0. iptables nat table POSTROUTING chain
+  is empty. Internal hosts on 192.168.100.0/24 cannot reach the internet. Interface
+  eth0 is the WAN interface.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check IP forwarding: `sysctl net.ipv4.ip_forward`. Enable: `sysctl -w net.ipv4.ip_forward=1`"
+  - order: 2
+    cost: 15
+    content: "Add MASQUERADE: `iptables -t nat -A POSTROUTING -s 192.168.100.0/24 -o eth0 -j MASQUERADE`"
+  - order: 3
+    cost: 15
+    content: "Persist iptables: `iptables-save > /etc/iptables/rules.v4`"
+  - order: 4
+    cost: 20
+    content: "Persist sysctl: add `net.ipv4.ip_forward=1` to /etc/sysctl.conf and run `sysctl -p`."

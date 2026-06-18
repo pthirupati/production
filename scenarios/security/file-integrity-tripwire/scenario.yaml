@@ -1,0 +1,40 @@
+slug: file-integrity-tripwire
+title: "File Integrity Alert — Investigate and Restore Modified Files"
+technology: Security
+category: File Integrity Monitoring
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  AIDE (Advanced Intrusion Detection Environment) triggered an alert — it detected
+  that /usr/bin/find and /etc/passwd were modified outside of the normal change
+  window. The modification times and checksums have changed. This could indicate
+  a compromised system or unauthorized changes. Investigate the modified files,
+  restore them from known-good backups, re-initialize the AIDE database, and
+  document your findings.
+objectives:
+  - Run AIDE check to identify all modified files
+  - Investigate /usr/bin/find and /etc/passwd for suspicious changes
+  - Restore the files from known-good backups in /var/backup/
+  - Re-initialize the AIDE database after confirming system integrity
+  - Write investigation findings to /tmp/integrity-report.txt
+initial_state: |
+  Ubuntu 22.04 with aide installed. `/usr/sbin/aide --check` reports modifications
+  to /usr/bin/find and /etc/passwd. Backups exist at /var/backup/find.backup and
+  /var/backup/passwd.backup. AIDE database is at /var/lib/aide/aide.db.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run check: `aide --check 2>&1 | head -50` — lists all changed files and attributes."
+  - order: 2
+    cost: 15
+    content: "Investigate changes: `diff /usr/bin/find /var/backup/find.backup` and `diff /etc/passwd /var/backup/passwd.backup`"
+  - order: 3
+    cost: 15
+    content: "Restore: `cp /var/backup/find.backup /usr/bin/find && cp /var/backup/passwd.backup /etc/passwd`"
+  - order: 4
+    cost: 20
+    content: "Reinitialize AIDE: `aide --init && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db`"

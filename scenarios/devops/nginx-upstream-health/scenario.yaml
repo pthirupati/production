@@ -1,0 +1,37 @@
+title: Fix Nginx Upstream Health Check Failure
+slug: nginx-upstream-health
+technology: DevOps
+category: Load Balancing
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  Nginx is reporting all upstream servers as unavailable. Health checks are
+  failing because the upstream port is wrong in the nginx.conf — the app
+  servers listen on port 8080 but nginx is configured to forward to port 80.
+  Fix the upstream server port so traffic is correctly forwarded.
+objectives:
+  - Identify the misconfigured upstream server port in nginx.conf
+  - Fix the upstream port from 80 to 8080
+  - Test the Nginx configuration syntax
+  - Reload Nginx and verify upstreams are healthy
+initial_state: |
+  Ubuntu server running Nginx as a reverse proxy. Config at /etc/nginx/nginx.conf.
+  Upstream app servers (app1.internal, app2.internal) listen on port 8080 but
+  the upstream block specifies port 80. The 502 errors confirm all backends are down.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check nginx config: cat /etc/nginx/nginx.conf | grep -A10 'upstream'"
+  - order: 2
+    cost: 15
+    content: "The upstream block has app1.internal:80 — should be app1.internal:8080"
+  - order: 3
+    cost: 20
+    content: "Fix both app1.internal:80 and app2.internal:80 to use port 8080"
+  - order: 4
+    cost: 25
+    content: "Test config: nginx -t then reload: systemctl reload nginx"

@@ -1,0 +1,39 @@
+slug: nmap-open-ports-audit
+title: "Unexpected Open Ports — Audit and Close Unauthorized Services"
+technology: Security
+category: Network Security
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  A vulnerability scan found unexpected ports open on a production server.
+  In addition to the expected ports (22/SSH, 80/HTTP, 443/HTTPS), nmap reveals
+  ports 6379 (Redis, exposed publicly), 8080 (development HTTP server), and
+  3306 (MySQL, exposed publicly) are open and accessible. These services should
+  only be accessible locally or from specific management hosts. Identify the
+  offending services and restrict their bind addresses.
+objectives:
+  - Run a port scan to identify all listening services
+  - Identify services bound to 0.0.0.0 that should only be on 127.0.0.1
+  - Configure Redis, MySQL, and the dev server to bind only to localhost
+  - Verify the unauthorized ports are no longer reachable from outside
+initial_state: |
+  Ubuntu 22.04. Redis bound to 0.0.0.0:6379. MySQL bound to 0.0.0.0:3306.
+  A Python SimpleHTTPServer running on 0.0.0.0:8080. All three are reachable
+  from external hosts. Expected services: only 22, 80, 443.
+hints:
+  - order: 1
+    cost: 10
+    content: "Scan: `ss -tlnp` or `netstat -tlnp` to see all listening sockets."
+  - order: 2
+    cost: 15
+    content: "Fix Redis: edit /etc/redis/redis.conf — set `bind 127.0.0.1` then `systemctl restart redis`"
+  - order: 3
+    cost: 15
+    content: "Fix MySQL: edit /etc/mysql/mysql.conf.d/mysqld.cnf — set `bind-address = 127.0.0.1` then `systemctl restart mysql`"
+  - order: 4
+    cost: 15
+    content: "Stop dev server: `pkill -f SimpleHTTPServer` or `pkill -f 'python.*8080'`"

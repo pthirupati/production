@@ -114,6 +114,13 @@ export default function AdminSecurity() {
         </div>
       </div>
 
+      <div className="glass-card p-4 flex items-start gap-3 border border-amber-500/30 bg-amber-500/5 text-sm">
+        <AlertTriangle size={16} className="text-amber-400 mt-0.5 shrink-0" />
+        <p className="text-amber-200">
+          <strong>Rotate Credentials Reminder:</strong> Rotate DJANGO_SECRET_KEY, database passwords, and Redis credentials periodically. API keys in git history should be considered compromised.
+        </p>
+      </div>
+
       <div className="glass-card p-4 flex flex-wrap items-center gap-4 text-sm">
         <span className="text-surface-400">Gmail API:</span>
         <span className={email.gmail_ok ? 'text-accent-green' : 'text-accent-red'}>

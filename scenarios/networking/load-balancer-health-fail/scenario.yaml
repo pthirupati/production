@@ -1,0 +1,38 @@
+slug: load-balancer-health-fail
+title: "Load Balancer Health Check Failing — Fix Endpoint Path"
+technology: Networking
+category: Load Balancing
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  The HAProxy load balancer is marking all backend servers as DOWN and returning
+  503 to clients. Investigation reveals the health check is configured to probe
+  /health but the application exposes its health endpoint at /healthz. This simple
+  path mismatch causes every backend to fail the health check and be removed from
+  the active pool.
+objectives:
+  - Identify the incorrect health check path in the HAProxy configuration
+  - Update the health check option to use /healthz
+  - Reload HAProxy and verify backends transition to UP state
+  - Confirm traffic is being load balanced to healthy backends
+initial_state: |
+  HAProxy 2.6 configured with 3 backend servers. Health check is `option httpchk
+  GET /health`. All backends return 404 for /health but 200 for /healthz. All 3
+  backends show as DOWN, stats page shows 0 active servers.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check `/etc/haproxy/haproxy.cfg` — look for the `option httpchk` line in the backend block."
+  - order: 2
+    cost: 15
+    content: "Change `option httpchk GET /health` to `option httpchk GET /healthz HTTP/1.1\\r\\nHost: localhost`"
+  - order: 3
+    cost: 10
+    content: "Reload HAProxy: `systemctl reload haproxy` (or `haproxy -sf $(cat /run/haproxy.pid)`)"
+  - order: 4
+    cost: 15
+    content: "Check backend status: `echo 'show stat' | socat /run/haproxy/admin.sock stdio | cut -d',' -f1,2,18`"

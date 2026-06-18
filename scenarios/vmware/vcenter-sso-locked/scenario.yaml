@@ -1,0 +1,49 @@
+---
+slug: vcenter-sso-locked
+title: "vCenter SSO Account Locked Out — Admin Cannot Login"
+technology: VMware
+category: Identity & Access
+difficulty: medium
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Critical
+is_free: false
+description: |
+  The vCenter administrator account administrator@vsphere.local is locked out after
+  multiple failed login attempts triggered by a misconfigured automation script.
+  The SSO lockout policy is set to lock accounts after 5 failed attempts. No other
+  users have Administrator privilege. Engineers must unlock the account using the
+  vSphere SSO CLI tool (sso-config.sh) directly on the vCenter appliance.
+objectives:
+  - SSH into the vCenter VCSA appliance and access the SSO management CLI
+  - Verify the administrator account is locked using sso-config.sh
+  - Unlock the account and optionally reset the password
+  - Update the automation script to use a non-admin service account
+initial_state: |
+  VMware vCenter simulation. vCenter VCSA at vcenter.lab.local.
+  SSH access to VCSA available as root.
+  Account administrator@vsphere.local shows as locked in SSO.
+hints:
+  - order: 1
+    cost: 10
+    content: "SSH to vCenter: ssh root@vcenter.lab.local
+      Navigate to: cd /opt/likewise/bin/
+      List locked accounts: ./sso-config.sh -l or check with:
+      /usr/lib/vmware-vmafd/bin/dir-cli user list --login administrator@vsphere.local"
+  - order: 2
+    cost: 15
+    content: "Unlock the account using the SSO CLI:
+      /usr/lib/vmware-vmafd/bin/dir-cli user unlock \
+        --account administrator \
+        --login administrator@vsphere.local \
+        --password <current_password>
+      If password is also unknown, use the appliance management UI at port 5480."
+  - order: 3
+    cost: 20
+    content: "After unlocking, review the SSO lockout policy:
+      /usr/lib/vmware-vmafd/bin/dir-cli ssoconfig --get-lockout-policy
+      Increase the failed attempts threshold or add an unlock notification.
+      Create a service account with minimal permissions for the automation script."

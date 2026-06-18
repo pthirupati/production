@@ -92,8 +92,8 @@ const FAQ_ITEMS = [
     a: 'All subscriptions are yearly (1-year access from purchase). Interview plan prices shown are per year, not per month.',
   },
   {
-    q: 'Can admins grant free access?',
-    a: 'Yes. Admins can grant complimentary technology and interview access to any user from the admin panel. Staff members get free interview access by default.',
+    q: 'Do paid plans include mock interview attempts?',
+    a: 'Yes. Pro and Premium interview plans include 10 full mock interview attempts per year with multi-round voice interviews and detailed STAR-scored feedback reports.',
   },
 ]
 

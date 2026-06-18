@@ -1,0 +1,45 @@
+---
+slug: vm-snapshot-delete-failed
+title: "VM Snapshot Deletion Failing — Datastore Almost Full"
+technology: VMware
+category: Storage
+difficulty: medium
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  A VM snapshot created 3 weeks ago is failing to delete with error: "Unable to
+  access file [datastore1] app-prod-01/app-prod-01-Snapshot3.vmsn." The datastore
+  is at 94% capacity (950 GB of 1 TB used). The snapshot delta VMDK files have grown
+  significantly as the base disk has continued to receive writes. Engineers must
+  free space, then delete the snapshot chain using the vSphere Snapshot Manager.
+objectives:
+  - Identify the VM with the failing snapshot in vSphere Client
+  - Check datastore free space and identify large delta VMDK files
+  - Free at least 60 GB of datastore space by migrating or deleting unused VMs
+  - Delete the snapshot using Snapshot Manager and verify datastore space increases
+initial_state: |
+  VMware vCenter simulation. VM "app-prod-01" on datastore1 has a 3-week-old snapshot.
+  Datastore1 is at 94% (950 GB / 1 TB). Snapshot delta files are ~55 GB.
+  vCenter: vcenter.lab.local. ESXi host: esxi-01.lab.local.
+hints:
+  - order: 1
+    cost: 10
+    content: "In vSphere Client, select app-prod-01 → Actions → Snapshots → Manage
+      Snapshots. Note the snapshot creation date and size. Check the datastore
+      browser to see delta VMDK sizes."
+  - order: 2
+    cost: 15
+    content: "To free space: find and delete ISOs in the datastore browser, or
+      use Storage vMotion to move a large VM to another datastore.
+      Alternatively, extend the datastore if the underlying LUN has free space."
+  - order: 3
+    cost: 20
+    content: "With sufficient free space, right-click app-prod-01 → Snapshots →
+      Delete All Snapshots. Monitor the datastore free space in real time.
+      If the GUI fails again, use the ESXi CLI:
+      vmkfstools -v 10 to enable verbose and retry via vmware-cmd or ESXCLI."

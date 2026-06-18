@@ -199,7 +199,9 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5MB
 # --------------------------------------------------
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # Cookie-based JWT must come first so httpOnly cookies are honoured;
+        # it falls back to Authorization header internally.
+        "apps.auth_app.cookie_auth.CookieJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
@@ -266,6 +268,10 @@ SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
 }
+
+# Custom JWT authentication that also accepts cookies (see apps/auth_app/cookie_auth.py)
+COOKIE_BASED_JWT_AUTH = True
+
 
 def _read_pem_file(path):
     try:

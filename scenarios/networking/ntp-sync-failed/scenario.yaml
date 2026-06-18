@@ -1,0 +1,38 @@
+slug: ntp-sync-failed
+title: "NTP Sync Failed — Fix Time Sync to Resolve Certificate Errors"
+technology: Networking
+category: Time Synchronization
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  The server's clock has drifted over 5 minutes from actual time. TLS connections
+  are failing because certificates appear expired from the server's perspective.
+  The systemd-timesyncd service is configured to use an unreachable internal NTP
+  server (ntp.internal.corp). Update the NTP configuration to use public NTP
+  servers, force an immediate sync, and verify time is correct.
+objectives:
+  - Identify that NTP sync is failing due to misconfigured server
+  - Update /etc/systemd/timesyncd.conf with public NTP servers
+  - Force an immediate time sync
+  - Verify system clock is synchronized and within acceptable drift
+initial_state: |
+  Ubuntu 22.04. systemd-timesyncd configured with NTP=ntp.internal.corp which is
+  unreachable. System clock shows time from 6 minutes ago. TLS connections to
+  public services are failing with CERTIFICATE_VERIFY_FAILED.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check status: `timedatectl status` and `systemctl status systemd-timesyncd`."
+  - order: 2
+    cost: 10
+    content: "Edit /etc/systemd/timesyncd.conf — set NTP=pool.ntp.org and FallbackNTP=time.cloudflare.com"
+  - order: 3
+    cost: 10
+    content: "Restart and sync: `systemctl restart systemd-timesyncd` then `timedatectl set-ntp true`"
+  - order: 4
+    cost: 15
+    content: "Force immediate sync: `chronyc makestep` (if using chrony) or `ntpdate pool.ntp.org`"

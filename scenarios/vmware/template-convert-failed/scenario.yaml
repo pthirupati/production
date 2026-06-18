@@ -1,0 +1,46 @@
+---
+slug: template-convert-failed
+title: "Converting VM to Template Failed — Snapshots Blocking Conversion"
+technology: VMware
+category: VM Management
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  An attempt to convert VM "golden-image-ubuntu22" to a template failed with:
+  "Cannot convert a virtual machine that has one or more snapshots to a template."
+  The golden image VM was prepared for templating but a backup snapshot was taken
+  before the final sysprep/cloud-init configuration was applied. The snapshot must
+  be committed before template conversion can proceed.
+objectives:
+  - Verify the error by checking the Recent Tasks for the failed conversion task
+  - Open Snapshot Manager for golden-image-ubuntu22 and review existing snapshots
+  - Delete the backup snapshot to consolidate the disk
+  - Convert the VM to a template successfully and verify it appears in VM Templates
+initial_state: |
+  VMware vCenter simulation. golden-image-ubuntu22 has 1 snapshot: "pre-sysprep-backup".
+  VM is powered off. Template conversion fails with snapshot error.
+  Target template name: ubuntu-22-04-template.
+hints:
+  - order: 1
+    cost: 10
+    content: "Right-click golden-image-ubuntu22 → Snapshots → Manage Snapshots.
+      You will see the 'pre-sysprep-backup' snapshot. Confirm the VM has only this
+      one snapshot (no linked clones depend on it before deleting)."
+  - order: 2
+    cost: 15
+    content: "Delete the snapshot: in Snapshot Manager, select 'pre-sysprep-backup'
+      and click 'Delete'. This commits the delta VMDK into the base disk.
+      Wait for the task to complete (shown in Recent Tasks)."
+  - order: 3
+    cost: 20
+    content: "After snapshot deletion, right-click golden-image-ubuntu22 →
+      Template → Convert to Template.
+      The VM will disappear from the VM inventory and appear under
+      VM Templates in the content library or under VMs and Templates as a template icon.
+      Verify it can be deployed: right-click template → New VM from this Template."

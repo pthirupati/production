@@ -1,0 +1,36 @@
+title: Fix Terraform Variable Type Error
+slug: terraform-apply-failed
+technology: DevOps
+category: Infrastructure as Code
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  Terraform plan is failing with a variable type mismatch error. A recent change
+  to variables.tf introduced an incorrect type constraint. The variable
+  "instance_count" is declared as type string but the terraform.tfvars file
+  provides a number. Fix the type declaration so terraform plan succeeds.
+objectives:
+  - Run terraform plan and identify the variable type error
+  - Fix the type constraint in variables.tf
+  - Verify terraform plan completes without errors
+initial_state: |
+  Ubuntu server with Terraform installed. Working directory is /opt/terraform/infra.
+  The variables.tf file declares instance_count as type string but tfvars provides
+  a number value, causing a type mismatch error.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run: cd /opt/terraform/infra && terraform plan to see the error"
+  - order: 2
+    cost: 15
+    content: "Check the variable declaration: cat variables.tf | grep -A5 instance_count"
+  - order: 3
+    cost: 20
+    content: "Check the value provided: cat terraform.tfvars | grep instance_count"
+  - order: 4
+    cost: 25
+    content: "In variables.tf, change 'type = string' to 'type = number' for instance_count"

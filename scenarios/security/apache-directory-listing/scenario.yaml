@@ -1,0 +1,38 @@
+slug: apache-directory-listing
+title: "Apache Directory Listing Enabled — Disable Options Indexes"
+technology: Security
+category: Web Server Security
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: true
+description: |
+  Apache is serving directory listings for all directories that don't have an
+  index.html file. This exposes sensitive files including backup files, config
+  files, and application source code to anyone who can reach the server. The
+  Options Indexes directive is enabled in the virtual host configuration.
+  Disable it to prevent unauthorized file browsing.
+objectives:
+  - Confirm directory listing is enabled by accessing a directory without index
+  - Remove or disable the Options Indexes directive in the Apache config
+  - Reload Apache and verify directory listings are no longer served
+  - Ensure this is configured for all virtual hosts
+initial_state: |
+  Ubuntu 22.04 with Apache2. /var/www/html/ has no index.html. Apache returns a
+  directory listing when accessing the webroot. /etc/apache2/sites-enabled/000-default.conf
+  has `Options Indexes FollowSymLinks`.
+hints:
+  - order: 1
+    cost: 10
+    content: "Confirm the issue: `curl -s http://localhost/ | grep -i 'Index of'` — should show directory listing."
+  - order: 2
+    cost: 10
+    content: "Edit /etc/apache2/sites-enabled/000-default.conf — change `Options Indexes FollowSymLinks` to `Options -Indexes FollowSymLinks`"
+  - order: 3
+    cost: 10
+    content: "Also check /etc/apache2/apache2.conf for any global Options Indexes setting."
+  - order: 4
+    cost: 10
+    content: "Reload: `apache2ctl -t && systemctl reload apache2`. Verify: `curl http://localhost/` should return 403."

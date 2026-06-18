@@ -1,0 +1,46 @@
+---
+slug: vcenter-db-full
+title: "vCenter Database Nearly Full — Performance Alerts and Event Loss"
+technology: VMware
+category: vCenter Management
+difficulty: medium
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  The vCenter Embedded PostgreSQL database is at 92% capacity. vCenter performance
+  charts are not updating, alarms are delayed, and some events are being dropped.
+  The database grew beyond normal due to a misconfigured event retention policy that
+  was set to retain events for 365 days instead of the recommended 30 days. Engineers
+  must archive old events and adjust the database retention settings.
+objectives:
+  - Confirm vCenter database disk usage from the VCSA management UI
+  - Access the embedded PostgreSQL and check database table sizes
+  - Reduce the event and task retention period to reclaim database space
+  - Run a database cleanup to archive old records and verify space is recovered
+initial_state: |
+  VMware vCenter simulation. VCSA at vcenter.lab.local. DB at 92% (18.4 GB / 20 GB).
+  Event retention: 365 days (misconfigured). Task retention: 365 days.
+  Recommended: events 30 days, tasks 30 days.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check VCSA disk usage: log into https://vcenter.lab.local:5480 (appliance management)
+      Navigate to: Monitor → Database and check PostgreSQL usage stats.
+      Also check: VCSA CLI via SSH → df -h to see /storage/db partition usage."
+  - order: 2
+    cost: 15
+    content: "Reduce retention in vCenter: Administration → vCenter Server Settings →
+      Statistics → Change Task and Event retention to 30 days.
+      This schedules old records for cleanup on the next maintenance cycle."
+  - order: 3
+    cost: 20
+    content: "To force immediate cleanup via VCSA CLI:
+      SSH to vcenter.lab.local as root.
+      Run: /usr/lib/vmware-vpx/scripts/cleanup-event-db.sh
+      Or via psql: psql -U vc -d VCDB -c \"DELETE FROM vpx_event WHERE create_time < NOW() - INTERVAL '30 days';\"
+      Monitor DB size after cleanup: df -h /storage/db"

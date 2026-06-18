@@ -1,0 +1,49 @@
+---
+slug: redis-jedis-connection
+title: "Jedis Connection Refused — Redis Host Misconfigured in application.yml"
+technology: Java
+category: Caching
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  A Spring Boot application using Jedis for Redis caching is failing to start with:
+  redis.clients.jedis.exceptions.JedisConnectionException: Connection refused.
+  The Redis server was migrated from localhost to a dedicated Redis cluster, but
+  the application.yml still points to 127.0.0.1:6379. The correct endpoint is
+  redis.production.internal:6380 with TLS enabled and password authentication.
+objectives:
+  - Identify the Redis connection error in application startup logs
+  - Update spring.redis.host, port, and password in application.yml
+  - Enable TLS for the Redis connection
+  - Verify the application starts and Redis cache operations succeed
+initial_state: |
+  Simulated server. Spring Boot app at /opt/app/.
+  Config at /opt/app/src/main/resources/application.yml.
+  Redis currently configured as: host: 127.0.0.1, port: 6379 (wrong).
+  Correct endpoint: redis.production.internal:6380 with password 'r3d1s$ecret'.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check the error: grep 'JedisConnectionException\|Connection refused' /opt/app/logs/app.log
+      Confirm it's trying to connect to 127.0.0.1:6379 which is not running."
+  - order: 2
+    cost: 15
+    content: "In application.yml, update the Redis config:
+      spring:
+        redis:
+          host: redis.production.internal
+          port: 6380
+          password: r3d1s$ecret
+          ssl: true"
+  - order: 3
+    cost: 20
+    content: "Test connectivity first: redis-cli -h redis.production.internal -p 6380
+      -a 'r3d1s$ecret' --tls ping
+      Should return PONG. Then restart the app and check for successful
+      'Connected to Redis' log messages."

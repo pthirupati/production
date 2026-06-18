@@ -1,0 +1,43 @@
+---
+slug: log4j-config-missing
+title: "Application Logging Broken — log4j2.xml Config Not Found"
+technology: Java
+category: Logging
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: true
+description: |
+  After deploying a new JAR version, application logs have completely stopped.
+  The console shows: "ERROR StatusLogger No log4j2 configuration file found."
+  The log4j2.xml file was placed in the wrong directory during the build and is
+  not being picked up from the classpath. No structured logs are flowing to the
+  centralized log aggregation system, making the application a black box.
+objectives:
+  - Identify why log4j2.xml is not being found on the classpath
+  - Move or configure log4j2.xml to the correct classpath location
+  - Verify structured logging resumes by checking log output
+  - Confirm logs appear in the target log file defined in log4j2.xml
+initial_state: |
+  Simulated server. Application JAR at /opt/app/app.jar.
+  The log4j2.xml file exists at /opt/app/config/log4j2.xml but is not
+  on the classpath. Log directory /opt/app/logs/ exists but is empty.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run: java -jar /opt/app/app.jar 2>&1 | head -20 to see the
+      'No log4j2 configuration file found' error and confirm the symptom."
+  - order: 2
+    cost: 15
+    content: "Log4j2 looks for log4j2.xml in the classpath root. Copy the file:
+      cp /opt/app/config/log4j2.xml /opt/app/resources/
+      Then add -cp /opt/app/resources to the java startup command in start.sh."
+  - order: 3
+    cost: 20
+    content: "Alternatively, specify the config path explicitly in start.sh:
+      java -Dlog4j.configurationFile=/opt/app/config/log4j2.xml -jar /opt/app/app.jar
+      This is the most reliable approach for external config files."

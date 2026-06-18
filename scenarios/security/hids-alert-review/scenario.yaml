@@ -1,0 +1,37 @@
+title: "HIDS Alert Review — Investigate OSSEC File Integrity Alerts"
+slug: hids-alert-review
+technology: Security
+category: Intrusion Detection
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  OSSEC HIDS has triggered a level-7 file integrity monitoring alert indicating
+  that /etc/passwd and /usr/bin/sudo have been modified outside of a change
+  window. Review the OSSEC alerts, determine what changed in each file using
+  the stored checksums, and assess whether the changes indicate a compromise
+  or a legitimate system update.
+objectives:
+  - Review /var/ossec/logs/alerts/alerts.log for the file modification events
+  - Compare current checksums of /etc/passwd and /usr/bin/sudo against OSSEC's baseline database
+  - Write a one-line finding to /tmp/hids-findings.txt stating whether each change is suspicious or benign
+initial_state: |
+  CentOS server running OSSEC HIDS in local mode. Alerts have been triggered for
+  /etc/passwd and /usr/bin/sudo. OSSEC database is at /var/ossec/queue/syscheck/.
+  The server last had a legitimate package update 3 days ago.
+hints:
+  - order: 1
+    cost: 10
+    content: "Read alerts: `grep -A10 'Integrity checksum changed' /var/ossec/logs/alerts/alerts.log | head -50` to see what changed."
+  - order: 2
+    cost: 15
+    content: "Check /etc/passwd with `sha256sum /etc/passwd` and compare against `ossec-logtest` or the stored checksum in /var/ossec/queue/syscheck/."
+  - order: 3
+    cost: 20
+    content: "For /usr/bin/sudo, run `rpm -V sudo` (on RHEL/CentOS) to see if the package checksum matches the installed binary."
+  - order: 4
+    cost: 25
+    content: "Write findings: `echo 'passwd: benign - new user added via useradd; sudo: suspicious - binary mtime changed without rpm update' > /tmp/hids-findings.txt`"

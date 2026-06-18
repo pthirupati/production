@@ -1,0 +1,38 @@
+slug: nginx-server-tokens
+title: "nginx Revealing Version — Disable server_tokens"
+technology: Security
+category: Web Server Hardening
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: Low
+is_free: true
+description: |
+  nginx is exposing its version number in HTTP response headers and in error pages.
+  This information disclosure makes targeted attacks easier — an attacker who knows
+  the exact nginx version can look up specific CVEs. The Server header currently
+  reads "nginx/1.18.0" and error pages include the full version string. Disable
+  server_tokens to hide the version information.
+objectives:
+  - Verify nginx is exposing version in Server header
+  - Disable server_tokens in nginx.conf
+  - Reload nginx and verify the Server header no longer shows the version
+  - Verify error pages also no longer show the version
+initial_state: |
+  Ubuntu 22.04 with nginx 1.18.0. `curl -I http://localhost/` shows:
+  `Server: nginx/1.18.0`. 404 error pages display "nginx/1.18.0" in the footer.
+  server_tokens is set to 'on' (the default).
+hints:
+  - order: 1
+    cost: 10
+    content: "Verify: `curl -I http://localhost/ | grep Server` — shows full version."
+  - order: 2
+    cost: 10
+    content: "Edit /etc/nginx/nginx.conf — in the `http` block add or change: `server_tokens off;`"
+  - order: 3
+    cost: 10
+    content: "Reload nginx: `nginx -t && systemctl reload nginx`"
+  - order: 4
+    cost: 10
+    content: "Verify: `curl -I http://localhost/ | grep Server` — should show only 'nginx' without version."

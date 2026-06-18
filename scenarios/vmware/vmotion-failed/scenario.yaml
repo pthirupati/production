@@ -1,0 +1,46 @@
+---
+slug: vmotion-failed
+title: "vMotion Failed — Incompatible CPU Feature Sets Between Hosts"
+technology: VMware
+category: Migration
+difficulty: hard
+time_limit: 1500
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  A vMotion migration of VM "web-prod-02" from esxi-01 to esxi-03 failed with:
+  "The virtual machine's CPU hardware is incompatible with this host." The two hosts
+  have different CPU generations — esxi-01 has Intel Haswell processors and esxi-03
+  has older Intel Sandy Bridge processors. The VM was configured to "Expose hardware
+  assisted virtualization" which prevents migration to older CPU generations without
+  Enhanced vMotion Compatibility (EVC).
+objectives:
+  - Review the vMotion compatibility error in the Recent Tasks panel
+  - Check the EVC baseline configured on the cluster
+  - Enable EVC on the cluster at the Sandy Bridge baseline
+  - Retry the vMotion migration and verify it succeeds
+initial_state: |
+  VMware vCenter simulation. Cluster has no EVC baseline set.
+  esxi-01: Intel Haswell (4th gen). esxi-03: Intel Sandy Bridge (2nd gen).
+  web-prod-02 has "Expose hardware assisted virtualization to guest" enabled.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check the vMotion error: select the cluster → Monitor → Tasks & Events
+      → Tasks. Find the failed vMotion task and expand it to see the compatibility
+      error details, including which CPU feature is incompatible."
+  - order: 2
+    cost: 15
+    content: "Enable EVC: cluster → Configure → VMware EVC → Edit.
+      Select 'Intel Hosts' → 'Intel Sandy Bridge Generation' (the lowest common CPU).
+      Note: Enabling EVC may require all VMs to be powered off. Plan a maintenance window."
+  - order: 3
+    cost: 20
+    content: "Alternatively, without EVC, disable 'Expose hardware assisted virtualization'
+      in the VM's CPU settings (Edit Settings → CPU → Hardware Virtualization).
+      This removes the restriction for this specific VM but may impact nested
+      virtualization workloads. Retry vMotion after the change."

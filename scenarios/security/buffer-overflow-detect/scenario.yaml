@@ -1,0 +1,37 @@
+title: "Buffer Overflow — Detect and Mitigate a Vulnerable Service"
+slug: buffer-overflow-detect
+technology: Security
+category: Exploitation Defense
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  A legacy C application `dataparser` running as a service on port 8888 has been
+  flagged by a security audit as lacking stack canaries and NX-bit protection.
+  The binary was compiled without -fstack-protector and with -z execstack. Your
+  task is to confirm the vulnerability using checksec, examine the binary's
+  protections, and redeploy it with proper compiler hardening flags.
+objectives:
+  - Use checksec to identify missing binary protections on /usr/local/bin/dataparser
+  - Recompile the source at /opt/dataparser/main.c with -fstack-protector-strong, -D_FORTIFY_SOURCE=2, and -z noexecstack
+  - Restart the dataparser service and confirm checksec now reports protections enabled
+initial_state: |
+  Ubuntu server with the dataparser binary deployed and running as a systemd
+  service. Source code is available at /opt/dataparser/main.c. checksec is
+  installed. The service listens on 127.0.0.1:8888.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run `checksec --file=/usr/local/bin/dataparser` to see which protections are missing."
+  - order: 2
+    cost: 15
+    content: "Compile with: `gcc -o /usr/local/bin/dataparser /opt/dataparser/main.c -fstack-protector-strong -D_FORTIFY_SOURCE=2 -z noexecstack -pie -fPIE`"
+  - order: 3
+    cost: 20
+    content: "After recompiling, run `systemctl restart dataparser` and re-run checksec to verify Stack Canary, NX, and PIE are now enabled."
+  - order: 4
+    cost: 25
+    content: "Check `checksec --file=/usr/local/bin/dataparser` — all of RELRO, Stack, NX, PIE should show as enabled."

@@ -1,0 +1,35 @@
+slug: firewall-blocked-http
+title: "Firewall Blocked HTTP — Add iptables Allow Rule"
+technology: Networking
+category: Firewall
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: true
+description: |
+  Nginx is running and healthy, but all HTTP requests on port 80 are being silently
+  dropped by an iptables INPUT rule installed during a recent security hardening pass.
+  The rule was too broad — it blocks all traffic on port 80 rather than only external
+  traffic. Add a specific ACCEPT rule before the DROP to restore HTTP access.
+objectives:
+  - Identify the iptables rule dropping port 80 traffic
+  - Insert an ACCEPT rule for tcp/80 before the DROP rule
+  - Confirm nginx responds to HTTP requests on port 80
+initial_state: |
+  Ubuntu 22.04 with nginx running. An iptables DROP rule is installed in the INPUT
+  chain for tcp dpt:80. The service is healthy but completely unreachable.
+hints:
+  - order: 1
+    cost: 10
+    content: "`iptables -L INPUT -n --line-numbers` shows all INPUT rules with line numbers."
+  - order: 2
+    cost: 15
+    content: "Use `iptables -I INPUT <line> -p tcp --dport 80 -j ACCEPT` to insert an ACCEPT rule before the DROP."
+  - order: 3
+    cost: 10
+    content: "Verify with `curl -s http://127.0.0.1/` — you should get the nginx welcome page."
+  - order: 4
+    cost: 15
+    content: "To persist across reboots: `iptables-save > /etc/iptables/rules.v4`"

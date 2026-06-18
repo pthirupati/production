@@ -141,6 +141,13 @@ export default function InterviewRoom() {
   }
 
   const executeMediaRequest = async (type) => {
+    // Camera/microphone access requires HTTPS (or localhost).
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      const msg = 'Camera and microphone access requires a secure (HTTPS) connection. Please open this page over HTTPS and try again.'
+      setMediaError(msg)
+      toast.error(msg)
+      return
+    }
     if (!isMediaDevicesSupported()) {
       const msg = getMediaErrorMessage({ name: 'NotSupportedError' })
       setMediaError(msg)
@@ -157,7 +164,7 @@ export default function InterviewRoom() {
     ])
     if (micState === 'denied' || camState === 'denied') {
       const which = micState === 'denied' && camState === 'denied' ? 'Camera and microphone' : micState === 'denied' ? 'Microphone' : 'Camera'
-      const msg = `${which} access is blocked. Click the lock icon in your browser address bar, choose "Allow" for camera and microphone, then try again.`
+      const msg = `${which} access is blocked by your browser. Click the lock icon (🔒) in your browser address bar, set camera and microphone to "Allow", then refresh the page.`
       setMediaError(msg)
       toast.error(msg)
       return

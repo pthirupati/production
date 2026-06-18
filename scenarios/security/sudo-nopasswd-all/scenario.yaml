@@ -1,0 +1,38 @@
+slug: sudo-nopasswd-all
+title: "Sudo NOPASSWD ALL Found — Restrict the User's Access"
+technology: Security
+category: Privilege Escalation
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  During a routine access review, a user account 'deploy' was found with
+  NOPASSWD: ALL in the sudoers configuration. This deployment service account
+  only needs to restart two specific services (nginx and app). The broad grant
+  means any compromise of the deploy account leads to immediate full root access.
+  Restrict the sudo grant to only the specific commands needed.
+objectives:
+  - Identify the overly broad NOPASSWD: ALL grant for the 'deploy' user
+  - Modify the sudoers entry to restrict to specific commands only
+  - Grant: sudo /usr/bin/systemctl restart nginx, sudo /usr/bin/systemctl restart app
+  - Verify the deploy user cannot run arbitrary commands as root
+initial_state: |
+  Ubuntu 22.04. /etc/sudoers.d/deploy contains: `deploy ALL=(ALL) NOPASSWD: ALL`
+  The deploy user only needs to restart nginx and the app service. Any other
+  sudo command should be denied.
+hints:
+  - order: 1
+    cost: 10
+    content: "Audit: `sudo -l -U deploy` shows the current grants."
+  - order: 2
+    cost: 15
+    content: "Use visudo to safely edit /etc/sudoers.d/deploy — NEVER edit sudoers files directly."
+  - order: 3
+    cost: 15
+    content: "Replace the ALL=(ALL) line with: `deploy ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart nginx, /usr/bin/systemctl restart app`"
+  - order: 4
+    cost: 10
+    content: "Verify: `visudo -c` to check syntax. `sudo -l -U deploy` should list only the two commands."

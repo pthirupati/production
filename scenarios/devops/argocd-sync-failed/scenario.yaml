@@ -1,0 +1,40 @@
+title: Fix ArgoCD Application Sync Failure
+slug: argocd-sync-failed
+technology: DevOps
+category: GitOps
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  An ArgoCD application is stuck in a SyncFailed state. The Kubernetes manifests
+  in the Git repository have a validation error that prevents ArgoCD from applying
+  them to the cluster. Identify the invalid manifest and fix it so ArgoCD can
+  sync successfully.
+objectives:
+  - Identify the ArgoCD application that is in SyncFailed state
+  - Find the invalid Kubernetes manifest causing the sync failure
+  - Fix the manifest validation error
+  - Trigger a new sync and verify the application reaches Synced state
+initial_state: |
+  Kubernetes cluster with ArgoCD installed. Application "myapp" in namespace "argocd"
+  is in SyncFailed state. Manifests are at /opt/gitops/myapp/manifests/.
+  The deployment manifest has an invalid resource specification.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check app status: argocd app get myapp"
+  - order: 2
+    cost: 15
+    content: "Look at the sync error details: argocd app get myapp --refresh"
+  - order: 3
+    cost: 20
+    content: "Validate manifests: kubectl apply --dry-run=client -f /opt/gitops/myapp/manifests/"
+  - order: 4
+    cost: 25
+    content: "The deployment.yaml has cpu limit set to '0' which is invalid — set it to '500m'"
+  - order: 5
+    cost: 30
+    content: "After fixing, sync: argocd app sync myapp"

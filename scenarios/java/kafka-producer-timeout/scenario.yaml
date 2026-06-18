@@ -1,0 +1,51 @@
+---
+slug: kafka-producer-timeout
+title: "Kafka Producer Timing Out — Messages Not Reaching Broker"
+technology: Java
+category: Messaging
+difficulty: medium
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  A Spring Kafka producer is throwing: org.apache.kafka.common.errors.TimeoutException:
+  Topic order-events not present in metadata after 60000 ms. The Kafka broker address
+  in application.yml was recently changed during an infrastructure migration but the
+  Spring Boot service was not updated. Additionally, request.timeout.ms is set too low
+  for the new network latency profile. Engineers must fix both the broker address and
+  timeout configuration.
+objectives:
+  - Identify the Kafka broker connection error in application logs
+  - Update spring.kafka.bootstrap-servers in application.yml to the correct address
+  - Tune request.timeout.ms and delivery.timeout.ms for production reliability
+  - Verify messages are successfully produced and consumed
+initial_state: |
+  Simulated server. Spring Boot app at /opt/app/.
+  Config at /opt/app/src/main/resources/application.yml.
+  Current bootstrap-servers points to old broker: kafka-old.internal:9092.
+  New broker address: kafka.production.internal:9092.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check logs: grep -i 'TimeoutException\|bootstrap\|metadata' /opt/app/logs/app.log
+      to see the connection failure details and the wrong broker address being used."
+  - order: 2
+    cost: 15
+    content: "In application.yml, update:
+      spring:
+        kafka:
+          bootstrap-servers: kafka.production.internal:9092
+          producer:
+            properties:
+              request.timeout.ms: 30000
+              delivery.timeout.ms: 120000"
+  - order: 3
+    cost: 20
+    content: "Also check that the Kafka broker is reachable: nc -zv kafka.production.internal 9092
+      If it times out, check security groups and DNS resolution.
+      After updating config, restart the service and use kafka-console-consumer.sh
+      to verify messages appear on the topic."

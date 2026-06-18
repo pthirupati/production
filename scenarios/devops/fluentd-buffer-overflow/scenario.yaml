@@ -1,0 +1,37 @@
+title: Tune Fluentd Buffer to Prevent Overflow
+slug: fluentd-buffer-overflow
+technology: DevOps
+category: Observability
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  Fluentd is dropping log events because the buffer is overflowing. The buffer
+  size limits are too small for the current log volume. Memory buffer chunks
+  are being discarded and logs are being lost. Tune the buffer configuration
+  in fluent.conf to handle the load without data loss.
+objectives:
+  - Identify the buffer overflow errors in Fluentd logs
+  - Increase the buffer chunk_limit_size and total_limit_size
+  - Tune flush_interval and retry settings
+  - Verify Fluentd processes logs without buffer overflow errors
+initial_state: |
+  Ubuntu server running Fluentd. Config at /etc/fluent/fluent.conf.
+  Current buffer settings are too small: chunk_limit_size 1m, total_limit_size 10m.
+  These need to be increased to at least chunk_limit_size 8m, total_limit_size 256m.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check Fluentd logs: journalctl -u fluentd -n 50 | grep -i buffer"
+  - order: 2
+    cost: 15
+    content: "View buffer config: cat /etc/fluent/fluent.conf | grep -A10 '<buffer>'"
+  - order: 3
+    cost: 20
+    content: "Increase chunk_limit_size from 1m to 8m in the <buffer> section"
+  - order: 4
+    cost: 25
+    content: "Increase total_limit_size from 10m to 256m and restart: systemctl restart fluentd"

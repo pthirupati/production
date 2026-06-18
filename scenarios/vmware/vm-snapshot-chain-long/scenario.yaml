@@ -1,0 +1,45 @@
+---
+slug: vm-snapshot-chain-long
+title: "32-Deep Snapshot Chain Causing Severe VM Performance Degradation"
+technology: VMware
+category: Storage
+difficulty: hard
+time_limit: 1500
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Critical
+is_free: false
+description: |
+  VM "legacy-app-01" has accumulated 32 snapshots over 18 months. Every read and
+  write operation must traverse the entire snapshot chain, causing I/O latency 40x
+  higher than normal. The VM's disk read throughput is 2 MB/s instead of the usual
+  800 MB/s. VMware recommends keeping no more than 3 snapshots. Engineers must
+  consolidate the snapshot chain during a maintenance window.
+objectives:
+  - View the full snapshot chain and total snapshot size in Snapshot Manager
+  - Schedule a maintenance window due to the consolidation time required
+  - Delete all snapshots to consolidate the chain into the base disk
+  - Monitor the consolidation progress and verify I/O performance improves
+initial_state: |
+  VMware vCenter simulation. legacy-app-01 on datastore2. 32 snapshots, total 180 GB.
+  VM's disk read: 2 MB/s (normal: 800 MB/s). Consolidation estimated: 45-60 minutes.
+  Datastore2 has 250 GB free (consolidation will temporarily need additional space).
+hints:
+  - order: 1
+    cost: 10
+    content: "Right-click legacy-app-01 → Snapshots → Manage Snapshots.
+      Count the snapshots and note total size. Warn stakeholders: consolidation
+      will cause temporary performance degradation during the merge process."
+  - order: 2
+    cost: 15
+    content: "To delete all snapshots: in Snapshot Manager, click 'Delete All'.
+      VMware will begin merging delta VMDKs from the oldest to newest.
+      This is I/O intensive — do this during off-hours. Monitor Recent Tasks for progress."
+  - order: 3
+    cost: 20
+    content: "If 'Delete All' fails due to a locked file: check for vmware.log errors.
+      Try consolidation via: right-click VM → Snapshot → Consolidate.
+      If still failing, use vmkfstools on the ESXi host to manually commit the chain.
+      After completion, verify in VM properties that 0 snapshots remain and I/O normalizes."

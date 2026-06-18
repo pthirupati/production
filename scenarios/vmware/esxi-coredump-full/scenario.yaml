@@ -1,0 +1,48 @@
+---
+slug: esxi-coredump-full
+title: "ESXi Coredump Partition Full — Host Warning Alarm Active"
+technology: VMware
+category: Host Management
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Low
+is_free: false
+description: |
+  ESXi host esxi-01.lab.local has a persistent warning alarm: "ESXi coredump
+  partition is full." The host has generated multiple core dumps from past PSOD
+  (Purple Screen of Death) events. These core dump files are consuming the entire
+  coredump partition, preventing any future crash diagnostics from being captured.
+  Engineers must review past dumps, archive important ones, and clear the partition.
+objectives:
+  - SSH into the ESXi host and list existing coredump files
+  - Identify and archive any diagnostics not yet sent to VMware Support
+  - Remove old coredump files to clear the partition
+  - Verify the alarm clears and the partition has free space
+initial_state: |
+  VMware vCenter simulation. esxi-01 shows coredump partition full alarm.
+  SSH access to esxi-01 available. Coredump partition at /var/core/ is full.
+  Multiple .gz coredump files from past PSOD events in /var/core/.
+hints:
+  - order: 1
+    cost: 10
+    content: "SSH to esxi-01: ssh root@esxi-01.lab.local
+      List coredumps: ls -lh /var/core/
+      Also check: esxcli system coredump partition get to see partition config
+      and: esxcli system coredump file list"
+  - order: 2
+    cost: 15
+    content: "Before deleting, copy important core dumps to a datastore for archiving:
+      cp /var/core/vmkernel-zdump.* /vmfs/volumes/datastore1/coredump-archive/
+      Then remove old files: rm /var/core/vmkernel-zdump.*
+      Keep the most recent one if a support ticket is open."
+  - order: 3
+    cost: 20
+    content: "To prevent future overflow, configure network coredump collection:
+      esxcli system coredump network set --interface-name vmk0 \
+        --server-ipv4 <netdump-server-ip> --server-port 6500
+      esxcli system coredump network set --enable true
+      This sends future core dumps to a netdump server instead of local partition."

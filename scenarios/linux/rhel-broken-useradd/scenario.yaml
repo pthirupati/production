@@ -1,0 +1,32 @@
+title: "RHEL Simulation: Repair Broken /etc/passwd"
+slug: sim-rhel-broken-useradd
+technology: Linux Administration
+category: User Management
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: generic
+infrastructure_type: docker
+jira_priority: Medium
+is_free: true
+description: |
+  A malformed /etc/passwd entry prevents useradd from working.
+  Clean up the corrupt line, run pwck, and create appuser.
+objectives:
+  - Identify the malformed passwd entry
+  - Remove or fix the corrupt line
+  - Run pwck to verify account files
+  - Create user appuser with useradd -m
+initial_state: |
+  Simulated RHEL 9 server with a corrupt /etc/passwd line blocking new users.
+hints:
+  - order: 1
+    cost: 10
+    content: Run `pwck` to see which line is malformed.
+  - order: 2
+    cost: 15
+    content: Edit /etc/passwd and remove the line with missing UID fields.
+  - order: 3
+    cost: 20
+    content: Use `useradd -m appuser` after passwd is clean.

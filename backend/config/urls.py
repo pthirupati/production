@@ -2,7 +2,6 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.permissions import IsAdminUser
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
@@ -13,6 +12,7 @@ from apps.accounts.views import (
     SocialAuthConfigView, SocialOAuthStartView, GitHubCallbackView, GoogleCallbackView,
     GitHubLinkView, GoogleLinkView,
     LabHistoryView, SearchView, ContactView,
+    CookieTokenRefreshView,
 )
 
 urlpatterns = [
@@ -25,7 +25,7 @@ urlpatterns = [
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
     path("api/auth/send-otp/", SendOTPView.as_view(), name="send_otp"),
     path("api/auth/verify-otp/", VerifyOTPView.as_view(), name="verify_otp"),
-    path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/auth/refresh/", CookieTokenRefreshView.as_view(), name="token_refresh"),
     path("api/auth/profile/", UserProfileView.as_view(), name="profile"),
     path("api/auth/account/delete/", DeleteAccountView.as_view(), name="delete_account"),
     path("api/auth/change-password/", ChangePasswordView.as_view(), name="change_password"),

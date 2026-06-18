@@ -1,0 +1,37 @@
+title: "OSSEC False Positive — Tune Rules to Reduce Alert Noise"
+slug: ossec-false-positive
+technology: Security
+category: Intrusion Detection
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  The OSSEC HIDS installation is generating hundreds of level-10 alerts per day
+  for a known-good deployment script that runs every 15 minutes via cron. The
+  script legitimately modifies /etc/hosts and /etc/resolv.conf as part of
+  service discovery. Create a local rule to suppress these specific false
+  positives while keeping all other file integrity alerts active.
+objectives:
+  - Identify the specific OSSEC rule IDs generating the false positive alerts in /var/ossec/logs/alerts/alerts.log
+  - Create a local rule override in /var/ossec/rules/local_rules.xml to suppress the false positive
+  - Restart OSSEC and verify that the false positive alerts no longer appear while other alerts still fire
+initial_state: |
+  CentOS server running OSSEC 3.6 with file integrity monitoring enabled. The
+  deployment script /usr/local/bin/svc-discovery.sh runs every 15 minutes and
+  legitimately modifies /etc/hosts. OSSEC is generating rule 550 alerts for this.
+hints:
+  - order: 1
+    cost: 10
+    content: "Find the rule: `grep -A5 'svc-discovery\|etc/hosts' /var/ossec/logs/alerts/alerts.log | grep 'Rule:'` to identify the rule ID (likely 550 or 554)."
+  - order: 2
+    cost: 15
+    content: "In /var/ossec/rules/local_rules.xml add a rule: `<rule id='100001' level='0'><if_sid>550</if_sid><match>/etc/hosts</match><description>FP: svc-discovery modifying /etc/hosts</description></rule>`"
+  - order: 3
+    cost: 20
+    content: "Reload OSSEC: `/var/ossec/bin/ossec-control reload` and monitor the alert log: `tail -f /var/ossec/logs/alerts/alerts.log` to confirm suppression."
+  - order: 4
+    cost: 25
+    content: "Test that other alerts still fire: `touch /etc/passwd` then check that the rule 550 alert for /etc/passwd still appears in the alert log."

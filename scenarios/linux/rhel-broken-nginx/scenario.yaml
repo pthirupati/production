@@ -1,0 +1,33 @@
+title: "RHEL Simulation: Fix Broken Nginx"
+slug: sim-rhel-broken-nginx
+technology: Linux Administration
+category: Web Servers
+difficulty: easy
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: generic
+infrastructure_type: docker
+jira_priority: Medium
+is_free: true
+description: |
+  A simulated RHEL 9 server runs Nginx but the service fails to start.
+  Investigate the configuration, fix the typo, start nginx, and verify port 80.
+objectives:
+  - Find the configuration error with nginx -t
+  - Fix the listen directive typo
+  - Start and enable the nginx service
+  - Verify http://localhost returns HTTP 200
+initial_state: |
+  You are root on a simulated RHEL 9.3 server (no Docker required).
+  Nginx is installed but failed to start due to a bad site config.
+hints:
+  - order: 1
+    cost: 10
+    content: Run `nginx -t` to test the configuration syntax.
+  - order: 2
+    cost: 15
+    content: Check `/etc/nginx/sites-enabled/default` for typos in the listen directive.
+  - order: 3
+    cost: 20
+    content: Fix `listn` to `listen`, then `systemctl start nginx`.

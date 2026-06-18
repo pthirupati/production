@@ -327,6 +327,12 @@ export default function LabRunner() {
           }
           setSession(sessionData)
 
+          // Redirect VMware simulation labs to the dedicated vSphere simulator UI
+          if (lab.scenario?.simulation_type === 'vmware' || lab.scenario?.technology?.slug === 'vmware') {
+            navigate(`/vmware-sim?session=${sessionId}&scenario=${lab.scenario?.slug || ''}`, { replace: true })
+            return
+          }
+
           if (lab.jira_issue_key && lab.scenario?.id) {
             import('../api/jira').then(({ jiraApi }) =>
               jiraApi.getScenarioTicket(lab.scenario.id, { details: 1 })

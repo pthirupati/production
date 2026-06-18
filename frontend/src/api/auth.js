@@ -35,9 +35,11 @@ export const authApi = {
     const store = useAuthStore.getState()
     const refreshToken = store.refreshToken
     try {
-      if (refreshToken) {
-        await api.post('/auth/logout/', { refresh: refreshToken })
-      }
+      // Always hit the logout endpoint so the backend can:
+      //   1. Blacklist the refresh token (if provided in body)
+      //   2. Clear the httpOnly access_token and refresh_token cookies
+      // withCredentials is set globally on the axios instance so cookies are sent.
+      await api.post('/auth/logout/', refreshToken ? { refresh: refreshToken } : {})
     } catch {
       // Ignore errors — still clear local state
     } finally {

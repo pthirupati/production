@@ -1,0 +1,40 @@
+---
+slug: jvm-heap-oom
+title: "JVM Heap OutOfMemoryError — Application Crash on Peak Load"
+technology: Java
+category: JVM Tuning
+difficulty: easy
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: true
+description: |
+  A Spring Boot microservice is crashing on the production servers during peak traffic
+  with the error: java.lang.OutOfMemoryError: Java heap space. The service restarts but
+  crashes again within minutes. The default JVM heap (-Xmx256m) is too small for the
+  current workload. Engineers need to identify the correct heap settings and redeploy.
+objectives:
+  - Read the application crash logs and identify the OutOfMemoryError cause
+  - Determine the appropriate -Xmx and -Xms heap settings for the workload
+  - Update the JVM startup flags in the service configuration
+  - Verify the application runs without OOM errors under simulated load
+initial_state: |
+  Simulated RHEL 9 server running a Spring Boot 3.x service. The service is configured
+  with default heap settings (-Xmx256m). Application logs show repeated OOM crashes.
+  File: /opt/app/start.sh contains the java startup command.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check /opt/app/logs/app.log for the full OOM stack trace. Look for the
+      java.lang.OutOfMemoryError: Java heap space line."
+  - order: 2
+    cost: 15
+    content: "Edit /opt/app/start.sh and change -Xmx256m to -Xmx1g and add -Xms512m
+      to set the minimum heap as well."
+  - order: 3
+    cost: 20
+    content: "After editing, run: systemctl restart app-service and monitor with:
+      tail -f /opt/app/logs/app.log to confirm clean startup."

@@ -1,0 +1,38 @@
+slug: nginx-upstream-timeout
+title: "nginx Upstream Timeout — Fix proxy_read_timeout for 504 Errors"
+technology: Networking
+category: Reverse Proxy
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  Users are receiving 504 Gateway Timeout errors from nginx when accessing a
+  long-running API endpoint. The backend application legitimately takes 45–90
+  seconds to process certain requests (data exports, report generation), but
+  nginx's proxy_read_timeout is set to 30 seconds — shorter than the processing
+  time. Increase the timeout to allow these slow requests to complete successfully.
+objectives:
+  - Identify the proxy_read_timeout setting causing 504 errors
+  - Increase proxy_read_timeout to 120 seconds in the nginx config
+  - Also set proxy_connect_timeout and proxy_send_timeout appropriately
+  - Reload nginx and verify the endpoint no longer returns 504
+initial_state: |
+  Ubuntu 22.04 with nginx as a reverse proxy. proxy_read_timeout=30s configured in
+  /etc/nginx/conf.d/app.conf. Backend API at /api/export takes 60+ seconds.
+  All requests to /api/export return 504 Gateway Timeout.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check current config: `grep -r proxy_read_timeout /etc/nginx/`"
+  - order: 2
+    cost: 15
+    content: "Update in /etc/nginx/conf.d/app.conf: set `proxy_read_timeout 120s;` in the location block."
+  - order: 3
+    cost: 10
+    content: "Also set: `proxy_connect_timeout 10s;` and `proxy_send_timeout 120s;`"
+  - order: 4
+    cost: 10
+    content: "Reload nginx: `nginx -t && systemctl reload nginx`"

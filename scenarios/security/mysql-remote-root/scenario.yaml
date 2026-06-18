@@ -1,0 +1,39 @@
+slug: mysql-remote-root
+title: "MySQL Root Accessible Remotely — Restrict to Localhost"
+technology: Security
+category: Database Security
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  The MySQL root user account has been granted access from any host ('%'),
+  allowing remote root connections to the database server. Combined with a
+  weak root password discovered in a leaked config file, this gives an attacker
+  full control over all databases. Revoke the remote root grant, ensure root
+  can only connect from localhost, and update the root password.
+objectives:
+  - Connect to MySQL and check root user host grants
+  - Revoke the root@'%' grant
+  - Ensure root exists only for localhost and 127.0.0.1
+  - Change the root password to a strong value
+  - Verify remote root login is rejected
+initial_state: |
+  Ubuntu 22.04 with MySQL 8.0. `SELECT user, host FROM mysql.user WHERE user='root'`
+  shows entries for root@'%', root@localhost, root@127.0.0.1.
+  Remote root login works. Root password is 'admin123'.
+hints:
+  - order: 1
+    cost: 10
+    content: "`mysql -u root -p` then `SELECT user, host FROM mysql.user WHERE user='root';`"
+  - order: 2
+    cost: 15
+    content: "Revoke remote access: `DROP USER 'root'@'%'; FLUSH PRIVILEGES;`"
+  - order: 3
+    cost: 15
+    content: "Change password: `ALTER USER 'root'@'localhost' IDENTIFIED BY '<strong-password>';`"
+  - order: 4
+    cost: 10
+    content: "Also update bind-address in /etc/mysql/mysql.conf.d/mysqld.cnf: `bind-address = 127.0.0.1`"

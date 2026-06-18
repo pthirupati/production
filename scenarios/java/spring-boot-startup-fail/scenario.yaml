@@ -1,0 +1,46 @@
+---
+slug: spring-boot-startup-fail
+title: "Spring Boot App Fails to Start — Unsatisfied Bean Dependency"
+technology: Java
+category: Spring Boot
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  A Spring Boot 3.2 application fails to start after a recent refactor. The startup
+  log shows: UnsatisfiedDependencyException: Error creating bean with name
+  'orderService': Unsatisfied dependency expressed through field 'paymentGateway'.
+  A required @Bean definition was accidentally removed from a @Configuration class
+  during the refactoring. Engineers must find the missing bean and restore the config.
+objectives:
+  - Read the application startup logs to identify the missing bean name
+  - Locate the @Configuration class that should define the bean
+  - Add the missing @Bean method to restore the Spring context
+  - Verify the application starts successfully
+initial_state: |
+  Simulated server. Spring Boot app source at /opt/app/src/main/java/.
+  Application logs at /opt/app/logs/startup.log showing the exception.
+  The missing bean is 'paymentGateway' of type PaymentGatewayClient.
+hints:
+  - order: 1
+    cost: 10
+    content: "Read /opt/app/logs/startup.log and find the full exception chain.
+      The 'Caused by' lines will show exactly which bean is missing and which
+      class needs it."
+  - order: 2
+    cost: 15
+    content: "Search for the configuration: grep -r '@Configuration' /opt/app/src/
+      then look for a class that likely configures payment/gateway integrations.
+      Check git diff to see what was removed."
+  - order: 3
+    cost: 20
+    content: "In /opt/app/src/main/java/com/app/config/PaymentConfig.java, add:
+      @Bean public PaymentGatewayClient paymentGateway() {
+        return new PaymentGatewayClient(paymentProperties());
+      }
+      Then rebuild and restart."

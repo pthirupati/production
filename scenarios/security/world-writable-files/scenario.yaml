@@ -1,0 +1,38 @@
+slug: world-writable-files
+title: "World-Writable Files in /etc — Fix Permissions"
+technology: Security
+category: File Permissions
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: true
+description: |
+  A security scan flagged several world-writable files in /etc, including critical
+  configuration files like /etc/cron.d/app and /etc/logrotate.d/myapp. World-writable
+  files in /etc allow any local user to modify system configurations, potentially
+  leading to privilege escalation or service disruption. Find all world-writable
+  files in /etc and remove the write permission for others.
+objectives:
+  - Find all world-writable files in /etc using find
+  - Remove the world-writable bit from each identified file
+  - Verify no world-writable files remain in /etc
+  - Identify which process likely caused the misconfiguration
+initial_state: |
+  Ubuntu 22.04. Multiple files in /etc are world-writable (mode 777 or o+w).
+  At minimum: /etc/cron.d/app (777), /etc/logrotate.d/myapp (666).
+  `find /etc -perm -o+w` returns several results.
+hints:
+  - order: 1
+    cost: 10
+    content: "Find world-writable files: `find /etc -perm -o+w -type f 2>/dev/null`"
+  - order: 2
+    cost: 10
+    content: "Fix individual file: `chmod o-w /etc/cron.d/app`"
+  - order: 3
+    cost: 10
+    content: "Fix all at once: `find /etc -perm -o+w -type f -exec chmod o-w {} \\;`"
+  - order: 4
+    cost: 15
+    content: "Verify: `find /etc -perm -o+w -type f 2>/dev/null` should return empty output."

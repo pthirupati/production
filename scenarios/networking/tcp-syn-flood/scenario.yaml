@@ -1,0 +1,38 @@
+slug: tcp-syn-flood
+title: "TCP SYN Flood — Enable tcp_syncookies to Mitigate Attack"
+technology: Networking
+category: DDoS Mitigation
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  The server is under an ongoing TCP SYN flood attack. The SYN backlog queue is
+  filling up and legitimate connections are being rejected. The kernel's SYN cookie
+  protection is disabled, allowing the attack to exhaust the half-open connection
+  table. Enable tcp_syncookies and tune the SYN backlog parameters to allow the
+  server to continue handling legitimate traffic during the attack.
+objectives:
+  - Identify that tcp_syncookies is disabled
+  - Enable tcp_syncookies and increase the SYN backlog size
+  - Persist the settings via sysctl.conf
+  - Verify the server can accept new legitimate connections
+initial_state: |
+  Ubuntu 22.04 server under SYN flood. `sysctl net.ipv4.tcp_syncookies` returns 0.
+  `netstat -an | grep SYN_RECV` shows hundreds of half-open connections. Legitimate
+  clients are getting connection refused or timeout.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check current value: `sysctl net.ipv4.tcp_syncookies` and `sysctl net.ipv4.tcp_max_syn_backlog`."
+  - order: 2
+    cost: 15
+    content: "Enable immediately: `sysctl -w net.ipv4.tcp_syncookies=1` and `sysctl -w net.ipv4.tcp_max_syn_backlog=4096`"
+  - order: 3
+    cost: 15
+    content: "Also set: `sysctl -w net.ipv4.tcp_synack_retries=2` to reduce resource hold time for half-open connections."
+  - order: 4
+    cost: 10
+    content: "Persist: add settings to /etc/sysctl.conf and run `sysctl -p`."

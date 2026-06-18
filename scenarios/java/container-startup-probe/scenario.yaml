@@ -1,0 +1,51 @@
+---
+slug: container-startup-probe
+title: "Kubernetes Startup Probe Killing Java App Before JVM Warms Up"
+technology: Java
+category: Kubernetes
+difficulty: medium
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  A Spring Boot application deployed in Kubernetes is being killed and restarted
+  in a loop. The startup probe is configured with a 30-second timeout but the JVM
+  takes 45-60 seconds to complete initialization (class loading, Spring context, and
+  data source connection validation). The pod reaches the READY state momentarily then
+  gets killed before it can serve traffic. Engineers must tune the startup probe
+  parameters and optionally enable JVM class data sharing to reduce startup time.
+objectives:
+  - Examine the pod events to confirm the startup probe is failing
+  - Review the current startupProbe configuration in the Kubernetes deployment YAML
+  - Increase failureThreshold or periodSeconds to allow enough time for startup
+  - Optionally add -XX:+UseAppCDS to reduce JVM startup time
+initial_state: |
+  Simulated Kubernetes environment. Deployment YAML at /opt/k8s/deployment.yaml.
+  Pod logs accessible via: kubectl logs -l app=order-service --previous.
+  Current startupProbe: httpGet /actuator/health, period=10s, failureThreshold=3.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check pod events: kubectl describe pod -l app=order-service | grep -A5 Events
+      Look for 'Startup probe failed' messages and the probe timeout."
+  - order: 2
+    cost: 15
+    content: "In /opt/k8s/deployment.yaml, update startupProbe:
+      startupProbe:
+        httpGet:
+          path: /actuator/health
+          port: 8080
+        failureThreshold: 12
+        periodSeconds: 10
+      This gives 12 * 10 = 120 seconds for startup."
+  - order: 3
+    cost: 20
+    content: "To reduce JVM startup time, add to the container env:
+      - name: JAVA_OPTS
+        value: '-XX:+UseAppCDS -Xshare:on -XX:SharedArchiveFile=/tmp/app-cds.jsa'
+      You need to pre-generate the CDS archive by running the app with -Xshare:dump.
+      Also consider GraalVM native image for sub-second startup."

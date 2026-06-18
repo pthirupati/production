@@ -1,0 +1,15 @@
+category: Linux Administration
+description: Nginx runs but port 80 blocked by firewalld.
+difficulty: easy
+hints:
+- content: firewall-cmd --add-port=80/tcp
+  cost: 10
+  order: 1
+initial_state: Nginx runs but port 80 blocked by firewalld.
+is_free: false
+lab_mode: simulation
+objectives:
+- firewall-cmd --add-port=80/tcp
+simulation_type: generic
+slug: sim-rhel-firewalld-port
+title: Open Firewall Port 80

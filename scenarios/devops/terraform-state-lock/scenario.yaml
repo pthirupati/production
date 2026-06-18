@@ -1,0 +1,36 @@
+title: Unlock a Locked Terraform State
+slug: terraform-state-lock
+technology: DevOps
+category: Infrastructure as Code
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  A Terraform apply was interrupted mid-run and left the state file locked.
+  Now no one on the team can run terraform plan or apply — every command
+  returns "Error acquiring the state lock". You need to force-unlock the
+  state and restore normal Terraform operations.
+objectives:
+  - Identify the Terraform state lock ID
+  - Force-unlock the Terraform state
+  - Verify terraform plan runs without lock errors
+initial_state: |
+  Ubuntu server with Terraform installed. Working directory is /opt/terraform/infra.
+  The state file is locked by a previous interrupted run. Lock ID is stored
+  in the .terraform/lock_id file.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check lock details: terraform force-unlock --help"
+  - order: 2
+    cost: 15
+    content: "Get the lock ID: cat /opt/terraform/infra/.terraform/lock_id"
+  - order: 3
+    cost: 20
+    content: "Force unlock: cd /opt/terraform/infra && terraform force-unlock <LOCK_ID>"
+  - order: 4
+    cost: 25
+    content: "Confirm with yes when prompted. Then verify: terraform plan"

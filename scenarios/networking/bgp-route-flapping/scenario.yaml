@@ -1,0 +1,39 @@
+slug: bgp-route-flapping
+title: "BGP Route Flapping — Fix Keepalive Timers"
+technology: Networking
+category: Routing
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  A BGP peer session between two routers is oscillating — the peer repeatedly
+  transitions between Established and Idle states every 30–60 seconds, causing
+  route flapping and instability for all prefixes learned from that peer.
+  Analysis shows the holdtime timer is set too low relative to the keepalive
+  interval, and the link has intermittent latency spikes. Fix the BGP timer
+  configuration so the session remains stable under normal link conditions.
+objectives:
+  - Identify the BGP peer session that is flapping
+  - Diagnose the timer mismatch (keepalive vs holdtime)
+  - Set appropriate keepalive (10s) and holdtime (30s) timers
+  - Confirm the BGP session reaches and holds Established state
+initial_state: |
+  FRRouting (vtysh) configured with two BGP peers. One peer has keepalive=3s
+  and holdtime=9s — too aggressive for this link. Link latency spikes above
+  3s are causing the holdtime to expire and the session to reset.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run `vtysh -c 'show bgp summary'` to see peer state and flap count."
+  - order: 2
+    cost: 20
+    content: "Enter config mode: `vtysh` → `conf t` → `router bgp <ASN>` → `neighbor <peer-ip> timers 10 30`"
+  - order: 3
+    cost: 15
+    content: "The standard recommendation is keepalive = holdtime/3. Use 10s keepalive and 30s holdtime."
+  - order: 4
+    cost: 15
+    content: "Save with `write memory` and verify with `show bgp neighbors <peer-ip>` — look for 'BGP state = Established'."

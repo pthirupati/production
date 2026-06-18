@@ -1,0 +1,37 @@
+title: "John the Ripper — Crack Weak Hashed Passwords"
+slug: john-password-crack
+technology: Security
+category: Forensics
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  A backup of /etc/shadow has been recovered from a compromised server during
+  an incident response. Three accounts (backup-svc, deploybot, tempuser) are
+  suspected of using weak passwords that enabled the initial breach. Use John
+  the Ripper with the rockyou wordlist to crack their hashes and identify which
+  accounts had weak passwords.
+objectives:
+  - Use unshadow to combine /opt/ir/passwd.bak and /opt/ir/shadow.bak into a crackable format
+  - Run john with /usr/share/wordlists/rockyou.txt against the combined file
+  - Write the cracked username:password pairs to /tmp/cracked.txt
+initial_state: |
+  Forensics workstation with John the Ripper installed and rockyou.txt available
+  at /usr/share/wordlists/rockyou.txt. Backup copies of passwd and shadow are
+  at /opt/ir/passwd.bak and /opt/ir/shadow.bak respectively.
+hints:
+  - order: 1
+    cost: 10
+    content: "Combine the files: `unshadow /opt/ir/passwd.bak /opt/ir/shadow.bak > /tmp/combined.txt` to create a john-readable format."
+  - order: 2
+    cost: 15
+    content: "Run john: `john --wordlist=/usr/share/wordlists/rockyou.txt /tmp/combined.txt` and wait for results."
+  - order: 3
+    cost: 20
+    content: "Show cracked passwords: `john --show /tmp/combined.txt` to display username:password pairs."
+  - order: 4
+    cost: 25
+    content: "Save results: `john --show /tmp/combined.txt | grep -v 'password hashes cracked' > /tmp/cracked.txt`"

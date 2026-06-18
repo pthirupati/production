@@ -1,0 +1,46 @@
+---
+slug: vm-question-pending
+title: "VM Stuck at Pending Question — Cannot Power On or Operate"
+technology: VMware
+category: VM Management
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  VM "test-lab-07" is in a suspended state and all operations (power on, power off,
+  vMotion) are failing with: "The virtual machine requires user input to continue."
+  The VM has a pending question asking whether to keep the existing UUID or generate
+  a new one — this happens when a VM is copied or imported without properly clearing
+  the UUID. The question must be answered before the VM can be operated.
+objectives:
+  - Identify the pending question on the VM in vSphere Client
+  - Answer the question appropriately (Yes to keep UUID or No to generate a new one)
+  - Verify the VM can be powered on after answering the question
+  - Document why this happens and how to prevent it during VM cloning
+initial_state: |
+  VMware vCenter simulation. test-lab-07 shows a question/warning badge in vCenter.
+  The VM cannot be powered on or migrated. A question dialog is blocking operations.
+  The question: "This virtual machine might have been moved or copied. What do you want to do?"
+hints:
+  - order: 1
+    cost: 10
+    content: "In vSphere Client, select test-lab-07. Look for an orange warning badge
+      or a 'Questions' button in the Summary tab. Click 'Answer' or look in the
+      Monitor → Tasks & Events → Events tab for the pending question event."
+  - order: 2
+    cost: 15
+    content: "The question asks whether the VM was moved or copied:
+      - Select 'I moved it' if this is the original VM and UUID should be kept.
+      - Select 'I copied it' if this is a copy and it should get a new UUID.
+      For lab VMs that were cloned, select 'I copied it' to generate a new UUID."
+  - order: 3
+    cost: 20
+    content: "To prevent future occurrences when cloning VMs:
+      Use the 'Clone' function in vCenter rather than copying VMDK files manually.
+      When using templates, always use 'Deploy from Template' which handles UUID
+      generation automatically. Check /etc/vmware/config for uuid.action setting."

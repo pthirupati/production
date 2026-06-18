@@ -1,0 +1,37 @@
+title: "OpenSSL Heartbleed — Verify Vulnerability and Apply Patch"
+slug: openssl-heartbleed
+technology: Security
+category: Vulnerability Management
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  An older nginx server is running OpenSSL 1.0.1e, which is vulnerable to
+  CVE-2014-0160 (Heartbleed). The vulnerability allows remote attackers to read
+  64KB of server memory per request, potentially leaking private keys and session
+  tokens. Verify the vulnerability is present, update OpenSSL to a patched
+  version, and confirm the service is no longer vulnerable.
+objectives:
+  - Confirm the current OpenSSL version is vulnerable using openssl version and a Heartbleed test script
+  - Update the openssl and libssl packages to a patched version using the package manager
+  - Restart nginx and confirm the Heartbleed test script reports the server as not vulnerable
+initial_state: |
+  Ubuntu server running nginx with OpenSSL 1.0.1e compiled in. A Heartbleed
+  test script is available at /opt/tools/heartbleed-test.py. The patched OpenSSL
+  version is available in the local apt repository. nginx is serving HTTPS on 443.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check version: `openssl version -a` — if it shows 1.0.1 through 1.0.1f without a patch suffix, it is vulnerable to Heartbleed."
+  - order: 2
+    cost: 15
+    content: "Test vulnerability: `python3 /opt/tools/heartbleed-test.py localhost 443` — a vulnerable server will return memory contents."
+  - order: 3
+    cost: 20
+    content: "Patch: `apt-get update && apt-get install --only-upgrade openssl libssl1.0.0` then `systemctl restart nginx`."
+  - order: 4
+    cost: 25
+    content: "Re-test: `python3 /opt/tools/heartbleed-test.py localhost 443` should now report 'Server is NOT vulnerable to Heartbleed'."

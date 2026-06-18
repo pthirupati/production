@@ -1,0 +1,26 @@
+category: Linux Administration
+description: |
+  Monthly patching window. Coordinate with @backup team, @database team, and @application team
+  in Jira before patching. After reboot, resolve any mount issues before starting services.
+difficulty: medium
+dual_terminal: false
+hints:
+  - content: 'Jira: @backup team @database team @application team — stop and backup before patch'
+    cost: 10
+    order: 1
+initial_state: |
+  Simulated RHEL 9 server. Use the Jira ticket to request change-window actions from
+  @backup team, @database team, and @application team (~30s replies), then patch via terminal.
+is_free: false
+jira_priority: Medium
+lab_mode: simulation
+max_score: 100
+objectives:
+  - Request stop/backup from teams in Jira before precheck
+  - Run precheck, dnf update, reboot, postcheck in terminal
+  - Fix mount issue if reported; start DB/app via Jira after patching
+requires_companion_hosts: false
+simulation_type: rhel
+slug: sim-rhel-patching
+time_limit: 1200
+title: RHEL System Patching (Jira change window)

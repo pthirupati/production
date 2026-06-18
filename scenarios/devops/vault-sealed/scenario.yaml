@@ -1,0 +1,40 @@
+title: Unseal HashiCorp Vault
+slug: vault-sealed
+technology: DevOps
+category: Secrets Management
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  HashiCorp Vault is in a sealed state after a server restart. Applications
+  cannot retrieve secrets and are failing to start. The Vault unseal keys are
+  stored securely and you need to use them to unseal Vault and restore
+  secret access for all dependent services.
+objectives:
+  - Check Vault seal status
+  - Locate the unseal keys
+  - Apply the unseal keys to unseal Vault (requires 3 of 5 keys)
+  - Verify Vault is unsealed and accepting requests
+initial_state: |
+  Ubuntu server running HashiCorp Vault at http://127.0.0.1:8200. Vault is sealed.
+  The unseal keys are stored in /opt/vault/unseal_keys.txt (5 keys, need 3 to unseal).
+  VAULT_ADDR is set to http://127.0.0.1:8200.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check status: vault status"
+  - order: 2
+    cost: 15
+    content: "View unseal keys: cat /opt/vault/unseal_keys.txt"
+  - order: 3
+    cost: 20
+    content: "Apply key 1: vault operator unseal <KEY_1>"
+  - order: 4
+    cost: 25
+    content: "Repeat for key 2 and key 3. After 3 keys Vault will be unsealed."
+  - order: 5
+    cost: 30
+    content: "Verify: vault status | grep Sealed — should show false"

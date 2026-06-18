@@ -1,0 +1,37 @@
+title: "Log Tampering — Detect Deleted and Altered Log Entries"
+slug: log-tampering-detect
+technology: Security
+category: Forensics
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  During an incident response, evidence suggests an attacker gained root access
+  and attempted to cover their tracks by deleting entries from /var/log/auth.log
+  and modifying /var/log/syslog. Use last, wtmp, btmp, and filesystem metadata
+  to reconstruct the attacker's timeline and identify what evidence was removed
+  from the logs.
+objectives:
+  - Use `last` and `lastb` against /var/log/wtmp and /var/log/btmp to find login history the attacker could not erase
+  - Compare auth.log timestamps to syslog and journalctl output to find gaps indicating deleted entries
+  - Write a timeline of the attack to /tmp/incident-timeline.txt with at least 3 timestamped events
+initial_state: |
+  Ubuntu server post-compromise. /var/log/auth.log has gaps between 02:00-03:00
+  UTC. wtmp and btmp binary logs are intact. journald journal is also intact.
+  The attacker had root access for approximately one hour overnight.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check login history that survives log deletion: `last -F -f /var/log/wtmp` and `lastb -F -f /var/log/btmp` to see all login attempts."
+  - order: 2
+    cost: 15
+    content: "Find log gaps: `awk '{print $1}' /var/log/auth.log | grep -c 'Jun'` and compare to journalctl: `journalctl --since '2024-01-01' -u ssh | wc -l`."
+  - order: 3
+    cost: 20
+    content: "Check file metadata: `stat /var/log/auth.log` — look for mtime that differs from ctime, indicating the file was edited after writing."
+  - order: 4
+    cost: 25
+    content: "Cross-reference: `journalctl _COMM=sshd --since yesterday | grep -E 'Accepted|Failed'` shows entries the attacker could not delete from the binary journal."

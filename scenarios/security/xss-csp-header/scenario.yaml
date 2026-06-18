@@ -1,0 +1,37 @@
+title: "XSS and CSP Header — Add Content Security Policy to Prevent Script Injection"
+slug: xss-csp-header
+technology: Security
+category: Web Security
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  A penetration test has identified a reflected cross-site scripting (XSS)
+  vulnerability in the search parameter of a web application. While the
+  underlying code fix is pending, you must add a Content Security Policy header
+  via nginx to block inline script execution and restrict resource loading to
+  same-origin only. Also add X-Frame-Options and X-Content-Type-Options headers.
+objectives:
+  - Add a Content-Security-Policy header to /etc/nginx/conf.d/app.conf restricting script-src to 'self'
+  - Add X-Frame-Options DENY and X-Content-Type-Options nosniff headers
+  - Reload nginx and verify all three security headers are present using curl
+initial_state: |
+  Ubuntu server running nginx as a reverse proxy for a Flask web app on port 5000.
+  The nginx config at /etc/nginx/conf.d/app.conf has no security headers configured.
+  curl is available for testing. The app is reachable at http://localhost/.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check current headers: `curl -I http://localhost/` — confirm no CSP, X-Frame-Options, or X-Content-Type-Options headers are present."
+  - order: 2
+    cost: 15
+    content: "Add to the server block in /etc/nginx/conf.d/app.conf: `add_header Content-Security-Policy \"default-src 'self'; script-src 'self'; object-src 'none';\" always;`"
+  - order: 3
+    cost: 20
+    content: "Also add: `add_header X-Frame-Options \"DENY\" always;` and `add_header X-Content-Type-Options \"nosniff\" always;` then run `nginx -t && systemctl reload nginx`."
+  - order: 4
+    cost: 25
+    content: "Verify all headers: `curl -I http://localhost/ | grep -E 'Content-Security-Policy|X-Frame-Options|X-Content-Type-Options'` — all three should appear in the response."

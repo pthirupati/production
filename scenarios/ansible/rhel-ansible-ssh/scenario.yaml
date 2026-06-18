@@ -1,0 +1,30 @@
+title: "RHEL Simulation: Ansible SSH Key Failure"
+slug: sim-rhel-ansible-ssh
+technology: Ansible Automation
+category: Automation
+difficulty: medium
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: ansible
+requires_companion_hosts: true
+dual_terminal: true
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  Ansible control node cannot reach web2 via SSH. Fix key distribution and re-run ping.
+objectives:
+  - Run ansible webservers -m ping and identify unreachable host
+  - Copy SSH key to web2 with ssh-copy-id
+  - Verify all hosts respond to ansible ping
+initial_state: |
+  Simulated ansible-control node with inventory at /etc/ansible/hosts.
+  web1 is reachable; web2 rejects publickey auth.
+hints:
+  - order: 1
+    cost: 10
+    content: Run `ansible webservers -m ping` from the control node.
+  - order: 2
+    cost: 20
+    content: Use `ssh-copy-id root@web2` (simulated) to install your key.

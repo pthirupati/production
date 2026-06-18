@@ -1,0 +1,40 @@
+slug: wireguard-tunnel-down
+title: "WireGuard VPN Tunnel Down — Fix Peer Config and Routing"
+technology: Networking
+category: VPN
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  The WireGuard VPN tunnel between the office and a cloud server is down. Remote
+  users cannot reach internal resources. The tunnel interface wg0 is up but the
+  peer handshake is failing. Investigation reveals two issues: the remote peer's
+  public key was rotated last week but the local config still has the old key,
+  and the AllowedIPs range is missing the 10.10.0.0/16 subnet that users need.
+  Fix both the peer configuration and add the missing route.
+objectives:
+  - Identify the stale public key in the WireGuard peer config
+  - Update /etc/wireguard/wg0.conf with the correct peer public key
+  - Add 10.10.0.0/16 to the AllowedIPs for the peer
+  - Bring the tunnel back up and verify the handshake succeeds
+initial_state: |
+  Ubuntu 22.04 with WireGuard. wg0 interface is configured. Peer public key in
+  /etc/wireguard/wg0.conf is stale (old-key-base64). Correct key is in
+  /etc/wireguard/new-peer-pubkey.txt. AllowedIPs=10.8.0.0/24 (missing 10.10.0.0/16).
+  `wg show` shows no active handshake. Remote VPN subnet is unreachable.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check status: `wg show wg0` — look for 'latest handshake' and 'transfer' fields."
+  - order: 2
+    cost: 20
+    content: "Update peer key: in /etc/wireguard/wg0.conf change `PublicKey` to the value in /etc/wireguard/new-peer-pubkey.txt"
+  - order: 3
+    cost: 15
+    content: "Update AllowedIPs: `AllowedIPs = 10.8.0.0/24, 10.10.0.0/16`"
+  - order: 4
+    cost: 15
+    content: "Apply changes: `wg syncconf wg0 <(wg-quick strip wg0)` or `wg-quick down wg0 && wg-quick up wg0`"

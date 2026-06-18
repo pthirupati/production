@@ -6,6 +6,9 @@ const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
   timeout: 45_000, // 45s default timeout — lab operations can be slow
+  // Required so the browser sends the httpOnly access_token / refresh_token
+  // cookies with every request (cross-origin and same-origin).
+  withCredentials: true,
 })
 
 // Attach JWT token; strip JSON Content-Type for multipart uploads
@@ -38,18 +41,26 @@ api.interceptors.response.use(
     const original = error.config
     if (error.response.status === 401 && !original._retry) {
       original._retry = true
-      const refreshToken = useAuthStore.getState().refreshToken
-      if (refreshToken) {
+      const { refreshToken, isAuthenticated } = useAuthStore.getState()
+      // Attempt refresh if we have either a stored refresh token (legacy) or
+      // an active session (cookies will carry the refresh_token automatically).
+      if (refreshToken || isAuthenticated) {
         try {
-          const { data } = await axios.post('/api/auth/refresh/', {
-            refresh: refreshToken,
+          // Send refresh token in body when available (backwards compat).
+          // When omitted, the backend reads it from the httpOnly cookie.
+          const refreshPayload = refreshToken ? { refresh: refreshToken } : {}
+          const { data } = await axios.post('/api/auth/refresh/', refreshPayload, {
+            withCredentials: true,
           })
           useAuthStore.getState().setAuth(
             useAuthStore.getState().user,
             data.access,
             data.refresh || refreshToken
           )
-          original.headers.Authorization = `Bearer ${data.access}`
+          // Update Authorization header on the retried request if token in store
+          if (data.access) {
+            original.headers.Authorization = `Bearer ${data.access}`
+          }
           return api(original)
         } catch {
           useAuthStore.getState().logout()

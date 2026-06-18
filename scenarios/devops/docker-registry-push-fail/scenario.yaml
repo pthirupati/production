@@ -1,0 +1,37 @@
+title: Fix Docker Registry Push Authentication
+slug: docker-registry-push-fail
+technology: DevOps
+category: Container Registry
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  Docker image pushes to the private registry are failing with
+  "unauthorized: authentication required". The registry is using self-signed
+  TLS but Docker is not configured to trust it. Additionally, the credentials
+  are not configured in daemon.json. Fix the Docker daemon configuration
+  to allow pushes to the private registry.
+objectives:
+  - Add the private registry as an insecure-registry in daemon.json
+  - Log in to the private registry with docker login
+  - Verify docker push succeeds
+initial_state: |
+  Ubuntu server with Docker. Private registry at registry.internal:5000 uses
+  self-signed TLS. /etc/docker/daemon.json is missing the insecure-registries
+  entry. Docker credentials for the registry: user=ci, password=cipassword123.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check daemon.json: cat /etc/docker/daemon.json"
+  - order: 2
+    cost: 15
+    content: "Add insecure-registries to daemon.json: {\"insecure-registries\": [\"registry.internal:5000\"]}"
+  - order: 3
+    cost: 20
+    content: "Restart Docker: systemctl restart docker"
+  - order: 4
+    cost: 25
+    content: "Login: docker login registry.internal:5000 -u ci -p cipassword123"

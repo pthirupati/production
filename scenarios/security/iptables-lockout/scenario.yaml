@@ -1,0 +1,37 @@
+title: "iptables Lockout — Recover and Fix Firewall Rules"
+slug: iptables-lockout
+technology: Security
+category: Hardening
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  A junior admin accidentally applied an iptables INPUT policy of DROP without
+  saving a recovery rule, locking out all remote access to the server. You have
+  console access. Recover the server by flushing the broken rules, restoring
+  connectivity for SSH on port 22, and then building a correct iptables ruleset
+  that allows SSH, HTTP, and HTTPS while dropping everything else.
+objectives:
+  - Flush the current broken iptables rules and set default policies to ACCEPT to restore access
+  - Build a proper ruleset allowing established connections, SSH (22), HTTP (80), and HTTPS (443)
+  - Save the rules to /etc/iptables/rules.v4 so they persist after reboot
+initial_state: |
+  Ubuntu server with iptables INPUT chain policy set to DROP and no ACCEPT rules.
+  Console access is available. iptables-persistent package is installed.
+  The server should allow SSH, HTTP, and HTTPS inbound traffic.
+hints:
+  - order: 1
+    cost: 10
+    content: "Recover immediately: `iptables -P INPUT ACCEPT && iptables -F` to flush all rules and restore connectivity."
+  - order: 2
+    cost: 15
+    content: "Build the correct ruleset: allow loopback (`-A INPUT -i lo -j ACCEPT`), established (`-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT`), then ports 22, 80, 443."
+  - order: 3
+    cost: 20
+    content: "Add port rules: `iptables -A INPUT -p tcp --dport 22 -j ACCEPT; iptables -A INPUT -p tcp --dport 80 -j ACCEPT; iptables -A INPUT -p tcp --dport 443 -j ACCEPT` then `iptables -P INPUT DROP`."
+  - order: 4
+    cost: 25
+    content: "Save rules: `iptables-save > /etc/iptables/rules.v4` and verify with `iptables -L INPUT -n -v --line-numbers`."

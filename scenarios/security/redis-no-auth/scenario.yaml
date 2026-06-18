@@ -1,0 +1,38 @@
+slug: redis-no-auth
+title: "Redis No Auth on 0.0.0.0 — Add requirepass and Restrict Binding"
+technology: Security
+category: Database Security
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  Redis is running without authentication and listening on all network interfaces
+  (0.0.0.0:6379). This is a known critical misconfiguration that has led to
+  thousands of data breaches and ransomware infections. An unauthenticated attacker
+  can read all cached data, overwrite it, or even write SSH keys to /root/.ssh/
+  using Redis's CONFIG SET dir command. Add a strong password requirement and
+  restrict Redis to only listen on localhost.
+objectives:
+  - Verify Redis is listening on 0.0.0.0 without authentication
+  - Add requirepass with a strong password to /etc/redis/redis.conf
+  - Change bind to 127.0.0.1
+  - Restart Redis and verify unauthenticated access is rejected
+initial_state: |
+  Ubuntu 22.04 with Redis. redis.conf has `bind 0.0.0.0` and no `requirepass`.
+  `redis-cli -h localhost ping` returns PONG without any auth. Exposed to internet.
+hints:
+  - order: 1
+    cost: 10
+    content: "Verify: `redis-cli ping` returns PONG without auth. `ss -tlnp | grep 6379` shows 0.0.0.0."
+  - order: 2
+    cost: 10
+    content: "Edit /etc/redis/redis.conf — set `bind 127.0.0.1` (remove 0.0.0.0)"
+  - order: 3
+    cost: 10
+    content: "Add auth: set `requirepass <strong-random-password>` in redis.conf"
+  - order: 4
+    cost: 10
+    content: "Restart: `systemctl restart redis`. Verify: `redis-cli ping` should return (error) NOAUTH."

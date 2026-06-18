@@ -1,0 +1,45 @@
+---
+slug: drs-disabled
+title: "DRS Disabled — Hosts Severely Imbalanced, One Host Overloaded"
+technology: VMware
+category: Resource Management
+difficulty: easy
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  vSphere DRS is showing as "Disabled" on the production cluster. One ESXi host
+  (esxi-01) is running at 95% CPU utilization while the other two hosts are at 30%.
+  DRS was disabled 6 weeks ago during a troubleshooting session and never re-enabled.
+  VMs are not being automatically balanced, causing performance degradation on the
+  overloaded host. Engineers must enable DRS and run an initial balance.
+objectives:
+  - Confirm DRS status is disabled on the cluster
+  - Enable DRS in "Fully Automated" mode with a medium migration threshold
+  - Run an initial DRS recommendation to balance the cluster
+  - Verify VMs begin migrating from esxi-01 to less-loaded hosts
+initial_state: |
+  VMware vCenter simulation. 3-host cluster. DRS: Disabled.
+  esxi-01: 95% CPU. esxi-02: 28% CPU. esxi-03: 32% CPU.
+  18 VMs running, mostly concentrated on esxi-01.
+hints:
+  - order: 1
+    cost: 10
+    content: "Select the cluster → Configure → vSphere DRS → Edit.
+      The DRS status will show 'Off'. Change it to 'Fully Automated'.
+      Set the Migration Threshold slider to 3 (the middle/default value)."
+  - order: 2
+    cost: 15
+    content: "After enabling DRS, click 'Run DRS Now' from the cluster's Actions menu
+      to generate immediate migration recommendations without waiting for the
+      next automatic check interval (default is every 5 minutes)."
+  - order: 3
+    cost: 20
+    content: "Review DRS recommendations: cluster → Monitor → vSphere DRS → CPU Utilization
+      or Migration History. Confirm vMotion migrations are occurring.
+      Also check: Configure → DRS → DRS Settings and review VM overrides
+      to ensure no VMs have DRS set to 'Disabled' overriding the cluster setting."

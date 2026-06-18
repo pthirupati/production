@@ -1,0 +1,39 @@
+slug: iptables-default-accept
+title: "iptables Default Policy ACCEPT — Set to DROP"
+technology: Security
+category: Firewall
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  A security hardening review found that the iptables INPUT, FORWARD, and OUTPUT
+  chains all have their default policy set to ACCEPT. This means any traffic not
+  matching a specific rule is permitted by default — the opposite of a secure
+  default-deny posture. Change the default policy to DROP for INPUT and FORWARD,
+  ensure all legitimate services have explicit ACCEPT rules, and verify the server
+  remains accessible after applying the restrictive policy.
+objectives:
+  - Identify the current default ACCEPT policies on INPUT/FORWARD
+  - Add explicit ACCEPT rules for SSH (22), HTTP (80), HTTPS (443), and ICMP
+  - Set default policy to DROP for INPUT and FORWARD chains
+  - Verify the server remains accessible and legitimate traffic flows
+initial_state: |
+  Ubuntu 22.04. `iptables -L -n` shows policy ACCEPT on INPUT, FORWARD, OUTPUT.
+  No services are blocked but there is also no protection from unsolicited traffic.
+  The server is publicly accessible.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check current policies: `iptables -L -n | grep 'Chain INPUT\|Chain FORWARD\|Chain OUTPUT'`"
+  - order: 2
+    cost: 15
+    content: "Add ACCEPT rules FIRST: `iptables -A INPUT -p tcp --dport 22 -j ACCEPT` (then 80, 443)"
+  - order: 3
+    cost: 15
+    content: "Allow established connections: `iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT`"
+  - order: 4
+    cost: 15
+    content: "Set DROP policy: `iptables -P INPUT DROP` and `iptables -P FORWARD DROP`"

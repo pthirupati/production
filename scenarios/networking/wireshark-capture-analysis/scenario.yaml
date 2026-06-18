@@ -1,0 +1,39 @@
+slug: wireshark-capture-analysis
+title: "High Packet Loss — Analyze pcap and Identify Root Cause"
+technology: Networking
+category: Packet Analysis
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  Users are reporting intermittent connectivity and high packet loss affecting
+  a production service. A 30-second packet capture has been collected and saved
+  to /tmp/capture.pcap. Analyze the capture using tshark or tcpdump to identify
+  the root cause. The capture reveals TCP retransmissions, ICMP host unreachable
+  messages, and duplicate ACKs indicating a congested or misconfigured upstream
+  link. Document your findings in /tmp/analysis.txt and apply the identified fix.
+objectives:
+  - Analyze the pcap file to identify packet loss patterns
+  - Identify TCP retransmission rate and duplicate ACK count
+  - Determine the root cause (identified as a misconfigured tx queue length)
+  - Fix the issue and write findings to /tmp/analysis.txt
+initial_state: |
+  Ubuntu 22.04 with tshark and tcpdump installed. Capture file at /tmp/capture.pcap
+  shows ~15% packet loss. `ethtool -g eth0` shows txqueuelen=10 (very small).
+  The fix is to increase tx queue length: `ip link set eth0 txqueuelen 1000`.
+hints:
+  - order: 1
+    cost: 10
+    content: "Analyze retransmissions: `tshark -r /tmp/capture.pcap -q -z io,stat,1 | head -30`"
+  - order: 2
+    cost: 15
+    content: "Count TCP retransmissions: `tshark -r /tmp/capture.pcap -Y 'tcp.analysis.retransmission' | wc -l`"
+  - order: 3
+    cost: 20
+    content: "Check tx queue: `ip link show eth0 | grep qlen`. Fix: `ip link set eth0 txqueuelen 1000`"
+  - order: 4
+    cost: 15
+    content: "Write analysis: `echo 'Root cause: txqueuelen=10, fix: txqueuelen=1000' > /tmp/analysis.txt`"

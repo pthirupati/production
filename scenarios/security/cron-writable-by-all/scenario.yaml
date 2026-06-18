@@ -1,0 +1,38 @@
+slug: cron-writable-by-all
+title: "World-Writable Cron Directory — Fix /etc/cron.daily Permissions"
+technology: Security
+category: File Permissions
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  A security audit found that /etc/cron.daily is world-writable (mode 777).
+  This is a critical misconfiguration: any user on the system can place scripts
+  in this directory and have them executed as root by the cron daemon. This
+  provides a trivial privilege escalation path for any local user. Fix the
+  permissions on /etc/cron.daily and audit other cron directories for similar issues.
+objectives:
+  - Verify /etc/cron.daily is world-writable using ls -ld
+  - Fix permissions to 755 (root:root)
+  - Audit /etc/cron.d, /etc/cron.weekly, /etc/cron.monthly for similar issues
+  - Verify cron still runs normally after the fix
+initial_state: |
+  Ubuntu 22.04. `ls -ld /etc/cron.daily` shows drwxrwxrwx (world-writable).
+  Any user can add scripts: `echo 'cp /bin/bash /tmp/bash && chmod +s /tmp/bash' > /etc/cron.daily/evil`
+  The fix requires setting proper permissions.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check all cron dirs: `ls -ld /etc/cron.* /etc/cron.d`"
+  - order: 2
+    cost: 10
+    content: "Fix /etc/cron.daily: `chmod 755 /etc/cron.daily && chown root:root /etc/cron.daily`"
+  - order: 3
+    cost: 10
+    content: "Fix all at once: `chmod 755 /etc/cron.daily /etc/cron.weekly /etc/cron.monthly /etc/cron.hourly /etc/cron.d`"
+  - order: 4
+    cost: 10
+    content: "Verify: `ls -ld /etc/cron.*` — should show drwxr-xr-x and owner root:root."

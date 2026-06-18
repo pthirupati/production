@@ -1,0 +1,33 @@
+title: "RHEL Simulation: Firewall Blocks HTTP (Dual Terminal)"
+slug: sim-rhel-firewalld-dual
+technology: Linux Administration
+category: Linux Administration
+difficulty: easy
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: generic
+dual_terminal: true
+infrastructure_type: docker
+jira_priority: Low
+is_free: false
+description: |
+  Nginx is running on the server but firewalld blocks port 80. Use the SSH client to curl the server,
+  open the firewall on the server console, then verify HTTP works remotely.
+objectives:
+  - curl from SSH client fails until firewall is opened
+  - Allow HTTP through firewalld on the server
+  - Remote curl returns 200
+initial_state: |
+  primary (10.0.0.10): nginx active, firewalld blocks port 80
+  ssh_client: curl http://10.0.0.10 to test connectivity
+hints:
+  - order: 1
+    cost: 10
+    content: "From SSH Client: curl -v http://10.0.0.10/ — expect connection refused."
+  - order: 2
+    cost: 15
+    content: "On server: firewall-cmd --list-all then firewall-cmd --permanent --add-service=http && firewall-cmd --reload"
+  - order: 3
+    cost: 20
+    content: "Retry curl from SSH client — should return HTML."

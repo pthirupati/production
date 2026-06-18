@@ -1,0 +1,39 @@
+slug: ssl-cert-expired
+title: "SSL Certificate Expired — Replace nginx TLS Certificate"
+technology: Networking
+category: TLS/SSL
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  Users are receiving SSL_ERROR_EXPIRED errors when connecting to the nginx
+  web server. The TLS certificate expired 3 days ago and was never rotated.
+  The certificate was originally issued by an internal CA. A new certificate
+  and private key have been generated and placed in /tmp/new-cert.pem and
+  /tmp/new-key.pem. Update the nginx configuration to use the new certificate
+  and reload the service.
+objectives:
+  - Verify the current certificate is expired using openssl
+  - Replace the certificate and key files referenced in nginx config
+  - Reload nginx without downtime
+  - Confirm the new certificate is valid and nginx serves HTTPS correctly
+initial_state: |
+  Ubuntu 22.04 with nginx. Current cert at /etc/nginx/ssl/server.crt expired
+  3 days ago. New cert and key ready at /tmp/new-cert.pem and /tmp/new-key.pem.
+  HTTPS returns ERR_CERT_DATE_INVALID to clients.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check expiry: `openssl x509 -in /etc/nginx/ssl/server.crt -noout -dates`"
+  - order: 2
+    cost: 15
+    content: "Copy new files: `cp /tmp/new-cert.pem /etc/nginx/ssl/server.crt && cp /tmp/new-key.pem /etc/nginx/ssl/server.key`"
+  - order: 3
+    cost: 10
+    content: "Validate nginx config: `nginx -t` then reload: `systemctl reload nginx`"
+  - order: 4
+    cost: 15
+    content: "Verify: `openssl s_client -connect localhost:443 </dev/null 2>/dev/null | openssl x509 -noout -dates`"

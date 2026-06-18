@@ -1,0 +1,40 @@
+title: Fix Prometheus Scrape Configuration
+slug: prometheus-scrape-failing
+technology: DevOps
+category: Monitoring
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  Prometheus is showing targets as DOWN and metrics are not being scraped.
+  The scrape config in prometheus.yml points to the wrong port and the
+  service labels don't match the scrape selector. Fix the scrape config
+  and service labels so Prometheus can discover and scrape the targets.
+objectives:
+  - Identify why Prometheus targets show as DOWN
+  - Fix the scrape configuration in prometheus.yml
+  - Add correct service labels to match the scrape selector
+  - Verify targets show as UP in Prometheus
+initial_state: |
+  Ubuntu server running Prometheus at /etc/prometheus/prometheus.yml.
+  The myapp service is running on port 8080 but prometheus.yml has port 9090.
+  The service label "app: myapp-service" doesn't match the selector "app: myapp".
+hints:
+  - order: 1
+    cost: 10
+    content: "Check Prometheus config: cat /etc/prometheus/prometheus.yml"
+  - order: 2
+    cost: 15
+    content: "Look at the scrape_configs section — find the wrong port number"
+  - order: 3
+    cost: 20
+    content: "Change the target port from 9090 to 8080 in the static_configs targets"
+  - order: 4
+    cost: 25
+    content: "Also fix the relabel_configs or match labels to use 'app: myapp'"
+  - order: 5
+    cost: 30
+    content: "Reload Prometheus: curl -X POST http://localhost:9090/-/reload"

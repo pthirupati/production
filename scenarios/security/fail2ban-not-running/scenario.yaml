@@ -1,0 +1,38 @@
+slug: fail2ban-not-running
+title: "fail2ban Crashed — Fix Config Syntax Error and Restart"
+technology: Security
+category: Intrusion Prevention
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  fail2ban crashed and cannot restart due to a configuration syntax error introduced
+  during a recent customization. The journal shows "ERROR: Failed during configuration"
+  pointing to /etc/fail2ban/jail.local. A custom action was added but contains an
+  unclosed bracket. While fail2ban is down, brute force attacks against SSH are going
+  unblocked. Identify and fix the syntax error, then restart fail2ban.
+objectives:
+  - Identify the syntax error in /etc/fail2ban/jail.local
+  - Fix the configuration syntax
+  - Restart fail2ban and verify it starts successfully
+  - Confirm the sshd jail is active
+initial_state: |
+  Ubuntu 22.04 with fail2ban. Service is stopped. journalctl shows config parse error
+  in /etc/fail2ban/jail.local at line containing '[action_mw'. The closing bracket is
+  missing. Auth.log shows ongoing brute force attempts.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check the error: `fail2ban-client start 2>&1 | head -20` or `journalctl -u fail2ban -n 30`"
+  - order: 2
+    cost: 10
+    content: "Inspect the file: `cat /etc/fail2ban/jail.local` — look for unclosed brackets or malformed action blocks."
+  - order: 3
+    cost: 15
+    content: "Test config: `fail2ban-client --test` or `python3 -c 'import configparser; c=configparser.ConfigParser(); c.read(\"/etc/fail2ban/jail.local\")'`"
+  - order: 4
+    cost: 10
+    content: "After fixing: `systemctl start fail2ban` and `fail2ban-client status`."

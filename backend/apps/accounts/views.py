@@ -11,6 +11,32 @@ from rest_framework import status
 from common.throttles import LoginRateThrottle, OTPRateThrottle, PasswordResetRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+
+
+def set_auth_cookies(response, access_token, refresh_token=None):
+    """Set httpOnly JWT cookies on a DRF Response object."""
+    secure = not settings.DEBUG
+    common_opts = {
+        'httponly': True,
+        'secure': secure,
+        'samesite': 'Lax',
+        'path': '/',
+    }
+    response.set_cookie(
+        'access_token',
+        access_token,
+        max_age=60 * 15,  # 15 minutes — matches SIMPLE_JWT ACCESS_TOKEN_LIFETIME
+        **common_opts,
+    )
+    if refresh_token:
+        response.set_cookie(
+            'refresh_token',
+            refresh_token,
+            max_age=60 * 60 * 24 * 7,  # 7 days — matches SIMPLE_JWT REFRESH_TOKEN_LIFETIME
+            **common_opts,
+        )
+    return response
 
 from .serializers import (
     RegisterSerializer, LoginSerializer,
@@ -250,10 +276,12 @@ class RegisterView(APIView):
 
         # Return tokens immediately so user is logged in
         refresh = RefreshToken.for_user(user)
-        return Response({
+        access_token = str(refresh.access_token)
+        refresh_token = str(refresh)
+        response = Response({
             "message": "User registered successfully",
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
+            "access": access_token,
+            "refresh": refresh_token,
             "user": {
                 "id": user.id,
                 "email": user.email,
@@ -264,6 +292,8 @@ class RegisterView(APIView):
                 "date_joined": user.date_joined.isoformat(),
             },
         }, status=201)
+        set_auth_cookies(response, access_token, refresh_token)
+        return response
 
 
 class LoginView(APIView):
@@ -360,7 +390,7 @@ class LoginView(APIView):
             tags=["auth", "success"]
         )
         
-        return Response({
+        response = Response({
             "access": tokens["access"],
             "refresh": tokens["refresh"],
             "user": {
@@ -373,6 +403,8 @@ class LoginView(APIView):
                 "date_joined": user.date_joined.isoformat(),
             },
         })
+        set_auth_cookies(response, tokens["access"], tokens["refresh"])
+        return response
 
 
 class UserProfileView(APIView):
@@ -555,19 +587,22 @@ class ChangePasswordView(APIView):
 
 
 class LogoutView(APIView):
-    """Blacklist the refresh token so it can no longer be used."""
+    """Blacklist the refresh token and clear auth cookies."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        refresh_token = request.data.get("refresh")
-        if not refresh_token:
-            return Response({"error": "Refresh token required"}, status=400)
-        try:
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-        except Exception:
-            pass  # Token already blacklisted or invalid — still log user out
-        return Response({"message": "Logged out successfully"})
+        # Accept refresh token from body OR from cookie
+        refresh_token = request.data.get("refresh") or request.COOKIES.get("refresh_token")
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except Exception:
+                pass  # Token already blacklisted or invalid — still log user out
+        response = Response({"message": "Logged out successfully"})
+        response.delete_cookie("access_token", path="/", samesite="Lax")
+        response.delete_cookie("refresh_token", path="/", samesite="Lax")
+        return response
 
 
 class ForgotPasswordView(APIView):
@@ -648,6 +683,32 @@ class ResetPasswordView(APIView):
 
         logger.info(f"Password reset successfully for {user.email}")
         return Response({"message": "Password has been reset successfully. You can now sign in."})
+
+
+class CookieTokenRefreshView(TokenRefreshView):
+    """
+    Extends simplejwt's TokenRefreshView to:
+    1. Fall back to 'refresh_token' cookie when no refresh token in request body.
+    2. Set the new access_token (and rotated refresh_token) as httpOnly cookies.
+    """
+
+    def post(self, request, *args, **kwargs):
+        # If no refresh token in body, inject it from the cookie
+        if not request.data.get("refresh") and request.COOKIES.get("refresh_token"):
+            # request.data is immutable QueryDict on DRF — copy it
+            data = request.data.copy()
+            data["refresh"] = request.COOKIES["refresh_token"]
+            request._full_data = data
+
+        response = super().post(request, *args, **kwargs)
+
+        if response.status_code == 200:
+            new_access = response.data.get("access")
+            new_refresh = response.data.get("refresh")
+            if new_access:
+                set_auth_cookies(response, new_access, new_refresh)
+
+        return response
 
 
 from .oauth_urls import (
@@ -799,9 +860,11 @@ class GitHubCallbackView(APIView):
         if error:
             return error
         refresh = RefreshToken.for_user(user)
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
+        access_token = str(refresh.access_token)
+        refresh_token = str(refresh)
+        response = Response({
+            "access": access_token,
+            "refresh": refresh_token,
             "user": {
                 "id": user.id,
                 "email": user.email,
@@ -809,6 +872,8 @@ class GitHubCallbackView(APIView):
                 "is_staff": user.is_staff,
             },
         })
+        set_auth_cookies(response, access_token, refresh_token)
+        return response
 
     @staticmethod
     def _resolve_social_login(provider, provider_uid, email, display_name, *, allow_registration=False):
@@ -945,9 +1010,11 @@ class GoogleCallbackView(APIView):
         if error:
             return error
         refresh = RefreshToken.for_user(user)
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
+        access_token = str(refresh.access_token)
+        refresh_token = str(refresh)
+        response = Response({
+            "access": access_token,
+            "refresh": refresh_token,
             "user": {
                 "id": user.id,
                 "email": user.email,
@@ -955,6 +1022,8 @@ class GoogleCallbackView(APIView):
                 "is_staff": user.is_staff,
             },
         })
+        set_auth_cookies(response, access_token, refresh_token)
+        return response
 
 
 def _link_social_account(user, provider: str, provider_uid: str, display_name: str = ""):

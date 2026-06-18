@@ -1,0 +1,49 @@
+---
+slug: vsan-disk-claim-failed
+title: "vSAN Disk Claiming Failed — Existing Partition Table Blocking"
+technology: VMware
+category: vSAN
+difficulty: hard
+time_limit: 1800
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  When attempting to add a new NVMe disk to the vSAN cluster, the disk claiming
+  fails with: "Cannot add disk to vSAN: The disk has an existing partition table."
+  The disk was previously used in a different storage system and still has GPT
+  partition data. vSAN requires disks to be completely clean before claiming.
+  Engineers must wipe the partition table from the ESXi host before vSAN can
+  claim the disk.
+objectives:
+  - Identify the disk that failed to be claimed by vSAN
+  - SSH into the ESXi host and verify the existing partition table
+  - Wipe the partition table using partedUtil or dd
+  - Retry the vSAN disk claim and verify the disk is successfully added
+initial_state: |
+  VMware vCenter simulation. vSAN cluster with 4 hosts. New NVMe disk /dev/nvme1n1
+  added to esxi-04 but failing to claim. Disk has GPT partition table from previous use.
+  SSH access to esxi-04 available.
+hints:
+  - order: 1
+    cost: 10
+    content: "SSH to esxi-04: ssh root@esxi-04.lab.local
+      List disks: esxcli storage core device list | grep -i nvme
+      Check partition table: partedUtil getptbl /vmfs/devices/disks/t10.NVMe____<device-id>
+      Look for GPT header in the output."
+  - order: 2
+    cost: 15
+    content: "Wipe the partition table using partedUtil:
+      partedUtil mklabel /vmfs/devices/disks/<device-id> gpt
+      WARNING: ensure you have the correct device ID. Verify twice before running.
+      This destroys ALL data on the disk — confirm it is not in use anywhere."
+  - order: 3
+    cost: 20
+    content: "After wiping, verify the disk is clean:
+      partedUtil getptbl /vmfs/devices/disks/<device-id>
+      Should show 'gpt' with no partitions.
+      Then in vCenter: Hosts & Clusters → esxi-04 → Configure → vSAN → Disk Management
+      Click 'Claim Disks' and add the NVMe disk. Verify vSAN disk group health."

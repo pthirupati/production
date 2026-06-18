@@ -1,0 +1,35 @@
+title: "SSH Brute-Force Attack — Detect and Block"
+slug: brute-force-ssh
+technology: Security
+category: Intrusion Detection
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  The auth.log on your server shows thousands of failed SSH login attempts from
+  the IP 203.0.113.47 over the past hour targeting the root and admin accounts.
+  The attack is ongoing. Identify the source IP from the logs, block it using
+  iptables, and configure sshd to disable password authentication entirely.
+objectives:
+  - Parse /var/log/auth.log to identify the attacking IP address
+  - Block the attacker IP with an iptables DROP rule
+  - Disable PasswordAuthentication in /etc/ssh/sshd_config and reload sshd
+initial_state: |
+  Ubuntu server with SSH exposed on port 22. auth.log contains thousands of
+  failed login attempts. iptables is running with default ACCEPT policies.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run `grep 'Failed password' /var/log/auth.log | awk '{print $11}' | sort | uniq -c | sort -rn | head` to find the top offending IP."
+  - order: 2
+    cost: 15
+    content: "Block the IP with `iptables -I INPUT -s 203.0.113.47 -j DROP` and verify with `iptables -L INPUT -n -v`."
+  - order: 3
+    cost: 20
+    content: "Edit /etc/ssh/sshd_config and set `PasswordAuthentication no`, then run `systemctl reload sshd`."
+  - order: 4
+    cost: 25
+    content: "Confirm with `iptables-save | grep 203.0.113.47` and `sshd -T | grep passwordauthentication`."

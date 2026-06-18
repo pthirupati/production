@@ -1,0 +1,39 @@
+slug: haproxy-session-stuck
+title: "HAProxy Session Table Full — Increase maxconn to Fix Rejects"
+technology: Networking
+category: Load Balancing
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  During a traffic spike, HAProxy started rejecting new connections with the error
+  "no server available" even though all backend servers are healthy and have capacity.
+  The HAProxy session table is full because maxconn is set to 200 — far too low for
+  the current traffic volume of ~2000 concurrent connections. Increase maxconn in
+  the global and frontend sections, and increase the per-server connection limit.
+objectives:
+  - Identify that maxconn is exhausted in the HAProxy stats
+  - Increase global maxconn to at least 10000
+  - Increase frontend maxconn to match
+  - Increase per-server maxconn in the backend section
+  - Reload HAProxy and verify it accepts new connections
+initial_state: |
+  HAProxy 2.6. Global maxconn=200. Frontend maxconn=200. Stats show
+  "MaxConn: 200/200" and "Denied: XXX". New connections get TCP reset.
+  Backend servers have capacity — the limit is entirely in HAProxy config.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check current stats: `echo 'show info' | socat /run/haproxy/admin.sock stdio | grep -i maxconn`"
+  - order: 2
+    cost: 15
+    content: "Edit /etc/haproxy/haproxy.cfg — in `global` section: `maxconn 10000`"
+  - order: 3
+    cost: 15
+    content: "In `frontend` section: `maxconn 10000`. In `backend` for each server: `maxconn 3000`"
+  - order: 4
+    cost: 10
+    content: "Reload: `systemctl reload haproxy`. Verify: `echo 'show info' | socat /run/haproxy/admin.sock stdio | grep MaxConn`"

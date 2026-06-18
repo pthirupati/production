@@ -1,0 +1,49 @@
+---
+slug: jacoco-coverage-missing
+title: "JaCoCo Coverage Report Not Generated — Maven Plugin Misconfigured"
+technology: Java
+category: Testing
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Low
+is_free: false
+description: |
+  The CI pipeline requires a JaCoCo code coverage report but the target/site/jacoco/
+  directory is empty after running mvn verify. The jacoco-maven-plugin is listed as a
+  dependency in pom.xml but is missing the required execution configuration to bind
+  the prepare-agent and report goals to the Maven lifecycle. Engineers must fix the
+  plugin configuration so the coverage report is generated on every build.
+objectives:
+  - Run mvn verify and confirm the jacoco report directory is not created
+  - Inspect the current jacoco-maven-plugin configuration in pom.xml
+  - Add the correct execution entries to bind prepare-agent and report goals
+  - Run mvn verify again and confirm the HTML report is generated
+initial_state: |
+  Simulated build server. Maven project at /opt/project/.
+  pom.xml has jacoco-maven-plugin declared under <plugins> but with no <executions>.
+  target/site/jacoco/ directory is missing after running mvn verify.
+hints:
+  - order: 1
+    cost: 10
+    content: "Run: cd /opt/project && mvn verify then check: ls target/site/jacoco/
+      Confirm the directory is absent. Also check: cat pom.xml | grep -A 20 jacoco"
+  - order: 2
+    cost: 15
+    content: "In pom.xml, inside the jacoco-maven-plugin <plugin> block, add:
+      <executions>
+        <execution><id>prepare-agent</id>
+          <goals><goal>prepare-agent</goal></goals>
+        </execution>
+        <execution><id>report</id><phase>verify</phase>
+          <goals><goal>report</goal></goals>
+        </execution>
+      </executions>"
+  - order: 3
+    cost: 20
+    content: "After updating pom.xml, run: mvn verify
+      Check that target/site/jacoco/index.html now exists and shows coverage data.
+      You can also add a coverage minimum rule with <rules> inside a check execution."

@@ -1,0 +1,39 @@
+slug: arp-cache-stale
+title: "Stale ARP Cache — Flush Entries to Restore Connectivity"
+technology: Networking
+category: ARP
+difficulty: easy
+time_limit: 600
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: true
+description: |
+  After replacing a network device (a firewall appliance was swapped out), some
+  hosts on the same subnet are experiencing intermittent packet loss and high
+  latency when communicating with the new device's IP address. The old device's
+  MAC address is still cached in the ARP table, causing frames to be sent to the
+  decommissioned hardware. Flush the stale ARP cache so hosts learn the correct
+  MAC address of the replacement device.
+objectives:
+  - Inspect the ARP cache and identify stale entries
+  - Flush the stale ARP entry for the target IP
+  - Verify the ARP cache is updated with the correct MAC
+  - Confirm connectivity to the replacement device
+initial_state: |
+  Ubuntu 22.04. The ARP cache has an entry for 192.168.1.1 pointing to the old
+  MAC address aa:bb:cc:dd:ee:ff. The replacement device uses MAC 11:22:33:44:55:66.
+  Pings to 192.168.1.1 intermittently fail or have high latency.
+hints:
+  - order: 1
+    cost: 10
+    content: "View ARP cache: `arp -n` or `ip neigh show` — look for 192.168.1.1 entry."
+  - order: 2
+    cost: 10
+    content: "Delete stale entry: `ip neigh del 192.168.1.1 dev eth0` or `arp -d 192.168.1.1`"
+  - order: 3
+    cost: 10
+    content: "To flush all stale entries: `ip neigh flush all` or `ip neigh flush dev eth0`"
+  - order: 4
+    cost: 15
+    content: "Trigger re-learning: `ping -c 1 192.168.1.1` then check `ip neigh show 192.168.1.1` for updated MAC."

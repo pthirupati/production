@@ -1,0 +1,37 @@
+title: Fix HAProxy Backend Health Check Path
+slug: haproxy-backend-down
+technology: DevOps
+category: Load Balancing
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: High
+is_free: false
+description: |
+  HAProxy is showing all backend servers as DOWN in the stats page. The health
+  checks are sending HTTP requests to /health but the application's actual
+  health endpoint is at /api/health. Fix the health check path in
+  haproxy.cfg so backends show as UP and traffic can be served.
+objectives:
+  - Check HAProxy stats to confirm all backends are DOWN
+  - Identify the incorrect health check path in haproxy.cfg
+  - Fix the option httpchk path from /health to /api/health
+  - Reload HAProxy and verify backends show as UP
+initial_state: |
+  Ubuntu server running HAProxy. Config at /etc/haproxy/haproxy.cfg.
+  The backend section uses "option httpchk GET /health" but the app
+  health endpoint is at /api/health — returns 404 causing health check failure.
+hints:
+  - order: 1
+    cost: 10
+    content: "Check haproxy stats: curl -s http://localhost:9000/stats | grep -i backend"
+  - order: 2
+    cost: 15
+    content: "View backend config: cat /etc/haproxy/haproxy.cfg | grep -A20 'backend'"
+  - order: 3
+    cost: 20
+    content: "Find the line: option httpchk GET /health — the path is wrong"
+  - order: 4
+    cost: 25
+    content: "Change to: option httpchk GET /api/health then reload: systemctl reload haproxy"

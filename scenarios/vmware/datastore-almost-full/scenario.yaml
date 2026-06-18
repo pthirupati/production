@@ -1,0 +1,45 @@
+---
+slug: datastore-almost-full
+title: "Datastore at 95% Capacity — Risk of VM Suspension"
+technology: VMware
+category: Storage
+difficulty: medium
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Critical
+is_free: false
+description: |
+  Datastore "datastore-prod-01" is at 95% capacity (950 GB of 1 TB). VMware has
+  issued a "Datastore usage on disk" alarm. If the datastore reaches 100%, all VMs
+  on it will be suspended immediately, causing a production outage. Engineers must
+  immediately free space by cleaning up orphaned VMDKs, snapshots, and ISO files,
+  or extend the VMDK/LUN size via the storage team.
+objectives:
+  - Acknowledge the datastore alarm in vCenter and assess urgency
+  - Browse the datastore to identify large orphaned files, snapshots, and ISOs
+  - Delete orphaned VMDKs and old ISO files to recover at least 100 GB
+  - Verify datastore drops below 85% capacity and alarm clears
+initial_state: |
+  VMware vCenter simulation. datastore-prod-01 at 95% (950 GB / 1 TB).
+  Orphaned VMDK files: ~40 GB. Old ISO files in /ISOs folder: ~30 GB.
+  Snapshot delta files for dev-vm-03: ~25 GB.
+hints:
+  - order: 1
+    cost: 10
+    content: "In vCenter, select the datastore → Files tab. Sort by size descending.
+      Look for .vmdk files not associated with any running VM (orphaned),
+      large .iso files in an /ISOs folder, and -delta.vmdk snapshot files."
+  - order: 2
+    cost: 15
+    content: "To find orphaned VMDKs: compare files in the datastore browser against
+      the VM inventory. Files with no matching VM entry are orphaned and safe to delete.
+      Also delete ISOs that are not actively mounted to any VM."
+  - order: 3
+    cost: 20
+    content: "For snapshot cleanup: right-click dev-vm-03 → Snapshots → Delete All
+      Snapshots to consolidate and free the delta VMDK space.
+      After deletions, monitor datastore capacity in vCenter → Storage → Datastores
+      and confirm the alarm clears once usage drops below the threshold."

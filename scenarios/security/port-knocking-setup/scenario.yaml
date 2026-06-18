@@ -1,0 +1,37 @@
+title: "Port Knocking Setup — Hide SSH Behind a Knock Sequence"
+slug: port-knocking-setup
+technology: Security
+category: Hardening
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  To reduce SSH exposure on an internet-facing server, you have been asked to
+  implement port knocking using knockd. SSH port 22 will be blocked by default
+  and only opened temporarily after a client sends TCP packets to ports 7000,
+  8000, and 9000 in sequence. Configure knockd with the correct sequence and
+  verify that the port is inaccessible without knocking.
+objectives:
+  - Install and configure knockd with the sequence 7000:tcp, 8000:tcp, 9000:tcp to open port 22 for 10 seconds
+  - Set iptables to block port 22 by default and configure knockd to add and remove the ACCEPT rule on knock
+  - Test that port 22 is closed before knocking and opens after the correct sequence is sent
+initial_state: |
+  Ubuntu server with SSH on port 22. knockd is installed but not configured.
+  iptables currently allows all traffic. The server has a single network interface
+  (eth0). The knockd configuration file is at /etc/knockd.conf.
+hints:
+  - order: 1
+    cost: 10
+    content: "Start by blocking SSH: `iptables -A INPUT -p tcp --dport 22 -j DROP` — verify with `nmap -p 22 localhost` showing filtered."
+  - order: 2
+    cost: 15
+    content: "Configure /etc/knockd.conf with an [openSSH] sequence using `sequence = 7000,8000,9000`, `seq_timeout = 5`, and `command = iptables -I INPUT -s %IP% -p tcp --dport 22 -j ACCEPT`."
+  - order: 3
+    cost: 20
+    content: "Set the close sequence with a matching [closeSSH] block using reverse sequence 9000,8000,7000 and `command = iptables -D INPUT -s %IP% -p tcp --dport 22 -j ACCEPT`."
+  - order: 4
+    cost: 25
+    content: "Test: `systemctl start knockd` then `knock localhost 7000 8000 9000` and immediately `nmap -p 22 localhost` — port should be open. Wait 10s and recheck — it should close."

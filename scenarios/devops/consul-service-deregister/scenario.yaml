@@ -1,0 +1,37 @@
+title: Fix Consul Service Deregistration on Pod Deletion
+slug: consul-service-deregister
+technology: DevOps
+category: Service Mesh
+difficulty: hard
+time_limit: 1200
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: false
+description: |
+  Consul is holding stale service registrations for pods that have been deleted.
+  Health checks are failing for these ghost services, and load balancers are
+  routing traffic to non-existent endpoints. You need to deregister the stale
+  services and fix the Consul agent configuration to auto-deregister unhealthy services.
+objectives:
+  - List Consul services and identify stale registrations
+  - Deregister the stale service entries via Consul API
+  - Configure enable_tag_override and deregister_critical_service_after
+  - Verify only healthy, running services appear in Consul
+initial_state: |
+  Ubuntu server running Consul agent. Stale service IDs are:
+  myapp-pod-abc123 and myapp-pod-def456. These pods no longer exist.
+  Consul HTTP API at http://localhost:8500. Use consul CLI or API to deregister.
+hints:
+  - order: 1
+    cost: 10
+    content: "List services: consul catalog services or curl http://localhost:8500/v1/catalog/services"
+  - order: 2
+    cost: 15
+    content: "Check health: consul health service myapp"
+  - order: 3
+    cost: 20
+    content: "Deregister: curl -X PUT http://localhost:8500/v1/agent/service/deregister/myapp-pod-abc123"
+  - order: 4
+    cost: 25
+    content: "Add to service definition: deregister_critical_service_after = \"30s\""

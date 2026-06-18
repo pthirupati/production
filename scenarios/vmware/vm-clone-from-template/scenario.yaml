@@ -1,0 +1,47 @@
+---
+slug: vm-clone-from-template
+title: "Clone from Template Failing — Customization Spec Misconfigured"
+technology: VMware
+category: VM Management
+difficulty: medium
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  Cloning from the Ubuntu 22.04 template using a customization specification
+  "linux-static-ip-spec" is failing after the VM powers on for the first time.
+  The VM gets stuck in an endless reboot loop and the customization agent reports:
+  "Customization failed: Unable to set hostname — hostname string is invalid."
+  The customization spec is using a Windows-style hostname format (NETBIOS) which
+  is incompatible with Linux hostname requirements.
+objectives:
+  - Examine the failed customization spec in vCenter Customization Specifications Manager
+  - Identify the invalid hostname configuration in the Linux spec
+  - Fix the hostname format to be RFC 1123 compliant (lowercase, hyphens only)
+  - Redeploy the clone and verify successful customization and guest OS startup
+initial_state: |
+  VMware vCenter simulation. Template: ubuntu-22-04-template.
+  Customization spec: linux-static-ip-spec has hostname set to "APP_SERVER_01" (invalid).
+  Linux requires: lowercase letters, numbers, hyphens only (no underscores).
+hints:
+  - order: 1
+    cost: 10
+    content: "In vCenter: go to Policies and Profiles → VM Customization Specifications.
+      Find 'linux-static-ip-spec' and click Edit. Review the Computer Name field.
+      It shows 'APP_SERVER_01' which uses underscores — invalid for Linux hostnames."
+  - order: 2
+    cost: 15
+    content: "Fix the hostname: change 'APP_SERVER_01' to 'app-server-01' (lowercase,
+      replace underscores with hyphens). Or set it to 'Use the virtual machine name'
+      to dynamically use the VM name as the hostname (ensure VM names are RFC compliant)."
+  - order: 3
+    cost: 20
+    content: "Also verify the other spec settings: IP/gateway/DNS must match the
+      target network segment. After fixing, delete the failed clone VM, then
+      re-clone from the template using the corrected spec.
+      Check /var/log/vmware-imc/toolsDeployPkg.log in the guest OS after boot
+      to confirm customization completed successfully."

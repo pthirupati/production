@@ -1,0 +1,38 @@
+slug: sudoers-misconfigured
+title: "Sudoers Misconfigured — Restrict www-data ALL Command Access"
+technology: Security
+category: Privilege Escalation
+difficulty: medium
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Critical
+is_free: false
+description: |
+  A security audit discovered that the www-data user (the nginx/Apache web server
+  process account) has been granted unrestricted sudo access in the sudoers file.
+  This means any web application vulnerability (RCE, SSRF) could instantly escalate
+  to full root access. Remove the dangerous ALL=(ALL) NOPASSWD: ALL rule and replace
+  it with a minimal scoped permission if needed (or remove entirely).
+objectives:
+  - Identify the dangerous sudoers entry for www-data
+  - Remove the ALL=(ALL) NOPASSWD: ALL grant from /etc/sudoers.d/ or /etc/sudoers
+  - Verify www-data can no longer execute arbitrary commands as root
+  - Ensure the sudoers file syntax is valid after editing
+initial_state: |
+  Ubuntu 22.04. File /etc/sudoers.d/webserver contains:
+  www-data ALL=(ALL) NOPASSWD: ALL
+  This grants the web server process root access without any password.
+hints:
+  - order: 1
+    cost: 10
+    content: "Audit: `sudo -l -U www-data` shows what www-data can run."
+  - order: 2
+    cost: 15
+    content: "Remove the file: `rm /etc/sudoers.d/webserver` or edit it to remove the dangerous line."
+  - order: 3
+    cost: 10
+    content: "ALWAYS use `visudo -c` to check syntax after editing sudoers files."
+  - order: 4
+    cost: 15
+    content: "Verify: `sudo -l -U www-data` should show 'no sudo rights' or a minimal scoped rule."

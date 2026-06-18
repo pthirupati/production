@@ -1,0 +1,43 @@
+---
+slug: thread-deadlock
+title: "Thread Deadlock — Application Hanging Under Concurrent Load"
+technology: Java
+category: Concurrency
+difficulty: hard
+time_limit: 1500
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Critical
+is_free: false
+description: |
+  A Java REST API has been completely unresponsive for 45 minutes. All incoming
+  requests hang indefinitely and no responses are returned. The service process
+  is still running (not crashed). Operations suspects a thread deadlock caused by
+  two synchronized methods acquiring locks in opposite order. Engineers must use
+  jstack to capture a thread dump, identify the deadlock cycle, and fix the code.
+objectives:
+  - Capture a thread dump using jstack <pid>
+  - Locate the "Found one Java-level deadlock" section in the thread dump
+  - Identify the two threads and the two monitor locks involved
+  - Fix the lock acquisition order in the source code to eliminate the deadlock
+initial_state: |
+  Simulated server. The hanging Java process PID is in /var/run/app.pid.
+  Source code is at /opt/app/src/. jstack is installed and on PATH.
+  The deadlock involves AccountService.transfer() and AccountService.audit().
+hints:
+  - order: 1
+    cost: 10
+    content: "Run: jstack $(cat /var/run/app.pid) > /tmp/threaddump.txt then search
+      the file for the string 'deadlock' to find the relevant section."
+  - order: 2
+    cost: 15
+    content: "The thread dump will show two threads each waiting for a lock held by
+      the other. Note the object addresses in the 'waiting to lock' and 'locked'
+      lines to map the cycle."
+  - order: 3
+    cost: 20
+    content: "In /opt/app/src/AccountService.java, the transfer() method locks
+      accountA then accountB, while audit() locks accountB then accountA. Fix by
+      always acquiring locks in the same order: sort by account ID before locking."

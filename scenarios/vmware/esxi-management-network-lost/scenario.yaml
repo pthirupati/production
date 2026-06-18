@@ -1,0 +1,46 @@
+---
+slug: esxi-management-network-lost
+title: "ESXi Management Network Lost After NIC Team Configuration Change"
+technology: VMware
+category: Networking
+difficulty: hard
+time_limit: 1800
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Critical
+is_free: false
+description: |
+  ESXi host esxi-03 is unreachable after a network team reconfigured the NIC
+  teaming policy on vSwitch0. The management vmkernel (vmk0) lost connectivity
+  when the active uplink (vmnic0) was moved to the unused list and only vmnic1
+  (which has no physical cable connected) was left as active. The host shows as
+  "Not Responding" in vCenter. Physical console access is available via iDRAC/ILO.
+objectives:
+  - Connect to the ESXi host via physical console (iDRAC/ILO/DCUI)
+  - Access the Direct Console User Interface (DCUI) to restore network settings
+  - Move vmnic0 back to active in the management network NIC team
+  - Verify vCenter shows the host as Connected
+initial_state: |
+  VMware vCenter simulation. esxi-03 shows "Not Responding" in vCenter.
+  iDRAC console access available at: idrac-03.mgmt.local (admin/password).
+  On ESXi: vmnic0 is physically connected but in unused uplinks list.
+  vmnic1 is listed as active but has no physical cable connected.
+hints:
+  - order: 1
+    cost: 10
+    content: "Connect via DCUI: in the iDRAC/ILO console, you will see the ESXi
+      Direct Console User Interface. Press F2 to enter configuration.
+      Navigate to: Network Adapters → Configure Management Network → Network Adapters."
+  - order: 2
+    cost: 15
+    content: "In the DCUI Network Adapters screen, you can see vmnic0 and vmnic1.
+      Use space bar to select vmnic0 and deselect vmnic1.
+      Navigate to OK and press Enter. Confirm 'Apply changes and restart management network?'"
+  - order: 3
+    cost: 20
+    content: "After restoring management network via DCUI, the host should become
+      reachable within 30-60 seconds. In vCenter, wait for the host to reconnect
+      automatically. Then verify the vSwitch0 NIC teaming configuration from
+      vCenter GUI to ensure vmnic0 is active and vmnic1 is standby or also active."

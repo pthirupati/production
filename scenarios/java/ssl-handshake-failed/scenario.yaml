@@ -1,0 +1,49 @@
+---
+slug: ssl-handshake-failed
+title: "SSLHandshakeException — Certificate Chain Incomplete in Keystore"
+technology: Java
+category: Security
+difficulty: hard
+time_limit: 1500
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Critical
+is_free: false
+description: |
+  A Java service making outbound HTTPS calls to a partner API is failing with:
+  javax.net.ssl.SSLHandshakeException: PKIX path building failed: unable to find
+  valid certification path to requested target. The partner API recently switched to
+  a new CA. The intermediate CA certificate is not in the JVM's truststore. Engineers
+  must import the missing certificate chain into the custom truststore.
+objectives:
+  - Capture the full SSL exception and identify the missing certificate
+  - Download the partner API's certificate chain using openssl
+  - Import the intermediate and root CA certificates into the JVM truststore
+  - Verify the outbound HTTPS call succeeds after the truststore update
+initial_state: |
+  Simulated server. Java 17 service at /opt/app/.
+  Custom truststore at /opt/app/config/truststore.jks (password: changeit).
+  Partner API endpoint: https://api.partner.example.com/v2/data.
+  Intermediate CA cert available at /opt/app/certs/intermediate-ca.pem.
+hints:
+  - order: 1
+    cost: 10
+    content: "Verify the SSL chain: openssl s_client -connect api.partner.example.com:443
+      -showcerts </dev/null 2>/dev/null | grep 'Certificate chain'
+      Look for gaps in the chain (missing intermediate)."
+  - order: 2
+    cost: 15
+    content: "Import the intermediate CA into the truststore:
+      keytool -importcert -alias partner-intermediate-ca \
+        -file /opt/app/certs/intermediate-ca.pem \
+        -keystore /opt/app/config/truststore.jks \
+        -storepass changeit -noprompt"
+  - order: 3
+    cost: 20
+    content: "Verify the import: keytool -list -keystore /opt/app/config/truststore.jks
+      -storepass changeit | grep partner-intermediate
+      Then restart the service and test: curl --cacert /opt/app/config/truststore.jks
+      https://api.partner.example.com/v2/data
+      Or add -Djavax.net.ssl.trustStore=/opt/app/config/truststore.jks to the JVM args."

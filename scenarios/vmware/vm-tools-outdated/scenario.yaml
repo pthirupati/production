@@ -1,0 +1,46 @@
+---
+slug: vm-tools-outdated
+title: "VMware Tools Outdated — VM Performance and Management Degraded"
+technology: VMware
+category: VM Management
+difficulty: easy
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: true
+description: |
+  Multiple Windows and Linux VMs in the production cluster are running VMware Tools
+  versions that are more than 3 major versions behind the current ESXi 8.0 host.
+  Outdated Tools causes degraded VMXNET3 driver performance, missing balloon driver
+  for memory management, and inability to perform graceful guest OS quiesces for
+  snapshot consistency. vCenter shows "VMware Tools: Outdated" warnings on 8 VMs.
+objectives:
+  - Identify all VMs with outdated VMware Tools using vCenter inventory
+  - Update VMware Tools on a Windows VM using the automatic upgrade mechanism
+  - Update VMware Tools on a Linux VM using open-vm-tools package manager
+  - Verify all target VMs show "VMware Tools: OK (Current)" status
+initial_state: |
+  VMware vCenter simulation. 8 VMs showing "VMware Tools: Outdated" status.
+  Mix of Windows Server 2019 and Ubuntu 22.04 VMs.
+  VMware Tools current version for ESXi 8.0: 12.3.0.
+hints:
+  - order: 1
+    cost: 10
+    content: "In vCenter, use the VM inventory list view. Add the 'VMware Tools Status'
+      column. Filter by 'Outdated' to see all affected VMs.
+      Alternatively: Hosts & Clusters → cluster → VMs tab → filter."
+  - order: 2
+    cost: 15
+    content: "For Windows VMs: right-click VM → Guest OS → Upgrade VMware Tools.
+      Select 'Automatic upgrade' to perform a silent install.
+      The VM will not need to be powered off for a minor update."
+  - order: 3
+    cost: 20
+    content: "For Linux VMs using open-vm-tools:
+      SSH into the VM and run:
+      sudo apt update && sudo apt install --only-upgrade open-vm-tools open-vm-tools-desktop
+      OR for RHEL/CentOS: sudo yum update open-vm-tools
+      After upgrade, verify: vmware-toolsd --version"

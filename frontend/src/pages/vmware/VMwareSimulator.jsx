@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { vmwareApi } from '../../api/vmware'
 import toast from 'react-hot-toast'
 
@@ -389,7 +389,11 @@ function CloneVmModal({ vm, onClose, onAction }) {
 
 /* ─── Main component ─────────────────────────────────────────────────── */
 export default function VMwareSimulator() {
-  const { sessionId } = useParams()
+  const { sessionId: paramSessionId } = useParams()
+  const [searchParams] = useSearchParams()
+  // Prefer session ID from query param (redirected from LabRunner) over URL segment
+  const sessionId = searchParams.get('session') || paramSessionId
+  const scenarioSlug = searchParams.get('scenario') || ''
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
@@ -408,7 +412,7 @@ export default function VMwareSimulator() {
   const initialSelectionDone = useRef(false)
   const load = useCallback(async () => {
     try {
-      const data = await vmwareApi.getState(sessionId)
+      const data = await vmwareApi.getState(sessionId, scenarioSlug)
       setState(data)
       if (!initialSelectionDone.current && data.inventory?.hosts?.length) {
         setSelectedNode({ type: 'host', id: data.inventory.hosts[0].id })

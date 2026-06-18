@@ -1,0 +1,22 @@
+category: Linux Administration
+description: |
+  Application requires a secondary IP on eth0. Coordinate with the Network team via Jira,
+  verify in the terminal, then configure routing if needed.
+difficulty: medium
+hints:
+  - content: 'Comment on Jira: @network team please add secondary IP 10.0.0.20/24 on eth0'
+    cost: 10
+    order: 1
+initial_state: |
+  eth0 has only 10.0.0.10. A secondary IP (10.0.0.20) is required for the application VIP.
+  Request @network team in the Jira ticket, wait for confirmation, then verify with ip addr.
+is_free: false
+lab_mode: simulation
+objectives:
+  - Request @network team in Jira to add secondary IP
+  - Verify with ip addr show dev eth0
+  - Confirm application can bind to the new address
+simulation_type: rhel
+slug: sim-rhel-network-nic
+time_limit: 900
+title: Network — Add Secondary NIC IP via Jira
