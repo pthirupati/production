@@ -299,14 +299,11 @@ export default function Scenarios() {
     if (grouped[s.difficulty]) grouped[s.difficulty].push(s)
   })
 
-  const { hidden: toolbarHidden, anchorRef } = useScrollHideToolbar(96)
+  const { hidden: toolbarHidden, toolbarRef, anchorRef } = useScrollHideToolbar(64)
 
   return (
     <div className="max-w-6xl mx-auto animate-fade-in">
-      <div ref={anchorRef} className="h-0 w-full" aria-hidden="true" />
-
-      {/* ── Compact sticky search/filters (hides on scroll down) ── */}
-      <StickyPageToolbar hidden={toolbarHidden} className="mb-3">
+      <StickyPageToolbar hidden={toolbarHidden} toolbarRef={toolbarRef} className="mb-2">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 mb-0.5">
@@ -380,8 +377,9 @@ export default function Scenarios() {
           )}
         </div>
       </StickyPageToolbar>
+      <div ref={anchorRef} className="h-px w-full -mt-px" aria-hidden="true" />
 
-      <div className="space-y-5 pt-1">
+      <div className="space-y-5">
       {showFilters && (
         <div className="glass-card p-5 space-y-5 animate-slide-up border border-surface-700/50">
 

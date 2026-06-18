@@ -537,6 +537,7 @@ class AdminTechnologyStatsView(APIView):
                 profile__complimentary_access=True,
                 lab_sessions__scenario__technology=tech,
             ).distinct().count()
+            free_user_total = free_users + complimentary_users
             result.append({
                 "id": tech.id,
                 "name": tech.name,
@@ -549,6 +550,7 @@ class AdminTechnologyStatsView(APIView):
                 "active_subscribers": tech.active_subs,
                 "free_users": free_users,
                 "complimentary_users": complimentary_users,
+                "free_user_total": free_user_total,
                 "revenue_inr": float(revenue),
                 "revenue_display": f"₹{int(float(revenue))}",
             })
@@ -1288,22 +1290,38 @@ class AdminAnalyticsView(APIView):
         except Exception:
             interview_campaigns = 0
         try:
-            from apps.billing.models import TechnologySubscription
             new_subs = TechnologySubscription.objects.filter(created_at__gte=start_date, is_active=True).count()
+            revenue_inr = TechnologySubscription.objects.filter(
+                created_at__gte=start_date, is_active=True, payment_verified=True,
+            ).aggregate(total=Sum("amount"))["total"] or 0
         except Exception:
             new_subs = 0
+            revenue_inr = 0
+
+        total_starts = sum(d["count"] for d in daily_labs)
+        completion_rate = round((completed_labs / total_starts * 100), 1) if total_starts else 0
+
+        top_technologies = list(
+            LabSession.objects.filter(started_at__gte=start_date)
+            .values("scenario__technology__name", "scenario__technology__slug")
+            .annotate(count=Count("id"))
+            .order_by("-count")[:8]
+        )
 
         payload = {
             "daily_labs": daily_labs,
             "top_scenarios": list(top_scenarios),
             "difficulty_distribution": list(difficulty_stats),
+            "top_technologies": top_technologies,
             "summary": {
                 "new_users": new_users,
                 "active_users": active_users,
                 "completed_labs": completed_labs,
                 "interview_campaigns": interview_campaigns,
                 "new_subscriptions": new_subs,
-                "total_lab_starts": sum(d["count"] for d in daily_labs),
+                "total_lab_starts": total_starts,
+                "revenue_inr": float(revenue_inr),
+                "completion_rate_pct": completion_rate,
             },
             "cached_at": now.isoformat(),
         }
@@ -2946,6 +2964,7 @@ class AdminSecurityMetricsView(APIView):
         )
 
         email_stats = {}
+        email_failed_count = 0
         try:
             from apps.notifications.models import EmailLog
             from datetime import timedelta as td
@@ -2969,13 +2988,23 @@ class AdminSecurityMetricsView(APIView):
             email_stats["delivery_health"] = health
             if health.get("alert"):
                 security_alerts += 1
+            email_failed_count = email_stats.get("failed", 0)
         except Exception:
             email_stats = {"sent": 0, "failed": 0, "gmail_configured": False, "gmail_ok": False}
+            email_failed_count = 0
 
         otp_failed = AuditLog.objects.filter(action="otp_failed", created_at__gte=since).count()
 
         detail = request.query_params.get("detail")
         if detail:
+            if detail == "email_failed":
+                from apps.notifications.models import EmailLog
+                rows = list(
+                    EmailLog.objects.filter(status="failed", created_at__gte=since)
+                    .order_by("-created_at")[:100]
+                    .values("id", "recipient", "subject", "error", "created_at", "status")
+                )
+                return Response({"detail": "email_failed", "rows": rows})
             action_map = {
                 "login_failed": "login_failed",
                 "login_success": "login",
@@ -2983,6 +3012,8 @@ class AdminSecurityMetricsView(APIView):
                 "payment_failed": "payment_failed",
                 "lab_resets": "lab_reset",
                 "security_alerts": "security_alert",
+                "email_failed": "email_failed",
+                "rate_limit_hits": "security_alert",
             }
             action = action_map.get(detail)
             if action:
@@ -3009,6 +3040,7 @@ class AdminSecurityMetricsView(APIView):
             "payment_failed": payment_failed + failed_payments,
             "security_alerts": security_alerts,
             "otp_failed": otp_failed,
+            "email_failed": email_failed_count,
             "rate_limit_hits": rate_limit_hits,
             "email_stats": email_stats,
             "suspicious_ips": suspicious_ips,
@@ -3039,6 +3071,36 @@ class AdminSecurityActionView(APIView):
             block_country(country)
         elif action == "unblock_country":
             unblock_country(country)
+        elif action == "block_user":
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            uid = request.data.get("user_id")
+            email = (request.data.get("email") or "").strip().lower()
+            qs = User.objects.all()
+            if uid:
+                qs = qs.filter(pk=uid)
+            elif email:
+                qs = qs.filter(email__iexact=email)
+            else:
+                return Response({"error": "user_id or email required"}, status=400)
+            updated = qs.update(is_active=False)
+            if not updated:
+                return Response({"error": "User not found"}, status=404)
+        elif action == "unblock_user":
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            uid = request.data.get("user_id")
+            email = (request.data.get("email") or "").strip().lower()
+            qs = User.objects.all()
+            if uid:
+                qs = qs.filter(pk=uid)
+            elif email:
+                qs = qs.filter(email__iexact=email)
+            else:
+                return Response({"error": "user_id or email required"}, status=400)
+            updated = qs.update(is_active=True)
+            if not updated:
+                return Response({"error": "User not found"}, status=404)
         else:
             return Response({"error": "Unknown action"}, status=400)
 

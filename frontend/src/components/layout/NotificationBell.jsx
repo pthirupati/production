@@ -23,8 +23,13 @@ export default function NotificationBell() {
   // Poll every 60s
   useEffect(() => {
     fetchNotifications()
+    const onVis = () => { if (document.visibilityState === 'visible') fetchNotifications() }
+    document.addEventListener('visibilitychange', onVis)
     const interval = setInterval(fetchNotifications, 60_000)
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVis)
+    }
   }, [])
 
   // Position the panel relative to the bell using a portal
@@ -33,8 +38,8 @@ export default function NotificationBell() {
     const rect = btnRef.current.getBoundingClientRect()
     // Open upward-right from the bell icon
     setPos({
-      top: rect.top - 4, // panel bottom aligns near bell top
-      left: rect.left + rect.width + 8, // panel opens to the right of the bell
+      top: Math.min(rect.bottom + 8, window.innerHeight - 420),
+      left: Math.max(8, rect.left - 280),
     })
   }, [open])
 

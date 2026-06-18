@@ -134,18 +134,8 @@ export default function InterviewRoom() {
       toast.error(msg)
       return
     }
-    const needsMic = type === 'both' || type === 'audio'
-    const needsCam = type === 'both' || type === 'video'
-    const micState = needsMic ? await queryMediaPermission('microphone') : 'granted'
-    const camState = needsCam ? await queryMediaPermission('camera') : 'granted'
-
-    if (micState === 'denied' || camState === 'denied') {
-      const msg = getMediaErrorMessage({ name: 'NotAllowedError' })
-      setMediaError(msg)
-      toast.error(msg)
-      return
-    }
-    // Invoke browser permission prompt immediately (Google Meet style).
+    setMediaError('')
+    // Call getUserMedia directly on click so the browser shows Allow/Deny (Meet-style).
     await executeMediaRequest(type)
   }
 

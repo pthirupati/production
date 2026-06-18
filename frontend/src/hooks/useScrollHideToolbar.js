@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 
-/** Hide a sticky toolbar after scrolling down; reveal on scroll up. */
-export function useScrollHideToolbar(threshold = 80) {
+/**
+ * Collapse page toolbar once user scrolls past it (no leftover gap).
+ */
+export function useScrollHideToolbar(threshold = 64) {
   const [hidden, setHidden] = useState(false)
-  const lastY = useRef(0)
+  const toolbarRef = useRef(null)
   const anchorRef = useRef(null)
 
   useEffect(() => {
@@ -16,27 +18,28 @@ export function useScrollHideToolbar(threshold = 80) {
         }
         node = node.parentElement
       }
-      return window
+      return null
     }
 
-    const scrollTarget = findScrollParent(anchorRef.current)
-    const getY = () => (scrollTarget === window ? window.scrollY : scrollTarget.scrollTop)
+    const toolbar = toolbarRef.current
+    const anchor = anchorRef.current
+    if (!toolbar || !anchor) return
 
-    const onScroll = () => {
-      const y = getY()
-      if (y < threshold) {
-        setHidden(false)
-      } else if (y > lastY.current + 8) {
-        setHidden(true)
-      } else if (y < lastY.current - 8) {
-        setHidden(false)
-      }
-      lastY.current = y
-    }
-
-    scrollTarget.addEventListener('scroll', onScroll, { passive: true })
-    return () => scrollTarget.removeEventListener('scroll', onScroll)
+    const root = findScrollParent(toolbar)
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const scrolledPast = !entry.isIntersecting && entry.boundingClientRect.top < threshold
+        setHidden(scrolledPast)
+      },
+      {
+        root,
+        threshold: [0, 1],
+        rootMargin: `-${threshold}px 0px 0px 0px`,
+      },
+    )
+    observer.observe(anchor)
+    return () => observer.disconnect()
   }, [threshold])
 
-  return { hidden, anchorRef }
+  return { hidden, toolbarRef, anchorRef }
 }

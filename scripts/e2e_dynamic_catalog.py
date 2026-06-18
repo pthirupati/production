@@ -117,7 +117,7 @@ def grant_all_technology_subscriptions(user, technologies=None):
         technologies = Technology.objects.filter(is_active=True)
     for tech in technologies:
         sub_id = f"E2E-{user.username[:16]}-{tech.id}-AUTO"
-        sub, _ = TechnologySubscription.objects.get_or_create(
+        sub, _ = TechnologySubscription.objects.update_or_create(
             user=user,
             technology=tech,
             defaults={

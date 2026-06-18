@@ -38,8 +38,8 @@ function TechStatCard({ tech, onClick }) {
           <p className="text-[10px] text-surface-500 uppercase tracking-wide">Paid</p>
         </div>
         <div className="rounded-lg bg-surface-800/50 p-2 text-center">
-          <p className="text-lg font-bold text-accent-amber">{tech.free_users ?? 0}</p>
-          <p className="text-[10px] text-surface-500 uppercase tracking-wide">Free</p>
+          <p className="text-lg font-bold text-accent-amber">{tech.free_user_total ?? ((tech.free_users ?? 0) + (tech.complimentary_users ?? 0))}</p>
+          <p className="text-[10px] text-surface-500 uppercase tracking-wide">Free users</p>
         </div>
         <div className="rounded-lg bg-surface-800/50 p-2 text-center">
           <p className="text-lg font-bold text-accent-green">{tech.revenue_display || '₹0'}</p>

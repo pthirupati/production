@@ -8,6 +8,8 @@ const METRIC_KEYS = [
   { key: 'login_success', label: 'Successful logins', icon: Shield, color: 'text-green-400' },
   { key: 'otp_failed', label: 'OTP failures', icon: KeyRound, color: 'text-orange-400' },
   { key: 'payment_failed', label: 'Payment failures', icon: CreditCard, color: 'text-orange-400' },
+  { key: 'email_failed', label: 'Email failures', icon: Mail, color: 'text-red-300' },
+  { key: 'rate_limit_hits', label: 'Rate limit hits', icon: AlertTriangle, color: 'text-amber-400' },
   { key: 'lab_resets', label: 'Lab resets', icon: RotateCcw, color: 'text-amber-400' },
   { key: 'security_alerts', label: 'Security alerts', icon: AlertTriangle, color: 'text-purple-400' },
 ]
@@ -19,6 +21,7 @@ export default function AdminSecurity() {
   const [detail, setDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [blockIp, setBlockIp] = useState('')
+  const [blockUserEmail, setBlockUserEmail] = useState('')
   const [blockCountry, setBlockCountry] = useState('')
 
   const loadData = async () => {
@@ -29,6 +32,20 @@ export default function AdminSecurity() {
       toast.error('Failed to load security metrics')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleBlockUser = async (email, block = true) => {
+    if (!email?.trim()) return
+    try {
+      await adminApi.securityAction({
+        action: block ? 'block_user' : 'unblock_user',
+        email: email.trim(),
+      })
+      toast.success(block ? `Blocked ${email}` : `Unblocked ${email}`)
+      setBlockUserEmail('')
+    } catch {
+      toast.error('User action failed')
     }
   }
 
@@ -103,7 +120,7 @@ export default function AdminSecurity() {
         <span className="text-surface-500">|</span>
         <span className="text-surface-400">Emails sent: <strong className="text-white">{email.sent ?? 0}</strong></span>
         <span className="text-surface-400">Failed: <strong className="text-accent-red">{email.failed ?? 0}</strong></span>
-        <button type="button" className="text-xs text-accent-cyan hover:underline" onClick={() => openDetail('payment_failed')}>
+        <button type="button" className="text-xs text-accent-cyan hover:underline" onClick={() => openDetail('email_failed')}>
           View email failures
         </button>
       </div>
@@ -126,8 +143,15 @@ export default function AdminSecurity() {
         ))}
       </div>
 
-      {/* Block IP / country */}
-      <div className="grid md:grid-cols-2 gap-4">
+      {/* Block IP / country / user */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <div className="glass-card p-5 space-y-3">
+          <h2 className="text-sm font-semibold text-white flex items-center gap-2"><Ban size={16} /> Block user account</h2>
+          <div className="flex gap-2">
+            <input className="input-field flex-1 text-sm" placeholder="user@email.com" value={blockUserEmail} onChange={e => setBlockUserEmail(e.target.value)} />
+            <button type="button" className="btn-primary text-sm" onClick={() => handleBlockUser(blockUserEmail, true)}>Block</button>
+          </div>
+        </div>
         <div className="glass-card p-5 space-y-3">
           <h2 className="text-sm font-semibold text-white flex items-center gap-2"><Ban size={16} /> Block IP address</h2>
           <div className="flex gap-2">

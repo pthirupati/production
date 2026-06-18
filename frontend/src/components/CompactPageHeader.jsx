@@ -3,7 +3,7 @@ import StickyPageToolbar from './StickyPageToolbar'
 import { useScrollHideToolbar } from '../hooks/useScrollHideToolbar'
 
 /**
- * Compact sticky page header — collapses fully on scroll down (no layout gap).
+ * Compact sticky page header — fully removed from layout when scrolled past.
  */
 export default function CompactPageHeader({
   title,
@@ -11,14 +11,13 @@ export default function CompactPageHeader({
   eyebrow = '',
   icon: Icon = Target,
   children,
-  threshold = 72,
+  threshold = 64,
 }) {
-  const { hidden, anchorRef } = useScrollHideToolbar(threshold)
+  const { hidden, toolbarRef, anchorRef } = useScrollHideToolbar(threshold)
 
   return (
     <>
-      <div ref={anchorRef} className="h-0 w-full" aria-hidden="true" />
-      <StickyPageToolbar hidden={hidden} className="mb-3">
+      <StickyPageToolbar hidden={hidden} toolbarRef={toolbarRef} className="mb-2">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             {eyebrow && (
@@ -33,6 +32,7 @@ export default function CompactPageHeader({
           {children}
         </div>
       </StickyPageToolbar>
+      <div ref={anchorRef} className="h-px w-full -mt-px" aria-hidden="true" />
     </>
   )
 }

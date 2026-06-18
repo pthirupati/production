@@ -57,7 +57,9 @@ export default function AdminAnalytics() {
                 ['Active users', data.summary.active_users, 'text-accent-green'],
                 ['Lab starts', data.summary.total_lab_starts, 'text-accent-purple'],
                 ['Completed labs', data.summary.completed_labs, 'text-accent-amber'],
+                ['Completion rate', `${data.summary.completion_rate_pct ?? 0}%`, 'text-accent-green'],
                 ['New subscriptions', data.summary.new_subscriptions, 'text-accent-blue'],
+                ['Revenue (INR)', `₹${Math.round(data.summary.revenue_inr ?? 0)}`, 'text-accent-amber'],
                 ['Interviews', data.summary.interview_campaigns, 'text-accent-pink'],
               ].map(([label, val, cls]) => (
                 <div key={label} className="glass-card p-4">
@@ -92,6 +94,20 @@ export default function AdminAnalytics() {
 
           <div className="grid md:grid-cols-2 gap-6">
             <div className="glass-card p-6">
+              <h2 className="text-sm font-semibold text-surface-400 uppercase tracking-wider mb-4">Top Technologies (lab starts)</h2>
+              <div className="space-y-2">
+                {(data?.top_technologies || []).map((t, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm py-2 border-b border-surface-800/50 last:border-0">
+                    <span className="text-surface-300">{t.scenario__technology__name || t.scenario__technology__slug}</span>
+                    <span className="text-surface-500">{t.count} starts</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="glass-card p-6">
               <h2 className="text-sm font-semibold text-surface-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <Target size={16} /> Top Scenarios
               </h2>
@@ -117,7 +133,7 @@ export default function AdminAnalytics() {
                     <div className="h-2 bg-surface-800 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-accent-purple rounded-full"
-                        style={{ width: `${Math.min(100, (d.count / (data?.top_scenarios?.length || 10)) * 100)}%` }}
+                        style={{ width: `${Math.min(100, (d.count / Math.max(...(data?.difficulty_distribution || []).map(x => x.count), 1)) * 100)}%` }}
                       />
                     </div>
                   </div>

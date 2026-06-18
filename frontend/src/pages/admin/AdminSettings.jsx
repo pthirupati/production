@@ -192,7 +192,7 @@ export default function AdminSettings() {
           <p className="text-surface-400 mt-1">Maintenance mode, email configuration, and user management</p>
         </div>
         <button type="button" onClick={handleResetDefaults} disabled={saving} className="btn-secondary text-sm flex items-center gap-2">
-          <Wrench size={14} /> Reset to defaults
+          <Wrench size={14} /> Reset settings to normal
         </button>
       </div>
 
