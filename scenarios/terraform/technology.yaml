@@ -1,0 +1,7 @@
+name: Terraform & IaC
+slug: terraform
+icon: layers
+color: purple
+order: 22
+is_active: true
+description: "Infrastructure as Code with Terraform, CloudFormation, and Pulumi"

@@ -1,0 +1,28 @@
+title: Terraform Provider Version Constraint Conflict
+slug: terraform-provider-version-conflict
+difficulty: medium
+category: Terraform
+description: 'Two Terraform modules require conflicting version constraints for the AWS provider — one requires >= 4.0 and another requires < 4.0 — causing terraform init to fail with "no available version" errors. Resolve the constraint conflict.'
+initial_state: 'Simulated Terraform project with a root module and a child module that declare incompatible AWS provider version constraints. Running terraform init fails because no single provider version satisfies all constraints simultaneously.'
+objectives:
+  - Run terraform init and read the provider version conflict error to identify the incompatible constraints
+  - Update the provider required_version constraints in each module to use a compatible overlapping range
+  - Run terraform init successfully and confirm providers are downloaded
+lab_mode: docker
+simulation_type: terraform
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: terraform init and read the "no available version satisfying constraints" error. Note which modules declare conflicting constraints.'
+    cost: 10
+    order: 1
+  - content: 'Open versions.tf in each module and align the AWS provider constraint to a common range, e.g., ~> 5.0 which satisfies >= 5.0, < 6.0.'
+    cost: 15
+    order: 2
+  - content: 'Use ~> (pessimistic constraint) instead of >= + < combinations to simplify version pinning across modules.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

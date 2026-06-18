@@ -3,6 +3,8 @@ from django.db import models
 from django.core.validators import RegexValidator
 import uuid
 import hashlib
+import secrets
+import string
 from django.utils import timezone
 
 
@@ -40,7 +42,22 @@ class Profile(models.Model):
         default=True,
         help_text="Show the floating FixitLab support assistant",
     )
+    daily_streak = models.PositiveIntegerField(default=0)
+    longest_streak = models.PositiveIntegerField(default=0)
+    xp = models.PositiveIntegerField(default=0)
+    last_activity_date = models.DateField(null=True, blank=True)
+    referral_code = models.CharField(max_length=20, unique=True, blank=True, default="")
+    referred_by = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='referrals'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.referral_code:
+            self.referral_code = ''.join(
+                secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8)
+            )
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.user.username

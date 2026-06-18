@@ -1,0 +1,39 @@
+title: PowerShell Execution Policy Blocking Scripts
+slug: win-ps-execution-policy
+difficulty: easy
+category: Windows Server
+description: 'PowerShell scripts are blocked from running due to a restrictive execution
+  policy. Administrators cannot run automation scripts or management tools that rely
+  on PowerShell. The execution policy must be set to an appropriate level to allow
+  script execution while maintaining reasonable security.'
+initial_state: 'Windows Server 2022 with PowerShell 5.1 or PowerShell 7. The execution
+  policy is set to Restricted or AllSigned, blocking unsigned local scripts from running.
+  Scripts needed for system administration and automation are failing with a security
+  warning.'
+objectives:
+  - Identify the current PowerShell execution policy and scope
+  - Set the execution policy to RemoteSigned or Unrestricted as appropriate
+  - Verify scripts can run successfully after the policy change
+lab_mode: docker
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'Check current policy: Get-ExecutionPolicy -List to see the policy at
+      all scopes (MachinePolicy, UserPolicy, Process, CurrentUser, LocalMachine).'
+    cost: 10
+    order: 1
+  - content: 'Set policy for the machine: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
+      -Scope LocalMachine -Force to allow local scripts while requiring remote scripts
+      to be signed.'
+    cost: 15
+    order: 2
+  - content: 'If GPO is enforcing the policy, update the GPO setting at: Computer
+      Configuration > Policies > Administrative Templates > Windows Components > Windows
+      PowerShell > Turn on Script Execution.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Low

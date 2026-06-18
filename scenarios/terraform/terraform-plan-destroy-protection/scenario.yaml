@@ -1,0 +1,28 @@
+title: Terraform Plan Shows Unexpected Resource Destruction
+slug: terraform-plan-destroy-protection
+difficulty: medium
+category: Terraform
+description: 'Running terraform plan unexpectedly shows that critical resources (e.g., an RDS instance or S3 bucket) will be destroyed and recreated due to a configuration change. Add lifecycle prevent_destroy to protect the resources and rethink the change strategy.'
+initial_state: 'Simulated Terraform project where a change to a resource argument (e.g., renaming an RDS identifier or changing an immutable attribute) causes Terraform to plan a destroy + create cycle for a stateful resource. The plan output shows "-/+" destroy and recreate.'
+objectives:
+  - Read the terraform plan output and identify which resources are scheduled for destruction
+  - Add a lifecycle { prevent_destroy = true } block to the critical resource to block accidental deletion
+  - Investigate whether the change can be made in-place or requires a migration strategy instead
+lab_mode: docker
+simulation_type: terraform
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: terraform plan and look for lines starting with "-/+" which indicate destroy-then-recreate. Note which resource and which argument forces replacement.'
+    cost: 10
+    order: 1
+  - content: 'Add lifecycle { prevent_destroy = true } inside the resource block. Now terraform plan will error if any action would destroy this resource.'
+    cost: 15
+    order: 2
+  - content: 'For immutable attribute changes (like RDS identifier), consider using terraform state mv or a blue-green migration instead of destroy-recreate.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

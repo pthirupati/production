@@ -1,0 +1,28 @@
+title: Sensitive Variable Leaking in Terraform Plan
+slug: terraform-variable-sensitive
+difficulty: easy
+category: Terraform
+description: 'A Terraform variable holding a database password or API key is not marked as sensitive, causing its plaintext value to appear in terraform plan output and be stored unmasked in logs. Mark the variable as sensitive to suppress its value.'
+initial_state: 'Simulated Terraform project with a variable "db_password" or "api_key" that is passed to a resource argument. The variable declaration is missing sensitive = true, so terraform plan prints the secret value in plaintext to stdout.'
+objectives:
+  - Identify the variable(s) containing secret values in the Terraform configuration
+  - Add sensitive = true to each secret variable declaration
+  - Run terraform plan and confirm the value is shown as (sensitive value) in the output
+lab_mode: docker
+simulation_type: terraform
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'Look in variables.tf for variable blocks that hold passwords, tokens, or keys but lack sensitive = true.'
+    cost: 10
+    order: 1
+  - content: 'Add sensitive = true inside the variable block: variable "db_password" { type = string; sensitive = true }.'
+    cost: 15
+    order: 2
+  - content: 'After adding sensitive = true, run terraform plan and verify the output shows "(sensitive value)" instead of the plaintext secret.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

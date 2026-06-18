@@ -1,0 +1,37 @@
+title: NTFS Permissions Broken
+slug: win-ntfs-permissions
+difficulty: medium
+category: Windows Server
+description: 'Broken NTFS permissions are preventing users from accessing a shared
+  folder despite appearing to have the correct group membership. Inheritance may have
+  been disabled or explicit deny entries added incorrectly. You must audit the ACL,
+  fix inheritance, and restore appropriate permissions.'
+initial_state: 'Windows Server 2022 file server with NTFS-formatted volumes. A shared
+  folder has permissions configured but users are receiving access denied errors.
+  Permission inheritance may be broken, Deny ACEs may override Allow entries, or
+  the CREATOR OWNER permissions may be misconfigured.'
+objectives:
+  - Audit the current NTFS ACL on the affected folder using PowerShell
+  - Fix broken inheritance and remove or correct erroneous Deny entries
+  - Verify the target users or groups can access the folder after the fix
+lab_mode: docker
+simulation_type: windows
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'View ACL: Get-Acl -Path "D:\SharedFolder" | Format-List to see all
+      access entries, inheritance flags, and owner. Look for explicit Deny entries.'
+    cost: 10
+    order: 1
+  - content: 'Re-enable inheritance: $acl = Get-Acl "D:\SharedFolder"; $acl.SetAccessRuleProtection($false,
+      $true); Set-Acl "D:\SharedFolder" $acl to restore inherited permissions.'
+    cost: 15
+    order: 2
+  - content: 'Add explicit allow rule: $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("Domain\GroupName","FullControl","ContainerInherit,ObjectInherit","None","Allow");
+      $acl.AddAccessRule($rule); Set-Acl "D:\SharedFolder" $acl'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

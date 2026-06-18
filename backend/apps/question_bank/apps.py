@@ -12,6 +12,7 @@ class QuestionBankConfig(AppConfig):
 
         @receiver(post_save, sender=Scenario)
         def capture_scenario_version(sender, instance, created, **kwargs):
+            import json
             from apps.scenario_versions.models import ScenarioVersion
             try:
                 next_version = ScenarioVersion.objects.filter(scenario=instance).count() + 1
@@ -19,10 +20,20 @@ class QuestionBankConfig(AppConfig):
                     instance.definition_path
                     or f"scenarios/{instance.slug}/scenario.yaml"
                 )
+                snapshot = {
+                    "slug": instance.slug,
+                    "title": instance.title,
+                    "difficulty": instance.difficulty,
+                    "description": instance.description,
+                    "objectives": instance.objectives,
+                    "time_limit": instance.time_limit,
+                    "max_score": instance.max_score,
+                }
+                changelog = json.dumps(snapshot)
                 ScenarioVersion.objects.create(
                     scenario=instance,
                     version=next_version,
-                    changelog="Auto-snapshot on save" if not created else "Initial version",
+                    changelog=changelog,
                     definition_path=definition_path,
                     is_active=True,
                 )

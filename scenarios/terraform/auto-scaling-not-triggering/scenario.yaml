@@ -1,0 +1,28 @@
+title: Auto Scaling Group Not Triggering
+slug: aws-autoscaling-not-triggering
+difficulty: medium
+category: AWS
+description: 'An Auto Scaling group is not launching new instances despite CPU utilization spiking above the target threshold. The CloudWatch alarm exists but never transitions to ALARM state, leaving the application under-provisioned during peak load.'
+initial_state: 'Simulated AWS environment with an Auto Scaling group, a CloudWatch alarm, and EC2 instances. The alarm metric namespace or dimension is misconfigured, preventing it from detecting high CPU and triggering scale-out.'
+objectives:
+  - Inspect the CloudWatch alarm configuration and identify why it never enters ALARM state
+  - Fix the alarm metric namespace, dimension, or threshold so it correctly monitors ASG CPU utilization
+  - Verify the Auto Scaling policy is linked to the corrected alarm
+lab_mode: docker
+simulation_type: aws
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: aws cloudwatch describe-alarms --alarm-names <alarm-name> and check the Namespace and Dimensions fields match your ASG.'
+    cost: 10
+    order: 1
+  - content: 'The Namespace for ASG CPU should be AWS/EC2, and the Dimension should be AutoScalingGroupName, not InstanceId.'
+    cost: 15
+    order: 2
+  - content: 'Use aws autoscaling describe-policies to confirm the scaling policy ARN is attached to the corrected alarm.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

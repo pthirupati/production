@@ -1,0 +1,29 @@
+title: Terraform Running in Wrong Workspace
+slug: terraform-workspace-wrong
+difficulty: easy
+category: Terraform
+description: 'A developer runs terraform plan while in the default or production workspace instead of the staging workspace, risking changes to the wrong environment. Switch to the correct workspace before running any infrastructure commands.'
+initial_state: 'Simulated Terraform project with multiple workspaces (default, staging, production). The shell session is currently in the production workspace. Running terraform plan would target production resources instead of the intended staging environment.'
+objectives:
+  - Run terraform workspace show to identify the currently active workspace
+  - List available workspaces with terraform workspace list
+  - Switch to the staging workspace using terraform workspace select
+  - Run terraform plan and verify it targets the staging environment
+lab_mode: docker
+simulation_type: terraform
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'Run: terraform workspace show to see the current workspace. If it says "default" or "production", you are in the wrong one.'
+    cost: 10
+    order: 1
+  - content: 'Run: terraform workspace list to see all available workspaces, then: terraform workspace select staging to switch.'
+    cost: 15
+    order: 2
+  - content: 'If the staging workspace does not exist yet, create it: terraform workspace new staging. Then run terraform plan to confirm the correct state is used.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

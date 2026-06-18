@@ -1,0 +1,40 @@
+title: Windows Service Dependency Failed
+slug: win-service-dependency
+difficulty: easy
+category: Windows Server
+description: 'A Windows service is failing to start because one or more of its required
+  dependency services are stopped or failed. The error log shows a dependency service
+  failure. You must identify the dependency chain, start the required services in
+  the correct order, and verify the main service comes online.'
+initial_state: 'Windows Server 2022 with one or more services in a stopped or failed
+  state. The primary service cannot start because it depends on another service that
+  is not running. The Windows Event Log shows error 1068 or similar dependency errors.
+  Services may need to be started in a specific order.'
+objectives:
+  - Identify the failing service and its dependency chain
+  - Start the required dependency services in the correct order
+  - Confirm the primary service starts successfully
+lab_mode: docker
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'View service dependencies: Get-Service -Name <ServiceName> | Select
+      Name, Status, RequiredServices, DependentServices to map the full dependency
+      tree.'
+    cost: 10
+    order: 1
+  - content: 'Check service errors: Get-EventLog -LogName System -Source "Service
+      Control Manager" -Newest 20 | Where-Object {$_.EventID -in 7000,7001,7009,7023}
+      to find startup failures.'
+    cost: 15
+    order: 2
+  - content: 'Start services in dependency order: Start-Service -Name <DependencyService>
+      then Start-Service -Name <MainService>. Use -PassThru to see status or check
+      with Get-Service -Name <ServiceName> | Select Status.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

@@ -51,6 +51,21 @@ export const labApi = {
     return data
   },
 
+  async extendLab(sessionId) {
+    const { data } = await api.post(`/labs/${sessionId}/extend/`)
+    return data
+  },
+
+  async getAiReview(sessionId) {
+    const { data } = await api.get(`/labs/${sessionId}/ai-review/`)
+    return data
+  },
+
+  async generateAiReview(sessionId) {
+    const { data } = await api.post(`/labs/${sessionId}/ai-review/`)
+    return data
+  },
+
   async getActiveLabs(statusFilter) {
     const params = statusFilter ? `?status=${statusFilter}` : ''
     const { data } = await api.get(`/labs/active/${params}`, { silentError: true })

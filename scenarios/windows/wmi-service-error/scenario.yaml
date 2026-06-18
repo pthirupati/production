@@ -1,0 +1,40 @@
+title: WMI Service Errors Causing Monitoring Failures
+slug: win-wmi-error
+difficulty: medium
+category: Windows Server
+description: 'WMI (Windows Management Instrumentation) service errors are causing
+  monitoring agents and management tools to fail. WMI queries are timing out or returning
+  errors. The WMI repository may be corrupted and needs to be verified and rebuilt
+  to restore monitoring functionality.'
+initial_state: 'Windows Server 2022 with WMI service experiencing errors. Monitoring
+  agents, SCCM, or other management tools relying on WMI are failing. The WMI repository
+  may be corrupted. The Winmgmt service may be stopping unexpectedly or WMI queries
+  may be returning generic errors.'
+objectives:
+  - Identify WMI errors and verify the repository integrity
+  - Rebuild the WMI repository if corrupted
+  - Verify WMI queries succeed and monitoring agents reconnect
+lab_mode: docker
+simulation_type: windows
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check WMI status and test: Get-Service Winmgmt | Select Status then
+      test a basic WMI query: Get-WmiObject -Class Win32_ComputerSystem. Check Event
+      ID 10 in Application log for WMI errors.'
+    cost: 10
+    order: 1
+  - content: 'Verify WMI repository integrity: winmgmt /verifyrepository. If it returns
+      "WMI repository is inconsistent" then run: winmgmt /salvagerepository or winmgmt
+      /resetrepository (destructive - use as last resort).'
+    cost: 15
+    order: 2
+  - content: 'Rebuild WMI from scratch if salvage fails: Stop-Service Winmgmt -Force;
+      Rename-Item "$env:SystemRoot\System32\wbem\Repository" "Repository.old"; Start-Service
+      Winmgmt then mofcomp "%systemroot%\system32\wbem\*.mof" to re-register providers.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

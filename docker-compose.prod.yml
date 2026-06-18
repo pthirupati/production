@@ -101,6 +101,42 @@ services:
           memory: 512M
     restart: unless-stopped
 
+  # ── Scale-out: uncomment backend2 + update nginx upstream block to add second server ──
+  # backend2:
+  #   build: ./backend
+  #   container_name: fixitlab_backend2
+  #   env_file:
+  #     - .env.production
+  #   environment:
+  #     TERMINAL_MAX_WS_PER_USER: ${TERMINAL_MAX_WS_PER_USER:-20}
+  #   depends_on:
+  #     pgbouncer:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #     rabbitmq:
+  #       condition: service_healthy
+  #   volumes:
+  #     - static_volume:/app/staticfiles
+  #     - media_volume:/app/media
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - ./scripts:/scripts
+  #     - ./scenarios:/scenarios:ro
+  #   networks:
+  #     - fixitlab_net
+  #     - fixitlab_labs
+  #   healthcheck:
+  #     test: ["CMD", "python", "-c", "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/'); assert r.status==200"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 8
+  #     start_period: 180s
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 2G
+  #   restart: unless-stopped
+
   celery_worker:
     build: ./backend
     command: celery -A config worker -l info --concurrency=8 -Q default,notifications -n default@%h

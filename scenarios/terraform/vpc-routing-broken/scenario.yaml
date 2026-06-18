@@ -1,0 +1,29 @@
+title: EC2 Private Subnet Has No Internet Access
+slug: aws-vpc-routing-broken
+difficulty: hard
+category: AWS
+description: 'An EC2 instance in a private subnet cannot reach the internet to download packages or call external APIs. The route table is missing a route to a NAT Gateway, or the NAT Gateway itself is misconfigured or in a wrong subnet.'
+initial_state: 'Simulated AWS environment with a VPC containing public and private subnets, an Internet Gateway, and a NAT Gateway. The private subnet route table has no entry for 0.0.0.0/0 pointing to the NAT Gateway, so outbound internet traffic from private EC2 instances is dropped.'
+objectives:
+  - Identify the private subnet route table and confirm the missing 0.0.0.0/0 route
+  - Verify the NAT Gateway is in a public subnet and has an Elastic IP
+  - Add the missing route: destination 0.0.0.0/0, target the NAT Gateway ID
+  - Confirm the EC2 instance can reach the internet (e.g., curl an external URL)
+lab_mode: docker
+simulation_type: aws
+time_limit: 2400
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: aws ec2 describe-route-tables --filters Name=association.subnet-id,Values=<private-subnet-id> and look for a 0.0.0.0/0 entry. If absent, the route is missing.'
+    cost: 10
+    order: 1
+  - content: 'Find the NAT Gateway: aws ec2 describe-nat-gateways --filter Name=state,Values=available. It must be in a public subnet (one with an IGW route).'
+    cost: 15
+    order: 2
+  - content: 'Add the route: aws ec2 create-route --route-table-id <rtb-id> --destination-cidr-block 0.0.0.0/0 --nat-gateway-id <ngw-id>. Then test outbound connectivity from the instance.'
+    cost: 25
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

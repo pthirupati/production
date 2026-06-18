@@ -1,0 +1,38 @@
+title: Print Spooler Service Crashed
+slug: win-print-spooler
+difficulty: easy
+category: Windows Server
+description: 'The Windows Print Spooler service has crashed, preventing all printing
+  on the server and connected clients. The print queue may be stuck with corrupted
+  jobs that are preventing the spooler from restarting. You must clear the print queue,
+  restart the spooler service, and verify printing is restored.'
+initial_state: 'Windows Server 2022 acting as a print server. The Print Spooler service
+  is stopped or crashing on restart. The print queue has stuck or corrupted jobs.
+  Connected clients are unable to print and may be showing offline printer status.'
+objectives:
+  - Confirm the Print Spooler service is stopped and identify stuck print jobs
+  - Clear the print queue and remove corrupted spool files
+  - Restart the Print Spooler and verify printers come back online
+lab_mode: docker
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'Check spooler state: Get-Service -Name Spooler | Select Status and
+      list stuck jobs: Get-PrintJob -PrinterName * to see all queued jobs across printers.'
+    cost: 10
+    order: 1
+  - content: 'Stop spooler and clear queue: Stop-Service Spooler -Force; Remove-Item
+      "$env:SystemRoot\System32\spool\PRINTERS\*" -Force -Recurse; Start-Service
+      Spooler'
+    cost: 15
+    order: 2
+  - content: 'Set spooler to auto-restart on failure: Set-Service Spooler -StartupType
+      Automatic then configure recovery options in services.msc or via sc.exe failure
+      commands.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

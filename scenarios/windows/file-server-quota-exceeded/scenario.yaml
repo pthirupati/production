@@ -1,0 +1,37 @@
+title: File Server Quota Exceeded
+slug: win-file-quota-exceeded
+difficulty: easy
+category: Windows Server
+description: 'A file server quota has been exceeded, preventing users from saving
+  new files to their network share. Users are receiving "disk quota exceeded" errors.
+  You must either increase the quota limit, identify and clean up old or large files,
+  or configure quota templates appropriately.'
+initial_state: 'Windows Server 2022 with File Server Resource Manager (FSRM) installed.
+  User home directories or shared folders have quota limits applied. One or more quotas
+  are at or over the hard limit, blocking writes. Old or large files may be consuming
+  the available space.'
+objectives:
+  - Identify which quotas are exceeded using FSRM or PowerShell
+  - Increase the quota limit or remove old files to free space
+  - Verify users can successfully save files after the fix
+lab_mode: docker
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'List exceeded quotas: Get-FsrmQuota | Where-Object {$_.Usage -ge $_.Size}
+      | Select Path, Size, Usage to find over-limit directories.'
+    cost: 10
+    order: 1
+  - content: 'Increase quota for a path: Set-FsrmQuota -Path "D:\Users\username"
+      -Size 10GB or update the quota template used by the folder.'
+    cost: 15
+    order: 2
+  - content: 'Find large files to clean up: Get-ChildItem -Path "D:\Users" -Recurse
+      | Sort-Object Length -Descending | Select-Object -First 20 FullName, Length'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Low

@@ -1,0 +1,38 @@
+title: Hyper-V VM in Paused-Critical State
+slug: win-hyperv-vm-paused
+difficulty: medium
+category: Windows Server
+description: 'A Hyper-V virtual machine has entered a paused-critical state due to
+  insufficient disk space on the host. The VM is suspended and cannot run until the
+  storage issue is resolved. You must free storage space on the host and resume the
+  VM to restore service.'
+initial_state: 'Windows Server 2022 with Hyper-V role installed. One or more VMs
+  are in paused-critical state. The host volume containing VM files is critically
+  low on space. VM checkpoints, old VHDs, or other large files may be consuming excess
+  storage.'
+objectives:
+  - Identify the paused-critical VM and the root cause storage issue
+  - Free sufficient disk space on the host to allow the VM to resume
+  - Resume the VM and verify it returns to a running state
+lab_mode: docker
+simulation_type: windows
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'List VM states: Get-VM | Select Name, State, Status to identify paused-critical
+      VMs and Get-VMHardDiskDrive -VMName <VMName> | Select Path to find VHD locations.'
+    cost: 10
+    order: 1
+  - content: 'Check host disk space: Get-PSDrive -PSProvider FileSystem | Select
+      Name, Used, Free to identify the low-space volume. Remove old checkpoints: Get-VMSnapshot
+      -VMName <VMName> | Remove-VMSnapshot'
+    cost: 15
+    order: 2
+  - content: 'Resume the VM after freeing space: Resume-VM -Name <VMName> and verify
+      with Get-VM -Name <VMName> | Select State to confirm it returns to Running state.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

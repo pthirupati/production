@@ -35,7 +35,10 @@ export default function InterviewRoom() {
   const streamRef = useRef(null)
   const audioCtxRef = useRef(null)
   const rafRef = useRef(null)
+  const recorderRef = useRef(null)
+  const recChunksRef = useRef([])
   const [mediaStream, setMediaStream] = useState(null)
+  const [recordingReady, setRecordingReady] = useState(false)
   const [micLevel, setMicLevel] = useState(0)
   const { speak, listen, config: voiceConfig, resolveVoiceProfile } = useInterviewVoice()
 
@@ -301,6 +304,8 @@ export default function InterviewRoom() {
       if (data.first_question) msgs.push(data.first_question)
       setMessages(msgs)
       setStarted(true)
+      // Start recording once the interview is live
+      if (streamRef.current) startRecording(streamRef.current)
       const introText = data.intro?.content || ''
       if (introText) speak(introText, data.persona_voice_id)
       setTimeout(() => {
@@ -355,7 +360,42 @@ export default function InterviewRoom() {
     }
   }
 
+  const startRecording = (stream) => {
+    if (!stream || !window.MediaRecorder) return
+    try {
+      const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'audio/webm'].find(
+        t => MediaRecorder.isTypeSupported(t)
+      )
+      if (!mimeType) return
+      recChunksRef.current = []
+      const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 500_000 })
+      rec.ondataavailable = e => { if (e.data?.size > 0) recChunksRef.current.push(e.data) }
+      rec.onstop = () => {
+        if (recChunksRef.current.length > 0) setRecordingReady(true)
+      }
+      rec.start(5000) // collect in 5-second chunks
+      recorderRef.current = rec
+    } catch { /* MediaRecorder not supported — silently skip */ }
+  }
+
+  const stopRecording = () => {
+    try { recorderRef.current?.stop() } catch { /* ignore */ }
+  }
+
+  const downloadRecording = () => {
+    const chunks = recChunksRef.current
+    if (!chunks.length) return
+    const blob = new Blob(chunks, { type: chunks[0].type || 'video/webm' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `interview-${roundId}-recording.webm`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const endInterview = async () => {
+    stopRecording()
     stopMediaStream(streamRef.current)
     streamRef.current = null
     setMediaStream(null)
@@ -605,6 +645,13 @@ export default function InterviewRoom() {
           <button type="button" onClick={endInterview} className="p-2 rounded-lg bg-red-500/20 text-red-400" title="End round">
             <PhoneOff size={16} />
           </button>
+          {recordingReady && (
+            <button type="button" onClick={downloadRecording}
+              className="px-2 py-1 rounded-lg bg-accent-cyan/20 text-accent-cyan text-xs font-medium hover:bg-accent-cyan/30 transition-colors"
+              title="Download interview recording">
+              ⬇ Recording
+            </button>
+          )}
         </div>
       </header>
       {showReschedule && (

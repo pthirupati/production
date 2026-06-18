@@ -1,0 +1,37 @@
+title: DNS Zone Transfer Failed
+slug: win-dns-zone-transfer
+difficulty: medium
+category: Windows Server
+description: 'Secondary DNS server is failing to replicate zone data from the primary
+  DNS server. Zone transfer requests are being refused, resulting in outdated or missing
+  DNS records on the secondary. You must fix zone transfer permissions and zone settings
+  to restore replication.'
+initial_state: 'Windows Server 2022 with DNS Server role on both primary and secondary
+  DNS servers. Zone transfers are configured but failing. The secondary zone may be
+  showing stale data or failing to load. Transfer notifications or ACLs may be misconfigured.'
+objectives:
+  - Diagnose why the DNS zone transfer is failing between primary and secondary servers
+  - Fix zone transfer permissions, notification settings, and allowed transfer list
+  - Verify successful zone replication to the secondary DNS server
+lab_mode: docker
+simulation_type: windows
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check zone transfer settings on primary: Get-DnsServerZone -Name <ZoneName>
+      | Select ZoneType, SecondaryServers, TransferAllowed, Notify to see current config.'
+    cost: 10
+    order: 1
+  - content: 'Allow zone transfer to secondary: Set-DnsServerPrimaryZone -Name <ZoneName>
+      -SecondaryServers <SecondaryIP> -TransferAllowed [ToAllServers|ToZoneNameServers|ToAnyServer]'
+    cost: 15
+    order: 2
+  - content: 'Force zone transfer from secondary: Start-DnsServerZoneTransfer -Name
+      <ZoneName> or check event log: Get-EventLog -LogName DNS -Source DNS -Newest
+      20 for transfer error codes.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

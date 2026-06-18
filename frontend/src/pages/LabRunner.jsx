@@ -85,6 +85,9 @@ export default function LabRunner() {
   const [stopping, setStopping] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [terminalFullscreen, setTerminalFullscreen] = useState(false)
+  // Feature: Lab time extension
+  const [extending, setExtending] = useState(false)
+  const [extensionsUsed, setExtensionsUsed] = useState(0)
   // Feature: Ask AI coaching hint
   const [aiHint, setAiHint] = useState(null)
   const [aiHintLoading, setAiHintLoading] = useState(false)
@@ -101,6 +104,8 @@ export default function LabRunner() {
   const [closingIn, setClosingIn] = useState(null)
   const [terminalHost, setTerminalHost] = useState('primary')
   const [showSimWizard, setShowSimWizard] = useState(false)
+  const [mobileInput, setMobileInput] = useState('')
+  const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
   const [sshClientTarget, setSshClientTarget] = useState(null)
 
@@ -576,6 +581,25 @@ export default function LabRunner() {
       } else {
         toast.error(err.response?.data?.error || 'No more hints')
       }
+    }
+  }
+
+  const handleExtendLab = async () => {
+    if (extending) return
+    setExtending(true)
+    try {
+      const res = await labApi.extendLab(sessionId)
+      setExtensionsUsed(res.extensions_used)
+      startTimer(res.time_remaining, async () => {
+        await labApi.stopLab(sessionId)
+        clearSession()
+        navigate('/scenarios')
+      })
+      toast.success(`+30 min added. ${res.extensions_remaining} extension${res.extensions_remaining !== 1 ? 's' : ''} remaining today.`)
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Extension unavailable')
+    } finally {
+      setExtending(false)
     }
   }
 
@@ -1249,6 +1273,21 @@ export default function LabRunner() {
             )}
             Check
           </button>
+          {extensionsUsed < 2 && (
+            <button
+              onClick={handleExtendLab}
+              disabled={extending}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-accent-cyan/30 text-accent-cyan bg-accent-cyan/10 hover:bg-accent-cyan/20 disabled:opacity-50"
+              title={`Add 30 min (${2 - extensionsUsed} left today)`}
+            >
+              {extending ? (
+                <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Clock size={12} />
+              )}
+              +30m
+            </button>
+          )}
           <button
             onClick={() => setShowStopConfirm(true)}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-red-500/30 text-red-400 bg-red-500/10 hover:bg-red-500/20"
@@ -1317,6 +1356,36 @@ export default function LabRunner() {
         </div>
       </div>
 
+      {/* Mobile: floating terminal input bar */}
+      {showMobileInput && (
+        <div className="sm:hidden fixed bottom-14 inset-x-0 bg-surface-950/95 border-t border-accent-cyan/30 px-3 py-2 flex gap-2 z-40 backdrop-blur-sm">
+          <input
+            autoFocus
+            type="text"
+            value={mobileInput}
+            onChange={e => setMobileInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                const term = terminalRefs.current[terminalHost]
+                if (term?.sendCommand) { term.sendCommand(mobileInput); setMobileInput('') }
+              }
+            }}
+            placeholder="Type command and press Enter…"
+            className="flex-1 bg-surface-800 text-white text-sm rounded px-3 py-1.5 border border-surface-600 focus:border-accent-cyan focus:outline-none font-mono"
+          />
+          <button
+            onClick={() => {
+              const term = terminalRefs.current[terminalHost]
+              if (term?.sendCommand) { term.sendCommand(mobileInput); setMobileInput('') }
+            }}
+            className="px-3 py-1.5 bg-accent-cyan text-surface-950 rounded text-sm font-medium"
+          >Run</button>
+          <button onClick={() => navigator.clipboard.readText().then(t => setMobileInput(prev => prev + t)).catch(() => {})}
+            className="px-2 py-1.5 bg-surface-700 rounded text-surface-300 text-sm">Paste</button>
+          <button onClick={() => setShowMobileInput(false)} className="p-1.5 text-surface-400">✕</button>
+        </div>
+      )}
+
       {/* Mobile: floating action bar */}
       <div className="sm:hidden fixed bottom-0 inset-x-0 bg-surface-900 border-t border-surface-700/50 px-2 py-2 flex items-center justify-around z-30 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <LabTimerBadge variant="mobile-float" />
@@ -1346,8 +1415,9 @@ export default function LabRunner() {
           className="p-2 text-surface-400 hover:text-accent-red" aria-label="Stop lab">
           <StopCircle size={20} />
         </button>
-        <button onClick={() => setShowShortcuts(true)}
-          className="p-2 text-surface-400 hover:text-white" aria-label="Keyboard shortcuts">
+        <button onClick={() => setShowMobileInput(p => !p)}
+          className={`p-2 ${showMobileInput ? 'text-accent-cyan' : 'text-surface-400 hover:text-white'}`}
+          aria-label="Terminal input">
           <Keyboard size={20} />
         </button>
       </div>

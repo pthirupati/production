@@ -1,0 +1,39 @@
+title: SMB Share Access Denied
+slug: win-smb-access-denied
+difficulty: medium
+category: Windows Server
+description: 'Users are receiving access denied errors when connecting to an SMB network
+  share, even though their NTFS permissions appear correct. The problem lies with
+  the share-level permissions being more restrictive than the NTFS permissions. You
+  must audit and fix both share permissions and NTFS permissions to restore access.'
+initial_state: 'Windows Server 2022 file server with SMB shares configured. Users
+  with correct NTFS permissions are being denied access when connecting via UNC path.
+  The share-level permissions (not NTFS) are likely set to Everyone Read-only or
+  missing the required user groups entirely.'
+objectives:
+  - Identify the mismatch between share permissions and NTFS permissions
+  - Fix share-level permissions to grant the appropriate groups access
+  - Verify SMB connectivity and file access for affected users
+lab_mode: docker
+simulation_type: windows
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'View share permissions: Get-SmbShareAccess -Name <ShareName> to see
+      current share ACL. Compare with NTFS: Get-Acl -Path <LocalPath> | Format-List'
+    cost: 10
+    order: 1
+  - content: 'Grant share access to a group: Grant-SmbShareAccess -Name <ShareName>
+      -AccountName "Domain\GroupName" -AccessRight Full -Force to set share-level
+      permission.'
+    cost: 15
+    order: 2
+  - content: 'Effective access is the intersection of share and NTFS permissions.
+      Use: Get-SmbShareAccess, Get-Acl, and the "Effective Access" tab in Advanced
+      Security Settings to confirm the combined result for a specific user.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

@@ -1,0 +1,28 @@
+title: EKS Worker Node Fails to Join Cluster
+slug: aws-eks-node-not-joining
+difficulty: hard
+category: AWS
+description: 'EKS worker nodes in a managed node group are not joining the cluster. The nodes launch but remain in a NotReady state because the node group IAM role is missing the required policies or the aws-auth ConfigMap does not map the role correctly.'
+initial_state: 'Simulated AWS environment with an EKS cluster and a managed node group. The node group IAM role lacks the AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy, or AmazonEC2ContainerRegistryReadOnly policies, or the role ARN is absent from the aws-auth ConfigMap.'
+objectives:
+  - Inspect the node group IAM role and identify the missing managed policies
+  - Attach the required policies to the node group IAM role
+  - Verify the aws-auth ConfigMap includes the node role ARN and nodes join the cluster
+lab_mode: docker
+simulation_type: aws
+time_limit: 2400
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: kubectl get nodes to see NotReady nodes, then: aws eks describe-nodegroup --cluster-name <cluster> --nodegroup-name <ng> to inspect the IAM role.'
+    cost: 10
+    order: 1
+  - content: 'Attach AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy, and AmazonEC2ContainerRegistryReadOnly to the node group role using aws iam attach-role-policy.'
+    cost: 15
+    order: 2
+  - content: 'Check the aws-auth ConfigMap with: kubectl -n kube-system get configmap aws-auth -o yaml. The node role ARN must appear under mapRoles.'
+    cost: 25
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

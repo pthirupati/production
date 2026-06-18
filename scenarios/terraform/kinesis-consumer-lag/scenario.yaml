@@ -1,0 +1,28 @@
+title: Kinesis Consumer Falling Behind
+slug: aws-kinesis-consumer-lag
+difficulty: hard
+category: AWS
+description: 'A Kinesis Data Stream consumer is accumulating significant lag — the MillisBehindLatest metric is growing because the stream has too few shards and the consumer cannot process records fast enough to keep up with the producer throughput.'
+initial_state: 'Simulated AWS environment with a Kinesis Data Stream configured with 1 shard and a Lambda consumer. Producer throughput exceeds the single shard capacity of 1 MB/s, causing records to pile up and MillisBehindLatest to increase continuously.'
+objectives:
+  - Identify the consumer lag using CloudWatch MillisBehindLatest and GetRecords.IteratorAgeMilliseconds metrics
+  - Increase the shard count on the Kinesis stream to meet throughput requirements
+  - Optionally increase Lambda concurrency or batch size to improve consumer throughput
+lab_mode: docker
+simulation_type: aws
+time_limit: 2400
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check lag with: aws cloudwatch get-metric-statistics --namespace AWS/Kinesis --metric-name GetRecords.IteratorAgeMilliseconds --dimensions Name=StreamName,Value=<stream>'
+    cost: 10
+    order: 1
+  - content: 'Use aws kinesis update-shard-count --stream-name <name> --target-shard-count <n> --scaling-type UNIFORM_SCALING to increase shards. Each shard handles 1 MB/s ingest and 2 MB/s reads.'
+    cost: 20
+    order: 2
+  - content: 'After resharding, increase the Lambda event source mapping batch size and parallelization factor to scale consumer throughput proportionally.'
+    cost: 25
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

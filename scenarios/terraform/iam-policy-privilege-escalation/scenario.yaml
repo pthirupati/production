@@ -1,0 +1,28 @@
+title: IAM Privilege Escalation via iam:PassRole
+slug: aws-iam-privilege-escalation
+difficulty: hard
+category: AWS
+description: 'An IAM user has the iam:PassRole permission combined with ec2:RunInstances, allowing them to launch EC2 instances with any IAM role — including admin roles — and escalate their effective privileges beyond what is intended.'
+initial_state: 'Simulated AWS environment where an IAM user policy grants iam:PassRole with a wildcard resource alongside ec2:RunInstances. This allows the user to attach high-privilege roles to instances and gain indirect admin access.'
+objectives:
+  - Identify the dangerous iam:PassRole + ec2:RunInstances combination in the IAM policy
+  - Remove or scope down the iam:PassRole permission to restrict it to specific safe roles only
+  - Confirm the user can no longer pass arbitrary roles to EC2 instances
+lab_mode: docker
+simulation_type: aws
+time_limit: 2400
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: aws iam get-user-policy or list-attached-user-policies to retrieve the policy document and look for iam:PassRole with Resource: "*".'
+    cost: 10
+    order: 1
+  - content: 'Scope iam:PassRole to a specific role ARN resource condition, e.g. arn:aws:iam::*:role/safe-instance-role, instead of wildcard.'
+    cost: 20
+    order: 2
+  - content: 'Use the IAM Access Analyzer to detect privilege escalation paths. Policies granting iam:PassRole + ec2:RunInstances together are flagged as high-risk.'
+    cost: 25
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Critical

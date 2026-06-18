@@ -1,0 +1,7 @@
+name: Windows Server
+slug: windows
+icon: monitor
+color: blue
+order: 23
+is_active: true
+description: "Windows Server, Active Directory, IIS, and enterprise administration"

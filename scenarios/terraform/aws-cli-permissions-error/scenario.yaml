@@ -1,0 +1,28 @@
+title: AWS CLI AccessDenied Error
+slug: aws-cli-permissions-error
+difficulty: easy
+category: AWS
+description: 'An IAM user receives an AccessDenied error when running AWS CLI commands against S3 and EC2. The user exists but is missing the required IAM policy permissions needed to perform the intended operations.'
+initial_state: 'Simulated AWS environment with an IAM user configured in the CLI profile. The user has no inline or managed policies granting the necessary actions, causing all resource API calls to fail with AccessDenied.'
+objectives:
+  - Identify which IAM actions are being denied using the CLI error output or IAM policy simulator
+  - Attach or create an IAM policy granting the minimum required permissions
+  - Confirm the CLI commands succeed after the policy change
+lab_mode: docker
+simulation_type: aws
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'Run: aws iam list-attached-user-policies --user-name <user> and aws iam list-user-policies --user-name <user> to see current permissions.'
+    cost: 10
+    order: 1
+  - content: 'Use aws iam simulate-principal-policy to test specific actions before attaching a policy.'
+    cost: 15
+    order: 2
+  - content: 'Attach the AmazonS3ReadOnlyAccess and AmazonEC2ReadOnlyAccess managed policies as a starting point, then scope down to least privilege.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Low

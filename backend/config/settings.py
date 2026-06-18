@@ -345,6 +345,8 @@ CELERY_RESULT_BACKEND = f"redis://{_celery_redis_auth}{_celery_redis_host}:{_cel
 CELERY_RESULT_EXPIRES = 3600  # Expire results after 1 hour
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_TASK_MAX_RETRIES = 3
+CELERY_TASK_RETRY_BACKOFF = True        # Exponential backoff between retries
+CELERY_TASK_RETRY_BACKOFF_MAX = 600     # Cap backoff at 10 minutes
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     "max_retries": 3,
     "interval_start": 0,

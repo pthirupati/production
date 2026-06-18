@@ -1,0 +1,29 @@
+title: Terraform Remote State Corrupted
+slug: terraform-state-backend-corrupt
+difficulty: hard
+category: Terraform
+description: 'The Terraform remote state file in S3 is corrupted — it contains invalid JSON or was partially overwritten. All terraform commands fail with state parsing errors. Recover the state from an S3 versioned backup.'
+initial_state: 'Simulated environment with a Terraform S3 backend where S3 versioning is enabled. The current state file version is corrupted (truncated JSON). Previous valid versions exist in S3 object version history and can be restored.'
+objectives:
+  - Identify the corruption by running terraform state list and observing the parse error
+  - List S3 object versions for the state file and identify the last known-good version
+  - Restore the previous version as the current state object in S3
+  - Run terraform state list to confirm the state is readable again
+lab_mode: docker
+simulation_type: terraform
+time_limit: 2400
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: aws s3api list-object-versions --bucket <bucket> --prefix <state-key> to list all versions of the state file with their VersionIds and timestamps.'
+    cost: 10
+    order: 1
+  - content: 'Download the last known-good version: aws s3api get-object --bucket <bucket> --key <state-key> --version-id <id> terraform.tfstate.bak and validate the JSON.'
+    cost: 20
+    order: 2
+  - content: 'Restore by copying the good version back: aws s3 cp terraform.tfstate.bak s3://<bucket>/<state-key>. Then run terraform state list to confirm recovery.'
+    cost: 25
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Critical

@@ -1,0 +1,28 @@
+title: CloudFront Origin Misconfigured
+slug: aws-cloudfront-origin-misconfigured
+difficulty: medium
+category: AWS
+description: 'A CloudFront distribution is returning 502 Bad Gateway errors to users. The origin domain name is pointing to an incorrect or non-existent endpoint, causing CloudFront to fail when attempting to fetch content from the origin.'
+initial_state: 'Simulated AWS environment with a CloudFront distribution configured. The origin domain is set to an invalid ALB or S3 endpoint, resulting in 502 errors for all requests through the CDN.'
+objectives:
+  - Inspect the CloudFront distribution origin configuration and identify the incorrect domain
+  - Update the origin domain name to the correct ALB DNS name or S3 bucket endpoint
+  - Verify the distribution returns 200 responses after the fix
+lab_mode: docker
+simulation_type: aws
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: aws cloudfront get-distribution --id <dist-id> and inspect the Origins.Items[].DomainName field.'
+    cost: 10
+    order: 1
+  - content: 'Compare the origin domain against your ALB DNS name from: aws elbv2 describe-load-balancers --query LoadBalancers[].DNSName'
+    cost: 15
+    order: 2
+  - content: 'Use aws cloudfront update-distribution with the corrected origin domain and increment the CallerReference to apply the change.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

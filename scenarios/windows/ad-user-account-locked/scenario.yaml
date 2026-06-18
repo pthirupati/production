@@ -1,0 +1,36 @@
+title: AD User Account Locked
+slug: win-ad-user-locked
+difficulty: easy
+category: Windows Server
+description: 'A user account has been locked out of Active Directory after multiple failed
+  login attempts. The user cannot authenticate to any domain-joined resource. You
+  must identify the locked account, unlock it via PowerShell, and review the account
+  lockout policy to prevent recurrence.'
+initial_state: 'Windows Server 2022 with Active Directory Domain Services installed.
+  One or more user accounts are locked out due to failed login attempts. The lockout
+  policy is configured but may be overly aggressive.'
+objectives:
+  - Identify which user accounts are locked out in Active Directory
+  - Unlock the affected account(s) using PowerShell
+  - Review and adjust the account lockout policy appropriately
+lab_mode: docker
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'Find locked accounts: Get-ADUser -Filter {LockedOut -eq $true} -Properties
+      LockedOut, LastLogonDate | Select Name, LockedOut, LastLogonDate'
+    cost: 10
+    order: 1
+  - content: 'Unlock a specific account: Unlock-ADAccount -Identity "username" or
+      unlock all: Get-ADUser -Filter {LockedOut -eq $true} | Unlock-ADAccount'
+    cost: 15
+    order: 2
+  - content: 'View lockout policy: Get-ADDefaultDomainPasswordPolicy | Select LockoutDuration,
+      LockoutObservationWindow, LockoutThreshold'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

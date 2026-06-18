@@ -1,0 +1,28 @@
+title: ECR Image HIGH Severity Vulnerabilities
+slug: aws-ecr-image-vulnerabilities
+difficulty: medium
+category: AWS
+description: 'An ECR image scan reports HIGH severity CVEs in the base image, and the deployment pipeline is blocked by a policy that rejects images with HIGH or CRITICAL findings. Remediate by updating the base image to a patched version.'
+initial_state: 'Simulated AWS environment with an ECR repository containing an image built on an outdated base image (e.g., ubuntu:18.04). Image scanning is enabled and reports multiple HIGH severity vulnerabilities, causing downstream deployment checks to fail.'
+objectives:
+  - Run an ECR image scan and review the HIGH severity CVE findings
+  - Update the Dockerfile base image to a patched version and push a new image to ECR
+  - Confirm the new image scan shows no HIGH or CRITICAL findings
+lab_mode: docker
+simulation_type: aws
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: aws ecr describe-image-scan-findings --repository-name <repo> --image-id imageTag=latest to view CVEs.'
+    cost: 10
+    order: 1
+  - content: 'Switch the base image FROM line in the Dockerfile to ubuntu:22.04 or the latest minimal distroless image to eliminate known CVEs.'
+    cost: 15
+    order: 2
+  - content: 'After pushing the new image, trigger a scan with: aws ecr start-image-scan --repository-name <repo> --image-id imageTag=latest and recheck findings.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

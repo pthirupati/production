@@ -31,6 +31,8 @@ from .views import (
     ProjectStartView,
     ProjectTaskUpdateView,
     ProjectJiraBotView,
+    ExtendLabView,
+    LabAiReviewView,
 )
 
 urlpatterns = [
@@ -60,6 +62,8 @@ urlpatterns = [
     path("labs/<uuid:session_id>/replay/", SessionReplayView.as_view()),
     path("labs/<uuid:session_id>/solution/", ExpiredSessionSolutionView.as_view()),
     path("labs/<uuid:session_id>/status/", LabSessionStatusView.as_view()),
+    path("labs/<uuid:session_id>/extend/", ExtendLabView.as_view()),
+    path("labs/<uuid:session_id>/ai-review/", LabAiReviewView.as_view()),
     path("labs/active/", ActiveLabsView.as_view()),
 
     # User

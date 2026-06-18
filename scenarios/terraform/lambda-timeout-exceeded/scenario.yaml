@@ -1,0 +1,28 @@
+title: Lambda Function Timing Out
+slug: aws-lambda-timeout
+difficulty: medium
+category: AWS
+description: 'A Lambda function is timing out when processing large payloads. The function timeout is set to the default 3 seconds, which is insufficient for the workload, and the memory allocation is too low, slowing down execution further.'
+initial_state: 'Simulated AWS environment with a Lambda function configured with a 3-second timeout and 128 MB memory. Processing a large S3 object or complex computation consistently exceeds the timeout, resulting in Task timed out errors in CloudWatch Logs.'
+objectives:
+  - Review the Lambda configuration and CloudWatch Logs to confirm timeout errors
+  - Increase the function timeout to an appropriate value (e.g., 60 seconds)
+  - Increase memory allocation to improve CPU proportioning and reduce execution time
+lab_mode: docker
+simulation_type: aws
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: aws lambda get-function-configuration --function-name <name> to see current Timeout and MemorySize settings.'
+    cost: 10
+    order: 1
+  - content: 'Use aws lambda update-function-configuration --function-name <name> --timeout 60 --memory-size 512 to increase both values.'
+    cost: 15
+    order: 2
+  - content: 'Lambda CPU scales proportionally with memory. Doubling memory from 128 to 256 MB roughly doubles CPU allocation and can cut execution time significantly.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

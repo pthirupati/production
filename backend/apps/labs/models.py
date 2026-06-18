@@ -128,6 +128,20 @@ class LabSession(models.Model):
         help_text="Persisted in-memory simulation engine state for worker restarts",
     )
 
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Arbitrary session metadata (e.g. ai_review generated post-lab)",
+    )
+    extensions_used = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Free self-service time extensions used today (quota: 2/day)",
+    )
+    last_extension_date = models.DateField(
+        null=True, blank=True,
+        help_text="Date the last self-service extension was granted",
+    )
+
     class Meta:
         ordering = ["-started_at"]
         indexes = [

@@ -1,0 +1,29 @@
+title: Terraform Import and Drift Reconciliation
+slug: terraform-import-drift
+difficulty: medium
+category: Terraform
+description: 'An existing AWS resource was created manually and is not tracked in Terraform state. Running terraform plan shows it will be created as a duplicate or causes drift conflicts. Import the resource into state and reconcile any configuration differences.'
+initial_state: 'Simulated environment where an S3 bucket or EC2 security group was created outside of Terraform. The resource exists in AWS but is absent from the Terraform state file, causing plan to show a conflicting create action.'
+objectives:
+  - Identify the existing AWS resource that is absent from Terraform state
+  - Write the matching resource block in the Terraform configuration
+  - Run terraform import to bring the resource into state without recreating it
+  - Run terraform plan to confirm zero drift after import
+lab_mode: docker
+simulation_type: terraform
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: terraform state list to see all tracked resources, then compare against actual AWS resources to find what is missing.'
+    cost: 10
+    order: 1
+  - content: 'Add the resource block to your .tf file matching the existing resource configuration, then run: terraform import <resource_type>.<name> <aws_id>'
+    cost: 15
+    order: 2
+  - content: 'After import, run terraform plan. If there is drift (non-empty plan), update the .tf configuration to match the actual resource attributes until plan shows "No changes."'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

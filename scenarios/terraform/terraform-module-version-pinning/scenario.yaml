@@ -1,0 +1,28 @@
+title: Terraform Module Using Unpinned Version
+slug: terraform-module-version-pinning
+difficulty: easy
+category: Terraform
+description: 'A Terraform module source is referencing a Git repository or Terraform Registry module without a pinned version, causing inconsistent deployments as the upstream module changes. Pin the module to a specific version or tag.'
+initial_state: 'Simulated Terraform project where a module block uses source without a version constraint, or uses a floating ref like ?ref=main. Different team members get different infrastructure depending on when they run terraform init.'
+objectives:
+  - Identify the unpinned module source reference in the Terraform configuration
+  - Add a version constraint (Registry module) or a specific Git tag ref to the source
+  - Run terraform init -upgrade to lock the pinned version into .terraform.lock.hcl
+lab_mode: docker
+simulation_type: terraform
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'Look for module blocks in your .tf files. A Registry module should have a version = "x.y.z" argument. A Git source should use ?ref=v1.2.3.'
+    cost: 10
+    order: 1
+  - content: 'Check the Terraform Registry (registry.terraform.io) or the module Git repo for the latest stable release tag to use as the pinned version.'
+    cost: 15
+    order: 2
+  - content: 'After pinning, run: terraform init -upgrade and commit the updated .terraform.lock.hcl so all team members use the same module version.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Low

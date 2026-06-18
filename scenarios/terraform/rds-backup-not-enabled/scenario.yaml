@@ -1,0 +1,27 @@
+title: RDS Automated Backups Disabled
+slug: aws-rds-backup-not-enabled
+difficulty: easy
+category: AWS
+description: 'An RDS instance has automated backups disabled (BackupRetentionPeriod set to 0), meaning the database has no automated snapshots and cannot be recovered to a point in time. Enable backup retention to meet RPO requirements.'
+initial_state: 'Simulated AWS environment with an RDS MySQL instance where BackupRetentionPeriod is 0. No automated snapshots are being taken, leaving the database unprotected against accidental data loss or corruption.'
+objectives:
+  - Identify the RDS instance with backups disabled using the AWS CLI
+  - Enable automated backups by setting the BackupRetentionPeriod to at least 7 days
+lab_mode: docker
+simulation_type: aws
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'Run: aws rds describe-db-instances --query "DBInstances[].[DBInstanceIdentifier,BackupRetentionPeriod]" to find instances with retention 0.'
+    cost: 10
+    order: 1
+  - content: 'Use aws rds modify-db-instance --db-instance-identifier <id> --backup-retention-period 7 --apply-immediately to enable backups.'
+    cost: 15
+    order: 2
+  - content: 'Set --preferred-backup-window to a low-traffic time (e.g., "03:00-04:00") when enabling backups to minimize impact.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

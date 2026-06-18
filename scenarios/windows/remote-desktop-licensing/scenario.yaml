@@ -1,0 +1,39 @@
+title: Remote Desktop Licensing Expired
+slug: win-rdp-licensing
+difficulty: medium
+category: Windows Server
+description: 'RDP clients are unable to connect to a Remote Desktop Session Host because
+  the RD Licensing server has expired CALs or is unreachable. Users receive a licensing
+  error on connection. The license server configuration must be corrected and CALs
+  verified to restore RDP access.'
+initial_state: 'Windows Server 2022 with Remote Desktop Services (RDS) role installed.
+  The RD Session Host is configured but clients are receiving "Remote Session was
+  disconnected because there are no Remote Desktop License Servers available" or similar
+  CAL errors. The licensing server may be unconfigured, unreachable, or out of CALs.'
+objectives:
+  - Identify the RD licensing error and current license server configuration
+  - Fix the license server configuration or activate the correct CAL type
+  - Verify RDP clients can successfully connect after the licensing fix
+lab_mode: docker
+simulation_type: windows
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check licensing config: Get-RDLicenseConfiguration and Get-RDActivationStatus
+      to see license server and activation state. Also check Event ID 1128 in the
+      System log.'
+    cost: 10
+    order: 1
+  - content: 'Set license server for the RD Session Host: Set-RDLicenseConfiguration
+      -LicenseServer <ServerName> -Mode PerUser or PerDevice -ConnectionBroker <BrokerName>'
+    cost: 15
+    order: 2
+  - content: 'If within the 120-day grace period, you can temporarily set the registry
+      override: HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\RCM\GracePeriod
+      to extend access while resolving licensing.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

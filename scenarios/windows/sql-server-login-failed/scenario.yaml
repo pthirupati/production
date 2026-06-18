@@ -1,0 +1,40 @@
+title: SQL Server Login Failed (Error 18456)
+slug: win-sql-login-failed
+difficulty: medium
+category: Windows Server
+description: 'SQL Server is rejecting logins with error 18456, indicating authentication
+  failure. The server may be in Windows Authentication Only mode while application
+  accounts use SQL authentication, or SQL user accounts may be unmapped or disabled.
+  You must fix the authentication mode and user mapping to restore database connectivity.'
+initial_state: 'Windows Server 2022 running SQL Server 2019 or 2022. Applications
+  or users are receiving error 18456 on login. The SQL Server may be configured for
+  Windows Authentication only, blocking SQL logins. SQL Server logins may be disabled,
+  have incorrect passwords, or be unmapped from database users.'
+objectives:
+  - Identify the 18456 error state to determine the specific authentication failure
+  - Enable Mixed Mode authentication and fix SQL login or user mapping as needed
+  - Verify applications can successfully authenticate after the fix
+lab_mode: docker
+simulation_type: windows
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check error state for 18456 in SQL Error Log: Get-Content "C:\Program
+      Files\Microsoft SQL Server\*\MSSQL\Log\ERRORLOG" | Select-String "18456". The
+      state number indicates the specific failure reason.'
+    cost: 10
+    order: 1
+  - content: 'Enable Mixed Mode auth via T-SQL: EXEC xp_instance_regwrite N''HKEY_LOCAL_MACHINE'',
+      N''Software\Microsoft\MSSQLServer\MSSQLServer'', N''LoginMode'', REG_DWORD,
+      2; then restart SQL Server service.'
+    cost: 15
+    order: 2
+  - content: 'Fix SQL login or user mapping: ALTER LOGIN [username] ENABLE; ALTER
+      LOGIN [username] WITH PASSWORD = ''NewPassword''; and USE [dbname]; ALTER USER
+      [username] WITH LOGIN = [username]; to re-map orphaned users.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

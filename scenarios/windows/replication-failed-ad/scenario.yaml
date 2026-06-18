@@ -1,0 +1,41 @@
+title: Active Directory Replication Failed
+slug: win-ad-replication-fail
+difficulty: hard
+category: Windows Server
+description: 'Active Directory replication is failing between domain controllers,
+  causing inconsistent directory data across the domain. Users may experience authentication
+  failures or see different data depending on which DC they hit. You must diagnose
+  the replication errors, identify the root cause, and repair the replication topology.'
+initial_state: 'Windows Server 2022 domain with multiple domain controllers. AD replication
+  is failing with errors visible in repadmin and the Directory Service event log.
+  Possible causes include network connectivity, DNS misconfiguration, USN rollback,
+  lingering objects, or a failed domain controller.'
+objectives:
+  - Run repadmin diagnostics to identify all replication failures and error codes
+  - Fix the underlying cause (network, DNS, lingering objects, or metadata cleanup)
+  - Verify all domain controllers are replicating successfully
+lab_mode: docker
+simulation_type: windows
+time_limit: 2400
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run full replication diagnostic: repadmin /replsummary and repadmin
+      /showrepl to get per-DC replication status and error codes. Check Event IDs
+      1311, 1388, 1988 in the Directory Service log.'
+    cost: 10
+    order: 1
+  - content: 'Force replication and check results: repadmin /syncall /AdeP and repadmin
+      /showrepl after sync. For DNS issues: dcdiag /test:dns /v to identify DNS problems
+      affecting AD replication.'
+    cost: 15
+    order: 2
+  - content: 'Remove lingering objects if present: repadmin /removelingeringobjects
+      <DestDCName> <SourceDCGUID> <NC> /advisory_mode first, then without advisory_mode
+      after confirming. For metadata cleanup: ntdsutil "metadata cleanup" to remove
+      failed DC references.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Critical

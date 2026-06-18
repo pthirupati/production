@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { labApi } from '../api/labs'
-import { Play, Pause, RotateCcw, Clock, Terminal, ChevronLeft, FastForward } from 'lucide-react'
+import { Play, Pause, RotateCcw, Clock, Terminal, ChevronLeft, FastForward, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function SessionReplay() {
@@ -12,7 +12,9 @@ export default function SessionReplay() {
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [speed, setSpeed] = useState(1)
-  const [tab, setTab] = useState('replay') // replay | commands
+  const [tab, setTab] = useState('replay') // replay | commands | review
+  const [aiReview, setAiReview] = useState(null)
+  const [reviewLoading, setReviewLoading] = useState(false)
 
   const terminalRef = useRef(null)
   const outputRef = useRef('')
@@ -28,6 +30,24 @@ export default function SessionReplay() {
     }).catch(() => toast.error('Failed to load session data'))
       .finally(() => setLoading(false))
   }, [sessionId])
+
+  const handleLoadReview = async () => {
+    if (aiReview) return
+    setReviewLoading(true)
+    try {
+      const res = await labApi.getAiReview(sessionId)
+      if (res.review) {
+        setAiReview(res.review)
+      } else {
+        const generated = await labApi.generateAiReview(sessionId)
+        setAiReview(generated.review)
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Review unavailable for this session')
+    } finally {
+      setReviewLoading(false)
+    }
+  }
 
   const renderUpToTime = useCallback((targetTime) => {
     if (!replay?.events || !terminalRef.current) return
@@ -131,10 +151,11 @@ export default function SessionReplay() {
         {[
           { key: 'replay', label: 'Terminal Replay', icon: Play },
           { key: 'commands', label: 'Command Log', icon: Terminal },
+          { key: 'review', label: 'AI Review', icon: Sparkles },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => { setTab(key); if (key === 'review') handleLoadReview() }}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               tab === key ? 'bg-surface-700 text-white' : 'text-surface-500 hover:text-surface-300'
             }`}
@@ -237,6 +258,72 @@ export default function SessionReplay() {
             <div className="p-12 text-center">
               <Terminal size={32} className="mx-auto text-surface-700 mb-3" />
               <p className="text-surface-500">No command history recorded for this session</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* AI Review tab */}
+      {tab === 'review' && (
+        <div className="glass-card p-6">
+          {reviewLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <div className="w-8 h-8 border-2 border-accent-cyan/30 border-t-accent-cyan rounded-full animate-spin" />
+              <p className="text-surface-400 text-sm">Analyzing your session…</p>
+            </div>
+          ) : aiReview ? (
+            <div className="space-y-6">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-accent-cyan" />
+                <h3 className="text-white font-semibold">AI Performance Review</h3>
+              </div>
+              <p className="text-surface-300 text-sm bg-surface-800/50 rounded-xl px-4 py-3 border border-surface-700">{aiReview.overall}</p>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Commands', value: aiReview.stats.total_commands },
+                  { label: 'Errors', value: aiReview.stats.error_commands },
+                  { label: 'Hints Used', value: aiReview.stats.hints_used },
+                  { label: 'Solved', value: aiReview.stats.solved ? 'Yes' : 'No' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-surface-800/50 rounded-xl p-3 text-center border border-surface-700">
+                    <div className="text-lg font-bold text-white">{value}</div>
+                    <div className="text-xs text-surface-500 mt-0.5">{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-accent-green text-sm font-medium mb-2 flex items-center gap-1.5">
+                    <CheckCircle2 size={14} /> Strengths
+                  </h4>
+                  <ul className="space-y-1.5">
+                    {aiReview.strengths.map((s, i) => (
+                      <li key={i} className="text-sm text-surface-300 flex items-start gap-2">
+                        <span className="text-accent-green mt-0.5 shrink-0">·</span> {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="text-accent-amber text-sm font-medium mb-2 flex items-center gap-1.5">
+                    <AlertCircle size={14} /> Areas to Improve
+                  </h4>
+                  <ul className="space-y-1.5">
+                    {aiReview.improvements.map((s, i) => (
+                      <li key={i} className="text-sm text-surface-300 flex items-start gap-2">
+                        <span className="text-accent-amber mt-0.5 shrink-0">·</span> {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-12 text-center">
+              <Sparkles size={32} className="mx-auto text-surface-700 mb-3" />
+              <p className="text-surface-500">Could not load review for this session.</p>
             </div>
           )}
         </div>

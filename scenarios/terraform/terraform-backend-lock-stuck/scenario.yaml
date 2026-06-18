@@ -1,0 +1,28 @@
+title: Terraform State Lock Stuck in DynamoDB
+slug: terraform-backend-lock-stuck
+difficulty: medium
+category: Terraform
+description: 'Terraform operations are failing with "Error acquiring the state lock" because a previous run crashed and left a stale lock entry in DynamoDB. The lock must be force-unlocked safely so the team can resume infrastructure changes.'
+initial_state: 'Simulated environment with a Terraform S3 backend and DynamoDB locking table. A stale lock entry exists in DynamoDB from a previous interrupted plan. All terraform plan/apply commands fail immediately with a state lock error.'
+objectives:
+  - Identify the stale DynamoDB lock entry and retrieve the LockID from the error message
+  - Verify no other Terraform process is actively running before force-unlocking
+  - Run terraform force-unlock <LockID> to release the stale lock
+lab_mode: docker
+simulation_type: terraform
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: terraform plan to see the full lock error including the LockID. Copy the LockID from the error output.'
+    cost: 10
+    order: 1
+  - content: 'Verify the lock in DynamoDB: aws dynamodb get-item --table-name <lock-table> --key "{\"LockID\":{\"S\":\"<path>\"}}" to confirm it is stale.'
+    cost: 15
+    order: 2
+  - content: 'Run: terraform force-unlock <LockID> and confirm with "yes". Then retry terraform plan to verify the lock is released.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

@@ -1,0 +1,28 @@
+title: ALB Showing All Targets Unhealthy
+slug: aws-elb-unhealthy-targets
+difficulty: medium
+category: AWS
+description: 'An Application Load Balancer reports all registered targets as unhealthy. The health check path does not exist on the application, and the target security group does not allow traffic from the ALB on the service port.'
+initial_state: 'Simulated AWS environment with an ALB and a target group. The health check is configured to ping /healthcheck but the app only serves /health, and the EC2 security group blocks port 8080 from the ALB security group.'
+objectives:
+  - Inspect the target group health check configuration and identify the incorrect path
+  - Fix the health check path to match the application endpoint
+  - Update the EC2 instance security group to allow inbound traffic from the ALB on the correct port
+lab_mode: docker
+simulation_type: aws
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: aws elbv2 describe-target-health --target-group-arn <arn> to see unhealthy reason codes, then check the health check config.'
+    cost: 10
+    order: 1
+  - content: 'Use aws elbv2 modify-target-group to update the HealthCheckPath to the correct endpoint (e.g., /health).'
+    cost: 15
+    order: 2
+  - content: 'Check the EC2 security group: it must allow the ALB security group on the app port. Use aws ec2 authorize-security-group-ingress with the ALB SG as the source.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

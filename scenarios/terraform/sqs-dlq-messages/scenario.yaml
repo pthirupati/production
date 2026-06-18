@@ -1,0 +1,28 @@
+title: SQS Dead-Letter Queue Accumulating Messages
+slug: aws-sqs-dlq-messages
+difficulty: medium
+category: AWS
+description: 'An SQS queue is continuously sending messages to its dead-letter queue (DLQ) because the consumer Lambda function is throwing unhandled exceptions and exhausting maxReceiveCount. Diagnose the root cause and fix the processing failure.'
+initial_state: 'Simulated AWS environment with an SQS standard queue, a DLQ, and a Lambda consumer. The Lambda function fails processing due to a missing environment variable or malformed message, causing messages to be retried and eventually moved to the DLQ.'
+objectives:
+  - Inspect the DLQ message bodies to understand why processing is failing
+  - Fix the Lambda function configuration or code that causes the processing exception
+  - Redrive DLQ messages back to the source queue and confirm successful processing
+lab_mode: docker
+simulation_type: aws
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Run: aws sqs receive-message --queue-url <dlq-url> --attribute-names All to inspect failed message bodies and attributes.'
+    cost: 10
+    order: 1
+  - content: 'Check Lambda CloudWatch Logs for the error traceback. A missing environment variable (KeyError) or JSON parse failure is a common cause.'
+    cost: 15
+    order: 2
+  - content: 'After fixing the Lambda, use SQS dead-letter queue redrive: aws sqs start-message-move-task --source-arn <dlq-arn> --destination-arn <source-queue-arn>'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

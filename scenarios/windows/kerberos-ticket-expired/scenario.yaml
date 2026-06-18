@@ -1,0 +1,37 @@
+title: Kerberos Ticket Expired
+slug: win-kerberos-expired
+difficulty: medium
+category: Windows Server
+description: 'Kerberos authentication tickets have expired due to a time skew between
+  a domain controller and client machines, causing authentication failures across
+  domain resources. You must synchronize the system clocks, renew the Kerberos tickets,
+  and verify authentication is restored.'
+initial_state: 'Windows Server 2022 domain environment with Active Directory. Client
+  machines or member servers are experiencing Kerberos authentication errors (KDC_ERR_TKT_EXPIRED
+  or CLOCK_SKEW). The time difference between a machine and the domain controller
+  exceeds the Kerberos tolerance of 5 minutes.'
+objectives:
+  - Identify the time skew between affected machines and the domain controller
+  - Synchronize system clocks using w32tm and restore NTP configuration
+  - Clear and renew Kerberos tickets to restore authentication
+lab_mode: docker
+simulation_type: windows
+time_limit: 1800
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check time skew: w32tm /query /status to see current time source and
+      offset. Compare with DC: w32tm /stripchart /computer:<DCName> /samples:5'
+    cost: 10
+    order: 1
+  - content: 'Sync time immediately: w32tm /resync /force and set NTP source: w32tm
+      /config /manualpeerlist:<NTPServer> /syncfromflags:manual /reliable:yes /update'
+    cost: 15
+    order: 2
+  - content: 'Clear Kerberos ticket cache and renew: klist purge then klist get <ServicePrincipal>
+      to force ticket renewal. Alternatively log off and back on, or use Restart-Computer.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

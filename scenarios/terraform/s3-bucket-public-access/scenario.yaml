@@ -1,0 +1,28 @@
+title: S3 Bucket Publicly Readable
+slug: aws-s3-public-access
+difficulty: easy
+category: AWS
+description: 'An S3 bucket is publicly readable because the Block Public Access settings are disabled and a bucket policy or ACL grants s3:GetObject to everyone. Restrict access by enabling Block Public Access and removing public grants.'
+initial_state: 'Simulated AWS environment with an S3 bucket containing sensitive data. The bucket has BlockPublicAcls and BlockPublicPolicy set to false, and a permissive bucket policy grants s3:GetObject to Principal: "*".'
+objectives:
+  - Identify the public S3 bucket using the CLI and review its public access settings and bucket policy
+  - Enable all four Block Public Access settings on the bucket
+  - Remove any bucket policy or ACL entries that grant public read access
+lab_mode: docker
+simulation_type: aws
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'Run: aws s3api get-public-access-block --bucket <name> to see which block settings are disabled.'
+    cost: 10
+    order: 1
+  - content: 'Use aws s3api put-public-access-block with all four block flags set to true: --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true'
+    cost: 15
+    order: 2
+  - content: 'Remove the public bucket policy with: aws s3api delete-bucket-policy --bucket <name>, or update it to remove the Principal "*" statement.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Critical

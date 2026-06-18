@@ -1,0 +1,27 @@
+title: CloudWatch Alarm Never Triggers
+slug: aws-cloudwatch-alarm-missing
+difficulty: easy
+category: AWS
+description: 'A CloudWatch alarm is defined but never transitions to ALARM state even when the monitored metric clearly exceeds the threshold. The alarm metric name or threshold value is misconfigured.'
+initial_state: 'Simulated AWS environment with a CloudWatch alarm attached to an EC2 instance metric. The alarm threshold is set to an unreachable value (e.g., 99999) or the metric name does not match the actual emitted metric, so ALARM is never triggered.'
+objectives:
+  - Identify why the CloudWatch alarm stays in OK or INSUFFICIENT_DATA state
+  - Fix the metric name, threshold, or period so the alarm reflects actual resource utilization
+lab_mode: docker
+simulation_type: aws
+time_limit: 1200
+max_score: 100
+is_free: true
+hints:
+  - content: 'Run: aws cloudwatch describe-alarms and check the MetricName, Threshold, and ComparisonOperator fields.'
+    cost: 10
+    order: 1
+  - content: 'Use aws cloudwatch list-metrics to find the exact MetricName as emitted by the resource, then update the alarm to match.'
+    cost: 15
+    order: 2
+  - content: 'Run: aws cloudwatch put-metric-alarm with corrected parameters. Ensure EvaluationPeriods and Period are reasonable (e.g., 1 period of 60 seconds).'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Low

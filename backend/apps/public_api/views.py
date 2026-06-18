@@ -768,6 +768,43 @@ class StopLabView(APIView):
         })
 
 
+class ExtendLabView(APIView):
+    """POST /api/labs/<session_id>/extend/ — add 30 min (quota: 2/day)."""
+    permission_classes = [IsAuthenticated]
+
+    EXTENSION_SECONDS = 1800  # 30 minutes
+    DAILY_QUOTA = 2
+
+    def post(self, request, session_id):
+        from datetime import date, timedelta
+        session = get_object_or_404(LabSession, pk=session_id, user=request.user, status="RUNNING")
+
+        today = date.today()
+        if session.last_extension_date == today:
+            used = session.extensions_used
+        else:
+            used = 0
+
+        if used >= self.DAILY_QUOTA:
+            return Response(
+                {"error": f"Daily extension limit reached ({self.DAILY_QUOTA}/day). Resets at midnight."},
+                status=429,
+            )
+
+        session.duration_limit += self.EXTENSION_SECONDS
+        session.extensions_used = used + 1
+        session.last_extension_date = today
+        session.save(update_fields=["duration_limit", "expires_at", "extensions_used", "last_extension_date"])
+
+        return Response({
+            "session_id": str(session.id),
+            "extensions_used": session.extensions_used,
+            "extensions_remaining": self.DAILY_QUOTA - session.extensions_used,
+            "new_expires_at": session.expires_at.isoformat() if session.expires_at else None,
+            "time_remaining": session.time_remaining,
+        })
+
+
 class RestartLabView(APIView):
     """POST /api/labs/<session_id>/restart/ — restart a crashed/stuck lab container."""
     permission_classes = [IsAuthenticated]
@@ -1122,6 +1159,88 @@ class LabAiHintView(APIView):
             "total_hints": self.MAX_AI_HINTS,
             "interview_mode": True,
         })
+
+
+class LabAiReviewView(APIView):
+    """GET/POST /api/labs/<session_id>/ai-review/ — command-pattern feedback, no external API."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = get_object_or_404(LabSession, pk=session_id, user=request.user)
+        review = session.metadata.get("ai_review")
+        if not review:
+            return Response({"review": None})
+        return Response({"review": review})
+
+    def post(self, request, session_id):
+        session = get_object_or_404(LabSession, pk=session_id, user=request.user)
+        if session.status not in ("COMPLETED", "TERMINATED", "EXPIRED", "FAILED"):
+            return Response({"error": "Review only available after session ends."}, status=400)
+
+        if session.metadata.get("ai_review"):
+            return Response({"review": session.metadata["ai_review"]})
+
+        commands = list(
+            session.command_history.order_by("timestamp").values_list("command", "exit_code")
+        )
+
+        total = len(commands)
+        errors = sum(1 for _, code in commands if code not in (None, 0))
+        hints = session.hints_used
+        solved = session.validation_passed
+
+        # Pattern analysis
+        used_sudo = any("sudo" in cmd for cmd, _ in commands)
+        used_systemctl = any("systemctl" in cmd for cmd, _ in commands)
+        used_journalctl = any("journalctl" in cmd for cmd, _ in commands)
+        used_tail_logs = any(("tail" in cmd or "cat" in cmd) and "log" in cmd for cmd, _ in commands)
+        used_grep = any("grep" in cmd for cmd, _ in commands)
+        used_man = any(cmd.strip().startswith("man ") for cmd, _ in commands)
+
+        strengths = []
+        improvements = []
+
+        if solved:
+            strengths.append("Successfully resolved the scenario — well done.")
+        if used_journalctl:
+            strengths.append("Used `journalctl` for structured log analysis.")
+        elif used_tail_logs:
+            strengths.append("Checked logs to diagnose the issue.")
+        if used_grep:
+            strengths.append("Used `grep` to filter relevant output efficiently.")
+        if used_man:
+            strengths.append("Consulted `man` pages — good habit for unfamiliar options.")
+        if errors < total * 0.2 and total > 3:
+            strengths.append("Low error rate — commands were accurate and purposeful.")
+
+        if errors > total * 0.4 and total > 3:
+            improvements.append("High command error rate. Review syntax before running.")
+        if hints >= 3:
+            improvements.append("Used many hints. Try to diagnose from logs before requesting help.")
+        if not used_journalctl and not used_tail_logs and total > 3:
+            improvements.append("Log inspection was minimal. Start with `journalctl -xe` or check /var/log/.")
+        if not used_grep and total > 5:
+            improvements.append("Adding `grep` to filter command output speeds up root-cause identification.")
+        if not solved:
+            improvements.append("The scenario wasn't fully resolved. Review the solution to understand the fix.")
+
+        overall = (
+            "Excellent work!" if solved and hints <= 1
+            else "Good effort!" if solved
+            else "Solid attempt — check the solution for the final steps."
+        )
+
+        review = {
+            "overall": overall,
+            "stats": {"total_commands": total, "error_commands": errors, "hints_used": hints, "solved": solved},
+            "strengths": strengths or ["Engaged with the scenario — keep practicing."],
+            "improvements": improvements or ["Strong performance — nothing significant to flag."],
+        }
+
+        session.metadata["ai_review"] = review
+        session.save(update_fields=["metadata"])
+
+        return Response({"review": review})
 
 
 # ─── Progress + Stats ────────────────────────────────────────────────
