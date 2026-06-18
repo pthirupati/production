@@ -67,17 +67,35 @@ class Command(BaseCommand):
             "coming_soon": meta.get("coming_soon", False),
             "is_active": meta.get("is_active", True),
         }
-        if meta.get("slug"):
-            technology, _ = Technology.objects.update_or_create(
-                slug=meta["slug"],
-                defaults={**defaults, "name": name},
-            )
+        slug = meta.get("slug")
+        if slug:
+            # 1. Try exact slug match first (idempotent updates)
+            try:
+                technology = Technology.objects.get(slug=slug)
+                for k, v in {**defaults, "name": name}.items():
+                    setattr(technology, k, v)
+                technology.save()
+                return technology
+            except Technology.DoesNotExist:
+                pass
+            # 2. A record with the same name but old/different slug exists — migrate it
+            try:
+                technology = Technology.objects.get(name=name)
+                technology.slug = slug
+                for k, v in defaults.items():
+                    setattr(technology, k, v)
+                technology.save()
+                return technology
+            except Technology.DoesNotExist:
+                pass
+            # 3. Neither exists — create fresh
+            return Technology.objects.create(slug=slug, name=name, **defaults)
         else:
             technology, _ = Technology.objects.update_or_create(
                 name=name,
                 defaults=defaults,
             )
-        return technology
+            return technology
 
     def handle(self, *args, **options):
         scenarios_dir = options["dir"]
