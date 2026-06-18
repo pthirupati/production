@@ -8,6 +8,7 @@ from .org_views import (
     OrganizationMemberDetailView,
     OrganizationMemberRemoveView,
     OrganizationRazorpayVerifyView,
+    OrganizationSettingsView,
 )
 
 urlpatterns = [
@@ -18,4 +19,5 @@ urlpatterns = [
     path("<slug:slug>/members/<int:user_id>/remove/", OrganizationMemberRemoveView.as_view(), name="organization_member_remove"),
     path("<slug:slug>/invites/<uuid:invite_id>/", OrganizationInviteCancelView.as_view(), name="organization_invite_cancel"),
     path("<slug:slug>/verify-payment/", OrganizationRazorpayVerifyView.as_view(), name="organization_verify_payment"),
+    path("<slug:slug>/settings/", OrganizationSettingsView.as_view(), name="organization_settings"),
 ]

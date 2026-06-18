@@ -222,6 +222,13 @@ class Organization(models.Model):
     billing_email = models.EmailField(blank=True, default="")
     stripe_customer_id = models.CharField(max_length=100, blank=True, default="")
     notes = models.TextField(blank=True, default="")
+    # Outbound webhook for org events (lab completed, member joined, etc.)
+    webhook_url = models.URLField(max_length=500, blank=True, default="")
+    webhook_secret = models.CharField(max_length=100, blank=True, default="")
+    # Branding
+    logo_url = models.URLField(max_length=500, blank=True, default="")
+    primary_color = models.CharField(max_length=7, blank=True, default="", help_text="Hex color, e.g. #6366f1")
+    custom_domain = models.CharField(max_length=200, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

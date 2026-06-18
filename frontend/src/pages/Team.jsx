@@ -4,7 +4,7 @@ import { orgApi } from '../api/org'
 import { subscriptionApi } from '../api/subscriptions'
 import {
   Users, Building2, Mail, Shield, AlertCircle, BarChart3, CreditCard,
-  Clock, Trash2, UserMinus, ChevronRight, X, BookOpen, FlaskConical
+  Clock, Trash2, UserMinus, ChevronRight, X, BookOpen, FlaskConical, Webhook, Paintbrush
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CompactPageHeader from '../components/CompactPageHeader'
@@ -25,6 +25,11 @@ export default function Team() {
   const [checkoutSeats, setCheckoutSeats] = useState(10)
   const [checkingOut, setCheckingOut] = useState(false)
   const [removingId, setRemovingId] = useState(null)
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [webhookSecret, setWebhookSecret] = useState('')
+  const [logoUrl, setLogoUrl] = useState('')
+  const [primaryColor, setPrimaryColor] = useState('')
+  const [savingSettings, setSavingSettings] = useState(false)
 
   useEffect(() => {
     orgApi.list()
@@ -39,6 +44,10 @@ export default function Team() {
       const data = await orgApi.get(slug)
       setSelected(data)
       setCheckoutSeats(data.seat_limit || 10)
+      setWebhookUrl(data.webhook_url || '')
+      setWebhookSecret(data.webhook_secret || '')
+      setLogoUrl(data.logo_url || '')
+      setPrimaryColor(data.primary_color || '')
       if (['owner', 'admin'].includes(data.role)) {
         const stats = await orgApi.getAnalytics(slug).catch(() => null)
         setAnalytics(stats)
@@ -88,6 +97,25 @@ export default function Team() {
       toast.error(err.response?.data?.error || 'Could not remove member')
     } finally {
       setRemovingId(null)
+    }
+  }
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault()
+    if (!selected) return
+    setSavingSettings(true)
+    try {
+      await orgApi.updateSettings(selected.slug, {
+        webhook_url: webhookUrl,
+        webhook_secret: webhookSecret,
+        logo_url: logoUrl,
+        primary_color: primaryColor,
+      })
+      toast.success('Settings saved')
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save settings')
+    } finally {
+      setSavingSettings(false)
     }
   }
 
@@ -318,6 +346,51 @@ export default function Team() {
                     </button>
                   </div>
                 </form>
+
+                {selected.role === 'owner' && (
+                  <form onSubmit={handleSaveSettings} className="border-t border-surface-800 pt-4 space-y-3">
+                    <h3 className="font-medium flex items-center gap-2">
+                      <Webhook size={16} className="text-accent-cyan" /> Webhook &amp; Branding
+                    </h3>
+                    <p className="text-xs text-surface-500">Receive org events (member joined, lab completed) at your endpoint.</p>
+                    <input
+                      type="url"
+                      className="input-field text-sm"
+                      placeholder="https://your-server.com/webhook"
+                      value={webhookUrl}
+                      onChange={e => setWebhookUrl(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      className="input-field text-sm"
+                      placeholder="Webhook secret (HMAC SHA-256)"
+                      value={webhookSecret}
+                      onChange={e => setWebhookSecret(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Paintbrush size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500" />
+                        <input
+                          type="url"
+                          className="input-field pl-9 text-sm"
+                          placeholder="Logo URL"
+                          value={logoUrl}
+                          onChange={e => setLogoUrl(e.target.value)}
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        className="input-field w-28 text-sm"
+                        placeholder="#6366f1"
+                        value={primaryColor}
+                        onChange={e => setPrimaryColor(e.target.value)}
+                      />
+                    </div>
+                    <button type="submit" disabled={savingSettings} className="btn-secondary text-sm">
+                      {savingSettings ? 'Saving…' : 'Save settings'}
+                    </button>
+                  </form>
+                )}
 
                 <div className="border-t border-surface-800 pt-4 space-y-3">
                   <h3 className="font-medium flex items-center gap-2">

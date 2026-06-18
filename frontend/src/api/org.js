@@ -29,4 +29,8 @@ export const orgApi = {
     const { data } = await api.delete(`/org/${slug}/invites/${inviteId}/`)
     return data
   },
+  async updateSettings(slug, settings) {
+    const { data } = await api.patch(`/org/${slug}/settings/`, settings)
+    return data
+  },
 }

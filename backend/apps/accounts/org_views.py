@@ -243,6 +243,40 @@ class OrganizationDetailView(APIView):
         return Response({"message": f"{email} added to {org.name}."}, status=201)
 
 
+class OrganizationSettingsView(APIView):
+    """PATCH /api/org/<slug>/settings/ — update branding and webhook (owner only)."""
+    permission_classes = [IsAuthenticated]
+
+    ALLOWED = ("webhook_url", "webhook_secret", "logo_url", "primary_color", "custom_domain")
+
+    def patch(self, request, slug):
+        try:
+            org = Organization.objects.get(slug=slug, is_active=True)
+            member = OrganizationMember.objects.get(organization=org, user=request.user)
+        except (Organization.DoesNotExist, OrganizationMember.DoesNotExist):
+            return Response({"error": "Not found or access denied."}, status=404)
+
+        if member.role != "owner":
+            return Response({"error": "Only the owner can change org settings."}, status=403)
+
+        update_fields = []
+        for field in self.ALLOWED:
+            if field in request.data:
+                setattr(org, field, request.data[field] or "")
+                update_fields.append(field)
+
+        if update_fields:
+            org.save(update_fields=update_fields)
+
+        return Response({
+            "message": "Settings updated.",
+            "webhook_url": org.webhook_url,
+            "logo_url": org.logo_url,
+            "primary_color": org.primary_color,
+            "custom_domain": org.custom_domain,
+        })
+
+
 class OrganizationMemberDetailView(APIView):
     """Per-member analytics for owners/admins."""
     permission_classes = [IsAuthenticated]

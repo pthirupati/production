@@ -245,6 +245,13 @@ class RegisterView(APIView):
                 )
             invite.accepted_at = timezone.now()
             invite.save(update_fields=["accepted_at"])
+            try:
+                from .webhooks import fire_org_webhook
+                fire_org_webhook(invite.organization, "member.joined", {
+                    "user": user.username, "email": user.email, "role": invite.role,
+                })
+            except Exception:
+                pass
 
         # Send welcome email asynchronously
         try:

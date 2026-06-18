@@ -918,6 +918,18 @@ class ValidateLabView(APIView):
                     schedule_jira_reset_after_lab_close(session)
                 except Exception as e:
                     logger.warning(f"Jira reset schedule failed: {e}")
+                try:
+                    from apps.accounts.models import OrganizationMember
+                    from apps.accounts.webhooks import fire_org_webhook
+                    membership = OrganizationMember.objects.filter(user=request.user).select_related("organization").first()
+                    if membership:
+                        fire_org_webhook(membership.organization, "lab.completed", {
+                            "user": request.user.username,
+                            "scenario": session.scenario.slug,
+                            "score": score,
+                        })
+                except Exception:
+                    pass
 
                 from apps.jira_integration.helpers import is_jira_closed
                 from apps.jira_integration.models import UserScenarioJiraTicket

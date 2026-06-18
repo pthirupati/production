@@ -2922,6 +2922,26 @@ class AdminOrganizationDetailView(APIView):
         OrganizationMember.objects.create(organization=org, user=user, role=role, invited_email=email)
         return Response({"message": f"Added {user.username} to {org.name}"})
 
+    def patch(self, request, org_id):
+        """Update org settings: webhook_url, webhook_secret, logo_url, primary_color, custom_domain, seat_limit."""
+        from apps.accounts.models import Organization
+        try:
+            org = Organization.objects.get(pk=org_id, is_active=True)
+        except Organization.DoesNotExist:
+            return Response({"error": "Organization not found"}, status=404)
+
+        allowed = ("webhook_url", "webhook_secret", "logo_url", "primary_color", "custom_domain", "seat_limit", "notes", "billing_email")
+        update_fields = []
+        for field in allowed:
+            if field in request.data:
+                setattr(org, field, request.data[field])
+                update_fields.append(field)
+
+        if update_fields:
+            org.save(update_fields=update_fields)
+
+        return Response({"message": "Organization updated", "updated": update_fields})
+
     def delete(self, request, org_id):
         from apps.accounts.models import Organization
         Organization.objects.filter(pk=org_id).update(is_active=False)
