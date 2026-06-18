@@ -10,7 +10,6 @@ import {
   requestUserMedia,
   stopMediaStream,
 } from '../../utils/mediaDevices'
-import MediaPermissionDialog from '../../components/interviews/MediaPermissionDialog'
 import InterviewVideoPreview from '../../components/interviews/InterviewVideoPreview'
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Clock, MessageSquare, Terminal,
@@ -56,7 +55,6 @@ export default function InterviewRoom() {
   const [rescheduleAt, setRescheduleAt] = useState('')
   const [mediaError, setMediaError] = useState('')
   const [mediaLoading, setMediaLoading] = useState(false)
-  const [permissionRequest, setPermissionRequest] = useState(null)
   const [backgroundId, setBackgroundId] = useState('none')
 
   const endsAt = round?.ends_at ? new Date(round.ends_at).getTime() : null
@@ -148,24 +146,12 @@ export default function InterviewRoom() {
       }
     } finally {
       setMediaLoading(false)
-      setPermissionRequest(null)
     }
   }
 
-  const requestMediaAccess = (type) => {
-    if (!isMediaDevicesSupported()) {
-      const msg = getMediaErrorMessage({ name: 'NotSupportedError' })
-      setMediaError(msg)
-      toast.error(msg)
-      return
-    }
-    setMediaError('')
-    setPermissionRequest(type)
-  }
-
-  const enableMic = () => requestMediaAccess('audio')
-  const enableCamera = () => requestMediaAccess('video')
-  const enableMedia = () => requestMediaAccess('both')
+  const enableMic = () => executeMediaRequest('audio')
+  const enableCamera = () => executeMediaRequest('video')
+  const enableMedia = () => executeMediaRequest('both')
 
   useEffect(() => {
     if (observerToken) {
@@ -375,19 +361,6 @@ export default function InterviewRoom() {
     return `${m}:${sec.toString().padStart(2, '0')}`
   }
 
-  const permissionDialog = (
-    <MediaPermissionDialog
-      open={!!permissionRequest}
-      type={permissionRequest || 'both'}
-      loading={mediaLoading}
-      onAllow={() => executeMediaRequest(permissionRequest || 'both')}
-      onBlock={() => {
-        setPermissionRequest(null)
-        setMediaError('Camera and microphone are required for interviews. Click Enable when you are ready.')
-      }}
-    />
-  )
-
   if (!round) return <p className="text-surface-500 p-8">Loading room…</p>
 
   if (observerMode) {
@@ -526,7 +499,6 @@ export default function InterviewRoom() {
           I'm ready — start interview
         </button>
       </div>
-      {permissionDialog}
       </>
     )
   }
@@ -594,7 +566,7 @@ export default function InterviewRoom() {
                 onClick={async () => {
                   const t = streamRef.current?.getAudioTracks()[0]
                   if (!t) {
-                    await requestMediaAccess('audio')
+                    await executeMediaRequest('audio')
                     return
                   }
                   t.enabled = !t.enabled
@@ -609,7 +581,7 @@ export default function InterviewRoom() {
                 onClick={async () => {
                   const t = streamRef.current?.getVideoTracks()[0]
                   if (!t) {
-                    await requestMediaAccess('video')
+                    await executeMediaRequest('video')
                     return
                   }
                   t.enabled = !t.enabled
@@ -733,7 +705,6 @@ export default function InterviewRoom() {
         </div>
       </div>
     </div>
-    {permissionDialog}
     </>
   )
 }

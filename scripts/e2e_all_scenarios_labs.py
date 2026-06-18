@@ -123,11 +123,17 @@ def _factory_view(view_cls, method: str, path: str, user, data=None, **kwargs):
 
 def wait_session(session_id, timeout=LAB_TIMEOUT):
     deadline = time.time() + timeout
+    missing_count = 0
     while time.time() < deadline:
         db_refresh()
         session = LabSession.objects.filter(id=session_id).first()
         if not session:
-            return None, "missing"
+            missing_count += 1
+            if missing_count > 12:  # ~24s before giving up on a missing session
+                return None, "missing"
+            time.sleep(2)
+            continue
+        missing_count = 0
         if session.status == "RUNNING":
             return session, "RUNNING"
         if session.status in ("COMPLETED", "FAILED", "TERMINATED", "EXPIRED"):
@@ -252,6 +258,9 @@ def run_scenario_e2e(stats: RunStats, scenario, user_a, user_b, user_c, *, test_
             stats.ok(f"{label} replay API")
 
         is_sim = (sess_a.provider or "") == "simulation" or getattr(scenario, "lab_mode", "") == "simulation"
+        if not SKIP_TERMINAL and sess_a and not is_sim:
+            # Wait for shell to be ready — container may still be initializing its entrypoint
+            time.sleep(3)
         if not SKIP_TERMINAL and sess_a:
             from rest_framework_simplejwt.tokens import AccessToken
 

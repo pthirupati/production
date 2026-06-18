@@ -707,6 +707,166 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 return {"ok": True, "message": "Alarm acknowledged"}
         return {"ok": False, "error": "Alarm not found"}
 
+    if action == "create_vm":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "VM name is required"}
+        if any(v["name"] == name for v in state["vms"]):
+            return {"ok": False, "error": f"A VM named '{name}' already exists"}
+        host_id = payload.get("host_id") or (state["hosts"][0]["id"] if state["hosts"] else None)
+        ds_id = payload.get("datastore_id") or (state["datastores"][0]["id"] if state["datastores"] else None)
+        net_id = payload.get("network_id") or (state["networks"][0]["id"] if state["networks"] else None)
+        guest_os = payload.get("guest_os") or "Ubuntu Linux (64-bit)"
+        cpu = max(1, int(payload.get("cpu") or 2))
+        mem_mb = max(512, int(payload.get("memory_mb") or 4096))
+        disk_gb = max(10, int(payload.get("disk_gb") or 40))
+        vm_id = f"vm-{name.lower().replace(' ', '-')}-{int(time.time()) % 100000}"
+        vm = {
+            "id": vm_id,
+            "name": name,
+            "host_id": host_id,
+            "datastore_id": ds_id,
+            "network_id": net_id,
+            "resource_pool_id": "rp-prod",
+            "power": "poweredOff",
+            "cpu": cpu,
+            "memory_mb": mem_mb,
+            "disk_gb": disk_gb,
+            "guest_os": guest_os,
+            "guest_os_version": guest_os,
+            "ip": "—",
+            "hostname": f"{name}.fixitlab.local",
+            "tools": "notRunning",
+            "tools_version": "11333",
+            "hardware_version": "vmx-19",
+            "annotation": payload.get("annotation") or "",
+            "snapshots": [],
+            "cpu_pct": 0,
+            "mem_pct": 0,
+            "disk_io_mbps": 0,
+            "net_mbps": 0,
+        }
+        state["vms"].append(vm)
+        host = _find_host(state, host_id=host_id)
+        if host:
+            host.setdefault("vms", []).append(vm_id)
+        ds = _find_ds(state, ds_id=ds_id)
+        if ds:
+            ds.setdefault("vms", []).append(vm_id)
+            disk_used = disk_gb
+            if ds["free_gb"] >= disk_used:
+                ds["free_gb"] -= disk_used
+        events.append(_event(f"Created VM {name}", "info", name))
+        tasks.insert(0, _task("Create Virtual Machine", name))
+        return {"ok": True, "message": f"VM '{name}' created", "vm_id": vm_id}
+
+    if action == "delete_vm":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        if vm["power"] == "poweredOn":
+            return {"ok": False, "error": f"Cannot delete a powered-on VM — shut it down first"}
+        vm_id = vm["id"]
+        vm_name = vm["name"]
+        disk_gb = vm.get("disk_gb", 0)
+        ds = _find_ds(state, ds_id=vm.get("datastore_id"))
+        if ds:
+            ds["free_gb"] = min(ds["capacity_gb"], ds["free_gb"] + disk_gb)
+            ds["vms"] = [v for v in ds.get("vms", []) if v != vm_id]
+        host = _find_host(state, host_id=vm.get("host_id"))
+        if host:
+            host["vms"] = [v for v in host.get("vms", []) if v != vm_id]
+        state["vms"] = [v for v in state["vms"] if v["id"] != vm_id]
+        state["alarms"] = [a for a in state.get("alarms", []) if a.get("entity") != vm_name]
+        events.append(_event(f"VM {vm_name} deleted from inventory", "warning", vm_name))
+        tasks.insert(0, _task("Delete Virtual Machine", vm_name))
+        return {"ok": True, "message": f"VM '{vm_name}' deleted"}
+
+    if action == "edit_vm":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        if vm["power"] == "poweredOn" and (payload.get("cpu") or payload.get("memory_mb")):
+            return {"ok": False, "error": "Power off the VM before editing CPU or memory"}
+        changed = []
+        if payload.get("cpu"):
+            vm["cpu"] = max(1, int(payload["cpu"]))
+            changed.append("CPU")
+        if payload.get("memory_mb"):
+            vm["memory_mb"] = max(512, int(payload["memory_mb"]))
+            changed.append("Memory")
+        if payload.get("annotation") is not None:
+            vm["annotation"] = payload["annotation"]
+            changed.append("Annotation")
+        if payload.get("name"):
+            new_name = payload["name"].strip()
+            if new_name and new_name != vm["name"]:
+                if any(v["name"] == new_name for v in state["vms"]):
+                    return {"ok": False, "error": f"A VM named '{new_name}' already exists"}
+                old_name = vm["name"]
+                vm["name"] = new_name
+                events.append(_event(f"VM renamed from {old_name} to {new_name}", "info", new_name))
+                changed.append("Name")
+        if not changed:
+            return {"ok": False, "error": "No changes specified"}
+        events.append(_event(f"VM {vm['name']} configuration updated: {', '.join(changed)}", "info", vm["name"]))
+        tasks.insert(0, _task("Edit Virtual Machine Settings", vm["name"]))
+        return {"ok": True, "message": f"{vm['name']} updated: {', '.join(changed)}"}
+
+    if action == "clone_vm":
+        src = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not src:
+            return {"ok": False, "error": "Source VM not found"}
+        clone_name = (payload.get("clone_name") or f"{src['name']}-clone").strip()
+        if any(v["name"] == clone_name for v in state["vms"]):
+            return {"ok": False, "error": f"VM named '{clone_name}' already exists"}
+        import copy as _copy
+        clone = _copy.deepcopy(src)
+        clone["id"] = f"vm-clone-{int(time.time()) % 100000}"
+        clone["name"] = clone_name
+        clone["power"] = "poweredOff"
+        clone["cpu_pct"] = 0
+        clone["mem_pct"] = 0
+        clone["net_mbps"] = 0
+        clone["disk_io_mbps"] = 0
+        clone["snapshots"] = []
+        clone["ip"] = "—"
+        clone["tools"] = "notRunning"
+        state["vms"].append(clone)
+        ds = _find_ds(state, ds_id=src.get("datastore_id"))
+        if ds and ds["free_gb"] >= src.get("disk_gb", 40):
+            ds["free_gb"] -= src.get("disk_gb", 40)
+            ds.setdefault("vms", []).append(clone["id"])
+        events.append(_event(f"Cloned {src['name']} → {clone_name}", "info", clone_name))
+        tasks.insert(0, _task("Clone Virtual Machine", clone_name))
+        return {"ok": True, "message": f"VM cloned as '{clone_name}'", "vm_id": clone["id"]}
+
+    if action == "add_disk":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        add_gb = max(10, int(payload.get("size_gb") or 100))
+        vm["disk_gb"] = vm.get("disk_gb", 40) + add_gb
+        ds = _find_ds(state, ds_id=vm.get("datastore_id"))
+        if ds and ds["free_gb"] >= add_gb:
+            ds["free_gb"] -= add_gb
+        events.append(_event(f"Added {add_gb} GB disk to {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Add Hard Disk", vm["name"]))
+        return {"ok": True, "message": f"Added {add_gb} GB disk to {vm['name']}"}
+
+    if action == "change_network":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        net_id = payload.get("network_id")
+        net = next((n for n in state["networks"] if n["id"] == net_id), None)
+        if not net:
+            return {"ok": False, "error": "Network not found"}
+        vm["network_id"] = net_id
+        events.append(_event(f"Changed {vm['name']} network to {net['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Change Network Adapter", vm["name"]))
+        return {"ok": True, "message": f"{vm['name']} moved to network '{net['name']}'"}
+
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 

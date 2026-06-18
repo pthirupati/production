@@ -153,6 +153,240 @@ function MigrateModal({ vm, hosts, onClose, onAction }) {
   )
 }
 
+/* ─── Create VM Modal ────────────────────────────────────────────────── */
+function CreateVmModal({ hosts, datastores, networks, onClose, onAction }) {
+  const [name, setName] = useState('')
+  const [cpu, setCpu] = useState('2')
+  const [memGb, setMemGb] = useState('4')
+  const [diskGb, setDiskGb] = useState('40')
+  const [guestOs, setGuestOs] = useState('Ubuntu Linux (64-bit)')
+  const [hostId, setHostId] = useState(hosts[0]?.id || '')
+  const [dsId, setDsId] = useState(datastores[0]?.id || '')
+  const [netId, setNetId] = useState(networks[0]?.id || '')
+  const [acting, setActing] = useState(false)
+  const [error, setError] = useState('')
+
+  const create = async () => {
+    if (!name.trim()) { setError('VM name is required'); return }
+    setActing(true); setError('')
+    try {
+      await onAction('create_vm', {
+        name: name.trim(), cpu: parseInt(cpu), memory_mb: parseInt(memGb) * 1024,
+        disk_gb: parseInt(diskGb), guest_os: guestOs, host_id: hostId, datastore_id: dsId, network_id: netId,
+      })
+      onClose()
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Create failed')
+    } finally { setActing(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-[#f5f5f5] border border-[#c0c0c0] shadow-xl rounded w-[480px]">
+        <div className="bg-[#5b9bd5] text-white text-sm font-semibold px-3 py-2 flex items-center justify-between">
+          <span>New Virtual Machine</span>
+          <button onClick={onClose} className="hover:bg-white/20 rounded px-1">✕</button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-xs text-[#444] mb-1">VM Name *</label>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="my-server-01"
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]" />
+            </div>
+            <div>
+              <label className="block text-xs text-[#444] mb-1">Guest OS</label>
+              <select value={guestOs} onChange={e => setGuestOs(e.target.value)}
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]">
+                {['Ubuntu Linux (64-bit)', 'Red Hat Enterprise Linux 8 (64-bit)', 'CentOS 7 (64-bit)', 'Windows Server 2019 (64-bit)', 'Debian GNU/Linux 11 (64-bit)', 'Other Linux (64-bit)'].map(o => (
+                  <option key={o}>{o}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-[#444] mb-1">Host</label>
+              <select value={hostId} onChange={e => setHostId(e.target.value)}
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]">
+                {hosts.filter(h => h.status === 'connected' && !h.maintenance).map(h => (
+                  <option key={h.id} value={h.id}>{h.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-[#444] mb-1">CPUs</label>
+              <select value={cpu} onChange={e => setCpu(e.target.value)}
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]">
+                {['1','2','4','8','16'].map(v => <option key={v} value={v}>{v} vCPU{v !== '1' ? 's' : ''}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-[#444] mb-1">Memory (GB)</label>
+              <select value={memGb} onChange={e => setMemGb(e.target.value)}
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]">
+                {['1','2','4','8','16','32','64'].map(v => <option key={v} value={v}>{v} GB</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-[#444] mb-1">Hard disk (GB)</label>
+              <input type="number" min="10" value={diskGb} onChange={e => setDiskGb(e.target.value)}
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]" />
+            </div>
+            <div>
+              <label className="block text-xs text-[#444] mb-1">Datastore</label>
+              <select value={dsId} onChange={e => setDsId(e.target.value)}
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]">
+                {datastores.filter(d => d.accessible).map(d => (
+                  <option key={d.id} value={d.id}>{d.name} ({fmtBytes(d.free_gb)} free)</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-[#444] mb-1">Network</label>
+              <select value={netId} onChange={e => setNetId(e.target.value)}
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]">
+                {networks.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+              </select>
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+        <div className="px-4 pb-4 flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-1.5 text-sm border border-[#aaa] rounded bg-[#e8e8e8] hover:bg-[#ddd]">Cancel</button>
+          <button disabled={acting || !name.trim()} onClick={create}
+            className="px-4 py-1.5 text-sm rounded bg-[#5b9bd5] text-white hover:bg-[#4a8ac4] disabled:opacity-50">
+            {acting ? 'Creating…' : 'Create'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Edit VM Modal ──────────────────────────────────────────────────── */
+function EditVmModal({ vm, networks, onClose, onAction }) {
+  const [cpu, setCpu] = useState(String(vm.cpu))
+  const [memGb, setMemGb] = useState(String(Math.round(vm.memory_mb / 1024)))
+  const [annotation, setAnnotation] = useState(vm.annotation || '')
+  const [netId, setNetId] = useState(vm.network_id || '')
+  const [acting, setActing] = useState(false)
+  const [error, setError] = useState('')
+  const isPoweredOn = vm.power === 'poweredOn'
+
+  const save = async () => {
+    setActing(true); setError('')
+    try {
+      const payload = { vm_id: vm.id, annotation }
+      if (!isPoweredOn) { payload.cpu = parseInt(cpu); payload.memory_mb = parseInt(memGb) * 1024 }
+      if (netId !== vm.network_id) {
+        await onAction('change_network', { vm_id: vm.id, network_id: netId })
+      }
+      await onAction('edit_vm', payload)
+      onClose()
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Save failed')
+    } finally { setActing(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-[#f5f5f5] border border-[#c0c0c0] shadow-xl rounded w-[420px]">
+        <div className="bg-[#5b9bd5] text-white text-sm font-semibold px-3 py-2 flex items-center justify-between">
+          <span>Edit Settings — {vm.name}</span>
+          <button onClick={onClose} className="hover:bg-white/20 rounded px-1">✕</button>
+        </div>
+        <div className="p-4 space-y-3">
+          {isPoweredOn && (
+            <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+              CPU and Memory cannot be changed while the VM is powered on.
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-[#444] mb-1">CPUs</label>
+              <select value={cpu} onChange={e => setCpu(e.target.value)} disabled={isPoweredOn}
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5] disabled:opacity-50">
+                {['1','2','4','8','16'].map(v => <option key={v} value={v}>{v} vCPU{v !== '1' ? 's' : ''}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-[#444] mb-1">Memory (GB)</label>
+              <select value={memGb} onChange={e => setMemGb(e.target.value)} disabled={isPoweredOn}
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5] disabled:opacity-50">
+                {['1','2','4','8','16','32','64'].map(v => <option key={v} value={v}>{v} GB</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs text-[#444] mb-1">Network</label>
+              <select value={netId} onChange={e => setNetId(e.target.value)}
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]">
+                {networks.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs text-[#444] mb-1">Annotation / Notes</label>
+              <textarea value={annotation} onChange={e => setAnnotation(e.target.value)} rows={2}
+                className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]" />
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+        <div className="px-4 pb-4 flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-1.5 text-sm border border-[#aaa] rounded bg-[#e8e8e8] hover:bg-[#ddd]">Cancel</button>
+          <button disabled={acting} onClick={save}
+            className="px-4 py-1.5 text-sm rounded bg-[#5b9bd5] text-white hover:bg-[#4a8ac4] disabled:opacity-50">
+            {acting ? 'Saving…' : 'OK'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Clone VM Modal ─────────────────────────────────────────────────── */
+function CloneVmModal({ vm, onClose, onAction }) {
+  const [cloneName, setCloneName] = useState(`${vm.name}-clone`)
+  const [acting, setActing] = useState(false)
+  const [error, setError] = useState('')
+
+  const clone = async () => {
+    if (!cloneName.trim()) { setError('Clone name is required'); return }
+    setActing(true); setError('')
+    try {
+      await onAction('clone_vm', { vm_id: vm.id, clone_name: cloneName.trim() })
+      onClose()
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Clone failed')
+    } finally { setActing(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-[#f5f5f5] border border-[#c0c0c0] shadow-xl rounded w-80">
+        <div className="bg-[#5b9bd5] text-white text-sm font-semibold px-3 py-2 flex items-center justify-between">
+          <span>Clone Virtual Machine — {vm.name}</span>
+          <button onClick={onClose} className="hover:bg-white/20 rounded px-1">✕</button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div>
+            <label className="block text-xs text-[#444] mb-1">Clone name</label>
+            <input value={cloneName} onChange={e => setCloneName(e.target.value)}
+              className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]" />
+          </div>
+          <p className="text-[10px] text-[#666]">Creates a full copy of the VM in a powered-off state.</p>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+        <div className="px-4 pb-4 flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-1.5 text-sm border border-[#aaa] rounded bg-[#e8e8e8] hover:bg-[#ddd]">Cancel</button>
+          <button disabled={acting || !cloneName.trim()} onClick={clone}
+            className="px-4 py-1.5 text-sm rounded bg-[#5b9bd5] text-white hover:bg-[#4a8ac4] disabled:opacity-50">
+            {acting ? 'Cloning…' : 'Clone'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Main component ─────────────────────────────────────────────────── */
 export default function VMwareSimulator() {
   const { sessionId } = useParams()
@@ -164,6 +398,10 @@ export default function VMwareSimulator() {
   const [expandedSections, setExpandedSections] = useState({ hosts: true, vms: true, storage: true, networks: false })
   const [showSnapshotModal, setShowSnapshotModal] = useState(false)
   const [showMigrateModal, setShowMigrateModal] = useState(false)
+  const [showCreateVmModal, setShowCreateVmModal] = useState(false)
+  const [showEditVmModal, setShowEditVmModal] = useState(false)
+  const [showCloneVmModal, setShowCloneVmModal] = useState(false)
+  const [pendingDeleteVm, setPendingDeleteVm] = useState(null)
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false)
   const actionsRef = useRef(null)
 
@@ -255,6 +493,10 @@ export default function VMwareSimulator() {
         <ToolbarSep />
         <ToolbarBtn onClick={() => setShowSnapshotModal(true)} disabled={acting} label="Take Snapshot" />
         <ToolbarBtn onClick={() => setShowMigrateModal(true)} disabled={acting} label="Migrate…" />
+        <ToolbarBtn onClick={() => setShowCloneVmModal(true)} disabled={acting} label="Clone…" />
+        <ToolbarSep />
+        <ToolbarBtn onClick={() => setShowEditVmModal(true)} disabled={acting} label="Edit Settings…" />
+        <ToolbarBtn onClick={() => setPendingDeleteVm(vm)} disabled={isOn || acting} label="Delete" red />
         <div className="flex-1" />
         <RefreshBtn onClick={load} />
       </div>
@@ -266,7 +508,7 @@ export default function VMwareSimulator() {
     <div className="flex items-center gap-1 px-2 py-1.5 bg-[#eef2f7] border-b border-[#c8d0dc] flex-wrap">
       <ToolbarBtn onClick={() => { }} disabled label="Get vCenter Server" blue />
       <ToolbarSep />
-      <ToolbarBtn onClick={() => { }} disabled={acting} label="Create/Register VM" />
+      <ToolbarBtn onClick={() => setShowCreateVmModal(true)} disabled={acting} label="Create/Register VM" />
       <ToolbarSep />
       {host.maintenance
         ? <ToolbarBtn onClick={() => runAction('exit_maintenance', { host_name: host.name })} disabled={acting} label="Exit Maintenance Mode" />
@@ -646,6 +888,101 @@ export default function VMwareSimulator() {
                 </div>
               )}
 
+              {/* ── HOST PERMISSIONS ─────────────────────────────── */}
+              {selectedHost && activeTab === 'permissions' && (
+                <ContentPanel title="Roles &amp; Permissions">
+                  <table className="w-full text-[10px] border-collapse">
+                    <thead>
+                      <tr className="bg-[#e8edf4]">
+                        <th className="border border-[#ccc] px-2 py-1 text-left font-semibold">User / Group</th>
+                        <th className="border border-[#ccc] px-2 py-1 text-left font-semibold">Role</th>
+                        <th className="border border-[#ccc] px-2 py-1 text-left font-semibold">Propagate</th>
+                        <th className="border border-[#ccc] px-2 py-1 text-left font-semibold">Defined In</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { user: 'VSPHERE.LOCAL\\Administrator', role: 'Administrator', prop: 'Yes', defined: 'Root' },
+                        { user: 'VSPHERE.LOCAL\\SSOAdminServer', role: 'Administrator', prop: 'Yes', defined: 'Root' },
+                        { user: 'root', role: 'Administrator', prop: 'No', defined: `${selectedHost.name}` },
+                      ].map((r, i) => (
+                        <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#f8f9fb]'}>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5 text-[#1a4fa0]">{r.user}</td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5">{r.role}</td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5">{r.prop}</td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5 text-[#555]">{r.defined}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ContentPanel>
+              )}
+
+              {/* ── HOST DATASTORES ──────────────────────────────── */}
+              {selectedHost && activeTab === 'datastores' && (
+                <ContentPanel title={`Datastores on ${selectedHost.name}`}>
+                  <table className="w-full text-[10px] border-collapse">
+                    <thead>
+                      <tr className="bg-[#e8edf4]">
+                        {['Name', 'Type', 'Capacity', 'Free', 'Used %', 'Accessible'].map(h => (
+                          <th key={h} className="border border-[#ccc] px-2 py-1 text-left font-semibold">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {datastores.filter(d => d.hosts?.includes(selectedHost.id)).map((ds, i) => {
+                        const usedPct = (((ds.capacity_gb - ds.free_gb) / ds.capacity_gb) * 100).toFixed(0)
+                        return (
+                          <tr key={ds.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-[#f8f9fb]'} cursor-pointer hover:bg-[#e8f0fc]`}
+                            onClick={() => { setSelectedNode({ type: 'datastore', id: ds.id }); setActiveTab('summary') }}>
+                            <td className="border border-[#e0e0e0] px-2 py-0.5 text-[#1a4fa0]">{ds.name}</td>
+                            <td className="border border-[#e0e0e0] px-2 py-0.5">{ds.type}</td>
+                            <td className="border border-[#e0e0e0] px-2 py-0.5">{fmtBytes(ds.capacity_gb)}</td>
+                            <td className="border border-[#e0e0e0] px-2 py-0.5 font-medium" style={{ color: ds.free_gb < 50 ? '#e04' : '#270' }}>{fmtBytes(ds.free_gb)}</td>
+                            <td className="border border-[#e0e0e0] px-2 py-0.5">
+                              <div className="flex items-center gap-1">
+                                <div className="w-16"><UsageBar pct={Number(usedPct)} color={Number(usedPct) > 85 ? '#e0412b' : '#4c9be8'} /></div>
+                                <span>{usedPct}%</span>
+                              </div>
+                            </td>
+                            <td className="border border-[#e0e0e0] px-2 py-0.5">
+                              <span className={ds.accessible ? 'text-[#2db52d]' : 'text-[#e04]'}>{ds.accessible ? 'Yes' : 'No'}</span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </ContentPanel>
+              )}
+
+              {/* ── HOST NETWORKS ────────────────────────────────── */}
+              {selectedHost && activeTab === 'networks' && (
+                <ContentPanel title={`Networks on ${selectedHost.name}`}>
+                  <table className="w-full text-[10px] border-collapse">
+                    <thead>
+                      <tr className="bg-[#e8edf4]">
+                        {['Name', 'Type', 'VLAN', 'vSwitch', 'VMs'].map(h => (
+                          <th key={h} className="border border-[#ccc] px-2 py-1 text-left font-semibold">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {networks.filter(n => n.hosts?.includes(selectedHost.id)).map((net, i) => (
+                        <tr key={net.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-[#f8f9fb]'} cursor-pointer hover:bg-[#e8f0fc]`}
+                          onClick={() => { setSelectedNode({ type: 'network', id: net.id }); setActiveTab('summary') }}>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5 text-[#1a4fa0]">{net.name}</td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5">{net.type}</td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5">{net.vlan === 0 ? 'All (0)' : net.vlan}</td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5">{net.switch}</td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5">{vms.filter(v => v.network_id === net.id && v.host_id === selectedHost.id).length}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ContentPanel>
+              )}
+
               {/* ── VM SUMMARY ───────────────────────────────────── */}
               {selectedVm && activeTab === 'summary' && (
                 <div className="space-y-3">
@@ -726,6 +1063,61 @@ export default function VMwareSimulator() {
                 </div>
               )}
 
+              {/* ── VM CONFIGURE ─────────────────────────────────── */}
+              {selectedVm && activeTab === 'configure' && (
+                <div className="space-y-3">
+                  <ContentPanel title="Virtual Hardware">
+                    <div className="space-y-2">
+                      <InfoRow label="CPU" value={
+                        <span className="flex items-center gap-2">
+                          {selectedVm.cpu} vCPU
+                          <button onClick={() => setShowEditVmModal(true)} disabled={selectedVm.power === 'poweredOn' || acting}
+                            className="text-[10px] text-[#5b9bd5] hover:underline disabled:opacity-40">Edit</button>
+                        </span>
+                      } />
+                      <InfoRow label="Memory" value={
+                        <span className="flex items-center gap-2">
+                          {fmtMb(selectedVm.memory_mb)}
+                          <button onClick={() => setShowEditVmModal(true)} disabled={selectedVm.power === 'poweredOn' || acting}
+                            className="text-[10px] text-[#5b9bd5] hover:underline disabled:opacity-40">Edit</button>
+                        </span>
+                      } />
+                      <InfoRow label="Hard Disk 1" value={
+                        <span className="flex items-center gap-2">
+                          {fmtBytes(selectedVm.disk_gb)}
+                          <button onClick={() => runAction('add_disk', { vm_id: selectedVm.id, size_gb: 100 })} disabled={acting}
+                            className="text-[10px] text-[#5b9bd5] hover:underline disabled:opacity-40">Add Disk (+100 GB)</button>
+                        </span>
+                      } />
+                      <InfoRow label="Network Adapter" value={networks.find(n => n.id === selectedVm.network_id)?.name || 'VM Network'} />
+                      <InfoRow label="VM Hardware Version" value={selectedVm.hardware_version} />
+                    </div>
+                  </ContentPanel>
+                  <ContentPanel title="VM Options">
+                    <InfoRow label="Guest OS" value={selectedVm.guest_os_version} />
+                    <InfoRow label="VMware Tools" value={selectedVm.tools === 'ok' ? 'Managed (current)' : 'Not installed'} />
+                    <div className="mt-2 pt-2 border-t border-[#eee]">
+                      <label className="block text-[10px] text-[#555] mb-0.5">Notes / Annotation</label>
+                      <p className="text-[11px] text-[#333]">{selectedVm.annotation || '—'}</p>
+                      <button onClick={() => setShowEditVmModal(true)} disabled={acting}
+                        className="mt-1 text-[10px] text-[#5b9bd5] hover:underline">Edit notes</button>
+                    </div>
+                  </ContentPanel>
+                  <ContentPanel title="Power Actions">
+                    <div className="flex gap-2 flex-wrap">
+                      <button onClick={() => runAction('power_on', { vm_id: selectedVm.id })} disabled={selectedVm.power === 'poweredOn' || acting}
+                        className="px-3 py-1 text-[11px] bg-[#2db52d] text-white rounded hover:bg-[#239023] disabled:opacity-40">Power On</button>
+                      <button onClick={() => runAction('power_off', { vm_id: selectedVm.id })} disabled={selectedVm.power === 'poweredOff' || acting}
+                        className="px-3 py-1 text-[11px] bg-[#e0412b] text-white rounded hover:bg-[#c8371c] disabled:opacity-40">Power Off</button>
+                      <button onClick={() => runAction('reboot', { vm_id: selectedVm.id })} disabled={selectedVm.power !== 'poweredOn' || acting}
+                        className="px-3 py-1 text-[11px] border border-[#aaa] rounded bg-[#f0f0f0] hover:bg-[#e0e0e0] disabled:opacity-40">Reset</button>
+                      <button onClick={() => setPendingDeleteVm(selectedVm)} disabled={selectedVm.power === 'poweredOn' || acting}
+                        className="px-3 py-1 text-[11px] border border-[#faa] rounded bg-[#fff0ee] text-[#c03] hover:bg-[#ffe0dc] disabled:opacity-40">Delete from Inventory</button>
+                    </div>
+                  </ContentPanel>
+                </div>
+              )}
+
               {/* ── VM SNAPSHOTS ─────────────────────────────────── */}
               {selectedVm && activeTab === 'snapshots' && (
                 <ContentPanel title="Snapshot Manager">
@@ -779,6 +1171,65 @@ export default function VMwareSimulator() {
                 </div>
               )}
 
+              {/* ── DATASTORE MONITOR ────────────────────────────── */}
+              {selectedDs && activeTab === 'monitor' && (
+                <div className="space-y-3">
+                  <ContentPanel title="Space utilization">
+                    <div className="mb-2">
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span>Used: {fmtBytes(selectedDs.capacity_gb - selectedDs.free_gb)}</span>
+                        <span>Free: {fmtBytes(selectedDs.free_gb)}</span>
+                        <span>Capacity: {fmtBytes(selectedDs.capacity_gb)}</span>
+                      </div>
+                      <UsageBar pct={((selectedDs.capacity_gb - selectedDs.free_gb) / selectedDs.capacity_gb) * 100}
+                        color={selectedDs.free_gb < 50 ? '#e0412b' : '#4c9be8'} />
+                    </div>
+                  </ContentPanel>
+                  <ContentPanel title="I/O Performance (last hour)">
+                    <div className="grid grid-cols-3 gap-4">
+                      <MetricCard label="Read Throughput" value="48 MB/s" color="#4c9be8" />
+                      <MetricCard label="Write Throughput" value="32 MB/s" color="#e67e22" />
+                      <MetricCard label="I/O Latency" value="4.2 ms" color="#9b59b6" />
+                    </div>
+                  </ContentPanel>
+                </div>
+              )}
+
+              {/* ── DATASTORE HOSTS ───────────────────────────────── */}
+              {selectedDs && activeTab === 'hosts' && (
+                <ContentPanel title={`Hosts connected to ${selectedDs.name}`}>
+                  <table className="w-full text-[10px] border-collapse">
+                    <thead>
+                      <tr className="bg-[#e8edf4]">
+                        {['', 'Host', 'Status', 'Version'].map(h => (
+                          <th key={h} className="border border-[#ccc] px-2 py-1 text-left font-semibold">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hosts.filter(h => selectedDs.hosts?.includes(h.id)).map((h, i) => (
+                        <tr key={h.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-[#f8f9fb]'} cursor-pointer hover:bg-[#e8f0fc]`}
+                          onClick={() => { setSelectedNode({ type: 'host', id: h.id }); setActiveTab('summary') }}>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5"><StatusIcon status={h.status} /></td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5 text-[#1a4fa0]">{h.name}</td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5">{h.status}</td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5">{h.version}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ContentPanel>
+              )}
+
+              {/* ── DATASTORE VMS ─────────────────────────────────── */}
+              {selectedDs && activeTab === 'vms' && (
+                <ContentPanel title={`VMs on ${selectedDs.name}`}>
+                  <VmTable vms={vms.filter(v => v.datastore_id === selectedDs.id)}
+                    onSelect={vm => { setSelectedNode({ type: 'vm', id: vm.id }); setActiveTab('summary') }}
+                    onAction={runAction} acting={acting} />
+                </ContentPanel>
+              )}
+
               {/* ── NETWORK ──────────────────────────────────────── */}
               {selectedNet && activeTab === 'summary' && (
                 <ContentPanel title="Network details">
@@ -786,6 +1237,40 @@ export default function VMwareSimulator() {
                   <InfoRow label="VLAN ID" value={selectedNet.vlan === 0 ? 'All (0)' : String(selectedNet.vlan)} />
                   <InfoRow label="vSwitch" value={selectedNet.switch} />
                   <InfoRow label="Connected hosts" value={selectedNet.hosts?.length || 0} />
+                </ContentPanel>
+              )}
+
+              {/* ── NETWORK HOSTS ─────────────────────────────────── */}
+              {selectedNet && activeTab === 'hosts' && (
+                <ContentPanel title={`Hosts using ${selectedNet.name}`}>
+                  <table className="w-full text-[10px] border-collapse">
+                    <thead>
+                      <tr className="bg-[#e8edf4]">
+                        {['', 'Host', 'Status'].map(h => (
+                          <th key={h} className="border border-[#ccc] px-2 py-1 text-left font-semibold">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hosts.filter(h => selectedNet.hosts?.includes(h.id)).map((h, i) => (
+                        <tr key={h.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-[#f8f9fb]'} cursor-pointer hover:bg-[#e8f0fc]`}
+                          onClick={() => { setSelectedNode({ type: 'host', id: h.id }); setActiveTab('summary') }}>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5"><StatusIcon status={h.status} /></td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5 text-[#1a4fa0]">{h.name}</td>
+                          <td className="border border-[#e0e0e0] px-2 py-0.5">{h.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ContentPanel>
+              )}
+
+              {/* ── NETWORK VMS ───────────────────────────────────── */}
+              {selectedNet && activeTab === 'vms' && (
+                <ContentPanel title={`VMs on ${selectedNet.name}`}>
+                  <VmTable vms={vms.filter(v => v.network_id === selectedNet.id)}
+                    onSelect={vm => { setSelectedNode({ type: 'vm', id: vm.id }); setActiveTab('summary') }}
+                    onAction={runAction} acting={acting} />
                 </ContentPanel>
               )}
 
@@ -892,6 +1377,42 @@ export default function VMwareSimulator() {
       )}
       {showMigrateModal && selectedVm && (
         <MigrateModal vm={selectedVm} hosts={hosts} onClose={() => setShowMigrateModal(false)} onAction={runAction} />
+      )}
+      {showCreateVmModal && (
+        <CreateVmModal hosts={hosts} datastores={datastores} networks={networks}
+          onClose={() => setShowCreateVmModal(false)} onAction={runAction} />
+      )}
+      {showEditVmModal && selectedVm && (
+        <EditVmModal vm={selectedVm} networks={networks}
+          onClose={() => setShowEditVmModal(false)} onAction={runAction} />
+      )}
+      {showCloneVmModal && selectedVm && (
+        <CloneVmModal vm={selectedVm} onClose={() => setShowCloneVmModal(false)} onAction={runAction} />
+      )}
+      {pendingDeleteVm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-[#f5f5f5] border border-[#c0c0c0] shadow-xl rounded w-80">
+            <div className="bg-[#e0412b] text-white text-sm font-semibold px-3 py-2">
+              Confirm Delete
+            </div>
+            <div className="p-4">
+              <p className="text-[12px] text-[#333] mb-1">Delete VM <strong>{pendingDeleteVm.name}</strong>?</p>
+              <p className="text-[10px] text-[#666]">This removes the VM from inventory. Disk files will be released.</p>
+            </div>
+            <div className="px-4 pb-4 flex gap-2 justify-end">
+              <button onClick={() => setPendingDeleteVm(null)}
+                className="px-4 py-1.5 text-sm border border-[#aaa] rounded bg-[#e8e8e8] hover:bg-[#ddd]">Cancel</button>
+              <button onClick={async () => {
+                await runAction('delete_vm', { vm_id: pendingDeleteVm.id })
+                setPendingDeleteVm(null)
+                setSelectedNode({ type: 'host', id: hosts[0]?.id || null })
+                setActiveTab('summary')
+              }} className="px-4 py-1.5 text-sm rounded bg-[#e0412b] text-white hover:bg-[#c8371c]">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -1014,12 +1535,14 @@ function VmTable({ vms, onSelect, onAction, acting }) {
   )
 }
 
-function ToolbarBtn({ onClick, disabled, label, blue }) {
+function ToolbarBtn({ onClick, disabled, label, blue, red }) {
   return (
     <button onClick={onClick} disabled={disabled}
       className={`px-2.5 py-1 text-[11px] border rounded disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${blue
         ? 'bg-[#5b9bd5] text-white border-[#4a8ac4] hover:bg-[#4a8ac4]'
-        : 'border-[#aab] bg-[#e4e9f0] hover:bg-[#d8dfe8] text-[#222]'}`}
+        : red
+          ? 'bg-[#fff0ee] text-[#c03] border-[#faa] hover:bg-[#ffe0dc]'
+          : 'border-[#aab] bg-[#e4e9f0] hover:bg-[#d8dfe8] text-[#222]'}`}
     >
       {label}
     </button>
