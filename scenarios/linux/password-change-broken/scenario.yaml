@@ -1,5 +1,7 @@
 title: Password Change Broken
 slug: password-change-broken
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Authentication
 difficulty: medium

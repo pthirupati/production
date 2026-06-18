@@ -1,5 +1,7 @@
 title: SSH Key Auth Fails — Bad .ssh Permissions
 slug: ssh-key-permissions
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: SSH / Security
 difficulty: easy

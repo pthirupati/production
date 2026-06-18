@@ -379,75 +379,89 @@ class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-        profile = Profile.objects.filter(user=user).first()
-        social = list(
-            SocialAccount.objects.filter(user=user).values("provider", "provider_uid", "created_at")
-        )
-        return Response({
-            "id": user.id,
-            "email": user.email,
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "phone_number": profile.phone_number if profile else None,
-            "country": profile.country if profile else "",
-            "is_staff": user.is_staff,
-            "has_usable_password": user.has_usable_password(),
-            "date_joined": user.date_joined.isoformat(),
-            "social_accounts": [
-                {
-                    "provider": s["provider"],
-                    "linked_at": s["created_at"].isoformat() if s.get("created_at") else None,
-                }
-                for s in social
-            ],
-            "support_bot_enabled": profile.support_bot_enabled if profile else True,
-        })
-
-    def put(self, request):
-        user = request.user
-        username = request.data.get("username", user.username)
-        phone_number = request.data.get("phone_number")
-        first_name = request.data.get("first_name")
-        last_name = request.data.get("last_name")
-
-        # Validate username uniqueness
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        if username != user.username and User.objects.filter(username=username).exists():
+        try:
+            user = request.user
+            profile = Profile.objects.filter(user=user).first()
+            social = list(
+                SocialAccount.objects.filter(user=user).values("provider", "provider_uid", "created_at")
+            )
+            return Response({
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "phone_number": profile.phone_number if profile else None,
+                "country": profile.country if profile else "",
+                "is_staff": user.is_staff,
+                "has_usable_password": user.has_usable_password(),
+                "date_joined": user.date_joined.isoformat(),
+                "social_accounts": [
+                    {
+                        "provider": s["provider"],
+                        "linked_at": s["created_at"].isoformat() if s.get("created_at") else None,
+                    }
+                    for s in social
+                ],
+                "support_bot_enabled": profile.support_bot_enabled if profile else True,
+            })
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error("Profile fetch error: %s", exc, exc_info=True)
             return Response(
-                {"error": "Username already taken"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Failed to load profile. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        user.username = username
-        if first_name is not None:
-            user.first_name = first_name
-        if last_name is not None:
-            user.last_name = last_name
-        user.save()
+    def put(self, request):
+        try:
+            user = request.user
+            username = request.data.get("username", user.username)
+            phone_number = request.data.get("phone_number")
+            first_name = request.data.get("first_name")
+            last_name = request.data.get("last_name")
 
-        # Update profile fields
-        profile, _ = Profile.objects.get_or_create(user=user)
-        if phone_number is not None:
-            profile.phone_number = phone_number or None
-        country = request.data.get("country")
-        if country is not None:
-            profile.country = country
-        if "support_bot_enabled" in request.data:
-            profile.support_bot_enabled = bool(request.data.get("support_bot_enabled"))
-        profile.save()
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            if username != user.username and User.objects.filter(username=username).exists():
+                return Response(
+                    {"error": "Username already taken"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        return Response({
-            "message": "Profile updated",
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "phone_number": profile.phone_number,
-            "country": profile.country,
-            "support_bot_enabled": profile.support_bot_enabled,
-        })
+            user.username = username
+            if first_name is not None:
+                user.first_name = first_name
+            if last_name is not None:
+                user.last_name = last_name
+            user.save()
+
+            profile, _ = Profile.objects.get_or_create(user=user)
+            if phone_number is not None:
+                profile.phone_number = phone_number or None
+            country = request.data.get("country")
+            if country is not None:
+                profile.country = country
+            if "support_bot_enabled" in request.data:
+                profile.support_bot_enabled = bool(request.data.get("support_bot_enabled"))
+            profile.save()
+
+            return Response({
+                "message": "Profile updated",
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "phone_number": profile.phone_number,
+                "country": profile.country,
+                "support_bot_enabled": profile.support_bot_enabled,
+            })
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error("Profile update error: %s", exc, exc_info=True)
+            return Response(
+                {"error": "Failed to update profile. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class DeleteAccountView(APIView):

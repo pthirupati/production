@@ -1,5 +1,7 @@
 title: Fix the Broken Nginx Server
 slug: broken-nginx
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Web Servers
 difficulty: easy

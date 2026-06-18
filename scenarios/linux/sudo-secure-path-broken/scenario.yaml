@@ -1,5 +1,7 @@
 title: sudo secure_path Blocks Admin Commands
 slug: sudo-secure-path-broken
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Sudo / Security
 difficulty: hard

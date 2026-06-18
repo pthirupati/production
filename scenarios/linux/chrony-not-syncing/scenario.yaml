@@ -1,5 +1,7 @@
 title: NTP/Chrony Not Synchronizing
 slug: chrony-not-syncing
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Services
 difficulty: medium

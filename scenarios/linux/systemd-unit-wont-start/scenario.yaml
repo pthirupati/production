@@ -1,5 +1,7 @@
 title: Broken systemd Unit — App Won't Start
 slug: systemd-unit-wont-start
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Services / systemd
 difficulty: hard

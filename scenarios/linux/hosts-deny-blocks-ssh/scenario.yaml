@@ -1,5 +1,7 @@
 title: TCP Wrappers hosts.deny Blocks SSH
 slug: hosts-deny-blocks-ssh
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Security / SSH
 difficulty: hard

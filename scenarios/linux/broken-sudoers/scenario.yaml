@@ -1,5 +1,7 @@
 title: Broken sudoers Configuration
 slug: broken-sudoers
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: User Management
 difficulty: easy

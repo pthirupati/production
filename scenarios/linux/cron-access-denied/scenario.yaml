@@ -1,5 +1,7 @@
 title: User Not Allowed to Run Cron
 slug: cron-access-denied
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Scheduling
 difficulty: easy

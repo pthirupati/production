@@ -1,5 +1,7 @@
 title: Fix the Broken Cron Job
 slug: broken-cron
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Scheduling
 difficulty: easy

@@ -1,5 +1,7 @@
 title: Disk Space Crisis
 slug: disk-full
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Storage
 difficulty: medium

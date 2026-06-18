@@ -1,5 +1,7 @@
 title: Application Fails — Shared Library Not Found
 slug: ldconfig-missing-library
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Libraries
 difficulty: hard

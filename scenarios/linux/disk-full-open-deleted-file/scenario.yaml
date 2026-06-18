@@ -1,5 +1,7 @@
 title: Disk Full — Deleted File Still Open
 slug: disk-full-open-deleted-file
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Storage
 difficulty: hard

@@ -1,5 +1,7 @@
 title: Swap Disabled — Memory Pressure
 slug: swap-disabled
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Memory
 difficulty: easy

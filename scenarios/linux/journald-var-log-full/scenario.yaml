@@ -1,5 +1,7 @@
 title: journald Cannot Write — /var/log Full
 slug: journald-var-log-full
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Logging / Disk
 difficulty: hard

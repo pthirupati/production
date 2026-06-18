@@ -1,5 +1,7 @@
 title: Inode Exhaustion on /var/cache
 slug: inode-exhausted
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Storage
 difficulty: hard

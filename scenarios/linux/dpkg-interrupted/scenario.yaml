@@ -1,5 +1,7 @@
 title: APT/DPKG Database Interrupted
 slug: dpkg-interrupted
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Package Management
 difficulty: hard

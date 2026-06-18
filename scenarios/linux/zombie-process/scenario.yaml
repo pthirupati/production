@@ -1,5 +1,7 @@
 title: Kill the Zombie Process
 slug: zombie-process
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Process Management
 difficulty: easy

@@ -4,14 +4,15 @@ export const PUBLIC_NAV_PRIMARY = [
   { to: '/mock-interviews', label: 'Mock Interviews' },
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/pricing', label: 'Pricing' },
+  { to: '/technologies', label: 'Technology' },
+  { to: '/verify-certificate', label: 'Verify Certificate' },
+  { to: '/about', label: 'About' },
 ]
 
 export const PUBLIC_NAV_SECONDARY = [
-  { to: '/about', label: 'About' },
   { to: '/blog', label: 'Blog' },
   { to: '/community', label: 'Community' },
   { to: '/faq', label: 'FAQ' },
-  { to: '/verify-certificate', label: 'Verify Certificate' },
   { to: '/contact', label: 'Contact' },
 ]
 

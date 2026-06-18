@@ -1,5 +1,7 @@
 title: SSH Configuration Lockout
 slug: ssh-lockout
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Security
 difficulty: hard

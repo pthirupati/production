@@ -1,5 +1,7 @@
 title: User Shell Set to /usr/sbin/nologin
 slug: user-nologin-shell
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Users / Groups
 difficulty: medium

@@ -1,5 +1,7 @@
 title: LVM Full — Add New PV and Extend LV
 slug: lvm-add-pv-extend
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Storage / LVM
 difficulty: hard

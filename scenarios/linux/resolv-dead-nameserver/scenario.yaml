@@ -1,5 +1,7 @@
 title: DNS Resolution Broken — Dead nameserver
 slug: resolv-dead-nameserver
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Networking / DNS
 difficulty: hard

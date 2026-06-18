@@ -1,5 +1,7 @@
 title: Cron Job Fails — PATH Not Set
 slug: cron-missing-path
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Scheduling
 difficulty: hard

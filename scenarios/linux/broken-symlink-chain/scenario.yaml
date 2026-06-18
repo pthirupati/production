@@ -1,5 +1,7 @@
 title: Broken Symbolic Link Chain
 slug: broken-symlink-chain
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Filesystem
 difficulty: easy

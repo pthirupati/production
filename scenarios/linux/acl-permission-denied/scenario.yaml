@@ -1,5 +1,7 @@
 title: ACL Required for Shared Directory
 slug: acl-permission-denied
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Permissions / ACL
 difficulty: medium

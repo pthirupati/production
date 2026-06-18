@@ -1,5 +1,7 @@
 title: nproc Limit Prevents Forking
 slug: limits-nproc-exceeded
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Performance
 difficulty: medium

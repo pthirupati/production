@@ -91,9 +91,9 @@ export default function Home() {
               <span className="text-lg sm:text-xl font-bold font-display text-white tracking-tight hidden sm:inline">FixitLab</span>
             </Link>
 
-            {/* Desktop nav — primary links only, single row */}
-            <nav className="hidden lg:flex flex-1 min-w-0 items-center justify-center" aria-label="Main navigation">
-              <div className="flex items-center gap-1 flex-nowrap">
+            {/* Desktop nav — scrollable single row */}
+            <nav className="hidden lg:flex flex-1 min-w-0 items-center justify-center overflow-hidden" aria-label="Main navigation">
+              <div className="flex items-center gap-0.5 flex-nowrap overflow-x-auto nav-scroll-strip px-1">
                 {PUBLIC_NAV_PRIMARY.map(({ to, label }) => (
                   <BubbleNavLink key={to} to={to} active={navActive(to)} size="sm">
                     {label}

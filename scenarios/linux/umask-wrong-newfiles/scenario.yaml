@@ -1,5 +1,7 @@
 title: Wrong umask — Insecure New Files
 slug: umask-wrong-newfiles
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Permissions
 difficulty: easy

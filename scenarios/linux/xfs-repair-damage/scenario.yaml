@@ -1,5 +1,7 @@
 title: XFS Filesystem Requires xfs_repair
 slug: xfs-repair-damage
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Storage / XFS
 difficulty: hard

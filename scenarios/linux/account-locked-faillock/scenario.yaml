@@ -1,5 +1,7 @@
 title: Account Locked After Failed Logins
 slug: account-locked-faillock
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Authentication
 difficulty: medium

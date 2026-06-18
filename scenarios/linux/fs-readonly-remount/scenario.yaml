@@ -1,5 +1,7 @@
 title: Filesystem Stuck Read-Only
 slug: fs-readonly-remount
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Storage
 difficulty: medium

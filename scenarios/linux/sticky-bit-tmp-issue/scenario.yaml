@@ -1,5 +1,7 @@
 title: Sticky Bit Missing on Shared /tmp/app
 slug: sticky-bit-tmp-issue
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Permissions
 difficulty: easy

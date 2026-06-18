@@ -1,5 +1,7 @@
 title: fstab Wrong UUID — /mnt/data Won't Mount
 slug: fstab-bad-uuid
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Storage / fstab
 difficulty: hard

@@ -1,5 +1,7 @@
 title: Immutable Flag Blocks Config Edit
 slug: chattr-immutable-config
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Filesystem / Attributes
 difficulty: hard

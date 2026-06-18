@@ -1,5 +1,7 @@
 title: Extend LVM Logical Volume
 slug: lvm-extend
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Storage / LVM
 difficulty: hard

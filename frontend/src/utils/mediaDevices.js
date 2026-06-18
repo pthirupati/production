@@ -4,8 +4,10 @@
 
 export async function queryMediaPermission(kind = 'camera') {
   if (!navigator.permissions?.query) return 'prompt'
+  // Permissions API uses 'microphone', not 'audio'
+  const permName = kind === 'audio' ? 'microphone' : kind
   try {
-    const status = await navigator.permissions.query({ name: kind })
+    const status = await navigator.permissions.query({ name: permName })
     return status.state
   } catch {
     return 'prompt'

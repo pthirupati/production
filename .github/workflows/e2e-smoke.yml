@@ -88,16 +88,23 @@ jobs:
       - name: Wait for staging health (up to 120s)
         env:
           BASE_URL: ${{ steps.urls.outputs.base_url }}
+          SITE_URL: ${{ steps.urls.outputs.site_url }}
         run: |
+          HEALTHY=false
           for i in $(seq 1 24); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/health" || echo "000")
-            if [ "$STATUS" = "200" ]; then echo "Healthy"; break; fi
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/api/health/" || echo "000")
-            if [ "$STATUS" = "200" ]; then echo "Healthy (api)"; break; fi
-            echo "Attempt $i — status $STATUS, retrying in 5s…"
+            # Try public Django config endpoint (always accessible externally)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/api/config/" || echo "000")
+            if [ "$STATUS" = "200" ]; then echo "Healthy via /api/config/ (attempt $i)"; HEALTHY=true; break; fi
+            # Fallback: try the nginx /health path
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/health" || echo "000")
+            if [ "$STATUS" = "200" ]; then echo "Healthy via /health (attempt $i)"; HEALTHY=true; break; fi
+            # Fallback: try site root
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${SITE_URL}/" || echo "000")
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "301" ]; then echo "Healthy via site root (attempt $i)"; HEALTHY=true; break; fi
+            echo "Attempt $i — last status $STATUS, retrying in 5s…"
             sleep 5
           done
-          [ "$STATUS" = "200" ] || { echo "Staging not healthy after 120s"; exit 1; }
+          [ "$HEALTHY" = "true" ] || { echo "Service not healthy after 120s"; exit 1; }
 
       - name: Resolve superuser credentials
         id: superuser

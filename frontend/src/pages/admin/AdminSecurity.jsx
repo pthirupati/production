@@ -20,6 +20,7 @@ export default function AdminSecurity() {
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [clearingEmails, setClearingEmails] = useState(false)
   const [blockIp, setBlockIp] = useState('')
   const [blockUserEmail, setBlockUserEmail] = useState('')
   const [blockCountry, setBlockCountry] = useState('')
@@ -56,7 +57,8 @@ export default function AdminSecurity() {
     setDetail({ metric: metricKey, rows: [] })
     try {
       const data = await adminApi.getSecurityDetail(metricKey, days)
-      setDetail(data)
+      // Backend returns { detail: '...', rows: [] } — normalise to metric key
+      setDetail({ metric: data.detail || metricKey, rows: data.rows || [] })
     } catch {
       toast.error('Failed to load details')
       setDetail(null)
@@ -123,22 +125,22 @@ export default function AdminSecurity() {
         <button type="button" className="text-xs text-accent-cyan hover:underline" onClick={() => openDetail('email_failed')}>
           View email failures
         </button>
-        {(email.failed ?? 0) > 0 && (
-          <button
-            type="button"
-            className="text-xs text-accent-red hover:underline"
-            onClick={async () => {
-              try {
-                const res = await adminApi.securityAction({ action: 'clear_email_failures' })
-                toast.success(`Cleared ${res.cleared || 0} failed email log(s)`)
-                loadData()
-                setDetail(null)
-              } catch { toast.error('Clear failed') }
-            }}
-          >
-            Clear failures
-          </button>
-        )}
+        <button
+          type="button"
+          disabled={clearingEmails}
+          className="text-xs text-accent-red hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={async () => {
+            setClearingEmails(true)
+            try {
+              const res = await adminApi.securityAction({ action: 'clear_email_failures' })
+              toast.success(`Cleared ${res.cleared || 0} failed email log(s)`)
+              loadData()
+              setDetail(null)
+            } catch { toast.error('Clear failed') } finally { setClearingEmails(false) }
+          }}
+        >
+          {clearingEmails ? 'Clearing…' : 'Clear failures'}
+        </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

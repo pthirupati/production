@@ -1,5 +1,7 @@
 title: SCP and Rsync Mirror to Remote Host
 slug: scp-rsync-remote-sync
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: SSH / File transfer
 difficulty: medium

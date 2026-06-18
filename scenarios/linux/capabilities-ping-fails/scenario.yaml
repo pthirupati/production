@@ -1,5 +1,7 @@
 title: ping Fails — Missing CAP_NET_RAW
 slug: capabilities-ping-fails
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Capabilities / Security
 difficulty: hard

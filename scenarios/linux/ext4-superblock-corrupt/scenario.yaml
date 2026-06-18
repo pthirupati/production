@@ -1,5 +1,7 @@
 title: ext4 Filesystem Needs fsck
 slug: ext4-superblock-corrupt
+lab_mode: simulation
+simulation_type: generic
 technology: Linux
 category: Storage
 difficulty: hard

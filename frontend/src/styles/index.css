@@ -386,14 +386,14 @@ body::after {
   color: rgb(var(--s-400));
 }
 .nav-link-idle:hover {
-  color: rgb(var(--s-100));
-  background: rgb(var(--s-800) / 0.65);
-  box-shadow: inset 0 -2px 0 rgb(var(--a-cyan) / 0.5);
+  color: white;
+  background: rgb(var(--a-cyan) / 0.1);
+  box-shadow: inset 0 -2px 0 rgb(var(--a-cyan) / 0.7);
   transform: translateY(-1px);
 }
 .nav-link-active:hover {
-  color: rgb(var(--s-50));
-  background: rgb(var(--s-800) / 0.75);
+  color: white;
+  background: rgb(var(--a-cyan) / 0.2);
 }
 
 /* Interview preflight media buttons */
@@ -472,11 +472,12 @@ body::after {
 }
 [data-theme="light"] .nav-link-idle:hover {
   color: rgb(var(--s-900));
-  background: rgb(var(--s-200) / 0.7);
+  background: rgb(var(--a-cyan) / 0.1);
+  box-shadow: inset 0 -2px 0 rgb(var(--a-cyan) / 0.6);
 }
 [data-theme="light"] .nav-link-active {
   color: rgb(var(--s-900));
-  background: rgb(var(--s-100));
+  background: rgb(var(--a-cyan) / 0.08);
 }
 [data-theme="light"] .sidebar-nav-idle {
   color: rgb(var(--s-600));
