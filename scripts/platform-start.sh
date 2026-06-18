@@ -85,7 +85,12 @@ echo "Syncing superuser credentials from env..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python /scripts/create_superuser.py || true
 
 echo "Seeding/updating scenarios..."
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_scenarios --dir /scenarios
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+  python manage.py seed_scenarios --dir /scenarios --merge-only
+
+echo "Admin demo certificate / sample interview..."
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+  python manage.py seed_admin_demo || true
 
 echo "Seeding/updating projects..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_projects || true

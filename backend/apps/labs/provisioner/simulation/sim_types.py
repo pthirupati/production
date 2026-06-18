@@ -8,7 +8,8 @@ UNIFIED_SIM_TYPES = {
     "rhel": "RHEL Linux Simulation",
     "kubernetes": "Kubernetes Simulation",
     "gpu": "GPU / NVIDIA Simulation",
-    "baremetal": "Bare Metal / IPMI / VMware Simulation",
+    "baremetal": "Bare Metal / IPMI Simulation",
+    "vmware": "VMware vCenter Simulation",
     "database": "Database Simulation",
     "ansible": "Ansible Simulation",
     "python": "Python Simulation",
@@ -23,7 +24,6 @@ _LEGACY_MAP = {
     "html": "rhel",
     "shell_script": "rhel",
     "docker": "generic",
-    "vmware": "baremetal",
     "k8s": "kubernetes",
 }
 
@@ -47,6 +47,7 @@ def hostname_for_type(sim_type: str, slug: str = "") -> str:
         "ansible": "ansible-control",
         "python": "dev-server",
         "java": "dev-server",
+        "vmware": "vcenter-sim",
     }
     if "ansible" in slug:
         return "ansible-control"

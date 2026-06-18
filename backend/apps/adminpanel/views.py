@@ -3002,7 +3002,7 @@ class AdminSecurityMetricsView(APIView):
                 rows = list(
                     EmailLog.objects.filter(status="failed", created_at__gte=since)
                     .order_by("-created_at")[:100]
-                    .values("id", "recipient", "subject", "error", "created_at", "status")
+                    .values("id", "to_email", "subject", "error", "created_at", "status", "template")
                 )
                 return Response({"detail": "email_failed", "rows": rows})
             action_map = {
@@ -3101,6 +3101,10 @@ class AdminSecurityActionView(APIView):
             updated = qs.update(is_active=True)
             if not updated:
                 return Response({"error": "User not found"}, status=404)
+        elif action == "clear_email_failures":
+            from apps.notifications.models import EmailLog
+            deleted, _ = EmailLog.objects.filter(status="failed").delete()
+            return Response({"cleared": deleted, "blocked_ips": get_blocked_ips(), "blocked_countries": get_blocked_countries()})
         else:
             return Response({"error": "Unknown action"}, status=400)
 

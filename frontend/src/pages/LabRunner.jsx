@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { labApi } from '../api/labs'
 import { useLabStore } from '../store/labStore'
 import { useAuthStore } from '../store/authStore'
@@ -670,6 +670,30 @@ export default function LabRunner() {
   const useDualPane = Boolean(scenario.dual_terminal && labHosts.length >= 2)
   const dualHosts = useDualPane ? labHosts.slice(0, 2) : []
   const isSimulationLab = session?.provider === 'simulation' || scenario.lab_mode === 'simulation'
+  const isVmwareLab = (scenario?.slug || '').includes('vmware')
+    || scenario?.technology?.slug === 'vmware'
+    || scenario?.simulation_type === 'vmware'
+
+  const labUnavailable = session && !['RUNNING', 'PROVISIONING'].includes(session.status)
+
+  if (labUnavailable) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-6">
+        <div className="max-w-md text-center glass-card p-8 space-y-4">
+          <XCircle size={40} className="text-accent-red mx-auto" />
+          <h1 className="text-xl font-bold text-white">Lab environment is not available</h1>
+          <p className="text-surface-400 text-sm">
+            This lab session is {session.status?.toLowerCase() || 'unavailable'}. The terminal cannot be opened.
+            Please contact support if you believe this is an error.
+          </p>
+          <Link to="/contact" className="btn-primary inline-block">Contact support</Link>
+          <Link to={`/scenarios/${scenario?.slug || ''}`} className="block text-sm text-accent-cyan hover:underline mt-2">
+            Back to scenario
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   const remoteSshTargets = labHosts.filter(h => h.ip && h.name !== 'primary' && h.name !== 'ssh_client')
   const hasSshClient = labHosts.some(h => h.name === 'ssh_client')
@@ -990,6 +1014,16 @@ export default function LabRunner() {
         <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-2 bg-surface-900 border-b border-surface-800 text-[10px] sm:text-xs">
           {useDualPane && (
             <span className="text-accent-purple font-medium mr-1">Dual terminal</span>
+          )}
+          {isVmwareLab && (
+            <Link
+              to={`/vmware/${sessionId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#4fa7e8]/40 text-[#4fa7e8] bg-[#4fa7e8]/10 hover:bg-[#4fa7e8]/20 text-[10px] font-medium"
+            >
+              <ExternalLink size={12} /> vCenter Simulator
+            </Link>
           )}
           {isSimulationLab && (
             <>

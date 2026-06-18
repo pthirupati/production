@@ -1,0 +1,9 @@
+name: VMware vSphere
+slug: vmware
+description: Learn VMware vCenter administration with a full vSphere simulator — datacenters, clusters, ESXi hosts, VMs, storage, networking, and troubleshooting labs.
+icon: server
+color: blue
+order: 8
+price: 499
+is_active: true
+coming_soon: false

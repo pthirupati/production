@@ -42,6 +42,17 @@ def _log_action(session, issue_key, issue_url, action, jira_status="", details=N
     )
 
 
+def _is_vmware_scenario(scenario) -> bool:
+    if not scenario:
+        return False
+    slug = (getattr(scenario, "slug", "") or "").lower()
+    tech_slug = ""
+    if getattr(scenario, "technology_id", None) and scenario.technology:
+        tech_slug = (scenario.technology.slug or "").lower()
+    sim_type = (getattr(scenario, "simulation_type", "") or "").lower()
+    return "vmware" in slug or tech_slug == "vmware" or sim_type == "vmware"
+
+
 def _build_issue_body(session=None, user=None, scenario=None) -> str:
     if session is not None:
         scenario = session.scenario
@@ -49,6 +60,7 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
     site = settings.SITE_URL.rstrip("/")
     scenario_url = f"{site}/scenarios/{scenario.slug}"
     lab_url = f"{site}/lab/{session.id}" if session else scenario_url
+    vmware_url = f"{site}/vmware/{session.id}" if session and _is_vmware_scenario(scenario) else ""
 
     custom = (getattr(scenario, "jira_issue_template", "") or "").strip()
     if custom:
@@ -90,7 +102,8 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
         f"{outcome_text}\n\n"
         f"h3. FixitLab Links\n"
         f"* [Open lab|{lab_url}]\n"
-        f"* [Scenario details|{scenario_url}]\n\n"
+        + (f"* [Open VMware vCenter Simulator|{vmware_url}]\n" if vmware_url else "")
+        + f"* [Scenario details|{scenario_url}]\n\n"
         f"*Session ID:* {session.id if session else 'pending'}\n"
         f"*Site:* {site}"
     )

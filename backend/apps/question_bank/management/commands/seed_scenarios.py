@@ -23,6 +23,7 @@ TECH_META = {
     "rhel-linux": {"name": "RHEL Linux", "icon": "hard-drive", "color": "red", "order": 19},
     "simulation": {"name": "Simulation Labs", "icon": "monitor", "color": "cyan", "order": 20},
     "linux-administration": {"name": "Linux Administration", "icon": "terminal", "color": "cyan", "order": 5},
+    "vmware": {"name": "VMware vSphere", "icon": "server", "color": "blue", "order": 8},
 }
 
 
@@ -34,6 +35,16 @@ class Command(BaseCommand):
             "--dir",
             default="/scenarios",
             help="Root directory containing scenario YAML files",
+        )
+        parser.add_argument(
+            "--technologies",
+            default="",
+            help="Comma-separated technology folder slugs to seed (default: all)",
+        )
+        parser.add_argument(
+            "--merge-only",
+            action="store_true",
+            help="Only create new scenarios; do not overwrite existing scenario fields",
         )
 
     def _load_technology(self, tech_dir: str, tech_path: str) -> Technology:
@@ -68,6 +79,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         scenarios_dir = options["dir"]
+        tech_filter = {
+            t.strip().lower()
+            for t in (options.get("technologies") or "").split(",")
+            if t.strip()
+        }
+        merge_only = bool(options.get("merge_only"))
 
         if not os.path.exists(scenarios_dir):
             scenarios_dir = os.path.join(
@@ -84,6 +101,8 @@ class Command(BaseCommand):
         for tech_dir in sorted(os.listdir(scenarios_dir)):
             tech_path = os.path.join(scenarios_dir, tech_dir)
             if not os.path.isdir(tech_path):
+                continue
+            if tech_filter and tech_dir.lower() not in tech_filter:
                 continue
 
             technology = self._load_technology(tech_dir, tech_path)
@@ -125,8 +144,13 @@ class Command(BaseCommand):
                 from apps.labs.provisioner.simulation.sim_types import normalize_sim_type
                 sim_type = normalize_sim_type(sim_type)
 
+                slug = data.get("slug", scenario_dir)
+                if merge_only and Scenario.objects.filter(slug=slug).exists():
+                    self.stdout.write(f"  Skipped (exists): {slug}")
+                    continue
+
                 scenario, created = Scenario.objects.update_or_create(
-                    slug=data.get("slug", scenario_dir),
+                    slug=slug,
                     defaults={
                         "title": data["title"],
                         "technology": technology,

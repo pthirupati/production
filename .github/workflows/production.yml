@@ -67,6 +67,14 @@ on:
         description: "Skip email sending during tests (set SKIP_EMAIL_TESTS=true)"
         type: boolean
         default: false
+      technologies:
+        description: "Comma-separated technology slugs to seed/test (empty = all). e.g. vmware,linux-administration"
+        type: string
+        default: ""
+      merge_seed_only:
+        description: "Only add new scenarios from YAML; do not overwrite existing DB scenarios"
+        type: boolean
+        default: true
 
 concurrency:
   group: fixitlab-production
@@ -432,8 +440,13 @@ jobs:
           script: |
             set -e
             cd /opt/fixitlab
+            SEED_ARGS="--dir /scenarios"
+            if [ "${{ inputs.merge_seed_only }}" = "true" ]; then SEED_ARGS="$SEED_ARGS --merge-only"; fi
+            if [ -n "${{ inputs.technologies }}" ]; then SEED_ARGS="$SEED_ARGS --technologies ${{ inputs.technologies }}"; fi
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
-              python manage.py seed_scenarios --dir /scenarios
+              python manage.py seed_scenarios $SEED_ARGS
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              python manage.py seed_admin_demo || true
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
               python manage.py seed_projects || true
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
@@ -453,7 +466,8 @@ jobs:
             set -e
             cd /opt/fixitlab
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
-              env E2E_SKIP_LAB=0 E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 TERMINAL_MAX_WS_PER_USER=64 \
+              env E2E_SKIP_LAB=0 E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 E2E_PRESERVE_LAB_USERS=1 \
+              E2E_TECH_FILTER="${{ inputs.technologies }}" TERMINAL_MAX_WS_PER_USER=64 \
               python /scripts/e2e_all_scenarios_labs.py
 
   # ─────────────────────────────────────────────────────────────
@@ -482,7 +496,7 @@ jobs:
             set -e
             cd /opt/fixitlab
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
-              env E2E_SKIP_LAB=0 RUN_FULL_E2E=1 E2E_SKIP_DUPLICATE_LABS=1 E2E_SKIP_CLEANUP=1 \
+              env E2E_SKIP_LAB=0 RUN_FULL_E2E=1 E2E_SKIP_DUPLICATE_LABS=1 E2E_SKIP_CLEANUP=1 E2E_PRESERVE_LAB_USERS=1 \
               python /scripts/e2e_production_test.py
 
       - name: External API E2E (through gateway)

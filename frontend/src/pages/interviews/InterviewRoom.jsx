@@ -127,7 +127,7 @@ export default function InterviewRoom() {
     }
   }
 
-  const requestMediaAccess = async (type) => {
+  const requestMediaAccess = (type) => {
     if (!isMediaDevicesSupported()) {
       const msg = getMediaErrorMessage({ name: 'NotSupportedError' })
       setMediaError(msg)
@@ -135,8 +135,7 @@ export default function InterviewRoom() {
       return
     }
     setMediaError('')
-    // Call getUserMedia directly on click so the browser shows Allow/Deny (Meet-style).
-    await executeMediaRequest(type)
+    setPermissionRequest(type)
   }
 
   const enableMic = () => requestMediaAccess('audio')

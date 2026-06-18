@@ -8,7 +8,7 @@ import { useDataStore } from '../store/dataStore'
 import { scenarioApi } from '../api/scenarios'
 import api from '../api/client'
 import { PlatformBanners } from '../components/PlatformBanners'
-import { PUBLIC_NAV_LINKS } from '../constants/publicNav'
+import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_SECONDARY, PUBLIC_NAV_LINKS } from '../constants/publicNav'
 import {
   Terminal, Shield, Clock, Trophy, Zap, Server,
   Cloud, Lock, Cpu, ArrowRight, CheckCircle2,
@@ -91,13 +91,10 @@ export default function Home() {
               <span className="text-lg sm:text-xl font-bold font-display text-white tracking-tight hidden sm:inline">FixitLab</span>
             </Link>
 
-            {/* Desktop nav — single row, scrolls on narrow lg viewports */}
-            <nav
-              className="hidden lg:flex flex-1 min-w-0 items-center justify-center overflow-x-auto overscroll-x-contain nav-scroll-strip"
-              aria-label="Main navigation"
-            >
-              <div className="flex items-center gap-0.5 flex-nowrap px-1">
-                {PUBLIC_NAV_LINKS.map(({ to, label }) => (
+            {/* Desktop nav — primary links only, single row */}
+            <nav className="hidden lg:flex flex-1 min-w-0 items-center justify-center" aria-label="Main navigation">
+              <div className="flex items-center gap-1 flex-nowrap">
+                {PUBLIC_NAV_PRIMARY.map(({ to, label }) => (
                   <BubbleNavLink key={to} to={to} active={navActive(to)} size="sm">
                     {label}
                   </BubbleNavLink>

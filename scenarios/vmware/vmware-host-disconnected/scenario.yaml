@@ -1,0 +1,24 @@
+title: ESXi Host Disconnected
+slug: vmware-host-disconnected
+category: VMware vSphere
+description: An ESXi host shows as disconnected in vCenter. Reconnect the host and verify cluster health.
+difficulty: medium
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+  - Open VMware vCenter Simulator from the Jira ticket
+  - Identify the disconnected ESXi host
+  - Reconnect the host and verify validation passes
+initial_state: vCenter shows esxi-01.fixitlab.local as disconnected. VMs may be affected.
+hints:
+  - content: Check host connection state under the cluster in vCenter.
+    cost: 10
+    order: 1
+  - content: Use Reconnect host from the monitor tab.
+    cost: 20
+    order: 2

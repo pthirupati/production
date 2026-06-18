@@ -1,0 +1,19 @@
+title: HA Host Failure
+slug: vmware-ha-failure
+category: VMware vSphere
+description: An ESXi host is not responding and a production VM is down. Investigate HA and restore the workload.
+difficulty: hard
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: Critical
+time_limit: 1500
+max_score: 100
+objectives:
+  - Review cluster HA status and host health
+  - Identify affected VMs
+  - Restore VM power state
+initial_state: esxi-01 is not responding. web-prod-01 is powered off.
+hints:
+  - content: Check alarms and recent events for HA failures.
+    cost: 15
+    order: 1

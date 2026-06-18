@@ -1,0 +1,24 @@
+title: VM Guest Powered Off
+slug: vmware-guest-powered-off
+category: VMware vSphere
+description: Production web VM is powered off. Use vCenter or the host shell to investigate and restore service.
+difficulty: medium
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: Medium
+time_limit: 900
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+  - Open VMware vCenter Simulator from the Jira ticket
+  - Identify the powered-off VM
+  - Power on the VM and verify validation passes
+initial_state: VMware vCenter shows web-prod-01 powered off. ESXi hosts are connected.
+hints:
+  - content: Check VM power state in the vCenter inventory tree.
+    cost: 10
+    order: 1
+  - content: Power on web-prod-01 from the VM actions panel.
+    cost: 20
+    order: 2

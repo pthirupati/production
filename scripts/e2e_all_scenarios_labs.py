@@ -413,7 +413,13 @@ def main():
               + (" ..." if len(catalog["missing_images"]) > 15 else ""))
 
     isolation_done = False
+    tech_filter_raw = os.environ.get("E2E_TECH_FILTER", "").strip()
+    tech_filter = {t.strip().lower() for t in tech_filter_raw.split(",") if t.strip()}
+
     for tech in catalog["technologies"]:
+        if tech_filter and tech.slug.lower() not in tech_filter:
+            stats.skip(f"[{tech.slug}] all scenarios", "E2E_TECH_FILTER")
+            continue
         tech_scenarios = catalog["by_tech"].get(tech.slug, [])
         if getattr(tech, "coming_soon", False):
             stats.skip(f"[{tech.slug}] all scenarios", "technology coming soon")

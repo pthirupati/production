@@ -84,6 +84,9 @@ urlpatterns = [
     # AI Interview Studio
     path("api/interviews/", include("apps.interviews.urls")),
 
+    # VMware vCenter Simulator
+    path("api/vmware/", include("apps.vmware_sim.urls")),
+
     # OpenAPI schema + Swagger UI
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),

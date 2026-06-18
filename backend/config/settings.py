@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "apps.jira_integration",
     "apps.interviews",
     "apps.support",
+    "apps.vmware_sim",
 ]
 
 # --------------------------------------------------

@@ -256,6 +256,10 @@ class SimulationProvisioner:
         if entry:
             _wire_engine_hosts(engine, entry)
 
+        if "vmware" in slug.lower() or raw_type == "vmware":
+            from apps.vmware_sim.engine import _ensure_session
+            _ensure_session(str(lab_session.id), slug)
+
         logger.info("Simulation lab %s persona=%s resource=%s", lab_session.id, sim_type, resource_id)
         return resource_id, f"sim-{slug}"
 
@@ -368,6 +372,15 @@ class SimulationProvisioner:
                 entry = None
         engine = entry.get("state", {}).get("engine") if entry else None
         slug = scenario_slug or (entry.get("state", {}).get("scenario_slug", "") if entry else "")
+        if "vmware" in (slug or "").lower():
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.engine import validate_vmware_lab, _ensure_session
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                _ensure_session(str(lab_session.id), slug)
+                return validate_vmware_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "VMware simulation session not found"
         script = resolve_simulation_validation_script(slug, validation_script or "")
         if engine and hasattr(engine, "state"):
             return validate_simulation_state(engine.state, script, engine=engine)
@@ -378,6 +391,13 @@ class SimulationProvisioner:
     def get_status(self, resource_id):
         if get_sim_session_by_resource(resource_id):
             return "running"
+        from apps.labs.models import LabSession
+        try:
+            lab_session = LabSession.objects.get(container_id=resource_id, status="RUNNING")
+            if ensure_sim_session(lab_session):
+                return "running"
+        except LabSession.DoesNotExist:
+            pass
         return "stopped"
 
     def terminate(self, resource_id, session_id=None):

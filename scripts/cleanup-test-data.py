@@ -152,6 +152,12 @@ def cleanup_test_data() -> dict:
         print("No test users to clean up.")
         return stats
 
+    if os.environ.get("E2E_PRESERVE_LAB_USERS", "0") == "1":
+        test_users = [u for u in test_users if not (u.username or "").startswith("e2e_lab_")]
+        if not test_users:
+            print("Skipped e2e_lab_* users (E2E_PRESERVE_LAB_USERS=1).")
+            return stats
+
     user_ids = [u.id for u in test_users]
     usernames = [u.username for u in test_users]
 

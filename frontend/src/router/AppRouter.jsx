@@ -67,6 +67,7 @@ const InterviewReport = lazy(() => import('../pages/interviews/InterviewReport')
 const AdminInterviews = lazy(() => import('../pages/admin/AdminInterviews'))
 const AdminCertificates = lazy(() => import('../pages/admin/AdminCertificates'))
 const InterviewLanding = lazy(() => import('../pages/interviews/InterviewLanding'))
+const VMwareSimulator = lazy(() => import('../pages/vmware/VMwareSimulator'))
 const Unsubscribe = lazy(() => import('../pages/Unsubscribe'))
 
 function PageLoader() {
@@ -133,6 +134,7 @@ export default function AppRouter() {
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
         <Route path="/jira/:issueKey" element={<ProtectedRoute><JiraTicketPage /></ProtectedRoute>} />
         <Route path="/auth/callback/:provider" element={<OAuthCallback />} />
+        <Route path="/vmware/:sessionId" element={<ProtectedRoute><VMwareSimulator /></ProtectedRoute>} />
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>

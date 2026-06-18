@@ -123,6 +123,22 @@ export default function AdminSecurity() {
         <button type="button" className="text-xs text-accent-cyan hover:underline" onClick={() => openDetail('email_failed')}>
           View email failures
         </button>
+        {(email.failed ?? 0) > 0 && (
+          <button
+            type="button"
+            className="text-xs text-accent-red hover:underline"
+            onClick={async () => {
+              try {
+                const res = await adminApi.securityAction({ action: 'clear_email_failures' })
+                toast.success(`Cleared ${res.cleared || 0} failed email log(s)`)
+                loadData()
+                setDetail(null)
+              } catch { toast.error('Clear failed') }
+            }}
+          >
+            Clear failures
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -227,6 +243,7 @@ export default function AdminSecurity() {
                   <div className="flex flex-wrap gap-2 items-center">
                     <span className="text-surface-500">{new Date(row.created_at).toLocaleString()}</span>
                     {row.user__username && <span className="text-surface-300">@{row.user__username}</span>}
+                    {row.to_email && <span className="text-accent-cyan">{row.to_email}</span>}
                     {row.ip_address && (
                       <>
                         <span className="font-mono text-surface-400">{row.ip_address}</span>
@@ -234,6 +251,8 @@ export default function AdminSecurity() {
                       </>
                     )}
                   </div>
+                  {row.subject && <p className="text-white mt-0.5 font-medium">{row.subject}</p>}
+                  {row.error && <p className="text-accent-red text-xs mt-0.5 whitespace-pre-wrap">{row.error}</p>}
                   {row.resource && <p className="text-surface-400 mt-0.5 truncate">{row.resource}</p>}
                 </div>
               ))}

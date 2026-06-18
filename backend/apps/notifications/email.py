@@ -107,6 +107,12 @@ def send_email(subject, to_email, template, context=None):
 
     try:
         html_content = render_to_string(template, context)
+        html_content = (
+            html_content.replace("#94a3b8", "#d1d5db")
+            .replace("#64748b", "#b0bcc9")
+            .replace("#475569", "#94a3b8")
+            .replace("color:#8b9cb3", "color:#cbd5e1")
+        )
     except TemplateDoesNotExist:
         logger.warning(f"Email template '{template}' not found — skipping email to {to_email}")
         _log_email(subject, to_email, template, "failed", "Template not found")
