@@ -69,7 +69,7 @@ const FAQ_ITEMS = [
         a: 'Yes! You can restart any scenario to improve your score or practice. Your best score is tracked on the leaderboard.',
       },
       {
-        q: 'How do Jira bots work in simulation labs?',
+        q: 'How do Jira bots work in AI labs?',
         a: 'Each lab can have a Jira ticket. Comment on the ticket for customer impact/timeline (customer bot). Mention @backup team, @database team, @application team for patching, @storage team for disks, or @network team for NIC/IP — team bots reply after ~30 seconds and update the server. Use the terminal after confirmations.',
       },
       {

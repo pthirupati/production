@@ -420,7 +420,7 @@ export default function TechnologyDetail() {
             <div>
               <p className="text-sm font-semibold text-white">End-to-End Projects</p>
               <p className="text-xs text-surface-400 mt-0.5">
-                Build real architectures step-by-step. Each project is guided by Jira tickets — open them in the simulation, complete the tasks, and ask the Jira bot if you get stuck.
+                Build real architectures step-by-step. Each project is guided by Jira tickets — open them in the AI lab, complete the tasks, and ask the Jira bot if you get stuck.
               </p>
             </div>
           </div>

@@ -337,7 +337,7 @@ export default function JiraTicketPage() {
             </div>
 
             <p className="mt-3 text-[10px] text-[#8993A4] text-center px-2">
-              FixitLab incident simulation — styled like Jira Cloud. No external Atlassian account required.
+              FixitLab live incident environment — styled like Jira Cloud. No external Atlassian account required.
             </p>
           </aside>
         </div>

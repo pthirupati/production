@@ -212,7 +212,7 @@ function LabTerminal({
             reconnectAttempts.current++
             const cap = isSim ? 3 : maxReconnectAttempts
             if (isSim && reconnectAttempts.current > 3) {
-              bindEnterRetry('\r\n\x1b[1;33mSimulation shell paused — press Enter to reconnect\x1b[0m\r\n')
+              bindEnterRetry('\r\n\x1b[1;33mAI Lab shell paused — press Enter to reconnect\x1b[0m\r\n')
               return
             }
             if (reconnectAttempts.current >= cap) {

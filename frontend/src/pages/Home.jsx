@@ -166,36 +166,46 @@ export default function Home() {
         {/* Background layers */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 hero-gradient" />
-          <div className="absolute inset-0 hero-grid opacity-40" />
-          <div className="glow-orb-cyan   absolute -top-40  left-1/4  animate-morph" />
-          <div className="glow-orb-purple absolute  top-1/3 -right-20 animate-float" />
-          <div className="glow-orb-pink   absolute -bottom-40 right-1/3 animate-morph" style={{ animationDelay: '3s' }} />
-          {/* Slow rotating dashed ring */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[820px] h-[820px] opacity-[0.05] animate-rotate-slow">
+          <div className="absolute inset-0 cyber-grid opacity-60" />
+          {/* Deep 3D glow orbs */}
+          <div className="glow-orb-cyan   absolute -top-40  left-1/4  animate-morph" style={{ width: '700px', height: '700px' }} />
+          <div className="glow-orb-purple absolute  top-1/3 -right-20 animate-float" style={{ width: '560px', height: '560px' }} />
+          <div className="glow-orb-pink   absolute -bottom-40 right-1/3 animate-morph" style={{ animationDelay: '3s', width: '480px', height: '480px' }} />
+          <div className="glow-orb-blue absolute bottom-0 left-0 animate-float" style={{ animationDelay: '5s', width: '400px', height: '400px', opacity: '0.35' }} />
+          {/* Slow rotating dashed rings (nested for depth) */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] opacity-[0.06] animate-rotate-slow">
             <div className="w-full h-full rounded-full border-2 border-dashed border-accent-cyan" />
           </div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[640px] h-[640px] opacity-[0.04]" style={{ animation: 'rotate-slow 20s linear infinite reverse' }}>
+            <div className="w-full h-full rounded-full border border-dashed border-accent-purple" />
+          </div>
           {/* Floating particles */}
-          {[...Array(14)].map((_, i) => (
+          {[...Array(20)].map((_, i) => (
             <div
               key={i}
               className="particle"
               style={{
-                width:  `${2 + (i % 4) * 2}px`,
-                height: `${2 + (i % 4) * 2}px`,
+                width:  `${2 + (i % 5) * 1.5}px`,
+                height: `${2 + (i % 5) * 1.5}px`,
                 background: i % 4 === 0
-                  ? 'rgb(var(--a-cyan)   / 0.5)'
+                  ? 'rgb(var(--a-cyan)   / 0.6)'
                   : i % 4 === 1
-                    ? 'rgb(var(--a-purple) / 0.4)'
+                    ? 'rgb(var(--a-purple) / 0.5)'
                     : i % 4 === 2
-                      ? 'rgb(var(--a-pink)   / 0.4)'
-                      : 'rgb(var(--a-green)  / 0.4)',
-                top:  `${5  + i * 6.5}%`,
-                left: `${3  + i * 6.8}%`,
-                animationDelay:    `${i * 0.5}s`,
-                animationDuration: `${6 + i * 0.5}s`,
+                      ? 'rgb(var(--a-pink)   / 0.5)'
+                      : 'rgb(var(--a-blue)   / 0.5)',
+                top:  `${5  + i * 5}%`,
+                left: `${3  + i * 5}%`,
+                animationDelay:    `${i * 0.4}s`,
+                animationDuration: `${7 + (i % 5) * 1.2}s`,
+                boxShadow: i % 3 === 0 ? '0 0 8px rgb(var(--a-cyan)/0.6)' : undefined,
               }}
             />
           ))}
+        </div>
+        {/* 3D perspective floor grid at hero bottom */}
+        <div className="hero-3d-floor">
+          <div className="hero-3d-floor-inner" />
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 relative w-full">
@@ -204,8 +214,9 @@ export default function Home() {
             {/* LEFT col — Terminal demo */}
             <div className="hidden lg:block animate-slide-up">
               <div className="relative">
-                <div className="absolute -inset-6 bg-gradient-to-r from-accent-cyan/10 via-accent-blue/8 to-transparent rounded-3xl blur-3xl" />
-                <div className="glass-card p-1 card-3d gradient-border relative">
+                <div className="absolute -inset-8 bg-gradient-to-r from-accent-cyan/15 via-accent-blue/10 to-accent-purple/8 rounded-3xl blur-3xl" />
+                <div className="absolute -inset-1 bg-gradient-to-br from-accent-cyan/8 to-accent-purple/8 rounded-2xl blur-xl" />
+                <div className="glass-3d p-1 card-3d-deep gradient-border holo-card relative depth-shadow">
                   {/* Live badge */}
                   <div className="absolute -top-4 -left-4 bg-surface-800/90 backdrop-blur-xl border border-accent-green/30 rounded-xl px-4 py-2 text-xs text-accent-green font-semibold flex items-center gap-2 z-10 shadow-lg shadow-accent-green/10">
                     <div className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
@@ -291,15 +302,15 @@ export default function Home() {
 
               {/* Live stats — only render when data is available */}
               {stats.total_scenarios > 0 && (
-                <div className="flex flex-wrap items-center gap-8 pt-8 border-t border-surface-700/30">
+                <div className="flex flex-wrap items-center gap-4 pt-8 border-t border-surface-700/30">
                   {[
-                    { val: `${stats.total_scenarios}+`,                    label: 'Scenarios', icon: Target       },
-                    { val: `${stats.total_users?.toLocaleString()}+`,       label: 'Engineers', icon: Users        },
-                    { val: `${stats.total_completions?.toLocaleString()}+`, label: 'Solves',    icon: CheckCircle2 },
-                  ].map(({ val, label, icon: Icon }) => (
-                    <div key={label} className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-accent-cyan/10 flex items-center justify-center shrink-0">
-                        <Icon size={18} className="text-accent-cyan" />
+                    { val: `${stats.total_scenarios}+`,                    label: 'Scenarios', icon: Target,       color: 'cyan'   },
+                    { val: `${stats.total_users?.toLocaleString()}+`,       label: 'Engineers', icon: Users,        color: 'purple' },
+                    { val: `${stats.total_completions?.toLocaleString()}+`, label: 'Solves',    icon: CheckCircle2, color: 'green'  },
+                  ].map(({ val, label, icon: Icon, color }) => (
+                    <div key={label} className="stat-badge-3d flex items-center gap-3 px-5 py-3">
+                      <div className={`w-10 h-10 rounded-lg bg-accent-${color}/15 border border-accent-${color}/20 flex items-center justify-center shrink-0`}>
+                        <Icon size={18} className={`text-accent-${color}`} />
                       </div>
                       <div>
                         <p className="text-2xl font-black text-white leading-none">{val}</p>
@@ -348,7 +359,7 @@ export default function Home() {
               <Link
                 to={`/scenarios?type=${type}`}
                 key={type}
-                className="glass-card-hover card-3d card-shine p-10 text-center group relative overflow-hidden"
+                className="glass-3d card-3d-deep holo-card p-10 text-center group relative overflow-hidden transition-all duration-400"
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
                 <div className="relative">
@@ -420,7 +431,7 @@ export default function Home() {
                 <Link
                   to={isAuthenticated ? '/technologies' : '/register'}
                   key={tech.id}
-                  className="glass-card-hover card-3d card-shine p-8 text-center group"
+                  className="glass-3d card-3d-deep holo-card p-8 text-center group transition-all duration-400"
                 >
                   <div className="w-[68px] h-[68px] rounded-2xl bg-gradient-to-br from-accent-cyan/15 to-accent-purple/15 border border-accent-cyan/20 flex items-center justify-center mx-auto mb-5 group-hover:scale-110 group-hover:border-accent-cyan/40 transition-all duration-300">
                     <Icon size={32} className="text-accent-cyan group-hover:text-white transition-colors" />
@@ -533,7 +544,7 @@ export default function Home() {
       <div className="bg-gradient-stripe" />
 
       {/* ═══════════════════════════════════════════
-          SECTION 5b — VMWARE SIMULATION SHOWCASE
+          SECTION 5b — VMWARE AI LAB SHOWCASE
       ═══════════════════════════════════════════ */}
       <section className="relative overflow-hidden py-20 lg:py-24">
         <div className="absolute inset-0 section-dark" />
@@ -544,17 +555,17 @@ export default function Home() {
             {/* LEFT — copy */}
             <div className="flex-1 space-y-6">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#5b9bd5]/10 border border-[#5b9bd5]/20 text-[#5b9bd5] text-xs font-bold uppercase tracking-widest">
-                <Server size={13} /> VMware vCenter Simulation
+                <Server size={13} /> VMware vCenter AI Lab
               </div>
               <h2 className="text-4xl lg:text-5xl font-black text-white leading-tight">
                 Master{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5b9bd5] to-[#8ab4d4]">
                   VMware Infrastructure
                 </span>
-                {' '}in a Live Sim
+                {' '}in a Live AI Lab
               </h2>
               <p className="text-surface-400 text-lg leading-relaxed">
-                Practice real VMware vCenter and ESXi operations in a fully-featured browser simulation — no expensive lab hardware required. Fix HA failures, perform vMotion migrations, resolve datastore alerts, and more.
+                Practice real VMware vCenter and ESXi operations in a fully-featured AI-powered environment — no expensive lab hardware required. Fix HA failures, perform vMotion migrations, resolve datastore alerts, and more.
               </p>
               <ul className="space-y-3">
                 {[
@@ -622,7 +633,7 @@ export default function Home() {
             {features.map(({ icon: Icon, title, desc, color }, idx) => (
               <div
                 key={title}
-                className="glass-card-hover card-shine p-7 group"
+                className="glass-3d holo-card card-3d-deep p-7 group transition-all duration-400"
                 style={{ animationDelay: `${idx * 0.08}s` }}
               >
                 <div className={`w-14 h-14 rounded-xl bg-gradient-to-br from-accent-${color}/20 to-accent-${color}/5 border border-accent-${color}/20 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:border-accent-${color}/35 transition-all duration-300`}>
@@ -673,12 +684,13 @@ export default function Home() {
               <div key={step} className="flex flex-col items-center text-center relative group">
                 {/* Connector line */}
                 {idx < 2 && (
-                  <div className="hidden md:block absolute top-10 left-[62%] w-[76%] h-px bg-gradient-to-r from-surface-600 via-accent-cyan/20 to-transparent" />
+                  <div className="hidden md:block absolute top-10 left-[62%] w-[76%] h-px bg-gradient-to-r from-surface-600 via-accent-cyan/30 to-transparent" />
                 )}
 
                 {/* Icon */}
-                <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br from-accent-${color}/20 to-accent-${color}/5 border border-surface-700/50 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:border-accent-${color}/30 transition-all duration-300`}>
+                <div className={`w-20 h-20 rounded-2xl glass-3d float-3d border border-accent-${color}/25 flex items-center justify-center mb-6 group-hover:scale-110 transition-all duration-300`} style={{ animationDelay: `${idx * 1.5}s` }}>
                   <Icon size={30} className={`text-accent-${color}`} />
+                  <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br from-accent-${color}/15 to-transparent`} />
                 </div>
 
                 {/* Step pill */}
@@ -734,7 +746,7 @@ export default function Home() {
           </div>
 
           <div className="max-w-3xl mx-auto">
-            <div className="glass-card p-10 relative overflow-hidden gradient-border">
+            <div className="glass-3d holo-card animated-border-premium p-10 relative overflow-hidden depth-shadow">
               <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/5 via-transparent to-accent-purple/5" />
               <div className="relative">
                 {/* Stars */}
@@ -796,9 +808,9 @@ export default function Home() {
         <div className="glow-orb-purple absolute -right-20 top-0" />
 
         <div className="max-w-4xl mx-auto px-6 text-center relative">
-          <div className="glass-card p-16 relative overflow-hidden gradient-border">
-            <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/8 via-transparent to-accent-purple/8" />
-            <div className="absolute inset-0 bg-grid-pattern opacity-20" />
+          <div className="glass-3d holo-card animated-border-premium p-16 relative overflow-hidden depth-shadow">
+            <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/10 via-transparent to-accent-purple/10" />
+            <div className="absolute inset-0 cyber-grid opacity-30" />
 
             <div className="relative">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-cyan/10 border border-accent-cyan/20 text-accent-cyan text-xs font-bold uppercase tracking-widest mb-7">

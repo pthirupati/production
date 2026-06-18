@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
-  timeout: 30_000, // 30s default timeout
+  timeout: 45_000, // 45s default timeout — lab operations can be slow
 })
 
 // Attach JWT token; strip JSON Content-Type for multipart uploads
@@ -62,12 +62,13 @@ api.interceptors.response.use(
     if (error.response.status === 429) {
       const path = original?.url || ''
       const isLabStart = /\/labs\/\d+\/start\//.test(path)
-      toast.error(
-        isLabStart
-          ? 'Lab start limit reached. Wait a minute or resume an active lab from Dashboard.'
-          : 'Too many requests. Please slow down.',
-        { id: 'rate-limit', duration: 6000 },
-      )
+      const retryAfter = error.response.headers?.['retry-after']
+      const msg = isLabStart
+        ? 'Lab start limit reached. Wait a minute or resume an active lab from Dashboard.'
+        : retryAfter
+          ? `Too many requests — retry in ${retryAfter}s.`
+          : 'Too many requests. Please wait a moment.'
+      toast.error(msg, { id: 'rate-limit', duration: 6000 })
     }
 
     // 500+ Server error (skip auth forms and silent bootstrap requests)

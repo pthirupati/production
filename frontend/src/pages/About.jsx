@@ -48,7 +48,7 @@ const milestones = [
   { year: '2025', title: 'MVP Launch', desc: 'First Docker-based scenarios went live with Nginx, Cron, and DNS challenges.', icon: Terminal, color: 'text-accent-cyan', bg: 'bg-accent-cyan/10', border: 'border-accent-cyan/20' },
   { year: '2026', title: 'Cloud Labs', desc: 'Added AWS EC2 and DigitalOcean support for advanced scenarios needing real servers.', icon: Cloud, color: 'text-accent-blue', bg: 'bg-accent-blue/10', border: 'border-accent-blue/20' },
   { year: '2026', title: 'Jira & Teams', desc: 'Incident tickets per learner, Jira bot sync, org invites, member analytics, and AI interview coaching.', icon: Ticket, color: 'text-accent-green', bg: 'bg-accent-green/10', border: 'border-accent-green/20' },
-  { year: '2026', title: 'Growing Fast', desc: 'Expanded catalog across Linux, cloud, K8s, and simulations — full admin, billing, and certificate flows.', icon: Zap, color: 'text-accent-amber', bg: 'bg-accent-amber/10', border: 'border-accent-amber/20' },
+  { year: '2026', title: 'Growing Fast', desc: 'Expanded catalog across Linux, cloud, K8s, and AI-powered environments — full admin, billing, and certificate flows.', icon: Zap, color: 'text-accent-amber', bg: 'bg-accent-amber/10', border: 'border-accent-amber/20' },
 ]
 
 const values = [
@@ -56,7 +56,7 @@ const values = [
   { icon: Shield, title: 'Safe to Fail', desc: 'Every lab is an isolated sandbox (Docker, EC2, or DO). Sessions auto-expire in 15 minutes by default.', color: 'text-accent-green', bg: 'bg-accent-green/10 group-hover:bg-accent-green/20' },
   { icon: Heart, title: 'Accessible', desc: 'Free tier for everyone. Promo coupons, teams for enterprise, and OAuth sign-up.', color: 'text-accent-pink', bg: 'bg-accent-pink/10 group-hover:bg-accent-pink/20' },
   { icon: Globe, title: 'Global Community', desc: 'Engineers share threads with screenshots, vote on solutions, and compete on leaderboards.', color: 'text-accent-blue', bg: 'bg-accent-blue/10 group-hover:bg-accent-blue/20' },
-  { icon: Code, title: 'Real Environments', desc: 'Docker containers, AWS EC2, and DigitalOcean droplets — plus unified RHEL simulations.', color: 'text-accent-purple', bg: 'bg-accent-purple/10 group-hover:bg-accent-purple/20' },
+  { icon: Code, title: 'Real Environments', desc: 'Docker containers, AWS EC2, and DigitalOcean droplets — plus AI-powered RHEL environments.', color: 'text-accent-purple', bg: 'bg-accent-purple/10 group-hover:bg-accent-purple/20' },
   { icon: Zap, title: 'Instant Feedback', desc: 'Auto-validation checks your fix inside the environment. Know if you solved it immediately.', color: 'text-accent-amber', bg: 'bg-accent-amber/10 group-hover:bg-accent-amber/20' },
 ]
 
@@ -70,7 +70,7 @@ const platformFeatures = [
       'One personal ticket per user per scenario (not shared across learners)',
       'Ticket moves To Do → In Progress when you start the lab, Done when you pass validation',
       'In-app ticket panel with comments, activity history, and status — no Atlassian login required',
-      'Works with real Jira Cloud or built-in simulation mode when Jira is not configured',
+      'Works with real Jira Cloud or built-in AI-powered mode when Jira is not configured',
     ],
   },
   {
@@ -127,7 +127,7 @@ const platformFeatures = [
     desc: 'Full xterm.js shell over WebSocket — type real commands in Chrome, Firefox, or mobile. Dual-pane terminals and SSH-client scenarios for networking and multi-host puzzles.',
     bullets: [
       'Docker containers for fast spin-up; AWS EC2 & DigitalOcean for cloud-native drills',
-      'Unified RHEL simulation engine when you need instant labs without waiting for VMs',
+      'Instant AI-powered RHEL environments — labs ready in seconds, no VM provisioning wait',
       'Blocked-command guardrails per scenario (e.g. prevent destructive reboots)',
       'Command history and session recording for review',
     ],

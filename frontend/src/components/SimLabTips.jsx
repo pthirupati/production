@@ -67,7 +67,7 @@ export default function SimLabTips({ scenario }) {
   return (
     <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-3">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400 mb-2">
-        Simulation tips
+        Lab Tips
       </p>
       <ul className="space-y-1.5">
         {tips.map((tip, i) => (

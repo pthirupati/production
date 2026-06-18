@@ -1068,3 +1068,339 @@ body::after {
 .text-glow-purple { text-shadow: 0 0 20px rgba(var(--a-purple), 0.3), 0 0 40px rgba(var(--a-purple), 0.1); }
 [data-theme="light"] .text-glow-cyan { text-shadow: 0 0 10px rgba(var(--a-cyan), 0.15); }
 [data-theme="light"] .text-glow-purple { text-shadow: 0 0 10px rgba(var(--a-purple), 0.15); }
+
+/* ════════════════════════════════════════════════════════════════
+   ADVANCED 3D & GLASSMORPHISM EFFECTS
+   ════════════════════════════════════════════════════════════════ */
+
+/* ─── Perspective 3D grid floor ─── */
+.hero-3d-floor {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 260px;
+  pointer-events: none;
+  perspective: 800px;
+  perspective-origin: 50% 0%;
+  overflow: hidden;
+}
+.hero-3d-floor-inner {
+  position: absolute;
+  inset: 0;
+  transform: rotateX(60deg) translateY(40%);
+  transform-origin: center bottom;
+  background-image:
+    linear-gradient(rgb(var(--a-cyan) / 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--a-cyan) / 0.10) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: linear-gradient(to top, black 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, black 0%, transparent 100%);
+}
+
+/* ─── Enhanced card-3d with deeper perspective ─── */
+.card-3d-deep {
+  transform-style: preserve-3d;
+  transition: transform 0.45s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.45s cubic-bezier(0.23, 1, 0.32, 1);
+  will-change: transform;
+}
+.card-3d-deep:hover {
+  transform: perspective(600px) rotateX(-3deg) rotateY(3deg) translateZ(8px) translateY(-6px);
+  box-shadow:
+    0 30px 60px rgb(0 0 0 / 0.35),
+    0 0 0 1px rgb(var(--a-cyan) / 0.20),
+    0 0 40px rgb(var(--a-cyan) / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+/* ─── Floating 3D element ─── */
+@keyframes float-3d {
+  0%   { transform: translateY(0px)   rotateX(0deg)   rotateY(0deg); }
+  25%  { transform: translateY(-10px) rotateX(2deg)   rotateY(3deg); }
+  50%  { transform: translateY(-6px)  rotateX(-1deg)  rotateY(-2deg); }
+  75%  { transform: translateY(-14px) rotateX(3deg)   rotateY(-3deg); }
+  100% { transform: translateY(0px)   rotateX(0deg)   rotateY(0deg); }
+}
+.float-3d {
+  animation: float-3d 6s ease-in-out infinite;
+  transform-style: preserve-3d;
+}
+
+/* ─── Glowing neon rings ─── */
+@keyframes ring-pulse-3d {
+  0%, 100% { transform: translate(-50%, -50%) scale(1)    rotateX(65deg); opacity: 0.25; }
+  50%       { transform: translate(-50%, -50%) scale(1.12) rotateX(65deg); opacity: 0.50; }
+}
+.glow-ring-3d {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgb(var(--a-cyan) / 0.35);
+  box-shadow: 0 0 20px rgb(var(--a-cyan) / 0.15), inset 0 0 20px rgb(var(--a-cyan) / 0.05);
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotateX(65deg);
+  animation: ring-pulse-3d 4s ease-in-out infinite;
+}
+
+/* ─── Animated morphing blobs ─── */
+@keyframes morph-blob {
+  0%   { border-radius: 60% 40% 70% 30% / 50% 60% 40% 50%; transform: rotate(0deg) scale(1); }
+  33%  { border-radius: 40% 60% 30% 70% / 60% 40% 60% 40%; transform: rotate(120deg) scale(1.05); }
+  66%  { border-radius: 70% 30% 50% 50% / 30% 70% 50% 50%; transform: rotate(240deg) scale(0.95); }
+  100% { border-radius: 60% 40% 70% 30% / 50% 60% 40% 50%; transform: rotate(360deg) scale(1); }
+}
+.morph-blob {
+  animation: morph-blob 14s ease-in-out infinite;
+}
+
+/* ─── Spotlight sweep ─── */
+@keyframes spotlight-sweep {
+  0%   { transform: translateX(-100%) skewX(-15deg); }
+  100% { transform: translateX(300%)  skewX(-15deg); }
+}
+.spotlight-sweep {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.04), transparent);
+  animation: spotlight-sweep 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ─── 3D depth stat badge ─── */
+.stat-badge-3d {
+  background: rgb(var(--s-800) / 0.85);
+  backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid rgb(var(--a-cyan) / 0.22);
+  box-shadow:
+    0 4px 24px rgb(0 0 0 / 0.25),
+    0 0 0 1px rgb(255 255 255 / 0.04),
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 0 16px rgb(var(--a-cyan) / 0.08);
+  border-radius: 1rem;
+  transform: translateZ(0);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.stat-badge-3d:hover {
+  transform: translateY(-3px) translateZ(4px);
+  box-shadow:
+    0 8px 32px rgb(0 0 0 / 0.30),
+    0 0 0 1px rgb(var(--a-cyan) / 0.25),
+    inset 0 1px 0 rgb(255 255 255 / 0.10),
+    0 0 24px rgb(var(--a-cyan) / 0.12);
+}
+
+/* ─── Enhanced glassmorphism card ─── */
+.glass-3d {
+  background: rgb(var(--s-800) / 0.45);
+  backdrop-filter: blur(28px) saturate(1.8) brightness(1.05);
+  border: 1px solid rgb(255 255 255 / 0.10);
+  border-top-color: rgb(255 255 255 / 0.14);
+  border-left-color: rgb(255 255 255 / 0.08);
+  box-shadow:
+    0 8px 40px rgb(0 0 0 / 0.22),
+    0 2px 8px rgb(0 0 0 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    inset 0 0 0 1px rgb(255 255 255 / 0.02);
+  border-radius: 1.25rem;
+}
+.glass-3d:hover {
+  border-color: rgb(var(--a-cyan) / 0.22);
+  box-shadow:
+    0 16px 60px rgb(0 0 0 / 0.28),
+    0 0 0 1px rgb(var(--a-cyan) / 0.12),
+    0 0 32px rgb(var(--a-cyan) / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.09);
+}
+
+/* ─── Animated gradient border (slower, premium) ─── */
+.animated-border-premium {
+  position: relative;
+}
+.animated-border-premium::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg,
+    rgb(var(--a-cyan) / 0.8),
+    rgb(var(--a-purple) / 0.6),
+    rgb(var(--a-pink) / 0.5),
+    rgb(var(--a-blue) / 0.7),
+    rgb(var(--a-cyan) / 0.8)
+  );
+  background-size: 300% 300%;
+  animation: gradientShift 6s ease infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ─── Floating tech dots (decorative) ─── */
+@keyframes tech-dot-float {
+  0%, 100% { transform: translate(0, 0) scale(1);    opacity: 0.5; }
+  25%       { transform: translate(8px, -12px) scale(1.2); opacity: 0.8; }
+  50%       { transform: translate(-6px, -8px) scale(0.9);  opacity: 0.4; }
+  75%       { transform: translate(10px, -16px) scale(1.1); opacity: 0.7; }
+}
+.tech-dot {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: tech-dot-float 7s ease-in-out infinite;
+}
+
+/* ─── Rotate slow (hero dashed ring) ─── */
+@keyframes rotate-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.animate-rotate-slow { animation: rotate-slow 28s linear infinite; }
+
+/* ─── Morph (hero large orb) ─── */
+@keyframes morph {
+  0%,100% { border-radius: 60% 40% 70% 30% / 50% 60% 40% 50%; }
+  50%      { border-radius: 40% 60% 30% 70% / 60% 40% 60% 40%; }
+}
+.animate-morph { animation: morph 14s ease-in-out infinite; }
+.animate-float { animation: float-slow 8s ease-in-out infinite; }
+
+/* ─── Slow pulse glow for widgets ─── */
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* ─── Text shimmer gradient animation ─── */
+@keyframes text-gradient-move {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.animate-text-gradient { animation: text-gradient-move 4s ease infinite; }
+
+/* ─── Slide-in animations ─── */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-up { animation: slide-up 0.7s ease forwards; }
+.animate-slide-in-right { animation: slide-in-right 0.7s ease 0.2s both; }
+
+/* ─── Shimmer ─── */
+@keyframes shimmer {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.animate-shimmer { animation: shimmer 3s linear infinite; }
+
+/* ─── Depth shadow on floating panels ─── */
+.depth-shadow {
+  box-shadow:
+    0 2px 4px  rgb(0 0 0 / 0.08),
+    0 6px 16px rgb(0 0 0 / 0.12),
+    0 20px 48px rgb(0 0 0 / 0.18),
+    0 0 0 1px  rgb(255 255 255 / 0.04);
+}
+
+/* ─── 3D layered section intro glow ─── */
+.section-intro-glow {
+  position: relative;
+}
+.section-intro-glow::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 480px;
+  height: 120px;
+  background: radial-gradient(ellipse, rgb(var(--a-cyan) / 0.18) 0%, transparent 70%);
+  pointer-events: none;
+  filter: blur(20px);
+}
+
+/* ─── Neon underline for hero heading ─── */
+.neon-underline {
+  position: relative;
+  display: inline-block;
+}
+.neon-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, rgb(var(--a-cyan)), rgb(var(--a-blue)), rgb(var(--a-purple)));
+  background-size: 200% 100%;
+  border-radius: 2px;
+  animation: shimmer 2.5s linear infinite;
+  box-shadow: 0 0 12px rgb(var(--a-cyan) / 0.5), 0 0 24px rgb(var(--a-cyan) / 0.2);
+}
+
+/* ─── Holographic card overlay ─── */
+.holo-card {
+  position: relative;
+  overflow: hidden;
+}
+.holo-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    rgb(var(--a-cyan) / 0.04) 25%,
+    transparent 50%,
+    rgb(var(--a-purple) / 0.03) 75%,
+    transparent 100%
+  );
+  background-size: 200% 200%;
+  animation: gradientShift 8s ease infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ─── Cyber grid (denser, accent-colored) ─── */
+.cyber-grid {
+  background-image:
+    linear-gradient(rgb(var(--a-cyan) / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--a-cyan) / 0.05) 1px, transparent 1px),
+    linear-gradient(rgb(var(--a-purple) / 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--a-purple) / 0.03) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+}
+
+/* ─── Orb hover glow ─── */
+.orb-glow-hover {
+  transition: filter 0.4s ease, opacity 0.4s ease;
+}
+.orb-glow-hover:hover {
+  filter: blur(50px) brightness(1.4);
+  opacity: 0.35;
+}
+
+/* ─── Frosted glass button ─── */
+.btn-glass {
+  background: rgb(var(--s-800) / 0.55);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgb(255 255 255 / 0.10);
+  color: white;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.20), inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+.btn-glass:hover {
+  background: rgb(var(--s-700) / 0.65);
+  border-color: rgb(var(--a-cyan) / 0.28);
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.25), 0 0 16px rgb(var(--a-cyan) / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.10);
+  transform: translateY(-1px);
+}

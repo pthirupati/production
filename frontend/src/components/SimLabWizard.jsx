@@ -88,7 +88,7 @@ export default function SimLabWizard({ open, onClose, scenario, labHosts = [], o
 
   if (!wizards.length) {
     return (
-      <ConfirmModal open={open} onClose={onClose} title="Simulation wizards" maxWidth="max-w-lg">
+      <ConfirmModal open={open} onClose={onClose} title="Lab Wizards" maxWidth="max-w-lg">
         <p className="text-sm text-surface-400">
           For disk, NIC, and change-window actions, use the <strong className="text-surface-200">Jira ticket</strong> and
           mention @storage team, @network team, @backup team, @database team, or @application team.
@@ -117,7 +117,7 @@ export default function SimLabWizard({ open, onClose, scenario, labHosts = [], o
   if (!open) return null
 
   return (
-    <ConfirmModal open={open} onClose={onClose} title="Simulation wizards" maxWidth="max-w-lg">
+    <ConfirmModal open={open} onClose={onClose} title="Lab Wizards" maxWidth="max-w-lg">
       <div className="space-y-4">
         <p className="text-xs text-surface-400">
           Step-by-step guides inject commands into the correct terminal. Password hint: <span className="text-surface-200">redhat</span>

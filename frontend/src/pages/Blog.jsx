@@ -271,7 +271,7 @@ export default function Blog() {
             <Sparkles className="text-accent-cyan mx-auto mb-4" size={28} />
             <h2 className="text-xl md:text-2xl font-bold text-white mb-2">Ready to practice?</h2>
             <p className="text-surface-400 text-sm md:text-base mb-6">
-              Stop reading docs — break things safely in real Docker, cloud, and simulated environments.
+              Stop reading docs — break things safely in real Docker, cloud, and AI-powered environments.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Link to="/register" className="btn-primary px-6 py-2.5 text-sm">Get started free</Link>

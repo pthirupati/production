@@ -119,7 +119,12 @@ class PlatformConfigView(APIView):
     def get(self, request):
         from apps.adminpanel.platform_config import public_config_payload
 
-        return Response(public_config_payload())
+        cached = cache.get("platform_config_public")
+        if cached is not None:
+            return Response(cached)
+        payload = public_config_payload()
+        cache.set("platform_config_public", payload, 60)  # 1 min
+        return Response(payload)
 
 
 class TechnologiesListView(APIView):
@@ -220,6 +225,16 @@ class ScenariosListView(APIView):
     throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
+        # Cache anonymous list responses for 2 minutes to avoid hammering the DB
+        if not request.user.is_authenticated:
+            params = request.query_params
+            cache_key = (
+                f"scenarios_anon_{params.get('technology','')}_{params.get('technology_slug','')}_{params.get('difficulty','')}_{params.get('type','')}_{params.get('category','')}_{params.get('tag','')}_{params.get('search','')}_{params.get('free','')}_{params.get('page',1)}_{params.get('page_size',50)}"
+            )
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+
         qs = Scenario.objects.filter(is_active=True).select_related(
             "technology"
         ).prefetch_related("tags")
@@ -291,7 +306,13 @@ class ScenariosListView(APIView):
         subscribed = _get_subscribed_tech_ids(request.user if request.user.is_authenticated else None)
         _mark_accessible(data, subscribed)
 
-        return paginator.get_paginated_response(data)
+        response = paginator.get_paginated_response(data)
+
+        # Cache anonymous list result to reduce DB load on repeated browses
+        if not request.user.is_authenticated:
+            cache.set(cache_key, response.data, 120)  # 2 min
+
+        return response
 
 
 class ScenarioDetailView(APIView):

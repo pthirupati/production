@@ -216,8 +216,8 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "100/hour",
-        "user": "1000/hour",
+        "anon": "300/hour",
+        "user": "3000/hour",
         "auth": "10/minute",  # Strict limit on auth endpoints
         "lab_start": "60/hour",  # Limit lab provisioning (DoS protection)
         "login": "5/minute",
@@ -225,7 +225,7 @@ REST_FRAMEWORK = {
         "password_reset": "3/minute",
         "payment": "20/hour",
         "interview": "100/day",
-        "strict_anon": "10/minute",
+        "strict_anon": "60/minute",  # Public browsing needs headroom
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
