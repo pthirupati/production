@@ -11,21 +11,21 @@ from apps.question_bank.models import Technology, Scenario
 from apps.hints.models import Hint
 
 TECH_META = {
-    "linux": {"name": "Linux Administration", "icon": "terminal", "color": "cyan", "order": 5},
-    "networking": {"name": "Networking", "icon": "globe", "color": "blue", "order": 7},
-    "vmware": {"name": "VMware vSphere", "icon": "server", "color": "blue", "order": 8},
-    "database": {"name": "Database Administration", "icon": "database", "color": "blue", "order": 10},
-    "docker": {"name": "Docker & Containers", "icon": "container", "color": "cyan", "order": 11},
-    "ansible": {"name": "Ansible Automation", "icon": "network", "color": "purple", "order": 12},
-    "kubernetes": {"name": "Kubernetes", "icon": "layers", "color": "indigo", "order": 13},
-    "baremetal": {"name": "Bare Metal & IPMI", "icon": "server", "color": "orange", "order": 14},
-    "gpu": {"name": "GPU & NVIDIA", "icon": "cpu", "color": "green", "order": 15},
-    "python": {"name": "Python Development", "icon": "code", "color": "yellow", "order": 16},
-    "java": {"name": "Java Development", "icon": "code", "color": "orange", "order": 17},
-    "html": {"name": "HTML & Web Servers", "icon": "globe", "color": "pink", "order": 18},
-    "shell-script": {"name": "Shell Scripting", "icon": "terminal", "color": "teal", "order": 19},
-    "devops": {"name": "DevOps", "icon": "layers", "color": "purple", "order": 20},
-    "security": {"name": "Security", "icon": "shield", "color": "red", "order": 21},
+    "linux": {"slug": "linux", "name": "Linux Administration", "icon": "terminal", "color": "cyan", "order": 5},
+    "networking": {"slug": "networking", "name": "Networking", "icon": "globe", "color": "blue", "order": 7},
+    "vmware": {"slug": "vmware", "name": "VMware vSphere", "icon": "server", "color": "blue", "order": 8},
+    "database": {"slug": "database", "name": "Database Administration", "icon": "database", "color": "blue", "order": 10},
+    "docker": {"slug": "docker", "name": "Docker & Containers", "icon": "container", "color": "cyan", "order": 11},
+    "ansible": {"slug": "ansible", "name": "Ansible Automation", "icon": "network", "color": "purple", "order": 12},
+    "kubernetes": {"slug": "kubernetes", "name": "Kubernetes", "icon": "layers", "color": "indigo", "order": 13},
+    "baremetal": {"slug": "baremetal", "name": "Bare Metal & IPMI", "icon": "server", "color": "orange", "order": 14},
+    "gpu": {"slug": "gpu", "name": "GPU & NVIDIA", "icon": "cpu", "color": "green", "order": 15},
+    "python": {"slug": "python", "name": "Python Development", "icon": "code", "color": "yellow", "order": 16},
+    "java": {"slug": "java", "name": "Java Development", "icon": "code", "color": "orange", "order": 17},
+    "html": {"slug": "html", "name": "HTML & Web Servers", "icon": "globe", "color": "pink", "order": 18},
+    "shell-script": {"slug": "shell-script", "name": "Shell Scripting", "icon": "terminal", "color": "teal", "order": 19},
+    "devops": {"slug": "devops", "name": "DevOps", "icon": "layers", "color": "purple", "order": 20},
+    "security": {"slug": "security", "name": "Security", "icon": "shield", "color": "red", "order": 21},
 }
 
 
