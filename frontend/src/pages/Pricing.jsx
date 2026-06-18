@@ -73,7 +73,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'How do interview plans work?',
-    a: 'Interview Studio plans are billed yearly. Pro and Premium include 10 full mock interview attempts per year with multi-round voice interviews and reports. Prices are configured by admins.',
+    a: 'Interview Studio plans are billed yearly. Pro and Premium include 10 full mock interview attempts per year with multi-round voice interviews and detailed feedback reports.',
   },
   {
     q: 'What can I access for free?',
@@ -531,7 +531,7 @@ export default function Pricing() {
               Simple Yearly Pricing
             </h1>
             <p className="text-surface-400 text-lg max-w-2xl mx-auto animate-fade-in">
-              Subscribe per technology for lab scenarios, or choose an AI Interview Studio plan — both billed yearly with admin-controlled prices.
+              Subscribe per technology for lab scenarios, or choose an AI Interview Studio plan — both billed yearly.
             </p>
           </div>
           <div className="flex flex-wrap justify-center gap-3 mt-6">
@@ -549,7 +549,6 @@ export default function Pricing() {
               <span className="text-[10px] text-surface-500">(updated hourly)</span>
             </div>
           )}
-        </div>
         </div>
 
         {/* Free vs Paid comparison */}
@@ -611,7 +610,7 @@ export default function Pricing() {
         <h2 id="technology-pricing" className="text-2xl font-bold text-white text-center mb-2 scroll-mt-24">
           Technology Subscriptions
         </h2>
-        <p className="text-surface-400 text-center mb-2 text-sm">1-year access per technology &middot; prices set by admin</p>
+        <p className="text-surface-400 text-center mb-2 text-sm">1-year access per technology</p>
         <p className="text-surface-500 text-center mb-8 flex items-center justify-center gap-2 text-sm">
           <ShoppingCart size={14} /> Select multiple technologies and subscribe at once
         </p>
@@ -745,7 +744,7 @@ export default function Pricing() {
             <Mic2 className="text-indigo-400" size={22} /> AI Interview Studio
           </h2>
           <p className="text-sm text-surface-400 max-w-xl mx-auto">
-            Yearly mock interview plans — admin sets prices in Admin &rarr; Interviews &rarr; Pricing. 10 full interview attempts per year on paid tiers.
+            Yearly mock interview plans with AI-powered voice interviews and detailed feedback. 10 full interview attempts per year on paid tiers.
           </p>
         </div>
 
