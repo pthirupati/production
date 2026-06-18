@@ -199,7 +199,7 @@ export default function About() {
   return (
     <PublicLayout>
       {/* ── Hero ──────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden py-28">
+      <section className="relative overflow-hidden py-28 aurora-bg mesh-gradient">
         <div className="absolute inset-0 hero-grid opacity-50 pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-accent-purple/8 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-1/4 w-[500px] h-[400px] bg-accent-cyan/6 rounded-full blur-3xl pointer-events-none" />
@@ -209,7 +209,7 @@ export default function About() {
             <Heart size={14} />
             Our Mission
           </div>
-          <h1 className="text-5xl lg:text-7xl font-extrabold text-white leading-[1.05] mb-6 tracking-tight">
+          <h1 className="text-5xl lg:text-7xl font-extrabold text-white leading-[1.05] mb-6 tracking-tight glow-text">
             Master Technology
             <span className="block text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple">
               Through Practice
@@ -230,6 +230,8 @@ export default function About() {
           </div>
         </div>
       </section>
+
+      <div className="section-divider" />
 
       {/* ── Stats bar ─────────────────────────────────────────── */}
       <section className="border-y border-surface-800/50 bg-surface-900/40 backdrop-blur-sm">
@@ -266,17 +268,22 @@ export default function About() {
           </p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {values.map(({ icon: Icon, title, desc, color, bg }) => (
-            <div key={title} className="glass-card-hover p-6 group">
+          {values.map(({ icon: Icon, title, desc, color, bg }, idx) => {
+            const vDelays = ['reveal-delay-1','reveal-delay-2','reveal-delay-3','reveal-delay-4','reveal-delay-5','reveal-delay-6']
+            return (
+            <div key={title} className={`glass-card-hover p-6 group reveal ${vDelays[idx] || 'reveal-delay-1'}`}>
               <div className={`w-12 h-12 rounded-xl ${bg} flex items-center justify-center mb-4 transition-colors`}>
                 <Icon size={22} className={color} />
               </div>
               <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
               <p className="text-sm text-surface-400 leading-relaxed">{desc}</p>
             </div>
-          ))}
+            )
+          })}
         </div>
       </section>
+
+      <div className="section-divider" />
 
       {/* ── Timeline / Milestones ─────────────────────────────── */}
       <section className="bg-surface-900/40 border-y border-surface-800/50">
@@ -294,7 +301,7 @@ export default function About() {
             <div className="absolute left-[2.5rem] top-4 bottom-4 w-px bg-gradient-to-b from-accent-cyan/40 via-accent-purple/40 to-accent-amber/40 hidden md:block" />
             <div className="space-y-8">
               {milestones.map(({ year, title, desc, icon: Icon, color, bg, border }, i) => (
-                <div key={i} className="flex gap-5 items-start">
+                <div key={i} className={`flex gap-5 items-start reveal reveal-delay-${Math.min(i + 1, 5)}`}>
                   {/* Year + icon dot */}
                   <div className="shrink-0 hidden md:flex flex-col items-center gap-1 w-20 pt-1">
                     <span className={`text-xs font-bold ${color} mb-1`}>{year}</span>
@@ -318,6 +325,8 @@ export default function About() {
         </div>
       </section>
 
+      <div className="section-divider" />
+
       {/* ── Team ──────────────────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-6 py-24">
         <div className="text-center mb-14">
@@ -331,8 +340,10 @@ export default function About() {
           </p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-          {team.map(({ name, role, bio, gradient, border, textColor }) => (
-            <div key={name} className="glass-card-hover p-6 text-center group">
+          {team.map(({ name, role, bio, gradient, border, textColor }, tIdx) => {
+            const tDelays = ['reveal-delay-1','reveal-delay-2','reveal-delay-3','reveal-delay-4']
+            return (
+            <div key={name} className={`glass-card-hover feature-card-premium p-6 text-center group reveal ${tDelays[tIdx] || 'reveal-delay-1'}`}>
               <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${gradient} border ${border} flex items-center justify-center mx-auto mb-5 group-hover:scale-110 transition-transform duration-300`}>
                 <span className={`text-2xl font-extrabold ${textColor}`}>
                   {name.split(' ').map(w => w[0]).join('')}
@@ -342,7 +353,8 @@ export default function About() {
               <p className={`text-xs ${textColor} font-semibold mb-3 uppercase tracking-wide`}>{role}</p>
               <p className="text-sm text-surface-400 leading-relaxed">{bio}</p>
             </div>
-          ))}
+            )
+          })}
         </div>
       </section>
 

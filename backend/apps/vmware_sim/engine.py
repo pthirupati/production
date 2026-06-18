@@ -6,11 +6,33 @@ Replicates the full vSphere 6.x/7.x inventory, actions, and validation logic.
 from __future__ import annotations
 
 import copy
+import json
 import random
 import time
 from typing import Any
 
-_SESSIONS: dict[str, dict[str, Any]] = {}
+import django
+from django.core.cache import cache
+
+SESSION_TTL = 7200  # 2-hour TTL for VMware lab sessions
+
+# Sessions stored in Django cache (Redis in production) for multi-worker safety
+# Key: "vmware_session:{session_id}"  Value: JSON-serialized session dict
+
+
+def _session_key(session_id: str) -> str:
+    return f"vmware_session:{session_id}"
+
+
+def _load_session(session_id: str) -> dict | None:
+    data = cache.get(_session_key(str(session_id)))
+    if data is None:
+        return None
+    return json.loads(data) if isinstance(data, str) else data
+
+
+def _save_session(session_id: str, entry: dict) -> None:
+    cache.set(_session_key(str(session_id)), json.dumps(entry, default=str), SESSION_TTL)
 
 
 def _now_iso() -> str:
@@ -399,11 +421,13 @@ def _apply_scenario_preset(state: dict, scenario_slug: str) -> None:
 
 def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
     key = str(session_id)
-    if key not in _SESSIONS:
+    entry = _load_session(key)
+    if entry is None:
         state = _base_inventory()
         _apply_scenario_preset(state, scenario_slug)
-        _SESSIONS[key] = {"session_id": key, "scenario_slug": scenario_slug, "state": state, "created_at": _now_iso()}
-    return _SESSIONS[key]
+        entry = {"session_id": key, "scenario_slug": scenario_slug, "state": state, "created_at": _now_iso()}
+        _save_session(key, entry)
+    return entry
 
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
@@ -426,7 +450,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
 
 
 def drop_session(session_id: str) -> None:
-    _SESSIONS.pop(str(session_id), None)
+    cache.delete(_session_key(str(session_id)))
 
 
 def _find_vm(state: dict, vm_id: str | None = None, vm_name: str | None = None) -> dict | None:
@@ -458,7 +482,7 @@ def _find_ds(state: dict, ds_id: str | None = None, ds_name: str | None = None) 
 
 def apply_action(session_id: str, action: str, payload: dict | None = None) -> dict:
     payload = payload or {}
-    entry = _SESSIONS.get(str(session_id))
+    entry = _load_session(str(session_id))
     if not entry:
         return {"ok": False, "error": "Simulation session not found"}
     state = entry["state"]
@@ -485,6 +509,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["alarms"] = [a for a in state.get("alarms", []) if a.get("entity") != vm["name"]]
         events.append(_event(f"VM {vm['name']} powered on", "info", vm["name"]))
         tasks.insert(0, _task("Power On Virtual Machine", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} powered on successfully"}
 
     if action == "power_off":
@@ -501,6 +526,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["disk_io_mbps"] = 0
         events.append(_event(f"VM {vm['name']} powered off", "info", vm["name"]))
         tasks.insert(0, _task("Power Off Virtual Machine", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} powered off"}
 
     if action == "power_off_guest":
@@ -517,6 +543,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["mem_pct"] = 0
         events.append(_event(f"Shut down guest OS on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Shut Down Guest", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} shut down gracefully"}
 
     if action == "reboot":
@@ -528,6 +555,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["cpu_pct"] = random.randint(20, 50)
         events.append(_event(f"VM {vm['name']} rebooted", "info", vm["name"]))
         tasks.insert(0, _task("Restart Virtual Machine", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} restarted"}
 
     if action == "reboot_guest":
@@ -540,6 +568,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "VMware Tools not running"}
         events.append(_event(f"Restart guest OS on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Restart Guest", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} guest OS restarted"}
 
     if action == "suspend":
@@ -553,6 +582,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["net_mbps"] = 0
         events.append(_event(f"VM {vm['name']} suspended", "info", vm["name"]))
         tasks.insert(0, _task("Suspend Virtual Machine", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} suspended"}
 
     if action == "resume":
@@ -565,6 +595,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["cpu_pct"] = random.randint(10, 25)
         events.append(_event(f"VM {vm['name']} resumed", "info", vm["name"]))
         tasks.insert(0, _task("Resume Virtual Machine", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} resumed"}
 
     if action == "take_snapshot":
@@ -581,6 +612,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm.setdefault("snapshots", []).append(snap)
         events.append(_event(f"Snapshot '{snap_name}' created on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Create Snapshot", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Snapshot '{snap_name}' created", "snapshot": snap}
 
     if action == "delete_snapshot":
@@ -594,6 +626,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "Snapshot not found"}
         events.append(_event(f"Snapshot deleted on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Remove Snapshot", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": "Snapshot deleted"}
 
     if action == "revert_snapshot":
@@ -606,6 +639,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "Snapshot not found"}
         events.append(_event(f"Reverted {vm['name']} to snapshot '{snap['name']}'", "info", vm["name"]))
         tasks.insert(0, _task("Revert to Snapshot", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Reverted to '{snap['name']}'"}
 
     if action == "reconnect_host":
@@ -622,6 +656,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["alarms"] = [a for a in state.get("alarms", []) if a.get("entity") != host["name"]]
         events.append(_event(f"Host {host['name']} reconnected", "info", host["name"]))
         tasks.insert(0, _task("Reconnect Host", host["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{host['name']} reconnected"}
 
     if action == "enter_maintenance":
@@ -633,6 +668,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         host["maintenance"] = True
         events.append(_event(f"Host {host['name']} entered maintenance mode", "warning", host["name"]))
         tasks.insert(0, _task("Enter Maintenance Mode", host["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{host['name']} entered maintenance mode"}
 
     if action == "exit_maintenance":
@@ -644,6 +680,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         host["maintenance"] = False
         events.append(_event(f"Host {host['name']} exited maintenance mode", "info", host["name"]))
         tasks.insert(0, _task("Exit Maintenance Mode", host["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{host['name']} exited maintenance mode"}
 
     if action == "enable_ha":
@@ -655,18 +692,21 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["alarms"] = [a for a in state.get("alarms", []) if "ha" not in a.get("id", "").lower()]
         events.append(_event("vSphere HA enabled on Cluster-01", "info", "Cluster-01"))
         tasks.insert(0, _task("Enable vSphere HA", "Cluster-01"))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": "HA enabled on cluster"}
 
     if action == "disable_ha":
         state["cluster_ha"] = False
         events.append(_event("vSphere HA disabled on Cluster-01", "warning", "Cluster-01"))
         tasks.insert(0, _task("Disable vSphere HA", "Cluster-01"))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": "HA disabled"}
 
     if action == "enable_drs":
         state["cluster_drs"] = True
         events.append(_event("vSphere DRS enabled on Cluster-01", "info", "Cluster-01"))
         tasks.insert(0, _task("Enable vSphere DRS", "Cluster-01"))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": "DRS enabled"}
 
     if action == "expand_datastore":
@@ -682,6 +722,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["alarms"] = [a for a in state.get("alarms", []) if a.get("entity") != ds_name]
         events.append(_event(f"Expanded {ds_name} by {add_gb} GB", "info", ds_name))
         tasks.insert(0, _task("Expand Datastore", ds_name))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{ds_name} expanded by {add_gb} GB"}
 
     if action == "migrate_vm":
@@ -696,6 +737,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["host_id"] = target_host["id"]
         events.append(_event(f"vMotion: migrated {vm['name']} to {target_host['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Migrate Virtual Machine (VMotion)", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} migrated to {target_host['name']}"}
 
     if action == "acknowledge_alarm":
@@ -704,6 +746,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             if alarm["id"] == alarm_id:
                 alarm["status"] = "acknowledged"
                 events.append(_event(f"Alarm '{alarm['name']}' acknowledged", "info", alarm["entity"]))
+                _save_session(str(session_id), entry)
                 return {"ok": True, "message": "Alarm acknowledged"}
         return {"ok": False, "error": "Alarm not found"}
 
@@ -758,6 +801,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 ds["free_gb"] -= disk_used
         events.append(_event(f"Created VM {name}", "info", name))
         tasks.insert(0, _task("Create Virtual Machine", name))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"VM '{name}' created", "vm_id": vm_id}
 
     if action == "delete_vm":
@@ -780,6 +824,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["alarms"] = [a for a in state.get("alarms", []) if a.get("entity") != vm_name]
         events.append(_event(f"VM {vm_name} deleted from inventory", "warning", vm_name))
         tasks.insert(0, _task("Delete Virtual Machine", vm_name))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"VM '{vm_name}' deleted"}
 
     if action == "edit_vm":
@@ -811,6 +856,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "No changes specified"}
         events.append(_event(f"VM {vm['name']} configuration updated: {', '.join(changed)}", "info", vm["name"]))
         tasks.insert(0, _task("Edit Virtual Machine Settings", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} updated: {', '.join(changed)}"}
 
     if action == "clone_vm":
@@ -839,6 +885,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             ds.setdefault("vms", []).append(clone["id"])
         events.append(_event(f"Cloned {src['name']} → {clone_name}", "info", clone_name))
         tasks.insert(0, _task("Clone Virtual Machine", clone_name))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"VM cloned as '{clone_name}'", "vm_id": clone["id"]}
 
     if action == "add_disk":
@@ -852,6 +899,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             ds["free_gb"] -= add_gb
         events.append(_event(f"Added {add_gb} GB disk to {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Add Hard Disk", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Added {add_gb} GB disk to {vm['name']}"}
 
     if action == "change_network":
@@ -865,13 +913,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["network_id"] = net_id
         events.append(_event(f"Changed {vm['name']} network to {net['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Change Network Adapter", vm["name"]))
+        _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} moved to network '{net['name']}'"}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
 def validate_vmware_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
-    entry = _SESSIONS.get(str(session_id)) or _ensure_session(session_id, scenario_slug)
+    entry = _load_session(str(session_id)) or _ensure_session(session_id, scenario_slug)
     state = entry["state"]
     rules = state.get("validation") or {}
 

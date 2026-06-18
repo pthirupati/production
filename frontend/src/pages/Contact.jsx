@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
-import { Mail, Phone, MapPin, Send, MessageCircle, Mic, Clock, Twitter, Github, ArrowRight } from 'lucide-react'
+import { Mail, Phone, MapPin, Send, MessageCircle, Mic, Clock, Twitter, Github, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../api/client'
@@ -55,6 +55,7 @@ const CONTACT_CARDS = [
 export default function Contact() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' })
   const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
   const [errors, setErrors] = useState({})
 
   const validate = () => {
@@ -77,6 +78,7 @@ export default function Contact() {
       const { data } = await api.post('/contact/', form)
       toast.success(data.message || "Message sent! We'll get back to you within 24 hours.")
       setForm({ name: '', email: '', subject: '', message: '' })
+      setSent(true)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to send message. Please try again.')
     } finally {
@@ -95,7 +97,7 @@ export default function Contact() {
   return (
     <PublicLayout>
       {/* ── Hero ──────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden py-20">
+      <section className="relative overflow-hidden py-20 aurora-bg mesh-gradient">
         <div className="absolute inset-0 hero-grid opacity-40 pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-accent-cyan/6 rounded-full blur-3xl pointer-events-none" />
 
@@ -134,7 +136,23 @@ export default function Contact() {
         <div className="grid lg:grid-cols-5 gap-8 items-start">
 
           {/* ── LEFT: Contact form ─────────────────────────────── */}
-          <div className="lg:col-span-3 animate-slide-up">
+          <div className="lg:col-span-3 animate-slide-up reveal reveal-delay-1">
+            {sent ? (
+              <div className="glass-card p-10 flex flex-col items-center justify-center text-center space-y-4 animate-fade-in min-h-[320px]">
+                <div className="w-20 h-20 rounded-full bg-accent-green/10 border-2 border-accent-green/30 flex items-center justify-center animate-scale-in">
+                  <CheckCircle2 size={40} className="text-accent-green" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Message sent!</h3>
+                <p className="text-surface-400 text-sm max-w-xs">We received your message and will get back to you within 24 hours.</p>
+                <button
+                  type="button"
+                  onClick={() => setSent(false)}
+                  className="btn-secondary text-sm mt-2"
+                >
+                  Send another message
+                </button>
+              </div>
+            ) : (
             <form onSubmit={handleSubmit} className="glass-card p-7 space-y-5">
               <div className="mb-1">
                 <h2 className="text-xl font-bold text-white mb-1">Send us a message</h2>
@@ -218,21 +236,24 @@ export default function Contact() {
                 {sending ? 'Sending...' : 'Send Message'}
               </button>
             </form>
+            )}
           </div>
 
           {/* ── RIGHT: Contact info ────────────────────────────── */}
-          <div className="lg:col-span-2 space-y-5 animate-slide-up" style={{ animationDelay: '100ms' }}>
+          <div className="lg:col-span-2 space-y-5 animate-slide-up reveal reveal-delay-2" style={{ animationDelay: '100ms' }}>
             <div>
               <h2 className="text-xl font-bold text-white mb-1">Contact info</h2>
               <p className="text-sm text-surface-400">Reach us directly via email.</p>
             </div>
 
             {/* Contact cards */}
-            {CONTACT_CARDS.map(({ icon: Icon, label, value, href, color, bg, border }) => (
+            {CONTACT_CARDS.map(({ icon: Icon, label, value, href, color, bg, border }, cIdx) => {
+              const cDelays = ['reveal-delay-1','reveal-delay-2','reveal-delay-3','reveal-delay-4']
+              return (
               <a
                 key={label}
                 href={href}
-                className={`glass-card-hover p-5 flex items-center gap-4 group block`}
+                className={`glass-card-hover feature-card-premium p-5 flex items-center gap-4 group block reveal ${cDelays[cIdx] || 'reveal-delay-1'}`}
               >
                 <div className={`w-11 h-11 rounded-xl ${bg} border ${border} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
                   <Icon size={20} className={color} />
@@ -242,7 +263,8 @@ export default function Contact() {
                   <p className={`text-sm font-medium ${color} truncate`}>{value}</p>
                 </div>
               </a>
-            ))}
+              )
+            })}
 
             {/* Support hours */}
             <div className="glass-card p-5 flex items-start gap-4">

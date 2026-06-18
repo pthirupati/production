@@ -144,6 +144,69 @@ def notify_achievement_earned(user_id, achievement_key, achievement_name):
         logger.warning(f"Failed to send achievement notification: {e}")
 
 
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=10, retry_kwargs={"max_retries": 3})
+def send_lab_completion_notification(self, user_id, scenario_id, score, time_seconds):
+    """
+    Send an email notification when a user passes lab validation.
+    Records the send in EmailLog and respects user notification preferences.
+    """
+    try:
+        from django.contrib.auth import get_user_model
+        from django.conf import settings
+        from apps.question_bank.models import Scenario
+        from .models import NotificationPreference, EmailLog
+
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        scenario = Scenario.objects.get(id=scenario_id)
+
+        prefs = NotificationPreference.get_for_user(user)
+
+        # In-app notification
+        if prefs.should_notify_inapp("system"):
+            create_in_app_notification.delay(
+                user_id=user_id,
+                notification_type="system",
+                title=f"Challenge Solved: {scenario.title}",
+                message=f"Score: {score} | Time: {time_seconds}s",
+                metadata={"score": score, "scenario_id": scenario_id, "scenario_title": scenario.title},
+            )
+
+        # Email — respect user preference for lab_completed
+        if prefs.should_email("lab_completed"):
+            minutes = time_seconds // 60
+            seconds = time_seconds % 60
+            time_display = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
+
+            subject = f"You solved {scenario.title}!"
+            to_email = user.email
+            template = "emails/lab_completed.html"
+            context = {
+                "username": user.get_full_name() or user.username,
+                "scenario_title": scenario.title,
+                "score": score,
+                "time_taken": time_seconds,
+                "time_display": time_display,
+                "hints_used": 0,
+                "dashboard_url": f"{settings.FRONTEND_URL}/dashboard",
+            }
+
+            ok = send_email(subject=subject, to_email=to_email, template=template, context=context)
+            status_val = "sent" if ok else "failed"
+            EmailLog.objects.create(
+                subject=subject,
+                to_email=to_email,
+                template=template,
+                status=status_val,
+            )
+
+            if not ok:
+                raise RuntimeError(f"Email delivery failed for {to_email}")
+    except Exception as e:
+        logger.warning(f"Failed to send lab completion notification for user {user_id}: {e}")
+        raise
+
+
 @shared_task
 def send_payment_error_notification(user_id, email, technology_name, error_message, order_id=None):
     """

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import InterviewDemoWidget from '../components/InterviewDemoWidget'
 import VMwareDemoWidget from '../components/VMwareDemoWidget'
@@ -52,6 +52,31 @@ export default function Home() {
   const [platformConfig, setPlatformConfig]       = useState(null)
   const [mobileNavOpen, setMobileNavOpen]         = useState(false)
   const [activeTestimonial, setActiveTestimonial] = useState(0)
+  const [counted, setCounted]                     = useState(false)
+  const mouseRef = useRef({ x: 0, y: 0 })
+
+  useEffect(() => {
+    const handleMouse = (e) => {
+      document.documentElement.style.setProperty('--mouse-x', e.clientX + 'px')
+      document.documentElement.style.setProperty('--mouse-y', e.clientY + 'px')
+    }
+    window.addEventListener('mousemove', handleMouse, { passive: true })
+    return () => window.removeEventListener('mousemove', handleMouse)
+  }, [])
+
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      (entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible') }),
+      { threshold: 0.1, rootMargin: '0px 0px -60px 0px' }
+    )
+    document.querySelectorAll('.reveal').forEach(el => obs.observe(el))
+    return () => obs.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const t = setTimeout(() => setCounted(true), 800)
+    return () => clearTimeout(t)
+  }, [])
 
   useEffect(() => {
     getTechnologies().then(setTechnologies).catch(() => {})
@@ -77,6 +102,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-surface-950">
+      <div className="cursor-spotlight" aria-hidden="true" />
 
       {/* ─── Sticky Navbar ─── */}
       <div className="sticky top-0 z-50">
@@ -162,7 +188,7 @@ export default function Home() {
           SECTION 1 — HERO
           Left: terminal demo  |  Right: copy + CTAs
       ═══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden min-h-[min(88vh,920px)] flex items-center">
+      <section className="relative overflow-hidden min-h-[min(88vh,920px)] flex items-center mesh-gradient">
         {/* Background layers */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 hero-gradient" />
@@ -202,6 +228,9 @@ export default function Home() {
               }}
             />
           ))}
+          <div className="orb orb-indigo" style={{ width: 400, height: 400, top: '10%', left: '-10%' }} />
+          <div className="orb orb-cyan" style={{ width: 300, height: 300, top: '30%', right: '-5%' }} />
+          <div className="orb orb-purple" style={{ width: 350, height: 350, bottom: '10%', left: '30%' }} />
         </div>
         {/* 3D perspective floor grid at hero bottom */}
         <div className="hero-3d-floor">
@@ -287,7 +316,7 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row gap-4 mb-12">
                 <Link
                   to="/register"
-                  className="group btn-primary text-base px-8 py-4 flex items-center justify-center gap-2 shadow-lg shadow-accent-cyan/25 hover:shadow-accent-cyan/45 transition-all"
+                  className="group btn-primary magnetic-btn text-base px-8 py-4 flex items-center justify-center gap-2 shadow-lg shadow-accent-cyan/25 hover:shadow-accent-cyan/45 transition-all"
                 >
                   Start Fixing for Free
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
@@ -308,12 +337,12 @@ export default function Home() {
                     { val: `${stats.total_users?.toLocaleString()}+`,       label: 'Engineers', icon: Users,        color: 'purple' },
                     { val: `${stats.total_completions?.toLocaleString()}+`, label: 'Solves',    icon: CheckCircle2, color: 'green'  },
                   ].map(({ val, label, icon: Icon, color }) => (
-                    <div key={label} className="stat-badge-3d flex items-center gap-3 px-5 py-3">
+                    <div key={label} className="stat-badge-3d flex items-center gap-3 px-5 py-3 reveal">
                       <div className={`w-10 h-10 rounded-lg bg-accent-${color}/15 border border-accent-${color}/20 flex items-center justify-center shrink-0`}>
                         <Icon size={18} className={`text-accent-${color}`} />
                       </div>
                       <div>
-                        <p className="text-2xl font-black text-white leading-none">{val}</p>
+                        <p className="text-2xl font-black text-white leading-none" data-target={val}>{val}</p>
                         <p className="text-xs text-surface-400 uppercase tracking-wider mt-0.5">{label}</p>
                       </div>
                     </div>
@@ -328,6 +357,7 @@ export default function Home() {
       {/* ─── end Hero ─── */}
 
       <div className="bg-gradient-stripe" />
+      <div className="section-divider" />
 
 
       {/* ═══════════════════════════════════════════
@@ -343,7 +373,7 @@ export default function Home() {
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-purple/10 border border-accent-purple/20 text-accent-purple text-xs font-bold uppercase tracking-widest mb-5">
               <Code2 size={13} /> Challenge Modes
             </div>
-            <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight">
+            <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight reveal">
               Three Ways to{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan to-accent-purple">
                 Prove Yourself
@@ -359,7 +389,7 @@ export default function Home() {
               <Link
                 to={`/scenarios?type=${type}`}
                 key={type}
-                className="glass-3d card-3d-deep holo-card p-10 text-center group relative overflow-hidden transition-all duration-400"
+                className="glass-3d card-3d-deep holo-card feature-card-premium p-10 text-center group relative overflow-hidden transition-all duration-400 reveal"
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
                 <div className="relative">
@@ -379,6 +409,7 @@ export default function Home() {
       </section>
 
       <div className="bg-gradient-stripe" />
+      <div className="section-divider" />
 
 
       {/* ═══════════════════════════════════════════
@@ -395,7 +426,7 @@ export default function Home() {
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-green/10 border border-accent-green/20 text-accent-green text-xs font-bold uppercase tracking-widest mb-5">
               <Layers size={13} /> Technologies
             </div>
-            <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight">
+            <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight reveal">
               Choose Your{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-green to-accent-cyan">
                 Technology
@@ -431,7 +462,7 @@ export default function Home() {
                 <Link
                   to={isAuthenticated ? '/technologies' : '/register'}
                   key={tech.id}
-                  className="glass-3d card-3d-deep holo-card p-8 text-center group transition-all duration-400"
+                  className="glass-3d card-3d-deep holo-card p-8 text-center group transition-all duration-400 reveal"
                 >
                   <div className="w-[68px] h-[68px] rounded-2xl bg-gradient-to-br from-accent-cyan/15 to-accent-purple/15 border border-accent-cyan/20 flex items-center justify-center mx-auto mb-5 group-hover:scale-110 group-hover:border-accent-cyan/40 transition-all duration-300">
                     <Icon size={32} className="text-accent-cyan group-hover:text-white transition-colors" />
@@ -451,6 +482,7 @@ export default function Home() {
       </section>
 
       <div className="bg-gradient-stripe" />
+      <div className="section-divider" />
 
 
       {/* ═══════════════════════════════════════════
@@ -477,7 +509,7 @@ export default function Home() {
                 <Mic2 size={13} className="animate-pulse" /> AI Interview Studio
               </div>
 
-              <h2 className="font-display text-4xl lg:text-5xl font-black text-white mb-6 leading-tight">
+              <h2 className="font-display text-4xl lg:text-5xl font-black text-white mb-6 leading-tight reveal">
                 Get Hired Faster with<br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-purple via-accent-cyan to-accent-pink">
                   Face-to-Face AI Interviews
@@ -512,7 +544,7 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link
                   to={isAuthenticated ? '/interview-hub' : '/register'}
-                  className="btn-primary px-7 py-3.5 flex items-center gap-2 group shadow-lg shadow-accent-purple/25 hover:shadow-accent-purple/40 transition-all"
+                  className="btn-primary magnetic-btn px-7 py-3.5 flex items-center gap-2 group shadow-lg shadow-accent-purple/25 hover:shadow-accent-purple/40 transition-all"
                 >
                   <Mic2 size={16} className="group-hover:scale-110 transition-transform" />
                   Start Mock Interview
@@ -542,6 +574,7 @@ export default function Home() {
       </section>
 
       <div className="bg-gradient-stripe" />
+      <div className="section-divider" />
 
       {/* ═══════════════════════════════════════════
           SECTION 5b — VMWARE AI LAB SHOWCASE
@@ -601,6 +634,7 @@ export default function Home() {
       </section>
 
       <div className="bg-gradient-stripe" />
+      <div className="section-divider" />
 
       {/* ═══════════════════════════════════════════
           SECTION 6 — FEATURES GRID
@@ -617,7 +651,7 @@ export default function Home() {
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-cyan/10 border border-accent-cyan/20 text-accent-cyan text-xs font-bold uppercase tracking-widest mb-5">
               <Rocket size={13} /> Platform Features
             </div>
-            <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight">
+            <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight reveal">
               Built for{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan to-accent-blue">
                 Serious Engineers
@@ -633,7 +667,7 @@ export default function Home() {
             {features.map(({ icon: Icon, title, desc, color }, idx) => (
               <div
                 key={title}
-                className="glass-3d holo-card card-3d-deep p-7 group transition-all duration-400"
+                className="glass-3d holo-card card-3d-deep feature-card-premium p-7 group transition-all duration-400 reveal"
                 style={{ animationDelay: `${idx * 0.08}s` }}
               >
                 <div className={`w-14 h-14 rounded-xl bg-gradient-to-br from-accent-${color}/20 to-accent-${color}/5 border border-accent-${color}/20 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:border-accent-${color}/35 transition-all duration-300`}>
@@ -648,6 +682,7 @@ export default function Home() {
       </section>
 
       <div className="bg-gradient-stripe" />
+      <div className="section-divider" />
 
 
       {/* ═══════════════════════════════════════════
@@ -663,7 +698,7 @@ export default function Home() {
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-amber/10 border border-accent-amber/20 text-accent-amber text-xs font-bold uppercase tracking-widest mb-5">
               <GraduationCap size={13} /> How It Works
             </div>
-            <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight">
+            <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight reveal">
               Up and Running in{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-amber to-accent-red">
                 30 Seconds
@@ -718,6 +753,7 @@ export default function Home() {
       </section>
 
       <div className="bg-gradient-stripe" />
+      <div className="section-divider" />
 
 
       {/* ═══════════════════════════════════════════
@@ -734,7 +770,7 @@ export default function Home() {
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-amber/10 border border-accent-amber/20 text-accent-amber text-xs font-bold uppercase tracking-widest mb-5">
               <Star size={13} /> Testimonials
             </div>
-            <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight">
+            <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight reveal">
               Loved by{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-amber to-accent-red">
                 Engineers
@@ -803,7 +839,7 @@ export default function Home() {
       {/* ═══════════════════════════════════════════
           SECTION 9 — PRICING CTA
       ═══════════════════════════════════════════ */}
-      <section className="py-20 lg:py-24 relative">
+      <section className="py-20 lg:py-24 relative aurora-bg">
         <div className="glow-orb-cyan   absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
         <div className="glow-orb-purple absolute -right-20 top-0" />
 
@@ -846,7 +882,7 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
                   to="/register"
-                  className="group btn-primary text-lg px-10 py-4 inline-flex items-center gap-2 shadow-lg shadow-accent-cyan/30 hover:shadow-accent-cyan/50 transition-all"
+                  className="group btn-primary magnetic-btn text-lg px-10 py-4 inline-flex items-center gap-2 shadow-lg shadow-accent-cyan/30 hover:shadow-accent-cyan/50 transition-all"
                 >
                   Create Free Account
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />

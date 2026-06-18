@@ -33,7 +33,10 @@ export default function InterviewRoom() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const streamRef = useRef(null)
+  const audioCtxRef = useRef(null)
+  const rafRef = useRef(null)
   const [mediaStream, setMediaStream] = useState(null)
+  const [micLevel, setMicLevel] = useState(0)
   const { speak, listen, config: voiceConfig, resolveVoiceProfile } = useInterviewVoice()
 
   const [round, setRound] = useState(null)
@@ -64,8 +67,44 @@ export default function InterviewRoom() {
       stopMediaStream(streamRef.current)
       streamRef.current = null
       setMediaStream(null)
+      cancelAnimationFrame(rafRef.current)
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close()
+        audioCtxRef.current = null
+      }
     }
   }, [])
+
+  useEffect(() => {
+    if (!preflight || !micOn || !mediaStream) {
+      cancelAnimationFrame(rafRef.current)
+      setMicLevel(0)
+      return
+    }
+    let ctx
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)()
+      audioCtxRef.current = ctx
+      const source = ctx.createMediaStreamSource(mediaStream)
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 256
+      source.connect(analyser)
+      const data = new Uint8Array(analyser.frequencyBinCount)
+      const tick = () => {
+        analyser.getByteFrequencyData(data)
+        const avg = data.reduce((s, v) => s + v, 0) / data.length
+        setMicLevel(Math.min(1, avg / 80))
+        rafRef.current = requestAnimationFrame(tick)
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    } catch {
+      // AudioContext not available
+    }
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+      if (ctx) ctx.close()
+    }
+  }, [preflight, micOn, mediaStream])
 
   const syncMediaState = (stream) => {
     streamRef.current = stream
@@ -438,6 +477,31 @@ export default function InterviewRoom() {
             placeholder="Click Allow below — your browser will ask to use camera & mic"
           />
         </div>
+        {micOn && mediaStream && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-surface-400 flex items-center gap-1.5">
+              <Mic size={12} className="text-emerald-400" />
+              Microphone level — speak to test
+            </p>
+            <div className="flex items-end gap-1 h-6">
+              {Array.from({ length: 8 }, (_, i) => {
+                const threshold = i / 8
+                const active = micLevel > threshold
+                return (
+                  <div
+                    key={i}
+                    style={{ height: `${50 + i * 7}%` }}
+                    className={`flex-1 rounded-sm transition-colors duration-75 ${
+                      active
+                        ? i < 5 ? 'bg-emerald-400' : i < 7 ? 'bg-amber-400' : 'bg-red-400'
+                        : 'bg-surface-700'
+                    }`}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        )}
         {mediaError && (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
             {mediaError}

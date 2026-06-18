@@ -1404,3 +1404,183 @@ body::after {
   box-shadow: 0 4px 20px rgb(0 0 0 / 0.25), 0 0 16px rgb(var(--a-cyan) / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.10);
   transform: translateY(-1px);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PREMIUM EFFECTS — appended
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 1. CURSOR SPOTLIGHT */
+.cursor-spotlight {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(99,102,241,0.06), transparent 70%);
+  transition: background 0.1s;
+}
+
+/* 2. SCROLL REVEAL */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: none;
+}
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+.reveal-delay-5 { transition-delay: 0.5s; }
+
+/* 3. AURORA GRADIENT BACKGROUND */
+.aurora-bg {
+  position: relative;
+  overflow: hidden;
+}
+.aurora-bg::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.15) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(14,165,233,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 80%, rgba(168,85,247,0.10) 0%, transparent 60%);
+  animation: aurora-shift 12s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes aurora-shift {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  33%  { transform: translate(3%, 2%) rotate(1deg); }
+  66%  { transform: translate(-2%, 3%) rotate(-0.5deg); }
+  100% { transform: translate(1%, -2%) rotate(0.5deg); }
+}
+
+/* 4. MAGNETIC BUTTON */
+.magnetic-btn {
+  transition: transform 0.2s cubic-bezier(0.16,1,0.3,1);
+  will-change: transform;
+}
+
+/* 5. PREMIUM FEATURE CARD */
+.feature-card-premium {
+  position: relative;
+  background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 2rem;
+  transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
+  overflow: hidden;
+}
+.feature-card-premium::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--card-x, 50%) var(--card-y, 50%), rgba(99,102,241,0.08), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.feature-card-premium:hover::before { opacity: 1; }
+.feature-card-premium:hover {
+  transform: translateY(-4px);
+  border-color: rgba(99,102,241,0.3);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(99,102,241,0.1);
+}
+
+/* 6. ANIMATED COUNTER */
+.counter-num {
+  font-variant-numeric: tabular-nums;
+  transition: none;
+}
+
+/* 7. PREMIUM SECTION DIVIDER */
+.section-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.4) 30%, rgba(14,165,233,0.4) 70%, transparent);
+  margin: 0 auto;
+}
+
+/* 8. MESH GRADIENT HERO */
+.mesh-gradient {
+  background-color: #050814;
+  background-image:
+    radial-gradient(at 40% 20%, rgba(99,102,241,0.2) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(14,165,233,0.15) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(168,85,247,0.12) 0px, transparent 50%),
+    radial-gradient(at 80% 50%, rgba(16,185,129,0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(99,102,241,0.15) 0px, transparent 50%);
+}
+
+/* 9. GLOW TEXT */
+.glow-text {
+  text-shadow: 0 0 40px rgba(99,102,241,0.5), 0 0 80px rgba(99,102,241,0.2);
+}
+
+/* 10. GRADIENT BORDER ANIMATED */
+.gradient-border-animated {
+  position: relative;
+  background: rgba(255,255,255,0.02);
+  border-radius: 16px;
+}
+.gradient-border-animated::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 17px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.5), rgba(14,165,233,0.5), rgba(168,85,247,0.5));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  padding: 1px;
+  animation: border-spin 4s linear infinite;
+}
+@keyframes border-spin {
+  to { filter: hue-rotate(360deg); }
+}
+
+/* 11. FLOATING ORB */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.15;
+  pointer-events: none;
+  animation: orb-float 8s ease-in-out infinite;
+}
+.orb-indigo { background: radial-gradient(circle, #6366f1, transparent); }
+.orb-cyan   { background: radial-gradient(circle, #0ea5e9, transparent); }
+.orb-purple { background: radial-gradient(circle, #a855f7, transparent); }
+@keyframes orb-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%       { transform: translateY(-30px) scale(1.05); }
+}
+
+/* 12. PREMIUM PRICING CARD HIGHLIGHT */
+.pricing-card-featured {
+  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(14,165,233,0.08));
+  border: 1px solid rgba(99,102,241,0.3);
+  box-shadow: 0 0 0 1px rgba(99,102,241,0.1), 0 20px 40px rgba(99,102,241,0.15), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+/* 13. TESTIMONIAL CARD */
+.testimonial-card {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 1.5rem;
+  position: relative;
+}
+.testimonial-card::before {
+  content: '"';
+  position: absolute;
+  top: -20px;
+  left: 20px;
+  font-size: 80px;
+  line-height: 1;
+  color: rgba(99,102,241,0.3);
+  font-family: Georgia, serif;
+}

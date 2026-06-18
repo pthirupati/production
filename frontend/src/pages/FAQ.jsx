@@ -176,7 +176,7 @@ export default function FAQ() {
   return (
     <PublicLayout>
       {/* ── Hero ──────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden py-20">
+      <section className="relative overflow-hidden py-20 aurora-bg">
         <div className="absolute inset-0 hero-grid opacity-40 pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-accent-cyan/6 rounded-full blur-3xl pointer-events-none" />
 
@@ -231,7 +231,7 @@ export default function FAQ() {
           </div>
         ) : (
           <div className="space-y-10">
-            {filtered.map((cat) => {
+            {filtered.map((cat, catIdx) => {
               const meta = CATEGORY_META[cat.category] || {
                 icon: HelpCircle,
                 color: 'text-accent-cyan',
@@ -239,8 +239,9 @@ export default function FAQ() {
                 border: 'border-accent-cyan/20',
               }
               const Icon = meta.icon
+              const catRevealDelays = ['reveal-delay-1','reveal-delay-2','reveal-delay-3','reveal-delay-4','reveal-delay-5','reveal-delay-6']
               return (
-                <div key={cat.category}>
+                <div key={cat.category} className={`reveal ${catRevealDelays[catIdx % catRevealDelays.length]}`}>
                   {/* Category header */}
                   <div className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-xl ${meta.bg} border ${meta.border} mb-4`}>
                     <Icon size={16} className={meta.color} />
@@ -250,9 +251,14 @@ export default function FAQ() {
                     </span>
                   </div>
                   <div className="space-y-2">
-                    {cat.items.map((item) => (
-                      <FAQItem key={item.q} question={item.q} answer={item.a} />
-                    ))}
+                    {cat.items.map((item, itemIdx) => {
+                      const itemDelays = ['reveal-delay-1','reveal-delay-2','reveal-delay-3','reveal-delay-4']
+                      return (
+                        <div key={item.q} className={`reveal ${itemDelays[itemIdx % itemDelays.length]}`}>
+                          <FAQItem question={item.q} answer={item.a} />
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )

@@ -69,6 +69,7 @@ const AdminCertificates = lazy(() => import('../pages/admin/AdminCertificates'))
 const InterviewLanding = lazy(() => import('../pages/interviews/InterviewLanding'))
 const VMwareSimulator = lazy(() => import('../pages/vmware/VMwareSimulator'))
 const Unsubscribe = lazy(() => import('../pages/Unsubscribe'))
+const Changelog = lazy(() => import('../pages/Changelog'))
 
 function PageLoader() {
   return (
@@ -126,6 +127,7 @@ export default function AppRouter() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
+        <Route path="/changelog" element={<Changelog />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/support" element={<Navigate to="/contact" replace />} />
         <Route path="/faq" element={<FAQ />} />

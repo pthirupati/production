@@ -10,13 +10,130 @@ import {
   Target, Trophy, Zap, Clock, TrendingUp, ArrowRight,
   CheckCircle2, Award, BookOpen, Play, Star,
   Calendar, CreditCard, Crown, Layers, ArrowUpRight, XCircle, AlertTriangle, Sparkles, Download, Ticket,
-  Bookmark, Bell, History, BarChart3, X, Mic2,
+  Bookmark, Bell, History, BarChart3, X, Mic2, ListChecks,
 } from 'lucide-react'
 import JiraTicketLink from '../components/JiraTicketLink'
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
 import { ACHIEVEMENT_META } from '../utils/constants'
 import ActivityHeatmap from '../components/ActivityHeatmap'
 import OnboardingTour from '../components/OnboardingTour'
+
+function OnboardingChecklist({ subscriptions, progress, profile }) {
+  const [dismissed, setDismissed] = useState(
+    () => localStorage.getItem('onboarding_dismissed') === '1'
+  )
+
+  const hasSubscription = subscriptions?.length > 0
+  const hasCompletedScenario = (progress?.summary?.completed || 0) > 0
+  const hasInterview = (progress?.interview_rounds_count || 0) > 0
+  const jiraConnected = profile?.jira_connected === true
+
+  // Only show to new users who haven't dismissed and have no activity
+  const isNewUser = !hasSubscription && !hasCompletedScenario && !hasInterview && !jiraConnected
+  const shouldShow = (isNewUser || (!dismissed)) && !dismissed
+
+  if (!shouldShow) return null
+
+  const steps = [
+    {
+      label: 'Pick a technology',
+      desc: 'Subscribe to a technology track to unlock labs',
+      to: '/technologies',
+      done: hasSubscription,
+    },
+    {
+      label: 'Try a free scenario',
+      desc: 'Run your first hands-on lab challenge',
+      to: '/scenarios',
+      done: hasCompletedScenario,
+    },
+    {
+      label: 'Start an interview',
+      desc: 'Practice with AI mock interview questions',
+      to: '/interviews',
+      done: hasInterview,
+    },
+    {
+      label: 'Connect Jira',
+      desc: 'Link Jira to track incidents as tickets',
+      to: '/profile',
+      done: jiraConnected,
+    },
+  ]
+
+  const completedCount = steps.filter(s => s.done).length
+
+  const handleDismiss = () => {
+    localStorage.setItem('onboarding_dismissed', '1')
+    setDismissed(true)
+  }
+
+  return (
+    <div className="glass-card p-6 border-accent-cyan/20 bg-gradient-to-br from-accent-cyan/[0.04] via-transparent to-accent-purple/[0.03] relative overflow-hidden animate-slide-up">
+      <div className="absolute inset-0 bg-grid-pattern opacity-[0.04] pointer-events-none" />
+      <div className="flex items-start justify-between relative mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-accent-cyan/15 flex items-center justify-center border border-accent-cyan/20">
+            <ListChecks size={20} className="text-accent-cyan" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-white">Getting Started</h2>
+            <p className="text-xs text-surface-400">{completedCount}/{steps.length} steps complete</p>
+          </div>
+        </div>
+        <button
+          onClick={handleDismiss}
+          className="p-1.5 rounded-lg text-surface-500 hover:text-surface-300 hover:bg-surface-800/60 transition-all"
+          aria-label="Dismiss checklist"
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1.5 bg-surface-700/50 rounded-full overflow-hidden mb-5 relative">
+        <div
+          className="h-full bg-gradient-to-r from-accent-cyan to-accent-purple rounded-full transition-all duration-700"
+          style={{ width: `${(completedCount / steps.length) * 100}%` }}
+        />
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3 relative">
+        {steps.map((step, idx) => (
+          <Link
+            key={idx}
+            to={step.to}
+            className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all group ${
+              step.done
+                ? 'bg-accent-green/5 border-accent-green/20 opacity-75'
+                : 'bg-surface-800/40 border-surface-700/40 hover:border-accent-cyan/30 hover:bg-surface-800/70'
+            }`}
+          >
+            <div className={`mt-0.5 shrink-0 w-5 h-5 rounded-full flex items-center justify-center border ${
+              step.done
+                ? 'bg-accent-green/20 border-accent-green/40 text-accent-green'
+                : 'border-surface-600 text-surface-600 group-hover:border-accent-cyan/50 group-hover:text-accent-cyan/50'
+            }`}>
+              {step.done
+                ? <CheckCircle2 size={14} />
+                : <span className="text-[10px] font-bold">{idx + 1}</span>
+              }
+            </div>
+            <div className="min-w-0">
+              <p className={`text-sm font-semibold ${step.done ? 'text-accent-green line-through decoration-accent-green/40' : 'text-white'}`}>
+                {step.label}
+              </p>
+              <p className="text-xs text-surface-500 mt-0.5">{step.desc}</p>
+            </div>
+            {!step.done && (
+              <ArrowRight size={14} className="text-surface-600 group-hover:text-accent-cyan shrink-0 mt-1 ml-auto transition-colors" />
+            )}
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function Dashboard() {
   const { user } = useAuthStore()
@@ -127,6 +244,12 @@ export default function Dashboard() {
           </button>
         </div>
       )}
+
+      <OnboardingChecklist
+        subscriptions={subscriptions.filter(s => s.is_active)}
+        progress={progress}
+        profile={user}
+      />
 
       {/* ═══ HERO HEADER ═══ */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900/90 via-surface-900/70 to-surface-800/50 border border-surface-700/40 p-6 sm:p-8 animate-slide-up">

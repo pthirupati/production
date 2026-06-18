@@ -905,6 +905,17 @@ class ValidateLabView(APIView):
                 from apps.progress.learning_path import sync_learning_path_on_completion
                 sync_learning_path_on_completion(request.user, session.scenario)
 
+                try:
+                    from apps.notifications.tasks import send_lab_completion_notification
+                    send_lab_completion_notification.delay(
+                        user_id=request.user.id,
+                        scenario_id=session.scenario_id,
+                        score=score,
+                        time_seconds=int(elapsed),
+                    )
+                except Exception:
+                    pass  # never fail validation due to email errors
+
                 return Response({
                     "passed": True,
                     "score": score,

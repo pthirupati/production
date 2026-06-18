@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
-import { Calendar, Play, CheckCircle2, Lock, Award, ChevronRight } from 'lucide-react'
+import { Calendar, Play, CheckCircle2, Lock, Award, ChevronRight, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function InterviewCampaign() {
@@ -12,6 +12,27 @@ export default function InterviewCampaign() {
 
   const [rescheduleRoundId, setRescheduleRoundId] = useState(null)
   const [rescheduleAt, setRescheduleAt] = useState('')
+  const [confirmDeleteRoundId, setConfirmDeleteRoundId] = useState(null)
+  const [deletingRoundId, setDeletingRoundId] = useState(null)
+
+  const DELETABLE_ROUND_STATUSES = ['completed', 'cancelled', 'failed']
+
+  const deleteRound = async (roundId) => {
+    setDeletingRoundId(roundId)
+    try {
+      await interviewsApi.deleteRound(roundId)
+      setCampaign(prev => ({
+        ...prev,
+        rounds: (prev.rounds || []).filter(r => r.id !== roundId),
+      }))
+      toast.success('Round deleted')
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Could not delete round')
+    } finally {
+      setDeletingRoundId(null)
+      setConfirmDeleteRoundId(null)
+    }
+  }
 
   const load = () => {
     interviewsApi.getCampaign(campaignId)
@@ -103,6 +124,29 @@ export default function InterviewCampaign() {
                 passed ? 'border-emerald-500/30' : locked ? 'border-surface-800 opacity-60' : 'border-surface-700'
               }`}
             >
+              {confirmDeleteRoundId === round.id ? (
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm text-surface-300">Delete this interview round? This cannot be undone.</p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      disabled={deletingRoundId === round.id}
+                      onClick={() => deleteRound(round.id)}
+                      className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-medium hover:bg-red-500/30 disabled:opacity-50"
+                    >
+                      {deletingRoundId === round.id ? 'Deleting…' : 'Yes, delete'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteRoundId(null)}
+                      className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+              <>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs text-indigo-400 font-semibold uppercase">Round {round.round_number}</p>
@@ -119,8 +163,20 @@ export default function InterviewCampaign() {
                     <p className="text-xs text-surface-400 mt-1">Score: {round.overall_score.toFixed(0)}/100</p>
                   )}
                 </div>
-                {locked && <Lock size={18} className="text-surface-600" />}
-                {passed && <CheckCircle2 size={18} className="text-emerald-400" />}
+                <div className="flex items-center gap-2 shrink-0">
+                  {locked && <Lock size={18} className="text-surface-600" />}
+                  {passed && <CheckCircle2 size={18} className="text-emerald-400" />}
+                  {DELETABLE_ROUND_STATUSES.includes(round.status) && (
+                    <button
+                      type="button"
+                      title="Delete round"
+                      onClick={() => setConfirmDeleteRoundId(round.id)}
+                      className="p-1.5 rounded-lg text-surface-600 hover:text-red-400 hover:bg-surface-800 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {canSchedule && round.status === 'schedulable' && !isSample && (
@@ -185,6 +241,8 @@ export default function InterviewCampaign() {
                   </Link>
                 )}
               </div>
+              </>
+              )}
             </div>
           )
         })}

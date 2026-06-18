@@ -94,7 +94,12 @@ export default function Blog() {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 md:py-14 space-y-10">
       {/* Hero */}
-      <div className="text-center space-y-4 animate-fade-in">
+      <div className="text-center space-y-4 animate-fade-in aurora-bg rounded-2xl py-12 px-6 relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-[-40px] left-[-60px] w-[260px] h-[260px] bg-accent-cyan/[0.06] rounded-full blur-[70px]" />
+          <div className="absolute bottom-[-30px] right-[-50px] w-[220px] h-[220px] bg-accent-purple/[0.07] rounded-full blur-[60px]" />
+        </div>
+        <div className="relative">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-cyan/10 text-accent-cyan text-xs font-medium border border-accent-cyan/20">
           <Rss size={13} /> FixitLab Blog
         </div>
@@ -113,6 +118,7 @@ export default function Blog() {
           <span className="inline-flex items-center gap-1.5"><BookOpen size={14} /> {posts.length} articles</span>
           <span className="inline-flex items-center gap-1.5"><Tag size={14} /> {categories.length - 1} topics</span>
           <span className="inline-flex items-center gap-1.5"><TrendingUp size={14} /> Updated regularly</span>
+        </div>
         </div>
       </div>
 
@@ -184,7 +190,7 @@ export default function Blog() {
       {!loading && featured && (
         <Link
           to={`/blog/${featured.slug}`}
-          className="block glass-card overflow-hidden group hover:ring-2 hover:ring-accent-cyan/30 transition-all animate-fade-in"
+          className="block glass-card feature-card-premium overflow-hidden group hover:ring-2 hover:ring-accent-cyan/30 transition-all animate-fade-in reveal reveal-delay-1"
         >
           <div className="md:flex md:items-stretch">
             {/* Cover */}
@@ -232,11 +238,13 @@ export default function Blog() {
             </h2>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {rest.map(post => (
+            {rest.map((post, postIdx) => {
+              const postDelays = ['reveal-delay-1','reveal-delay-2','reveal-delay-3','reveal-delay-4']
+              return (
               <Link
                 key={post.slug}
                 to={`/blog/${post.slug}`}
-                className="glass-card overflow-hidden group hover:ring-1 hover:ring-accent-cyan/20 transition-all flex flex-col h-full"
+                className={`glass-card feature-card-premium overflow-hidden group hover:ring-1 hover:ring-accent-cyan/20 transition-all flex flex-col h-full reveal ${postDelays[postIdx % postDelays.length]}`}
               >
                 {/* Category cover image */}
                 <CategoryCover category={post.category} />
@@ -257,7 +265,8 @@ export default function Blog() {
                   </div>
                 </div>
               </Link>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

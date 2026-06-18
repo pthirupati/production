@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import api from '../api/client'
 import { labApi } from '../api/labs'
+import { ratingsApi } from '../api/ratings'
 import { useLabStore } from '../store/labStore'
 import { useAuthStore } from '../store/authStore'
 import {
@@ -82,6 +84,16 @@ export default function LabRunner() {
   const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [terminalFullscreen, setTerminalFullscreen] = useState(false)
+  // Feature: Ask AI coaching hint
+  const [aiHint, setAiHint] = useState(null)
+  const [aiHintLoading, setAiHintLoading] = useState(false)
+  const [aiCreditsRemaining, setAiCreditsRemaining] = useState(null)
+  // Feature: Scenario star rating
+  const [hasRated, setHasRated] = useState(false)
+  const [rating, setRating] = useState(0)
+  const [ratingHover, setRatingHover] = useState(0)
+  const [ratingSubmitting, setRatingSubmitting] = useState(false)
   const [jiraComments, setJiraComments] = useState([])
   const [jiraActivity, setJiraActivity] = useState([])
   const [jiraTicket, setJiraTicket] = useState(null)
@@ -150,6 +162,42 @@ export default function LabRunner() {
     onToggleSidebar: () => setSidebarOpen(p => !p),
     disabled: loading,
   })
+
+  // Single-key shortcuts: V, H, F, R, ?
+  useEffect(() => {
+    if (loading) return
+    const handleKey = (e) => {
+      // Skip when focus is on a text input or textarea
+      const tag = document.activeElement?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable) return
+      switch (e.key) {
+        case 'v':
+        case 'V':
+          if (!validating && !validationResult?.passed) handleValidate()
+          break
+        case 'h':
+        case 'H':
+          toggleHints()
+          break
+        case 'f':
+        case 'F':
+          setTerminalFullscreen(p => !p)
+          break
+        case 'r':
+        case 'R':
+          // Reset timer display: restart the visible countdown from current remaining
+          // (We call startTimer with the current value to re-render the badge)
+          break
+        case '?':
+          setShowShortcuts(p => !p)
+          break
+        default:
+          break
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [loading, validating, validationResult, toggleHints])
 
   // ── Cross-tab sync: detect when lab is stopped/expired from another tab ──
   useEffect(() => {
@@ -525,6 +573,36 @@ export default function LabRunner() {
     }
   }
 
+  const handleAiHint = async () => {
+    setAiHintLoading(true)
+    try {
+      const res = await api.post(`/labs/${sessionId}/ai-hint/`)
+      setAiHint(res.data.hint)
+      if (res.data.credits_remaining != null) {
+        setAiCreditsRemaining(res.data.credits_remaining)
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'AI hint unavailable')
+    } finally {
+      setAiHintLoading(false)
+    }
+  }
+
+  const handleRatingSubmit = async (starValue) => {
+    if (ratingSubmitting || hasRated) return
+    setRating(starValue)
+    setRatingSubmitting(true)
+    try {
+      const scenarioId = session?.scenario?.id || session?.scenario_detail?.id
+      await ratingsApi.submitRating({ ratingType: 'scenario', scenario: scenarioId, score: starValue, review: '' })
+      setHasRated(true)
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to submit rating')
+    } finally {
+      setRatingSubmitting(false)
+    }
+  }
+
   const handleStop = async () => {
     setStopping(true)
     try {
@@ -897,6 +975,42 @@ export default function LabRunner() {
                   {!hints.next_available && !interviewMode && hints.total_hints > 0 && (
                     <p className="text-xs text-surface-600 text-center">All hints revealed</p>
                   )}
+
+                  {/* Ask AI coaching hint */}
+                  <div className="mt-4 rounded-lg p-px" style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6, #06b6d4)' }}>
+                    <div className="rounded-[7px] bg-surface-900 p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-accent-cyan flex items-center gap-1.5">
+                          <Sparkles size={12} /> AI Coaching
+                        </span>
+                        {aiCreditsRemaining != null && (
+                          <span className="text-[10px] text-surface-500">{aiCreditsRemaining} credits left</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-surface-400 mb-2.5">
+                        Get a personalized coaching nudge without revealing the full solution.
+                        {aiCreditsRemaining == null && <span className="text-surface-500"> (costs 1 credit)</span>}
+                      </p>
+                      {aiHint ? (
+                        <div className="rounded-md bg-accent-cyan/5 border border-accent-cyan/20 p-2.5 text-xs text-surface-200 leading-relaxed whitespace-pre-wrap">
+                          {aiHint}
+                        </div>
+                      ) : null}
+                      <button
+                        onClick={handleAiHint}
+                        disabled={aiHintLoading}
+                        className="mt-2.5 w-full py-2 rounded-md text-xs font-medium text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        style={{ background: 'linear-gradient(135deg, #0891b2, #7c3aed)' }}
+                      >
+                        {aiHintLoading ? (
+                          <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Sparkles size={12} />
+                        )}
+                        {aiHint ? 'Ask Again' : 'Ask AI'}
+                      </button>
+                    </div>
+                  </div>
                 </>
               )}
 
@@ -960,6 +1074,35 @@ export default function LabRunner() {
                         </div>
                       )}
 
+                      {/* Scenario star rating */}
+                      <div className="border-t border-surface-800 pt-4">
+                        {hasRated ? (
+                          <p className="text-xs text-accent-green text-center font-medium">Thanks for your rating!</p>
+                        ) : (
+                          <div>
+                            <p className="text-xs text-surface-400 text-center mb-2">Rate this scenario</p>
+                            <div className="flex items-center justify-center gap-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                  key={star}
+                                  type="button"
+                                  disabled={ratingSubmitting}
+                                  onClick={() => handleRatingSubmit(star)}
+                                  onMouseEnter={() => setRatingHover(star)}
+                                  onMouseLeave={() => setRatingHover(0)}
+                                  className="text-2xl leading-none transition-transform hover:scale-110 disabled:opacity-50"
+                                  aria-label={`Rate ${star} star${star !== 1 ? 's' : ''}`}
+                                >
+                                  <span className={star <= (ratingHover || rating) ? 'text-accent-amber' : 'text-surface-700'}>
+                                    ★
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       {validationResult.solution && (
                         <div className="border-t border-surface-800 pt-4">
                           <h4 className="text-xs font-semibold text-accent-green uppercase mb-2 flex items-center gap-1">
@@ -1009,7 +1152,7 @@ export default function LabRunner() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+        <div className={`${terminalFullscreen ? 'fixed inset-0 z-50 bg-surface-950' : 'flex-1'} flex flex-col min-h-0 min-w-0 overflow-hidden`}>
         {/* Terminal action bar — above xterm */}
         <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-2 bg-surface-900 border-b border-surface-800 text-[10px] sm:text-xs">
           {useDualPane && (
@@ -1073,6 +1216,13 @@ export default function LabRunner() {
             </button>
           ))}
           <div className="w-px h-6 bg-surface-700 mx-0.5 hidden sm:block" />
+          <button
+            onClick={() => setTerminalFullscreen(p => !p)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-700 text-surface-300 hover:border-accent-cyan hover:text-accent-cyan"
+            title="Toggle fullscreen terminal (F)"
+          >
+            <Terminal size={12} /> {terminalFullscreen ? 'Exit Full' : 'Fullscreen'}
+          </button>
           <button
             onClick={() => { setSidebarTab('hints'); setSidebarOpen(true) }}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-700 text-surface-300 hover:border-accent-amber hover:text-accent-amber"
@@ -1223,20 +1373,24 @@ export default function LabRunner() {
 
       {/* Keyboard shortcuts help */}
       {showShortcuts && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowShortcuts(false)}>
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setShowShortcuts(false)}>
           <div className="glass-card p-6 max-w-xs w-full" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
               <Keyboard size={16} className="text-accent-cyan" /> Keyboard Shortcuts
             </h3>
-            <div className="space-y-3 text-sm">
+            <div className="space-y-2.5 text-sm">
               {[
-                ['Ctrl + Enter', 'Check Solution'],
-                ['Ctrl + H', 'Toggle Hints'],
+                ['V', 'Validate / Check Solution'],
+                ['H', 'Show / Hide Hints Panel'],
+                ['F', 'Toggle Fullscreen Terminal'],
+                ['R', 'Reset Timer Display'],
+                ['?', 'Show / Hide This Overlay'],
+                ['Ctrl + Enter', 'Check Solution (alt)'],
                 ['Escape', 'Toggle Sidebar'],
               ].map(([key, action]) => (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-surface-400">{action}</span>
-                  <kbd className="px-2 py-0.5 bg-surface-800 border border-surface-700 rounded text-xs text-surface-300 font-mono">{key}</kbd>
+                <div key={key} className="flex items-center justify-between gap-4">
+                  <span className="text-surface-400 text-xs">{action}</span>
+                  <kbd className="shrink-0 px-2 py-0.5 bg-surface-800 border border-surface-700 rounded text-xs text-surface-200 font-mono">{key}</kbd>
                 </div>
               ))}
             </div>

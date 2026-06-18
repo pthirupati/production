@@ -138,10 +138,31 @@ class ReplyView(APIView):
 
         serializer = ReplySerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        serializer.save(author=request.user, thread=thread)
+        reply = serializer.save(author=request.user, thread=thread)
 
         # Update reply count
         Thread.objects.filter(id=thread_id).update(reply_count=F("reply_count") + 1)
+
+        # Parse @mentions and notify mentioned users
+        import re
+        reply_content = reply.body or ""
+        mentioned_usernames = re.findall(r'@(\w+)', reply_content)
+        for username in set(mentioned_usernames):
+            try:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                mentioned_user = User.objects.filter(username=username).first()
+                if mentioned_user and mentioned_user != request.user:
+                    from apps.notifications.models import Notification
+                    Notification.objects.create(
+                        user=mentioned_user,
+                        type='system',
+                        title=f'@{request.user.username} mentioned you',
+                        message=reply_content[:200],
+                        metadata={'mention_by': request.user.username, 'thread_id': str(thread_id)},
+                    )
+            except Exception:
+                pass
 
         return Response(serializer.data, status=http_status.HTTP_201_CREATED)
 

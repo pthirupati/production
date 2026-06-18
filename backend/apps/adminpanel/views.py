@@ -2625,7 +2625,10 @@ class AdminMonitoringContainersView(APIView):
 
         for c in client.containers.list(all=True):
             name = (c.name or "").lower()
-            image_str = " ".join(c.image.tags or [str(c.image.id)[:12]]).lower()
+            try:
+                image_str = " ".join(c.image.tags or [str(c.image.id)[:12]]).lower()
+            except Exception:
+                image_str = ""
             is_system = any(h in name for h in self.SYSTEM_NAME_HINTS)
             # Also catch vault by image (hashicorp/vault)
             if not is_system and "vault" in image_str:

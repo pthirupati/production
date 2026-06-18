@@ -228,6 +228,7 @@ REST_FRAMEWORK = {
         "strict_anon": "60/minute",  # Public browsing needs headroom
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "NUM_PROXIES": 1,
 }
 
 SPECTACULAR_SETTINGS = {
@@ -336,6 +337,14 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_BACKEND = f"redis://{_celery_redis_auth}{_celery_redis_host}:{_celery_redis_port}/2"  # Redis (fast) instead of django-db
 CELERY_RESULT_EXPIRES = 3600  # Expire results after 1 hour
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_TASK_MAX_RETRIES = 3
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    "max_retries": 3,
+    "interval_start": 0,
+    "interval_step": 0.2,
+    "interval_max": 0.5,
+}
 CELERY_TIMEZONE = "UTC"
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 200  # Prevent memory leaks in long-lived workers
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Fair scheduling for long-running tasks

@@ -140,4 +140,8 @@ export const interviewsApi = {
   startSampleInterview() {
     return api.post('/interviews/sample/').then(r => r.data)
   },
+
+  deleteRound(roundId) {
+    return api.delete(`/interviews/rounds/${roundId}/`).then(r => r.data)
+  },
 }
