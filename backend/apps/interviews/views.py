@@ -214,7 +214,7 @@ class InterviewCampaignListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        qs = InterviewCampaign.objects.filter(user=request.user).select_related("primary_technology")
+        qs = InterviewCampaign.objects.filter(user=request.user, is_archived=False).select_related("primary_technology")
         return Response({"campaigns": InterviewCampaignListSerializer(qs, many=True).data})
 
     def post(self, request):
@@ -268,8 +268,14 @@ class InterviewCampaignDetailView(APIView):
 
     def delete(self, request, campaign_id):
         campaign = get_object_or_404(InterviewCampaign, id=campaign_id, user=request.user)
-        if campaign.status in ("completed", "cancelled"):
-            return Response({"error": "Campaign already finished"}, status=400)
+        # Archive finished interviews (remove from history view)
+        if campaign.status in ("completed", "failed", "cancelled"):
+            campaign.is_archived = True
+            campaign.save(update_fields=["is_archived", "updated_at"])
+            return Response({"status": "archived", "id": str(campaign.id)})
+        # Cancel active/scheduled interviews
+        if campaign.status in ("in_progress", "scheduled"):
+            return Response({"error": "Cannot delete an ongoing or scheduled interview"}, status=400)
         campaign.status = "cancelled"
         campaign.save(update_fields=["status", "updated_at"])
         campaign.rounds.exclude(status__in=("passed", "completed")).update(status="abandoned")

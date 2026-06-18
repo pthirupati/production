@@ -51,6 +51,9 @@ export const interviewsApi = {
   cancelCampaign(id) {
     return api.delete(`/interviews/campaigns/${id}/`).then(r => r.data)
   },
+  archiveCampaign(id) {
+    return api.delete(`/interviews/campaigns/${id}/`).then(r => r.data)
+  },
   getCampaign(id) {
     return api.get(`/interviews/campaigns/${id}/`).then(r => r.data)
   },

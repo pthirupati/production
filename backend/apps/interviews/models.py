@@ -115,6 +115,10 @@ class InterviewCampaign(models.Model):
         default=False,
         help_text="One-time free trial interview (short duration, no certificate)",
     )
+    is_archived = models.BooleanField(
+        default=False,
+        help_text="Soft-deleted by user from history; excluded from list view",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)

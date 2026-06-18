@@ -6,7 +6,7 @@ import { useAuthStore } from '../../store/authStore'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import {
   Mic, Video, Calendar, Trophy, ChevronRight, Sparkles, Clock, Award, Plus,
-  Play, CheckCircle2, Headphones, AlertCircle,
+  Play, CheckCircle2, Headphones, AlertCircle, Trash2, X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CompactPageHeader from '../../components/CompactPageHeader'
@@ -29,6 +29,8 @@ export default function InterviewHub() {
   const [plans, setPlans] = useState([])
   const [subscribing, setSubscribing] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [stripeConfigured, setStripeConfigured] = useState(false)
   const [sampleInfo, setSampleInfo] = useState(null)
   const [startingSample, setStartingSample] = useState(false)
@@ -89,6 +91,22 @@ export default function InterviewHub() {
       setStartingSample(false)
     }
   }
+
+  const handleArchive = async (id) => {
+    setDeletingId(id)
+    try {
+      await interviewsApi.archiveCampaign(id)
+      setCampaigns(prev => prev.filter(c => c.id !== id))
+      toast.success('Interview removed from history')
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Could not remove interview')
+    } finally {
+      setDeletingId(null)
+      setConfirmDeleteId(null)
+    }
+  }
+
+  const DELETABLE_STATUSES = ['completed', 'failed', 'cancelled']
 
   const sampleMinutes = sampleInfo?.sample_duration_minutes || entitlement?.sample_duration_minutes || 10
   const showSample = sampleInfo?.sample_available || entitlement?.sample_available
@@ -344,21 +362,57 @@ export default function InterviewHub() {
         ) : (
           <div className="space-y-2">
             {campaigns.map(c => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => navigate(`/interviews/campaign/${c.id}`)}
-                className="w-full glass-card p-4 border border-surface-800 hover:border-indigo-500/30 text-left flex items-center justify-between gap-3 transition-colors"
-              >
-                <div>
-                  <p className="text-sm font-medium text-white">{c.title}</p>
-                  <p className="text-xs text-surface-500 mt-0.5">
-                    {c.round_count} rounds · {c.primary_technology_name || 'Multi-stack'} ·{' '}
-                    <span className={STATUS_COLORS[c.status] || ''}>{c.status}</span>
-                  </p>
-                </div>
-                <ChevronRight size={16} className="text-surface-600 shrink-0" />
-              </button>
+              <div key={c.id} className="glass-card border border-surface-800 hover:border-indigo-500/30 transition-colors relative group">
+                {confirmDeleteId === c.id ? (
+                  <div className="p-4 flex items-center justify-between gap-3">
+                    <p className="text-sm text-surface-300">Remove this interview from history?</p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        disabled={deletingId === c.id}
+                        onClick={() => handleArchive(c.id)}
+                        className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-medium hover:bg-red-500/30 disabled:opacity-50"
+                      >
+                        {deletingId === c.id ? 'Removing…' : 'Yes, remove'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/interviews/campaign/${c.id}`)}
+                      className="flex-1 p-4 text-left flex items-center justify-between gap-3"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-white">{c.title}</p>
+                        <p className="text-xs text-surface-500 mt-0.5">
+                          {c.round_count} rounds · {c.primary_technology_name || 'Multi-stack'} ·{' '}
+                          <span className={STATUS_COLORS[c.status] || ''}>{c.status}</span>
+                        </p>
+                      </div>
+                      <ChevronRight size={16} className="text-surface-600 shrink-0" />
+                    </button>
+                    {DELETABLE_STATUSES.includes(c.status) && (
+                      <button
+                        type="button"
+                        title="Remove from history"
+                        onClick={() => setConfirmDeleteId(c.id)}
+                        className="px-3 py-4 text-surface-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}

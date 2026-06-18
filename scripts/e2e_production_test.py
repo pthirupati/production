@@ -151,7 +151,8 @@ def login(email: str, password: str) -> tuple[str | None, dict]:
 
 def run_public_tests(s: Suite):
     print("\n=== Public / unauthenticated endpoints ===")
-    health_path = "/health" if EXTERNAL_GATEWAY else "/api/health/"
+    # External gateway: /api/health/ is nginx-blocked; use /api/config/ which is always public
+    health_path = "/api/config/" if EXTERNAL_GATEWAY else "/api/health/"
     cases = [
         ("GET", health_path, None, (200,)),
         ("GET", "/api/stats/", None, (200,)),

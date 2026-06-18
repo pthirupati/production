@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import InterviewDemoWidget from '../components/InterviewDemoWidget'
+import VMwareDemoWidget from '../components/VMwareDemoWidget'
 import BubbleNavLink from '../components/BubbleNavLink'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
@@ -531,6 +532,64 @@ export default function Home() {
 
       <div className="bg-gradient-stripe" />
 
+      {/* ═══════════════════════════════════════════
+          SECTION 5b — VMWARE SIMULATION SHOWCASE
+      ═══════════════════════════════════════════ */}
+      <section className="relative overflow-hidden py-20 lg:py-24">
+        <div className="absolute inset-0 section-dark" />
+        <div className="glow-orb-blue absolute right-1/4 top-0" />
+        <div className="glow-orb-purple absolute left-0 bottom-0" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            {/* LEFT — copy */}
+            <div className="flex-1 space-y-6">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#5b9bd5]/10 border border-[#5b9bd5]/20 text-[#5b9bd5] text-xs font-bold uppercase tracking-widest">
+                <Server size={13} /> VMware vCenter Simulation
+              </div>
+              <h2 className="text-4xl lg:text-5xl font-black text-white leading-tight">
+                Master{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#5b9bd5] to-[#8ab4d4]">
+                  VMware Infrastructure
+                </span>
+                {' '}in a Live Sim
+              </h2>
+              <p className="text-surface-400 text-lg leading-relaxed">
+                Practice real VMware vCenter and ESXi operations in a fully-featured browser simulation — no expensive lab hardware required. Fix HA failures, perform vMotion migrations, resolve datastore alerts, and more.
+              </p>
+              <ul className="space-y-3">
+                {[
+                  { text: 'Full vCenter UI — hosts, VMs, storage, networking', icon: '⊞' },
+                  { text: 'Live vMotion, HA, DRS, snapshots, and maintenance mode', icon: '⚡' },
+                  { text: 'Realistic scenario faults: disconnected hosts, full datastores', icon: '🔧' },
+                  { text: 'Real-time performance charts and recent tasks panel', icon: '📊' },
+                ].map(({ text, icon }) => (
+                  <li key={text} className="flex items-center gap-3 text-sm text-surface-300">
+                    <span className="w-6 h-6 rounded-lg bg-[#5b9bd5]/15 border border-[#5b9bd5]/30 flex items-center justify-center text-xs shrink-0">{icon}</span>
+                    {text}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-3 flex-wrap">
+                <Link to="/scenarios?technology=vmware"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
+                  style={{ background: 'linear-gradient(135deg, #5b9bd5, #2a6ab5)' }}>
+                  <Play size={16} /> Try VMware Scenarios
+                </Link>
+                <Link to="/technologies"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold border border-surface-600 text-surface-300 hover:border-[#5b9bd5]/50 hover:text-white transition-all">
+                  All Technologies <ChevronRight size={14} />
+                </Link>
+              </div>
+            </div>
+            {/* RIGHT — VMware demo widget */}
+            <div className="w-full lg:w-[440px] shrink-0">
+              <VMwareDemoWidget />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="bg-gradient-stripe" />
 
       {/* ═══════════════════════════════════════════
           SECTION 6 — FEATURES GRID
