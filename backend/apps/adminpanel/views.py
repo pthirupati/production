@@ -976,6 +976,8 @@ class AdminUserDetailView(APIView):
         if "is_active" in request.data:
             user.is_active = request.data["is_active"]
         if "is_staff" in request.data:
+            if not request.user.is_superuser:
+                return Response({"error": "Only superusers can modify admin privileges"}, status=403)
             user.is_staff = request.data["is_staff"]
 
         # Admin can reset user password
@@ -1067,10 +1069,14 @@ class AdminBulkUsersView(APIView):
             return Response({"message": f"{updated} user(s) deactivated", "count": updated})
 
         elif action == "make_staff":
+            if not request.user.is_superuser:
+                return Response({"error": "Only superusers can grant admin privileges"}, status=403)
             updated = users.update(is_staff=True)
             return Response({"message": f"{updated} user(s) granted admin", "count": updated})
 
         elif action == "remove_staff":
+            if not request.user.is_superuser:
+                return Response({"error": "Only superusers can revoke admin privileges"}, status=403)
             updated = users.update(is_staff=False)
             return Response({"message": f"{updated} user(s) had admin removed", "count": updated})
 

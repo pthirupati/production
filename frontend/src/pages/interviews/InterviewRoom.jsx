@@ -23,6 +23,16 @@ export default function InterviewRoom() {
   const [searchParams] = useSearchParams()
   const observerToken = searchParams.get('observer')
   const navigate = useNavigate()
+
+  // Strip sensitive observer token from URL immediately to avoid leaking via
+  // browser history, server logs, or Referer headers.
+  useEffect(() => {
+    if (observerToken) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('observer')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const streamRef = useRef(null)
   const [mediaStream, setMediaStream] = useState(null)
   const { speak, listen, config: voiceConfig, resolveVoiceProfile } = useInterviewVoice()

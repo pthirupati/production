@@ -81,7 +81,6 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -517,6 +516,13 @@ JIRA_SIMULATION_PREFIX = env("JIRA_SIMULATION_PREFIX", default="KAN")
 # Comma-separated IPs allowed to access /django-admin/ and /api/admin/
 # Empty = allow all (set in production to your office/VPN IP)
 ADMIN_ALLOWED_IPS = [ip.strip() for ip in env("ADMIN_ALLOWED_IPS", default="").split(",") if ip.strip()]
+if not DEBUG and not ADMIN_ALLOWED_IPS:
+    import warnings
+    warnings.warn(
+        "ADMIN_ALLOWED_IPS is not set — admin endpoints are accessible from all IPs. "
+        "Set ADMIN_ALLOWED_IPS in production.",
+        stacklevel=2,
+    )
 
 # --------------------------------------------------
 # Social OAuth (GitHub + Google)
@@ -608,12 +614,14 @@ PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
 ]
 
+# Always enforce secure cookies regardless of DEBUG mode
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
 # --------------------------------------------------
 # Security (production only)
 # --------------------------------------------------
 if not DEBUG:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True

@@ -32,7 +32,9 @@ export default function OAuthCallback() {
       try {
         const socialConfig = await authApi.getSocialConfig()
         const redirectUri = getOAuthRedirectUri(socialConfig, provider)
-        const intent = searchParams.get('state') || sessionStorage.getItem('oauth_intent') || searchParams.get('intent') || 'login'
+        const VALID_INTENTS = ['login', 'register', 'link']
+        const rawIntent = searchParams.get('state') || sessionStorage.getItem('oauth_intent') || searchParams.get('intent') || 'login'
+        const intent = VALID_INTENTS.includes(rawIntent) ? rawIntent : 'login'
         sessionStorage.removeItem('oauth_intent')
         if (intent === 'link') {
           await authApi.socialLink(provider, code, redirectUri)

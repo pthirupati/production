@@ -100,13 +100,22 @@ def consume_interview_credit(user) -> bool:
     if ent.is_complimentary or ent.is_admin_granted_free:
         return True
     if ent.is_active and ent.period_end and ent.period_end >= timezone.now():
-        if ent.interviews_remaining > 0:
-            ent.interviews_remaining -= 1
-            if ent.interviews_remaining <= 0:
-                ent.is_active = False
-            ent.save(update_fields=["interviews_remaining", "is_active", "updated_at"])
-            return True
-        return False
+        from django.db import transaction
+        from django.db.models import F
+        with transaction.atomic():
+            updated = InterviewEntitlement.objects.select_for_update().filter(
+                pk=ent.pk,
+                interviews_remaining__gt=0,
+                is_active=True,
+                period_end__gte=timezone.now(),
+            ).update(interviews_remaining=F("interviews_remaining") - 1)
+            if not updated:
+                return False
+            # Deactivate if now exhausted
+            InterviewEntitlement.objects.filter(
+                pk=ent.pk, interviews_remaining__lte=0
+            ).update(is_active=False)
+        return True
     platform = get_platform_settings()
     limit = platform.free_campaigns_per_month
     campaigns_this_month = user.interview_campaigns.filter(

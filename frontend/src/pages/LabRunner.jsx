@@ -155,7 +155,7 @@ export default function LabRunner() {
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return
 
-    const channel = new BroadcastChannel('fixitlab_lab_sync')
+    const channel = new BroadcastChannel(`fixitlab_lab_sync_${sessionId || 'global'}`)
     labChannelRef.current = channel
 
     channel.onmessage = (event) => {

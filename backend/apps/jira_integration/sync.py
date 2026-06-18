@@ -62,9 +62,10 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
     lab_url = f"{site}/lab/{session.id}" if session else scenario_url
     vmware_url = f"{site}/vmware/{session.id}" if session and _is_vmware_scenario(scenario) else ""
 
+    from string import Template
     custom = (getattr(scenario, "jira_issue_template", "") or "").strip()
     if custom:
-        return custom.format(
+        return Template(custom).safe_substitute(
             scenario_title=scenario.title,
             scenario_slug=scenario.slug,
             scenario_description=scenario.description,

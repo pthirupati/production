@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from django.db import transaction
+
 from apps.interviews.models import (
     CandidateProfile,
     InterviewCampaign,
@@ -45,39 +47,41 @@ def create_sample_campaign(user) -> InterviewCampaign:
     if not platform.sample_enabled:
         raise ValueError("Sample interviews are disabled")
 
-    ent, _ = InterviewEntitlement.objects.get_or_create(user=user)
-    if ent.sample_interview_used:
-        raise ValueError("You have already used your free sample interview")
+    with transaction.atomic():
+        ent, _ = InterviewEntitlement.objects.get_or_create(user=user)
+        ent = InterviewEntitlement.objects.select_for_update().get(pk=ent.pk)
+        if ent.sample_interview_used:
+            raise ValueError("You have already used your free sample interview")
 
-    profile, _ = CandidateProfile.objects.get_or_create(user=user)
-    duration = int(platform.sample_duration_minutes or 10)
-    free_tier = InterviewPlanTier.objects.filter(code="free", is_active=True).first()
-    snap = CandidateProfileSerializer(profile).data
-    title = f"Free sample — {profile.target_role or 'Mock Interview'}"
+        profile, _ = CandidateProfile.objects.get_or_create(user=user)
+        duration = int(platform.sample_duration_minutes or 10)
+        free_tier = InterviewPlanTier.objects.filter(code="free", is_active=True).first()
+        snap = CandidateProfileSerializer(profile).data
+        title = f"Free sample — {profile.target_role or 'Mock Interview'}"
 
-    campaign = InterviewCampaign.objects.create(
-        user=user,
-        title=title,
-        round_count=1,
-        status="scheduled",
-        is_sample=True,
-        profile_snapshot=snap,
-        primary_technology=profile.primary_technology,
-        experience_level=profile.experience_level,
-        plan_tier=free_tier,
-    )
-    InterviewRound.objects.create(
-        campaign=campaign,
-        round_number=1,
-        round_type="technical",
-        title=f"Sample — {duration}-minute intro",
-        duration_minutes=duration,
-        max_extension_minutes=0,
-        status="ready",
-        persona_name="Alex Chen",
-        persona_voice_id="indian-female",
-        pass_threshold=50.0,
-    )
+        campaign = InterviewCampaign.objects.create(
+            user=user,
+            title=title,
+            round_count=1,
+            status="scheduled",
+            is_sample=True,
+            profile_snapshot=snap,
+            primary_technology=profile.primary_technology,
+            experience_level=profile.experience_level,
+            plan_tier=free_tier,
+        )
+        InterviewRound.objects.create(
+            campaign=campaign,
+            round_number=1,
+            round_type="technical",
+            title=f"Sample — {duration}-minute intro",
+            duration_minutes=duration,
+            max_extension_minutes=0,
+            status="ready",
+            persona_name="Alex Chen",
+            persona_voice_id="indian-female",
+            pass_threshold=50.0,
+        )
     return campaign
 
 

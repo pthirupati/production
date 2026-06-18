@@ -497,6 +497,12 @@ class StartLabView(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
+        # ── Fast pre-checks (no lock held) ──
+        # These are intentionally outside the atomic block as a performance
+        # optimisation: most requests will fail here and never need the lock.
+        # Both checks are RE-VERIFIED inside the lock below (double-checked
+        # locking pattern) to close the TOCTOU race between concurrent requests.
+
         # Check billing limits — only count non-failed sessions
         today_count = LabSession.objects.filter(
             user=request.user,
@@ -559,6 +565,43 @@ class StartLabView(APIView):
                 return Response(
                     {**serializer.data, "resumed": True, **jira_info},
                     status=status.HTTP_200_OK,
+                )
+
+            # ── Re-check limits under the row-level lock (TOCTOU guard) ──
+            # By the time we acquired the lock, another concurrent request may
+            # have already created a session.  Re-evaluate both limits using the
+            # now-locked queryset so we don't exceed them under load.
+
+            # Re-check concurrent-session limit using the locked queryset
+            locked_active_count = existing_sessions.count()
+            if locked_active_count >= max_concurrent:
+                return Response(
+                    {
+                        "error": f"You already have {locked_active_count} active lab(s) running. "
+                                 f"Stop an existing lab before starting a new one.",
+                        "active_labs": locked_active_count,
+                        "max_concurrent": max_concurrent,
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+
+            # Re-check daily billing limit (requires a separate query — not
+            # covered by the RUNNING/PROVISIONING lock above)
+            locked_today_count = LabSession.objects.filter(
+                user=request.user,
+                started_at__date=timezone.now().date()
+            ).exclude(status="FAILED").count()
+            if not can_start_lab(request.user, locked_today_count):
+                from apps.billing.services import get_user_plan_info
+                plan_info = get_user_plan_info(request.user)
+                return Response(
+                    {
+                        "error": "Daily lab limit reached. Upgrade your plan for unlimited access.",
+                        "code": "LIMIT_REACHED",
+                        "plan": plan_info["plan"],
+                        "usage": plan_info["usage"],
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
             # Terminate active sessions for OTHER scenarios
@@ -1227,8 +1270,8 @@ class LeaderboardView(APIView):
                     user_rank = entry
                     break
 
-        page = int(request.query_params.get("page", 1))
-        page_size = min(int(request.query_params.get("page_size", 20)), 100)
+        page = max(1, int(request.query_params.get("page", 1)))
+        page_size = max(1, min(int(request.query_params.get("page_size", 20)), 100))
         start = (page - 1) * page_size
         end = start + page_size
         paginated = cached_data[start:end]
@@ -1752,8 +1795,14 @@ class ProjectTaskUpdateView(APIView):
         utp.notes = request.data.get("notes", utp.notes)
         if new_status == "done" and not utp.completed_at:
             utp.completed_at = tz.now()
-        if request.FILES.get("screenshot"):
-            utp.screenshot = request.FILES["screenshot"]
+        screenshot = request.FILES.get("screenshot")
+        if screenshot:
+            if screenshot.content_type not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif'):
+                return Response({'error': 'Screenshot must be PNG, JPEG, WebP, or GIF'}, status=400)
+            if screenshot.size > 5 * 1024 * 1024:
+                return Response({'error': 'Screenshot must be under 5 MB'}, status=400)
+        if screenshot:
+            utp.screenshot = screenshot
         utp.save()
 
         # Check if all tasks done → mark project completed

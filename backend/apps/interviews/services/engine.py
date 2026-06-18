@@ -58,11 +58,22 @@ def _profile_for_round(round_obj: InterviewRound) -> dict:
 
 
 def start_round(round_obj: InterviewRound) -> dict:
-    now = timezone.now()
+    # Re-fetch with lock to prevent concurrent starts
+    from django.db import transaction as db_transaction
+    with db_transaction.atomic():
+        locked = InterviewRound.objects.select_for_update().get(pk=round_obj.pk)
+        if locked.status not in ("scheduled", "ready"):
+            # Already started or ended by a concurrent request
+            round_obj.status = locked.status
+            return {"already_started": True}
+        now = timezone.now()
+        locked.status = "in_progress"
+        locked.started_at = now
+        locked.ends_at = now + timedelta(minutes=locked.duration_minutes + locked.extension_minutes)
+        locked.save(update_fields=["status", "started_at", "ends_at"])
     round_obj.status = "in_progress"
-    round_obj.started_at = now
-    round_obj.ends_at = now + timedelta(minutes=round_obj.duration_minutes + round_obj.extension_minutes)
-    round_obj.save(update_fields=["status", "started_at", "ends_at"])
+    round_obj.started_at = locked.started_at
+    round_obj.ends_at = locked.ends_at
 
     campaign = round_obj.campaign
     if getattr(campaign, "is_sample", False):
@@ -265,64 +276,71 @@ def record_av_status(round_obj: InterviewRound, mic_on: bool, camera_on: bool) -
 
 
 def end_round(round_obj: InterviewRound, reason: str = "completed") -> dict:
-    now = timezone.now()
-    round_obj.status = "completed"
-    round_obj.ended_at = now
-    round_obj.save(update_fields=["status", "ended_at"])
+    from django.db import transaction as db_transaction
+    with db_transaction.atomic():
+        locked = InterviewRound.objects.select_for_update().get(pk=round_obj.pk)
+        if locked.status != "in_progress":
+            # Already ended by a concurrent request
+            return {"already_ended": True, "status": locked.status}
 
-    scores = list(
-        round_obj.messages.filter(role="candidate", score__isnull=False).values_list("score", flat=True)
-    )
-    agg = aggregate_round_scores(scores)
-    passed = agg["overall_score"] >= round_obj.pass_threshold and reason != "av_timeout"
-    strengths, improvements = build_strengths_and_improvements(
-        [{"score": s} for s in scores],
-        round_obj.round_type,
-    )
+        now = timezone.now()
+        round_obj.status = "completed"
+        round_obj.ended_at = now
+        round_obj.save(update_fields=["status", "ended_at"])
 
-    report = InterviewReport.objects.create(
-        round=round_obj,
-        passed=passed,
-        **agg,
-        strengths=strengths,
-        improvements=improvements,
-        summary=_build_summary(round_obj, passed, reason),
-        study_plan=_study_plan(round_obj),
-        question_breakdown=list(
-            round_obj.messages.filter(role="candidate", score__isnull=False).values(
-                "content", "score", "metadata"
-            )[:20]
-        ),
-    )
-
-    round_obj.overall_score = agg["overall_score"]
-    round_obj.status = "passed" if passed else "failed"
-    round_obj.save(update_fields=["overall_score", "status"])
-
-    campaign = round_obj.campaign
-    result = {"report": report, "passed": passed, "reason": reason}
-
-    if getattr(campaign, "is_sample", False):
-        campaign.status = "completed"
-        campaign.completed_at = now
-        campaign.save(update_fields=["status", "completed_at", "updated_at"])
-        report.summary = (
-            report.summary + " This was your free sample — subscribe for full multi-round interviews, "
-            "hands-on labs, and FIXIT-INT certificates."
+        scores = list(
+            round_obj.messages.filter(role="candidate", score__isnull=False).values_list("score", flat=True)
         )
-        report.save(update_fields=["summary"])
-        result["is_sample"] = True
-        result["upgrade_required"] = True
-        return result
+        agg = aggregate_round_scores(scores)
+        passed = agg["overall_score"] >= round_obj.pass_threshold and reason != "av_timeout"
+        strengths, improvements = build_strengths_and_improvements(
+            [{"score": s} for s in scores],
+            round_obj.round_type,
+        )
 
-    if passed:
-        nxt = unlock_next_round(campaign, round_obj)
-        result["next_round"] = nxt
-        if not nxt:
-            _finalize_campaign(campaign)
-    else:
-        campaign.status = "failed"
-        campaign.save(update_fields=["status", "updated_at"])
+        report = InterviewReport.objects.create(
+            round=round_obj,
+            passed=passed,
+            **agg,
+            strengths=strengths,
+            improvements=improvements,
+            summary=_build_summary(round_obj, passed, reason),
+            study_plan=_study_plan(round_obj),
+            question_breakdown=list(
+                round_obj.messages.filter(role="candidate", score__isnull=False).values(
+                    "content", "score", "metadata"
+                )[:20]
+            ),
+        )
+
+        round_obj.overall_score = agg["overall_score"]
+        round_obj.status = "passed" if passed else "failed"
+        round_obj.save(update_fields=["overall_score", "status"])
+
+        campaign = round_obj.campaign
+        result = {"report": report, "passed": passed, "reason": reason}
+
+        if getattr(campaign, "is_sample", False):
+            campaign.status = "completed"
+            campaign.completed_at = now
+            campaign.save(update_fields=["status", "completed_at", "updated_at"])
+            report.summary = (
+                report.summary + " This was your free sample — subscribe for full multi-round interviews, "
+                "hands-on labs, and FIXIT-INT certificates."
+            )
+            report.save(update_fields=["summary"])
+            result["is_sample"] = True
+            result["upgrade_required"] = True
+            return result
+
+        if passed:
+            nxt = unlock_next_round(campaign, round_obj)
+            result["next_round"] = nxt
+            if not nxt:
+                _finalize_campaign(campaign)
+        else:
+            campaign.status = "failed"
+            campaign.save(update_fields=["status", "updated_at"])
 
     try:
         from apps.notifications.tasks import send_notification_email

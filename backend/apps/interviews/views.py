@@ -134,9 +134,16 @@ class CandidateProfileView(APIView):
         ):
             if json_field in data:
                 data[json_field] = _coerce_json_field(data.get(json_field), expect_list=expect_list)
-        if request.FILES.get("resume"):
-            profile.resume_file = request.FILES["resume"]
-            text = extract_text_from_upload(request.FILES["resume"])
+        resume = request.FILES.get("resume")
+        if resume:
+            ALLOWED_TYPES = ('application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain')
+            if resume.content_type not in ALLOWED_TYPES:
+                return Response({'error': 'Only PDF, DOCX, or TXT files are accepted for resume'}, status=400)
+            if resume.size > 10 * 1024 * 1024:
+                return Response({'error': 'Resume file must be under 10 MB'}, status=400)
+        if resume:
+            profile.resume_file = resume
+            text = extract_text_from_upload(resume)
             profile.resume_text = text
             profile.resume_parsed = parse_resume_text(text)
         ser = CandidateProfileSerializer(profile, data=data, partial=True)
@@ -314,6 +321,8 @@ class InterviewRoundScheduleView(APIView):
             from django.utils.dateparse import parse_datetime
 
             dt = parse_datetime(scheduled_at)
+            if dt and dt < timezone.now():
+                return Response({'error': 'Scheduled time must be in the future'}, status=400)
             if dt:
                 round_obj.scheduled_at = dt
         else:
@@ -412,6 +421,8 @@ class InterviewRoundMessageView(APIView):
             return Response({"error": "Round not in progress"}, status=400)
 
         answer = request.data.get("answer", "")
+        if len(answer) > 8000:
+            return Response({'error': 'Answer is too long (max 8000 characters)'}, status=400)
         meta = {
             "input_type": request.data.get("input_type", "text"),
             "command_validated": request.data.get("command_validated", False),
@@ -456,7 +467,7 @@ class InterviewRoundExtendView(APIView):
             id=round_id,
             campaign__user=request.user,
         )
-        minutes = int(request.data.get("minutes", 10))
+        minutes = max(1, min(int(request.data.get("minutes", 10)), 60))
         ok = engine.extend_round(round_obj, minutes)
         if not ok:
             return Response({"error": "Extension limit reached"}, status=400)

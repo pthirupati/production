@@ -656,7 +656,12 @@ export default function BlogPost() {
       // Inline code
       text = text.replace(/`([^`]+)`/g, '<code class="bg-surface-800 text-accent-cyan px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
 
-      return DOMPurify.sanitize(text)
+      return DOMPurify.sanitize(text, {
+        ALLOWED_TAGS: ['strong', 'em', 'code', 'br', 'span'],
+        ALLOWED_ATTR: ['class'],
+        ALLOW_DATA_ATTR: false,
+        FORCE_BODY: true,
+      })
     }
 
     for (let i = 0; i < lines.length; i++) {
