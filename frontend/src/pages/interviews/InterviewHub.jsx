@@ -106,7 +106,7 @@ export default function InterviewHub() {
     }
   }
 
-  const DELETABLE_STATUSES = ['completed', 'failed', 'cancelled']
+  const DELETABLE_STATUSES = ['draft', 'completed', 'failed', 'cancelled']
 
   const sampleMinutes = sampleInfo?.sample_duration_minutes || entitlement?.sample_duration_minutes || 10
   const showSample = sampleInfo?.sample_available || entitlement?.sample_available

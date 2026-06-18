@@ -100,6 +100,21 @@ export default function InterviewRoom() {
       toast.error(msg)
       return
     }
+    // Pre-check: if already denied in browser settings getUserMedia will silently
+    // fail with no browser prompt. Detect this early and show actionable guidance.
+    const needsAudio = type === 'audio' || type === 'both'
+    const needsVideo = type === 'video' || type === 'both'
+    const [micState, camState] = await Promise.all([
+      needsAudio ? queryMediaPermission('audio') : Promise.resolve('granted'),
+      needsVideo ? queryMediaPermission('video') : Promise.resolve('granted'),
+    ])
+    if (micState === 'denied' || camState === 'denied') {
+      const which = micState === 'denied' && camState === 'denied' ? 'Camera and microphone' : micState === 'denied' ? 'Microphone' : 'Camera'
+      const msg = `${which} access is blocked. Click the lock icon in your browser address bar, choose "Allow" for camera and microphone, then try again.`
+      setMediaError(msg)
+      toast.error(msg)
+      return
+    }
     setMediaLoading(true)
     setMediaError('')
     try {

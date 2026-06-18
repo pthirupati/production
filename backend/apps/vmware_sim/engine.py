@@ -573,7 +573,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "VM not found"}
         snap_name = payload.get("snapshot_name") or f"snapshot-{int(time.time())}"
         snap = {
-            "id": f"snap-{int(time.time())}",
+            "id": f"snap-{int(time.time())}-{random.randint(100, 999)}",
             "name": snap_name,
             "description": payload.get("description") or "",
             "created": _now_iso(),
@@ -614,12 +614,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "Host not found"}
         host["status"] = "connected"
         host["connection_state"] = "connected"
+        # Restore tools status on VMs but do NOT auto-power-on — ESXi reconnect
+        # does not restart VMs; HA or the admin must do that explicitly.
         for vm in state["vms"]:
-            if vm["host_id"] == host["id"] and vm["power"] == "poweredOff":
-                vm["power"] = "poweredOn"
-                vm["tools"] = "ok"
-                vm["cpu_pct"] = random.randint(10, 30)
-                vm["mem_pct"] = random.randint(40, 70)
+            if vm["host_id"] == host["id"] and vm.get("tools") == "notRunning":
+                vm["tools"] = "guestToolsNotInstalled"
         state["alarms"] = [a for a in state.get("alarms", []) if a.get("entity") != host["name"]]
         events.append(_event(f"Host {host['name']} reconnected", "info", host["name"]))
         tasks.insert(0, _task("Reconnect Host", host["name"]))
@@ -673,6 +672,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     if action == "expand_datastore":
         ds_name = payload.get("datastore") or "datastore-ssd-01"
         add_gb = int(payload.get("gb") or 500)
+        if add_gb <= 0:
+            return {"ok": False, "error": "Expansion size must be a positive number of GB"}
         ds = _find_ds(state, ds_name=ds_name)
         if not ds:
             return {"ok": False, "error": "Datastore not found"}
@@ -727,6 +728,7 @@ def validate_vmware_lab(session_id: str, scenario_slug: str = "") -> tuple[bool,
         for host in state["hosts"]:
             if host.get("status") not in ("connected",):
                 return False, f"Host {host['name']} must be connected for HA"
+        return True, "HA is enabled and all hosts connected — validation passed"
 
     if rules.get("datastore_min_free_gb"):
         ds_name = rules.get("datastore", "datastore-ssd-01")

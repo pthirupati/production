@@ -42,5 +42,7 @@ class VMwareSimReleaseView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
         drop_session(session_id)
         return Response({"released": True})

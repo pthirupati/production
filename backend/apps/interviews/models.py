@@ -117,6 +117,7 @@ class InterviewCampaign(models.Model):
     )
     is_archived = models.BooleanField(
         default=False,
+        db_index=True,
         help_text="Soft-deleted by user from history; excluded from list view",
     )
     created_at = models.DateTimeField(auto_now_add=True)

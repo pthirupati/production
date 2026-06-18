@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { vmwareApi } from '../../api/vmware'
 import toast from 'react-hot-toast'
@@ -36,9 +36,15 @@ function UsageBar({ pct, color = '#4c9be8' }) {
 /* ─── Simulated sparkline chart ─────────────────────────────────────── */
 function PerfChart({ cpuPct = 30, memPct = 50 }) {
   const W = 560, H = 120
-  const points = (base) => Array.from({ length: 20 }, (_, i) => base + Math.sin(i * 0.6) * 10 + Math.random() * 8 - 4)
-  const cpuPts = points(cpuPct)
-  const memPts = points(memPct)
+  // Stabilize points so the chart doesn't redraw on every parent re-render.
+  const cpuPts = useMemo(
+    () => Array.from({ length: 20 }, (_, i) => cpuPct + Math.sin(i * 0.6) * 10 + (((i * 17 + cpuPct * 3) % 17) - 8) * 0.5),
+    [cpuPct],
+  )
+  const memPts = useMemo(
+    () => Array.from({ length: 20 }, (_, i) => memPct + Math.sin(i * 0.4) * 8 + (((i * 13 + memPct * 5) % 13) - 6) * 0.5),
+    [memPct],
+  )
   const toSvg = (pts) => pts.map((v, i) => `${(i / 19) * W},${H - (v / 100) * H}`).join(' ')
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block">
@@ -54,11 +60,18 @@ function SnapshotModal({ vm, onClose, onAction }) {
   const [desc, setDesc] = useState('')
   const [acting, setActing] = useState(false)
 
+  const [error, setError] = useState('')
   const create = async () => {
     setActing(true)
-    await onAction('take_snapshot', { vm_name: vm.name, snapshot_name: name, description: desc })
-    setActing(false)
-    onClose()
+    setError('')
+    try {
+      await onAction('take_snapshot', { vm_name: vm.name, snapshot_name: name, description: desc })
+      onClose()
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Snapshot failed')
+    } finally {
+      setActing(false)
+    }
   }
 
   return (
@@ -80,6 +93,9 @@ function SnapshotModal({ vm, onClose, onAction }) {
               className="w-full border border-[#aaa] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#5b9bd5]" />
           </div>
         </div>
+        {error && (
+          <div className="px-4 pb-2 text-xs text-red-600">{error}</div>
+        )}
         <div className="px-4 pb-4 flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-1.5 text-sm border border-[#aaa] rounded bg-[#e8e8e8] hover:bg-[#ddd]">Cancel</button>
           <button disabled={acting || !name.trim()} onClick={create}
@@ -151,19 +167,21 @@ export default function VMwareSimulator() {
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false)
   const actionsRef = useRef(null)
 
+  const initialSelectionDone = useRef(false)
   const load = useCallback(async () => {
     try {
       const data = await vmwareApi.getState(sessionId)
       setState(data)
-      if (!selectedNode.id && data.inventory?.hosts?.length) {
+      if (!initialSelectionDone.current && data.inventory?.hosts?.length) {
         setSelectedNode({ type: 'host', id: data.inventory.hosts[0].id })
+        initialSelectionDone.current = true
       }
     } catch {
       toast.error('Could not load VMware simulator')
     } finally {
       setLoading(false)
     }
-  }, [sessionId, selectedNode.id])
+  }, [sessionId])
 
   useEffect(() => { load() }, [load])
 
@@ -209,7 +227,7 @@ export default function VMwareSimulator() {
   const events = inv.events || []
   const recentTasks = inv.recent_tasks || []
 
-  const selectedHost = selectedNode.type === 'host' ? hosts.find(h => h.id === selectedNode.id) || hosts[0] : null
+  const selectedHost = selectedNode.type === 'host' ? (hosts.find(h => h.id === selectedNode.id) ?? null) : null
   const selectedVm = selectedNode.type === 'vm' ? vms.find(v => v.id === selectedNode.id) : null
   const selectedDs = selectedNode.type === 'datastore' ? datastores.find(d => d.id === selectedNode.id) : null
   const selectedNet = selectedNode.type === 'network' ? networks.find(n => n.id === selectedNode.id) : null

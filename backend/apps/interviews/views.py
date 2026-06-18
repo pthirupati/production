@@ -276,6 +276,11 @@ class InterviewCampaignDetailView(APIView):
         # Cancel active/scheduled interviews
         if campaign.status in ("in_progress", "scheduled"):
             return Response({"error": "Cannot delete an ongoing or scheduled interview"}, status=400)
+        # Draft campaigns: archive without sending a cancellation email
+        if campaign.status == "draft":
+            campaign.is_archived = True
+            campaign.save(update_fields=["is_archived", "updated_at"])
+            return Response({"status": "archived", "id": str(campaign.id)})
         campaign.status = "cancelled"
         campaign.save(update_fields=["status", "updated_at"])
         campaign.rounds.exclude(status__in=("passed", "completed")).update(status="abandoned")
