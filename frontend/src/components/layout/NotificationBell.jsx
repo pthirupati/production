@@ -110,7 +110,14 @@ export default function NotificationBell() {
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800">
-        <h3 className="text-sm font-semibold text-surface-50">Notifications</h3>
+        <h3 className="text-sm font-semibold text-surface-50 flex items-center gap-2">
+          Notifications
+          {unreadCount > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-accent-red text-[10px] font-bold text-white">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </h3>
         <div className="flex items-center gap-2">
           {unreadCount > 0 && (
             <button
@@ -196,9 +203,13 @@ export default function NotificationBell() {
         className="relative p-2 text-surface-400 hover:text-surface-50 transition-colors rounded-lg hover:bg-surface-800 overflow-visible"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
-        <Bell size={18} />
+        <Bell
+          size={18}
+          className={unreadCount > 0 ? 'text-accent-cyan' : undefined}
+          fill={unreadCount > 0 ? 'currentColor' : 'none'}
+        />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-accent-red text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-surface-900 z-10">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-accent-red text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-surface-900 z-20 pointer-events-none animate-pulse">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}

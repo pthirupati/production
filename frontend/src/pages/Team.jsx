@@ -7,7 +7,7 @@ import {
   Clock, Trash2, UserMinus, ChevronRight, X, BookOpen, FlaskConical
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import StickyPageToolbar from '../components/StickyPageToolbar'
+import CompactPageHeader from '../components/CompactPageHeader'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -154,14 +154,12 @@ export default function Team() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <StickyPageToolbar>
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Users size={24} className="text-accent-cyan shrink-0" /> My Team
-        </h1>
-        <p className="text-surface-400 mt-1 text-sm">Organization access, member analytics, invites, and seat billing</p>
-      </div>
-      </StickyPageToolbar>
+      <CompactPageHeader
+        title="My Team"
+        subtitle="Organization access, member analytics, invites, and seat billing"
+        eyebrow="Collaboration"
+        icon={Users}
+      />
 
       <div className="grid sm:grid-cols-2 gap-4">
         {orgs.map(org => (

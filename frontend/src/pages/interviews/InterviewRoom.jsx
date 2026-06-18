@@ -446,7 +446,7 @@ export default function InterviewRoom() {
             {mediaError}
           </div>
         )}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
           <button
             type="button"
             onClick={enableMedia}

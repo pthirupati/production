@@ -80,7 +80,7 @@ export default function Home() {
       {/* ─── Sticky Navbar ─── */}
       <div className="sticky top-0 z-50">
         <nav className="border-b border-surface-700/30 backdrop-blur-xl bg-surface-950/95">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 grid grid-cols-[auto_1fr_auto] items-center gap-3 sm:gap-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:gap-3 isolate">
 
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2 group shrink-0 z-10">
@@ -91,14 +91,19 @@ export default function Home() {
               <span className="text-lg sm:text-xl font-bold font-display text-white tracking-tight hidden sm:inline">FixitLab</span>
             </Link>
 
-            {/* Desktop nav — centered, wraps on lg+ only */}
-            <div className="hidden lg:flex items-center justify-center gap-0.5 flex-wrap min-w-0">
-              {PUBLIC_NAV_LINKS.map(({ to, label }) => (
-                <BubbleNavLink key={to} to={to} active={navActive(to)} size="md">
-                  {label}
-                </BubbleNavLink>
-              ))}
-            </div>
+            {/* Desktop nav — single row, scrolls on narrow lg viewports */}
+            <nav
+              className="hidden lg:flex flex-1 min-w-0 items-center justify-center overflow-x-auto overscroll-x-contain nav-scroll-strip"
+              aria-label="Main navigation"
+            >
+              <div className="flex items-center gap-0.5 flex-nowrap px-1">
+                {PUBLIC_NAV_LINKS.map(({ to, label }) => (
+                  <BubbleNavLink key={to} to={to} active={navActive(to)} size="sm">
+                    {label}
+                  </BubbleNavLink>
+                ))}
+              </div>
+            </nav>
 
             {/* Right actions */}
             <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0 z-10">

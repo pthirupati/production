@@ -9,7 +9,7 @@ import {
   Play, CheckCircle2, Headphones, AlertCircle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import StickyPageToolbar from '../../components/StickyPageToolbar'
+import CompactPageHeader from '../../components/CompactPageHeader'
 
 const STATUS_COLORS = {
   draft: 'text-surface-400',
@@ -151,24 +151,19 @@ export default function InterviewHub() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
-      <StickyPageToolbar className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs uppercase tracking-widest text-indigo-400 font-semibold mb-1">AI Interview Studio</p>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">Mock interviews that feel real</h1>
-          <p className="text-surface-400 text-sm mt-2 max-w-xl">
-            Multi-round voice interviews with resume-aware questions, hands-on troubleshooting, ITIL/SLA panels,
-            scheduling, and LinkedIn-ready certificates. Voice runs in your browser — no extra apps required.
-          </p>
-        </div>
+      <CompactPageHeader
+        title="Mock interviews that feel real"
+        subtitle="Multi-round voice interviews with resume-aware questions, scheduling, and certificates."
+        eyebrow="AI Interview Studio"
+        icon={Mic}
+      >
         <Link
           to="/interviews/setup"
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-medium hover:opacity-90 shrink-0"
         >
           <Plus size={16} /> New interview
         </Link>
-      </div>
-      </StickyPageToolbar>
+      </CompactPageHeader>
 
       {/* Free sample interview */}
       {showSample && (

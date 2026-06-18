@@ -11,6 +11,7 @@ import toast from 'react-hot-toast'
 import { resolveMediaUrl, IMAGE_UPLOAD_HINTS } from '../utils/mediaUrl'
 import Pagination from '../components/Pagination'
 import StickyPageToolbar from '../components/StickyPageToolbar'
+import { useScrollHideToolbar } from '../hooks/useScrollHideToolbar'
 
 function timeAgo(dateStr) {
   const d = new Date(dateStr)
@@ -346,9 +347,11 @@ export default function Community() {
     </div>
   )
 
+  const { hidden: toolbarHidden, toolbarRef, anchorRef } = useScrollHideToolbar(64)
+
   return (
     <div className="space-y-5">
-      <StickyPageToolbar>
+      <StickyPageToolbar hidden={toolbarHidden} toolbarRef={toolbarRef} className="space-y-3">
         {/* ── Header ─────────────────────────────────────────── */}
         <div className="relative overflow-hidden glass-card p-6 sm:p-7">
           <div className="absolute inset-0 bg-gradient-to-r from-accent-cyan/8 via-transparent to-accent-purple/8 pointer-events-none" />
@@ -427,6 +430,7 @@ export default function Community() {
           </div>
         )}
       </StickyPageToolbar>
+      <div ref={anchorRef} className="h-px w-full -mt-px" aria-hidden="true" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* ── Thread List ──────────────────────────────────────── */}

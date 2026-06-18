@@ -93,12 +93,26 @@ def ensure_test_user(suffix: str, password: str = "E2eLabPass123!"):
     return user
 
 
+def refresh_test_user(user):
+    """Re-load test user by username — parallel E2E jobs may delete/recreate accounts."""
+    db_refresh()
+    username = getattr(user, "username", None)
+    if not username:
+        raise ValueError("Invalid user object")
+    fresh = User.objects.filter(username=username).first()
+    if fresh:
+        return fresh
+    suffix = username.replace("e2e_lab_", "", 1)
+    return ensure_test_user(suffix)
+
+
 def ensure_multi_users(n: int = 3):
     labels = ["user_a", "user_b", "user_c"][:n]
     return [ensure_test_user(lbl) for lbl in labels]
 
 
 def grant_unlimited_labs(user):
+    user = refresh_test_user(user)
     plan, _ = Plan.objects.get_or_create(
         code="e2e-unlimited",
         defaults={
@@ -112,6 +126,7 @@ def grant_unlimited_labs(user):
 
 
 def grant_all_technology_subscriptions(user, technologies=None):
+    user = refresh_test_user(user)
     cache.clear()
     if technologies is None:
         technologies = Technology.objects.filter(is_active=True)

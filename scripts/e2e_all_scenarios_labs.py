@@ -43,7 +43,7 @@ from apps.jira_integration.views import ScenarioJiraTicketView
 from apps.public_api.views import LabHintsView
 from apps.accounts.views import LabHistoryView
 
-from e2e_dynamic_catalog import db_refresh, setup_all_test_users, grant_all_technology_subscriptions
+from e2e_dynamic_catalog import db_refresh, setup_all_test_users, grant_all_technology_subscriptions, refresh_test_user
 from e2e_scenario_fix import apply_scenario_fix, fix_script_path
 
 try:
@@ -429,6 +429,9 @@ def main():
                 stats.skip(f"[{tech.slug}/{sc.slug}]", "scenario missing after refresh")
                 continue
             # Re-apply subs — parallel E2E jobs may revoke test subscriptions mid-run.
+            user_a = refresh_test_user(user_a)
+            user_b = refresh_test_user(user_b) if user_b else None
+            user_c = refresh_test_user(user_c) if user_c else None
             grant_all_technology_subscriptions(user_a, [fresh.technology])
             if user_b:
                 grant_all_technology_subscriptions(user_b, [fresh.technology])

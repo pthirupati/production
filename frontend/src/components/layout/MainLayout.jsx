@@ -85,7 +85,7 @@ function SidebarContent({ navVisible, location, user, theme, toggleTheme, handle
         )}
       </nav>
 
-      <div className="shrink-0 p-3 border-t border-surface-700/50 bg-surface-900/95">
+      <div className="shrink-0 p-3 border-t border-surface-700/50 bg-surface-900/95 overflow-visible">
         <div className="flex items-center gap-2 px-3 py-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-cyan to-brand-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
             {user?.first_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || 'U'}

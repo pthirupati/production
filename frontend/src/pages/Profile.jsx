@@ -17,7 +17,7 @@ import toast from 'react-hot-toast'
 import { startOAuth } from '../utils/oauth'
 import { validators } from '../utils/validators'
 import { SkeletonCard } from '../components/Skeleton'
-import StickyPageToolbar from '../components/StickyPageToolbar'
+import CompactPageHeader from '../components/CompactPageHeader'
 import { interviewsApi } from '../api/interviews'
 
 export default function Profile() {
@@ -161,17 +161,12 @@ export default function Profile() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-      <StickyPageToolbar>
-      <div className="relative overflow-hidden glass-card p-6 sm:p-8">
-        <div className="absolute inset-0 bg-gradient-to-r from-accent-cyan/8 via-transparent to-accent-purple/8" />
-        <div className="absolute inset-0 bg-dots-pattern opacity-20" />
-        <div className="relative">
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            <span className="bg-gradient-to-r from-accent-cyan to-accent-purple bg-clip-text text-transparent">Profile Settings</span>
-          </h1>
-        </div>
-      </div>
-      </StickyPageToolbar>
+      <CompactPageHeader
+        title="Profile Settings"
+        subtitle="Account, billing, and preferences"
+        eyebrow="Your account"
+        icon={User}
+      />
 
       <div className="glass-card p-6">
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">

@@ -387,8 +387,9 @@ body::after {
 }
 .nav-link-idle:hover {
   color: rgb(var(--s-100));
-  background: rgb(var(--s-800) / 0.55);
-  box-shadow: inset 0 -2px 0 rgb(var(--a-cyan) / 0.35);
+  background: rgb(var(--s-800) / 0.65);
+  box-shadow: inset 0 -2px 0 rgb(var(--a-cyan) / 0.5);
+  transform: translateY(-1px);
 }
 .nav-link-active:hover {
   color: rgb(var(--s-50));
@@ -397,7 +398,7 @@ body::after {
 
 /* Interview preflight media buttons */
 .interview-media-btn {
-  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-surface-600/60 bg-surface-800/60 text-surface-200 transition-all duration-200;
+  @apply inline-flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl text-sm font-semibold min-h-[44px] border border-surface-600/60 bg-surface-800/70 text-surface-100 transition-all duration-200 shadow-sm;
 }
 .interview-media-btn:hover:not(:disabled) {
   border-color: rgb(var(--a-cyan) / 0.45);
@@ -409,7 +410,7 @@ body::after {
   @apply opacity-50 cursor-not-allowed;
 }
 .interview-media-btn-primary {
-  @apply border-transparent text-white font-semibold;
+  @apply border-transparent text-white font-bold min-h-[48px] px-6;
   background: linear-gradient(135deg, rgb(var(--a-cyan)), rgb(var(--a-blue)));
   box-shadow: 0 4px 20px rgb(var(--a-cyan) / 0.25);
 }
@@ -436,6 +437,16 @@ body::after {
   background: linear-gradient(90deg, rgb(var(--a-cyan)), rgb(var(--a-blue)));
 }
 
+/* Horizontal nav strip (marketing header) */
+.nav-scroll-strip {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+}
+.nav-scroll-strip::-webkit-scrollbar {
+  display: none;
+}
+
 /* Sidebar navigation */
 .sidebar-nav-link {
   @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200;
@@ -445,13 +456,15 @@ body::after {
 }
 .sidebar-nav-idle:hover {
   color: rgb(var(--s-100));
-  background: rgb(var(--s-800) / 0.55);
+  background: rgb(var(--s-800) / 0.65);
+  box-shadow: inset 3px 0 0 rgb(var(--a-cyan) / 0.55);
+  transform: translateX(2px);
 }
 .sidebar-nav-active {
   color: rgb(var(--s-50));
-  background: linear-gradient(135deg, rgb(var(--a-cyan) / 0.14), rgb(var(--a-blue) / 0.08));
-  border: 1px solid rgb(var(--a-cyan) / 0.22);
-  box-shadow: inset 3px 0 0 rgb(var(--a-cyan));
+  background: linear-gradient(135deg, rgb(var(--a-cyan) / 0.16), rgb(var(--a-blue) / 0.1));
+  border: 1px solid rgb(var(--a-cyan) / 0.28);
+  box-shadow: inset 3px 0 0 rgb(var(--a-cyan)), 0 2px 12px rgb(var(--a-cyan) / 0.08);
 }
 
 [data-theme="light"] .nav-link-idle {
