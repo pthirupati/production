@@ -11,7 +11,7 @@ export const interviewsApi = {
     return api.get('/interviews/voices/').then(r => r.data)
   },
   getProfile() {
-    return api.get('/interviews/profile/').then(r => r.data)
+    return api.get('/interviews/profile/', { silentError: true }).then(r => r.data)
   },
   updateProfile(data, resumeFile) {
     const payload = {

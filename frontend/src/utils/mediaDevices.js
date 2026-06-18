@@ -22,8 +22,8 @@ export function getMediaErrorMessage(err) {
   const name = err?.name || ''
   if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
     return (
-      'Camera or microphone access was blocked. Click the lock icon in your browser address bar, ' +
-      'allow camera and microphone for this site, then click Enable again.'
+      'Camera or microphone access is blocked. Open your browser site settings ' +
+      '(click the lock icon next to the address bar), set Camera and Microphone to "Allow", then click Enable again.'
     )
   }
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {

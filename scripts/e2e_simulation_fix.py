@@ -202,6 +202,13 @@ def apply_simulation_fix(session) -> tuple[bool, str]:
             state.mount_filesystems_fixed = True
             return True, "fs remounted"
 
+        if "ldconfig" in slug or "missing-library" in slug:
+            state._mkdir("/etc/ld.so.conf.d")
+            state._write_file("/etc/ld.so.conf.d/fixitlab.conf", "/usr/local/lib\n")
+            state.ldconfig_updated = True
+            state.myapp_working = True
+            return True, "ldconfig conf restored"
+
         return False, f"no simulation fix map for {slug}"
     except Exception as exc:
         return False, str(exc)[:200]

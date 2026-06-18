@@ -6,7 +6,6 @@ import { useInterviewVoice } from '../../hooks/useInterviewVoice'
 import {
   getMediaErrorMessage,
   isMediaDevicesSupported,
-  queryMediaPermission,
   requestUserMedia,
   stopMediaStream,
 } from '../../utils/mediaDevices'
@@ -64,6 +63,23 @@ export default function InterviewRoom() {
   const [backgroundId, setBackgroundId] = useState('none')
 
   const endsAt = round?.ends_at ? new Date(round.ends_at).getTime() : null
+
+  // Proactively request permissions when preflight loads — triggers browser dialog
+  // immediately (like Google Meet), before the user clicks any button.
+  useEffect(() => {
+    if (!preflight || !isMediaDevicesSupported()) return
+    navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      .then(stream => {
+        stream.getAudioTracks().forEach(t => { t.enabled = true })
+        stream.getVideoTracks().forEach(t => { t.enabled = true })
+        syncMediaState(stream)
+      })
+      .catch(() => {
+        navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+          .then(stream => { stream.getAudioTracks().forEach(t => { t.enabled = true }); syncMediaState(stream) })
+          .catch(() => {})
+      })
+  }, [preflight]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => {
@@ -153,21 +169,6 @@ export default function InterviewRoom() {
     }
     if (!isMediaDevicesSupported()) {
       const msg = getMediaErrorMessage({ name: 'NotSupportedError' })
-      setMediaError(msg)
-      toast.error(msg)
-      return
-    }
-    // Pre-check: if already denied in browser settings getUserMedia will silently
-    // fail with no browser prompt. Detect this early and show actionable guidance.
-    const needsAudio = type === 'audio' || type === 'both'
-    const needsVideo = type === 'video' || type === 'both'
-    const [micState, camState] = await Promise.all([
-      needsAudio ? queryMediaPermission('audio') : Promise.resolve('granted'),
-      needsVideo ? queryMediaPermission('video') : Promise.resolve('granted'),
-    ])
-    if (micState === 'denied' || camState === 'denied') {
-      const which = micState === 'denied' && camState === 'denied' ? 'Camera and microphone' : micState === 'denied' ? 'Microphone' : 'Camera'
-      const msg = `${which} access is blocked by your browser. Click the lock icon (🔒) in your browser address bar, set camera and microphone to "Allow", then refresh the page.`
       setMediaError(msg)
       toast.error(msg)
       return
@@ -550,8 +551,17 @@ export default function InterviewRoom() {
           </div>
         )}
         {mediaError && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-            {mediaError}
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100 space-y-1.5">
+            <p>{mediaError}</p>
+            {(mediaError.includes('blocked') || mediaError.includes('Allow')) && (
+              <p className="text-amber-300/80">
+                Chrome/Edge: click the <strong>lock icon</strong> in the address bar → Site settings → Camera/Microphone → Allow → reload.
+                Safari: Settings → Safari → Camera &amp; Microphone → Allow.
+              </p>
+            )}
+            <button type="button" onClick={() => { setMediaError(''); enableMedia() }} className="text-amber-300 underline hover:text-amber-100">
+              Try again
+            </button>
           </div>
         )}
         <div className="flex flex-wrap gap-3">

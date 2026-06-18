@@ -72,7 +72,7 @@ export const subscriptionApi = {
   },
 
   async getUnifiedBilling() {
-    const { data } = await api.get('/billing/unified/')
+    const { data } = await api.get('/billing/unified/', { silentError: true })
     return data
   },
 
@@ -97,7 +97,7 @@ export const subscriptionApi = {
   },
 
   async getMyInvoices() {
-    const { data } = await api.get('/billing/invoices/')
+    const { data } = await api.get('/billing/invoices/', { silentError: true })
     return data
   },
 

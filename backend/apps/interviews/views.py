@@ -62,7 +62,10 @@ class CandidateProfileView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
-        profile, _ = CandidateProfile.objects.get_or_create(user=request.user)
+        try:
+            profile, _ = CandidateProfile.objects.get_or_create(user=request.user)
+        except Exception:
+            profile = CandidateProfile(user=request.user)
         return Response(CandidateProfileSerializer(profile).data)
 
     def put(self, request):

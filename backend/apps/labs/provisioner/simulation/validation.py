@@ -124,6 +124,12 @@ systemctl is-active sshd
 exit 0
 """
 
+CANONICAL_LDCONFIG_CHECK = """#!/bin/bash
+ldconfig -p 2>/dev/null | grep -q libfixit
+/usr/local/bin/myapp
+exit 0
+"""
+
 
 def is_trivial_validation_script(script: str) -> bool:
     """True when script would always pass without checking lab state."""
@@ -166,6 +172,7 @@ def resolve_simulation_validation_script(scenario_slug: str, validation_script: 
         (lambda s: "grub" in s or "mbr" in s or "kernel-panic" in s or "kernel" in s or "boot" in s, CANONICAL_GRUB_CHECK),
         (lambda s: "patch" in s, CANONICAL_PATCHING_CHECK),
         (lambda s: "ssh-stop" in s or "sshd-down" in s, CANONICAL_SSHD_CHECK),
+        (lambda s: "ldconfig" in s or "missing-library" in s, CANONICAL_LDCONFIG_CHECK),
         (lambda s: "ipmi" in s or "baremetal" in s or "vmware" in s, CANONICAL_BAREMETAL_CHECK),
     ]
     for pred, canonical in rules:
@@ -459,6 +466,14 @@ def _run_line_check(
         svc = state.services.get("sshd")
         if not svc or svc.active != "active":
             failures.append("sshd is not active")
+        return True
+
+    if "/usr/local/bin/myapp" in stripped or ("ldconfig" in stripped and "libfixit" in stripped):
+        working = getattr(state, "myapp_working", False) or getattr(state, "ldconfig_updated", False)
+        if not working:
+            conf = state.read_file("/etc/ld.so.conf.d/fixitlab.conf") or ""
+            if "/usr/local/lib" not in conf:
+                failures.append("FAIL: restore /etc/ld.so.conf.d/fixitlab.conf and run ldconfig")
         return True
 
     return False
