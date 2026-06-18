@@ -136,14 +136,27 @@ ${[['Overall', r.overall_score], ['Technical', r.technical_score], ['Communicati
 
       {(r.study_plan || []).length > 0 && (
         <div className="glass-card p-4 border border-surface-800">
-          <p className="text-xs font-semibold text-indigo-400 mb-2">Study plan</p>
+          <p className="text-xs font-semibold text-indigo-400 mb-2 flex items-center gap-1.5">
+            <TrendingUp size={13} /> Resume-Aligned Next Steps
+          </p>
+          <p className="text-xs text-surface-500 mb-3">Practice these scenarios to close the gaps identified in your interview.</p>
           <div className="flex flex-wrap gap-2">
             {r.study_plan.map((item, i) => (
-              <Link key={i} to={item.url} className="text-xs px-2 py-1 rounded border border-indigo-500/30 text-indigo-300">
+              <Link key={i} to={item.url} className="text-xs px-2.5 py-1.5 rounded-lg border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10 transition-colors">
                 {item.title}
               </Link>
             ))}
           </div>
+          {r.resume_alignment_score != null && (
+            <div className="mt-3 pt-3 border-t border-surface-700">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-surface-500">Resume alignment score:</span>
+                <span className={`text-xs font-semibold ${r.resume_alignment_score >= 70 ? 'text-accent-green' : r.resume_alignment_score >= 50 ? 'text-accent-amber' : 'text-accent-red'}`}>
+                  {Math.round(r.resume_alignment_score)}/100
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
