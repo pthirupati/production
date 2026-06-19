@@ -3335,6 +3335,107 @@ body::after {
   color: #fff;
 }
 
+/* ─── Light mode: marketing + pricing pages ─── */
+[data-theme="light"] .fx-marketing-page {
+  background: #f8fafc;
+  color: rgb(15 23 42);
+}
+[data-theme="light"] .fx-marketing-nav {
+  background: rgb(255 255 255 / 0.92);
+  border-bottom: 1px solid rgb(226 232 240);
+  backdrop-filter: blur(16px);
+}
+[data-theme="light"] .fx-marketing-nav-link {
+  color: rgb(71 85 105);
+}
+[data-theme="light"] .fx-marketing-nav-link:hover,
+[data-theme="light"] .fx-marketing-nav-link-active {
+  color: rgb(15 23 42);
+}
+[data-theme="light"] .fx-marketing-footer {
+  background: rgb(248 250 252);
+  border-top: 1px solid rgb(226 232 240);
+}
+[data-theme="light"] .fx-marketing-footer-col-title {
+  color: rgb(100 116 139);
+}
+[data-theme="light"] .fx-marketing-footer-link {
+  color: rgb(71 85 105);
+}
+[data-theme="light"] .fx-marketing-footer-link:hover {
+  color: rgb(15 23 42);
+}
+[data-theme="light"] .fx-home-title {
+  color: rgb(15 23 42);
+}
+[data-theme="light"] .fx-home-sub {
+  color: rgb(71 85 105);
+}
+[data-theme="light"] .fx-home-section {
+  border-color: rgb(226 232 240);
+}
+[data-theme="light"] .fx-interview-showcase,
+[data-theme="light"] .fx-vmware-showcase {
+  background: rgb(255 255 255);
+  border-color: rgb(226 232 240);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.06);
+}
+[data-theme="light"] .fx-btn-secondary {
+  background: rgb(255 255 255);
+  border-color: rgb(203 213 225);
+  color: rgb(51 65 85);
+}
+[data-theme="light"] .min-h-screen.bg-surface-950 {
+  background-color: rgb(248 250 252);
+}
+[data-theme="light"] .fx-hero-h1,
+[data-theme="light"] .fx-hero-lead {
+  color: rgb(15 23 42);
+}
+[data-theme="light"] .fx-hero-lead {
+  color: rgb(71 85 105);
+}
+[data-theme="light"] .fx-hero-stat-val {
+  color: rgb(15 23 42);
+}
+[data-theme="light"] .fx-hero-stat-label {
+  color: rgb(100 116 139);
+}
+[data-theme="light"] .fx-testimonial-quote,
+[data-theme="light"] .fx-testimonial-name {
+  color: rgb(15 23 42);
+}
+[data-theme="light"] .fx-testimonial-role {
+  color: rgb(100 116 139);
+}
+[data-theme="light"] .fx-challenge-card h3 {
+  color: rgb(15 23 42);
+}
+[data-theme="light"] .fx-challenge-card p {
+  color: rgb(71 85 105);
+}
+[data-theme="light"] .fx-pricing-cta {
+  background: linear-gradient(135deg, rgb(248 250 252), rgb(241 245 249));
+  border-color: rgb(226 232 240);
+}
+[data-theme="light"] .text-white\/78,
+[data-theme="light"] .text-white\/70,
+[data-theme="light"] .text-white\/60,
+[data-theme="light"] .text-white\/55,
+[data-theme="light"] .text-white\/52 {
+  color: rgb(71 85 105);
+}
+
+/* VMware simulator always uses dark UI — ignore global light text overrides */
+[data-theme="light"] .vmware-sim,
+[data-theme="light"] .vmware-sim .text-white {
+  color: #fff;
+}
+[data-theme="light"] .vmware-sim {
+  color: var(--vm-text);
+  background: var(--vm-bg);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fx-hero-showcase-wrap,
   .fx-parallax-orb,

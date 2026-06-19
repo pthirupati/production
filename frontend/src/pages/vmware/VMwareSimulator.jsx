@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { vmwareApi } from '../../api/vmware'
 import toast from 'react-hot-toast'
+import VmwareLoginGate, { isVcenterAuthenticated } from '../../components/vmware/VmwareLoginGate'
+import VmwareScenarioActions from '../../components/vmware/VmwareScenarioActions'
 import VmwareLabChrome from '../../components/vmware/VmwareLabChrome'
 import VmwareInventoryTree from '../../components/vmware/VmwareInventoryTree'
 import VmwareConsole from '../../components/vmware/VmwareConsole'
@@ -144,10 +146,19 @@ function MigrateModal({ vm, hosts, onClose, onAction }) {
             </label>
           ))}
         </div>
-        <div className="vm-modal-footer">
+        <div className="vm-modal-footer flex-wrap gap-2">
           <button type="button" onClick={onClose} className="vm-btn">Cancel</button>
+          {vm?.vmotion_failed && (
+            <button type="button" disabled={acting} onClick={async () => {
+              setActing(true)
+              try { await onAction('resolve_vmotion', { vm_id: vm.id }); onClose() }
+              finally { setActing(false) }
+            }} className="vm-btn vm-btn-green">
+              Resolve failed vMotion
+            </button>
+          )}
           <button type="button" disabled={acting || !targetHost} onClick={migrate} className="vm-btn vm-btn-blue">
-            {acting ? 'Migrating…' : 'Migrate'}
+            {acting ? 'Migrating…' : 'Migrate (vMotion)'}
           </button>
         </div>
       </div>
@@ -373,6 +384,68 @@ function CloneVmModal({ vm, onClose, onAction }) {
   )
 }
 
+/* ─── Deploy from Template Modal ─────────────────────────────────────── */
+function DeployFromTemplateModal({ templates, hosts, onClose, onAction }) {
+  const [templateName, setTemplateName] = useState(templates[0]?.name || '')
+  const [vmName, setVmName] = useState('')
+  const [hostId, setHostId] = useState(hosts.find(h => h.status === 'connected' && !h.maintenance)?.id || '')
+  const [acting, setActing] = useState(false)
+  const [error, setError] = useState('')
+
+  const deploy = async () => {
+    if (!templateName) { setError('Select a template'); return }
+    setActing(true); setError('')
+    try {
+      await onAction('deploy_from_template', {
+        template_name: templateName,
+        vm_name: vmName.trim() || undefined,
+        host_id: hostId || undefined,
+      })
+      onClose()
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Deploy failed')
+    } finally { setActing(false) }
+  }
+
+  return (
+    <div className="vm-modal-overlay">
+      <div className="vm-modal w-[420px] max-w-[95vw]">
+        <div className="vm-modal-header">
+          <span>Deploy VM from Template</span>
+          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+        </div>
+        <div className="vm-modal-body space-y-3">
+          <div>
+            <label className="block text-xs text-[#8fa5b8] mb-1">Template</label>
+            <select value={templateName} onChange={e => setTemplateName(e.target.value)} className="vm-input !pl-3">
+              {templates.map(t => <option key={t.id} value={t.name}>{t.name} ({t.guest_os_version || t.guest_os})</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-[#8fa5b8] mb-1">New VM name (optional)</label>
+            <input value={vmName} onChange={e => setVmName(e.target.value)} placeholder="auto-generated if blank" className="vm-input !pl-3" />
+          </div>
+          <div>
+            <label className="block text-xs text-[#8fa5b8] mb-1">Target host</label>
+            <select value={hostId} onChange={e => setHostId(e.target.value)} className="vm-input !pl-3">
+              {hosts.filter(h => h.status === 'connected' && !h.maintenance).map(h => (
+                <option key={h.id} value={h.id}>{h.name}</option>
+              ))}
+            </select>
+          </div>
+          {error && <p className="text-xs text-[#D9534F]">{error}</p>}
+        </div>
+        <div className="vm-modal-footer">
+          <button type="button" onClick={onClose} className="vm-btn">Cancel</button>
+          <button type="button" disabled={acting || !templateName} onClick={deploy} className="vm-btn vm-btn-blue">
+            {acting ? 'Deploying…' : 'Deploy'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Main component ─────────────────────────────────────────────────── */
 export default function VMwareSimulator() {
   const { sessionId: paramSessionId } = useParams()
@@ -391,6 +464,7 @@ export default function VMwareSimulator() {
   const [showCreateVmModal, setShowCreateVmModal] = useState(false)
   const [showEditVmModal, setShowEditVmModal] = useState(false)
   const [showCloneVmModal, setShowCloneVmModal] = useState(false)
+  const [showDeployTemplateModal, setShowDeployTemplateModal] = useState(false)
   const [pendingDeleteVm, setPendingDeleteVm] = useState(null)
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false)
   const [inventorySearch, setInventorySearch] = useState('')
@@ -399,6 +473,7 @@ export default function VMwareSimulator() {
   const [monSub, setMonSub] = useState('performance')
   const [monRange, setMonRange] = useState('1H')
   const [consoleVm, setConsoleVm] = useState(null)
+  const [vcAuth, setVcAuth] = useState(() => isVcenterAuthenticated())
   const [ctxMenu, setCtxMenu] = useState(null)
   const [vmToast, setVmToast] = useState(null)
   const rootRef = useRef(null)
@@ -418,7 +493,7 @@ export default function VMwareSimulator() {
     } finally {
       setLoading(false)
     }
-  }, [sessionId])
+  }, [sessionId, scenarioSlug])
 
   useEffect(() => { load() }, [load])
 
@@ -447,6 +522,7 @@ export default function VMwareSimulator() {
         setShowCreateVmModal(false)
         setShowEditVmModal(false)
         setShowCloneVmModal(false)
+        setShowDeployTemplateModal(false)
         setPendingDeleteVm(null)
       }
     }
@@ -519,8 +595,9 @@ export default function VMwareSimulator() {
     )
   }
 
-  const invSearch = inventorySearch.trim().toLowerCase()
-  const filterLabel = (label) => !invSearch || label.toLowerCase().includes(invSearch)
+  if (!vcAuth) {
+    return <VmwareLoginGate onAuthenticated={() => setVcAuth(true)} />
+  }
 
   const inv = state?.inventory || {}
   const summary = state?.summary || {}
@@ -531,11 +608,15 @@ export default function VMwareSimulator() {
   const alarms = inv.alarms || []
   const events = inv.events || []
   const recentTasks = inv.recent_tasks || []
+  const templates = inv.templates || []
+  const invSearch = inventorySearch.trim().toLowerCase()
+  const filterLabel = (label) => !invSearch || label.toLowerCase().includes(invSearch)
 
   const selectedHost = selectedNode.type === 'host' ? (hosts.find(h => h.id === selectedNode.id) ?? null) : null
   const selectedVm = selectedNode.type === 'vm' ? vms.find(v => v.id === selectedNode.id) : null
   const selectedDs = selectedNode.type === 'datastore' ? datastores.find(d => d.id === selectedNode.id) : null
   const selectedNet = selectedNode.type === 'network' ? networks.find(n => n.id === selectedNode.id) : null
+  const selectedTemplate = selectedNode.type === 'template' ? templates.find(t => t.id === selectedNode.id) : null
 
   const activeAlarms = alarms.filter(a => a.status === 'active')
 
@@ -594,7 +675,7 @@ export default function VMwareSimulator() {
         </button>
         {actionsMenuOpen && (
           <div className="absolute top-full left-0 mt-0.5 bg-[#243447] border border-[#2D3A4A] shadow-lg z-20 min-w-40 text-xs rounded-md overflow-hidden">
-            <ActionsMenuItem label={`${host.ssh_enabled ? 'Disable' : 'Enable'} SSH`} onClick={() => toast('SSH toggle simulated')} />
+            <ActionsMenuItem label={`${host.ssh_enabled ? 'Disable' : 'Enable'} SSH`} onClick={() => runAction('toggle_ssh', { host_name: host.name })} />
             <ActionsMenuItem label="Reboot Host" onClick={() => toast('Host reboot simulated')} />
             <ActionsMenuItem label="Shut Down Host" onClick={() => toast('Shutdown simulated')} />
           </div>
@@ -614,6 +695,8 @@ export default function VMwareSimulator() {
         onSearchChange={setInventorySearch}
         onFullscreenToggle={toggleFullscreen}
         isFullscreen={isFullscreen}
+        vms={vms}
+        summary={summary}
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -624,6 +707,7 @@ export default function VMwareSimulator() {
             inv={inv}
             hosts={hosts}
             vms={vms}
+            templates={templates}
             datastores={datastores}
             networks={networks}
             filterLabel={filterLabel}
@@ -632,6 +716,7 @@ export default function VMwareSimulator() {
             setActiveTab={setActiveTab}
             onVmContextMenu={openVmContext}
             onCreateVm={() => setShowCreateVmModal(true)}
+            onDeployTemplate={() => setShowDeployTemplateModal(true)}
           />
         </aside>
 
@@ -660,7 +745,7 @@ export default function VMwareSimulator() {
             <span className="text-[#4a5a6d] text-[9px]">›</span>
             <span className="text-[#8fa5b8]">{inv.datacenter || 'DC-Prod'}</span>
             <span className="text-[#4a5a6d] text-[9px]">›</span>
-            <span className="text-white">{selectedVm?.name || selectedHost?.name || selectedDs?.name || selectedNet?.name || 'Inventory'}</span>
+            <span className="text-white">{selectedVm?.name || selectedHost?.name || selectedDs?.name || selectedNet?.name || selectedTemplate?.name || 'Inventory'}</span>
           </div>
 
           <div className="vm-object-bar">
@@ -668,7 +753,7 @@ export default function VMwareSimulator() {
             {selectedHost && <StatusIcon status={selectedHost.status} size={12} />}
             {selectedDs && <StatusIcon status={selectedDs.accessible ? 'connected' : 'disconnected'} size={12} />}
             <span className="text-[15px] font-bold text-white">
-              {selectedVm?.name || selectedHost?.name || selectedDs?.name || selectedNet?.name || 'Select an object'}
+              {selectedVm?.name || selectedHost?.name || selectedDs?.name || selectedNet?.name || selectedTemplate?.name || 'Select an object'}
             </span>
             {selectedVm && (
               <span className="vm-state-badge bg-[rgba(93,184,93,.12)] text-[#5DB85D]">
@@ -691,7 +776,7 @@ export default function VMwareSimulator() {
                 {actionsMenuOpen && selectedHost && (
                   <div className="vm-actions-menu">
                     <ActionsMenuItem label="Create VM…" onClick={() => { setShowCreateVmModal(true); setActionsMenuOpen(false) }} />
-                    <ActionsMenuItem label={`${selectedHost.ssh_enabled ? 'Disable' : 'Enable'} SSH`} onClick={() => toast('SSH toggle simulated')} />
+                    <ActionsMenuItem label={`${selectedHost.ssh_enabled ? 'Disable' : 'Enable'} SSH`} onClick={() => runAction('toggle_ssh', { host_name: selectedHost.name })} />
                     <ActionsMenuItem label="Reboot Host" onClick={() => toast('Host reboot simulated')} />
                     <ActionsMenuItem label="Enter Maintenance Mode" onClick={() => runAction('enter_maintenance', { host_name: selectedHost.name })} />
                     <div className="h-px bg-[#2D3A4A] my-1" />
@@ -709,6 +794,7 @@ export default function VMwareSimulator() {
                     <ActionsMenuItem label="Clone…" onClick={() => { setShowCloneVmModal(true); setActionsMenuOpen(false) }} />
                     <ActionsMenuItem label="Migrate…" onClick={() => { setShowMigrateModal(true); setActionsMenuOpen(false) }} />
                     <ActionsMenuItem label="Edit Settings…" onClick={() => { setShowEditVmModal(true); setActionsMenuOpen(false) }} />
+                    <ActionsMenuItem label="Convert to Template…" onClick={() => { runAction('convert_to_template', { vm_id: selectedVm.id }); setActionsMenuOpen(false) }} disabled={selectedVm.power !== 'poweredOff' || acting} />
                     <ActionsMenuItem label="Rename…" onClick={() => toast('Rename simulated — use Edit Settings')} />
                     <div className="h-px bg-[#2D3A4A] my-1" />
                     <ActionsMenuItem label="Open Console" onClick={() => { setConsoleVm(selectedVm); setActionsMenuOpen(false) }} />
@@ -898,22 +984,64 @@ export default function VMwareSimulator() {
                           {!summary.cluster_drs && (
                             <button onClick={() => runAction('enable_drs')} disabled={acting} className="ml-auto text-[11px] bg-[#5b9bd5] text-white px-2 py-0.5 rounded hover:bg-[#4a8ac4] disabled:opacity-50">Enable</button>
                           )}
+                          {summary.cluster_drs && (
+                            <>
+                              <button onClick={() => runAction('run_drs')} disabled={acting} className="ml-auto text-[11px] border border-[#2d3a4a] text-[#5b9bf5] px-2 py-0.5 rounded hover:bg-[#243447] disabled:opacity-50">Run DRS</button>
+                              <button onClick={() => runAction('disable_drs')} disabled={acting} className="text-[11px] border border-[#2d3a4a] px-2 py-0.5 rounded hover:bg-[#243447] disabled:opacity-50">Disable</button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
                   </ContentPanel>
-                  <ContentPanel title="Host network adapters">
+                  <ContentPanel title="Host network adapters (vmnic)">
+                    <table className="vm-table">
+                      <thead>
+                        <tr>{['Device', 'MAC address', 'Driver', 'Speed', 'Switch', 'Status', 'PCI'].map(h => <th key={h}>{h}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {(selectedHost.vmnics || []).map(vn => (
+                          <tr key={vn.id}>
+                            <td className="text-[#5b9bf5] font-semibold">{vn.name}</td>
+                            <td className="font-mono text-[10px] text-[#8FA5B8]">{vn.mac_address}</td>
+                            <td className="text-[#8FA5B8]">{vn.driver}</td>
+                            <td>{vn.speed_mbps >= 1000 ? `${vn.speed_mbps / 1000} Gbps` : `${vn.speed_mbps} Mbps`}</td>
+                            <td>{vn.switch}</td>
+                            <td className={vn.status === 'up' ? 'text-[#5DB85D] font-semibold' : 'text-[#D9534F]'}>{vn.status}</td>
+                            <td className="font-mono text-[10px] text-[#8FA5B8]">{vn.pci_id}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                     {(inv.vswitches || []).map(vsw => (
-                      <div key={vsw.id} className="border border-[#ddd] rounded p-2 mb-2">
-                        <p className="text-[11px] font-semibold">{vsw.name} <span className="text-[10px] text-[#888] font-normal">({vsw.type})</span></p>
-                        <div className="grid grid-cols-3 gap-1 mt-1 text-[10px]">
-                          <span className="text-[#666]">Ports: {vsw.ports}</span>
-                          <span className="text-[#666]">MTU: {vsw.mtu}</span>
-                          <span className="text-[#666]">Uplinks: {vsw.uplinks?.join(', ')}</span>
+                      <div key={vsw.id} className="border border-[#2D3A4A] rounded p-2.5 mb-2 mt-3 bg-[#16222f]">
+                        <p className="text-[11px] font-semibold text-[#E8EDF2]">{vsw.name} <span className="text-[10px] text-[#8FA5B8] font-normal">({vsw.type})</span></p>
+                        <div className="grid grid-cols-3 gap-1 mt-1 text-[10px] text-[#8FA5B8]">
+                          <span>Ports: {vsw.ports}</span>
+                          <span>MTU: {vsw.mtu}</span>
+                          <span>Uplinks: {vsw.uplinks?.join(', ')}</span>
                         </div>
-                        <p className="text-[10px] text-[#888] mt-0.5">Port groups: {vsw.portgroups?.join(', ')}</p>
+                        <p className="text-[10px] text-[#8FA5B8] mt-0.5">Port groups: {vsw.portgroups?.join(', ')}</p>
                       </div>
                     ))}
+                  </ContentPanel>
+                  <VmwareScenarioActions selectedVm={selectedVm} onAction={runAction} acting={acting} />
+                </div>
+              )}
+
+              {/* ── TEMPLATE SUMMARY ─────────────────────────────── */}
+              {selectedTemplate && activeTab === 'summary' && (
+                <div className="space-y-3">
+                  <ContentPanel title="Template details">
+                    <InfoRow label="Name" value={selectedTemplate.name} />
+                    <InfoRow label="Guest OS" value={selectedTemplate.guest_os_version || selectedTemplate.guest_os} />
+                    <InfoRow label="CPUs" value={selectedTemplate.cpu} />
+                    <InfoRow label="Memory" value={fmtMb(selectedTemplate.memory_mb || 4096)} />
+                    <InfoRow label="Disk" value={fmtBytes(selectedTemplate.disk_gb || 40)} />
+                    <div className="flex gap-2 mt-3">
+                      <button type="button" onClick={() => setShowDeployTemplateModal(true)} className="vm-btn vm-btn-blue text-xs">Deploy VM from Template…</button>
+                      <button type="button" onClick={() => runAction('convert_template', { template_name: selectedTemplate.name })} disabled={acting} className="vm-btn text-xs">Convert to VM</button>
+                    </div>
                   </ContentPanel>
                 </div>
               )}
@@ -1025,6 +1153,26 @@ export default function VMwareSimulator() {
                       <InfoRow label="VM hardware" value={selectedVm.hardware_version} />
                       <InfoRow label="Annotation" value={selectedVm.annotation || '—'} />
                     </ContentPanel>
+                    {(selectedVm.disks?.length > 0) && (
+                      <ContentPanel title="Virtual disks">
+                        <table className="vm-table">
+                          <thead>
+                            <tr>{['Disk', 'SCSI ID', 'Size', 'Mode', 'Datastore'].map(h => <th key={h}>{h}</th>)}</tr>
+                          </thead>
+                          <tbody>
+                            {selectedVm.disks.map((d, i) => (
+                              <tr key={d.id || i}>
+                                <td>{d.label || `Hard disk ${i + 1}`}</td>
+                                <td className="font-mono text-[10px] text-[#8FA5B8]">{d.scsi_id || `${d.scsi_controller || 0}:${d.scsi_unit ?? i}`}</td>
+                                <td>{d.capacity_gb} GB</td>
+                                <td>{d.thin_provisioned ? 'Thin' : 'Thick'}</td>
+                                <td className="text-[#5b9bf5]">{datastores.find(ds => ds.id === d.datastore_id)?.name || d.datastore_id}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </ContentPanel>
+                    )}
                     <div className="space-y-4">
                       <ContentPanel title="Resource usage">
                         {selectedVm.power === 'poweredOn' ? (
@@ -1245,6 +1393,7 @@ export default function VMwareSimulator() {
                 <VmConfigurePanel
                   vm={selectedVm}
                   networks={networks}
+                  datastores={datastores}
                   acting={acting}
                   onSave={(payload) => runAction('edit_vm', payload)}
                   onAddDisk={() => runAction('add_disk', { vm_id: selectedVm.id, size_gb: 100 })}
@@ -1290,17 +1439,32 @@ export default function VMwareSimulator() {
                   <table className="vm-table">
                     <thead>
                       <tr>
-                        {['Adapter', 'Network', 'MAC', 'Status', 'Type'].map(h => <th key={h}>{h}</th>)}
+                        {['Adapter', 'Network', 'VLAN', 'MAC address', 'Status', 'Type', 'Port group'].map(h => <th key={h}>{h}</th>)}
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td>Network adapter 1</td>
-                        <td className="text-[#5b9bf5]">{networks.find(n => n.id === selectedVm.network_id)?.name || 'VM Network'}</td>
-                        <td className="font-mono text-[#8FA5B8]">{selectedVm.mac || '00:50:56:aa:bb:cc'}</td>
-                        <td className="text-[#5DB85D] font-semibold">Connected</td>
-                        <td className="text-[#8FA5B8]">VMXNET3</td>
-                      </tr>
+                      {(selectedVm.nics?.length ? selectedVm.nics : [{
+                        label: 'Network adapter 1',
+                        network_id: selectedVm.network_id,
+                        mac_address: selectedVm.mac,
+                        adapter_type: 'Vmxnet3',
+                        connected: !selectedVm.network_disconnected,
+                      }]).map((nic, i) => {
+                        const net = networks.find(n => n.id === (nic.network_id || selectedVm.network_id))
+                        return (
+                          <tr key={nic.id || i}>
+                            <td>{nic.label || `Network adapter ${i + 1}`}</td>
+                            <td className="text-[#5b9bf5]">{nic.network_name || net?.name || 'VM Network'}</td>
+                            <td className="font-mono text-[#8FA5B8]">{nic.vlan_id ?? net?.vlan_id ?? net?.vlan ?? '—'}</td>
+                            <td className="font-mono text-[#8FA5B8]">{nic.mac_address || nic.mac || '—'}</td>
+                            <td className={nic.connected !== false ? 'text-[#5DB85D] font-semibold' : 'text-[#D9534F] font-semibold'}>
+                              {nic.connected !== false ? 'Connected' : 'Disconnected'}
+                            </td>
+                            <td className="text-[#8FA5B8]">{nic.adapter_type || 'VMXNET3'}</td>
+                            <td className="font-mono text-[10px] text-[#8FA5B8]">{nic.portgroup_key || net?.portgroup_key || '—'}</td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                   <button type="button" onClick={() => setShowEditVmModal(true)} className="mt-3 vm-btn vm-btn-blue text-[11px]">Add network adapter…</button>
@@ -1406,9 +1570,22 @@ export default function VMwareSimulator() {
               {/* ── DATASTORE ────────────────────────────────────── */}
               {selectedDs && activeTab === 'summary' && (
                 <div className="space-y-3">
+                  {(selectedDs.warning === 'critical' || selectedDs.free_gb < selectedDs.capacity_gb * 0.1) && (
+                    <div className="rounded-lg border border-[#D9534F]/50 bg-[rgba(217,83,79,.12)] px-3 py-2 text-xs text-[#f5a0a0] flex items-center gap-2">
+                      <span className="font-bold uppercase text-[10px]">Alarm</span>
+                      Datastore space usage is critically high ({(((selectedDs.capacity_gb - selectedDs.free_gb) / selectedDs.capacity_gb) * 100).toFixed(0)}% used)
+                    </div>
+                  )}
+                  {selectedDs.warning === 'warning' && selectedDs.free_gb >= selectedDs.capacity_gb * 0.1 && (
+                    <div className="rounded-lg border border-[#F5A623]/50 bg-[rgba(245,166,35,.12)] px-3 py-2 text-xs text-[#f5c97a]">
+                      Warning: Datastore free space below 20%
+                    </div>
+                  )}
                   <ContentPanel title="Datastore details">
                     <InfoRow label="Type" value={selectedDs.type} />
                     <InfoRow label="Version" value={selectedDs.version} />
+                    <InfoRow label="VMFS UUID" value={<span className="font-mono text-[10px]">{selectedDs.vmfs_uuid || '—'}</span>} />
+                    <InfoRow label="Extent (NAA)" value={<span className="font-mono text-[10px]">{selectedDs.extent_name || '—'}</span>} />
                     <InfoRow label="Capacity" value={fmtBytes(selectedDs.capacity_gb)} />
                     <InfoRow label="Free" value={<span className={selectedDs.free_gb < 50 ? 'text-[#e04]' : 'text-[#2db52d]'}>{fmtBytes(selectedDs.free_gb)}</span>} />
                     <InfoRow label="Used" value={fmtBytes(selectedDs.capacity_gb - selectedDs.free_gb)} />
@@ -1421,8 +1598,8 @@ export default function VMwareSimulator() {
                       <UsageBar pct={((selectedDs.capacity_gb - selectedDs.free_gb) / selectedDs.capacity_gb) * 100} color={selectedDs.free_gb < 50 ? '#e0412b' : '#4c9be8'} />
                       <span className="text-[11px] shrink-0">{(((selectedDs.capacity_gb - selectedDs.free_gb) / selectedDs.capacity_gb) * 100).toFixed(0)}%</span>
                     </div>
-                    <button onClick={() => runAction('expand_datastore', { datastore: selectedDs.name, gb: 500 })} disabled={acting}
-                      className="mt-2 px-3 py-1.5 text-[11px] border border-[#aaa] rounded bg-[#e8e8e8] hover:bg-[#ddd] disabled:opacity-50">
+                    <button type="button" onClick={() => runAction('expand_datastore', { datastore: selectedDs.name, gb: 500 })} disabled={acting}
+                      className="mt-2 vm-btn vm-btn-blue text-[11px]">
                       Increase capacity (+500 GB)
                     </button>
                   </ContentPanel>
@@ -1496,11 +1673,21 @@ export default function VMwareSimulator() {
               )}
 
               {selectedNet && activeTab === 'summary' && (
-                <ContentPanel title="Network details">
-                  <InfoRow label="Type" value={selectedNet.type} />
-                  <InfoRow label="VLAN ID" value={selectedNet.vlan === 0 ? 'All (0)' : String(selectedNet.vlan)} />
-                  <InfoRow label="vSwitch" value={selectedNet.switch} />
+                <ContentPanel title="Network / port group details">
+                  <InfoRow label="Type" value={selectedNet.type === 'distributed' ? 'Distributed port group' : 'Standard port group'} />
+                  <InfoRow label="VLAN ID" value={(selectedNet.vlan_id ?? selectedNet.vlan) === 0 ? 'All (0)' : String(selectedNet.vlan_id ?? selectedNet.vlan)} />
+                  <InfoRow label="Port group key" value={<span className="font-mono text-[10px]">{selectedNet.portgroup_key || '—'}</span>} />
+                  <InfoRow label="vSwitch / DVS" value={selectedNet.switch} />
+                  <InfoRow label="Active ports" value={`${selectedNet.active_ports ?? '—'} / ${selectedNet.num_ports ?? '—'}`} />
                   <InfoRow label="Connected hosts" value={selectedNet.hosts?.length || 0} />
+                  {selectedNet.type === 'distributed' && (
+                    <>
+                      <InfoRow label="Promiscuous mode" value={selectedNet.security_promiscuous ? 'Accept' : 'Reject'} />
+                      <InfoRow label="MAC address changes" value={selectedNet.security_mac_changes ? 'Accept' : 'Reject'} />
+                      <InfoRow label="Forged transmits" value={selectedNet.security_forged_transmits ? 'Accept' : 'Reject'} />
+                      <InfoRow label="Teaming policy" value={selectedNet.uplink_teaming || 'loadbalance_srcid'} />
+                    </>
+                  )}
                 </ContentPanel>
               )}
 
@@ -1674,6 +1861,10 @@ export default function VMwareSimulator() {
       {showCloneVmModal && selectedVm && (
         <CloneVmModal vm={selectedVm} onClose={() => setShowCloneVmModal(false)} onAction={runAction} />
       )}
+      {showDeployTemplateModal && templates.length > 0 && (
+        <DeployFromTemplateModal templates={templates} hosts={hosts}
+          onClose={() => setShowDeployTemplateModal(false)} onAction={runAction} />
+      )}
       {pendingDeleteVm && (
         <div className="vm-modal-overlay">
           <div className="vm-modal w-80">
@@ -1708,6 +1899,7 @@ function getTabs(type) {
   if (type === 'host') return ['summary', 'monitor', 'configure', 'permissions', 'datastores', 'networks', 'vms', 'users', 'updates', 'events']
   if (type === 'datastore') return ['summary', 'monitor', 'permissions', 'hosts', 'vms']
   if (type === 'network') return ['summary', 'permissions', 'hosts', 'vms']
+  if (type === 'template') return ['summary']
   return ['summary']
 }
 

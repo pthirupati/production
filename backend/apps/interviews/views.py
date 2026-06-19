@@ -33,6 +33,7 @@ from apps.interviews.serializers import (
 from apps.interviews.services.campaign_builder import create_campaign_rounds
 from apps.interviews.services.entitlements import (
     consume_interview_credit,
+    ensure_interview_defaults,
     get_entitlement_payload,
     user_has_interview_access,
 )
@@ -46,7 +47,8 @@ class InterviewPlansView(APIView):
     throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
-        tiers = InterviewPlanTier.objects.filter(is_active=True)
+        ensure_interview_defaults()
+        tiers = InterviewPlanTier.objects.filter(is_active=True).exclude(code="admin-demo")
         return Response({"plans": InterviewPlanTierSerializer(tiers, many=True).data})
 
 
@@ -224,7 +226,11 @@ class InterviewCampaignListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        qs = InterviewCampaign.objects.filter(user=request.user, is_archived=False).select_related("primary_technology")
+        qs = (
+            InterviewCampaign.objects.filter(user=request.user, is_archived=False)
+            .exclude(title="Admin Demo Interview")
+            .select_related("primary_technology")
+        )
         return Response({"campaigns": InterviewCampaignListSerializer(qs, many=True).data})
 
     def post(self, request):

@@ -207,9 +207,15 @@ export default function Changelog() {
   }, [])
 
   const releases = useMemo(() => {
-    if (loading || error || !changelog) return []
-    return parseChangelog(changelog)
-  }, [changelog, loading, error])
+    if (loading) return []
+    if (changelog) {
+      const parsed = parseChangelog(changelog)
+      if (parsed.length) return parsed
+    }
+    return FALLBACK_RELEASES
+  }, [changelog, loading])
+
+  const usingFallback = !loading && !changelog
 
   return (
     <MarketingPageShell
@@ -231,22 +237,18 @@ export default function Changelog() {
         </div>
       )}
 
-      {!loading && error && (
+      {!loading && error && releases.length === 0 && (
         <FixitPanel padding="p-12" className="text-center">
           <Sparkles size={32} className="text-surface-600 mx-auto mb-3" />
           <p className="text-surface-400">Could not load the changelog. Please try again later.</p>
         </FixitPanel>
       )}
 
-      {!loading && !error && !changelog && (
-        <FixitPanel padding="p-12" className="text-center">
-          <Sparkles size={32} className="text-surface-600 mx-auto mb-3" />
-          <p className="text-surface-400">No updates published yet. Check back soon!</p>
-        </FixitPanel>
-      )}
-
-      {!loading && !error && changelog && (
+      {!loading && releases.length > 0 && (
         <>
+          {usingFallback && (
+            <p className="text-xs text-surface-500 text-center mb-6">Showing recent platform highlights — live feed will sync when config is available.</p>
+          )}
           <div className="relative flex flex-col gap-3.5">
             <div
               aria-hidden="true"

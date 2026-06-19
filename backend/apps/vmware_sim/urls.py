@@ -8,12 +8,16 @@ from .views import (
     K8sSimReleaseView,
     K8sSimStateView,
     VMwareSimActionView,
+    VMwareSimDemoActionView,
+    VMwareSimDemoStateView,
     VMwareSimReleaseView,
     VMwareSimStateView,
 )
 
 urlpatterns = [
     # VMware simulation
+    path("demo/", VMwareSimDemoStateView.as_view(), name="vmware-sim-demo-state"),
+    path("demo/action/", VMwareSimDemoActionView.as_view(), name="vmware-sim-demo-action"),
     path("sessions/<uuid:session_id>/", VMwareSimStateView.as_view(), name="vmware-sim-state"),
     path("sessions/<uuid:session_id>/action/", VMwareSimActionView.as_view(), name="vmware-sim-action"),
     path("sessions/<uuid:session_id>/release/", VMwareSimReleaseView.as_view(), name="vmware-sim-release"),

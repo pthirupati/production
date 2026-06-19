@@ -15,9 +15,39 @@ from .docker_engine import drop_session as docker_drop_session
 from .docker_engine import get_state as docker_get_state
 
 
+def _demo_session_id(user) -> str:
+    """Stable sandbox key for standalone VMware simulator (no lab session)."""
+    return f"demo-{user.pk}"
+
+
 # ---------------------------------------------------------------------------
 # VMware views
 # ---------------------------------------------------------------------------
+
+class VMwareSimDemoStateView(APIView):
+    """Standalone VMware sandbox — no LabSession required (e.g. /vmware-sim)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        slug = request.query_params.get("scenario", "") or ""
+        sid = _demo_session_id(request.user)
+        return Response(get_state(sid, slug))
+
+
+class VMwareSimDemoActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        sid = _demo_session_id(request.user)
+        slug = request.data.get("scenario", "") or request.query_params.get("scenario", "") or ""
+        get_state(sid, slug)
+        result = apply_action(sid, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": get_state(sid, slug)})
+
 
 class VMwareSimStateView(APIView):
     permission_classes = [IsAuthenticated]

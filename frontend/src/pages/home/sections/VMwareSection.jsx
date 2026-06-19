@@ -22,7 +22,7 @@ export default function VMwareSection({ isAuthenticated }) {
           viewport={viewportOnce}
           variants={fadeLeft}
         >
-          <VMwareShowcase />
+          <VMwareShowcase demoHref={isAuthenticated ? '/vmware-sim' : '/register'} />
         </motion.div>
 
         <motion.div
@@ -64,14 +64,22 @@ export default function VMwareSection({ isAuthenticated }) {
             })}
           </div>
 
-          <Link
-            to={isAuthenticated ? '/scenarios?technology=vmware' : '/register'}
-            data-magnetic
-            className="fx-btn-primary inline-flex"
-            style={{ background: 'linear-gradient(135deg, #2a6ab5, #5b9bd5)', boxShadow: '0 10px 34px rgba(91,155,213,.4)' }}
-          >
-            Try VMware scenarios <ArrowRight size={16} />
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              to={isAuthenticated ? '/vmware-sim' : '/register'}
+              data-magnetic
+              className="fx-btn-primary inline-flex"
+              style={{ background: 'linear-gradient(135deg, #2a6ab5, #5b9bd5)', boxShadow: '0 10px 34px rgba(91,155,213,.4)' }}
+            >
+              {isAuthenticated ? 'Open VMware simulator' : 'Try VMware scenarios'} <ArrowRight size={16} />
+            </Link>
+            <Link
+              to={isAuthenticated ? '/scenarios?technology=vmware' : '/pricing'}
+              className="fx-btn-secondary inline-flex items-center gap-2"
+            >
+              Browse scenarios
+            </Link>
+          </div>
         </motion.div>
       </div>
     </section>

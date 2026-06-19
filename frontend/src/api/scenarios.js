@@ -2,7 +2,7 @@ import api from './client'
 
 export const scenarioApi = {
   async getTechnologies() {
-    const { data } = await api.get('/technologies/')
+    const { data } = await api.get('/technologies/', { silentError: true })
     return data
   },
 
@@ -37,7 +37,7 @@ export const scenarioApi = {
   },
 
   async getPlatformStats() {
-    const { data } = await api.get('/stats/')
+    const { data } = await api.get('/stats/', { silentError: true })
     return data
   },
 

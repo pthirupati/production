@@ -75,13 +75,13 @@ export default function MarketingNav({ navRef, platformConfig }) {
       </header>
 
       {mobileNavOpen && (
-        <div className="lg:hidden border-t border-white/10 px-4 py-3 flex flex-col gap-2 bg-[#080a16]/95 max-h-[70vh] overflow-y-auto">
+        <div className="lg:hidden border-t border-white/10 px-4 py-3 flex flex-col gap-2 bg-surface-950/95 dark:bg-[#080a16]/95 max-h-[70vh] overflow-y-auto">
           {PUBLIC_NAV_LINKS.map(({ to, label }) => (
             <Link
               key={to}
               to={to}
               onClick={() => setMobileNavOpen(false)}
-              className="text-sm text-white/70 py-2 no-underline"
+              className="text-sm text-surface-400 dark:text-white/70 py-2 no-underline hover:text-surface-100"
             >
               {label}
             </Link>

@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { labApi } from '../../api/labs'
 import { vmwareApi } from '../../api/vmware'
 import JiraTicketLink from '../JiraTicketLink'
+import VmwareSshTerminal from './VmwareSshTerminal'
 
 const TOAST = { style: { background: '#1b2a3b', color: '#e8edf2', border: '1px solid #2d3a4a', fontSize: '12px' } }
 
@@ -25,6 +26,8 @@ export default function VmwareLabChrome({
   onFullscreenToggle,
   isFullscreen,
   inventorySearch,
+  vms = [],
+  summary = null,
 }) {
   const navigate = useNavigate()
   const [labSession, setLabSession] = useState(null)
@@ -37,6 +40,7 @@ export default function VmwareLabChrome({
   const [extending, setExtending] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [panel, setPanel] = useState(null) // hints | results | info | ticket | ssh
+  const [sshVmId, setSshVmId] = useState('')
 
   const loadSession = useCallback(async () => {
     if (!sessionId) return
@@ -137,7 +141,7 @@ export default function VmwareLabChrome({
     if (!sessionId || workflowBusy) return
     setWorkflowBusy(true)
     try {
-      await vmwareApi.applyAction(sessionId, action)
+      await vmwareApi.action(sessionId, action, {})
       await loadVmwareSummary()
       toast.success(action === 'mark_jira_updated' ? 'Jira incident updated' : 'Customer approved reboot', TOAST)
     } catch (err) {
@@ -164,6 +168,12 @@ export default function VmwareLabChrome({
 
   const scenario = labSession?.scenario_detail || labSession?.scenario || {}
   const jiraKey = labSession?.jira_issue_key
+  const sshVm = vms.find(v => v.id === sshVmId) || vms.find(v => v.power === 'poweredOn') || vms[0]
+  const sshOk = summary?.linux_ssh_ok !== false && !sshVm?.guest_hung
+
+  useEffect(() => {
+    if (sshVm && !sshVmId) setSshVmId(sshVm.id)
+  }, [sshVm?.id, sshVmId])
 
   return (
     <>
@@ -376,23 +386,21 @@ export default function VmwareLabChrome({
       {/* SSH drawer */}
       {panel === 'ssh' && (
         <SidePanel title="SSH console" onClose={() => setPanel(null)}>
-          <div className="rounded-lg border border-[#2d3a4a] bg-[#05090f] p-3 font-mono text-[11px] leading-relaxed">
-            <p className="text-[#5DB85D]">$ ssh root@web-prod-01.fixitlab.local</p>
-            {vmSummary?.linux_ssh_ok === false ? (
-              <>
-                <p className="text-[#D9534F] mt-2">ssh: connect to host web-prod-01.fixitlab.local port 22: Connection timed out</p>
-                <p className="text-[#8fa5b8] mt-2">The Linux guest may be hung. Open the VMware web console, verify guest state, update Jira, and reboot after customer approval.</p>
-              </>
-            ) : (
-              <>
-                <p className="text-[#5DB85D] mt-2">web-prod-01.fixitlab.local's password:</p>
-                <p className="text-[#5DB85D]">[root@web-prod-01 ~]# uptime</p>
-                <p className="text-[#E8EDF2]"> 14:22:01 up 14 days,  3:22,  1 user,  load average: 0.08, 0.12, 0.09</p>
-                <p className="text-[#5DB85D] mt-2">[root@web-prod-01 ~]# systemctl is-active sshd</p>
-                <p className="text-[#E8EDF2]">active</p>
-              </>
-            )}
-          </div>
+          {vms.length > 1 && (
+            <div className="mb-3">
+              <label className="block text-[10px] text-[#8fa5b8] mb-1 uppercase tracking-wide">Target VM</label>
+              <select value={sshVmId || sshVm?.id || ''} onChange={e => setSshVmId(e.target.value)} className="vm-input !pl-3 w-full text-xs">
+                {vms.map(v => (
+                  <option key={v.id} value={v.id}>{v.name} ({v.ip || 'no IP'})</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {sshVm ? (
+            <VmwareSshTerminal vm={sshVm} sshOk={sshOk} onClose={() => setPanel(null)} />
+          ) : (
+            <p className="text-[#8fa5b8] text-sm">No VMs in inventory.</p>
+          )}
         </SidePanel>
       )}
     </>

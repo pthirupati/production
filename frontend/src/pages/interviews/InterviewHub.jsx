@@ -361,7 +361,7 @@ export default function InterviewHub() {
           </div>
         ) : (
           <div className="space-y-2">
-            {campaigns.map(c => (
+            {campaigns.filter(c => c.title !== 'Admin Demo Interview').map(c => (
               <div key={c.id} className="glass-card border border-surface-800 hover:border-indigo-500/30 transition-colors relative group">
                 {confirmDeleteId === c.id ? (
                   <div className="p-4 flex items-center justify-between gap-3">

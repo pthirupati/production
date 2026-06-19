@@ -2,7 +2,7 @@ import api from './client'
 
 export const interviewsApi = {
   getPlans() {
-    return api.get('/interviews/plans/').then(r => r.data)
+    return api.get('/interviews/plans/', { silentError: true }).then(r => r.data)
   },
   getEntitlement() {
     return api.get('/interviews/entitlement/', { silentError: true }).then(r => r.data)

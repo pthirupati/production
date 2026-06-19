@@ -33,7 +33,7 @@ export default function HomePage() {
       .then(data => setTechnologies(mergeTechnologies(data)))
       .catch(() => setTechnologies(mergeTechnologies([])))
     scenarioApi.getPlatformStats().then(setStats).catch(() => {})
-    api.get('/config/').then(res => {
+    api.get('/config/', { silentError: true }).then(res => {
       setPlatformConfig(res.data)
       if (res.data?.platform_stats) {
         setStats(prev => ({ ...res.data.platform_stats, ...prev }))

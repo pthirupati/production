@@ -1,12 +1,29 @@
 import { useEffect, useState } from 'react'
 
-/** VM Configure tab — Claude mockup sliders + save banner. */
-export default function VmConfigurePanel({ vm, networks, acting, onSave, onAddDisk, onEditNetwork }) {
+function fmtDisk(d, datastores) {
+  const ds = datastores?.find(x => x.id === d.datastore_id)
+  const thin = d.thin_provisioned ? 'Thin' : 'Thick'
+  return `${d.capacity_gb} GB · ${thin} · ${ds?.name || d.datastore_id}`
+}
+
+/** VM Configure tab — hardware with SCSI IDs and NIC details. */
+export default function VmConfigurePanel({ vm, networks, datastores, acting, onSave, onAddDisk, onEditNetwork }) {
   const [cpu, setCpu] = useState(vm.cpu)
   const [memGb, setMemGb] = useState(Math.round(vm.memory_mb / 1024))
   const [name, setName] = useState(vm.name)
   const [notes, setNotes] = useState(vm.annotation || '')
   const poweredOn = vm.power === 'poweredOn'
+  const disks = vm.disks?.length ? vm.disks : [{ id: 'legacy', scsi_id: '0:0', label: 'Hard disk 1', capacity_gb: vm.disk_gb, thin_provisioned: true }]
+  const nics = vm.nics?.length ? vm.nics : [{
+    id: 'legacy-nic',
+    label: 'Network adapter 1',
+    network_id: vm.network_id,
+    network_name: networks.find(n => n.id === vm.network_id)?.name || 'VM Network',
+    mac_address: vm.mac || '00:50:56:aa:bb:cc',
+    adapter_type: 'Vmxnet3',
+    connected: !vm.network_disconnected,
+    vlan_id: networks.find(n => n.id === vm.network_id)?.vlan,
+  }]
 
   useEffect(() => {
     setCpu(vm.cpu)
@@ -52,8 +69,14 @@ export default function VmConfigurePanel({ vm, networks, acting, onSave, onAddDi
           </div>
           <div className="vm-info-row">
             <span className="vm-info-label">Compatibility</span>
-            <span className="vm-info-value">ESXi 8.0 · {vm.hardware_version || 'Hardware v20'}</span>
+            <span className="vm-info-value">ESXi 7.0 U3 · {vm.hardware_version || 'vmx-19'}</span>
           </div>
+          {vm.scsi_controllers?.map(ctrl => (
+            <div key={ctrl.id} className="vm-info-row">
+              <span className="vm-info-label">{ctrl.id.toUpperCase()}</span>
+              <span className="vm-info-value">{ctrl.type} · Bus sharing: {ctrl.shared_bus || 'none'}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -80,23 +103,42 @@ export default function VmConfigurePanel({ vm, networks, acting, onSave, onAddDi
             <span className="text-sm font-semibold text-white w-[60px]">{memGb} GB</span>
           </div>
 
-          <div className="flex items-center gap-3.5 flex-wrap">
-            <span className="w-[120px] text-[#8FA5B8] text-xs shrink-0">Hard disk 1</span>
-            <span className="text-xs text-[#E8EDF2] flex-1">{vm.disk_gb} GB (Thin)</span>
-            <button type="button" onClick={onAddDisk} disabled={acting} className="vm-btn text-[11px] py-1 px-3">
-              Add disk +100 GB
-            </button>
-          </div>
+          {disks.map((d, i) => (
+            <div key={d.id || i} className="flex items-start gap-3.5 flex-wrap border-t border-[#22303f] pt-3 first:border-0 first:pt-0">
+              <span className="w-[120px] text-[#8FA5B8] text-xs shrink-0">{d.label || `Hard disk ${i + 1}`}</span>
+              <div className="flex-1 min-w-[200px]">
+                <p className="text-xs text-[#E8EDF2] m-0">{fmtDisk(d, datastores)}</p>
+                <p className="text-[10px] text-[#8FA5B8] font-mono mt-0.5 m-0">
+                  SCSI {d.scsi_id || `${d.scsi_controller || 0}:${d.scsi_unit ?? i}`} · UUID {d.uuid || '—'}
+                </p>
+              </div>
+            </div>
+          ))}
+          <button type="button" onClick={onAddDisk} disabled={acting} className="vm-btn vm-btn-blue text-[11px] py-1 px-3">
+            Add hard disk…
+          </button>
 
-          <div className="flex items-center gap-3.5 flex-wrap">
-            <span className="w-[120px] text-[#8FA5B8] text-xs shrink-0">Network adapter 1</span>
-            <span className="text-xs text-[#E8EDF2] flex-1">
-              {networks.find(n => n.id === vm.network_id)?.name || 'VM Network'} — VMXNET3
-            </span>
-            <button type="button" onClick={onEditNetwork} disabled={acting} className="vm-btn text-[11px] py-1 px-3">
-              Edit
-            </button>
-          </div>
+          {nics.map((nic, i) => (
+            <div key={nic.id || i} className="flex items-start gap-3.5 flex-wrap border-t border-[#22303f] pt-3">
+              <span className="w-[120px] text-[#8FA5B8] text-xs shrink-0">{nic.label || `Network adapter ${i + 1}`}</span>
+              <div className="flex-1 min-w-[200px]">
+                <p className="text-xs text-[#E8EDF2] m-0">
+                  {nic.network_name || networks.find(n => n.id === nic.network_id)?.name || 'VM Network'} · {nic.adapter_type || 'Vmxnet3'}
+                </p>
+                <p className="text-[10px] text-[#8FA5B8] font-mono mt-0.5 m-0">
+                  MAC {nic.mac_address || nic.mac} · VLAN {nic.vlan_id ?? '—'} · {nic.connected !== false ? 'Connected' : 'Disconnected'}
+                </p>
+                {nic.portgroup_key && (
+                  <p className="text-[10px] text-[#5a6a7d] mt-0.5 m-0">Port group key: {nic.portgroup_key}</p>
+                )}
+              </div>
+              {i === 0 && (
+                <button type="button" onClick={onEditNetwork} disabled={acting} className="vm-btn text-[11px] py-1 px-3">
+                  Edit
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>

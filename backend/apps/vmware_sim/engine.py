@@ -58,6 +58,197 @@ def _task(name: str, target: str, result: str = "Completed successfully") -> dic
     }
 
 
+def _vmware_mac(seed: str) -> str:
+    """VMware-assigned OUI 00:50:56."""
+    h = abs(hash(seed)) & 0xFFFFFF
+    return f"00:50:56:{(h >> 16) & 0xFF:02x}:{(h >> 8) & 0xFF:02x}:{h & 0xFF:02x}"
+
+
+def _scsi_label(controller: int, unit: int) -> str:
+    return f"Hard disk {unit + 1}"
+
+
+def _make_disk(
+    disk_id: str,
+    capacity_gb: int,
+    datastore_id: str,
+    controller: int = 0,
+    unit: int = 0,
+    thin: bool = True,
+) -> dict:
+    return {
+        "id": disk_id,
+        "label": _scsi_label(controller, unit),
+        "scsi_controller": controller,
+        "scsi_unit": unit,
+        "scsi_id": f"{controller}:{unit}",
+        "controller_type": "LSI Logic SAS",
+        "capacity_gb": capacity_gb,
+        "datastore_id": datastore_id,
+        "thin_provisioned": thin,
+        "disk_mode": "independent_persistent",
+        "sharing": "sharingNone",
+        "uuid": f"6000C29{abs(hash(disk_id)) & 0xFFFFFFFF:08x}",
+    }
+
+
+def _make_nic(
+    nic_id: str,
+    network_id: str,
+    network_name: str,
+    mac: str,
+    vlan_id: int | None = None,
+    connected: bool = True,
+    adapter_type: str = "Vmxnet3",
+    portgroup_key: str = "",
+) -> dict:
+    return {
+        "id": nic_id,
+        "label": f"Network adapter {nic_id.split('-')[-1].replace('nic', '') or '1'}",
+        "network_id": network_id,
+        "network_name": network_name,
+        "mac_address": mac,
+        "mac": mac,
+        "adapter_type": adapter_type,
+        "connected": connected,
+        "vlan_id": vlan_id,
+        "portgroup_key": portgroup_key or f"dvportgroup-{vlan_id or 0}",
+        "direct_path_io": False,
+        "wake_on_lan": True,
+    }
+
+
+def _enrich_inventory(state: dict) -> None:
+    """Add vSphere-realistic SCSI, MAC, and portgroup metadata."""
+    net_by_id = {n["id"]: n for n in state.get("networks", [])}
+
+    for net in state.get("networks", []):
+        net.setdefault("vlan_id", net.get("vlan", 0))
+        net.setdefault("portgroup_key", f"dvportgroup-{100 + int(net.get('vlan', 0))}")
+        net.setdefault("num_ports", 128 if net.get("type") == "distributed" else 64)
+        net.setdefault("active_ports", random.randint(4, 24))
+        if net.get("type") == "distributed":
+            net.setdefault("uplink_teaming", "loadbalance_srcmac")
+            net.setdefault("security_promiscuous", False)
+            net.setdefault("security_forged_transmits", True)
+            net.setdefault("security_mac_changes", True)
+
+    for ds in state.get("datastores", []):
+        used_pct = round(((ds["capacity_gb"] - ds["free_gb"]) / ds["capacity_gb"]) * 100, 1) if ds.get("capacity_gb") else 0
+        ds.setdefault("used_pct", used_pct)
+        ds.setdefault("vmfs_uuid", f"5f8{abs(hash(ds['id'])) & 0xFFFFFFFFFFF:011x}")
+        ds.setdefault("extent_name", f"naa.6000C29{abs(hash(ds['id'])) & 0xFFFFFFFF:08x}")
+        if used_pct >= 90:
+            ds.setdefault("warning", "critical")
+        elif used_pct >= 80:
+            ds.setdefault("warning", "warning")
+
+    for host in state.get("hosts", []):
+        if not host.get("vmnics"):
+            host["vmnics"] = [
+                {
+                    "id": f"{host['id']}-vmnic0",
+                    "name": "vmnic0",
+                    "mac_address": _vmware_mac(f"{host['id']}-vmnic0"),
+                    "pci_id": "0000:04:00.0",
+                    "driver": "bnxtnet",
+                    "speed_mbps": 10000,
+                    "status": "up",
+                    "switch": "vSwitch0",
+                    "duplex": "full",
+                },
+                {
+                    "id": f"{host['id']}-vmnic1",
+                    "name": "vmnic1",
+                    "mac_address": _vmware_mac(f"{host['id']}-vmnic1"),
+                    "pci_id": "0000:04:00.1",
+                    "driver": "bnxtnet",
+                    "speed_mbps": 10000,
+                    "status": "up",
+                    "switch": "vSwitch0",
+                    "duplex": "full",
+                },
+                {
+                    "id": f"{host['id']}-vmnic2",
+                    "name": "vmnic2",
+                    "mac_address": _vmware_mac(f"{host['id']}-vmnic2"),
+                    "pci_id": "0000:05:00.0",
+                    "driver": "bnxtnet",
+                    "speed_mbps": 25000,
+                    "status": "up",
+                    "switch": "dvSwitch-Prod",
+                    "duplex": "full",
+                },
+                {
+                    "id": f"{host['id']}-vmnic3",
+                    "name": "vmnic3",
+                    "mac_address": _vmware_mac(f"{host['id']}-vmnic3"),
+                    "pci_id": "0000:05:00.1",
+                    "driver": "bnxtnet",
+                    "speed_mbps": 25000,
+                    "status": "up",
+                    "switch": "dvSwitch-Prod",
+                    "duplex": "full",
+                },
+            ]
+
+    for vm in state.get("vms", []):
+        vm.setdefault("scsi_controllers", [
+            {"id": "scsi0", "type": "LSI Logic SAS", "shared_bus": "none", "slot": 16},
+        ])
+        ds_id = vm.get("datastore_id") or "ds-01"
+        net_id = vm.get("network_id") or "net-01"
+        net = net_by_id.get(net_id, {})
+        net_name = net.get("name", "VM Network")
+        vlan = net.get("vlan_id", net.get("vlan"))
+
+        if not vm.get("disks"):
+            total_gb = int(vm.get("disk_gb") or 40)
+            if total_gb > 200:
+                boot_gb = min(80, total_gb // 4)
+                data_gb = total_gb - boot_gb
+                vm["disks"] = [
+                    _make_disk(f"{vm['id']}-disk0", boot_gb, ds_id, 0, 0),
+                    _make_disk(f"{vm['id']}-disk1", data_gb, ds_id, 0, 1),
+                ]
+            else:
+                vm["disks"] = [_make_disk(f"{vm['id']}-disk0", total_gb, ds_id, 0, 0)]
+        else:
+            for d in vm["disks"]:
+                d.setdefault("scsi_id", f"{d.get('scsi_controller', 0)}:{d.get('scsi_unit', 0)}")
+                d.setdefault("uuid", f"6000C29{abs(hash(d['id'])) & 0xFFFFFFFF:08x}")
+
+        vm["disk_gb"] = sum(d.get("capacity_gb", 0) for d in vm["disks"])
+
+        mac = vm.get("mac") or _vmware_mac(vm["id"])
+        vm["mac"] = mac
+        if not vm.get("nics"):
+            vm["nics"] = [
+                _make_nic(
+                    f"{vm['id']}-nic0",
+                    net_id,
+                    net_name,
+                    mac,
+                    vlan_id=vlan,
+                    connected=not vm.get("network_disconnected"),
+                    portgroup_key=net.get("portgroup_key", ""),
+                ),
+            ]
+        else:
+            for nic in vm["nics"]:
+                nic.setdefault("mac_address", nic.get("mac") or _vmware_mac(nic["id"]))
+                nic.setdefault("mac", nic["mac_address"])
+                if nic.get("network_id") and not nic.get("vlan_id"):
+                    n = net_by_id.get(nic["network_id"], {})
+                    nic["vlan_id"] = n.get("vlan_id", n.get("vlan"))
+                    nic.setdefault("network_name", n.get("name", ""))
+
+        if vm.get("nics"):
+            primary = vm["nics"][0]
+            vm["network_id"] = primary.get("network_id", net_id)
+            vm["mac"] = primary.get("mac_address", mac)
+
+
 def _base_inventory() -> dict:
     return {
         "datacenter": "DC-Prod",
@@ -245,6 +436,33 @@ def _base_inventory() -> dict:
             },
         ],
 
+        "templates": [
+            {
+                "id": "tpl-rhel8",
+                "name": "rhel8-template",
+                "guest_os": "Red Hat Enterprise Linux 8 (64-bit)",
+                "guest_os_version": "RHEL 8.6",
+                "cpu": 2,
+                "memory_mb": 4096,
+                "disk_gb": 40,
+                "datastore_id": "ds-01",
+                "network_id": "net-02",
+                "hardware_version": "vmx-19",
+            },
+            {
+                "id": "tpl-ubuntu",
+                "name": "ubuntu-2204-template",
+                "guest_os": "Ubuntu Linux (64-bit)",
+                "guest_os_version": "Ubuntu 22.04 LTS",
+                "cpu": 2,
+                "memory_mb": 4096,
+                "disk_gb": 40,
+                "datastore_id": "ds-01",
+                "network_id": "net-02",
+                "hardware_version": "vmx-19",
+            },
+        ],
+
         "vms": [
             {
                 "id": "vm-web",
@@ -368,7 +586,11 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
     if entry is None:
         state = _base_inventory()
         _apply_scenario_preset(state, scenario_slug)
+        _enrich_inventory(state)
         entry = {"session_id": key, "scenario_slug": scenario_slug, "state": state, "created_at": _now_iso()}
+        _save_session(key, entry)
+    else:
+        _enrich_inventory(entry["state"])
         _save_session(key, entry)
     return entry
 
@@ -376,6 +598,7 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
     state = copy.deepcopy(entry["state"])
+    _enrich_inventory(state)
     return {
         "session_id": str(session_id),
         "scenario_slug": entry.get("scenario_slug") or scenario_slug,
@@ -683,6 +906,96 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "DRS recommendations applied"}
 
+    if action == "disable_drs":
+        state["cluster_drs"] = False
+        state["drs_balanced"] = False
+        events.append(_event("vSphere DRS disabled on Cluster-01", "info", "Cluster-01"))
+        tasks.insert(0, _task("Disable vSphere DRS", "Cluster-01"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "DRS disabled"}
+
+    if action == "toggle_ssh":
+        host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
+        if not host:
+            host = state["hosts"][0]
+        host["ssh_enabled"] = not host.get("ssh_enabled", False)
+        label = "enabled" if host["ssh_enabled"] else "disabled"
+        events.append(_event(f"SSH {label} on {host['name']}", "info", host["name"]))
+        tasks.insert(0, _task(f"{'Enable' if host['ssh_enabled'] else 'Disable'} SSH", host["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"SSH {label} on {host['name']}"}
+
+    if action == "deploy_from_template":
+        tpl_name = (payload.get("template_name") or payload.get("name") or "").strip()
+        tpl = next((t for t in state.get("templates", []) if t["name"] == tpl_name), None)
+        if not tpl:
+            return {"ok": False, "error": f"Template '{tpl_name}' not found"}
+        vm_name = (payload.get("vm_name") or f"{tpl_name}-deploy-{int(time.time()) % 1000}").strip()
+        if any(v["name"] == vm_name for v in state["vms"]):
+            return {"ok": False, "error": f"VM '{vm_name}' already exists"}
+        host_id = payload.get("host_id") or (state["hosts"][0]["id"] if state["hosts"] else None)
+        vm_id = f"vm-{vm_name.lower().replace(' ', '-')}-{int(time.time()) % 100000}"
+        vm = {
+            "id": vm_id,
+            "name": vm_name,
+            "host_id": host_id,
+            "datastore_id": tpl.get("datastore_id"),
+            "network_id": tpl.get("network_id"),
+            "resource_pool_id": "rp-prod",
+            "power": "poweredOff",
+            "cpu": tpl.get("cpu", 2),
+            "memory_mb": tpl.get("memory_mb", 4096),
+            "disk_gb": tpl.get("disk_gb", 40),
+            "guest_os": tpl.get("guest_os"),
+            "guest_os_version": tpl.get("guest_os_version", tpl.get("guest_os")),
+            "ip": "—",
+            "hostname": f"{vm_name}.fixitlab.local",
+            "tools": "notRunning",
+            "tools_version": "11333",
+            "hardware_version": tpl.get("hardware_version", "vmx-19"),
+            "annotation": f"Deployed from template {tpl_name}",
+            "snapshots": [],
+            "cpu_pct": 0,
+            "mem_pct": 0,
+            "disk_io_mbps": 0,
+            "net_mbps": 0,
+            "from_template": tpl_name,
+        }
+        state["vms"].append(vm)
+        _enrich_inventory(state)
+        events.append(_event(f"Deployed VM {vm_name} from template {tpl_name}", "info", vm_name))
+        tasks.insert(0, _task("Deploy Virtual Machine from Template", vm_name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Deployed {vm_name} from {tpl_name}", "vm_id": vm_id}
+
+    if action == "convert_to_template":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        if vm.get("power") != "poweredOff":
+            return {"ok": False, "error": "VM must be powered off to convert to template"}
+        tpl_name = (payload.get("template_name") or f"{vm['name']}-template").strip()
+        if any(t["name"] == tpl_name for t in state.get("templates", [])):
+            return {"ok": False, "error": f"Template '{tpl_name}' already exists"}
+        tpl = {
+            "id": f"tpl-{int(time.time()) % 100000}",
+            "name": tpl_name,
+            "guest_os": vm.get("guest_os"),
+            "guest_os_version": vm.get("guest_os_version"),
+            "cpu": vm.get("cpu", 2),
+            "memory_mb": vm.get("memory_mb", 4096),
+            "disk_gb": vm.get("disk_gb", 40),
+            "datastore_id": vm.get("datastore_id"),
+            "network_id": vm.get("network_id"),
+            "hardware_version": vm.get("hardware_version", "vmx-19"),
+        }
+        state.setdefault("templates", []).append(tpl)
+        state["vms"] = [v for v in state["vms"] if v["id"] != vm["id"]]
+        events.append(_event(f"Converted {vm['name']} to template {tpl_name}", "info", tpl_name))
+        tasks.insert(0, _task("Convert to Template", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Template '{tpl_name}' created"}
+
     if action == "sync_ntp":
         for host in state["hosts"]:
             host["ntp_synced"] = True
@@ -918,6 +1231,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             "net_mbps": 0,
         }
         state["vms"].append(vm)
+        _enrich_inventory(state)
         host = _find_host(state, host_id=host_id)
         if host:
             host.setdefault("vms", []).append(vm_id)
@@ -1006,7 +1320,10 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         clone["snapshots"] = []
         clone["ip"] = "—"
         clone["tools"] = "notRunning"
+        for field in ("disks", "nics", "scsi_controllers", "snapshots"):
+            clone.pop(field, None)
         state["vms"].append(clone)
+        _enrich_inventory(state)
         ds = _find_ds(state, ds_id=src.get("datastore_id"))
         if ds and ds["free_gb"] >= src.get("disk_gb", 40):
             ds["free_gb"] -= src.get("disk_gb", 40)
@@ -1021,14 +1338,21 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if not vm:
             return {"ok": False, "error": "VM not found"}
         add_gb = max(10, int(payload.get("size_gb") or 100))
-        vm["disk_gb"] = vm.get("disk_gb", 40) + add_gb
-        ds = _find_ds(state, ds_id=vm.get("datastore_id"))
+        _enrich_inventory(state)
+        disks = vm.setdefault("disks", [])
+        next_unit = max((d.get("scsi_unit", 0) for d in disks), default=-1) + 1
+        disk_id = f"{vm['id']}-disk{next_unit}"
+        ds_id = vm.get("datastore_id") or (state["datastores"][0]["id"] if state["datastores"] else "")
+        new_disk = _make_disk(disk_id, add_gb, ds_id, 0, next_unit)
+        disks.append(new_disk)
+        vm["disk_gb"] = sum(d.get("capacity_gb", 0) for d in disks)
+        ds = _find_ds(state, ds_id=ds_id)
         if ds and ds["free_gb"] >= add_gb:
             ds["free_gb"] -= add_gb
-        events.append(_event(f"Added {add_gb} GB disk to {vm['name']}", "info", vm["name"]))
+        events.append(_event(f"Added {add_gb} GB disk ({new_disk['scsi_id']}) to {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Add Hard Disk", vm["name"]))
         _save_session(str(session_id), entry)
-        return {"ok": True, "message": f"Added {add_gb} GB disk to {vm['name']}"}
+        return {"ok": True, "message": f"Added {add_gb} GB disk at SCSI 0:{next_unit}"}
 
     if action == "change_network":
         vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
@@ -1041,7 +1365,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["network_id"] = net_id
         vm.pop("network_disconnected", None)
         vm["net_mbps"] = random.randint(5, 30)
-        events.append(_event(f"Changed {vm['name']} network to {net['name']}", "info", vm["name"]))
+        if vm.get("nics"):
+            vm["nics"][0]["network_id"] = net_id
+            vm["nics"][0]["network_name"] = net["name"]
+            vm["nics"][0]["vlan_id"] = net.get("vlan_id", net.get("vlan"))
+            vm["nics"][0]["portgroup_key"] = net.get("portgroup_key", "")
+            vm["nics"][0]["connected"] = True
+        events.append(_event(f"Changed {vm['name']} network to {net['name']} (VLAN {net.get('vlan_id', net.get('vlan', 0))})", "info", vm["name"]))
         tasks.insert(0, _task("Change Network Adapter", vm["name"]))
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} moved to network '{net['name']}'"}

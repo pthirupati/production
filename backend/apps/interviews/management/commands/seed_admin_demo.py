@@ -99,11 +99,6 @@ class Command(BaseCommand):
                     "status": "scheduled",
                 },
             )
-        ent, _ = InterviewEntitlement.objects.get_or_create(user=user)
-        ent.sample_interview_used = False
-        ent.save(update_fields=["sample_interview_used"])
-
-        self.stdout.write(self.style.SUCCESS(
             f"Admin demo ready for {user.email}:\n"
             f"  Certificate: {cert.certificate_id} ({'created' if cert_created else 'updated'})\n"
             f"  Verify: /verify-certificate?certificate_id={cert_id}\n"

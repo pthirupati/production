@@ -57,6 +57,15 @@ class NotificationDismissView(APIView):
         return Response({"message": "Dismissed"})
 
 
+class NotificationDismissAllView(APIView):
+    """Delete all notifications for the current user."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        count, _ = Notification.objects.filter(user=request.user).delete()
+        return Response({"message": "Cleared", "deleted": count})
+
+
 class NotificationPreferenceView(APIView):
     """Get and update notification preferences."""
     permission_classes = [IsAuthenticated]

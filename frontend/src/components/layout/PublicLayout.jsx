@@ -2,8 +2,10 @@ import { Link, useLocation } from 'react-router-dom'
 import { useThemeStore } from '../../store/themeStore'
 import { useAuthStore } from '../../store/authStore'
 import { Sun, Moon, Menu, X, Bot } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import SupportBotWidget from '../SupportBotWidget'
+import { PlatformBanners } from '../PlatformBanners'
+import api from '../../api/client'
 import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_LINKS } from '../../constants/publicNav'
 import BubbleNavLink from '../BubbleNavLink'
 import { FixitLogo } from '../design'
@@ -51,7 +53,12 @@ export default function PublicLayout({ children }) {
   const { theme, toggleTheme } = useThemeStore()
   const { isAuthenticated } = useAuthStore()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [platformConfig, setPlatformConfig] = useState(null)
   const { pathname } = useLocation()
+
+  useEffect(() => {
+    api.get('/config/', { silentError: true }).then(res => setPlatformConfig(res.data)).catch(() => {})
+  }, [])
 
   const isActive = (to) => pathname === to || (to !== '/' && pathname.startsWith(to))
 
@@ -119,6 +126,8 @@ export default function PublicLayout({ children }) {
           </div>
         )}
       </nav>
+
+      <PlatformBanners config={platformConfig} showMaintenance showPromo />
 
       <main className="pt-[68px]">
         {children}

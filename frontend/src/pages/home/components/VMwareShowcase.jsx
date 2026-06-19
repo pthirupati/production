@@ -1,4 +1,5 @@
-import { Loader2, Check } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Loader2, Check, Play } from 'lucide-react'
 
 const HOSTS = [
   { name: 'esxi-01', color: '#4c9be8', width: '52%' },
@@ -6,11 +7,14 @@ const HOSTS = [
   { name: 'ds-01', color: '#56e0b0', width: '61%', dot: '#56e0b0' },
 ]
 
-export default function VMwareShowcase() {
+export default function VMwareShowcase({ demoHref = '/vmware-sim' }) {
   return (
-    <div className="fx-vmware-showcase-wrap">
+    <Link to={demoHref} className="fx-vmware-showcase-wrap block no-underline group" aria-label="Open VMware simulator demo">
       <div className="fx-vmware-showcase-glow" aria-hidden="true" />
-      <div className="fx-vmware-showcase">
+      <div className="fx-vmware-showcase relative">
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-white/15 text-[10px] font-semibold text-white/90 group-hover:bg-[#2a6ab5]/90 transition-colors">
+          <Play size={10} fill="currentColor" stroke="none" /> Open simulator
+        </div>
         <div className="fx-vmware-header">
           <span className="fx-vmware-header-title">
             <em>vm</em>ware vSphere
@@ -83,6 +87,6 @@ export default function VMwareShowcase() {
           ))}
         </div>
       </div>
-    </div>
+    </Link>
   )
 }

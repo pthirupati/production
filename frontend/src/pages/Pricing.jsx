@@ -4,7 +4,7 @@ import {
   Check, ArrowRight, Zap, Crown, Loader2, Sun, Moon, Server, Globe,
   Monitor, Database, Cpu, Shield, Lock, Sparkles, ShoppingCart, X,
   IndianRupee, DollarSign, BadgeCheck, ChevronRight, ChevronDown,
-  RefreshCw, ShieldCheck, AlertTriangle, Mic2,
+  RefreshCw, ShieldCheck, AlertTriangle, Mic2, Menu,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
@@ -13,7 +13,9 @@ import { subscriptionApi } from '../api/subscriptions'
 import { interviewsApi } from '../api/interviews'
 import api from '../api/client'
 import { PlatformBanners } from '../components/PlatformBanners'
-import { PUBLIC_NAV_LINKS } from '../constants/publicNav'
+import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_LINKS } from '../constants/publicNav'
+import MarketingFooter from './home/components/MarketingFooter'
+import { mergeTechnologies } from '../constants/techCatalog'
 import { PageHeader, FixitPanel } from '../components/design'
 import toast from 'react-hot-toast'
 
@@ -153,9 +155,10 @@ export default function Pricing() {
   const [interviewPlans, setInterviewPlans] = useState([])
   const [interviewEntitlement, setInterviewEntitlement] = useState(null)
   const [subscribingInterview, setSubscribingInterview] = useState(null)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   useEffect(() => {
-    api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
+    api.get('/config/', { silentError: true }).then(res => setPlatformConfig(res.data)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -194,7 +197,9 @@ export default function Pricing() {
   }, [user])
 
   useEffect(() => {
-    getTechnologies().then(setTechnologies).catch(() => {})
+    getTechnologies()
+      .then(data => setTechnologies(mergeTechnologies(data)))
+      .catch(() => setTechnologies(mergeTechnologies([])))
     interviewsApi.getPlans().then(d => setInterviewPlans(d.plans || [])).catch(() => {})
     if (isAuthenticated) {
       subscriptionApi.getMySubscriptions()
@@ -410,14 +415,22 @@ export default function Pricing() {
               </div>
               <span className="text-xl font-bold text-white">FixitLab</span>
             </Link>
-            <div className="hidden md:flex items-center gap-4 overflow-x-auto max-w-[65vw] pb-1">
-              {PUBLIC_NAV_LINKS.map(({ to, label }) => (
-                <Link key={to} to={to} className="text-sm text-surface-400 hover:text-white transition-colors relative group whitespace-nowrap shrink-0">
+            <div className="hidden md:flex items-center gap-5">
+              {PUBLIC_NAV_PRIMARY.map(({ to, label }) => (
+                <Link key={to} to={to} className="text-sm text-surface-400 hover:text-white transition-colors relative group whitespace-nowrap">
                   {label}
                   <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-accent-cyan to-accent-purple group-hover:w-full transition-all duration-300" />
                 </Link>
               ))}
             </div>
+            <button
+              type="button"
+              className="md:hidden p-2 text-surface-400 hover:text-white"
+              onClick={() => setMobileNavOpen(v => !v)}
+              aria-label="Menu"
+            >
+              {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
             <div className="flex items-center gap-3">
               {/* Currency toggle */}
               <div className="flex bg-surface-800/60 rounded-lg border border-surface-700/40 overflow-hidden">
@@ -464,6 +477,15 @@ export default function Pricing() {
           </div>
         </nav>
         <PlatformBanners config={platformConfig} showMaintenance showPromo />
+        {mobileNavOpen && (
+          <div className="md:hidden border-t border-surface-800/50 bg-surface-950/95 backdrop-blur-xl px-4 py-3 flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
+            {PUBLIC_NAV_LINKS.map(({ to, label }) => (
+              <Link key={to} to={to} onClick={() => setMobileNavOpen(false)} className="text-sm text-surface-300 py-2">
+                {label}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 relative z-10">
@@ -751,7 +773,7 @@ export default function Pricing() {
             { code: 'free', name: 'Free Mini', price_inr: 0, interviews_per_month: 1, max_rounds: 1, description: '1 sample per month' },
             { code: 'pro', name: 'Interview Pro', price_inr: 999, interviews_per_month: 10, max_rounds: 3, description: 'Voice + reports' },
             { code: 'premium', name: 'Interview Premium', price_inr: 2499, interviews_per_month: 10, max_rounds: 5, description: 'Certificate + 5 rounds' },
-          ]).filter(p => p.is_active !== false).map((plan, planIdx) => {
+          ]).filter(p => p.code !== 'admin-demo' && p.is_active !== false).map((plan, planIdx) => {
             const priceINR = Number(plan.price_inr || 0)
             const priceDisplay = getDisplayPrice(priceINR)
             const subscribed = isInterviewSubscribed(plan)
@@ -955,6 +977,8 @@ export default function Pricing() {
           <ChevronRight size={16} />
         </button>
       )}
+
+      <MarketingFooter />
     </div>
   )
 }

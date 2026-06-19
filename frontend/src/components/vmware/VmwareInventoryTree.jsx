@@ -29,22 +29,28 @@ function TreeRow({ depth = 0, label, status, active, onClick, onContextMenu, bad
 }
 
 export default function VmwareInventoryTree({
-  inv, hosts, vms, datastores, networks,
+  inv, hosts, vms, templates = [], datastores, networks,
   filterLabel,
   selectedNode, setSelectedNode, setActiveTab,
-  onVmContextMenu, onCreateVm,
+  onVmContextMenu, onCreateVm, onDeployTemplate,
 }) {
-  const [exp, setExp] = useState({ vcenter: true, dc: true, cluster: true, hosts: {}, vms: true, storage: true, net: false })
+  const [exp, setExp] = useState({ vcenter: true, dc: true, cluster: true, hosts: {}, vms: true, templates: true, storage: true, net: false })
   const toggle = (k) => setExp(p => ({ ...p, [k]: !p[k] }))
 
   const filteredHosts = hosts.filter(h => filterLabel(h.name))
   const filteredVms = vms.filter(v => filterLabel(v.name))
+  const filteredTemplates = templates.filter(t => filterLabel(t.name))
 
   return (
     <>
-      <div className="flex items-center justify-between px-3 pb-2">
+      <div className="flex items-center justify-between px-3 pb-2 gap-1">
         <span className="vm-nav-label p-0">Inventory</span>
-        <button type="button" onClick={onCreateVm} title="New VM" className="w-[22px] h-[22px] flex items-center justify-center rounded-[5px] border border-[#2d3a4a] bg-[#243447] text-[#00C8FF] text-[15px] leading-none">+</button>
+        <div className="flex gap-1">
+          {templates.length > 0 && onDeployTemplate && (
+            <button type="button" onClick={onDeployTemplate} title="Deploy from template" className="w-[22px] h-[22px] flex items-center justify-center rounded-[5px] border border-[#2d3a4a] bg-[#243447] text-[#F5A623] text-[10px] leading-none font-bold">T</button>
+          )}
+          <button type="button" onClick={onCreateVm} title="New VM" className="w-[22px] h-[22px] flex items-center justify-center rounded-[5px] border border-[#2d3a4a] bg-[#243447] text-[#00C8FF] text-[15px] leading-none">+</button>
+        </div>
       </div>
 
       <TreeRow depth={0} label="vCenter Server" hasChildren caret expanded={exp.vcenter} onToggle={() => toggle('vcenter')} onClick={() => toggle('vcenter')} />
@@ -82,6 +88,21 @@ export default function VmwareInventoryTree({
               ))}
             </>
           )}
+        </>
+      )}
+
+      {filteredTemplates.length > 0 && (
+        <>
+          <TreeRow depth={0} label="Templates" hasChildren expanded={exp.templates} onToggle={() => toggle('templates')} onClick={() => toggle('templates')} />
+          {exp.templates && filteredTemplates.map(tpl => (
+            <TreeRow
+              key={tpl.id}
+              depth={1}
+              label={tpl.name}
+              active={selectedNode.type === 'template' && selectedNode.id === tpl.id}
+              onClick={() => { setSelectedNode({ type: 'template', id: tpl.id }); setActiveTab('summary') }}
+            />
+          ))}
         </>
       )}
 

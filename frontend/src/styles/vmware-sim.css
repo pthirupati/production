@@ -22,6 +22,18 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.vmware-sim button:not(.vm-btn-green) {
+  color: var(--vm-text);
+}
+.vmware-sim .vm-actions-menu button,
+.vmware-sim .vm-tab-bar button {
+  color: var(--vm-muted);
+}
+.vmware-sim .vm-actions-menu button:hover,
+.vmware-sim .vm-tab-bar button:hover {
+  color: #fff;
+}
+
 .vmware-sim ::selection {
   background: var(--vm-blue);
   color: #fff;

@@ -14,7 +14,7 @@ const TYPE_CONFIG = {
 
 export default function NotificationBell({ variant = 'default' }) {
   const navigate = useNavigate()
-  const { notifications, unreadCount, fetchNotifications, markRead, markAllRead, clearAll, dismiss } = useNotificationStore()
+  const { notifications, unreadCount, loading, fetchNotifications, markRead, markAllRead, clearAll, dismiss } = useNotificationStore()
   const [open, setOpen] = useState(false)
   const btnRef = useRef(null)
   const panelRef = useRef(null)
@@ -105,7 +105,7 @@ export default function NotificationBell({ variant = 'default' }) {
   const panel = open && createPortal(
     <div
       ref={panelRef}
-      style={{ position: 'fixed', bottom: `${window.innerHeight - pos.top}px`, left: `${pos.left}px` }}
+      style={{ position: 'fixed', top: `${pos.top}px`, left: `${pos.left}px` }}
       className="w-80 bg-surface-900 border border-surface-700/50 rounded-xl shadow-2xl z-[9999] overflow-hidden animate-scale-in"
     >
       {/* Header */}
@@ -121,26 +121,34 @@ export default function NotificationBell({ variant = 'default' }) {
         <div className="flex items-center gap-2">
           {unreadCount > 0 && (
             <button
+              type="button"
               onClick={markAllRead}
-              className="text-xs text-accent-cyan hover:underline flex items-center gap-1"
+              className="text-xs text-accent-cyan hover:underline flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-surface-800/60"
+              title="Mark all as read"
             >
-              <CheckCheck size={12} /> Mark read
+              <CheckCheck size={12} /> Read all
             </button>
           )}
           {notifications.length > 0 && (
             <button
-              onClick={() => { clearAll(); setOpen(false) }}
-              className="text-xs text-accent-red hover:underline flex items-center gap-1"
+              type="button"
+              onClick={async () => { await clearAll(); setOpen(false) }}
+              className="text-xs text-accent-red hover:underline flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-surface-800/60"
+              title="Clear all notifications"
             >
-              <Trash2 size={12} /> Clear
+              <Trash2 size={12} /> Clear all
             </button>
           )}
         </div>
       </div>
 
       {/* List */}
-      <div className="max-h-80 overflow-y-auto">
-        {notifications.length === 0 ? (
+      <div className="max-h-80 overflow-y-auto overscroll-contain">
+        {loading && notifications.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-surface-500">Loading…</p>
+          </div>
+        ) : notifications.length === 0 ? (
           <div className="text-center py-8">
             <Bell size={24} className="text-surface-600 mx-auto mb-2" />
             <p className="text-sm text-surface-500">No notifications yet</p>

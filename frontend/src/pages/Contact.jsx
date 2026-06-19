@@ -19,7 +19,7 @@ const CONTACT_CARDS = [
   {
     icon: Mail,
     label: 'General',
-    value: 'fixitlab@gmail.com',
+    value: 'fixitlab.admin@gmail.com',
     href: 'mailto:fixitlab.admin@gmail.com',
     color: 'text-accent-cyan',
     bg: 'bg-accent-cyan/10',

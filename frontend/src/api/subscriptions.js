@@ -62,7 +62,7 @@ export const subscriptionApi = {
   },
 
   async getGatewayStatus() {
-    const { data } = await api.get('/billing/gateway-status/')
+    const { data } = await api.get('/billing/gateway-status/', { silentError: true })
     return data
   },
 

@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
 import { FixitPanel } from '../components/design'
+import api from '../api/client'
 import {
   Terminal, Shield, Cloud, Server, Users, Award, Target,
   Zap, ArrowRight, Globe, Heart, Code, Cpu, BookOpen,
@@ -197,6 +199,21 @@ const colorMap = {
 }
 
 export default function About() {
+  const [stats, setStats] = useState({ total_scenarios: 360, total_technologies: 18, total_users: 10000, total_completions: 50000 })
+
+  useEffect(() => {
+    api.get('/stats/', { silentError: true })
+      .then(res => setStats(prev => ({ ...prev, ...res.data })))
+      .catch(() => {})
+  }, [])
+
+  const fmtNum = (n) => {
+    const v = Number(n) || 0
+    if (v >= 10000) return `${Math.floor(v / 1000)}k+`
+    if (v >= 1000) return `${(v / 1000).toFixed(1).replace(/\.0$/, '')}k+`
+    return `${v}+`
+  }
+
   return (
     <PublicLayout>
       {/* ── Hero ──────────────────────────────────────────────── */}
@@ -225,7 +242,7 @@ export default function About() {
             <Link to="/register" className="btn-primary text-base px-8 py-3 inline-flex items-center gap-2 shadow-lg shadow-accent-cyan/20">
               Start for Free <ArrowRight size={16} />
             </Link>
-            <Link to="/scenarios" className="btn-secondary text-base px-8 py-3 inline-flex items-center gap-2">
+            <Link to="/register" className="btn-secondary text-base px-8 py-3 inline-flex items-center gap-2">
               Browse Challenges
             </Link>
           </div>
@@ -239,9 +256,9 @@ export default function About() {
         <div className="max-w-5xl mx-auto px-6 py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: '9+',   label: 'Scenarios',       icon: Target,       color: 'text-accent-cyan'   },
-              { value: '3+',   label: 'Technologies',    icon: Cpu,          color: 'text-accent-purple' },
-              { value: '3',    label: 'Cloud Providers', icon: Cloud,        color: 'text-accent-blue'   },
+              { value: fmtNum(stats.total_scenarios), label: 'Scenarios',       icon: Target,       color: 'text-accent-cyan'   },
+              { value: fmtNum(stats.total_technologies), label: 'Technologies',    icon: Cpu,          color: 'text-accent-purple' },
+              { value: fmtNum(stats.total_completions), label: 'Lab completions', icon: Cloud,        color: 'text-accent-blue'   },
               { value: '24/7', label: 'Availability',    icon: CheckCircle2, color: 'text-accent-green'  },
             ].map(({ value, label, icon: Icon, color }) => (
               <div key={label} className="group">
@@ -418,13 +435,13 @@ export default function About() {
           ))}
         </div>
         <div className="mt-10 flex flex-wrap justify-center gap-3 text-sm">
-          <Link to="/scenarios" className="btn-secondary px-5 py-2 inline-flex items-center gap-2">
+          <Link to="/register" className="btn-secondary px-5 py-2 inline-flex items-center gap-2">
             Browse scenarios <ArrowRight size={14} />
           </Link>
-          <Link to="/leaderboard" className="btn-secondary px-5 py-2 inline-flex items-center gap-2">
+          <Link to="/register" className="btn-secondary px-5 py-2 inline-flex items-center gap-2">
             <Trophy size={14} /> Leaderboard
           </Link>
-          <Link to="/community" className="btn-secondary px-5 py-2 inline-flex items-center gap-2">
+          <Link to="/register" className="btn-secondary px-5 py-2 inline-flex items-center gap-2">
             <MessageSquare size={14} /> Community
           </Link>
           <Link to="/pricing" className="btn-secondary px-5 py-2 inline-flex items-center gap-2">
@@ -472,7 +489,7 @@ export default function About() {
               <Link to="/register" className="btn-primary text-base px-10 py-3.5 inline-flex items-center gap-2 shadow-lg shadow-accent-cyan/20">
                 Create Free Account <ArrowRight size={18} />
               </Link>
-              <Link to="/scenarios" className="btn-secondary text-base px-10 py-3.5 inline-flex items-center gap-2">
+              <Link to="/register" className="btn-secondary text-base px-10 py-3.5 inline-flex items-center gap-2">
                 Browse Challenges
               </Link>
             </div>

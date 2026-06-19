@@ -8,25 +8,26 @@ export const useNotificationStore = create((set, get) => ({
   lastFetchError: null,
 
   fetchNotifications: async () => {
+    set({ loading: true })
     try {
-      const { data } = await api.get('/notifications/')
+      const { data } = await api.get('/notifications/', { silentError: true })
       set({
         notifications: data.notifications || data.results || [],
         unreadCount: data.unread_count ?? 0,
         lastFetchError: null,
+        loading: false,
       })
     } catch (err) {
-      // Only log on first failure, don't spam
       if (!get().lastFetchError) {
         console.warn('Failed to fetch notifications:', err.message)
       }
-      set({ lastFetchError: err.message })
+      set({ lastFetchError: err.message, loading: false })
     }
   },
 
   markRead: async (id) => {
     try {
-      await api.post(`/notifications/${id}/read/`)
+      await api.post(`/notifications/${id}/read/`, {}, { silentError: true })
       set((state) => ({
         notifications: state.notifications.map(n =>
           n.id === id ? { ...n, read: true } : n
@@ -38,7 +39,7 @@ export const useNotificationStore = create((set, get) => ({
 
   markAllRead: async () => {
     try {
-      await api.post('/notifications/read/')
+      await api.post('/notifications/read/', {}, { silentError: true })
       set((state) => ({
         notifications: state.notifications.map(n => ({ ...n, read: true })),
         unreadCount: 0,
@@ -48,14 +49,14 @@ export const useNotificationStore = create((set, get) => ({
 
   clearAll: async () => {
     try {
-      await api.post('/notifications/read/')
+      await api.delete('/notifications/clear/', { silentError: true })
       set({ notifications: [], unreadCount: 0 })
     } catch { /* ignore */ }
   },
 
   dismiss: async (id) => {
     try {
-      await api.delete(`/notifications/${id}/`)
+      await api.delete(`/notifications/${id}/`, { silentError: true })
       set((state) => {
         const target = state.notifications.find(n => n.id === id)
         return {

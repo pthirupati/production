@@ -9,7 +9,6 @@ export const PUBLIC_NAV_PRIMARY = [
 
 export const PUBLIC_NAV_SECONDARY = [
   { to: '/blog', label: 'Blog' },
-  { to: '/community', label: 'Community' },
   { to: '/changelog', label: 'Changelog' },
   { to: '/faq', label: 'FAQ' },
   { to: '/contact', label: 'Contact' },
