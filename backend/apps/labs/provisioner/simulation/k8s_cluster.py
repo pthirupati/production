@@ -65,7 +65,7 @@ class K8sCluster:
 
     def _apply_scenario(self, slug: str) -> None:
         s = slug.lower()
-        if "crashloop" in s or "pod" in s:
+        if "crashloop" in s:
             self.deployments = [K8sDeployment("nginx", image="nginx:broken")]
             self.pods = [
                 K8sPod(
@@ -78,7 +78,72 @@ class K8sCluster:
             self.services = [
                 K8sService("nginx", selector={"app": "nginx"}, endpoints=[]),
             ]
-        elif "service" in s or "endpoint" in s:
+        elif "imagepull" in s or "image-pull" in s:
+            self.deployments = [K8sDeployment("api", image="api:missing-tag")]
+            self.pods = [
+                K8sPod(
+                    "api-5f8c7d6b-abc12", status="ImagePullBackOff", ready="0/1",
+                    restarts=0, image="api:missing-tag", labels={"app": "api"},
+                    events=["Warning Failed: Error: ErrImagePull"],
+                )
+            ]
+            self.services = [K8sService("api", selector={"app": "api"}, endpoints=[])]
+        elif "node-notready" in s or ("node" in s and "notready" in s):
+            self.nodes = [
+                K8sNode("master-1", roles=["control-plane"]),
+                K8sNode("worker-1", status="NotReady", roles=[]),
+            ]
+            self.deployments = [K8sDeployment("nginx")]
+            self.pods = [K8sPod("nginx-7d4b8c9f-xk2m1", labels={"app": "nginx"}, node="worker-1")]
+            self.services = [K8sService("nginx", endpoints=["10.244.1.5:8080"])]
+        elif "configmap" in s:
+            self.deployments = [K8sDeployment("web", image="nginx:latest")]
+            self.pods = [
+                K8sPod(
+                    "web-6d4b8c9f-xk2m1", status="CreateContainerConfigError", ready="0/1",
+                    restarts=3, image="nginx:latest", labels={"app": "web"},
+                    events=["Warning Failed: configmap \"app-config\" not found"],
+                )
+            ]
+            self.services = [K8sService("web", selector={"app": "web"}, endpoints=[])]
+        elif "rbac" in s:
+            self.deployments = [K8sDeployment("nginx")]
+            self.pods = [K8sPod("nginx-7d4b8c9f-xk2m1", labels={"app": "nginx"})]
+            self.services = [K8sService("nginx", endpoints=["10.244.1.5:8080"])]
+            self.rbac_forbidden = True
+        elif "ingress" in s:
+            self.deployments = [K8sDeployment("web", selector={"app": "web"})]
+            self.pods = [K8sPod("web-7d4b8c9f-xk2m1", labels={"app": "web"})]
+            self.services = [K8sService("web", selector={"app": "web"}, endpoints=["10.244.1.5:8080"])]
+            self.ingress_broken = True
+        elif "quota" in s:
+            self.deployments = [K8sDeployment("worker")]
+            self.pods = [
+                K8sPod(
+                    "worker-7d4b8c9f-xk2m1", status="Pending", ready="0/1",
+                    restarts=0, image="busybox:latest", labels={"app": "worker"},
+                    events=["Warning FailedScheduling: exceeded quota: compute-resources"],
+                )
+            ]
+            self.services = []
+        elif "pvc" in s or "storageclass" in s:
+            self.deployments = [K8sDeployment("db")]
+            self.pods = [
+                K8sPod(
+                    "db-7d4b8c9f-xk2m1", status="Pending", ready="0/1",
+                    restarts=0, image="postgres:15", labels={"app": "db"},
+                    events=["Warning FailedScheduling: pod has unbound immediate PersistentVolumeClaims"],
+                )
+            ]
+            self.services = [K8sService("db", selector={"app": "db"}, endpoints=[])]
+        elif "port-fix" in s or "manifest" in s:
+            self.deployments = [K8sDeployment("api", selector={"app": "api"})]
+            self.pods = [K8sPod("api-5f8c7d6b-abc12", labels={"app": "api"}, image="api:v1")]
+            self.services = [
+                K8sService("api", selector={"app": "api"}, port=8080, endpoints=["10.244.1.5:8080"]),
+            ]
+            self.service_port_wrong = True
+        elif "service" in s or "endpoint" in s or "unreachable" in s:
             self.deployments = [K8sDeployment("api", selector={"app": "api"})]
             self.pods = [
                 K8sPod("api-5f8c7d6b-abc12", labels={"app": "api"}, image="api:v1"),
@@ -87,9 +152,14 @@ class K8sCluster:
                 K8sService("api", selector={"app": "api", "version": "v2"}, endpoints=[]),
             ]
         else:
-            self.deployments = [K8sDeployment("nginx")]
-            self.pods = [K8sPod("nginx-7d4b8c9f-xk2m1", labels={"app": "nginx"})]
-            self.services = [K8sService("nginx", endpoints=["10.244.1.5:8080"])]
+            self.deployments = [K8sDeployment("nginx", image="nginx:broken")]
+            self.pods = [
+                K8sPod(
+                    "nginx-7d4b8c9f-xk2m1", status="CrashLoopBackOff", ready="0/1",
+                    restarts=2, image="nginx:broken", labels={"app": "nginx"},
+                )
+            ]
+            self.services = [K8sService("nginx", selector={"app": "nginx"}, endpoints=[])]
 
     def get_pods(self, namespace: str = "default") -> str:
         lines = ["NAME                     READY   STATUS             RESTARTS   AGE"]
@@ -201,6 +271,14 @@ class K8sCluster:
                     s.endpoints.append("10.244.1.5:8080")
 
     def is_healthy(self) -> bool:
+        if getattr(self, "rbac_forbidden", False):
+            return False
+        if getattr(self, "ingress_broken", False):
+            return False
+        if getattr(self, "service_port_wrong", False):
+            return False
+        if any(n.status != "Ready" for n in self.nodes):
+            return False
         return all(p.status == "Running" for p in self.pods) and all(
             s.endpoints for s in self.services if s.name != "kubernetes"
         )

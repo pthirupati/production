@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { Building2, Plus, Users, Loader2, Trash2, Mail } from 'lucide-react'
+import { AdminPageHeader } from '../../components/design'
+import { Plus, Users, Loader2, Trash2, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AdminTeams() {
@@ -90,30 +91,26 @@ export default function AdminTeams() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Building2 size={24} className="text-accent-purple" /> Teams & Enterprise
-          </h1>
-          <p className="text-surface-400 text-sm mt-1">
-            Shared technology access, seat limits, and billing for organizations. Members use the self-service portal at /team.
-          </p>
-        </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2 text-sm">
-          <Plus size={16} /> New Team
-        </button>
-      </div>
+      <AdminPageHeader
+        title="Teams & Enterprise"
+        subtitle="Shared technology access, seat limits, and billing for organizations. Members use the self-service portal at /team."
+        actions={
+          <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2 text-sm">
+            <Plus size={16} /> New Team
+          </button>
+        }
+      />
 
       <div className="grid md:grid-cols-3 gap-4">
-        <div className="glass-card p-4">
+        <div className="fx-stat-card p-4">
           <p className="text-2xl font-bold text-white">{orgs.filter(o => o.is_active).length}</p>
           <p className="text-xs text-surface-400">Active teams</p>
         </div>
-        <div className="glass-card p-4">
+        <div className="fx-stat-card p-4">
           <p className="text-2xl font-bold text-white">{orgs.reduce((n, o) => n + (o.member_count || 0), 0)}</p>
           <p className="text-xs text-surface-400">Total seats used</p>
         </div>
-        <div className="glass-card p-4">
+        <div className="fx-stat-card p-4">
           <p className="text-2xl font-bold text-white">{technologies.length}</p>
           <p className="text-xs text-surface-400">Technologies grantable</p>
         </div>

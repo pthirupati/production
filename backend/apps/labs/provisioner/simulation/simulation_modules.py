@@ -53,11 +53,11 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
         )
 
     if "docker" in slug:
-        state.services.setdefault(
-            "docker",
-            SimService("docker", active="active", enabled="enabled", description="Docker Engine"),
+        docker_active = "inactive" if "daemon-stopped" in slug or "stopped" in slug else "active"
+        state.services["docker"] = SimService(
+            "docker", active=docker_active, enabled="enabled", description="Docker Engine",
         )
-        engine._container_running = False
+        engine._container_running = "exited" not in slug and "daemon-stopped" not in slug
 
     # Always ensure docker service exists for generic/docker scenarios
     if sim_type in ("generic", "rhel") or "docker" in slug:
@@ -152,6 +152,37 @@ def _register_k8s(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             return c.apply_yaml(shell.state.read_file(line.split()[-1]) or "")
         if "patch" in low and "service" in low:
             return c.patch_service_selector("api", {"app": "api"})
+        if "create configmap" in low or ("apply" in low and "configmap" in low):
+            for p in c.pods:
+                if p.status == "CreateContainerConfigError":
+                    p.status = "Running"
+                    p.ready = "1/1"
+            c._sync_endpoints()
+            return "configmap/app-config created"
+        if "create rolebinding" in low or "auth can-i" in low:
+            c.rbac_forbidden = False
+            return "rolebinding created"
+        if "cordon" in low and "uncordon" in low:
+            for n in c.nodes:
+                if n.status == "NotReady":
+                    n.status = "Ready"
+            return "node/worker-1 uncordoned"
+        if "uncordon" in low:
+            for n in c.nodes:
+                if n.status == "NotReady":
+                    n.status = "Ready"
+            return "node/worker-1 uncordoned"
+        if "patch" in low and "deployment" in low and "image" in low:
+            for d in c.deployments:
+                if "missing" in d.image:
+                    d.image = d.image.replace("missing-tag", "v1")
+            for p in c.pods:
+                if p.status == "ImagePullBackOff":
+                    p.status = "Running"
+                    p.ready = "1/1"
+                    p.image = "api:v1"
+            c._sync_endpoints()
+            return "deployment patched"
         if "logs" in low:
             pod = line.split()[-1]
             p = next((x for x in c.pods if pod in x.name), None)
@@ -245,9 +276,23 @@ def _register_docker(engine: "UnifiedSimulationEngine", shell: RHELShell) -> Non
         if not line.strip().lower().startswith("docker"):
             return None
         low = line.strip().lower()
-        if "docker start" in low:
+        if "systemctl start docker" in low:
+            svc = shell.state.services.get("docker")
+            if svc:
+                svc.active = "active"
+                svc.sub_state = "running"
+            return None
+        if "docker start" in low or "docker restart" in low:
             engine._container_running = True
             return "web"
+        if "docker pull" in low:
+            return "Pull complete"
+        if "docker compose up" in low or "docker-compose up" in low:
+            engine._container_running = True
+            return "Container web  Started"
+        if "docker network connect" in low:
+            engine._docker_network_fixed = True
+            return ""
         if "docker ps" in low and "-a" not in low:
             if engine._container_running:
                 return "CONTAINER ID   IMAGE          STATUS         NAMES\nabc123   nginx:latest   Up 1 second   web"

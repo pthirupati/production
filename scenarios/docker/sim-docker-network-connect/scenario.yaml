@@ -1,0 +1,23 @@
+title: Container Not on Application Network
+slug: sim-docker-network-connect
+technology: Docker & Containers
+category: Docker Networking
+difficulty: medium
+lab_mode: simulation
+simulation_type: docker
+time_limit: 900
+max_score: 100
+jira_priority: Medium
+is_free: false
+description: |
+  The web container is running but not attached to the application bridge network, so it
+  cannot reach the database sidecar. Connect it to the correct network.
+objectives:
+  - Inspect docker network ls and container networks
+  - Connect the web container to the bridge network
+  - Verify connectivity with docker ps
+initial_state: Container web is Exited; network attachment missing.
+hints:
+  - content: Use `docker network connect bridge web` after starting the container.
+    cost: 15
+    order: 1

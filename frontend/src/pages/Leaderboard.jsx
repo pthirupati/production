@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import { useDataStore } from '../store/dataStore'
 import { Trophy, Star, Clock, Crown, Medal, Server } from 'lucide-react'
 import Pagination from '../components/Pagination'
-import CompactPageHeader from '../components/CompactPageHeader'
+import { PageHeader, FixitPanel } from '../components/design'
 import { SkeletonTable } from '../components/Skeleton'
 
 const PAGE_SIZE = 20
@@ -170,15 +170,14 @@ export default function Leaderboard() {
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
 
-      <CompactPageHeader
+      <PageHeader
+        eyebrow="Rankings"
         title="Leaderboard"
         subtitle="Top fixers ranked by total score"
-        eyebrow="Rankings"
-        icon={Trophy}
       />
 
       {/* Tech filter chips */}
-      <div className="flex gap-2 flex-wrap">
+      <FixitPanel padding="p-4" className="flex gap-2 flex-wrap">
         <button
           onClick={() => setSelectedTech('')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
@@ -203,7 +202,7 @@ export default function Leaderboard() {
             {tech.name}
           </button>
         ))}
-      </div>
+      </FixitPanel>
 
       {/* ── Your rank banner (only if outside top 3) ── */}
       {!loading && data.user_rank && data.user_rank.rank > 3 && (

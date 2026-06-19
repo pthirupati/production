@@ -1,0 +1,23 @@
+title: Fix Image Pull Failure
+slug: sim-docker-image-pull
+technology: Docker & Containers
+category: Docker Engine
+difficulty: easy
+lab_mode: simulation
+simulation_type: docker
+time_limit: 900
+max_score: 100
+jira_priority: Medium
+is_free: false
+description: |
+  docker pull fails for the required nginx image tag. Diagnose and pull a working image,
+  then start the web container.
+objectives:
+  - Run docker pull for a valid nginx tag
+  - Start the web container
+  - Verify docker ps shows Up status
+initial_state: Simulated host; container exited; image tag missing locally.
+hints:
+  - content: Try `docker pull nginx:latest` then `docker start web`.
+    cost: 10
+    order: 1

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import PublicLayout from '../components/layout/PublicLayout'
+import MarketingPageShell from '../components/MarketingPageShell'
+import { FixitPanel } from '../components/design'
 import api from '../api/client'
 import { Mail, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react'
 
@@ -29,8 +31,8 @@ export default function Unsubscribe() {
 
   return (
     <PublicLayout>
-      <div className="max-w-lg mx-auto px-4 py-24 text-center">
-        <div className="glass-card p-10">
+      <MarketingPageShell narrow eyebrow="Email preferences" title="Unsubscribe">
+        <FixitPanel padding="p-10" className="text-center max-w-lg mx-auto">
           {status === 'loading' && (
             <>
               <Loader2 className="mx-auto mb-4 text-accent-cyan animate-spin" size={40} />
@@ -40,7 +42,7 @@ export default function Unsubscribe() {
           {status === 'success' && (
             <>
               <CheckCircle2 className="mx-auto mb-4 text-accent-green" size={48} />
-              <h1 className="text-xl font-bold text-white mb-2">Unsubscribed</h1>
+              <h2 className="text-xl font-display font-bold text-white mb-2">Unsubscribed</h2>
               <p className="text-surface-300 mb-6">{message}</p>
               <p className="text-sm text-surface-500">
                 You can re-enable subscribe reminders anytime in{' '}
@@ -51,15 +53,15 @@ export default function Unsubscribe() {
           {status === 'error' && (
             <>
               <AlertTriangle className="mx-auto mb-4 text-accent-amber" size={48} />
-              <h1 className="text-xl font-bold text-white mb-2">Unable to unsubscribe</h1>
+              <h2 className="text-xl font-display font-bold text-white mb-2">Unable to unsubscribe</h2>
               <p className="text-surface-300 mb-6">{message}</p>
               <Link to="/profile#notifications" className="inline-flex items-center gap-2 text-accent-cyan hover:underline text-sm">
                 <Mail size={14} /> Manage email preferences in Profile
               </Link>
             </>
           )}
-        </div>
-      </div>
+        </FixitPanel>
+      </MarketingPageShell>
     </PublicLayout>
   )
 }

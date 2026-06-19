@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { BarChart3, TrendingUp, Target, RefreshCw, Loader2 } from 'lucide-react'
+import { AdminPageHeader } from '../../components/design'
+import { TrendingUp, Target, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AdminAnalytics() {
@@ -27,24 +28,19 @@ export default function AdminAnalytics() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <BarChart3 size={24} className="text-accent-cyan" /> Analytics
-          </h1>
-          <p className="text-surface-400 text-sm mt-1">Lab activity, top scenarios, difficulty mix</p>
-        </div>
-        <div className="flex items-center gap-3">
+      <AdminPageHeader
+        title="Analytics"
+        subtitle="Lab activity, top scenarios, difficulty mix"
+        onRefresh={() => load(true)}
+        refreshing={loading}
+        actions={
           <select value={days} onChange={e => setDays(Number(e.target.value))} className="input-field text-sm py-2">
             <option value={7}>Last 7 days</option>
             <option value={30}>Last 30 days</option>
             <option value={90}>Last 90 days</option>
           </select>
-          <button onClick={() => load(true)} className="btn-secondary flex items-center gap-2 text-sm">
-            <RefreshCw size={14} /> Refresh
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-accent-cyan" size={32} /></div>
@@ -62,7 +58,7 @@ export default function AdminAnalytics() {
                 ['Revenue (INR)', `₹${Math.round(data.summary.revenue_inr ?? 0)}`, 'text-accent-amber'],
                 ['Interviews', data.summary.interview_campaigns, 'text-accent-pink'],
               ].map(([label, val, cls]) => (
-                <div key={label} className="glass-card p-4">
+                <div key={label} className="fx-stat-card p-4">
                   <p className={`text-2xl font-bold ${cls}`}>{val ?? 0}</p>
                   <p className="text-xs text-surface-400 mt-1">{label}</p>
                 </div>

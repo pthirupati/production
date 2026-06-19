@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
+import { AdminPageHeader } from '../../components/design'
 import { Plus, Edit2, Trash2, X, Save, Tag, Percent } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -98,16 +99,16 @@ export default function AdminCoupons() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Coupons</h1>
-          <p className="text-surface-400 mt-1">Create and manage promo codes (e.g. LINUX20)</p>
-        </div>
-        <button onClick={() => { resetForm(); setEditingId(null); setShowForm(true) }}
-          className="btn-primary flex items-center gap-2">
-          <Plus size={16} /> Add Coupon
-        </button>
-      </div>
+      <AdminPageHeader
+        title="Coupons"
+        subtitle="Create and manage promo codes (e.g. LINUX20)"
+        actions={
+          <button onClick={() => { resetForm(); setEditingId(null); setShowForm(true) }}
+            className="btn-primary flex items-center gap-2">
+            <Plus size={16} /> Add Coupon
+          </button>
+        }
+      />
 
       {showForm && (
         <div className="glass-card p-6 space-y-4">
@@ -149,7 +150,7 @@ export default function AdminCoupons() {
       )}
 
       <div className="glass-card overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="fx-admin-table">
           <thead className="bg-surface-900/50 text-surface-400 text-left">
             <tr>
               <th className="px-4 py-3">Code</th>

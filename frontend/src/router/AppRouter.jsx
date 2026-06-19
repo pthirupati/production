@@ -127,7 +127,7 @@ export default function AppRouter() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
-        <Route path="/changelog" element={<Changelog />} />
+        <Route path="/changelog" element={<PublicLayout><Changelog /></PublicLayout>} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/support" element={<Navigate to="/contact" replace />} />
         <Route path="/faq" element={<FAQ />} />

@@ -4,6 +4,8 @@ import { Clock, ArrowLeft, Tag, User, Calendar, ChevronRight } from 'lucide-reac
 import DOMPurify from 'dompurify'
 import api from '../api/client'
 import { getCategoryClass } from '../data/blogFallback'
+import MarketingPageShell from '../components/MarketingPageShell'
+import { FixitPanel } from '../components/design'
 
 const blogContent = {
   'why-hands-on-learning-works': {
@@ -620,21 +622,25 @@ export default function BlogPost() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <div className="w-8 h-8 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin" />
-      </div>
+      <MarketingPageShell narrow>
+        <div className="flex items-center justify-center py-24">
+          <div className="w-8 h-8 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin" />
+        </div>
+      </MarketingPageShell>
     )
   }
 
   if (!post) {
     return (
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-20 text-center">
-        <h1 className="text-3xl font-bold text-white mb-4">Post Not Found</h1>
-        <p className="text-surface-400 mb-6">The blog post you&apos;re looking for doesn&apos;t exist.</p>
-        <Link to="/blog" className="btn-primary px-6 py-2 inline-flex items-center gap-2">
-          <ArrowLeft size={16} /> Back to Blog
-        </Link>
-      </div>
+      <MarketingPageShell narrow>
+        <div className="py-12 text-center">
+          <h1 className="text-3xl font-bold text-white mb-4">Post Not Found</h1>
+          <p className="text-surface-400 mb-6">The blog post you&apos;re looking for doesn&apos;t exist.</p>
+          <Link to="/blog" className="btn-primary px-6 py-2 inline-flex items-center gap-2">
+            <ArrowLeft size={16} /> Back to Blog
+          </Link>
+        </div>
+      </MarketingPageShell>
     )
   }
 
@@ -811,12 +817,13 @@ export default function BlogPost() {
   const relatedPosts = related
 
   return (
-    <article className="max-w-3xl mx-auto px-4 sm:px-6 py-8 md:py-12">
+    <MarketingPageShell narrow>
+      <article>
         <Link to="/blog" className="inline-flex items-center gap-2 text-sm text-surface-400 hover:text-white transition-colors mb-8">
           <ArrowLeft size={14} /> Back to Blog
         </Link>
 
-        <header className="mb-10">
+        <header className="mb-8">
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${getCategoryClass(post.category)}`}>
               <Tag size={10} className="inline mr-1" />{post.category}
@@ -832,28 +839,28 @@ export default function BlogPost() {
           </div>
         </header>
 
-        {/* Content */}
-        <div className="prose-dark">
-          {renderContent(post.content)}
-        </div>
+        <FixitPanel padding="p-6 md:p-8" className="mb-8">
+          <div className="prose-dark">
+            {renderContent(post.content)}
+          </div>
+        </FixitPanel>
 
-        {/* CTA */}
-        <div className="mt-12 glass-card p-8 text-center relative overflow-hidden">
+        <FixitPanel hero padding="p-8" className="text-center relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/5 to-accent-purple/5" />
           <div className="relative">
             <h3 className="text-xl font-bold text-white mb-2">Ready to Practice?</h3>
             <p className="text-surface-400 text-sm mb-4">Stop reading, start doing. Real environments, real challenges.</p>
             <Link to="/register" className="btn-primary px-8 py-3 text-sm inline-block">Start Free &rarr;</Link>
           </div>
-        </div>
+        </FixitPanel>
 
-        {/* Related Posts */}
         {relatedPosts.length > 0 && (
           <div className="mt-12">
             <h3 className="text-lg font-semibold text-white mb-4">More Articles</h3>
             <div className="grid sm:grid-cols-3 gap-4">
               {relatedPosts.map(p => (
-                  <Link key={p.slug} to={`/blog/${p.slug}`} className="glass-card-hover p-4 group">
+                <Link key={p.slug} to={`/blog/${p.slug}`} className="group">
+                  <FixitPanel padding="p-4" className="h-full hover:border-accent-cyan/25 transition-colors">
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${getCategoryClass(p.category)}`}>
                       {p.category}
                     </span>
@@ -861,11 +868,13 @@ export default function BlogPost() {
                       {p.title}
                     </h4>
                     <span className="text-xs text-surface-500 mt-2 block">{p.readTime}</span>
-                  </Link>
+                  </FixitPanel>
+                </Link>
               ))}
             </div>
           </div>
         )}
       </article>
+    </MarketingPageShell>
   )
 }

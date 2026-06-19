@@ -1,0 +1,26 @@
+title: Docker Compose Stack Down
+slug: sim-docker-compose-down
+technology: Docker & Containers
+category: Docker Compose
+difficulty: medium
+lab_mode: simulation
+simulation_type: docker
+time_limit: 900
+max_score: 100
+jira_priority: Medium
+is_free: false
+description: |
+  The web application stack managed by Docker Compose is not running. Bring the stack back
+  up and verify containers are healthy.
+objectives:
+  - Check docker compose ps and identify stopped services
+  - Run docker compose up -d to start the stack
+  - Verify docker ps shows running containers
+initial_state: Simulated RHEL host with docker installed; compose stack stopped.
+hints:
+  - content: Run `docker compose ps -a` to see service state.
+    cost: 10
+    order: 1
+  - content: Start with `docker compose up -d` in /opt/app.
+    cost: 15
+    order: 2

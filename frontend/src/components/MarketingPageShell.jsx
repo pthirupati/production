@@ -17,7 +17,7 @@ export default function MarketingPageShell({
         {(eyebrow || title) && (
           <header className="mb-10 sm:mb-12 text-center max-w-3xl mx-auto animate-fade-in">
             {eyebrow && (
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent-cyan mb-3">{eyebrow}</p>
+              <p className="fx-page-eyebrow mb-3">{eyebrow}</p>
             )}
             {title && (
               <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight text-balance">

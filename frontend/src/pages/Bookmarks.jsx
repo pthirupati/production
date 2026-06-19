@@ -6,7 +6,7 @@ import {
   Server, ArrowRight, Loader2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import CompactPageHeader from '../components/CompactPageHeader'
+import { PageHeader, FixitPanel } from '../components/design'
 
 const typeConfig = {
   fix:  { icon: Wrench, label: 'Fix', color: 'text-accent-cyan' },
@@ -57,11 +57,10 @@ export default function Bookmarks() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
-      <CompactPageHeader
+      <PageHeader
+        eyebrow="Your library"
         title="Bookmarked Scenarios"
         subtitle={`${bookmarks.length} saved scenario${bookmarks.length !== 1 ? 's' : ''}`}
-        eyebrow="Your library"
-        icon={Bookmark}
       />
 
       {bookmarks.length === 0 ? (
@@ -74,7 +73,7 @@ export default function Bookmarks() {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <FixitPanel padding="p-5" className="grid gap-4">
           {bookmarks.map(scenario => {
             const TypeIcon = typeConfig[scenario.scenario_type]?.icon || Server
             return (
@@ -116,7 +115,7 @@ export default function Bookmarks() {
               </div>
             )
           })}
-        </div>
+        </FixitPanel>
       )}
     </div>
   )

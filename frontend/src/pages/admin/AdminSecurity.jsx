@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
+import { AdminPageHeader } from '../../components/design'
 import { Shield, AlertTriangle, Lock, CreditCard, RotateCcw, Mail, KeyRound, Ban, Globe, X, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -99,20 +100,18 @@ export default function AdminSecurity() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Security & Delivery</h1>
-          <p className="text-surface-400 mt-1">Click any metric to inspect events, block IPs, or review delivery health</p>
-        </div>
-        <div className="flex gap-2">
+      <AdminPageHeader
+        title="Security & Delivery"
+        subtitle="Click any metric to inspect events, block IPs, or review delivery health"
+        onRefresh={loadData}
+        actions={
           <select className="input-field text-sm" value={days} onChange={e => setDays(Number(e.target.value))}>
             <option value={1}>Last 24 hours</option>
             <option value={7}>Last 7 days</option>
             <option value={30}>Last 30 days</option>
           </select>
-          <button type="button" onClick={loadData} className="btn-secondary text-sm">Refresh</button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="glass-card p-4 flex items-start gap-3 border border-amber-500/30 bg-amber-500/5 text-sm">
         <AlertTriangle size={16} className="text-amber-400 mt-0.5 shrink-0" />
@@ -156,7 +155,7 @@ export default function AdminSecurity() {
             key={key}
             type="button"
             onClick={() => openDetail(key)}
-            className="glass-card glass-card-hover p-4 text-left group"
+            className="fx-stat-card p-4 text-left group"
           >
             <Icon size={18} className={`${color} mb-2`} />
             <p className="text-2xl font-bold text-white">{metrics[key] ?? 0}</p>

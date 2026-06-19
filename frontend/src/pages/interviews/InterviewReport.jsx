@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import { Award, TrendingUp, AlertCircle, Share2, Calendar, Download, Linkedin, Printer } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PageHeader } from '../../components/design'
 
 export default function InterviewReport() {
   const { roundId } = useParams()
@@ -69,17 +70,17 @@ ${[['Overall', r.overall_score], ['Technical', r.technical_score], ['Communicati
 
   return (
     <div ref={printRef} className="max-w-2xl mx-auto space-y-6 animate-fade-in py-4">
-      <div>
-        <Link to="/interviews" className="text-xs text-surface-500 hover:text-white">← Interviews</Link>
-        <h1 className="text-2xl font-bold text-white mt-2">Round feedback</h1>
-        <p className={`text-sm mt-1 ${r.passed ? 'text-emerald-400' : 'text-amber-400'}`}>
-          {round?.is_sample
+      <PageHeader
+        eyebrow="AI Interview Studio"
+        title="Round feedback"
+        subtitle={
+          round?.is_sample
             ? 'Sample complete — see your mini feedback below'
             : r.passed
               ? 'Cleared — schedule your next round within 48 hours'
-              : 'Keep practicing — review gaps below'}
-        </p>
-      </div>
+              : 'Keep practicing — review gaps below'
+        }
+      />
 
       <div className="flex flex-wrap gap-2">
         {round?.scheduled_at && (

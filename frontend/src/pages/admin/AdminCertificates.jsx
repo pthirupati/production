@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../api/admin'
-import { Award, Mic2, Trophy, Search, RefreshCw } from 'lucide-react'
+import { AdminPageHeader } from '../../components/design'
+import { Award, Mic2, Trophy, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 function StatusPill({ expired, active }) {
@@ -35,20 +36,12 @@ export default function AdminCertificates() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Award className="text-accent-cyan" size={24} />
-            Certificates & Achievements
-          </h1>
-          <p className="text-sm text-surface-400 mt-1">
-            Technology completion certs, interview FIXIT-INT certs, and user badges.
-          </p>
-        </div>
-        <button type="button" onClick={load} className="btn-secondary text-sm flex items-center gap-2">
-          <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
+      <AdminPageHeader
+        title="Certificates & Achievements"
+        subtitle="Technology completion certs, interview FIXIT-INT certs, and user badges."
+        onRefresh={load}
+        refreshing={loading}
+      />
 
       <div className="flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-[200px] max-w-md">
@@ -88,7 +81,7 @@ export default function AdminCertificates() {
       ) : (
         <div className="overflow-x-auto">
           {tab === 'technology' && (
-            <table className="w-full text-sm">
+            <table className="fx-admin-table">
               <thead>
                 <tr className="text-left text-surface-500 border-b border-surface-800">
                   <th className="py-2 pr-4">Certificate ID</th>
@@ -118,7 +111,7 @@ export default function AdminCertificates() {
           )}
 
           {tab === 'interview' && (
-            <table className="w-full text-sm">
+            <table className="fx-admin-table">
               <thead>
                 <tr className="text-left text-surface-500 border-b border-surface-800">
                   <th className="py-2 pr-4">Certificate ID</th>
@@ -150,7 +143,7 @@ export default function AdminCertificates() {
           )}
 
           {tab === 'achievements' && (
-            <table className="w-full text-sm">
+            <table className="fx-admin-table">
               <thead>
                 <tr className="text-left text-surface-500 border-b border-surface-800">
                   <th className="py-2 pr-4">User</th>

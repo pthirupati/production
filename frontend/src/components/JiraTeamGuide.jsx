@@ -86,11 +86,11 @@ export default function JiraTeamGuide({ scenarioSlug, compact = false }) {
   }
 
   return (
-    <div className="rounded-xl border border-surface-700/50 bg-surface-900/60 backdrop-blur-sm overflow-hidden">
+    <div className="fx-panel overflow-hidden p-0">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-surface-800/60 bg-surface-950/40">
-        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
-          <Bot size={15} className="text-indigo-400" />
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.06] bg-surface-950/40">
+        <div className="w-8 h-8 rounded-lg fixit-logo-mark flex items-center justify-center shrink-0">
+          <Bot size={15} className="text-white" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-white">Jira Team Bots</p>
@@ -103,7 +103,7 @@ export default function JiraTeamGuide({ scenarioSlug, compact = false }) {
         {teams.map(team => {
           const c = TEAM_COLORS[team.key] || TEAM_COLORS.network
           return (
-            <div key={team.mention} className="rounded-lg border border-surface-800/60 bg-surface-900/30 p-3 group hover:border-surface-700 transition-colors">
+            <div key={team.mention} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 group hover:border-white/10 transition-colors">
               <div className="flex items-center gap-2 mb-1.5">
                 <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />
                 <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-full border ${c.badge}`}>

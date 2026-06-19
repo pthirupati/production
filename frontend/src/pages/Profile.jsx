@@ -17,7 +17,7 @@ import toast from 'react-hot-toast'
 import { startOAuth } from '../utils/oauth'
 import { validators } from '../utils/validators'
 import { SkeletonCard } from '../components/Skeleton'
-import CompactPageHeader from '../components/CompactPageHeader'
+import { PageHeader } from '../components/design'
 import { interviewsApi } from '../api/interviews'
 
 export default function Profile() {
@@ -161,11 +161,10 @@ export default function Profile() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-      <CompactPageHeader
+      <PageHeader
+        eyebrow="Your account"
         title="Profile Settings"
         subtitle="Account, billing, and preferences"
-        eyebrow="Your account"
-        icon={User}
       />
 
       <div className="glass-card p-6">

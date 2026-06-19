@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { FileText, Download, Search, RefreshCw, IndianRupee } from 'lucide-react'
+import { AdminPageHeader } from '../../components/design'
+import { FileText, Download, Search, IndianRupee } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AdminInvoices() {
@@ -46,24 +47,19 @@ export default function AdminInvoices() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <FileText size={22} className="text-accent-cyan" /> Payment Invoices
-          </h1>
-          <p className="text-surface-400 mt-1">Invoices for verified payments (technology & interview)</p>
-        </div>
-        <button onClick={loadData} className="btn-secondary text-sm flex items-center gap-2">
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
-        </button>
-      </div>
+      <AdminPageHeader
+        title="Payment Invoices"
+        subtitle="Invoices for verified payments (technology & interview)"
+        onRefresh={loadData}
+        refreshing={loading}
+      />
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <div className="glass-card p-4">
+        <div className="fx-stat-card p-4">
           <p className="text-xs text-surface-500 uppercase">Total Invoices</p>
           <p className="text-2xl font-bold text-white mt-1">{stats.total_count}</p>
         </div>
-        <div className="glass-card p-4">
+        <div className="fx-stat-card p-4">
           <p className="text-xs text-surface-500 uppercase flex items-center gap-1"><IndianRupee size={12} /> Revenue (shown)</p>
           <p className="text-2xl font-bold text-accent-green mt-1">₹{Math.round(stats.total_revenue_inr)}</p>
         </div>
@@ -88,7 +84,7 @@ export default function AdminInvoices() {
           <div className="p-12 text-center text-surface-400">Loading...</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="fx-admin-table">
               <thead>
                 <tr className="border-b border-surface-700">
                   <th className="text-left p-3 text-surface-400 font-medium">Invoice #</th>

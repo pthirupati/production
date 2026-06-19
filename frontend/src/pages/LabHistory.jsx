@@ -4,7 +4,7 @@ import { authApi } from '../api/auth'
 import { History, CheckCircle2, XCircle, Clock, ArrowRight, Server, Cloud, Box, Play } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Pagination from '../components/Pagination'
-import CompactPageHeader from '../components/CompactPageHeader'
+import { PageHeader } from '../components/design'
 
 const PAGE_SIZE = 20
 
@@ -48,11 +48,10 @@ export default function LabHistory() {
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <CompactPageHeader
+      <PageHeader
+        eyebrow="Your progress"
         title="Lab History"
         subtitle={`${total} session${total !== 1 ? 's' : ''} · ${passed} passed`}
-        eyebrow="Your progress"
-        icon={History}
       />
 
       {/* Stats */}

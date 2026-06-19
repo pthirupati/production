@@ -14,6 +14,7 @@ import { interviewsApi } from '../api/interviews'
 import api from '../api/client'
 import { PlatformBanners } from '../components/PlatformBanners'
 import { PUBLIC_NAV_LINKS } from '../constants/publicNav'
+import { PageHeader, FixitPanel } from '../components/design'
 import toast from 'react-hot-toast'
 
 const techIcons = {
@@ -102,7 +103,7 @@ function FAQAccordion({ items }) {
   return (
     <div className="space-y-3">
       {items.map(({ q, a }, i) => (
-        <div key={i} className={`glass-card border transition-all duration-200 ${open === i ? 'border-accent-cyan/20' : 'hover:border-surface-600/60'}`}>
+        <FixitPanel key={i} padding="p-0" className={`border transition-all duration-200 ${open === i ? 'border-accent-cyan/20' : 'hover:border-surface-600/60'}`}>
           <button
             type="button"
             onClick={() => setOpen(open === i ? null : i)}
@@ -119,7 +120,7 @@ function FAQAccordion({ items }) {
               <p className="text-sm text-surface-400 leading-relaxed">{a}</p>
             </div>
           )}
-        </div>
+        </FixitPanel>
       ))}
     </div>
   )
@@ -517,22 +518,19 @@ export default function Pricing() {
         )}
 
         {/* Hero */}
-        <div className="text-center mb-14 animate-fade-in mesh-gradient rounded-2xl py-12 px-6 relative overflow-hidden">
+        <div className="mb-14 animate-fade-in mesh-gradient rounded-2xl py-12 px-6 relative overflow-hidden">
           {/* Orb elements */}
           <div className="orb absolute top-[-60px] left-[-80px] w-[320px] h-[320px] bg-accent-cyan/[0.08] rounded-full blur-[80px] pointer-events-none" />
           <div className="orb absolute bottom-[-40px] right-[-60px] w-[280px] h-[280px] bg-accent-purple/[0.08] rounded-full blur-[70px] pointer-events-none" />
           <div className="orb absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[200px] bg-blue-500/[0.04] rounded-full blur-[90px] pointer-events-none" />
 
           <div className="relative">
-            <div className="inline-flex items-center gap-2 bg-accent-cyan/10 border border-accent-cyan/20 rounded-full px-4 py-1.5 text-sm text-accent-cyan mb-6">
-              <Sparkles size={14} className="animate-pulse" /> Technology + Interview Studio
-            </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-white via-cyan-300 to-purple-400 bg-clip-text text-transparent animate-slide-up">
-              Simple Yearly Pricing
-            </h1>
-            <p className="text-surface-400 text-lg max-w-2xl mx-auto animate-fade-in">
-              Subscribe per technology for lab scenarios, or choose an AI Interview Studio plan — both billed yearly.
-            </p>
+            <PageHeader
+              eyebrow="Technology + Interview Studio"
+              title="Simple Yearly Pricing"
+              subtitle="Subscribe per technology for lab scenarios, or choose an AI Interview Studio plan — both billed yearly."
+              className="text-center [&_.flex]:justify-center [&_h1]:mx-auto [&_p]:mx-auto"
+            />
           </div>
           <div className="flex flex-wrap justify-center gap-3 mt-6">
             <a href="#technology-pricing" className="btn-secondary text-sm">Technology labs</a>
@@ -554,7 +552,7 @@ export default function Pricing() {
         {/* Free vs Paid comparison */}
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-16">
           {/* Free */}
-          <div className="glass-card p-8 hover:border-surface-600/40 transition-all duration-500 group reveal reveal-delay-1">
+          <FixitPanel padding="p-8" className="hover:border-surface-600/40 transition-all duration-500 group reveal reveal-delay-1">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl bg-surface-700 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                 <Zap size={20} className="text-surface-300" />
@@ -577,10 +575,10 @@ export default function Pricing() {
                 Get started free
               </Link>
             </div>
-          </div>
+          </FixitPanel>
 
           {/* Paid */}
-          <div className="glass-card p-8 border-accent-cyan/20 bg-gradient-to-br from-accent-cyan/5 to-transparent hover:border-accent-cyan/40 transition-all duration-500 group hover:shadow-lg hover:shadow-accent-cyan/5 reveal reveal-delay-2 pricing-card-featured">
+          <FixitPanel padding="p-8" className="border-accent-cyan/20 bg-gradient-to-br from-accent-cyan/5 to-transparent hover:border-accent-cyan/40 transition-all duration-500 group hover:shadow-lg hover:shadow-accent-cyan/5 reveal reveal-delay-2 pricing-card-featured">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                 <Crown size={20} className="text-white" />
@@ -603,7 +601,7 @@ export default function Pricing() {
                 Browse technologies <ArrowRight size={14} className="inline ml-1" />
               </a>
             </div>
-          </div>
+          </FixitPanel>
         </div>
 
         {/* Technology pricing grid */}
@@ -626,9 +624,9 @@ export default function Pricing() {
 
             const revealDelay = ['reveal-delay-1','reveal-delay-2','reveal-delay-3','reveal-delay-4']
             return (
-              <div
+              <FixitPanel
                 key={tech.id}
-                className={`relative glass-card p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group reveal ${revealDelay[technologies.indexOf(tech) % revealDelay.length]} ${
+                className={`relative flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group reveal ${revealDelay[technologies.indexOf(tech) % revealDelay.length]} ${
                   subscribed
                     ? 'border-emerald-500/30 bg-emerald-500/5'
                     : inCart
@@ -725,7 +723,7 @@ export default function Pricing() {
                     </button>
                   </div>
                 )}
-              </div>
+              </FixitPanel>
             )
           })}
         </div>
@@ -761,9 +759,9 @@ export default function Pricing() {
             const planRevealDelays = ['reveal-delay-1', 'reveal-delay-2', 'reveal-delay-3']
 
             return (
-              <div
+              <FixitPanel
                 key={plan.code}
-                className={`relative glass-card p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 reveal ${planRevealDelays[planIdx] || 'reveal-delay-1'} ${
+                className={`relative flex flex-col transition-all duration-300 hover:-translate-y-1 reveal ${planRevealDelays[planIdx] || 'reveal-delay-1'} ${
                   isPro
                     ? 'border-indigo-500/40 bg-indigo-500/5 shadow-lg shadow-indigo-500/10 pricing-card-featured'
                     : 'hover:border-surface-600/60'
@@ -838,7 +836,7 @@ export default function Pricing() {
                     )}
                   </button>
                 )}
-              </div>
+              </FixitPanel>
             )
           })}
         </div>
@@ -877,7 +875,7 @@ export default function Pricing() {
                 const priceINR = tech.price || 499
                 const priceDisplay = getDisplayPrice(priceINR)
                 return (
-                  <div key={tech.id} className="glass-card p-4 flex items-center gap-3 animate-fade-in">
+                  <FixitPanel key={tech.id} padding="p-4" className="flex items-center gap-3 animate-fade-in">
                     <div className={`w-10 h-10 rounded-lg ${colors.bg} flex items-center justify-center shrink-0`}>
                       <Icon size={18} className={colors.text} />
                     </div>
@@ -894,7 +892,7 @@ export default function Pricing() {
                     <button onClick={() => removeFromCart(tech.id)} className="p-1 text-surface-500 hover:text-red-400 transition-colors shrink-0">
                       <X size={14} />
                     </button>
-                  </div>
+                  </FixitPanel>
                 )
               })}
             </div>

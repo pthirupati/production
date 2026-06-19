@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { AdminPageHeader } from '../../components/design'
 import { adminApi } from '../../api/admin'
 import toast from 'react-hot-toast'
 import {
   Users, Target, MonitorPlay, TrendingUp,
   Activity, CheckCircle2, XCircle, AlertCircle,
-  Mail, Server, RefreshCw, Globe,
+  Mail, Server, Globe,
   UserPlus, Play, CheckCircle, XOctagon,
   Send, Database, Wifi, MessageSquare, Cpu,
   DollarSign, UserCheck, Wrench,
@@ -85,7 +86,7 @@ function Delta({ value, suffix = '' }) {
 
 function StatCard({ label, value, sub, delta, deltaSuffix, icon: Icon, color, sparkColor, seed }) {
   return (
-    <div className="glass-card glass-card-hover p-5 flex flex-col gap-2 group">
+    <div className="fx-stat-card p-5 flex flex-col gap-2 group">
       <div className="flex items-center justify-between">
         <div className="p-2 rounded-lg bg-surface-800/60 group-hover:bg-surface-700/60 transition-colors">
           <Icon size={17} className={color} />
@@ -329,39 +330,12 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-7 animate-fade-in">
 
-      {/* ── Header ── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900/90 via-surface-900/70 to-surface-800/50 border border-surface-700/40 p-6">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent-purple/5 via-transparent to-accent-cyan/5 pointer-events-none" />
-        <div className="relative flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Activity size={14} className="text-accent-green" />
-              <span className="text-xs font-semibold text-accent-green/80 uppercase tracking-widest">Live Dashboard</span>
-            </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Admin Overview</h1>
-            <p className="text-surface-400 text-sm mt-1">Platform health, monitoring &amp; real-time statistics</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-4 px-4 py-2 rounded-xl bg-surface-800/60 border border-surface-700/40 text-xs text-surface-400">
-              <span>{overview?.users?.total?.toLocaleString() || 0} users</span>
-              <span className="w-px h-3 bg-surface-700" />
-              <span>{overview?.scenarios?.active || 0} scenarios</span>
-              <span className="w-px h-3 bg-surface-700" />
-              <span className={health?.overall ? 'text-accent-green' : 'text-accent-red'}>
-                {health?.overall ? '● Operational' : '⚠ Degraded'}
-              </span>
-            </div>
-            <button
-              onClick={() => fetchData(true)}
-              disabled={refreshing}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-800/60 border border-surface-700/40 text-surface-300 hover:text-white hover:border-accent-purple/50 transition-all text-sm disabled:opacity-50"
-            >
-              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-              Refresh
-            </button>
-          </div>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Admin Overview"
+        subtitle="Platform health, monitoring & real-time statistics"
+        onRefresh={() => fetchData(true)}
+        refreshing={refreshing}
+      />
 
       {/* ── KPI Stat Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

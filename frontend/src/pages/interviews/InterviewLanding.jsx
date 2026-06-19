@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import PublicLayout from '../../components/layout/PublicLayout'
+import { PageHeader } from '../../components/design'
 import { useAuthStore } from '../../store/authStore'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import {
@@ -128,20 +129,12 @@ export default function InterviewLanding() {
 
           {/* HERO */}
           <div className="text-center mb-16 animate-fade-in">
-            <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full px-4 py-1.5 text-sm text-indigo-400 mb-6">
-              <Sparkles size={14} className="animate-pulse" /> AI Interview Studio &middot; Now in Beta
-            </div>
-
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white mb-5 leading-tight">
-              Face-to-Face{' '}
-              <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                AI Video
-              </span>
-              {' '}Interviews
-            </h1>
-            <p className="text-surface-400 text-lg max-w-2xl mx-auto mb-8">
-              Not a chatbot. A real video call with an AI interviewer — camera on, mic live, multi-round, STAR-scored, with a verifiable certificate at the end.
-            </p>
+            <PageHeader
+              eyebrow="AI Interview Studio · Now in Beta"
+              title="Face-to-Face AI Video Interviews"
+              subtitle="Not a chatbot. A real video call with an AI interviewer — camera on, mic live, multi-round, STAR-scored, with a verifiable certificate at the end."
+              className="text-center [&_.flex]:justify-center [&_h1]:mx-auto [&_p]:mx-auto [&_h1]:text-4xl [&_h1]:sm:text-5xl [&_h1]:lg:text-6xl"
+            />
 
             {/* Feature pills */}
             <div className="flex flex-wrap justify-center gap-2 mb-8">

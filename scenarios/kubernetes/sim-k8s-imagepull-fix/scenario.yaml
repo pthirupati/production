@@ -1,0 +1,23 @@
+title: Deployment ImagePullBackOff
+slug: sim-k8s-imagepull-fix
+technology: Kubernetes
+category: Workloads
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 900
+max_score: 100
+jira_priority: Medium
+is_free: false
+description: |
+  The api deployment pods are stuck in ImagePullBackOff due to a bad image tag. Fix the
+  deployment image and verify pods reach Running state.
+objectives:
+  - Describe the failing pod and identify the bad image tag
+  - Patch the deployment to use api:v1
+  - Verify pods are Running
+initial_state: api deployment uses api:missing-tag.
+hints:
+  - content: Run `kubectl set image deployment/api api=api:v1`.
+    cost: 15
+    order: 1

@@ -4,6 +4,7 @@ import { authApi } from '../../api/auth'
 import { Mail, Lock, ArrowRight, AlertCircle, Phone, Eye, EyeOff, Check, X, ShieldCheck, ArrowLeft, Terminal, Server, Cloud, Activity, Shield } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { startOAuth } from '../../utils/oauth'
+import { AuthShell } from '../../components/design'
 
 /* ── Animated illustration for registration ── */
 function RegisterIllustration() {
@@ -338,90 +339,66 @@ export default function Register() {
   const currentStepIdx = stepIndicators.findIndex(s => s.key === step)
 
   return (
-    <div className="min-h-screen bg-surface-950 flex">
-      {/* Left panel — illustration (hidden on mobile) */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-[55%] bg-gradient-to-br from-surface-900 via-surface-950 to-surface-900 relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="glow-orb-cyan absolute top-1/4 left-1/3" />
-          <div className="glow-orb-purple absolute bottom-1/4 right-1/4" />
-          <div className="absolute inset-0 hero-grid" />
-        </div>
-        <RegisterIllustration />
-        <div className="absolute top-6 left-8 flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center shadow-lg shadow-accent-cyan/25">
-              <Terminal size={18} className="text-white" />
+    <AuthShell
+      title="Create your account"
+      subtitle="Start practicing real incident response"
+      illustration={<RegisterIllustration />}
+      footer={
+        <>
+          <p className="text-center text-sm text-surface-500 mt-6">
+            Already have an account?{' '}
+            <Link to="/login" className="text-accent-cyan hover:underline font-medium">Sign in</Link>
+          </p>
+          <div className="flex items-center justify-center gap-6 mt-8 text-surface-600">
+            <div className="flex items-center gap-1.5 text-xs">
+              <Shield size={12} /> SSL Encrypted
             </div>
-            <span className="text-xl font-bold text-white tracking-tight">FixitLab</span>
-          </Link>
-        </div>
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-surface-950 via-surface-950/80 to-transparent p-8 pt-20">
-          <p className="text-lg font-semibold text-white">Join 10,000+ engineers</p>
-          <p className="text-sm text-surface-400 mt-1">Free tier includes 5 challenges per day — no credit card required</p>
-        </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <Server size={12} /> Free Tier Available
+            </div>
+          </div>
+        </>
+      }
+    >
+      {/* Step indicator */}
+      <div className="flex items-center justify-center gap-2 mb-6">
+        {stepIndicators.map((s, i) => (
+          <div key={s.key} className="flex items-center gap-2">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+              i < currentStepIdx ? 'bg-accent-green text-black' :
+              i === currentStepIdx ? 'bg-accent-cyan text-black' :
+              'bg-surface-800 text-surface-500'
+            }`}>
+              {i < currentStepIdx ? <Check size={14} /> : i + 1}
+            </div>
+            <span className={`text-xs font-medium ${i <= currentStepIdx ? 'text-white' : 'text-surface-600'}`}>{s.label}</span>
+            {i < stepIndicators.length - 1 && (
+              <div className={`w-8 h-0.5 ${i < currentStepIdx ? 'bg-accent-green' : 'bg-surface-700'}`} />
+            )}
+          </div>
+        ))}
       </div>
 
-      {/* Right panel — register form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 relative overflow-y-auto">
-        {/* Mobile background */}
-        <div className="lg:hidden fixed inset-0 pointer-events-none">
-          <div className="absolute inset-0 hero-grid" />
-          <div className="glow-orb-cyan absolute top-1/3 right-1/4" />
-          <div className="glow-orb-purple absolute bottom-1/3 left-1/4" />
+      {error && (
+        <div className="flex items-center gap-2 bg-accent-red/10 border border-accent-red/20 text-accent-red text-sm p-3 rounded-lg mb-6 animate-slide-up">
+          <AlertCircle size={16} className="shrink-0" />
+          <span>{error}</span>
         </div>
+      )}
 
-      <div className="w-full max-w-md relative animate-fade-in">
-        <div className="text-center mb-8">
-          <Link to="/" className="lg:hidden inline-flex items-center gap-2 mb-6 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-cyan to-accent-blue flex items-center justify-center shadow-lg shadow-accent-cyan/25 group-hover:shadow-accent-cyan/40 transition-shadow">
-              <Terminal size={20} className="text-white" />
-            </div>
-            <span className="text-2xl font-bold text-white">FixitLab</span>
-          </Link>
-          <h1 className="text-2xl font-extrabold text-white mb-2">Create Account</h1>
-          <p className="text-surface-400">Start your hands-on learning journey</p>
+      {emailExists && step === 'email' && (
+        <div className="bg-accent-amber/10 border border-accent-amber/20 text-accent-amber text-sm p-4 rounded-lg mb-6 space-y-3 animate-slide-up">
+          <p>This email is already registered. Please sign in or reset your password.</p>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/login" className="btn-primary text-sm py-2 px-4">Sign in</Link>
+            <Link to="/forgot-password" className="btn-secondary text-sm py-2 px-4">Forgot password</Link>
+          </div>
         </div>
+      )}
 
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-2 mb-6">
-          {stepIndicators.map((s, i) => (
-            <div key={s.key} className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                i < currentStepIdx ? 'bg-accent-green text-black' :
-                i === currentStepIdx ? 'bg-accent-cyan text-black' :
-                'bg-surface-800 text-surface-500'
-              }`}>
-                {i < currentStepIdx ? <Check size={14} /> : i + 1}
-              </div>
-              <span className={`text-xs font-medium ${i <= currentStepIdx ? 'text-white' : 'text-surface-600'}`}>{s.label}</span>
-              {i < stepIndicators.length - 1 && (
-                <div className={`w-8 h-0.5 ${i < currentStepIdx ? 'bg-accent-green' : 'bg-surface-700'}`} />
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className="glass-card p-8">
-          {error && (
-            <div className="flex items-center gap-2 bg-accent-red/10 border border-accent-red/20 text-accent-red text-sm p-3 rounded-lg mb-6 animate-slide-up">
-              <AlertCircle size={16} className="shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {emailExists && step === 'email' && (
-            <div className="bg-accent-amber/10 border border-accent-amber/20 text-accent-amber text-sm p-4 rounded-lg mb-6 space-y-3 animate-slide-up">
-              <p>This email is already registered. Please sign in or reset your password.</p>
-              <div className="flex flex-wrap gap-3">
-                <Link to="/login" className="btn-primary text-sm py-2 px-4">Sign in</Link>
-                <Link to="/forgot-password" className="btn-secondary text-sm py-2 px-4">Forgot password</Link>
-              </div>
-            </div>
-          )}
-
-          {/* Step 1: Email */}
-          {step === 'email' && (
-            <form onSubmit={handleSendOTP} className="space-y-5">
+      {/* Step 1: Email */}
+      {step === 'email' && (
+        <form onSubmit={handleSendOTP} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-surface-300 mb-1.5">Email Address</label>
                 <div className="relative">
@@ -610,24 +587,6 @@ export default function Register() {
               </button>
             </form>
           )}
-        </div>
-
-        <p className="text-center text-sm text-surface-500 mt-6">
-          Already have an account?{' '}
-          <Link to="/login" className="text-accent-cyan hover:underline font-medium">Sign in</Link>
-        </p>
-
-        {/* Trust badges */}
-        <div className="flex items-center justify-center gap-6 mt-8 text-surface-600">
-          <div className="flex items-center gap-1.5 text-xs">
-            <Shield size={12} /> SSL Encrypted
-          </div>
-          <div className="flex items-center gap-1.5 text-xs">
-            <Server size={12} /> Free Tier Available
-          </div>
-        </div>
-      </div>
-      </div>
-    </div>
+    </AuthShell>
   )
 }

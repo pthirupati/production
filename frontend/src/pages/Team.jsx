@@ -7,7 +7,7 @@ import {
   Clock, Trash2, UserMinus, ChevronRight, X, BookOpen, FlaskConical, Webhook, Paintbrush
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import CompactPageHeader from '../components/CompactPageHeader'
+import { PageHeader } from '../components/design'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -182,11 +182,10 @@ export default function Team() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <CompactPageHeader
+      <PageHeader
+        eyebrow="Collaboration"
         title="My Team"
         subtitle="Organization access, member analytics, invites, and seat billing"
-        eyebrow="Collaboration"
-        icon={Users}
       />
 
       <div className="grid sm:grid-cols-2 gap-4">

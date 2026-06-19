@@ -3,10 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useDataStore } from '../store/dataStore'
 import {
   Server, Cloud, Globe, Monitor, Database, Cpu,
-  ArrowRight, Layers, Shield
+  ArrowRight, Shield
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import CompactPageHeader from '../components/CompactPageHeader'
+import { PageHeader, FixitPanel } from '../components/design'
 
 const techIcons = {
   Linux: Server,
@@ -58,18 +58,18 @@ export default function Technologies() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
-      <CompactPageHeader
+      <PageHeader
+        eyebrow="Learning paths"
         title="Technologies"
         subtitle="Choose a technology to explore its challenges"
-        eyebrow="Learning paths"
-        icon={Layers}
-      >
-        <Link to="/scenarios" className="text-sm text-surface-400 hover:text-accent-cyan transition-colors flex items-center gap-1 shrink-0">
-          View All Scenarios <ArrowRight size={14} />
-        </Link>
-      </CompactPageHeader>
+        actions={
+          <Link to="/scenarios" className="text-sm text-surface-400 hover:text-accent-cyan transition-colors flex items-center gap-1 shrink-0">
+            View All Scenarios <ArrowRight size={14} />
+          </Link>
+        }
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      <FixitPanel padding="p-5" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {sortedTechnologies.map(tech => {
           const Icon = techIcons[tech.name] || Server
           const colorClass = techColors[tech.color] || techColors.cyan
@@ -103,7 +103,7 @@ export default function Technologies() {
             </button>
           )
         })}
-      </div>
+      </FixitPanel>
     </div>
   )
 }

@@ -39,17 +39,17 @@ export default function JiraTicketPanel({
   return (
     <div
       id="jira-ticket-panel"
-      className={`border border-blue-500/25 bg-gradient-to-br from-blue-500/10 to-indigo-500/5 rounded-lg scroll-mt-4 ${compact ? 'p-3' : 'p-4 mb-6'}`}
+      className={`fx-panel scroll-mt-4 border-accent-purple/20 ${compact ? 'p-3' : 'p-4 mb-6'}`}
     >
       <div className="flex items-start gap-2">
-        <Ticket size={compact ? 16 : 18} className="text-blue-400 mt-0.5 shrink-0" />
+        <Ticket size={compact ? 16 : 18} className="text-accent-purple mt-0.5 shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className={`font-medium text-blue-400 uppercase tracking-wide ${compact ? 'text-[10px]' : 'text-xs'}`}>
+            <p className={`fx-page-eyebrow m-0 ${compact ? '!text-[10px]' : ''}`}>
               Incident ticket
             </p>
             {ticket.simulated && !infoMode && (
-              <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold">
+              <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent-cyan/15 text-accent-cyan font-semibold">
                 AI Lab
               </span>
             )}
@@ -95,7 +95,7 @@ export default function JiraTicketPanel({
                   type="button"
                   disabled={transitioning}
                   onClick={() => onTransition(status)}
-                  className="px-2.5 py-1 text-xs rounded border border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 disabled:opacity-50"
+                  className="px-2.5 py-1 text-xs rounded-lg border border-accent-purple/30 bg-accent-purple/10 text-accent-purple hover:bg-accent-purple/20 disabled:opacity-50 transition-colors"
                 >
                   → {status}
                 </button>
@@ -105,7 +105,7 @@ export default function JiraTicketPanel({
           {!infoMode && (
             <Link
               to={issueUrl.startsWith('/') ? issueUrl : `/jira/${ticket.issue_key}`}
-              className="inline-flex items-center gap-1 text-xs text-blue-300 hover:underline mt-2"
+              className="inline-flex items-center gap-1 text-xs text-accent-cyan hover:underline mt-2"
             >
               Open full Jira view <ExternalLink size={12} />
             </Link>
@@ -130,7 +130,7 @@ export default function JiraTicketPanel({
       )}
 
       {((!hideComments && comments.length > 0) || (!hideHistory && activity.length > 0)) && !infoMode && (
-        <div className={`mt-3 pt-3 border-t border-blue-500/15 ${compact ? 'space-y-2' : 'space-y-3'}`}>
+        <div className={`mt-3 pt-3 border-t border-white/[0.06] ${compact ? 'space-y-2' : 'space-y-3'}`}>
           {!hideHistory && activity.length > 0 && (
             <div className="space-y-2">
               <p className="text-[10px] uppercase tracking-wide text-surface-500 flex items-center gap-1">

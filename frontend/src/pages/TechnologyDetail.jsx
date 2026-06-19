@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import StickyPageToolbar from '../components/StickyPageToolbar'
+import { PageHeader } from '../components/design'
 
 const difficultyConfig = {
   easy:   { label: 'Easy',   bg: 'bg-green-500/10 text-green-400 border-green-500/20' },
@@ -241,17 +242,18 @@ export default function TechnologyDetail() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-4 animate-fade-in">
+      <PageHeader
+        eyebrow="Learning paths"
+        title={tech.name}
+        subtitle={tech.description}
+      />
+
       <StickyPageToolbar className="space-y-3">
         <button type="button" onClick={() => navigate('/technologies')} className="text-sm text-surface-400 hover:text-accent-cyan flex items-center gap-1">
           <ChevronLeft size={16} /> All technologies
         </button>
         <div className="glass-card p-6">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-white truncate">{tech.name}</h1>
-              <p className="text-sm text-surface-400 mt-1 max-w-xl">{tech.description}</p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
               {tech.difficulty_counts && Object.entries(tech.difficulty_counts).map(([diff, count]) =>
                 count > 0 ? (
                   <div key={diff} className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${difficultyConfig[diff]?.bg || ''}`}>
@@ -264,7 +266,6 @@ export default function TechnologyDetail() {
                   <FolderKanban size={11} className="inline mr-1" />{projects.length} Project{projects.length !== 1 ? 's' : ''}
                 </div>
               )}
-            </div>
           </div>
 
           {/* Tabs */}

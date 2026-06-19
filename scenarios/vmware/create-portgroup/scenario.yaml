@@ -1,0 +1,22 @@
+title: Create Missing Distributed Port Group
+slug: vmware-create-portgroup
+category: VMware Networking
+description: |
+  A new VLAN Prod-VLAN-200 port group is required on dvSwitch-Prod but was never created.
+  Create the port group so VMs can be migrated to the correct network segment.
+difficulty: easy
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: Medium
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Identify the missing Prod-VLAN-200 port group
+  - Create the port group on the distributed switch
+  - Verify it appears in network inventory
+initial_state: Prod-VLAN-200 port group missing from dvSwitch-Prod.
+hints:
+  - content: Networking → dvSwitch-Prod → Add Networking / Create Port Group.
+    cost: 10
+    order: 1

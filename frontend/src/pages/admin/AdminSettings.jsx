@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { Wrench, AlertTriangle, Save, ToggleLeft, ToggleRight, Mail, Settings, Trash2, Bot, Shield, Eye, EyeOff, RefreshCw, CheckCircle2, KeyRound, Database, Zap, CreditCard } from 'lucide-react'
+import { AdminPageHeader } from '../../components/design'
+import { Wrench, AlertTriangle, Save, ToggleLeft, ToggleRight, Mail, Trash2, Bot, Shield, Eye, EyeOff, RefreshCw, CheckCircle2, KeyRound, Database, Zap, CreditCard } from 'lucide-react'
 import { IMAGE_UPLOAD_HINTS } from '../../utils/mediaUrl'
 import toast from 'react-hot-toast'
 
@@ -188,18 +189,15 @@ export default function AdminSettings() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Settings size={24} className="text-accent-cyan" />
-            Platform Settings
-          </h1>
-          <p className="text-surface-400 mt-1">Maintenance mode, email configuration, and user management</p>
-        </div>
-        <button type="button" onClick={handleResetDefaults} disabled={saving} className="btn-secondary text-sm flex items-center gap-2">
-          <Wrench size={14} /> Reset settings to normal
-        </button>
-      </div>
+      <AdminPageHeader
+        title="Platform Settings"
+        subtitle="Maintenance mode, email configuration, and user management"
+        actions={
+          <button type="button" onClick={handleResetDefaults} disabled={saving} className="btn-secondary text-sm flex items-center gap-2">
+            <Wrench size={14} /> Reset settings to normal
+          </button>
+        }
+      />
 
       {/* Maintenance Mode */}
       <div className="glass-card p-6 space-y-4">

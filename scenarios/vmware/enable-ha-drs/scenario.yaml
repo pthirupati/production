@@ -1,0 +1,25 @@
+title: Enable HA and DRS on Production Cluster
+slug: vmware-enable-ha-drs
+category: VMware vSphere
+description: |
+  Cluster-01 has both vSphere HA and DRS disabled after maintenance. Re-enable HA protection
+  and DRS balancing for production workloads.
+difficulty: medium
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Open cluster Configure tab and verify HA and DRS are off
+  - Enable vSphere HA on Cluster-01
+  - Enable vSphere DRS and run an initial balance
+initial_state: Cluster-01 HA and DRS disabled; hosts imbalanced.
+hints:
+  - content: Cluster → Configure → vSphere Availability → Enable HA.
+    cost: 10
+    order: 1
+  - content: Configure → vSphere DRS → Enable, then Run DRS Now from cluster actions.
+    cost: 15
+    order: 2

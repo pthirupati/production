@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { adminApi } from '../../api/admin'
+import { AdminPageHeader } from '../../components/design'
 import { scenarioApi } from '../../api/scenarios'
 import {
   CreditCard, IndianRupee, DollarSign, Users, Search, Download,
@@ -151,7 +152,7 @@ function TechDetailView({ tech, onBack }) {
           { label: 'Revenue', value: data ? `₹${Math.round(data.total_revenue).toLocaleString('en-IN')}` : tech.revenue_display, color: 'text-accent-green', icon: IndianRupee },
           { label: 'Price', value: `₹${Number(tech.price).toLocaleString('en-IN')}`, color: 'text-accent-purple', icon: TrendingUp },
         ].map(({ label, value, color, icon: Icon }) => (
-          <div key={label} className="glass-card p-4">
+          <div key={label} className="fx-stat-card p-4">
             <Icon size={16} className={`${color} mb-1`} />
             <p className={`text-xl font-bold ${color}`}>{value}</p>
             <p className="text-xs text-surface-500">{label}</p>
@@ -196,7 +197,7 @@ function TechDetailView({ tech, onBack }) {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="fx-admin-table">
                 <thead>
                   <tr className="border-b border-surface-700/40">
                     <th className="text-left p-3 text-xs text-surface-400 font-medium">User</th>
@@ -485,49 +486,48 @@ export default function AdminSubscriptions() {
     const hasActiveFilters = debouncedSearch || statusFilter !== 'all' || techFilter || dateFrom || dateTo
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <button onClick={() => setView('overview')} className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-all">
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-white">All Subscription Logs</h1>
-            <p className="text-sm text-surface-400">Detailed transaction log with filters</p>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <div className="flex bg-surface-800 rounded-lg border border-surface-700/40 overflow-hidden">
-              {['INR', 'USD'].map(c => (
-                <button key={c} onClick={() => setCurrency(c)}
-                  className={`px-3 py-1.5 text-xs font-medium flex items-center gap-1 transition-all ${currency === c ? 'bg-accent-cyan/20 text-accent-cyan' : 'text-surface-400 hover:text-surface-200'}`}>
-                  {c === 'INR' ? <IndianRupee size={12} /> : <DollarSign size={12} />} {c}
-                </button>
-              ))}
-            </div>
-            <button onClick={loadLogs} className="p-2 text-surface-400 hover:text-surface-200 hover:bg-surface-800 rounded-lg" title="Refresh">
-              <RefreshCw size={16} className={logsLoading ? 'animate-spin' : ''} />
-            </button>
-            <button onClick={handleExportCSV} className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-1.5">
-              <Download size={14} /> CSV
-            </button>
-          </div>
-        </div>
+        <AdminPageHeader
+          title="All Subscription Logs"
+          subtitle="Detailed transaction log with filters"
+          onRefresh={loadLogs}
+          refreshing={logsLoading}
+          actions={
+            <>
+              <button onClick={() => setView('overview')} className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-all">
+                <ArrowLeft size={18} />
+              </button>
+              <div className="flex bg-surface-800 rounded-lg border border-surface-700/40 overflow-hidden">
+                {['INR', 'USD'].map(c => (
+                  <button key={c} onClick={() => setCurrency(c)}
+                    className={`px-3 py-1.5 text-xs font-medium flex items-center gap-1 transition-all ${currency === c ? 'bg-accent-cyan/20 text-accent-cyan' : 'text-surface-400 hover:text-surface-200'}`}>
+                    {c === 'INR' ? <IndianRupee size={12} /> : <DollarSign size={12} />} {c}
+                  </button>
+                ))}
+              </div>
+              <button onClick={handleExportCSV} className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-1.5">
+                <Download size={14} /> CSV
+              </button>
+            </>
+          }
+        />
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="glass-card p-4">
+          <div className="fx-stat-card p-4">
             <CurrencyIcon size={18} className="text-accent-green mb-1" />
             <p className="text-xl font-bold">{currencySymbol}{typeof stats.total_revenue === 'number' ? stats.total_revenue.toLocaleString(undefined, { maximumFractionDigits: 2 }) : stats.total_revenue}</p>
             <p className="text-xs text-surface-400">Total Revenue ({currency})</p>
           </div>
-          <div className="glass-card p-4">
+          <div className="fx-stat-card p-4">
             <CreditCard size={18} className="text-accent-cyan mb-1" />
             <p className="text-xl font-bold">{stats.active_count}</p>
             <p className="text-xs text-surface-400">Active Subscriptions</p>
           </div>
-          <div className="glass-card p-4">
+          <div className="fx-stat-card p-4">
             <Users size={18} className="text-accent-amber mb-1" />
             <p className="text-xl font-bold">{new Set(logs.map(l => l.user?.id)).size}</p>
             <p className="text-xs text-surface-400">Unique Subscribers</p>
           </div>
-          <div className="glass-card p-4">
+          <div className="fx-stat-card p-4">
             <BadgeCheck size={18} className="text-accent-purple mb-1" />
             <p className="text-xl font-bold">{logs.filter(l => l.payment_verified).length}</p>
             <p className="text-xs text-surface-400">Verified Payments</p>
@@ -557,7 +557,7 @@ export default function AdminSubscriptions() {
         <div className="glass-card overflow-hidden">
           {logsLoading && <div className="h-0.5 bg-accent-cyan/60 animate-shimmer" />}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="fx-admin-table">
               <thead>
                 <tr className="border-b border-surface-700">
                   <th className="text-left p-3 text-surface-400 font-medium text-xs">Sub ID</th>
@@ -599,55 +599,52 @@ export default function AdminSubscriptions() {
   // ─── Overview ──────────────────────────────────────────────────────
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Subscriptions</h1>
-          <p className="text-surface-400 mt-1">Revenue, subscriber management, maintenance, and email campaigns by technology</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={loadTechStats} className="p-2 text-surface-400 hover:text-surface-200 hover:bg-surface-800 rounded-lg" title="Refresh">
-            <RefreshCw size={16} className={techStatsLoading ? 'animate-spin' : ''} />
-          </button>
+      <AdminPageHeader
+        title="Subscriptions"
+        subtitle="Revenue, subscriber management, maintenance, and email campaigns by technology"
+        onRefresh={loadTechStats}
+        refreshing={techStatsLoading}
+        actions={
           <button onClick={openLogs} className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-1.5">
             <BarChart3 size={14} /> All Logs
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Platform stats strip */}
       {techStats && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <div className="glass-card p-4">
+          <div className="fx-stat-card p-4">
             <IndianRupee size={18} className="text-accent-green mb-1" />
             <p className="text-xl font-bold text-accent-green">₹{Math.round(techStats.total_revenue_inr).toLocaleString('en-IN')}</p>
             <p className="text-xs text-surface-400">Total Revenue</p>
           </div>
-          <div className="glass-card p-4">
+          <div className="fx-stat-card p-4">
             <Users size={18} className="text-accent-cyan mb-1" />
             <p className="text-xl font-bold text-accent-cyan">{techStats.total_active_subscribers}</p>
             <p className="text-xs text-surface-400">Active Subscribers</p>
           </div>
-          <div className="glass-card p-4">
+          <div className="fx-stat-card p-4">
             <UserIcon size={18} className="text-accent-blue mb-1" />
             <p className="text-xl font-bold text-accent-blue">{techStats.total_unique_subscribers ?? techStats.total_active_subscribers}</p>
             <p className="text-xs text-surface-400">Unique Users</p>
           </div>
-          <div className="glass-card p-4">
+          <div className="fx-stat-card p-4">
             <UserIcon size={18} className="text-accent-amber mb-1" />
             <p className="text-xl font-bold text-accent-amber">{techStats.total_free_users ?? 0}</p>
             <p className="text-xs text-surface-400">Free / Complimentary</p>
           </div>
-          <div className="glass-card p-4">
+          <div className="fx-stat-card p-4">
             <Layers size={18} className="text-accent-purple mb-1" />
             <p className="text-xl font-bold text-accent-purple">{techStats.technologies?.length || 0}</p>
             <p className="text-xs text-surface-400">Technologies</p>
           </div>
-          <div className="glass-card p-4">
+          <div className="fx-stat-card p-4">
             <WrenchIcon size={18} className="text-amber-400 mb-1" />
             <p className="text-xl font-bold text-amber-400">{techStats.maintenance_technologies ?? 0}</p>
             <p className="text-xs text-surface-400">In Maintenance</p>
           </div>
-          <div className="glass-card p-4">
+          <div className="fx-stat-card p-4">
             <Clock size={18} className="text-surface-400 mb-1" />
             <p className="text-xl font-bold text-surface-300">{techStats.coming_soon_technologies ?? 0}</p>
             <p className="text-xs text-surface-400">Coming Soon</p>

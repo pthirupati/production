@@ -9,7 +9,7 @@ import {
   Play, CheckCircle2, Headphones, AlertCircle, Trash2, X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import CompactPageHeader from '../../components/CompactPageHeader'
+import { PageHeader } from '../../components/design'
 
 const STATUS_COLORS = {
   draft: 'text-surface-400',
@@ -169,19 +169,19 @@ export default function InterviewHub() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
-      <CompactPageHeader
+      <PageHeader
+        eyebrow="AI Interview Studio"
         title="Mock interviews that feel real"
         subtitle="Multi-round voice interviews with resume-aware questions, scheduling, and certificates."
-        eyebrow="AI Interview Studio"
-        icon={Mic}
-      >
-        <Link
-          to="/interviews/setup"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-medium hover:opacity-90 shrink-0"
-        >
-          <Plus size={16} /> New interview
-        </Link>
-      </CompactPageHeader>
+        actions={
+          <Link
+            to="/interviews/setup"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-medium hover:opacity-90 shrink-0"
+          >
+            <Plus size={16} /> New interview
+          </Link>
+        }
+      />
 
       {/* Free sample interview */}
       {showSample && (

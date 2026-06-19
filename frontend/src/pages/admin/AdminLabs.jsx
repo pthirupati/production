@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { adminApi } from '../../api/admin'
+import { AdminPageHeader } from '../../components/design'
 import { MonitorPlay, StopCircle, Trash2, Clock, CheckSquare, Square, MinusSquare } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ConfirmModal, { ConfirmDialog } from '../../components/ConfirmModal'
@@ -82,25 +83,25 @@ export default function AdminLabs() {
 
   return (
     <div className="space-y-4 sm:space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white">Active Labs</h1>
-          <p className="text-surface-400 mt-1 text-sm">{labs.length} lab(s) shown</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 text-sm text-surface-400">
-            <input type="checkbox" checked={includeExpired} onChange={e => setIncludeExpired(e.target.checked)} />
-            Show expired
-          </label>
-          <button
-            type="button"
-            onClick={() => setBulkConfirm({ action: 'terminate_expired' })}
-            className="btn-danger flex items-center gap-2 text-sm"
-          >
-            <Trash2 size={16} /> Terminate expired
-          </button>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Active Labs"
+        subtitle={`${labs.length} lab(s) shown`}
+        actions={
+          <>
+            <label className="flex items-center gap-2 text-sm text-surface-400">
+              <input type="checkbox" checked={includeExpired} onChange={e => setIncludeExpired(e.target.checked)} />
+              Show expired
+            </label>
+            <button
+              type="button"
+              onClick={() => setBulkConfirm({ action: 'terminate_expired' })}
+              className="btn-danger flex items-center gap-2 text-sm"
+            >
+              <Trash2 size={16} /> Terminate expired
+            </button>
+          </>
+        }
+      />
 
       {someSelected && (
         <div className="glass-card p-3 flex flex-wrap items-center gap-2 border border-accent-purple/30">
@@ -127,7 +128,7 @@ export default function AdminLabs() {
             No active labs
           </div>
         ) : (
-          <table className="w-full min-w-[720px]">
+          <table className="fx-admin-table min-w-[720px]">
             <thead>
               <tr className="border-b border-surface-700/50 text-left">
                 <th className="px-3 py-3 w-10">

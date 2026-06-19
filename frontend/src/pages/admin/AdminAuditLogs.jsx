@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { ScrollText, RefreshCw, Filter } from 'lucide-react'
+import { AdminPageHeader } from '../../components/design'
 import toast from 'react-hot-toast'
 
 export default function AdminAuditLogs() {
@@ -31,17 +31,12 @@ export default function AdminAuditLogs() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <ScrollText size={22} className="text-accent-cyan" /> Audit Logs
-          </h1>
-          <p className="text-surface-400 mt-1">Admin actions, logins, lab events, and complimentary access grants</p>
-        </div>
-        <button onClick={loadData} className="btn-secondary text-sm flex items-center gap-2">
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
-        </button>
-      </div>
+      <AdminPageHeader
+        title="Audit Logs"
+        subtitle="Admin actions, logins, lab events, and complimentary access grants"
+        onRefresh={loadData}
+        refreshing={loading}
+      />
 
       <div className="flex flex-wrap gap-3">
         <select value={days} onChange={e => setDays(Number(e.target.value))} className="input-field text-sm w-auto">
@@ -90,7 +85,7 @@ export default function AdminAuditLogs() {
           <div className="p-12 text-center text-surface-400">Loading audit logs...</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="fx-admin-table">
               <thead>
                 <tr className="border-b border-surface-700">
                   <th className="text-left p-3 text-surface-400 font-medium">Time</th>

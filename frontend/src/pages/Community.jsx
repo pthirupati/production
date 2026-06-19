@@ -12,6 +12,7 @@ import { resolveMediaUrl, IMAGE_UPLOAD_HINTS } from '../utils/mediaUrl'
 import Pagination from '../components/Pagination'
 import StickyPageToolbar from '../components/StickyPageToolbar'
 import { useScrollHideToolbar } from '../hooks/useScrollHideToolbar'
+import { PageHeader } from '../components/design'
 
 function timeAgo(dateStr) {
   const d = new Date(dateStr)
@@ -351,32 +352,21 @@ export default function Community() {
 
   return (
     <div className="space-y-5">
-      <StickyPageToolbar hidden={toolbarHidden} toolbarRef={toolbarRef} className="space-y-3">
-        {/* ── Header ─────────────────────────────────────────── */}
-        <div className="relative overflow-hidden glass-card p-6 sm:p-7">
-          <div className="absolute inset-0 bg-gradient-to-r from-accent-cyan/8 via-transparent to-accent-purple/8 pointer-events-none" />
-          <div className="absolute inset-0 bg-dots-pattern opacity-20 pointer-events-none" />
-          <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-accent-cyan/10 border border-accent-cyan/20 flex items-center justify-center shrink-0">
-                  <MessageSquare size={20} className="text-accent-cyan" />
-                </div>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan to-accent-purple">
-                  Community
-                </span>
-              </h1>
-              <p className="text-surface-400 mt-1.5 text-sm ml-[3.25rem]">Ask questions, share knowledge, and help others</p>
-            </div>
-            <button
-              onClick={() => setShowNewThread(true)}
-              className="btn-primary flex items-center gap-2 shrink-0 self-start sm:self-auto"
-            >
-              <Plus size={16} /> New Thread
-            </button>
-          </div>
-        </div>
+      <PageHeader
+        eyebrow="Community"
+        title="Community"
+        subtitle="Ask questions, share knowledge, and help others"
+        actions={
+          <button
+            onClick={() => setShowNewThread(true)}
+            className="btn-primary flex items-center gap-2 shrink-0"
+          >
+            <Plus size={16} /> New Thread
+          </button>
+        }
+      />
 
+      <StickyPageToolbar hidden={toolbarHidden} toolbarRef={toolbarRef} className="space-y-3">
         {/* ── Search + tech filter ────────────────────────────── */}
         <div className="flex gap-3">
           <div className="relative flex-1">

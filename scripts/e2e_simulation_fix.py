@@ -139,7 +139,19 @@ def apply_simulation_fix(session) -> tuple[bool, str]:
             return True, "postgresql started"
 
         if "docker" in slug:
-            shell.run("docker start web")
+            if "daemon-stopped" in slug or "stopped" in slug:
+                shell.run("systemctl start docker")
+            elif "exited" in slug or "container" in slug:
+                shell.run("docker start web")
+            elif "pull" in slug:
+                shell.run("docker pull nginx:latest")
+            elif "network" in slug:
+                shell.run("docker network connect bridge web")
+                engine._docker_network_fixed = True
+            elif "compose" in slug:
+                shell.run("docker compose up -d")
+            else:
+                shell.run("docker start web")
             engine._container_running = True
             docker_svc = state.services.get("docker")
             if docker_svc:
@@ -151,15 +163,36 @@ def apply_simulation_fix(session) -> tuple[bool, str]:
             shell.run("kubectl patch service api -p '{\"spec\":{\"selector\":{\"app\":\"api\"}}}'")
             return True, "k8s endpoints fixed"
 
+        sim_type = getattr(session.scenario, "simulation_type", "") or ""
+        if sim_type == "vmware" or "vmware" in slug:
+            from e2e_vmware_fix import apply_vmware_simulation_fix
+            return apply_vmware_simulation_fix(session)
+
         if "crashloop" in slug or ("k8s" in slug and "pod" in slug):
             shell.run("kubectl rollout restart deployment/nginx")
             return True, "k8s pods fixed"
+
+        if "node-notready" in slug:
+            shell.run("kubectl uncordon worker-1")
+            return True, "k8s node fixed"
+
+        if "configmap" in slug:
+            shell.run("kubectl create configmap app-config --from-literal=key=value")
+            return True, "k8s configmap fixed"
+
+        if "imagepull" in slug or "image-pull" in slug:
+            shell.run("kubectl set image deployment/api api=api:v1")
+            return True, "k8s image pull fixed"
+
+        if "rbac" in slug:
+            shell.run("kubectl create rolebinding fix --clusterrole=edit --serviceaccount=default:default")
+            return True, "k8s rbac fixed"
 
         if "k8s" in slug or "kubernetes" in slug:
             shell.run("kubectl rollout restart deployment/nginx")
             return True, "k8s fixed"
 
-        if "ipmi" in slug or "baremetal" in slug or "vmware" in slug:
+        if "ipmi" in slug or "baremetal" in slug:
             shell.run("ipmitool power on")
             engine._power_state = "on"
             return True, "power on"

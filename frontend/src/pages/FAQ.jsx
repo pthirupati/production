@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
+import MarketingPageShell from '../components/MarketingPageShell'
+import { FixitPanel } from '../components/design'
 import {
   HelpCircle, ChevronDown, Search, X,
   Rocket, CreditCard, Terminal, Brain, Award, UserCircle
@@ -138,7 +140,7 @@ const FAQ_ITEMS = [
 function FAQItem({ question, answer }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className={`glass-card overflow-hidden transition-all duration-200 ${open ? 'border-accent-cyan/30' : ''}`}>
+    <FixitPanel padding="p-0" className={`overflow-hidden transition-all duration-200 ${open ? 'border-accent-cyan/30' : ''}`}>
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between p-5 text-left gap-4 hover:bg-surface-800/30 transition-colors group"
@@ -153,7 +155,7 @@ function FAQItem({ question, answer }) {
           <div className="pt-4">{answer}</div>
         </div>
       </div>
-    </div>
+    </FixitPanel>
   )
 }
 
@@ -175,62 +177,54 @@ export default function FAQ() {
 
   return (
     <PublicLayout>
-      {/* ── Hero ──────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden py-20 aurora-bg">
-        <div className="absolute inset-0 hero-grid opacity-40 pointer-events-none" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-accent-cyan/6 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="max-w-3xl mx-auto px-6 text-center relative animate-fade-in">
-          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-accent-cyan/20 to-accent-blue/20 border border-accent-cyan/20 flex items-center justify-center">
-            <HelpCircle size={30} className="text-accent-cyan" />
-          </div>
-          <h1 className="text-5xl font-extrabold text-white mb-3 tracking-tight">
+      <MarketingPageShell
+        narrow
+        eyebrow="Help center"
+        title={
+          <>
             Frequently Asked{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan to-accent-blue">
               Questions
             </span>
-          </h1>
-          <p className="text-surface-400 mb-8 text-lg">Find answers to common questions about FixitLab</p>
-
-          {/* Search input */}
-          <div className="relative max-w-xl mx-auto">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search questions..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="input-field pl-11 pr-11 py-3 w-full text-base"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-md text-surface-400 hover:text-white hover:bg-surface-700 transition-colors"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
+          </>
+        }
+        subtitle="Find answers to common questions about FixitLab"
+      >
+        {/* Search */}
+        <div className="relative max-w-xl mx-auto mb-12 -mt-4">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search questions..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="input-field pl-11 pr-11 py-3 w-full text-base"
+          />
           {search && (
-            <p className="text-sm text-surface-500 mt-3">
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-md text-surface-400 hover:text-white hover:bg-surface-700 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          )}
+          {search && (
+            <p className="text-sm text-surface-500 mt-3 text-center">
               {totalResults === 0
                 ? 'No results found'
                 : `${totalResults} result${totalResults !== 1 ? 's' : ''} for "${search}"`}
             </p>
           )}
         </div>
-      </section>
 
-      {/* ── FAQ body ──────────────────────────────────────────── */}
-      <div className="max-w-4xl mx-auto px-6 pb-24 animate-slide-up">
         {filtered.length === 0 ? (
-          <div className="glass-card p-12 text-center">
+          <FixitPanel padding="p-12" className="text-center">
             <HelpCircle size={40} className="text-surface-500 mx-auto mb-3" />
             <p className="text-surface-400">No questions match your search. Try different keywords.</p>
             <button onClick={() => setSearch('')} className="btn-secondary mt-4 text-sm">Clear search</button>
-          </div>
+          </FixitPanel>
         ) : (
-          <div className="space-y-10">
+          <div className="space-y-10 animate-slide-up">
             {filtered.map((cat, catIdx) => {
               const meta = CATEGORY_META[cat.category] || {
                 icon: HelpCircle,
@@ -242,7 +236,6 @@ export default function FAQ() {
               const catRevealDelays = ['reveal-delay-1','reveal-delay-2','reveal-delay-3','reveal-delay-4','reveal-delay-5','reveal-delay-6']
               return (
                 <div key={cat.category} className={`reveal ${catRevealDelays[catIdx % catRevealDelays.length]}`}>
-                  {/* Category header */}
                   <div className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-xl ${meta.bg} border ${meta.border} mb-4`}>
                     <Icon size={16} className={meta.color} />
                     <h2 className={`text-sm font-bold ${meta.color}`}>{cat.category}</h2>
@@ -266,9 +259,8 @@ export default function FAQ() {
           </div>
         )}
 
-        {/* CTA card */}
-        <div className="mt-14 gradient-border glass-card p-8 text-center relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/5 via-transparent to-accent-purple/5 rounded-xl pointer-events-none" />
+        <FixitPanel hero padding="p-8" className="mt-14 text-center relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/5 via-transparent to-accent-purple/5 pointer-events-none" />
           <div className="relative">
             <HelpCircle size={28} className="text-accent-cyan mx-auto mb-3" />
             <h3 className="text-xl font-bold text-white mb-2">Still have questions?</h3>
@@ -277,8 +269,8 @@ export default function FAQ() {
               Contact Support
             </a>
           </div>
-        </div>
-      </div>
+        </FixitPanel>
+      </MarketingPageShell>
     </PublicLayout>
   )
 }

@@ -1,31 +1,195 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
-import { ArrowLeft, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
+import MarketingPageShell from '../components/MarketingPageShell'
+import { FixitPanel } from '../components/design'
 
-function markdownToHtml(md) {
-  if (!md) return ''
-  return md
-    // Headings
-    .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold text-white mt-6 mb-2">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold text-accent-cyan mt-8 mb-3">$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-black text-white mt-8 mb-4">$1</h1>')
-    // Bold
-    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
-    // Italic
-    .replace(/\*(.+?)\*/g, '<em class="text-surface-300 italic">$1</em>')
-    // Inline code
-    .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 bg-surface-800 rounded text-accent-green font-mono text-sm">$1</code>')
-    // Unordered list items
-    .replace(/^- (.+)$/gm, '<li class="flex items-start gap-2 text-surface-300"><span class="text-accent-cyan mt-1.5 shrink-0">&#x2022;</span><span>$1</span></li>')
-    // Wrap consecutive li elements
-    .replace(/(<li[^>]*>.*?<\/li>\n?)+/gs, '<ul class="space-y-1.5 my-3">$&</ul>')
-    // Horizontal rules
-    .replace(/^---$/gm, '<hr class="border-surface-700/50 my-6" />')
-    // Paragraphs: lines that aren't html tags
-    .replace(/^(?!<[a-z])(.+)$/gm, '<p class="text-surface-300 leading-relaxed">$1</p>')
-    // Collapse multiple blank lines
-    .replace(/\n{3,}/g, '\n\n')
+const TAG_META = {
+  New: { color: 'text-accent-green', bg: 'bg-accent-green/14', border: 'border-accent-green/30', dot: '#56e0b0' },
+  Improved: { color: 'text-accent-blue', bg: 'bg-accent-blue/14', border: 'border-accent-blue/30', dot: '#49b5ff' },
+  Fixed: { color: 'text-accent-amber', bg: 'bg-accent-amber/14', border: 'border-accent-amber/30', dot: '#feb155' },
+}
+
+const DOT_COLORS = ['#56e0b0', '#b266e0', '#49b5ff', '#56e0b0', '#49b5ff']
+
+const FALLBACK_RELEASES = [
+  {
+    version: 'v2.4',
+    tag: 'New',
+    date: 'June 2026',
+    title: 'Teams, coupons & security',
+    dotColor: '#56e0b0',
+    items: [
+      'Enterprise seat licensing with org invites and per-member analytics',
+      'Coupon codes at checkout for technology and interview plans',
+      'Admin security dashboards, audit logs, and rate limiting',
+      'Community threads now support screenshot attachments',
+    ],
+  },
+  {
+    version: 'v2.3',
+    tag: 'New',
+    date: 'May 2026',
+    title: 'AI Interview Studio',
+    dotColor: '#b266e0',
+    items: [
+      'Multi-round voice mock interviews (technical, manager, HR, leadership)',
+      'Resume-aware questions with adaptive STAR scoring and reports',
+      'FIXIT-INT certificates with public verification',
+      'Pro and Premium interview plans, separate from lab subscriptions',
+    ],
+  },
+  {
+    version: 'v2.2',
+    tag: 'New',
+    date: 'April 2026',
+    title: 'Jira incident workflow',
+    dotColor: '#56e0b0',
+    items: [
+      'Personal Jira ticket per learner per scenario with status timeline',
+      'Bot account creates and transitions issues via the Jira REST API',
+      'Bidirectional webhook sync of status and comments',
+      'Built-in AI-powered mode when Jira is not configured',
+    ],
+  },
+  {
+    version: 'v2.1',
+    tag: 'Improved',
+    date: 'March 2026',
+    title: 'Cloud labs & faster spin-up',
+    dotColor: '#49b5ff',
+    items: [
+      'AWS EC2 and DigitalOcean lab modes for cloud-native scenarios',
+      'Instant AI-powered RHEL environments — ready in seconds',
+      'Dual-pane terminals and SSH-client scenarios for networking',
+      'Per-scenario blocked-command guardrails and session recording',
+    ],
+  },
+  {
+    version: 'v2.0',
+    tag: 'New',
+    date: 'February 2026',
+    title: 'Browser terminal labs',
+    dotColor: '#56e0b0',
+    items: [
+      'Full xterm.js shell over WebSocket — real commands in any browser',
+      'Auto-validation checks your fix inside the environment',
+      'Global and per-technology leaderboards with timed scoring',
+      'Bookmarks, achievements, and downloadable completion certificates',
+    ],
+  },
+]
+
+function detectTag(text) {
+  const match = text.match(/\b(New|Improved|Fixed)\b/i)
+  if (match) return match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase()
+  if (/\b(improved|enhancement|enhanced)\b/i.test(text)) return 'Improved'
+  if (/\b(fixed|fix|bug)\b/i.test(text)) return 'Fixed'
+  return 'New'
+}
+
+function parseChangelog(md) {
+  if (!md || typeof md !== 'string') return FALLBACK_RELEASES
+
+  const trimmed = md.trim()
+  if (!trimmed.includes('## ')) return FALLBACK_RELEASES
+
+  const sections = trimmed.split(/^## /m).filter(Boolean)
+  if (sections.length === 0) return FALLBACK_RELEASES
+
+  const parsed = sections.map((section, idx) => {
+    const lines = section.trim().split('\n')
+    const heading = lines[0].trim()
+    const body = lines.slice(1)
+
+    const versionMatch = heading.match(/v?\d+\.\d+(?:\.\d+)?/i)
+    const version = versionMatch
+      ? (versionMatch[0].startsWith('v') ? versionMatch[0] : `v${versionMatch[0]}`)
+      : `Release ${sections.length - idx}`
+
+    const tag = detectTag(heading)
+    let title = heading
+      .replace(/^v?\d+\.\d+(?:\.\d+)?\s*[-–—:]\s*/i, '')
+      .replace(/\s*\((New|Improved|Fixed)\)\s*/gi, '')
+      .replace(/\b(New|Improved|Fixed)\b/gi, '')
+      .trim()
+    if (!title) title = heading
+
+    let date = ''
+    const dateInHeading = heading.match(
+      /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i
+    )
+    if (dateInHeading) {
+      date = dateInHeading[0]
+    } else {
+      const dateLine = body.find(l => /^(?:\*\*)?Date(?:\*\*)?:/i.test(l.trim()))
+      if (dateLine) {
+        date = dateLine.replace(/^(?:\*\*)?Date(?:\*\*)?:\s*/i, '').trim()
+      }
+    }
+
+    const items = body
+      .filter(l => /^[-*]\s+/.test(l.trim()))
+      .map(l => l.trim().replace(/^[-*]\s+/, '').replace(/\*\*(.+?)\*\*/g, '$1').trim())
+
+    const dotColor = TAG_META[tag]?.dot || DOT_COLORS[idx % DOT_COLORS.length]
+
+    return {
+      version,
+      tag,
+      date,
+      title,
+      dotColor,
+      items: items.length ? items : [body.filter(l => l.trim() && !l.startsWith('#')).join(' ').trim()].filter(Boolean),
+    }
+  }).filter(r => r.items.length > 0)
+
+  return parsed.length ? parsed : FALLBACK_RELEASES
+}
+
+function ReleaseCard({ release, index }) {
+  const meta = TAG_META[release.tag] || TAG_META.New
+
+  return (
+    <div
+      className="flex gap-5 items-start animate-fx-rise"
+      style={{ animationDelay: `${index * 0.06}s` }}
+    >
+      <div className="flex-shrink-0 w-6 flex justify-center pt-[22px] relative z-10">
+        <span
+          className="w-3.5 h-3.5 rounded-full bg-surface-950 border-2"
+          style={{
+            borderColor: release.dotColor,
+            boxShadow: `0 0 10px ${release.dotColor}66`,
+          }}
+        />
+      </div>
+      <FixitPanel
+        padding="p-6"
+        className="flex-1 hover:border-accent-cyan/30 transition-colors"
+      >
+        <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
+          <span className="font-display font-extrabold text-lg text-white">{release.version}</span>
+          <span className={`text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border ${meta.bg} ${meta.color} ${meta.border}`}>
+            {release.tag}
+          </span>
+          {release.date && (
+            <span className="text-xs text-surface-500 ml-auto">{release.date}</span>
+          )}
+        </div>
+        <h3 className="font-semibold text-base text-surface-100 mb-3.5">{release.title}</h3>
+        <div className="flex flex-col gap-2">
+          {release.items.map((item, i) => (
+            <div key={i} className="flex gap-2.5 text-sm leading-relaxed text-surface-400">
+              <span className="shrink-0 mt-0.5" style={{ color: release.dotColor }}>▹</span>
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      </FixitPanel>
+    </div>
+  )
 }
 
 export default function Changelog() {
@@ -42,83 +206,70 @@ export default function Changelog() {
       .finally(() => setLoading(false))
   }, [])
 
+  const releases = useMemo(() => {
+    if (loading || error || !changelog) return []
+    return parseChangelog(changelog)
+  }, [changelog, loading, error])
+
   return (
-    <div className="min-h-screen bg-surface-950 text-white">
-      {/* Background effects */}
-      <div className="fixed inset-0 bg-grid-pattern opacity-[0.04] pointer-events-none" />
-      <div className="fixed top-0 left-1/4 w-96 h-96 bg-accent-cyan/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="fixed bottom-1/4 right-1/4 w-72 h-72 bg-accent-purple/5 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="relative max-w-3xl mx-auto px-4 py-12">
-        {/* Back link */}
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm text-surface-400 hover:text-accent-cyan transition-colors mb-8 group"
-        >
-          <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
-          Back to Home
-        </Link>
-
-        {/* Header */}
-        <div className="mb-10">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 rounded-full bg-accent-cyan animate-pulse" />
-            <span className="text-xs font-semibold text-accent-cyan/80 uppercase tracking-widest">What's New</span>
+    <MarketingPageShell
+      narrow
+      eyebrow="What's new"
+      title={
+        <span className="bg-gradient-to-r from-accent-blue via-accent-cyan to-accent-purple bg-clip-text text-transparent">
+          Platform updates
+        </span>
+      }
+      subtitle="Stay up to date with the latest improvements, features, and fixes."
+    >
+      {loading && (
+        <div className="flex items-center justify-center py-16">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-accent-cyan/30 border-t-accent-cyan rounded-full animate-spin" />
+            <span className="text-sm text-surface-500">Loading updates...</span>
           </div>
-          <h1 className="text-4xl font-black tracking-tight mb-3">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple">
-              Platform Updates
-            </span>
-          </h1>
-          <p className="text-surface-400 text-base">Stay up to date with the latest improvements, features, and fixes.</p>
         </div>
+      )}
 
-        {/* Content card */}
-        <div className="glass-card p-8 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/[0.03] via-transparent to-accent-purple/[0.03] pointer-events-none" />
+      {!loading && error && (
+        <FixitPanel padding="p-12" className="text-center">
+          <Sparkles size={32} className="text-surface-600 mx-auto mb-3" />
+          <p className="text-surface-400">Could not load the changelog. Please try again later.</p>
+        </FixitPanel>
+      )}
 
-          {loading && (
-            <div className="flex items-center justify-center py-16">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-2 border-accent-cyan/30 border-t-accent-cyan rounded-full animate-spin" />
-                <span className="text-sm text-surface-500">Loading updates...</span>
-              </div>
-            </div>
-          )}
+      {!loading && !error && !changelog && (
+        <FixitPanel padding="p-12" className="text-center">
+          <Sparkles size={32} className="text-surface-600 mx-auto mb-3" />
+          <p className="text-surface-400">No updates published yet. Check back soon!</p>
+        </FixitPanel>
+      )}
 
-          {!loading && error && (
-            <div className="text-center py-16">
-              <Sparkles size={32} className="text-surface-600 mx-auto mb-3" />
-              <p className="text-surface-400">Could not load the changelog. Please try again later.</p>
-            </div>
-          )}
-
-          {!loading && !error && !changelog && (
-            <div className="text-center py-16">
-              <Sparkles size={32} className="text-surface-600 mx-auto mb-3" />
-              <p className="text-surface-400">No updates published yet. Check back soon!</p>
-            </div>
-          )}
-
-          {!loading && !error && changelog && (
+      {!loading && !error && changelog && (
+        <>
+          <div className="relative flex flex-col gap-3.5">
             <div
-              className="prose-custom relative"
-              dangerouslySetInnerHTML={{ __html: markdownToHtml(changelog) }}
+              aria-hidden="true"
+              className="absolute left-[11px] top-3.5 bottom-3.5 w-0.5 bg-gradient-to-b from-accent-blue via-accent-purple to-transparent opacity-40"
             />
-          )}
-        </div>
+            {releases.map((release, index) => (
+              <ReleaseCard key={`${release.version}-${index}`} release={release} index={index} />
+            ))}
+          </div>
 
-        {/* Footer link */}
-        <div className="mt-8 text-center">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-sm text-surface-400 hover:text-accent-cyan transition-colors"
-          >
-            <ArrowLeft size={14} />
-            Back to Home
-          </Link>
-        </div>
-      </div>
-    </div>
+          <FixitPanel hero padding="p-9" className="mt-10 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/10 via-transparent to-accent-purple/10 pointer-events-none" />
+            <div className="relative">
+              <p className="text-surface-300 text-sm mb-4">
+                Want these updates in your inbox? Start training and we&apos;ll keep you posted.
+              </p>
+              <Link to="/register" className="btn-primary px-7 py-3 text-sm inline-flex items-center gap-2">
+                Get started free
+              </Link>
+            </div>
+          </FixitPanel>
+        </>
+      )}
+    </MarketingPageShell>
   )
 }

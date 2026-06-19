@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { adminApi } from '../../api/admin'
+import { AdminPageHeader } from '../../components/design'
 import {
-  Activity, Container, RefreshCw, Terminal, Cpu, HardDrive,
+  Activity, Container, Terminal, Cpu, HardDrive,
   Filter, CheckCircle2, XCircle, AlertCircle, RotateCcw,
   Server, Database, Wifi, MessageSquare, ShieldCheck, Globe,
   Zap,
@@ -220,41 +221,33 @@ export default function AdminMonitoring() {
   return (
     <div className="space-y-5 sm:space-y-6 animate-fade-in">
 
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2 tracking-tight">
-            <Activity size={22} className="text-accent-cyan" /> Monitoring
-          </h1>
-          <p className="text-surface-400 text-sm mt-1">
-            {summary.running} running / {summary.total} containers
-            {summary.lab_count != null && ` · ${summary.lab_count} labs · ${summary.system_count} system`}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {[
-            { k: 'all', label: 'All' },
-            { k: 'lab', label: 'Lab containers' },
-            { k: 'system', label: 'System' },
-          ].map(({ k, label }) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setKindFilter(k)}
-              className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
-                kindFilter === k
-                  ? 'border-accent-cyan text-accent-cyan bg-accent-cyan/10'
-                  : 'border-surface-700 text-surface-400 hover:border-surface-500 hover:text-surface-300'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-          <button type="button" onClick={loadContainers} className="btn-secondary text-sm flex items-center gap-2">
-            <RefreshCw size={14} /> Refresh
-          </button>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Monitoring"
+        subtitle={`${summary.running} running / ${summary.total} containers${summary.lab_count != null ? ` · ${summary.lab_count} labs · ${summary.system_count} system` : ''}`}
+        onRefresh={loadContainers}
+        actions={
+          <>
+            {[
+              { k: 'all', label: 'All' },
+              { k: 'lab', label: 'Lab containers' },
+              { k: 'system', label: 'System' },
+            ].map(({ k, label }) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKindFilter(k)}
+                className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                  kindFilter === k
+                    ? 'border-accent-cyan text-accent-cyan bg-accent-cyan/10'
+                    : 'border-surface-700 text-surface-400 hover:border-surface-500 hover:text-surface-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </>
+        }
+      />
 
       {/* ── Summary KPI row ── */}
       {systemContainers.length > 0 && (
@@ -271,7 +264,7 @@ export default function AdminMonitoring() {
               label: 'Total Restarts',
             },
           ].map(({ icon: Icon, color, bg, val, label }) => (
-            <div key={label} className="glass-card p-4 flex items-center gap-3">
+            <div key={label} className="fx-stat-card p-4 flex items-center gap-3">
               <div className={`p-2 rounded-lg ${bg} shrink-0`}>
                 <Icon size={16} className={color} />
               </div>

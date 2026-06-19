@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useThemeStore } from '../../store/themeStore'
 import { useAuthStore } from '../../store/authStore'
-import { Sun, Moon, Terminal, Menu, X, Bot } from 'lucide-react'
+import { Sun, Moon, Menu, X, Bot } from 'lucide-react'
 import { useState } from 'react'
 import SupportBotWidget from '../SupportBotWidget'
-import { PUBLIC_NAV_LINKS } from '../../constants/publicNav'
+import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_LINKS } from '../../constants/publicNav'
 import BubbleNavLink from '../BubbleNavLink'
+import { FixitLogo } from '../design'
 
 const navLinkClass = (active) =>
   active
@@ -58,17 +59,12 @@ export default function PublicLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-surface-950">
-      <nav className="fixed top-0 w-full z-50 border-b border-surface-700/50 bg-surface-950/90 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <Link to="/" className="flex items-center gap-2 text-lg font-bold font-display tracking-tight shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-accent-cyan/20">
-              <Terminal size={18} className="text-white" />
-            </div>
-            FixitLab
-          </Link>
+      <nav className="fixed top-0 w-full z-50 border-b border-white/[0.07] bg-surface-950/[0.88] backdrop-blur-[18px]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[68px] flex items-center justify-between gap-4">
+          <FixitLogo to="/" size="sm" />
 
           <div className="hidden lg:flex items-center justify-center gap-0.5 flex-1 min-w-0 px-2">
-            {PUBLIC_NAV_LINKS.slice(0, 7).map(({ to, label }) => (
+            {PUBLIC_NAV_PRIMARY.map(({ to, label }) => (
               <BubbleNavLink key={to} to={to} active={isActive(to)} size="md">{label}</BubbleNavLink>
             ))}
           </div>
@@ -126,7 +122,7 @@ export default function PublicLayout({ children }) {
         )}
       </nav>
 
-      <main className="pt-16">
+      <main className="pt-[68px]">
         {children}
       </main>
 
@@ -135,12 +131,7 @@ export default function PublicLayout({ children }) {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
             <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-2 lg:mb-0">
-              <Link to="/" className="flex items-center gap-2 font-display font-bold text-white mb-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                  <Terminal size={16} className="text-white" />
-                </div>
-                FixitLab
-              </Link>
+              <FixitLogo to="/" size="sm" className="mb-3" />
               <p className="text-sm text-surface-400 leading-relaxed max-w-xs">
                 Hands-on labs, AI mock interviews, and verifiable certificates — learn by fixing real systems.
               </p>

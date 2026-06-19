@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
+import { AdminPageHeader } from '../../components/design'
 import { Plus, Edit2, Trash2, Search, X, Save, Tag, Eye, ShieldAlert } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -204,33 +205,33 @@ export default function AdminScenarios() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Scenarios</h1>
-          <p className="text-surface-400 mt-1">Manage challenge scenarios</p>
-        </div>
-        <div className="flex items-center gap-2">
-        <button onClick={() => { resetForm(); setEditingId(null); setShowForm(true) }}
-          className="btn-primary flex items-center gap-2">
-          <Plus size={16} /> Add Scenario
-        </button>
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              const result = await adminApi.syncScenarios()
-              toast.success(result.message || 'Scenarios synced from repo')
-              loadData()
-            } catch (err) {
-              toast.error(err.response?.data?.error || 'Sync failed')
-            }
-          }}
-          className="btn-secondary flex items-center gap-2"
-        >
-          Sync from repo
-        </button>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Scenarios"
+        subtitle="Manage challenge scenarios"
+        actions={
+          <>
+            <button onClick={() => { resetForm(); setEditingId(null); setShowForm(true) }}
+              className="btn-primary flex items-center gap-2">
+              <Plus size={16} /> Add Scenario
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const result = await adminApi.syncScenarios()
+                  toast.success(result.message || 'Scenarios synced from repo')
+                  loadData()
+                } catch (err) {
+                  toast.error(err.response?.data?.error || 'Sync failed')
+                }
+              }}
+              className="btn-secondary flex items-center gap-2"
+            >
+              Sync from repo
+            </button>
+          </>
+        }
+      />
 
       {/* Search */}
       <div className="relative max-w-md">
@@ -522,7 +523,7 @@ export default function AdminScenarios() {
             <div className="w-8 h-8 border-2 border-accent-purple border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <table className="w-full">
+          <table className="fx-admin-table">
             <thead>
               <tr className="border-b border-surface-700/50 text-left">
                 <th className="px-4 py-3 text-xs font-medium text-surface-400 uppercase">Title</th>

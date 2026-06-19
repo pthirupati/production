@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { labApi } from '../api/labs'
-import { Play, Pause, RotateCcw, Clock, Terminal, ChevronLeft, FastForward, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Play, Pause, RotateCcw, Clock, Terminal, FastForward, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PageHeader, FixitPanel } from '../components/design'
 
 export default function SessionReplay() {
   const { sessionId } = useParams()
@@ -132,22 +133,20 @@ export default function SessionReplay() {
   )
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <Link to="/lab-history" className="text-sm text-surface-500 hover:text-accent-cyan flex items-center gap-1 mb-2">
-            <ChevronLeft size={14} /> Back to History
+    <div className="max-w-5xl mx-auto animate-fx-rise">
+      <PageHeader
+        eyebrow="Lab history"
+        title="Session Replay"
+        subtitle={replay?.scenario_title || commands?.scenario_title || 'Lab Session'}
+        actions={
+          <Link to="/lab-history" className="btn-secondary text-sm px-4 py-2">
+            Back to History
           </Link>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Terminal size={22} className="text-accent-cyan" />
-            Session Replay
-          </h1>
-          <p className="text-surface-400 text-sm mt-0.5">{replay?.scenario_title || commands?.scenario_title || 'Lab Session'}</p>
-        </div>
-      </div>
+        }
+      />
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-surface-900 rounded-lg p-1 w-fit">
+      <FixitPanel padding="p-1" className="inline-flex gap-1 mb-6">
         {[
           { key: 'replay', label: 'Terminal Replay', icon: Play },
           { key: 'commands', label: 'Command Log', icon: Terminal },
@@ -156,18 +155,18 @@ export default function SessionReplay() {
           <button
             key={key}
             onClick={() => { setTab(key); if (key === 'review') handleLoadReview() }}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              tab === key ? 'bg-surface-700 text-white' : 'text-surface-500 hover:text-surface-300'
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === key ? 'bg-white/[0.08] text-white' : 'text-surface-500 hover:text-surface-300'
             }`}
           >
             <Icon size={14} /> {label}
           </button>
         ))}
-      </div>
+      </FixitPanel>
 
       {/* Replay tab */}
       {tab === 'replay' && (
-        <div className="glass-card overflow-hidden">
+        <FixitPanel padding="p-0" className="overflow-hidden">
           {replay ? (
             <>
               {/* Terminal output */}
@@ -177,7 +176,7 @@ export default function SessionReplay() {
               />
 
               {/* Playback controls */}
-              <div className="p-4 border-t border-surface-800 space-y-3">
+              <div className="p-4 border-t border-white/[0.06] space-y-3">
                 {/* Seek bar */}
                 <input
                   type="range"
@@ -230,12 +229,12 @@ export default function SessionReplay() {
               <p className="text-surface-500">No terminal recording available for this session</p>
             </div>
           )}
-        </div>
+        </FixitPanel>
       )}
 
       {/* Commands tab */}
       {tab === 'commands' && (
-        <div className="glass-card">
+        <FixitPanel padding="p-0">
           {commands?.commands?.length > 0 ? (
             <div className="divide-y divide-surface-800">
               <div className="px-4 py-3 bg-surface-900/50 text-xs text-surface-500 flex items-center justify-between">
@@ -260,12 +259,12 @@ export default function SessionReplay() {
               <p className="text-surface-500">No command history recorded for this session</p>
             </div>
           )}
-        </div>
+        </FixitPanel>
       )}
 
       {/* AI Review tab */}
       {tab === 'review' && (
-        <div className="glass-card p-6">
+        <FixitPanel>
           {reviewLoading ? (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <div className="w-8 h-8 border-2 border-accent-cyan/30 border-t-accent-cyan rounded-full animate-spin" />
@@ -326,7 +325,7 @@ export default function SessionReplay() {
               <p className="text-surface-500">Could not load review for this session.</p>
             </div>
           )}
-        </div>
+        </FixitPanel>
       )}
     </div>
   )

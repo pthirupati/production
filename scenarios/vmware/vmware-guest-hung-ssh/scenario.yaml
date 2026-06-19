@@ -1,0 +1,34 @@
+title: Hung Linux Guest — SSH Unreachable via VMware
+slug: vmware-guest-hung-ssh
+category: VMware vSphere
+description: |
+  Production Linux server web-prod-01 is unreachable over SSH. The VM shows powered on in
+  monitoring but the guest OS is hung. Use vCenter, the web console, Jira, and customer
+  coordination before rebooting.
+difficulty: hard
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+  - Confirm SSH to web-prod-01 fails from the lab SSH drawer
+  - Open VMware vCenter from the Jira ticket and launch the guest console
+  - Verify the guest OS is hung (no console response)
+  - Update the Jira incident with console findings
+  - Obtain customer approval for a reboot
+  - Reset/reboot the VM in vCenter and confirm SSH works again
+initial_state: |
+  web-prod-01 is poweredOn but guest_hung=true. SSH times out. Jira ticket linked.
+hints:
+  - content: Use the SSH button in the VMware lab toolbar — connection should time out.
+    cost: 10
+    order: 1
+  - content: Launch Web Console on web-prod-01 — keyboard input will not respond when hung.
+    cost: 15
+    order: 2
+  - content: Update Jira from the Incident ticket drawer, then confirm customer reboot approval before Reset.
+    cost: 20
+    order: 3

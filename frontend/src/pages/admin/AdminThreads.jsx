@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { MessageSquare, Pin, Lock, Trash2, Search, Shield, Reply, X } from 'lucide-react'
+import { AdminPageHeader } from '../../components/design'
+import { MessageSquare, Pin, Lock, Trash2, Search, Reply, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AdminThreads() {
@@ -119,13 +120,10 @@ export default function AdminThreads() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Shield size={24} className="text-accent-purple" />
-          Thread Moderation
-        </h1>
-        <p className="text-surface-400 mt-1">Manage community discussions, reply as admin, pin or lock threads</p>
-      </div>
+      <AdminPageHeader
+        title="Thread Moderation"
+        subtitle="Manage community discussions, reply as admin, pin or lock threads"
+      />
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" size={16} />

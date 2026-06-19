@@ -54,7 +54,7 @@ function SidebarContent({ location, theme, toggleTheme, onNav, navigate }) {
     <>
       {/* Header */}
       <div className="shrink-0 flex items-center gap-3 px-5 py-5 border-b border-surface-700/30">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-purple to-accent-cyan flex items-center justify-center shadow-lg shadow-accent-purple/25">
+        <div className="w-9 h-9 rounded-[11px] fixit-logo-mark flex items-center justify-center">
           <Shield size={16} className="text-white" />
         </div>
         <div className="flex-1 min-w-0">
@@ -134,7 +134,7 @@ export default function AdminLayout() {
       </div>
 
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex lg:flex-col w-56 shrink-0 h-screen border-r border-surface-700/30 bg-surface-900/90 backdrop-blur-xl relative z-10">
+      <aside className="hidden lg:flex lg:flex-col w-[248px] shrink-0 h-screen fx-sidebar relative z-10">
         <SidebarContent
           location={location}
           theme={theme}
@@ -146,7 +146,7 @@ export default function AdminLayout() {
 
       {/* Mobile sidebar overlay */}
       <aside className={`
-        lg:hidden fixed inset-y-0 left-0 z-50 w-56 flex flex-col h-screen bg-surface-900/95 backdrop-blur-xl border-r border-surface-700/30
+        lg:hidden fixed inset-y-0 left-0 z-50 w-[248px] flex flex-col h-screen fx-sidebar
         transform transition-transform duration-300
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>

@@ -10,7 +10,7 @@ import { SkeletonCard } from '../components/Skeleton'
 import toast from 'react-hot-toast'
 import { interviewsApi } from '../api/interviews'
 import { ACHIEVEMENT_META } from '../utils/constants'
-import CompactPageHeader from '../components/CompactPageHeader'
+import { PageHeader, FixitPanel } from '../components/design'
 
 const techIcons = { Linux: Server, Docker: Monitor, Networking: Globe, 'Web Servers': Globe, Databases: Database, AWS: Cpu, Kubernetes: Cpu, Security: Shield }
 
@@ -81,15 +81,14 @@ export default function Achievements() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
-      <CompactPageHeader
+      <PageHeader
+        eyebrow="Milestones"
         title="Achievements & Certificates"
         subtitle={`${earned.length} of ${achievements.length} achievements unlocked`}
-        eyebrow="Milestones"
-        icon={Trophy}
       />
 
       {/* ═══ Technology Certificates Section ═══ */}
-      <div>
+      <FixitPanel>
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <FileText size={18} className="text-accent-cyan" /> Technology Certificates
         </h2>
@@ -180,10 +179,10 @@ export default function Achievements() {
             })}
           </div>
         )}
-      </div>
+      </FixitPanel>
 
       {/* Interview certificates */}
-      <div>
+      <FixitPanel>
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <Award size={18} className="text-indigo-400" /> Interview Certificates (FIXIT-INT)
         </h2>
@@ -226,7 +225,7 @@ export default function Achievements() {
             ))}
           </div>
         )}
-      </div>
+      </FixitPanel>
 
       {/* Progress bar */}
       <div className="glass-card p-5">

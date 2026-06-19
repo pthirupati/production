@@ -185,7 +185,7 @@ def resolve_simulation_validation_script(scenario_slug: str, validation_script: 
         (lambda s: "ldconfig" in s or "missing-library" in s, CANONICAL_LDCONFIG_CHECK),
         (lambda s: "terraform" in s or "aws-" in s or "cloudwatch" in s or "lambda" in s or "s3-" in s or "eks" in s or "iam-" in s or "ec2-" in s or "elb" in s or "ecr" in s or "rds" in s or "vpc" in s or "kinesis" in s or "sqs" in s or "secrets-manager" in s, CANONICAL_TERRAFORM_CHECK),
         (lambda s: "windows" in s or "win-" in s or "iis" in s or "hyper-v" in s or "kerberos" in s or "gpo" in s or "ntfs" in s or "smb-" in s or "winrm" in s or "wmi" in s or "sql-server" in s or "dhcp-" in s or "replication-" in s or "dns-zone" in s, CANONICAL_WINDOWS_CHECK),
-        (lambda s: "ipmi" in s or "baremetal" in s or "vmware" in s, CANONICAL_BAREMETAL_CHECK),
+        (lambda s: "ipmi" in s or "baremetal" in s, CANONICAL_BAREMETAL_CHECK),
     ]
     for pred, canonical in rules:
         try:
@@ -334,8 +334,18 @@ def _run_line_check(
 
     if "kubectl get pods" in stripped and "Running" in stripped:
         cluster = engine.cluster if engine else None
-        if not cluster or not all(p.status == "Running" for p in cluster.pods):
+        if not cluster:
+            failures.append("kubernetes cluster not available")
+        elif not all(p.status == "Running" for p in cluster.pods):
             failures.append("not all pods are Running")
+        elif not cluster.is_healthy():
+            failures.append("kubernetes cluster is not healthy — apply the required fix")
+        return True
+
+    if "kubectl get nodes" in stripped and "Ready" in stripped:
+        cluster = engine.cluster if engine else None
+        if not cluster or any(n.status != "Ready" for n in cluster.nodes):
+            failures.append("not all nodes are Ready")
         return True
 
     if "kubectl get endpoints" in stripped:

@@ -5,6 +5,7 @@ import api from '../../api/client'
 import { Upload, ChevronRight, ChevronLeft, User, Briefcase, Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { LabelWithHint } from '../../components/FieldHint'
+import { PageHeader } from '../../components/design'
 
 const LEVELS = [
   { id: 'junior', label: 'Junior (0–2 yrs)' },
@@ -136,13 +137,11 @@ export default function InterviewSetup() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-      <div>
-        <Link to="/interviews" className="text-xs text-surface-500 hover:text-white">← Interview Studio</Link>
-        <h1 className="text-2xl font-bold text-white mt-2">Interview setup</h1>
-        <p className="text-sm text-surface-400 mt-1">
-          Resume is optional — we personalize from your career inputs and technology selections.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="AI Interview Studio"
+        title="Interview setup"
+        subtitle="Resume is optional — we personalize from your career inputs and technology selections."
+      />
 
       <div className="flex gap-2">
         {steps.map((s, i) => (

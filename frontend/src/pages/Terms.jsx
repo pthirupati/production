@@ -1,4 +1,6 @@
 import PublicLayout from '../components/layout/PublicLayout'
+import MarketingPageShell from '../components/MarketingPageShell'
+import { FixitPanel } from '../components/design'
 import { ScrollText, AlertCircle, CreditCard, UserX, Scale, Shield, ExternalLink } from 'lucide-react'
 
 export default function Terms() {
@@ -131,60 +133,47 @@ export default function Terms() {
 
   return (
     <PublicLayout>
-      <div className="relative overflow-hidden">
-        {/* Decorative background */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-20 left-1/4 w-96 h-96 bg-accent-cyan/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-40 right-1/4 w-72 h-72 bg-accent-purple/5 rounded-full blur-3xl" />
-        </div>
-
-        <div className="max-w-4xl mx-auto px-4 py-16 relative">
-          {/* Hero */}
-          <div className="text-center mb-16 animate-fade-in">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/20 flex items-center justify-center">
-              <ScrollText size={36} className="text-cyan-400" />
-            </div>
-            <h1 className="text-5xl font-extrabold mb-4 bg-gradient-to-r from-white via-cyan-300 to-cyan-500 bg-clip-text text-transparent">
-              Terms of Service
-            </h1>
-            <p className="text-surface-400 text-lg">Last updated: June 5, 2026</p>
-            <div className="w-20 h-1 bg-gradient-to-r from-accent-cyan to-accent-purple rounded-full mx-auto mt-6" />
-          </div>
-
-          {/* Sections */}
-          <div className="space-y-6">
-            {sections.map((section, i) => {
-              const Icon = section.icon
-              return (
-                <section
-                  key={i}
-                  className="glass-card p-8 hover:border-accent-cyan/20 transition-all duration-300 animate-fade-in"
-                  style={{ animationDelay: `${i * 0.1}s` }}
-                >
-                  <div className="flex items-center gap-4 mb-5">
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${section.color} flex items-center justify-center shadow-lg`}>
-                      <Icon size={20} className="text-white" />
-                    </div>
-                    <h2 className="text-xl font-bold text-white">{section.title}</h2>
+      <MarketingPageShell
+        narrow
+        eyebrow="Legal"
+        title={
+          <span className="bg-gradient-to-r from-white via-cyan-300 to-cyan-500 bg-clip-text text-transparent">
+            Terms of Service
+          </span>
+        }
+        subtitle="Last updated: June 5, 2026"
+      >
+        <div className="space-y-6">
+          {sections.map((section, i) => {
+            const Icon = section.icon
+            return (
+              <FixitPanel
+                key={i}
+                padding="p-8"
+                className="hover:border-accent-cyan/20 transition-all duration-300 animate-fade-in"
+              >
+                <div className="flex items-center gap-4 mb-5">
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${section.color} flex items-center justify-center shadow-lg`}>
+                    <Icon size={20} className="text-white" />
                   </div>
-                  {section.content}
-                </section>
-              )
-            })}
+                  <h2 className="text-xl font-bold text-white">{section.title}</h2>
+                </div>
+                {section.content}
+              </FixitPanel>
+            )
+          })}
 
-            {/* Contact */}
-            <section className="glass-card p-8 border-accent-cyan/20 bg-gradient-to-br from-accent-cyan/5 to-transparent animate-fade-in">
-              <h2 className="text-xl font-bold text-white mb-4">7. Contact</h2>
-              <p className="text-surface-300 leading-relaxed">
-                Questions about these terms? Contact us at{' '}
-                <a href="mailto:fixitlab.admin@gmail.com" className="inline-flex items-center gap-1 text-accent-cyan hover:underline font-medium">
-                  fixitlab.admin@gmail.com <ExternalLink size={12} />
-                </a>
-              </p>
-            </section>
-          </div>
+          <FixitPanel hero padding="p-8" className="border-accent-cyan/20 animate-fade-in">
+            <h2 className="text-xl font-bold text-white mb-4">7. Contact</h2>
+            <p className="text-surface-300 leading-relaxed">
+              Questions about these terms? Contact us at{' '}
+              <a href="mailto:fixitlab.admin@gmail.com" className="inline-flex items-center gap-1 text-accent-cyan hover:underline font-medium">
+                fixitlab.admin@gmail.com <ExternalLink size={12} />
+              </a>
+            </p>
+          </FixitPanel>
         </div>
-      </div>
+      </MarketingPageShell>
     </PublicLayout>
   )
 }

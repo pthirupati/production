@@ -1,0 +1,23 @@
+title: Kubernetes Worker Node NotReady
+slug: sim-k8s-node-uncordon
+technology: Kubernetes
+category: Cluster Operations
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 900
+max_score: 100
+jira_priority: Medium
+is_free: false
+description: |
+  worker-1 is in NotReady state after maintenance. Uncordon the node and verify the cluster
+  is healthy again.
+objectives:
+  - Run kubectl get nodes and confirm worker-1 is NotReady
+  - Uncordon worker-1
+  - Verify all nodes show Ready
+initial_state: Simulated k8s master; worker-1 NotReady.
+hints:
+  - content: Use `kubectl uncordon worker-1`.
+    cost: 10
+    order: 1

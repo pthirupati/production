@@ -12,7 +12,7 @@ const TYPE_CONFIG = {
   welcome: { icon: MessageCircle, color: 'text-accent-green' },
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ variant = 'default' }) {
   const navigate = useNavigate()
   const { notifications, unreadCount, fetchNotifications, markRead, markAllRead, clearAll, dismiss } = useNotificationStore()
   const [open, setOpen] = useState(false)
@@ -195,12 +195,16 @@ export default function NotificationBell() {
     document.body
   )
 
+  const btnClass = variant === 'topbar'
+    ? 'relative w-10 h-10 flex items-center justify-center rounded-[11px] bg-white/[0.04] border border-white/10 text-white/70 hover:bg-white/[0.09] transition-colors overflow-visible'
+    : 'relative p-2 text-surface-400 hover:text-surface-50 transition-colors rounded-lg hover:bg-surface-800 overflow-visible'
+
   return (
     <div className="relative">
       <button
         ref={btnRef}
         onClick={() => setOpen(!open)}
-        className="relative p-2 text-surface-400 hover:text-surface-50 transition-colors rounded-lg hover:bg-surface-800 overflow-visible"
+        className={btnClass}
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
         <Bell
@@ -208,7 +212,10 @@ export default function NotificationBell() {
           className={unreadCount > 0 ? 'text-accent-cyan' : undefined}
           fill={unreadCount > 0 ? 'currentColor' : 'none'}
         />
-        {unreadCount > 0 && (
+        {unreadCount > 0 && variant === 'topbar' && (
+          <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-accent-red border-2 border-[#0a0c18] z-20 pointer-events-none" />
+        )}
+        {unreadCount > 0 && variant !== 'topbar' && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-accent-red text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-surface-900 z-20 pointer-events-none animate-pulse">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>

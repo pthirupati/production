@@ -358,65 +358,8 @@ def _base_inventory() -> dict:
 
 
 def _apply_scenario_preset(state: dict, scenario_slug: str) -> None:
-    slug = (scenario_slug or "").lower()
-    events = state["events"]
-    tasks = state["recent_tasks"]
-
-    if "guest-powered-off" in slug:
-        for vm in state["vms"]:
-            if vm["name"] == "web-prod-01":
-                vm["power"] = "poweredOff"
-                vm["tools"] = "notRunning"
-                vm["cpu_pct"] = 0
-                vm["mem_pct"] = 0
-        events.append(_event("VM web-prod-01 powered off unexpectedly", "warning", "web-prod-01"))
-        events.append(_event("Guest heartbeat lost on web-prod-01", "critical", "web-prod-01"))
-        state["alarms"].append({"id": "alm-vm-off", "name": "VM powered off", "entity": "web-prod-01",
-                                 "severity": "critical", "status": "active", "time": _now_iso()})
-        state["validation"] = {"target_vm": "web-prod-01", "require_power": "poweredOn"}
-
-    elif "host-disconnected" in slug:
-        state["hosts"][0]["status"] = "disconnected"
-        state["hosts"][0]["connection_state"] = "disconnected"
-        for vm in state["vms"]:
-            if vm["host_id"] == "host-01":
-                vm["power"] = "poweredOff"
-                vm["tools"] = "notRunning"
-        events.append(_event("Host esxi-01.fixitlab.local disconnected from vCenter", "critical", "esxi-01.fixitlab.local"))
-        events.append(_event("2 VMs on esxi-01 are inaccessible", "critical", "DC-Prod"))
-        state["alarms"].append({"id": "alm-host-dc", "name": "Host disconnected", "entity": "esxi-01.fixitlab.local",
-                                 "severity": "critical", "status": "active", "time": _now_iso()})
-        state["validation"] = {"require_host_connected": "esxi-01.fixitlab.local"}
-
-    elif "ha-failure" in slug:
-        state["cluster_ha"] = False
-        state["hosts"][1]["status"] = "notResponding"
-        state["hosts"][1]["connection_state"] = "notResponding"
-        for vm in state["vms"]:
-            if vm["name"] == "web-prod-01":
-                vm["power"] = "poweredOff"
-        events.append(_event("HA protection disabled on Cluster-01", "critical", "Cluster-01"))
-        events.append(_event("Host esxi-02.fixitlab.local not responding", "critical", "esxi-02.fixitlab.local"))
-        state["alarms"].append({"id": "alm-ha", "name": "vSphere HA protection disabled", "entity": "Cluster-01",
-                                 "severity": "critical", "status": "active", "time": _now_iso()})
-        state["validation"] = {"cluster_ha": True, "target_vm": "web-prod-01", "require_power": "poweredOn"}
-
-    elif "datastore-full" in slug:
-        state["datastores"][0]["free_gb"] = 2
-        state["alarms"].append({"id": "alm-ds-full", "name": "Datastore usage exceeded threshold",
-                                 "entity": "datastore-ssd-01", "severity": "critical", "status": "active", "time": _now_iso()})
-        events.append(_event("Datastore datastore-ssd-01 at 99.9% capacity", "critical", "datastore-ssd-01"))
-        state["validation"] = {"datastore_min_free_gb": 100, "datastore": "datastore-ssd-01"}
-
-    else:
-        events.append(_event("vCenter inventory loaded successfully", "info", "vCenter"))
-        events.append(_event("All hosts connected and responding", "info", "Cluster-01"))
-        tasks.extend([
-            _task("Power On Virtual Machine", "api-prod-01"),
-            _task("Power On Virtual Machine", "db-prod-01"),
-            _task("Power On Virtual Machine", "monitor-prod-01"),
-            _task("VMotion", "api-prod-01"),
-        ])
+    from .scenario_presets import apply_vmware_scenario_preset
+    apply_vmware_scenario_preset(state, scenario_slug)
 
 
 def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
@@ -445,6 +388,9 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "active_alarms": len([a for a in state.get("alarms", []) if a.get("status") == "active"]),
             "cluster_ha": state.get("cluster_ha", True),
             "cluster_drs": state.get("cluster_drs", True),
+            "linux_ssh_ok": state.get("linux_ssh_ok", True),
+            "jira_incident_updated": state.get("jira_incident_updated", False),
+            "customer_reboot_approved": state.get("customer_reboot_approved", False),
         },
     }
 
@@ -506,6 +452,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["mem_pct"] = random.randint(40, 70)
         vm["net_mbps"] = random.randint(5, 30)
         vm["disk_io_mbps"] = random.randint(2, 20)
+        vm.pop("guest_hung", None)
+        vm.pop("question_pending", None)
+        vm.pop("network_disconnected", None)
+        if state.get("linux_ssh_ok") is False:
+            state["linux_ssh_ok"] = True
         state["alarms"] = [a for a in state.get("alarms", []) if a.get("entity") != vm["name"]]
         events.append(_event(f"VM {vm['name']} powered on", "info", vm["name"]))
         tasks.insert(0, _task("Power On Virtual Machine", vm["name"]))
@@ -552,7 +503,15 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "VM not found"}
         if vm["power"] != "poweredOn":
             return {"ok": False, "error": "VM must be powered on to reboot"}
+        if state.get("validation", {}).get("require_customer_approval") and not state.get("customer_reboot_approved"):
+            return {"ok": False, "error": "Customer must approve reboot before resetting the VM"}
+        vm.pop("guest_hung", None)
+        vm["tools"] = "ok"
         vm["cpu_pct"] = random.randint(20, 50)
+        vm.pop("network_disconnected", None)
+        if state.get("linux_ssh_ok") is False:
+            state["linux_ssh_ok"] = True
+        state["alarms"] = [a for a in state.get("alarms", []) if a.get("entity") != vm["name"]]
         events.append(_event(f"VM {vm['name']} rebooted", "info", vm["name"]))
         tasks.insert(0, _task("Restart Virtual Machine", vm["name"]))
         _save_session(str(session_id), entry)
@@ -648,6 +607,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "Host not found"}
         host["status"] = "connected"
         host["connection_state"] = "connected"
+        host.pop("management_network", None)
         # Restore tools status on VMs but do NOT auto-power-on — ESXi reconnect
         # does not restart VMs; HA or the admin must do that explicitly.
         for vm in state["vms"]:
@@ -704,10 +664,178 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     if action == "enable_drs":
         state["cluster_drs"] = True
+        state["drs_balanced"] = True
+        for host in state["hosts"]:
+            host["cpu_pct"] = random.randint(28, 45)
         events.append(_event("vSphere DRS enabled on Cluster-01", "info", "Cluster-01"))
         tasks.insert(0, _task("Enable vSphere DRS", "Cluster-01"))
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "DRS enabled"}
+
+    if action == "run_drs":
+        if not state.get("cluster_drs"):
+            return {"ok": False, "error": "DRS must be enabled before running balance"}
+        state["drs_balanced"] = True
+        for host in state["hosts"]:
+            host["cpu_pct"] = random.randint(28, 42)
+        events.append(_event("DRS balance completed on Cluster-01", "info", "Cluster-01"))
+        tasks.insert(0, _task("Run DRS", "Cluster-01"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "DRS recommendations applied"}
+
+    if action == "sync_ntp":
+        for host in state["hosts"]:
+            host["ntp_synced"] = True
+        events.append(_event("NTP synchronized on all ESXi hosts", "info", "Cluster-01"))
+        tasks.insert(0, _task("Sync NTP", "Cluster-01"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "NTP synchronized"}
+
+    if action == "clear_coredump":
+        host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
+        if not host:
+            host = state["hosts"][0]
+        host["coredump_full"] = False
+        events.append(_event(f"Core dump partition cleared on {host['name']}", "info", host["name"]))
+        tasks.insert(0, _task("Clear Core Dump", host["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Core dump partition cleared"}
+
+    if action == "fix_admission_control":
+        state["admission_control_failed"] = False
+        events.append(_event("HA admission control policy adjusted", "info", "Cluster-01"))
+        tasks.insert(0, _task("Configure HA Admission Control", "Cluster-01"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Admission control resolved"}
+
+    if action == "claim_vsan_disk":
+        state["vsan_disk_unclaimed"] = False
+        events.append(_event("vSAN disk claimed on esxi-02", "info", "esxi-02.fixitlab.local"))
+        tasks.insert(0, _task("Claim vSAN Disk", "esxi-02.fixitlab.local"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "vSAN disk claimed"}
+
+    if action == "complete_storage_vmotion":
+        state["storage_vmotion_stuck"] = False
+        events.append(_event("Storage vMotion completed", "info", "web-prod-01"))
+        tasks.insert(0, _task("Storage vMotion", "web-prod-01"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Storage vMotion completed"}
+
+    if action == "fix_dv_switch_mtu":
+        state["dv_switch_mtu_mismatch"] = False
+        events.append(_event("Distributed switch MTU corrected", "info", "dvSwitch-Prod"))
+        tasks.insert(0, _task("Fix MTU", "dvSwitch-Prod"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "MTU mismatch fixed"}
+
+    if action == "create_portgroup":
+        pg_name = (payload.get("name") or state.get("portgroup_missing") or "Prod-VLAN-200").strip()
+        if not pg_name:
+            return {"ok": False, "error": "Port group name required"}
+        if any(n.get("name") == pg_name for n in state.get("networks", [])):
+            return {"ok": False, "error": f"Port group '{pg_name}' already exists"}
+        net_id = f"net-{pg_name.lower().replace(' ', '-')}"
+        state.setdefault("networks", []).append({
+            "id": net_id, "name": pg_name, "type": "portgroup",
+            "vlan": payload.get("vlan") or 200, "switch": "dvSwitch-Prod",
+        })
+        state.pop("portgroup_missing", None)
+        events.append(_event(f"Created port group {pg_name}", "info", "dvSwitch-Prod"))
+        tasks.insert(0, _task("Create Port Group", pg_name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Port group '{pg_name}' created"}
+
+    if action == "resolve_vmotion":
+        state["vmotion_failed"] = False
+        events.append(_event("vMotion issue resolved for api-prod-01", "info", "api-prod-01"))
+        tasks.insert(0, _task("Migrate Virtual Machine (VMotion)", "api-prod-01"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "vMotion resolved"}
+
+    if action == "convert_template":
+        state["template_convert_failed"] = False
+        events.append(_event("Template converted to VM successfully", "info", "web-template"))
+        tasks.insert(0, _task("Convert Template", "web-template"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Template converted"}
+
+    if action == "renew_vcenter_cert":
+        state["vcenter_cert_expired"] = False
+        events.append(_event("vCenter certificate renewed", "info", "vCenter"))
+        tasks.insert(0, _task("Renew Certificate", "vCenter"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Certificate renewed"}
+
+    if action == "expand_vcenter_db":
+        state["vcenter_db_full"] = False
+        events.append(_event("vCenter database partition expanded", "info", "vCenter"))
+        tasks.insert(0, _task("Expand Database", "vCenter"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Database expanded"}
+
+    if action == "unlock_sso":
+        state["vcenter_sso_locked"] = False
+        events.append(_event("SSO administrator account unlocked", "info", "vCenter"))
+        tasks.insert(0, _task("Unlock SSO Account", "vCenter"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "SSO account unlocked"}
+
+    if action == "upgrade_tools":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        vm["tools"] = "ok"
+        vm["tools_version"] = "12389"
+        events.append(_event(f"VMware Tools upgraded on {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Upgrade VMware Tools", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Tools upgraded on {vm['name']}"}
+
+    if action == "answer_question":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        vm.pop("question_pending", None)
+        events.append(_event(f"Pending question answered on {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Answer VM Question", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Question cleared"}
+
+    if action == "connect_network":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        vm.pop("network_disconnected", None)
+        vm["net_mbps"] = random.randint(5, 30)
+        events.append(_event(f"Network adapter connected on {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Connect Network", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Network connected on {vm['name']}"}
+
+    if action == "reduce_cpu_contention":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        vm["cpu_ready_pct"] = random.randint(2, 8)
+        events.append(_event(f"CPU contention reduced on {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Migrate Virtual Machine (VMotion)", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "CPU ready time improved"}
+
+    if action == "mark_jira_updated":
+        state["jira_incident_updated"] = True
+        events.append(_event("Incident ticket updated with console findings", "info", "Jira"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Jira incident updated"}
+
+    if action == "confirm_customer_reboot":
+        if state.get("validation", {}).get("require_jira_updated") and not state.get("jira_incident_updated"):
+            return {"ok": False, "error": "Update Jira with findings before requesting customer reboot"}
+        state["customer_reboot_approved"] = True
+        events.append(_event("Customer approved server reboot", "info", "web-prod-01"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Customer reboot approved"}
 
     if action == "expand_datastore":
         ds_name = payload.get("datastore") or "datastore-ssd-01"
@@ -911,6 +1039,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if not net:
             return {"ok": False, "error": "Network not found"}
         vm["network_id"] = net_id
+        vm.pop("network_disconnected", None)
+        vm["net_mbps"] = random.randint(5, 30)
         events.append(_event(f"Changed {vm['name']} network to {net['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Change Network Adapter", vm["name"]))
         _save_session(str(session_id), entry)
@@ -927,17 +1057,39 @@ def validate_vmware_lab(session_id: str, scenario_slug: str = "") -> tuple[bool,
     if rules.get("require_host_connected"):
         name = rules["require_host_connected"]
         host = _find_host(state, host_name=name)
-        if not host or host.get("status") != "connected":
+        if not host or host.get("status") != "connected" or host.get("connection_state") != "connected":
             return False, f"Host {name} must be connected"
-        return True, f"Host {name} is connected — validation passed"
+        if host.get("management_network") == "down":
+            return False, f"Management network on {name} is down"
 
-    if rules.get("cluster_ha"):
-        if not state.get("cluster_ha", True):
+    if rules.get("require_ntp_synced"):
+        for host in state["hosts"]:
+            if not host.get("ntp_synced", True):
+                return False, f"NTP not synced on {host['name']}"
+
+    if rules.get("require_coredump_cleared"):
+        for host in state["hosts"]:
+            if host.get("coredump_full"):
+                return False, f"Core dump partition full on {host['name']}"
+
+    if rules.get("cluster_ha") is True:
+        if not state.get("cluster_ha", False):
             return False, "HA must be enabled on Cluster-01"
         for host in state["hosts"]:
             if host.get("status") not in ("connected",):
                 return False, f"Host {host['name']} must be connected for HA"
-        return True, "HA is enabled and all hosts connected — validation passed"
+
+    if rules.get("admission_control_ok"):
+        if state.get("admission_control_failed"):
+            return False, "HA admission control is blocking VM power-on"
+
+    if rules.get("cluster_drs") is True:
+        if not state.get("cluster_drs", False):
+            return False, "DRS must be enabled on Cluster-01"
+
+    if rules.get("drs_balanced") is True:
+        if not state.get("drs_balanced", False):
+            return False, "Cluster hosts are not balanced — enable or run DRS"
 
     if rules.get("datastore_min_free_gb"):
         ds_name = rules.get("datastore", "datastore-ssd-01")
@@ -945,14 +1097,105 @@ def validate_vmware_lab(session_id: str, scenario_slug: str = "") -> tuple[bool,
         if not ds:
             return False, f"Datastore {ds_name} not found"
         if ds["free_gb"] < rules["datastore_min_free_gb"]:
-            return False, f"{ds_name} needs at least {rules['datastore_min_free_gb']} GB free (currently {ds['free_gb']} GB)"
-        return True, f"{ds_name} has {ds['free_gb']} GB free — validation passed"
+            return False, (
+                f"{ds_name} needs at least {rules['datastore_min_free_gb']} GB free "
+                f"(currently {ds['free_gb']} GB)"
+            )
+
+    if rules.get("vsan_disks_claimed"):
+        if state.get("vsan_disk_unclaimed"):
+            return False, "vSAN disks must be claimed on all hosts"
+
+    if rules.get("storage_vmotion_complete"):
+        if state.get("storage_vmotion_stuck"):
+            return False, "Storage vMotion is still stuck — cancel or complete it"
+
+    if rules.get("dv_switch_mtu_fixed"):
+        if state.get("dv_switch_mtu_mismatch"):
+            return False, "Distributed switch MTU mismatch not fixed"
+
+    if rules.get("portgroup_created"):
+        pg = rules["portgroup_created"]
+        if not any(n.get("name") == pg for n in state.get("networks", [])):
+            return False, f"Port group {pg} must be created"
+
+    if rules.get("vmotion_resolved"):
+        if state.get("vmotion_failed"):
+            return False, "vMotion failure not resolved"
+
+    if rules.get("template_converted"):
+        if state.get("template_convert_failed"):
+            return False, "Template conversion not completed"
+
+    if rules.get("vcenter_cert_renewed"):
+        if state.get("vcenter_cert_expired"):
+            return False, "vCenter certificate must be renewed"
+
+    if rules.get("vcenter_db_expanded"):
+        if state.get("vcenter_db_full"):
+            return False, "vCenter database partition must be expanded"
+
+    if rules.get("vcenter_sso_unlocked"):
+        if state.get("vcenter_sso_locked"):
+            return False, "SSO administrator account is locked"
+
+    if rules.get("require_jira_updated"):
+        if not state.get("jira_incident_updated"):
+            return False, "Update the Jira incident with console findings before rebooting"
+
+    if rules.get("require_customer_approval"):
+        if not state.get("customer_reboot_approved"):
+            return False, "Customer must approve reboot before proceeding"
+
+    if rules.get("require_ssh_ok"):
+        if not state.get("linux_ssh_ok", True):
+            return False, "Linux server SSH is not reachable — fix the guest VM first"
+
+    target = rules.get("target_vm")
+    if target:
+        vm = _find_vm(state, vm_name=target)
+        if not vm:
+            return False, f"VM {target} not found"
+
+        if rules.get("require_power"):
+            if vm.get("power") != rules["require_power"]:
+                return False, f"{target} must be {rules['require_power']} (currently {vm.get('power')})"
+
+        if rules.get("require_guest_responsive"):
+            if vm.get("guest_hung"):
+                return False, f"{target} guest OS is hung — verify in console and reboot"
+
+        if rules.get("require_question_cleared"):
+            if vm.get("question_pending"):
+                return False, f"{target} has a pending question that must be answered"
+
+        if rules.get("require_network_connected"):
+            if vm.get("network_disconnected"):
+                return False, f"{target} network adapter is disconnected"
+
+        if rules.get("require_tools"):
+            if vm.get("tools") != rules["require_tools"]:
+                return False, f"{target} VMware Tools must be {rules['require_tools']}"
+
+        if rules.get("min_disk_gb"):
+            if vm.get("disk_gb", 0) < rules["min_disk_gb"]:
+                return False, f"{target} disk must be at least {rules['min_disk_gb']} GB"
+
+        if rules.get("max_snapshots") is not None:
+            if len(vm.get("snapshots", [])) > rules["max_snapshots"]:
+                return False, f"{target} has too many snapshots — consolidate or delete"
+
+        if rules.get("max_cpu_ready_pct") is not None:
+            if vm.get("cpu_ready_pct", 0) > rules["max_cpu_ready_pct"]:
+                return False, f"{target} CPU ready time is too high — migrate or reduce load"
+
+    if rules:
+        return True, "Validation passed — issue resolved"
 
     target = rules.get("target_vm", "web-prod-01")
-    required = rules.get("require_power", "poweredOn")
     vm = _find_vm(state, vm_name=target)
     if not vm:
         return False, f"VM {target} not found"
-    if vm.get("power") != required:
-        return False, f"{target} must be {required} (currently {vm.get('power')})"
-    return True, f"{target} is {required} — validation passed"
+    if vm.get("power") != "poweredOn":
+        return False, f"{target} must be poweredOn (currently {vm.get('power')})"
+    return True, f"{target} is poweredOn — validation passed"

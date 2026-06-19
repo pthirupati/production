@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../../api/admin'
+import { AdminPageHeader } from '../../components/design'
 import {
   BarChart3, Users, MessageSquare, CreditCard, Settings, CalendarClock, Mic,
   Gift, DollarSign, Eye,
@@ -93,15 +94,14 @@ export default function AdminInterviews() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">AI Interview Studio</h1>
-        <p className="text-sm text-surface-400">
-          100% free platform — browser voice + FixitLab AI. Full admin control, pricing, analytics.
-        </p>
-        {overview?.uses_paid_apis === false && (
-          <p className="text-xs text-emerald-400 mt-1">No paid AI APIs — voice runs in the browser</p>
-        )}
-      </div>
+      <AdminPageHeader
+        title="AI Interview Studio"
+        subtitle="100% free platform — browser voice + FixitLab AI. Full admin control, pricing, analytics."
+      />
+
+      {overview?.uses_paid_apis === false && (
+        <p className="text-xs text-emerald-400 -mt-4">No paid AI APIs — voice runs in the browser</p>
+      )}
 
       <div className="flex flex-wrap gap-2 border-b border-surface-800 pb-2">
         {TABS.map(({ id, label, icon: Icon }) => (
@@ -135,7 +135,7 @@ export default function AdminInterviews() {
               { label: 'Active subs', val: overview.active_entitlements },
               { label: 'Reports', val: overview.reports_generated },
             ].map(({ label, val }) => (
-              <div key={label} className="glass-card p-4 border border-surface-800">
+              <div key={label} className="fx-stat-card p-4 border border-surface-800">
                 <p className="text-2xl font-bold text-white">{val}</p>
                 <p className="text-xs text-surface-500">{label}</p>
               </div>
@@ -193,7 +193,7 @@ export default function AdminInterviews() {
             {!live.live?.length ? (
               <p className="text-xs text-surface-500">No live sessions right now</p>
             ) : (
-              <table className="w-full text-sm">
+              <table className="fx-admin-table">
                 <thead>
                   <tr className="text-left text-surface-500 border-b border-surface-800">
                     <th className="py-2 pr-4">Candidate</th>
@@ -390,7 +390,7 @@ export default function AdminInterviews() {
               Grant free access
             </button>
           </div>
-          <table className="w-full text-sm">
+          <table className="fx-admin-table">
             <thead>
               <tr className="text-left text-surface-500 border-b border-surface-800">
                 <th className="py-2 pr-4">Email</th>
@@ -470,7 +470,7 @@ export default function AdminInterviews() {
 
       {tab === 'campaigns' && (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="fx-admin-table">
             <thead>
               <tr className="text-left text-surface-500 border-b border-surface-800">
                 <th className="py-2 pr-4">User</th>

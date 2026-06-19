@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import Pagination from '../components/Pagination'
 import StickyPageToolbar from '../components/StickyPageToolbar'
 import { useScrollHideToolbar } from '../hooks/useScrollHideToolbar'
+import { PageHeader } from '../components/design'
 
 const typeConfig = {
   fix:  { icon: Wrench,  label: 'Fix',  color: 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20',    border: 'border-l-accent-cyan',   glow: 'hover:shadow-[0_0_20px_rgba(6,182,212,0.06)]' },
@@ -303,18 +304,14 @@ export default function Scenarios() {
 
   return (
     <div className="max-w-6xl mx-auto animate-fade-in">
+      <PageHeader
+        eyebrow="Training"
+        title="Scenarios"
+        subtitle={loading ? 'Loading…' : `${totalCount} challenge${totalCount !== 1 ? 's' : ''}`}
+      />
+
       <StickyPageToolbar hidden={toolbarHidden} toolbarRef={toolbarRef} className="mb-2">
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <Target size={13} className="text-accent-cyan shrink-0" />
-              <span className="text-[10px] font-semibold text-accent-cyan/80 uppercase tracking-widest">Challenge Library</span>
-            </div>
-            <h1 className="font-display text-xl sm:text-2xl font-bold text-white tracking-tight leading-tight">Scenarios</h1>
-            <p className="text-surface-500 text-xs mt-0.5">
-              {loading ? 'Loading…' : `${totalCount} challenge${totalCount !== 1 ? 's' : ''}`}
-            </p>
-          </div>
+        <div className="flex items-center justify-end gap-1.5 flex-wrap mb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             {Object.entries(difficultyConfig).map(([key, cfg]) => {
               const count = grouped[key]?.length ?? 0

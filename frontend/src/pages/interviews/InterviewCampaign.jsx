@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import { Calendar, Play, CheckCircle2, Lock, Award, ChevronRight, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PageHeader } from '../../components/design'
 
 export default function InterviewCampaign() {
   const { campaignId } = useParams()
@@ -75,23 +76,21 @@ export default function InterviewCampaign() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
-      <div>
-        <Link to="/interviews" className="text-xs text-surface-500 hover:text-white">← Interviews</Link>
-        <h1 className="text-2xl font-bold text-white mt-2">{campaign.title}</h1>
-        <p className="text-sm text-surface-400">
-          {campaign.is_sample ? 'Free sample' : `${campaign.round_count} rounds`} · {campaign.experience_level}
+      <PageHeader
+        eyebrow="AI Interview Studio"
+        title={campaign.title}
+        subtitle={`${campaign.is_sample ? 'Free sample' : `${campaign.round_count} rounds`} · ${campaign.experience_level}`}
+      />
+      {!campaign.is_sample && campaign.status !== 'cancelled' && campaign.status !== 'completed' && (
+        <button type="button" onClick={cancelCampaign} className="text-xs text-red-400 hover:text-red-300 -mt-4">
+          Cancel interview
+        </button>
+      )}
+      {campaign.is_sample && (
+        <p className="text-xs text-cyan-400 -mt-4">
+          One-time preview — start the room when ready. No scheduling needed.
         </p>
-        {!campaign.is_sample && campaign.status !== 'cancelled' && campaign.status !== 'completed' && (
-          <button type="button" onClick={cancelCampaign} className="text-xs text-red-400 hover:text-red-300 mt-2">
-            Cancel interview
-          </button>
-        )}
-        {campaign.is_sample && (
-          <p className="text-xs text-cyan-400 mt-2">
-            One-time preview — start the room when ready. No scheduling needed.
-          </p>
-        )}
-      </div>
+      )}
 
       {campaign.certificate_id && (
         <div className="glass-card p-4 border border-emerald-500/30 bg-emerald-500/10 flex items-center gap-3">

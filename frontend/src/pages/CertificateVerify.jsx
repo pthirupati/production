@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
+import MarketingPageShell from '../components/MarketingPageShell'
+import { FixitPanel } from '../components/design'
 import { ShieldCheck, Search, CheckCircle2, XCircle, Award, Loader, Linkedin, ExternalLink, Star, Target } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -54,26 +56,22 @@ export default function CertificateVerify() {
 
   return (
     <PublicLayout>
-      <div className="max-w-2xl mx-auto px-4 py-14 md:py-20">
-        {/* Hero */}
-        <div className="text-center mb-10 animate-fade-in">
-          <div className="relative w-24 h-24 mx-auto mb-6">
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-accent-cyan/30 to-accent-purple/20 blur-xl animate-pulse-glow" />
-            <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 border border-accent-cyan/25 flex items-center justify-center">
-              <ShieldCheck size={42} className="text-accent-cyan" />
-            </div>
-          </div>
-          <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-white via-accent-cyan to-accent-purple bg-clip-text text-transparent">
-            Verify Certificate
-          </h1>
-          <p className="text-surface-400 text-lg max-w-md mx-auto">
-            Authenticate any FixitLab certificate — technology labs <span className="text-surface-300 font-mono text-sm">FIXIT-*</span> or mock interviews <span className="text-surface-300 font-mono text-sm">FIXIT-INT-*</span>
-          </p>
-        </div>
-
+      <MarketingPageShell
+        narrow
+        eyebrow="Credentials"
+        title="Verify Certificate"
+        subtitle={
+          <>
+            Authenticate any FixitLab certificate — technology labs{' '}
+            <span className="text-surface-300 font-mono text-sm">FIXIT-*</span> or mock interviews{' '}
+            <span className="text-surface-300 font-mono text-sm">FIXIT-INT-*</span>
+          </>
+        }
+      >
         {/* Search form */}
-        <form onSubmit={handleVerify} className="glass-card p-6 mb-6 animate-slide-up">
-          <label className="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">
+        <form onSubmit={handleVerify} className="mb-6 animate-fx-rise">
+          <FixitPanel>
+          <label className="block fx-page-eyebrow mb-3 !text-left">
             Certificate ID
           </label>
           <div className="flex gap-3">
@@ -100,32 +98,33 @@ export default function CertificateVerify() {
           <p className="text-xs text-surface-600 mt-2.5">
             Certificate IDs are on your FixitLab achievement page and LinkedIn certificate entries.
           </p>
+          </FixitPanel>
         </form>
 
         {/* Error */}
         {error && (
-          <div className="glass-card p-5 border border-accent-red/30 bg-accent-red/5 animate-slide-up flex items-center gap-3">
+          <FixitPanel className="mb-6 border-accent-red/30 bg-accent-red/5 animate-fx-rise flex items-center gap-3">
             <XCircle size={22} className="text-accent-red shrink-0" />
             <p className="text-accent-red font-medium">{error}</p>
-          </div>
+          </FixitPanel>
         )}
 
         {/* Result: Invalid */}
         {result && !result.valid && (
-          <div className="glass-card p-8 border border-accent-red/25 bg-accent-red/5 animate-slide-up text-center">
+          <FixitPanel className="border-accent-red/25 bg-accent-red/5 animate-fx-rise text-center">
             <div className="w-16 h-16 rounded-full bg-accent-red/15 border border-accent-red/30 flex items-center justify-center mx-auto mb-4">
               <XCircle size={32} className="text-accent-red" />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Certificate Not Found</h2>
             <p className="text-surface-400">{result.error || 'This certificate ID could not be verified. Check the ID and try again.'}</p>
-          </div>
+          </FixitPanel>
         )}
 
         {/* Result: Valid — certificate card */}
         {result?.valid && (
-          <div className="animate-slide-up space-y-4">
+          <div className="animate-fx-rise space-y-4">
             {/* Certificate document */}
-            <div className="relative overflow-hidden rounded-2xl border border-accent-green/30 bg-gradient-to-br from-surface-900 to-surface-950">
+            <FixitPanel padding="p-0" className="overflow-hidden border-accent-green/30">
               {/* Certificate header stripe */}
               <div className="h-2 w-full bg-gradient-to-r from-accent-cyan via-accent-green to-accent-blue" />
 
@@ -207,7 +206,7 @@ export default function CertificateVerify() {
 
               {/* Certificate footer stripe */}
               <div className="h-1 w-full bg-gradient-to-r from-accent-purple via-accent-pink to-accent-cyan opacity-30" />
-            </div>
+            </FixitPanel>
 
             {/* Actions */}
             <div className="flex flex-wrap gap-3">
@@ -234,20 +233,20 @@ export default function CertificateVerify() {
 
         {/* Trust indicators */}
         {!result && !loading && (
-          <div className="mt-10 grid grid-cols-3 gap-4 animate-fade-in">
+          <div className="mt-10 grid grid-cols-3 gap-4 animate-fx-rise">
             {[
               { icon: ShieldCheck, label: 'Cryptographically signed', color: 'text-accent-green' },
               { icon: CheckCircle2, label: 'Tamper-proof IDs', color: 'text-accent-cyan' },
               { icon: ExternalLink, label: 'LinkedIn shareable', color: 'text-accent-blue' },
             ].map(({ icon: Icon, label, color }) => (
-              <div key={label} className="glass-card p-4 text-center">
+              <FixitPanel key={label} padding="p-4" className="text-center">
                 <Icon size={20} className={`${color} mx-auto mb-2`} />
                 <p className="text-xs text-surface-400">{label}</p>
-              </div>
+              </FixitPanel>
             ))}
           </div>
         )}
-      </div>
+      </MarketingPageShell>
     </PublicLayout>
   )
 }

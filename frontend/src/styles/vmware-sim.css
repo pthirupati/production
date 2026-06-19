@@ -1,0 +1,625 @@
+/* VMware vSphere simulator — Claude design system (#0f1722 palette) */
+
+.vmware-sim {
+  --vm-bg: #0f1722;
+  --vm-bg2: #1b2a3b;
+  --vm-bg3: #243447;
+  --vm-bg4: #16222f;
+  --vm-border: #2d3a4a;
+  --vm-border2: #22303f;
+  --vm-text: #e8edf2;
+  --vm-muted: #8fa5b8;
+  --vm-cyan: #00c8ff;
+  --vm-blue: #2d7cff;
+  --vm-green: #5db85d;
+  --vm-amber: #f5a623;
+  --vm-red: #d9534f;
+  --vm-font: 'Segoe UI', system-ui, Arial, sans-serif;
+  background: var(--vm-bg);
+  color: var(--vm-text);
+  font-family: var(--vm-font);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.vmware-sim ::selection {
+  background: var(--vm-blue);
+  color: #fff;
+}
+
+.vmware-sim ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.vmware-sim ::-webkit-scrollbar-track {
+  background: var(--vm-bg2);
+}
+.vmware-sim ::-webkit-scrollbar-thumb {
+  background: #3d5a73;
+  border-radius: 4px;
+}
+
+@keyframes vmPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.35); }
+}
+@keyframes vmFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes vmScale {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes vmSlideR {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes vmSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vmware-sim * {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+  }
+}
+
+/* ── Toolbar ── */
+.vm-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 14px;
+  background: #1b1b2f;
+  border-bottom: 1px solid var(--vm-border);
+  z-index: 50;
+  overflow-x: auto;
+}
+
+.vm-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid var(--vm-border);
+  background: var(--vm-bg3);
+  color: var(--vm-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.vm-toolbar-btn:hover:not(:disabled) {
+  background: #2d4057;
+}
+.vm-toolbar-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.vm-toolbar-btn-primary {
+  border: none;
+  background: var(--vm-green);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 4px 12px -4px var(--vm-green);
+}
+.vm-toolbar-btn-danger {
+  border: none;
+  background: var(--vm-red);
+  color: #fff;
+  font-weight: 700;
+}
+
+.vm-toolbar-search {
+  position: relative;
+  flex-shrink: 0;
+  width: 200px;
+  max-width: 30vw;
+}
+.vm-toolbar-search input {
+  width: 100%;
+  padding: 6px 10px 6px 28px;
+  border-radius: 6px;
+  background: var(--vm-bg3);
+  border: 1px solid var(--vm-border);
+  color: var(--vm-text);
+  font-size: 12px;
+  outline: none;
+}
+.vm-toolbar-search input:focus {
+  border-color: var(--vm-cyan);
+}
+
+.vm-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 7px;
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.vm-jira-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  background: rgba(45, 124, 255, 0.16);
+  border: 1px solid rgba(45, 124, 255, 0.4);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #5b9bf5;
+}
+
+/* ── Sidebar inventory ── */
+.vm-nav {
+  flex-shrink: 0;
+  width: 230px;
+  overflow-y: auto;
+  background: var(--vm-bg2);
+  border-right: 1px solid var(--vm-border);
+  padding: 8px 0;
+}
+
+.vm-nav-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--vm-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 12px 8px;
+}
+
+.vm-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background 0.12s ease;
+  font-size: 12px;
+  color: var(--vm-text);
+}
+.vm-nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.vm-nav-item-active {
+  background: rgba(45, 124, 255, 0.12);
+  border-left-color: var(--vm-blue);
+}
+
+/* ── Main content chrome ── */
+.vm-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--vm-bg);
+}
+
+.vm-breadcrumb {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  background: var(--vm-bg2);
+  border-bottom: 1px solid var(--vm-border);
+  font-size: 12px;
+  overflow-x: auto;
+}
+
+.vm-object-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  background: var(--vm-bg3);
+  border-bottom: 1px solid var(--vm-border);
+  flex-wrap: wrap;
+}
+
+.vm-tabs {
+  flex-shrink: 0;
+  display: flex;
+  background: var(--vm-bg4);
+  border-bottom: 1px solid var(--vm-border);
+  overflow-x: auto;
+}
+.vm-tab {
+  padding: 10px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--vm-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.vm-tab:hover {
+  color: var(--vm-text);
+}
+.vm-tab-active {
+  color: var(--vm-text);
+  border-bottom-color: var(--vm-cyan);
+  background: rgba(0, 200, 255, 0.08);
+}
+
+.vm-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  min-width: 0;
+}
+
+/* ── Panels & cards ── */
+.vm-panel {
+  background: var(--vm-bg2);
+  border: 1px solid var(--vm-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.vm-panel-header {
+  padding: 9px 14px;
+  background: var(--vm-bg3);
+  border-bottom: 1px solid var(--vm-border);
+  font-weight: 700;
+  font-size: 12px;
+  color: #fff;
+}
+.vm-panel-body {
+  padding: 13px 15px;
+}
+
+.vm-info-row {
+  display: flex;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--vm-border2);
+}
+.vm-info-row:last-child {
+  border-bottom: none;
+}
+.vm-info-label {
+  width: 150px;
+  flex-shrink: 0;
+  color: var(--vm-muted);
+  font-size: 12px;
+}
+.vm-info-value {
+  font-size: 12px;
+  color: var(--vm-text);
+}
+
+.vm-usage-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--vm-border2);
+  overflow: hidden;
+}
+.vm-usage-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  min-width: 520px;
+}
+.vm-table thead tr {
+  background: var(--vm-bg4);
+}
+.vm-table th {
+  text-align: left;
+  padding: 7px 14px;
+  color: var(--vm-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vm-table td {
+  padding: 7px 14px;
+  border-top: 1px solid var(--vm-border2);
+  color: var(--vm-text);
+}
+.vm-table tbody tr {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.vm-table tbody tr:hover {
+  background: var(--vm-border2);
+}
+
+.vm-banner-warning {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  background: rgba(245, 166, 35, 0.15);
+  border-bottom: 1px solid var(--vm-amber);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f5c97a;
+}
+
+.vm-actions-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--vm-blue);
+  background: rgba(45, 124, 255, 0.12);
+  color: #5b9bf5;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.vm-actions-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 72;
+  min-width: 236px;
+  background: var(--vm-bg3);
+  border: 1px solid var(--vm-border);
+  border-radius: 8px;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
+  padding: 5px;
+  animation: vmScale 0.12s both;
+}
+
+.vm-toolbar-row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--vm-bg2);
+  border-bottom: 1px solid var(--vm-border);
+  flex-wrap: wrap;
+}
+
+.vm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--vm-border);
+  background: var(--vm-bg3);
+  color: var(--vm-text);
+  transition: background 0.15s, opacity 0.15s;
+}
+.vm-btn:hover:not(:disabled) {
+  background: #2d4057;
+}
+.vm-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.vm-btn-blue {
+  border-color: var(--vm-blue);
+  background: rgba(45, 124, 255, 0.12);
+  color: #5b9bf5;
+}
+.vm-btn-red {
+  border-color: rgba(217, 83, 79, 0.4);
+  background: rgba(217, 83, 79, 0.1);
+  color: var(--vm-red);
+}
+.vm-btn-green {
+  border: none;
+  background: var(--vm-green);
+  color: #fff;
+  box-shadow: 0 4px 12px -4px var(--vm-green);
+}
+
+/* ── Modals ── */
+.vm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  animation: vmFade 0.15s both;
+}
+.vm-modal {
+  background: var(--vm-bg2);
+  border: 1px solid var(--vm-border);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: vmScale 0.18s both;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.vm-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--vm-bg3);
+  border-bottom: 1px solid var(--vm-border);
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+}
+.vm-modal-body {
+  padding: 16px;
+  overflow-y: auto;
+}
+.vm-modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid var(--vm-border);
+}
+
+.vm-input {
+  width: 100%;
+  padding: 8px 11px;
+  border-radius: 6px;
+  background: var(--vm-bg);
+  border: 1px solid var(--vm-border);
+  color: var(--vm-text);
+  font-size: 13px;
+  outline: none;
+}
+.vm-input:focus {
+  border-color: var(--vm-cyan);
+}
+
+.vm-drawer {
+  position: fixed;
+  top: 48px;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 95vw);
+  z-index: 90;
+  background: var(--vm-bg2);
+  border-left: 1px solid var(--vm-border);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.45);
+  animation: vmSlideR 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  display: flex;
+  flex-direction: column;
+}
+
+.vm-console {
+  margin: 0 auto 12px;
+  width: 100%;
+  max-width: 260px;
+  aspect-ratio: 16 / 10;
+  border-radius: 6px;
+  border: 1px solid var(--vm-border);
+  background: #05090f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.vm-console pre {
+  margin: 0;
+  padding: 10px;
+  font-size: 8px;
+  line-height: 1.5;
+  color: var(--vm-green);
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.vm-tasks-panel {
+  flex-shrink: 0;
+  border-top: 1px solid var(--vm-border);
+  background: var(--vm-bg2);
+}
+.vm-tasks-header {
+  display: flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--vm-border2);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vm-text);
+  cursor: pointer;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+}
+.vm-tasks-header:hover {
+  background: rgba(255,255,255,.03);
+}
+.vm-tasks-collapsed .vm-tasks-header {
+  border-bottom: none;
+}
+
+.vm-resource-aside {
+  flex-shrink: 0;
+  width: 168px;
+  border-left: 1px solid var(--vm-border);
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--vm-bg2);
+}
+
+.vm-resource-card {
+  border: 1px solid var(--vm-border);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--vm-bg3);
+  margin-bottom: 8px;
+}
+
+.vm-logo-vm {
+  color: var(--vm-cyan);
+}
+.vm-logo-vsphere {
+  font-size: 11px;
+  color: var(--vm-muted);
+  font-weight: 600;
+}
+
+.vm-state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.vm-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vm-bg);
+}
+.vm-loading-spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--vm-border);
+  border-top-color: var(--vm-cyan);
+  border-radius: 50%;
+  animation: vmSpin 0.8s linear infinite;
+}
+
+.vm-tasks-body {
+  max-height: 220px;
+}
+
+.vm-usage-bar-fill {
+  box-shadow: 0 0 10px currentColor;
+}

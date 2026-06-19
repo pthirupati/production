@@ -7,7 +7,7 @@ import {
   AlertTriangle, CheckCircle2, Clock, IndianRupee, Tag,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import PageHeader from '../components/PageHeader'
+import { PageHeader, FixitPanel } from '../components/design'
 import { SkeletonCard } from '../components/Skeleton'
 
 function StatusBadge({ active, expired, subscribed, label }) {
@@ -79,14 +79,15 @@ export default function Subscriptions() {
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
       <PageHeader
+        eyebrow="Billing"
         title="My Subscriptions"
         subtitle="Technology access, interview plans, payment history, and invoices in one place."
-        icon={CreditCard}
-      >
-        <button type="button" onClick={load} className="btn-secondary text-sm flex items-center gap-2 whitespace-nowrap">
-          <RefreshCw size={14} /> Refresh
-        </button>
-      </PageHeader>
+        actions={
+          <button type="button" onClick={load} className="btn-secondary text-sm flex items-center gap-2 whitespace-nowrap">
+            <RefreshCw size={14} /> Refresh
+          </button>
+        }
+      />
 
       {/* Interview subscription */}
       <section className="glass-card p-6 border border-indigo-500/20">
@@ -157,7 +158,7 @@ export default function Subscriptions() {
       </section>
 
       {/* Technology subscriptions */}
-      <section>
+      <FixitPanel>
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <Layers size={18} className="text-accent-cyan" /> Technology Subscriptions
         </h2>
@@ -198,10 +199,10 @@ export default function Subscriptions() {
             ))}
           </div>
         )}
-      </section>
+      </FixitPanel>
 
       {/* Payment history */}
-      <section>
+      <FixitPanel>
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <IndianRupee size={18} className="text-accent-green" /> Payment History
         </h2>
@@ -245,10 +246,10 @@ export default function Subscriptions() {
             </div>
           </div>
         )}
-      </section>
+      </FixitPanel>
 
       {/* Invoices */}
-      <section>
+      <FixitPanel>
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <FileText size={18} className="text-accent-purple" /> Invoices
         </h2>
@@ -275,7 +276,7 @@ export default function Subscriptions() {
             ))}
           </div>
         )}
-      </section>
+      </FixitPanel>
 
       {/* Platform plan usage */}
       {data?.platform_plan && (

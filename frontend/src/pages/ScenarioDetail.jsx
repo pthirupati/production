@@ -14,6 +14,7 @@ import {
   Users, BarChart3, Hash, Award, Lock, Eye, Zap, Star, Send
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PageHeader } from '../components/design'
 
 const typeConfig = {
   fix: { icon: Wrench, label: 'Fix', desc: 'Find and fix the broken service' },
@@ -244,15 +245,17 @@ export default function ScenarioDetail() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 animate-fade-in pb-8">
+      <PageHeader
+        eyebrow="Training"
+        title={scenario.title}
+        subtitle={scenario.subtitle || scenario.technology_name || scenario.category || typeInfo.desc}
+      />
+
       <StickyPageToolbar>
         <Link to="/scenarios" className="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-white transition-colors">
           <ArrowLeft size={14} /> All Scenarios
         </Link>
-        <div className="flex items-start justify-between gap-3 min-w-0 mt-1.5">
-          <div className="min-w-0">
-            <h1 className="text-lg sm:text-xl font-bold text-white truncate">{scenario.title}</h1>
-            <p className="text-xs text-surface-500 mt-0.5 truncate">{scenario.technology_name || scenario.category}</p>
-          </div>
+        <div className="flex items-center gap-2 mt-1.5">
           <span className={`shrink-0 text-xs px-2 py-1 rounded border ${typeInfo.label === 'Fix' ? 'border-accent-cyan/30 text-accent-cyan' : 'border-surface-600 text-surface-400'}`}>
             {typeInfo.label}
           </span>

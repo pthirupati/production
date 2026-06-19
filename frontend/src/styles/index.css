@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -10,7 +10,7 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* Surface scale — deep navy tones (KodeKloud-inspired) */
+  /* Surface scale — FixitLab design (#080a16 / #0a0c18) */
   --s-50:  248 250 252;
   --s-100: 241 245 249;
   --s-200: 226 232 240;
@@ -18,18 +18,18 @@
   --s-400: 165 180 200;
   --s-500: 130 145 170;
   --s-600: 100 115 140;
-  --s-700: 35  48  75;
-  --s-800: 18  28  55;
-  --s-900: 10  16  38;
-  --s-950: 4   8   26;
+  --s-700: 38  42  68;
+  --s-800: 17  18  36;
+  --s-900: 10  12  24;
+  --s-950: 8   10  22;
 
-  /* Accent colors — vivid & electric */
-  --a-cyan:   6   182 212;
-  --a-green:  16  185 129;
+  /* Brand accents — Claude design system (--ac / --ac2 / --ac3) */
+  --a-cyan:   109 120 255;
+  --a-green:  86  224 176;
   --a-amber:  245 158 11;
   --a-red:    239 68  68;
-  --a-purple: 139 92  246;
-  --a-blue:   59  130 246;
+  --a-purple: 178 102 224;
+  --a-blue:   73  181 255;
   --a-pink:   236 72  153;
 }
 
@@ -463,22 +463,19 @@ body::after {
 
 /* Sidebar navigation */
 .sidebar-nav-link {
-  @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200;
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-[11px] text-[13.5px] font-medium transition-all duration-200;
 }
 .sidebar-nav-idle {
-  color: rgb(var(--s-400));
+  color: rgb(255 255 255 / 0.6);
 }
 .sidebar-nav-idle:hover {
-  color: rgb(var(--s-100));
-  background: rgb(var(--s-800) / 0.65);
-  box-shadow: inset 3px 0 0 rgb(var(--a-cyan) / 0.55);
-  transform: translateX(2px);
+  color: rgb(255 255 255);
+  background: rgb(255 255 255 / 0.05);
 }
 .sidebar-nav-active {
-  color: rgb(var(--s-50));
-  background: linear-gradient(135deg, rgb(var(--a-cyan) / 0.16), rgb(var(--a-blue) / 0.1));
-  border: 1px solid rgb(var(--a-cyan) / 0.28);
-  box-shadow: inset 3px 0 0 rgb(var(--a-cyan)), 0 2px 12px rgb(var(--a-cyan) / 0.08);
+  color: rgb(255 255 255);
+  background: rgb(var(--a-cyan) / 0.12);
+  border: 1px solid rgb(var(--a-cyan) / 0.22);
 }
 
 [data-theme="light"] .nav-link-idle {
@@ -715,8 +712,8 @@ body::after {
     @apply bg-surface-950 text-surface-100 font-sans antialiased;
   }
 
-  h1, h2, h3 {
-    font-family: "Space Grotesk", system-ui, sans-serif;
+  h1, h2, h3, h4 {
+    font-family: "DM Sans", system-ui, sans-serif;
     @apply tracking-tight;
   }
 
@@ -768,11 +765,11 @@ body::after {
   }
   .btn-primary {
     @apply font-semibold px-6 py-2.5 rounded-xl transition-all duration-200 text-white;
-    background: linear-gradient(135deg, rgb(var(--a-cyan)), rgb(var(--a-blue)));
-    box-shadow: 0 4px 20px rgb(var(--a-cyan) / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.15);
+    background: linear-gradient(135deg, rgb(var(--a-cyan)), rgb(var(--a-purple)));
+    box-shadow: 0 8px 24px rgb(var(--a-cyan) / 0.40), inset 0 1px 0 rgb(255 255 255 / 0.15);
   }
   .btn-primary:hover {
-    box-shadow: 0 6px 28px rgb(var(--a-cyan) / 0.50), inset 0 1px 0 rgb(255 255 255 / 0.15);
+    box-shadow: 0 10px 32px rgb(var(--a-cyan) / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.15);
     transform: translateY(-2px);
   }
   .btn-secondary {
@@ -1583,4 +1580,234 @@ body::after {
   line-height: 1;
   color: rgba(99,102,241,0.3);
   font-family: Georgia, serif;
+}
+
+.animate-fx-rise {
+  animation: fxRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-fx-fade {
+  animation: fxFade 0.3s ease both;
+}
+@keyframes fxRise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fxFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ─── FixitLab Design System (Claude mockups) ─────────── */
+
+.fixit-logo-mark {
+  background: linear-gradient(135deg, rgb(var(--a-cyan)), rgb(var(--a-purple)));
+  box-shadow: 0 6px 20px rgb(var(--a-cyan) / 0.45);
+}
+
+.fx-panel {
+  background: rgb(255 255 255 / 0.025);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 1rem;
+  backdrop-filter: blur(12px);
+}
+
+.fx-hero-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: radial-gradient(120% 140% at 12% 0%, #16205c 0%, #11122e 50%, #0c0e1c 100%);
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+
+.fx-stat-card {
+  padding: 1.25rem;
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 0.03);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.fx-stat-card:hover {
+  border-color: rgb(var(--a-cyan) / 0.25);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
+}
+
+.fx-sidebar {
+  background: #0a0c18;
+  border-right: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.fx-topbar {
+  height: 62px;
+  background: rgb(var(--s-950) / 0.82);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.fx-input {
+  @apply w-full text-sm text-white outline-none transition-colors duration-200;
+  padding: 9px 14px 9px 38px;
+  border-radius: 11px;
+  background: rgb(255 255 255 / 0.04);
+  border: 1px solid rgb(255 255 255 / 0.1);
+}
+.fx-input:focus {
+  border-color: rgb(var(--a-cyan) / 0.5);
+}
+
+.fx-interview-promo {
+  padding: 14px;
+  border-radius: 13px;
+  background: linear-gradient(150deg, rgb(var(--a-purple) / 0.12), rgb(var(--a-cyan) / 0.06));
+  border: 1px solid rgb(var(--a-purple) / 0.2);
+}
+
+.text-gradient-brand {
+  background: linear-gradient(100deg, rgb(var(--a-blue)), rgb(var(--a-cyan)), rgb(var(--a-purple)));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradientShift 6s ease infinite;
+}
+
+[data-theme="light"] .fx-panel,
+[data-theme="light"] .fx-stat-card {
+  background: rgb(255 255 255 / 0.85);
+  border-color: rgb(226 232 240);
+}
+[data-theme="light"] .fx-sidebar {
+  background: rgb(248 250 252);
+  border-color: rgb(226 232 240);
+}
+[data-theme="light"] .fx-topbar {
+  background: rgb(255 255 255 / 0.92);
+  border-color: rgb(226 232 240);
+}
+[data-theme="light"] .fx-input {
+  background: rgb(255 255 255);
+  border-color: rgb(203 213 225);
+  color: rgb(15 23 42);
+}
+
+/* Page headers */
+.fx-page-header {
+  margin-bottom: 1.75rem;
+}
+.fx-page-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(var(--a-cyan));
+}
+
+.fx-admin-header {
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.07);
+}
+.fx-admin-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgb(var(--a-purple) / 0.85);
+}
+
+.animate-fx-rise {
+  animation: fxRise 0.45s ease both;
+}
+@keyframes fxRise {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fxFloat {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(0, -20px); }
+}
+@keyframes fxFloatX {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(16px, -12px); }
+}
+@keyframes fxLed {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+@keyframes fxBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes fxBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Admin data tables */
+.fx-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.fx-admin-table th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(var(--s-400));
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(255 255 255 / 0.02);
+}
+.fx-admin-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.05);
+  color: rgb(var(--s-300));
+}
+.fx-admin-table tr:hover td {
+  background: rgb(255 255 255 / 0.02);
+}
+
+[data-theme="light"] .fx-admin-header {
+  border-color: rgb(226 232 240);
+}
+[data-theme="light"] .fx-admin-table th {
+  background: rgb(248 250 252);
+  border-color: rgb(226 232 240);
+  color: rgb(100 116 139);
+}
+[data-theme="light"] .fx-admin-table td {
+  border-color: rgb(241 245 249);
+  color: rgb(51 65 85);
+}
+
+/* Jira simulation — FixitLab dark shell + Jira chrome */
+.fx-jira-page {
+  min-height: 100vh;
+  background: rgb(var(--s-950));
+  color: rgb(var(--s-200));
+}
+.fx-jira-breadcrumb {
+  background: rgb(255 255 255 / 0.03);
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+}
+.fx-jira-card {
+  background: rgb(255 255 255 / 0.025);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 0.75rem;
+  backdrop-filter: blur(12px);
+}
+.fx-jira-tab-active {
+  border-color: #4c9aff;
+  color: #4c9aff;
+}
+.fx-jira-link {
+  color: #4c9aff;
+}
+.fx-jira-link:hover {
+  color: #79b8ff;
+}
+.fx-support-fab {
+  background: linear-gradient(135deg, rgb(var(--a-cyan)), rgb(var(--a-purple)));
+  box-shadow: 0 8px 28px rgb(var(--a-purple) / 0.35);
 }

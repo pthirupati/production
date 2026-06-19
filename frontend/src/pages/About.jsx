@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import PublicLayout from '../components/layout/PublicLayout'
+import { FixitPanel } from '../components/design'
 import {
   Terminal, Shield, Cloud, Server, Users, Award, Target,
   Zap, ArrowRight, Globe, Heart, Code, Cpu, BookOpen,
@@ -271,13 +272,13 @@ export default function About() {
           {values.map(({ icon: Icon, title, desc, color, bg }, idx) => {
             const vDelays = ['reveal-delay-1','reveal-delay-2','reveal-delay-3','reveal-delay-4','reveal-delay-5','reveal-delay-6']
             return (
-            <div key={title} className={`glass-card-hover p-6 group reveal ${vDelays[idx] || 'reveal-delay-1'}`}>
+            <FixitPanel key={title} className={`group reveal ${vDelays[idx] || 'reveal-delay-1'}`}>
               <div className={`w-12 h-12 rounded-xl ${bg} flex items-center justify-center mb-4 transition-colors`}>
                 <Icon size={22} className={color} />
               </div>
               <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
               <p className="text-sm text-surface-400 leading-relaxed">{desc}</p>
-            </div>
+            </FixitPanel>
             )
           })}
         </div>
@@ -310,14 +311,14 @@ export default function About() {
                     </div>
                   </div>
                   {/* Card */}
-                  <div className="glass-card-hover p-5 flex-1">
+                  <FixitPanel padding="p-5" className="flex-1">
                     <div className="flex items-center gap-2 mb-2 md:hidden">
                       <Icon size={14} className={color} />
                       <span className={`text-xs font-bold ${color}`}>{year}</span>
                     </div>
                     <h3 className="text-lg font-semibold text-white mb-1">{title}</h3>
                     <p className="text-sm text-surface-400 leading-relaxed">{desc}</p>
-                  </div>
+                  </FixitPanel>
                 </div>
               ))}
             </div>
@@ -343,7 +344,7 @@ export default function About() {
           {team.map(({ name, role, bio, gradient, border, textColor }, tIdx) => {
             const tDelays = ['reveal-delay-1','reveal-delay-2','reveal-delay-3','reveal-delay-4']
             return (
-            <div key={name} className={`glass-card-hover feature-card-premium p-6 text-center group reveal ${tDelays[tIdx] || 'reveal-delay-1'}`}>
+            <FixitPanel key={name} padding="p-6" className={`text-center group reveal ${tDelays[tIdx] || 'reveal-delay-1'}`}>
               <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${gradient} border ${border} flex items-center justify-center mx-auto mb-5 group-hover:scale-110 transition-transform duration-300`}>
                 <span className={`text-2xl font-extrabold ${textColor}`}>
                   {name.split(' ').map(w => w[0]).join('')}
@@ -352,7 +353,7 @@ export default function About() {
               <h3 className="text-base font-semibold text-white mb-1">{name}</h3>
               <p className={`text-xs ${textColor} font-semibold mb-3 uppercase tracking-wide`}>{role}</p>
               <p className="text-sm text-surface-400 leading-relaxed">{bio}</p>
-            </div>
+            </FixitPanel>
             )
           })}
         </div>
@@ -376,7 +377,7 @@ export default function About() {
             {platformFeatures.map(({ icon: Icon, title, desc, bullets, color }) => {
               const c = colorMap[color] || colorMap.cyan
               return (
-                <div key={title} className="glass-card-hover p-6 group">
+                <FixitPanel key={title} className="group">
                   <div className={`w-12 h-12 rounded-xl ${c.bg} flex items-center justify-center mb-4 transition-colors`}>
                     <Icon size={22} className={c.text} />
                   </div>
@@ -390,7 +391,7 @@ export default function About() {
                       </li>
                     ))}
                   </ul>
-                </div>
+                </FixitPanel>
               )
             })}
           </div>
@@ -407,13 +408,13 @@ export default function About() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {whoItsFor.map(({ icon: Icon, title, desc, color, bg }) => (
-            <div key={title} className="glass-card-hover p-6 text-center group">
+            <FixitPanel key={title} padding="p-6" className="text-center group">
               <div className={`w-12 h-12 rounded-xl ${bg} flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform`}>
                 <Icon size={22} className={color} />
               </div>
               <h3 className="text-sm font-semibold text-white mb-2">{title}</h3>
               <p className="text-xs text-surface-400 leading-relaxed">{desc}</p>
-            </div>
+            </FixitPanel>
           ))}
         </div>
         <div className="mt-10 flex flex-wrap justify-center gap-3 text-sm">
@@ -448,11 +449,11 @@ export default function About() {
               { title: 'Privacy first', desc: 'You control resume and transcript data. Export or delete from your profile anytime.' },
               { title: 'Community support', desc: 'Discuss scenarios, share fixes, and learn from peers who have been in the same outage.' },
             ].map(({ title, desc }) => (
-              <div key={title} className="glass-card p-5 hover:border-accent-cyan/30 transition-colors">
+              <FixitPanel key={title} padding="p-5" className="hover:border-accent-cyan/30 transition-colors">
                 <div className="w-2 h-2 rounded-full bg-accent-cyan mb-3" />
                 <h3 className="text-sm font-semibold text-white mb-2">{title}</h3>
                 <p className="text-xs text-surface-400 leading-relaxed">{desc}</p>
-              </div>
+              </FixitPanel>
             ))}
           </div>
         </div>
@@ -460,7 +461,7 @@ export default function About() {
 
       {/* ── CTA ───────────────────────────────────────────────── */}
       <section className="max-w-4xl mx-auto px-6 py-24 text-center">
-        <div className="gradient-border glass-card p-12 relative overflow-hidden">
+        <FixitPanel hero padding="p-12" className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/5 via-transparent to-accent-purple/5 rounded-xl pointer-events-none" />
           <div className="relative">
             <h2 className="text-4xl font-extrabold text-white mb-4">Ready to start fixing?</h2>
@@ -476,7 +477,7 @@ export default function About() {
               </Link>
             </div>
           </div>
-        </div>
+        </FixitPanel>
       </section>
     </PublicLayout>
   )

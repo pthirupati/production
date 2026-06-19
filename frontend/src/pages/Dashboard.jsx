@@ -17,6 +17,7 @@ import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
 import { ACHIEVEMENT_META } from '../utils/constants'
 import ActivityHeatmap from '../components/ActivityHeatmap'
 import OnboardingTour from '../components/OnboardingTour'
+import { PageHeader, FixitPanel, FixitStatCard } from '../components/design'
 
 function OnboardingChecklist({ subscriptions, progress, profile }) {
   const [dismissed, setDismissed] = useState(
@@ -69,12 +70,11 @@ function OnboardingChecklist({ subscriptions, progress, profile }) {
   }
 
   return (
-    <div className="glass-card p-6 border-accent-cyan/20 bg-gradient-to-br from-accent-cyan/[0.04] via-transparent to-accent-purple/[0.03] relative overflow-hidden animate-slide-up">
-      <div className="absolute inset-0 bg-grid-pattern opacity-[0.04] pointer-events-none" />
+    <FixitPanel padding="p-6" className="border border-accent-blue/22 bg-gradient-to-br from-accent-blue/[0.06] via-transparent to-accent-purple/[0.04] relative overflow-hidden animate-fx-rise">
       <div className="flex items-start justify-between relative mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent-cyan/15 flex items-center justify-center border border-accent-cyan/20">
-            <ListChecks size={20} className="text-accent-cyan" />
+          <div className="w-10 h-10 rounded-[11px] bg-accent-blue/15 flex items-center justify-center border border-accent-blue/22">
+            <ListChecks size={20} className="text-accent-blue" />
           </div>
           <div>
             <h2 className="text-base font-bold text-white">Getting Started</h2>
@@ -90,10 +90,9 @@ function OnboardingChecklist({ subscriptions, progress, profile }) {
         </button>
       </div>
 
-      {/* Progress bar */}
-      <div className="h-1.5 bg-surface-700/50 rounded-full overflow-hidden mb-5 relative">
+      <div className="h-1.5 bg-white/[0.08] rounded-full overflow-hidden mb-5 relative">
         <div
-          className="h-full bg-gradient-to-r from-accent-cyan to-accent-purple rounded-full transition-all duration-700"
+          className="h-full bg-gradient-to-r from-accent-blue to-accent-purple rounded-full transition-all duration-700"
           style={{ width: `${(completedCount / steps.length) * 100}%` }}
         />
       </div>
@@ -131,7 +130,7 @@ function OnboardingChecklist({ subscriptions, progress, profile }) {
           </Link>
         ))}
       </div>
-    </div>
+    </FixitPanel>
   )
 }
 
@@ -246,6 +245,22 @@ export default function Dashboard() {
         </div>
       )}
 
+      <PageHeader
+        eyebrow="Dashboard"
+        title={`Welcome back, ${user?.first_name || user?.username || 'there'}`}
+        subtitle="Track your progress, manage labs, and keep levelling up."
+        actions={
+          <div className="flex items-center gap-3 shrink-0">
+            {activeLabs.length > 0 && (
+              <Link to={`/lab/${activeLabs[0].id}`} className="btn-primary flex items-center gap-2 shadow-lg shadow-accent-cyan/25 animate-pulse-glow text-sm">
+                <Play size={15} /> Resume Lab
+              </Link>
+            )}
+            <Link to="/subscriptions" className="btn-secondary flex items-center gap-2 text-sm"><CreditCard size={14} /> Subscriptions</Link>
+          </div>
+        }
+      />
+
       <OnboardingChecklist
         subscriptions={subscriptions.filter(s => s.is_active)}
         progress={progress}
@@ -253,24 +268,21 @@ export default function Dashboard() {
       />
 
       {/* ═══ HERO HEADER ═══ */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-900/90 via-surface-900/70 to-surface-800/50 border border-surface-700/40 p-6 sm:p-8 animate-slide-up">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/5 via-transparent to-accent-purple/5 pointer-events-none" />
-        <div className="absolute inset-0 bg-grid-pattern opacity-[0.07] pointer-events-none" />
-        {/* Subtle glow orbs */}
-        <div className="absolute -top-16 -left-16 w-48 h-48 bg-accent-cyan/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-accent-purple/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="fx-hero-panel p-6 sm:p-8 animate-fx-rise">
+        <div className="absolute -top-16 -left-16 w-60 h-60 rounded-full bg-accent-blue/16 blur-[40px] pointer-events-none" aria-hidden="true" />
+        <div className="absolute -bottom-12 -right-12 w-52 h-52 rounded-full bg-accent-purple/16 blur-[40px] pointer-events-none" aria-hidden="true" />
 
         <div className="relative">
           {/* Top row */}
           <div className="flex items-start justify-between flex-wrap gap-4 mb-5">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
-                <span className="text-xs font-semibold text-accent-green/80 uppercase tracking-widest">Your Dashboard</span>
+                <div className="w-[7px] h-[7px] rounded-full bg-accent-green shadow-[0_0_10px] shadow-accent-green animate-pulse" />
+                <span className="text-[11px] font-bold text-accent-green uppercase tracking-[0.16em]">Your dashboard</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
+              <h1 className="font-display text-2xl sm:text-[30px] font-extrabold text-white tracking-tight leading-tight">
                 Welcome back,{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple animate-text-gradient">
+                <span className="text-gradient-brand">
                   {user?.first_name || user?.username}
                 </span>
               </h1>
@@ -287,14 +299,14 @@ export default function Dashboard() {
           </div>
 
           {/* Stats strip */}
-          <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-surface-700/40">
+          <div className="flex flex-wrap items-center gap-2.5 pt-4 border-t border-white/[0.08]">
             {[
               { label: 'Completed', value: stats.completed || 0, color: 'text-accent-green' },
               { label: 'Avg Score', value: stats.average_score || 0, color: 'text-accent-amber' },
-              { label: 'Active Subs', value: subscriptions.filter(s => s.is_active).length, color: 'text-accent-cyan' },
+              { label: 'Active Subs', value: subscriptions.filter(s => s.is_active).length, color: 'text-accent-blue' },
               { label: 'Achievements', value: earnedAch.length, color: 'text-accent-purple' },
             ].map(({ label, value, color }) => (
-              <div key={label} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-800/50 border border-surface-700/30">
+              <div key={label} className="flex items-center gap-2 px-3 py-1.5 rounded-[10px] bg-white/[0.04] border border-white/[0.08]">
                 <span className={`text-sm font-bold tabular-nums ${color}`}>{value}</span>
                 <span className="text-xs text-surface-500">{label}</span>
               </div>
@@ -312,8 +324,9 @@ export default function Dashboard() {
       {interviewEntitlement?.platform_enabled !== false && (
         <Link
           to="/interviews"
-          className="relative block glass-card p-5 border border-indigo-500/25 bg-gradient-to-r from-indigo-500/10 to-purple-500/5 hover:border-indigo-500/40 transition-colors animate-slide-up"
+          className="relative block"
         >
+          <FixitPanel padding="p-5" className="border border-indigo-500/25 bg-gradient-to-r from-indigo-500/10 to-purple-500/5 hover:border-indigo-500/40 transition-colors animate-slide-up">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
@@ -335,51 +348,61 @@ export default function Dashboard() {
               Open <ArrowRight size={14} />
             </span>
           </div>
+          </FixitPanel>
         </Link>
       )}
 
       {/* ═══ STAT CARDS ═══ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-        {statCards.map(({ label, value, icon: Icon, color, bg, glow }, idx) => (
-          <div key={label} className="glass-card stat-card card-3d card-shine p-6 group hover:border-surface-600 transition-all animate-slide-up"
-            style={{ animationDelay: `${idx * 120}ms`, animationFillMode: 'both' }}>
-            <div className={`w-12 h-12 rounded-xl ${bg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg ${glow} icon-glow`}>
-              <Icon size={22} className={color} />
-            </div>
-            <p className="text-3xl font-extrabold text-white tabular-nums">{value}</p>
-            <p className="text-sm text-surface-300 mt-1.5 font-medium">{label}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {statCards.map(({ label, value, icon, color, bg }, idx) => (
+          <div key={label} className="animate-fx-rise" style={{ animationDelay: `${idx * 80}ms` }}>
+            <FixitStatCard
+              icon={icon}
+              value={value}
+              label={label}
+              iconBg={bg}
+              iconColor={color}
+            />
           </div>
         ))}
       </div>
 
       {/* Quick actions + continue learning */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Link to="/bookmarks" className="glass-card p-4 hover:border-accent-cyan/30 transition-all group">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-medium text-white"><Bookmark size={16} className="text-accent-cyan" /> Bookmarks</div>
-            <span className="text-lg font-bold text-accent-cyan">{bookmarks.length}</span>
-          </div>
-          <p className="text-xs text-surface-500 mt-2">Saved scenarios to retry</p>
+        <Link to="/bookmarks" className="block group">
+          <FixitPanel padding="p-4" className="hover:border-accent-cyan/30 transition-all h-full">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-medium text-white"><Bookmark size={16} className="text-accent-cyan" /> Bookmarks</div>
+              <span className="text-lg font-bold text-accent-cyan">{bookmarks.length}</span>
+            </div>
+            <p className="text-xs text-surface-500 mt-2">Saved scenarios to retry</p>
+          </FixitPanel>
         </Link>
-        <Link to="/profile" className="glass-card p-4 hover:border-accent-purple/30 transition-all">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-medium text-white"><Bell size={16} className="text-accent-purple" /> Notifications</div>
-            <span className="text-lg font-bold text-accent-purple">{unreadNotifications}</span>
-          </div>
-          <p className="text-xs text-surface-500 mt-2">Unread updates</p>
+        <Link to="/profile" className="block">
+          <FixitPanel padding="p-4" className="hover:border-accent-purple/30 transition-all h-full">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-medium text-white"><Bell size={16} className="text-accent-purple" /> Notifications</div>
+              <span className="text-lg font-bold text-accent-purple">{unreadNotifications}</span>
+            </div>
+            <p className="text-xs text-surface-500 mt-2">Unread updates</p>
+          </FixitPanel>
         </Link>
-        <Link to="/lab-history" className="glass-card p-4 hover:border-accent-amber/30 transition-all">
-          <div className="flex items-center gap-2 text-sm font-medium text-white"><History size={16} className="text-accent-amber" /> Lab History</div>
-          <p className="text-xs text-surface-500 mt-2">Past attempts & scores</p>
+        <Link to="/lab-history" className="block">
+          <FixitPanel padding="p-4" className="hover:border-accent-amber/30 transition-all h-full">
+            <div className="flex items-center gap-2 text-sm font-medium text-white"><History size={16} className="text-accent-amber" /> Lab History</div>
+            <p className="text-xs text-surface-500 mt-2">Past attempts & scores</p>
+          </FixitPanel>
         </Link>
-        <Link to="/achievements" className="glass-card p-4 hover:border-accent-green/30 transition-all">
-          <div className="flex items-center gap-2 text-sm font-medium text-white"><BarChart3 size={16} className="text-accent-green" /> Progress</div>
-          <p className="text-xs text-surface-500 mt-2">{stats.completed || 0} scenarios completed</p>
+        <Link to="/achievements" className="block">
+          <FixitPanel padding="p-4" className="hover:border-accent-green/30 transition-all h-full">
+            <div className="flex items-center gap-2 text-sm font-medium text-white"><BarChart3 size={16} className="text-accent-green" /> Progress</div>
+            <p className="text-xs text-surface-500 mt-2">{stats.completed || 0} scenarios completed</p>
+          </FixitPanel>
         </Link>
       </div>
 
       {Object.keys(displayedTechProgress).length > 0 && (
-        <div className="glass-card p-6">
+        <FixitPanel>
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Layers size={18} className="text-accent-cyan" /> Progress by Technology</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Object.entries(displayedTechProgress).map(([name, data]) => {
@@ -398,11 +421,11 @@ export default function Dashboard() {
               )
             })}
           </div>
-        </div>
+        </FixitPanel>
       )}
 
       {recent.filter(r => !r.completed && r.status !== 'COMPLETED').length > 0 && (
-        <div className="glass-card p-6 border-accent-cyan/20">
+        <FixitPanel className="border-accent-cyan/20">
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Play size={18} className="text-accent-cyan" /> Continue Learning</h2>
           <div className="space-y-2">
             {recent.filter(r => !r.completed && r.status !== 'COMPLETED').slice(0, 4).map(item => (
@@ -415,11 +438,11 @@ export default function Dashboard() {
               </Link>
             ))}
           </div>
-        </div>
+        </FixitPanel>
       )}
 
       {activeLabs.length > 0 && (
-        <div className="glass-card p-4 border-accent-amber/20 bg-accent-amber/5 relative overflow-hidden">
+        <FixitPanel padding="p-4" className="border-accent-amber/20 bg-accent-amber/5 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-accent-amber/[0.04] via-transparent to-transparent pointer-events-none" />
           <h3 className="text-sm font-semibold text-accent-amber mb-3 flex items-center gap-2 relative"><Zap size={14} className="animate-pulse" /> Active Labs</h3>
           <div className="space-y-2 relative">
@@ -433,11 +456,11 @@ export default function Dashboard() {
               </Link>
             ))}
           </div>
-        </div>
+        </FixitPanel>
       )}
 
       {jiraTickets.length > 0 && (
-        <div className="glass-card p-4 border-blue-500/20 bg-blue-500/5 relative overflow-hidden">
+        <FixitPanel padding="p-4" className="border-blue-500/20 bg-blue-500/5 relative overflow-hidden">
           <h3 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
             <Ticket size={14} /> My Incident Tickets
           </h3>
@@ -478,13 +501,13 @@ export default function Dashboard() {
             </div>
           )}
           <p className="text-[11px] text-surface-500 mt-3">Personal tickets only — you cannot see other learners&apos; incidents.</p>
-        </div>
+        </FixitPanel>
       )}
 
       <div className="bg-gradient-stripe rounded-full" />
 
       {/* ═══ MY SUBSCRIPTIONS ═══ */}
-      <div className="glass-card p-6 relative overflow-hidden">
+      <FixitPanel className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-accent-amber/[0.04] via-transparent to-accent-cyan/[0.04] pointer-events-none" />
         <div className="flex items-center justify-between mb-5 relative">
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><Crown size={18} className="text-accent-amber" /> My Subscriptions</h2>
@@ -557,7 +580,7 @@ export default function Dashboard() {
             })}
           </div>
         )}
-      </div>
+      </FixitPanel>
 
       <div className="bg-gradient-stripe rounded-full" />
       <ActivityHeatmap recentActivity={recent} />
@@ -565,7 +588,7 @@ export default function Dashboard() {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           {Object.keys(diffProgress).length > 0 && (
-            <div className="glass-card p-6 relative overflow-hidden">
+            <FixitPanel className="relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/[0.04] via-transparent to-accent-purple/[0.03] pointer-events-none" />
               <h2 className="text-lg font-bold text-white mb-5 flex items-center gap-2 relative"><Target size={18} className="text-accent-cyan" /> By Difficulty</h2>
               <div className="grid grid-cols-3 gap-4 relative">
@@ -584,9 +607,9 @@ export default function Dashboard() {
                   )
                 })}
               </div>
-            </div>
+            </FixitPanel>
           )}
-          <div className="glass-card p-6 relative overflow-hidden">
+          <FixitPanel className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-accent-blue/[0.03] via-transparent to-accent-green/[0.02] pointer-events-none" />
             <h2 className="text-lg font-bold text-white mb-5 flex items-center gap-2 relative"><Clock size={18} className="text-accent-blue" /> Recent Activity</h2>
             {recent.length === 0 ? (
@@ -605,10 +628,10 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
-          </div>
+          </FixitPanel>
         </div>
         <div className="space-y-6">
-          <div className="glass-card p-6 relative overflow-hidden">
+          <FixitPanel className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-accent-amber/[0.04] via-transparent to-accent-pink/[0.03] pointer-events-none" />
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 relative">
               <Award size={18} className="text-accent-amber" /> Achievements
@@ -630,8 +653,8 @@ export default function Dashboard() {
                 })}
               </div>
             )}
-          </div>
-          <div className="glass-card p-6 relative overflow-hidden">
+          </FixitPanel>
+          <FixitPanel className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-accent-purple/[0.04] via-transparent to-accent-blue/[0.03] pointer-events-none" />
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 relative"><BookOpen size={18} className="text-accent-purple" /> Account</h2>
             <div className="space-y-3 text-sm relative">
@@ -647,12 +670,12 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-          </div>
+          </FixitPanel>
         </div>
       </div>
 
       {recommended.length > 0 && (
-        <div className="glass-card p-5 space-y-3">
+        <FixitPanel padding="p-5" className="space-y-3">
           <h3 className="font-semibold text-white text-sm flex items-center gap-2">
             <TrendingUp size={16} className="text-accent-cyan" /> Recommended Next
           </h3>
@@ -675,7 +698,7 @@ export default function Dashboard() {
               </Link>
             ))}
           </div>
-        </div>
+        </FixitPanel>
       )}
 
       <div className="flex flex-wrap gap-3">
@@ -687,7 +710,8 @@ export default function Dashboard() {
       {/* ═══ CANCEL MODAL ═══ */}
       {cancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in" onClick={() => !cancelling && setCancelModal(null)}>
-          <div className="glass-card p-6 max-w-md w-full gradient-border animate-scale-in relative overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="max-w-md w-full animate-scale-in" onClick={e => e.stopPropagation()}>
+          <FixitPanel padding="p-6" className="gradient-border relative overflow-hidden">
             <button
               type="button"
               onClick={() => !cancelling && setCancelModal(null)}
@@ -713,6 +737,7 @@ export default function Dashboard() {
                 {cancelling ? <><div className="w-4 h-4 border-2 border-accent-red/30 border-t-accent-red rounded-full animate-spin" /> Cancelling...</> : <><XCircle size={14} /> Cancel Subscription</>}
               </button>
             </div>
+          </FixitPanel>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
-import { Ticket, Search, RefreshCw, Plus, User, Target, X } from 'lucide-react'
+import { AdminPageHeader } from '../../components/design'
+import { Ticket, Search, Plus, User, Target, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import JiraTicketLink from '../../components/JiraTicketLink'
 
@@ -88,26 +89,20 @@ export default function AdminJira() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Ticket size={24} className="text-blue-400" />
-            Jira Tickets
-          </h1>
-          <p className="text-surface-400 mt-1">
-            {stats.open_count} open · {stats.closed_count} closed
-            {!stats.jira_enabled && ' · Jira integration disabled'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => loadTickets(true)} className="btn-secondary flex items-center gap-2 text-sm">
-            <RefreshCw size={14} /> Refresh from Jira
-          </button>
-          <button onClick={openCreateModal} className="btn-primary flex items-center gap-2 text-sm">
-            <Plus size={14} /> Create Ticket
-          </button>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Jira Tickets"
+        subtitle={`${stats.open_count} open · ${stats.closed_count} closed${!stats.jira_enabled ? ' · Jira integration disabled' : ''}`}
+        actions={
+          <>
+            <button onClick={() => loadTickets(true)} className="btn-secondary flex items-center gap-2 text-sm">
+              Refresh from Jira
+            </button>
+            <button onClick={openCreateModal} className="btn-primary flex items-center gap-2 text-sm">
+              <Plus size={14} /> Create Ticket
+            </button>
+          </>
+        }
+      />
 
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">

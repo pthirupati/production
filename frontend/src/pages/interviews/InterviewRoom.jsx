@@ -10,6 +10,7 @@ import {
   stopMediaStream,
 } from '../../utils/mediaDevices'
 import InterviewVideoPreview from '../../components/interviews/InterviewVideoPreview'
+import { PageHeader } from '../../components/design'
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Clock, MessageSquare, Terminal,
   Volume2, Plus, ExternalLink, Loader2, ArrowLeft, Calendar, X,
@@ -481,11 +482,14 @@ export default function InterviewRoom() {
             <X size={14} /> Cancel
           </button>
         </div>
-        <h1 className="text-xl font-bold text-white">Pre-interview check</h1>
+        <PageHeader
+          eyebrow="AI Interview Studio"
+          title="Pre-interview check"
+          subtitle={`${round.title} with ${round.persona_name}`}
+        />
         {round.is_sample && (
-          <p className="text-xs text-cyan-400 font-medium">Free sample — {round.duration_minutes} minutes only</p>
+          <p className="text-xs text-cyan-400 font-medium -mt-4">Free sample — {round.duration_minutes} minutes only</p>
         )}
-        <p className="text-sm text-surface-400">{round.title} with {round.persona_name}</p>
         <ul className="text-xs text-surface-400 space-y-2 list-disc pl-4">
           <li>Quiet room, headphones recommended</li>
           <li>Microphone and camera must stay on</li>

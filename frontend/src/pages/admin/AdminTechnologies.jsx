@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
+import { AdminPageHeader } from '../../components/design'
 import { Plus, Edit2, Trash2, X, Save, Cpu, Tag, WrenchIcon, AlertTriangle, Mail, Users, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -160,12 +161,10 @@ export default function AdminTechnologies() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Technologies & Tags</h1>
-          <p className="text-surface-400 mt-1">Manage technology categories, maintenance, and scenario tags</p>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Technologies & Tags"
+        subtitle="Manage technology categories, maintenance, and scenario tags"
+      />
 
       {/* Tabs */}
       <div className="flex gap-1 bg-surface-800/50 rounded-lg p-1 w-fit">

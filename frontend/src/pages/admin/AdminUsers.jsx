@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { adminApi } from '../../api/admin'
+import { AdminPageHeader } from '../../components/design'
 import { Search, UserPlus, Ban, Trash2, Shield, X, Save, Key, Eye, Phone, Mail, Activity, Download, CheckSquare, Square, MinusSquare, Users, ShieldOff, UserCheck, UserX, Crown, MapPin, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { SkeletonTable } from '../../components/Skeleton'
@@ -182,21 +183,21 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Users</h1>
-          <p className="text-surface-400 mt-1">Manage platform users ({users.length} total)</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleExportCSV} disabled={exporting}
-            className="btn-secondary flex items-center gap-2 text-sm">
-            <Download size={14} /> {exporting ? 'Exporting...' : 'Export CSV'}
-          </button>
-          <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
-            <UserPlus size={16} /> Add User
-          </button>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Users"
+        subtitle={`Manage platform users (${users.length} total)`}
+        actions={
+          <>
+            <button onClick={handleExportCSV} disabled={exporting}
+              className="btn-secondary flex items-center gap-2 text-sm">
+              <Download size={14} /> {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+            <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+              <UserPlus size={16} /> Add User
+            </button>
+          </>
+        }
+      />
 
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
@@ -405,7 +406,7 @@ export default function AdminUsers() {
         {loading ? (
           <SkeletonTable rows={6} cols={6} />
         ) : (
-          <table className="w-full">
+          <table className="fx-admin-table">
             <thead>
               <tr className="border-b border-surface-700/50 text-left">
                 <th className="px-4 py-3 w-10">

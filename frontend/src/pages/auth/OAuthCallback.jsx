@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { authApi } from '../../api/auth'
-import { Terminal, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getOAuthRedirectUri } from '../../utils/oauth'
+import { AuthShell } from '../../components/design'
 
 export default function OAuthCallback() {
   const { provider } = useParams()
@@ -67,58 +68,60 @@ export default function OAuthCallback() {
     exchange()
   }, [provider, searchParams, navigate])
 
+  const providerLabel = provider === 'github' ? 'GitHub' : 'Google'
+
+  const title =
+    status === 'processing'
+      ? 'Signing you in…'
+      : status === 'success'
+        ? 'Welcome!'
+        : registrationRequired
+          ? 'Register first'
+          : 'Authentication failed'
+
+  const subtitle =
+    status === 'processing'
+      ? `Verifying your ${providerLabel} account`
+      : status === 'success'
+        ? 'Redirecting to your dashboard…'
+        : error
+
   return (
-    <div className="min-h-screen bg-surface-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-md text-center">
-        <div className="mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-cyan to-brand-600 flex items-center justify-center mx-auto shadow-lg shadow-accent-cyan/20">
-            <Terminal size={28} className="text-white" />
+    <AuthShell compact title={title} subtitle={status !== 'error' || registrationRequired ? subtitle : undefined}>
+      {status === 'processing' && (
+        <div className="flex flex-col items-center gap-4 py-2">
+          <Loader2 size={40} className="text-accent-cyan animate-spin" />
+        </div>
+      )}
+
+      {status === 'success' && (
+        <div className="flex flex-col items-center gap-4 py-2 animate-fx-rise">
+          <CheckCircle2 size={44} className="text-accent-green" />
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div className="flex flex-col items-center gap-4 animate-fx-rise">
+          <AlertCircle size={44} className="text-accent-red" />
+          {!registrationRequired && <p className="text-surface-400 text-sm text-center">{error}</p>}
+          {registrationRequired && (
+            <p className="text-surface-400 text-sm text-center">{error}</p>
+          )}
+          <div className="flex flex-wrap gap-3 justify-center mt-2">
+            {registrationRequired ? (
+              <>
+                <Link to="/register" className="btn-primary px-6">Create account</Link>
+                <button type="button" onClick={() => navigate('/login')} className="btn-secondary px-6">Back to Login</button>
+              </>
+            ) : (
+              <button type="button" onClick={() => navigate('/login')} className="btn-primary px-6">Back to Login</button>
+            )}
           </div>
-        </div>
-
-        <div className="glass-card p-8">
-          {status === 'processing' && (
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-10 h-10 border-3 border-accent-cyan/30 border-t-accent-cyan rounded-full animate-spin" />
-              <h2 className="text-xl font-semibold text-white">Signing you in…</h2>
-              <p className="text-surface-400 text-sm">
-                Verifying your {provider === 'github' ? 'GitHub' : 'Google'} account
-              </p>
-            </div>
-          )}
-
-          {status === 'success' && (
-            <div className="flex flex-col items-center gap-4 animate-slide-up">
-              <CheckCircle2 size={40} className="text-accent-green" />
-              <h2 className="text-xl font-semibold text-white">Welcome!</h2>
-              <p className="text-surface-400 text-sm">Redirecting to dashboard…</p>
-            </div>
-          )}
-
-          {status === 'error' && (
-            <div className="flex flex-col items-center gap-4 animate-slide-up">
-              <AlertCircle size={40} className="text-accent-red" />
-              <h2 className="text-xl font-semibold text-white">
-                {registrationRequired ? 'Register first' : 'Authentication Failed'}
-              </h2>
-              <p className="text-surface-400 text-sm">{error}</p>
-              <div className="flex flex-wrap gap-3 justify-center mt-2">
-                {registrationRequired ? (
-                  <>
-                    <Link to="/register" className="btn-primary px-6">Create account</Link>
-                    <button onClick={() => navigate('/login')} className="btn-secondary px-6">Back to Login</button>
-                  </>
-                ) : (
-                  <button onClick={() => navigate('/login')} className="btn-primary px-6">Back to Login</button>
-                )}
-              </div>
-              {registrationRequired && providerEmail && (
-                <p className="text-xs text-surface-500">Use the same email ({providerEmail}) when registering.</p>
-              )}
-            </div>
+          {registrationRequired && providerEmail && (
+            <p className="text-xs text-surface-500">Use the same email ({providerEmail}) when registering.</p>
           )}
         </div>
-      </div>
-    </div>
+      )}
+    </AuthShell>
   )
 }
