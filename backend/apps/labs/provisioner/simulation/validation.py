@@ -608,7 +608,14 @@ def _run_line_check(
         return True
 
     # ── Filesystem mounted at /data (mount | grep /data) ──
+    # Scoped to the new disk/LVM-creation scenarios. Other scenarios legitimately
+    # use /data with their own mount model, so for them we must NOT recognize this
+    # line (return False) or we'd turn a previously-ignored line into a failure.
+    _slug = (getattr(state, "scenario_slug", "") or "").lower()
+    _DATA_FS_SLUGS = ("lvm-create-mount", "disk-missing-rescan", "mkfs-mount")
     if "mount" in stripped and "/data" in stripped and "fstab" not in stripped:
+        if not any(m in _slug for m in _DATA_FS_SLUGS):
+            return False
         mounted = "/data" in state.mounts or any(
             d.mountpoint == "/data" for d in state.block_devices.values()
         )
@@ -618,6 +625,8 @@ def _run_line_check(
 
     # ── fstab persistence for /data (grep /data /etc/fstab) ──
     if "grep" in stripped and "/data" in stripped and "/etc/fstab" in stripped:
+        if not any(m in _slug for m in _DATA_FS_SLUGS):
+            return False
         fstab = state.read_file("/etc/fstab") or ""
         if "/data" not in fstab:
             failures.append("/data not in /etc/fstab — it will not remount on reboot")
@@ -625,6 +634,8 @@ def _run_line_check(
 
     # ── Active swap on /dev/sdc (swapon --show | grep /dev/sdc) ──
     if "swapon" in stripped and "/dev/sdc" in stripped:
+        if "swap-not-active" not in _slug:
+            return False
         dev = state.find_block_device("/dev/sdc")
         active = "/dev/sdc" in state.swaps and (dev is None or dev.mountpoint == "[SWAP]")
         if not active:
@@ -633,6 +644,8 @@ def _run_line_check(
 
     # ── fstab persistence for the swap device (grep /dev/sdc /etc/fstab) ──
     if "grep" in stripped and "/dev/sdc" in stripped and "/etc/fstab" in stripped:
+        if "swap-not-active" not in _slug:
+            return False
         fstab = state.read_file("/etc/fstab") or ""
         if "/dev/sdc" not in fstab:
             failures.append("/dev/sdc swap not in /etc/fstab — it will not activate on reboot")

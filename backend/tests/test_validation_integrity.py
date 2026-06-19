@@ -95,3 +95,30 @@ class ValidationIntegrityTests(TestCase):
     def test_resolver_routes_terraform_before_generic(self):
         script = resolve_simulation_validation_script("terraform-state-backend-corrupt", "exit 0")
         self.assertIn("terraform", script)
+
+    def test_fix_flags_survive_serialization_roundtrip(self):
+        """Cross-worker (Redis) validation must see fix-flags set by a fix.
+
+        ldconfig/terraform/windows fixes set plain attributes; if those aren't
+        serialized they're lost when another worker reloads the engine, and the
+        scenario validates as unfixed (the recurring ldconfig CI failure).
+        """
+        import json
+        from apps.labs.provisioner.simulation import sim_persistence as sp
+        from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
+
+        engine = UnifiedSimulationEngine("ldconfig-missing-library", simulation_type="generic")
+        st = engine.shell.state
+        st._mkdir("/etc/ld.so.conf.d")
+        st._write_file("/etc/ld.so.conf.d/fixitlab.conf", "/usr/local/lib\n")
+        st.ldconfig_updated = True
+        st.myapp_working = True
+        st.terraform_fixed = True
+        st.windows_fixed = True
+
+        restored = sp.restore_engine(json.loads(json.dumps(sp.snapshot_engine(engine))))
+        rst = restored.shell.state
+        self.assertTrue(rst.ldconfig_updated)
+        self.assertTrue(rst.myapp_working)
+        self.assertTrue(rst.terraform_fixed)
+        self.assertTrue(rst.windows_fixed)

@@ -97,6 +97,12 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
         "storage_disk_provisioned": st.storage_disk_provisioned,
         "pending_nic_config": st.pending_nic_config,
         "network_nic_provisioned": st.network_nic_provisioned,
+        # Fix-flags read by the validator — must survive a Redis round-trip or
+        # cross-worker validation reads them as unfixed (e.g. ldconfig in CI).
+        "ldconfig_updated": getattr(st, "ldconfig_updated", False),
+        "myapp_working": getattr(st, "myapp_working", False),
+        "terraform_fixed": getattr(st, "terraform_fixed", False),
+        "windows_fixed": getattr(st, "windows_fixed", False),
         "network_ifs": st.network_ifs,
         "lvm": {
             "pvs": {k: asdict(v) for k, v in lvm.pvs.items()},
@@ -141,6 +147,10 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
     st.env = data.get("env", st.env)
     st.dmesg_extra = list(data.get("dmesg_extra", []))
     st.gpu_healthy = data.get("gpu_healthy", True)
+    st.ldconfig_updated = data.get("ldconfig_updated", False)
+    st.myapp_working = data.get("myapp_working", False)
+    st.terraform_fixed = data.get("terraform_fixed", False)
+    st.windows_fixed = data.get("windows_fixed", False)
     st.initramfs_fixed = data.get("initramfs_fixed", False)
     st.grub_fixed = data.get("grub_fixed", False)
     st.mbr_fixed = data.get("mbr_fixed", False)
