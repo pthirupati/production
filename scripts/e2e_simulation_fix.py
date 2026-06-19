@@ -52,6 +52,20 @@ def _fix_boot_issue(engine: UnifiedSimulationEngine, slug: str) -> None:
 
 
 def apply_simulation_fix(session) -> tuple[bool, str]:
+    """Run the scenario fix, then persist the engine so cross-worker validation
+    (which may restore the engine from LabSession.simulation_snapshot) sees the
+    repaired state instead of the stale pre-fix snapshot."""
+    result = _apply_simulation_fix(session)
+    try:
+        if result and result[0]:
+            from apps.labs.provisioner.simulation.sim_persistence import persist_session_snapshot
+            persist_session_snapshot(str(session.id))
+    except Exception:
+        pass
+    return result
+
+
+def _apply_simulation_fix(session) -> tuple[bool, str]:
     """Run scenario-specific fix commands against the simulation engine."""
     engine = _engine_for_session(session)
     if not engine:
