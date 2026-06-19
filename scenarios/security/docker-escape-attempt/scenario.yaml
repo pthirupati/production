@@ -25,7 +25,7 @@ initial_state: |
 hints:
   - order: 1
     cost: 10
-    content: "Run `docker inspect webapp | grep -A5 'Privileged\|Binds\|CapAdd'` to see the dangerous configuration."
+    content: 'Run `docker inspect webapp | grep -A5 ''Privileged\|Binds\|CapAdd''` to see the dangerous configuration.'
   - order: 2
     cost: 15
     content: "Stop the container: `docker stop webapp && docker rm webapp` before redeploying with restricted settings."

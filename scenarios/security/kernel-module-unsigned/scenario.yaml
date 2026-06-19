@@ -28,7 +28,7 @@ initial_state: |
 hints:
   - order: 1
     cost: 10
-    content: "Identify: `lsmod | grep -v 'official\|canonical'`. Check signatures: `modinfo <module> | grep sig`"
+    content: 'Identify: `lsmod | grep -v ''official\|canonical''`. Check signatures: `modinfo <module> | grep sig`'
   - order: 2
     cost: 15
     content: "Unload: `rmmod hidepid` (may need `-f` if dependencies exist)"

@@ -27,7 +27,7 @@ initial_state: |
 hints:
   - order: 1
     cost: 10
-    content: "Check current policies: `iptables -L -n | grep 'Chain INPUT\|Chain FORWARD\|Chain OUTPUT'`"
+    content: 'Check current policies: `iptables -L -n | grep ''Chain INPUT\|Chain FORWARD\|Chain OUTPUT''`'
   - order: 2
     cost: 15
     content: "Add ACCEPT rules FIRST: `iptables -A INPUT -p tcp --dport 22 -j ACCEPT` (then 80, 443)"

@@ -25,7 +25,7 @@ initial_state: |
 hints:
   - order: 1
     cost: 10
-    content: "Find the rule: `grep -A5 'svc-discovery\|etc/hosts' /var/ossec/logs/alerts/alerts.log | grep 'Rule:'` to identify the rule ID (likely 550 or 554)."
+    content: 'Find the rule: `grep -A5 ''svc-discovery\|etc/hosts'' /var/ossec/logs/alerts/alerts.log | grep ''Rule:''` to identify the rule ID (likely 550 or 554).'
   - order: 2
     cost: 15
     content: "In /var/ossec/rules/local_rules.xml add a rule: `<rule id='100001' level='0'><if_sid>550</if_sid><match>/etc/hosts</match><description>FP: svc-discovery modifying /etc/hosts</description></rule>`"

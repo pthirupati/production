@@ -28,7 +28,7 @@ hints:
     content: "Review alerts: `tail -100 /var/log/snort/alert` and look for source IPs. Use `sort -u` to identify unique sources and `uniq -c` to count frequency."
   - order: 2
     cost: 15
-    content: "Inspect the pcap: `tcpdump -r /opt/evidence/suspicious.pcap -A | grep -i 'union\|select\|insert\|drop table'` to see the actual SQL injection payloads."
+    content: 'Inspect the pcap: `tcpdump -r /opt/evidence/suspicious.pcap -A | grep -i ''union\|select\|insert\|drop table''` to see the actual SQL injection payloads.'
   - order: 3
     cost: 20
     content: "Write a more specific rule in /etc/snort/rules/local.rules: `alert tcp any any -> $HTTP_SERVERS 80 (msg:\"SQL Injection UNION SELECT\"; content:\"UNION SELECT\"; nocase; sid:1000002; rev:1;)`"

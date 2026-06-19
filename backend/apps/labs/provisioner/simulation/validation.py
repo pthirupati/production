@@ -567,6 +567,146 @@ def _run_line_check(
                 failures.append("FAIL: restore /etc/ld.so.conf.d/fixitlab.conf and run ldconfig")
         return True
 
+    # ── SELinux: getenforce must stay Enforcing for the SELinux-port scenario ──
+    if stripped == "getenforce" or stripped.endswith(" getenforce"):
+        slug = (state.scenario_slug or "").lower()
+        if "selinux" in slug and "port" in slug:
+            if state.selinux_mode != "Enforcing":
+                failures.append("SELinux must remain Enforcing — do not disable it to fix the port")
+        return True
+
+    # ── SELinux port label (semanage port -l | grep http_port_t ... 8080) ──
+    if "semanage port" in stripped and "http_port_t" in stripped:
+        ports = state.selinux_ports.get("http_port_t", [])
+        if 8080 not in ports:
+            failures.append("port 8080 not in http_port_t — semanage port -a -t http_port_t -p tcp 8080")
+        return True
+
+    # ── New block device discovered + formatted (blkid | grep /dev/sdc) ──
+    if "blkid" in stripped and "/dev/sdc" in stripped:
+        dev = state.find_block_device("/dev/sdc")
+        if dev is None:
+            failures.append("/dev/sdc not visible — rescan the SCSI bus first")
+        elif not dev.fstype:
+            failures.append("/dev/sdc has no filesystem — run mkfs on it")
+        return True
+
+    # ── LVM provisioned on /dev/sdc (pvs | grep /dev/sdc) ──
+    # Fail-closed: the spare disk may be a known device, but it counts as solved
+    # only once it has been initialised AND added to the new volume group.
+    if "pvs" in stripped and "/dev/sdc" in stripped:
+        pv = state.lvm.pvs.get("/dev/sdc")
+        if not pv or not pv.vg:
+            failures.append("/dev/sdc is not in a volume group — pvcreate then vgcreate vgdata /dev/sdc")
+        return True
+
+    # ── LVM logical volume created (lvs | grep lvdata) ──
+    if "lvs" in stripped and "lvdata" in stripped:
+        has_lv = any("lvdata" in name for name in state.lvm.lvs)
+        if not has_lv:
+            failures.append("logical volume lvdata not found — create it with lvcreate")
+        return True
+
+    # ── Filesystem mounted at /data (mount | grep /data) ──
+    if "mount" in stripped and "/data" in stripped and "fstab" not in stripped:
+        mounted = "/data" in state.mounts or any(
+            d.mountpoint == "/data" for d in state.block_devices.values()
+        )
+        if not mounted:
+            failures.append("/data is not mounted")
+        return True
+
+    # ── fstab persistence for /data (grep /data /etc/fstab) ──
+    if "grep" in stripped and "/data" in stripped and "/etc/fstab" in stripped:
+        fstab = state.read_file("/etc/fstab") or ""
+        if "/data" not in fstab:
+            failures.append("/data not in /etc/fstab — it will not remount on reboot")
+        return True
+
+    # ── Active swap on /dev/sdc (swapon --show | grep /dev/sdc) ──
+    if "swapon" in stripped and "/dev/sdc" in stripped:
+        dev = state.find_block_device("/dev/sdc")
+        active = "/dev/sdc" in state.swaps and (dev is None or dev.mountpoint == "[SWAP]")
+        if not active:
+            failures.append("/dev/sdc is not active swap — run mkswap then swapon")
+        return True
+
+    # ── fstab persistence for the swap device (grep /dev/sdc /etc/fstab) ──
+    if "grep" in stripped and "/dev/sdc" in stripped and "/etc/fstab" in stripped:
+        fstab = state.read_file("/etc/fstab") or ""
+        if "/dev/sdc" not in fstab:
+            failures.append("/dev/sdc swap not in /etc/fstab — it will not activate on reboot")
+        return True
+
+    # ── Persistent default gateway (grep GATEWAY /etc/sysconfig/network) ──
+    if "grep" in stripped and "GATEWAY" in stripped:
+        net = state.read_file("/etc/sysconfig/network") or ""
+        if "GATEWAY=" not in net:
+            failures.append("no GATEWAY= line in /etc/sysconfig/network — default route not persisted")
+        return True
+
+    # ── Persistent sysctl ip_forward (sysctl net.ipv4.ip_forward) ──
+    if "sysctl" in stripped and "ip_forward" in stripped:
+        def _forward_enabled(content: str) -> bool:
+            for raw in content.splitlines():
+                line = raw.split("#", 1)[0].strip()
+                if line.startswith("net.ipv4.ip_forward") and "=" in line:
+                    if line.split("=", 1)[1].strip() == "1":
+                        return True
+            return False
+
+        persisted = _forward_enabled(state.read_file("/etc/sysctl.conf") or "")
+        # Any drop-in under /etc/sysctl.d that enables forwarding also counts.
+        for path, node in state.vfs.items():
+            if path.startswith("/etc/sysctl.d/") and isinstance(node, dict) and node.get("type") == "file":
+                if _forward_enabled(node.get("content", "")):
+                    persisted = True
+        if not persisted:
+            failures.append("net.ipv4.ip_forward not persistently set to 1 in sysctl config")
+        return True
+
+    # ── Kernel module persisted (grep -r br_netfilter /etc/modules-load.d) ──
+    if "br_netfilter" in stripped and "modules-load.d" in stripped:
+        loaded = False
+        for path, node in state.vfs.items():
+            if path.startswith("/etc/modules-load.d/") and isinstance(node, dict) and node.get("type") == "file":
+                if "br_netfilter" in node.get("content", ""):
+                    loaded = True
+        if not loaded:
+            failures.append("br_netfilter not configured to load at boot under /etc/modules-load.d")
+        return True
+
+    # ── Postgres max_connections raised above the broken default ──
+    if "max_connections" in stripped and "postgresql.conf" in stripped:
+        conf = state.read_file("/var/lib/pgsql/data/postgresql.conf") or ""
+        value = None
+        for line in conf.splitlines():
+            if line.strip().startswith("max_connections"):
+                try:
+                    value = int(line.split("=", 1)[1].strip())
+                except (ValueError, IndexError):
+                    value = None
+        if value is None or value <= 20:
+            failures.append("max_connections still too low — raise it in postgresql.conf and restart")
+        return True
+
+    # ── MySQL crashed-table repair (mysqlcheck --check appdb orders) ──
+    if "mysqlcheck" in stripped or ("appdb" in stripped and "orders" in stripped):
+        if state.read_file("/var/lib/mysql/appdb/orders.CRASHED") is not None:
+            failures.append("orders table still marked crashed — repair it before restarting mysqld")
+        return True
+
+    # ── Postgres WAL archive backlog cleared (ls /var/lib/pgsql/archive | grep wal) ──
+    if "/var/lib/pgsql/archive" in stripped:
+        backlog = [
+            p for p, node in state.vfs.items()
+            if p.startswith("/var/lib/pgsql/archive/") and isinstance(node, dict)
+            and node.get("type") == "file" and p.endswith(".wal")
+        ]
+        if backlog:
+            failures.append("stale archived WAL still present — reclaim disk space before restart")
+        return True
+
     return False
 
 

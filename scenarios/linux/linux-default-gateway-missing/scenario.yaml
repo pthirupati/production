@@ -1,0 +1,39 @@
+title: Missing Default Gateway Breaks Outbound Routing
+slug: linux-default-gateway-missing
+difficulty: easy
+category: Networking
+description: |
+  After a network reconfiguration the server can reach hosts on its local subnet but
+  cannot reach anything off-LAN — there is no default route. The interface eth0 has an
+  address (10.0.0.10/24) but no gateway is configured, so all non-local traffic is
+  dropped. You must configure the default gateway and persist it so it survives a reboot
+  (write GATEWAY=10.0.0.1 into the network config).
+
+initial_state: |
+  Simulated RHEL 9 server. eth0 is up with 10.0.0.10/24 but the routing table has no
+  default route. The persistent network config in /etc/sysconfig/network has no GATEWAY
+  line. Outbound connections to the internet time out.
+
+objectives:
+  - Confirm the routing table has no default route
+  - Configure the default gateway (10.0.0.1) for eth0
+  - Persist it so it survives a reboot by adding GATEWAY=10.0.0.1 to /etc/sysconfig/network
+  - Verify the default route is present
+lab_mode: simulation
+simulation_type: generic
+time_limit: 600
+max_score: 100
+is_free: false
+hints:
+  - content: 'Inspect routing with ip route — there is no "default via" line. The gateway for this subnet is 10.0.0.1.'
+    cost: 10
+    order: 1
+  - content: 'Add it at runtime with ip route add default via 10.0.0.1 dev eth0, then make it persistent.'
+    cost: 15
+    order: 2
+  - content: 'Persist by adding a GATEWAY line: echo "GATEWAY=10.0.0.1" >> /etc/sysconfig/network so the route is restored on reboot.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

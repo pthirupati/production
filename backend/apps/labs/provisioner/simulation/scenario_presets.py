@@ -227,6 +227,124 @@ def _preset_swap_add(state: RHELOSState) -> None:
     state.add_block_device("/dev/sdc", "4G", "disk", present=True)
 
 
+# ── New high-value scenarios ─────────────────────────────────────────
+
+
+def _preset_selinux_httpd_port(state: RHELOSState) -> None:
+    """SELinux Enforcing; nginx wants port 8080 which is NOT in http_port_t, so
+    the bind is denied and nginx fails to start. Fix = semanage port -a."""
+    state.selinux_mode = "Enforcing"
+    # 8080 is intentionally absent from http_port_t so the name_bind is denied.
+    state.selinux_ports.setdefault("http_port_t", [80, 443, 8008, 8009, 8443])
+    state._mkdir("/etc/nginx")
+    state._write_file(
+        "/etc/nginx/nginx.conf",
+        "user nginx;\nworker_processes auto;\n"
+        "server {\n    listen 8080;\n    server_name localhost;\n    root /var/www/html;\n}\n",
+    )
+    state._mkdir("/var/www/html")
+    state._write_file("/var/www/html/index.html", "<html><body>OK</body></html>\n")
+    state.services["nginx"].active = "failed"
+    state.services["nginx"].sub_state = "failed"
+
+
+def _preset_disk_missing_fs(state: RHELOSState) -> None:
+    """A new /dev/sdc is hidden until a SCSI rescan; then it must be formatted,
+    mounted at /data, and persisted in fstab."""
+    state.add_block_device("/dev/sdc", "20G", "disk", present=False)
+    state._mkdir("/data")
+
+
+def _preset_swap_not_active(state: RHELOSState) -> None:
+    """A spare /dev/sdc disk exists but swap is not active and not in fstab."""
+    state.add_block_device("/dev/sdc", "4G", "disk", present=True)
+
+
+def _preset_lvm_create_mount(state: RHELOSState) -> None:
+    """A spare /dev/sdc with no LVM metadata; build PV/VG/LV, mount at /data.
+
+    The disk is registered as a known LVM-capable device (pvs shell command only
+    operates on devices it already knows), but it carries NO volume group — the
+    scenario is solved only once it is added to the new vgdata VG and the LV is
+    created/mounted. Validation keys on PV→VG membership so a bare device is not
+    treated as solved.
+    """
+    from .lvm_state import SimPV
+
+    state.add_block_device("/dev/sdc", "20G", "disk", present=True)
+    state.lvm.pvs["/dev/sdc"] = SimPV("/dev/sdc", vg="", size="20.00g", free="20.00g")
+    state._mkdir("/data")
+
+
+def _preset_default_gateway_missing(state: RHELOSState) -> None:
+    """eth0 has an address but there is no persistent default gateway."""
+    state._mkdir("/etc/sysconfig")
+    # Network config exists but carries no GATEWAY line.
+    state._write_file("/etc/sysconfig/network", "NETWORKING=yes\nHOSTNAME=rhel-sim\n")
+
+
+def _preset_sysctl_ip_forward(state: RHELOSState) -> None:
+    """net.ipv4.ip_forward is off and no sysctl drop-in enables it."""
+    state._mkdir("/etc/sysctl.d")
+    state._write_file("/etc/sysctl.conf", "# sysctl settings\n")
+
+
+def _preset_kernel_module_not_loaded(state: RHELOSState) -> None:
+    """br_netfilter is not loaded and not configured to load at boot."""
+    state._mkdir("/etc/modules-load.d")
+
+
+def _preset_postgres_max_connections(state: RHELOSState) -> None:
+    """PostgreSQL is down and max_connections is far too low in postgresql.conf."""
+    from .rhel_os import SimService
+
+    state.services["postgresql"] = SimService(
+        "postgresql", active="failed", enabled="enabled", description="PostgreSQL",
+    )
+    state._mkdir("/var/lib/pgsql")
+    state._mkdir("/var/lib/pgsql/data")
+    state._write_file(
+        "/var/lib/pgsql/data/postgresql.conf",
+        "listen_addresses = '*'\nmax_connections = 20\nshared_buffers = 128MB\n",
+    )
+
+
+def _preset_mysql_table_crashed(state: RHELOSState) -> None:
+    """mysqld has failed and a MyISAM table is marked crashed."""
+    from .rhel_os import SimService
+
+    state.services["mysqld"] = SimService(
+        "mysqld", active="failed", enabled="enabled", description="MySQL Server",
+    )
+    state._mkdir("/var/lib/mysql")
+    state._mkdir("/var/lib/mysql/appdb")
+    state._write_file("/var/lib/mysql/appdb/orders.MYI", "MyISAM index (corrupt)\n")
+    # The crashed marker is what the validator watches; repair removes it.
+    state._write_file(
+        "/var/lib/mysql/appdb/orders.CRASHED",
+        "Table './appdb/orders' is marked as crashed and should be repaired\n",
+    )
+
+
+def _preset_postgres_disk_full_archive(state: RHELOSState) -> None:
+    """PostgreSQL stopped because the data filesystem filled with archived WAL."""
+    from .rhel_os import SimService
+
+    state.services["postgresql"] = SimService(
+        "postgresql", active="failed", enabled="enabled", description="PostgreSQL",
+    )
+    state._mkdir("/var/lib/pgsql")
+    state._mkdir("/var/lib/pgsql/archive")
+    state._mkdir("/var/lib/pgsql/data")
+    state._mkdir("/var/lib/pgsql/data/pg_wal")
+    # Stale already-archived WAL segments consuming the disk; clearing them frees space.
+    for i in range(1, 6):
+        state._write_file(
+            f"/var/lib/pgsql/archive/0000000100000000000000{i:02d}.wal",
+            "X" * 16,
+        )
+
+
 _PRESETS: dict[str, callable] = {
     "broken-nginx": _preset_broken_nginx,
     "sim-broken-nginx": _preset_broken_nginx,
@@ -259,4 +377,15 @@ _PRESETS: dict[str, callable] = {
     "sim-rhel-mkfs-mount": _preset_mkfs_mount,
     "sim-rhel-selinux-port": _preset_selinux_port,
     "sim-rhel-swap-add": _preset_swap_add,
+    # New high-value scenarios
+    "linux-selinux-httpd-port-denied": _preset_selinux_httpd_port,
+    "linux-disk-missing-rescan-fs": _preset_disk_missing_fs,
+    "linux-swap-not-active": _preset_swap_not_active,
+    "linux-lvm-create-mount": _preset_lvm_create_mount,
+    "linux-default-gateway-missing": _preset_default_gateway_missing,
+    "linux-sysctl-ip-forward": _preset_sysctl_ip_forward,
+    "linux-kernel-module-not-loaded": _preset_kernel_module_not_loaded,
+    "db-postgres-max-connections": _preset_postgres_max_connections,
+    "db-mysql-table-crashed": _preset_mysql_table_crashed,
+    "db-postgres-disk-full-archive": _preset_postgres_disk_full_archive,
 }

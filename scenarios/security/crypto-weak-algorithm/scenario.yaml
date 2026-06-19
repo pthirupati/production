@@ -25,7 +25,7 @@ initial_state: |
 hints:
   - order: 1
     cost: 10
-    content: "Find weak crypto: `grep -rn 'md5\|RC4\|SSLv3' /opt/webapp/ /etc/nginx/` to locate all occurrences."
+    content: 'Find weak crypto: `grep -rn ''md5\|RC4\|SSLv3'' /opt/webapp/ /etc/nginx/` to locate all occurrences.'
   - order: 2
     cost: 15
     content: "In auth.py replace `hashlib.md5(password.encode()).hexdigest()` with bcrypt: `import bcrypt; bcrypt.hashpw(password.encode(), bcrypt.gensalt())`."

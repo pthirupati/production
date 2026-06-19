@@ -1,0 +1,37 @@
+title: Enable IP Forwarding via sysctl
+slug: linux-sysctl-ip-forward
+difficulty: easy
+category: Networking
+description: |
+  This host is meant to act as a router/NAT gateway for a lab network, but packets are
+  not being forwarded between interfaces because net.ipv4.ip_forward is 0. You must
+  enable IP forwarding and make the change persistent so it is reapplied on every boot by
+  adding net.ipv4.ip_forward = 1 to a file under /etc/sysctl.d (or /etc/sysctl.conf).
+
+initial_state: |
+  Simulated RHEL 9 server with two interfaces. net.ipv4.ip_forward is 0, so traffic
+  arriving on one interface destined for another is silently dropped. No sysctl drop-in
+  enables forwarding, so even a runtime change would be lost on reboot.
+
+objectives:
+  - Enable forwarding at runtime (sysctl -w net.ipv4.ip_forward=1)
+  - Persist it by writing net.ipv4.ip_forward = 1 into /etc/sysctl.d/99-ipforward.conf
+  - Confirm the persistent setting is present so it survives a reboot
+lab_mode: simulation
+simulation_type: generic
+time_limit: 600
+max_score: 100
+is_free: false
+hints:
+  - content: 'Set it now with sysctl -w net.ipv4.ip_forward=1, but that alone is lost on reboot.'
+    cost: 10
+    order: 1
+  - content: 'Persist it in a sysctl drop-in: echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-ipforward.conf (then sysctl --system).'
+    cost: 15
+    order: 2
+  - content: 'You may also add the line to /etc/sysctl.conf. The validator checks the persistent config, not just the live kernel value.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

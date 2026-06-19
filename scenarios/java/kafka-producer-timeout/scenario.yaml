@@ -31,8 +31,8 @@ initial_state: |
 hints:
   - order: 1
     cost: 10
-    content: "Check logs: grep -i 'TimeoutException\|bootstrap\|metadata' /opt/app/logs/app.log
-      to see the connection failure details and the wrong broker address being used."
+    content: 'Check logs: grep -i ''TimeoutException\|bootstrap\|metadata'' /opt/app/logs/app.log
+      to see the connection failure details and the wrong broker address being used.'
   - order: 2
     cost: 15
     content: "In application.yml, update:

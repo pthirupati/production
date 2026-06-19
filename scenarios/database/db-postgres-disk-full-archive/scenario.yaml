@@ -1,0 +1,39 @@
+title: PostgreSQL Down — WAL Archive Filled the Disk
+slug: db-postgres-disk-full-archive
+difficulty: hard
+category: Database Administration
+description: |
+  PostgreSQL has stopped because the data partition is 100% full. A failing archive_command
+  meant WAL segments piled up in pg_wal and the archive_status directory until the disk
+  filled, and the server shut down to protect data integrity. You must reclaim space by
+  clearing the backed-up WAL archive, then restart PostgreSQL.
+
+initial_state: |
+  Simulated RHEL 9 database server. The postgresql service is down. df shows the data
+  filesystem at 100%. Stale WAL archive files have accumulated under
+  /var/lib/pgsql/data/pg_wal/archive_status and an old dump in
+  /var/lib/pgsql/archive is consuming the space. psql cannot connect.
+
+objectives:
+  - Identify the data partition is full and PostgreSQL stopped because of it
+  - Reclaim space by clearing the stale archived WAL files (e.g. rm the archive backlog)
+  - Restart PostgreSQL once there is free space
+  - Verify the service is active and accepting connections
+lab_mode: simulation
+simulation_type: database
+time_limit: 1200
+max_score: 100
+is_free: false
+hints:
+  - content: 'df -h shows the data filesystem at 100%. PostgreSQL stops itself when it cannot write WAL. Look under /var/lib/pgsql/archive and pg_wal/archive_status.'
+    cost: 10
+    order: 1
+  - content: 'Reclaim space by removing the already-archived backlog, e.g. rm -rf /var/lib/pgsql/archive/*. Do NOT delete live segments in pg_wal that have not been archived.'
+    cost: 20
+    order: 2
+  - content: 'Once there is free space, start the service: systemctl start postgresql, then confirm with systemctl is-active postgresql.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Critical

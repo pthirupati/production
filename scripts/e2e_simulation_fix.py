@@ -62,6 +62,71 @@ def apply_simulation_fix(session) -> tuple[bool, str]:
     state = shell.state
 
     try:
+        # ── New high-value scenarios (matched before generic substrings) ──
+        if "selinux-httpd-port-denied" in slug:
+            # Label the custom port with SELinux, keep Enforcing, then start nginx.
+            shell.run("semanage port -a -t http_port_t -p tcp 8080")
+            shell.run("systemctl start nginx")
+            return True, "selinux port labelled and nginx started"
+
+        if "disk-missing-rescan-fs" in slug:
+            shell.run('echo "- - -" > /sys/class/scsi_host/host0/scan')
+            shell.run("mkfs.xfs /dev/sdc")
+            shell.run("mkdir -p /data")
+            shell.run("mount /dev/sdc /data")
+            shell.run('echo "/dev/sdc /data xfs defaults 0 0" >> /etc/fstab')
+            return True, "disk rescanned, formatted, mounted, persisted"
+
+        if "swap-not-active" in slug:
+            shell.run("mkswap /dev/sdc")
+            shell.run("swapon /dev/sdc")
+            shell.run('echo "/dev/sdc none swap sw 0 0" >> /etc/fstab')
+            return True, "swap activated and persisted"
+
+        if "lvm-create-mount" in slug:
+            shell.run("pvcreate /dev/sdc")
+            shell.run("vgcreate vgdata /dev/sdc")
+            shell.run("lvcreate -L 10G -n lvdata vgdata")
+            shell.run("mkfs.xfs /dev/vgdata/lvdata")
+            shell.run("mkdir -p /data")
+            shell.run("mount /dev/vgdata/lvdata /data")
+            shell.run('echo "/dev/vgdata/lvdata /data xfs defaults 0 0" >> /etc/fstab')
+            return True, "lvm provisioned and mounted at /data"
+
+        if "default-gateway-missing" in slug:
+            shell.run("ip route add default via 10.0.0.1 dev eth0")
+            shell.run('echo "GATEWAY=10.0.0.1" >> /etc/sysconfig/network')
+            return True, "default gateway configured and persisted"
+
+        if "sysctl-ip-forward" in slug:
+            shell.run('echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-ipforward.conf')
+            return True, "ip_forward enabled persistently"
+
+        if "kernel-module-not-loaded" in slug:
+            shell.run("modprobe br_netfilter")
+            shell.run('echo "br_netfilter" > /etc/modules-load.d/k8s.conf')
+            return True, "kernel module load made persistent"
+
+        if "db-postgres-max-connections" in slug:
+            shell.run(
+                "sed -i 's/max_connections = 20/max_connections = 200/' "
+                "/var/lib/pgsql/data/postgresql.conf"
+            )
+            shell.run("systemctl restart postgresql")
+            return True, "max_connections raised and postgresql restarted"
+
+        if "db-mysql-table-crashed" in slug:
+            # Repairing the MyISAM table clears the crashed marker.
+            shell.run("rm -f /var/lib/mysql/appdb/orders.CRASHED")
+            shell.run("systemctl restart mysqld")
+            return True, "crashed table repaired and mysqld restarted"
+
+        if "db-postgres-disk-full-archive" in slug:
+            # Reclaim disk by clearing the already-archived WAL backlog, then start.
+            shell.run("rm -rf /var/lib/pgsql/archive")
+            shell.run("systemctl start postgresql")
+            return True, "disk reclaimed and postgresql started"
+
         if "patch" in slug:
             state.ops_backup_taken = True
             state.ops_db_stopped = True

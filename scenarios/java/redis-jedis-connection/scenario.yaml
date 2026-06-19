@@ -30,8 +30,8 @@ initial_state: |
 hints:
   - order: 1
     cost: 10
-    content: "Check the error: grep 'JedisConnectionException\|Connection refused' /opt/app/logs/app.log
-      Confirm it's trying to connect to 127.0.0.1:6379 which is not running."
+    content: 'Check the error: grep ''JedisConnectionException\|Connection refused'' /opt/app/logs/app.log
+      Confirm it''s trying to connect to 127.0.0.1:6379 which is not running.'
   - order: 2
     cost: 15
     content: "In application.yml, update the Redis config:

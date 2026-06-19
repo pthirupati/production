@@ -1,0 +1,37 @@
+title: Required Kernel Module Not Loaded at Boot
+slug: linux-kernel-module-not-loaded
+difficulty: easy
+category: Linux Administration
+description: |
+  A Kubernetes node preflight check fails because the br_netfilter kernel module is not
+  loaded, so bridged pod traffic cannot be filtered by iptables. Loading the module by
+  hand is not enough — it must be configured to load automatically on every boot by
+  creating a drop-in under /etc/modules-load.d. You must make the module load persistent.
+
+initial_state: |
+  Simulated RHEL 9 server being prepared as a Kubernetes node. lsmod | grep br_netfilter
+  returns nothing, and there is no /etc/modules-load.d drop-in to load it at boot. kubeadm
+  preflight fails with: "br_netfilter module is not loaded".
+
+objectives:
+  - Load the module immediately with modprobe br_netfilter
+  - Make it persistent by creating /etc/modules-load.d/k8s.conf containing br_netfilter
+  - Confirm the drop-in exists so systemd-modules-load loads it on next boot
+lab_mode: simulation
+simulation_type: generic
+time_limit: 600
+max_score: 100
+is_free: false
+hints:
+  - content: 'Load it now with modprobe br_netfilter, but that is lost on reboot.'
+    cost: 10
+    order: 1
+  - content: 'Persist it: echo "br_netfilter" > /etc/modules-load.d/k8s.conf. Files there are read by systemd-modules-load.service at boot — one module name per line.'
+    cost: 15
+    order: 2
+  - content: 'The validator checks the persistent drop-in, so the /etc/modules-load.d entry is what proves the fix.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

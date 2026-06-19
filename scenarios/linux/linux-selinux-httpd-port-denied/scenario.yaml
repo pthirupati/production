@@ -1,0 +1,41 @@
+title: SELinux Blocks nginx on a Custom Port
+slug: linux-selinux-httpd-port-denied
+difficulty: medium
+category: Linux Administration
+description: |
+  nginx is configured to listen on the non-standard port 8080, but SELinux is in
+  Enforcing mode and only labels the standard HTTP ports (80, 443, 8008, ...) with
+  the http_port_t type. When nginx tries to bind to 8080 the kernel denies the
+  name_bind and the service fails to start. The correct production fix is to add the
+  port to the http_port_t SELinux type with semanage — NOT to disable SELinux.
+
+initial_state: |
+  Simulated RHEL 9 server. getenforce returns Enforcing. nginx.conf listens on 8080.
+  systemctl start nginx fails and the audit log shows:
+  type=AVC msg=audit(...): avc:  denied  { name_bind } for  pid=... comm="nginx"
+  src=8080 scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:unreserved_port_t:s0
+
+objectives:
+  - Confirm SELinux is in Enforcing mode with getenforce / sestatus
+  - Identify port 8080 is not labelled http_port_t (semanage port -l | grep http_port_t)
+  - Add the port label with semanage port -a -t http_port_t -p tcp 8080
+  - Start nginx with systemctl start nginx and confirm it is running
+  - Leave SELinux in Enforcing mode — do not disable it
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'Check enforcement with getenforce. The audit denial is a name_bind on port 8080 because that port is not in the http_port_t type. Do not run setenforce 0.'
+    cost: 10
+    order: 1
+  - content: 'Add the port to SELinux policy: semanage port -a -t http_port_t -p tcp 8080. Confirm with semanage port -l | grep http_port_t before starting nginx.'
+    cost: 20
+    order: 2
+  - content: 'After labelling the port, start the service: systemctl start nginx. getenforce must still report Enforcing.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

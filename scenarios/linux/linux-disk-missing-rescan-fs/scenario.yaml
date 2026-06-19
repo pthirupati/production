@@ -1,0 +1,39 @@
+title: New Disk Not Visible — Rescan, Format, and Mount
+slug: linux-disk-missing-rescan-fs
+difficulty: medium
+category: Linux Administration
+description: |
+  A new 20G disk was hot-added to the VM at the hypervisor, but the Linux guest has
+  not noticed it — lsblk does not show /dev/sdc. You must trigger a SCSI bus rescan so
+  the kernel discovers the device, then partition/format it with a filesystem, mount it
+  at /data, and add it to /etc/fstab so the mount survives a reboot.
+
+initial_state: |
+  Simulated RHEL 9 server. The storage team confirms a 20G LUN is presented to this
+  host, but lsblk shows only sda and sdb — /dev/sdc is missing because the kernel has
+  not rescanned the SCSI bus. /data exists as an empty unmounted directory.
+
+objectives:
+  - Rescan the SCSI host so the kernel sees the new disk (echo "- - -" > /sys/class/scsi_host/host0/scan)
+  - Confirm /dev/sdc now appears in lsblk
+  - Create a filesystem on the disk with mkfs.xfs /dev/sdc (or mkfs.ext4)
+  - Mount it at /data and confirm with df -h and mount
+  - Persist it in /etc/fstab so it remounts on reboot
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+hints:
+  - content: 'The disk exists at the hypervisor but the kernel has not scanned for it. Force a rescan: echo "- - -" > /sys/class/scsi_host/host0/scan then run lsblk.'
+    cost: 10
+    order: 1
+  - content: 'Once /dev/sdc appears: mkfs.xfs /dev/sdc, then mkdir -p /data && mount /dev/sdc /data. Verify with blkid and df -h.'
+    cost: 20
+    order: 2
+  - content: 'Make it permanent by adding a line to /etc/fstab, e.g. /dev/sdc /data xfs defaults 0 0.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium
