@@ -97,6 +97,46 @@ class InterviewStudioTests(TestCase):
         self.assertIn("score", result)
         self.assertGreater(result["score"]["score"], 0)
 
+    def test_start_round_returns_200_without_api_key_or_profile(self):
+        """Starting a round must succeed (not 500) with the free engine, no
+        ANTHROPIC_API_KEY, and no pre-existing CandidateProfile.
+
+        Regression for the production 'Server error. Please try again later.' on
+        start: round 1 is created with status 'schedulable', the view permitted
+        that status but engine.start_round() rejected it and returned a payload
+        with no 'message' key, so the view 500'd with KeyError. The start path is
+        now robust and the first-question fetch is optional (it raises on the
+        SQLite test DB's JSON contains lookup but the room still opens with the
+        intro — on CI Postgres a question is also returned).
+        """
+        import os
+        from unittest import mock
+
+        # Explicitly create a campaign with NO profile and a snapshot whose
+        # experience_level is None (the value that used to crash intro rendering).
+        campaign = InterviewCampaign.objects.create(
+            user=self.user,
+            title="No-profile start",
+            round_count=3,
+            status="scheduled",
+            profile_snapshot={"experience_level": None, "target_role": ""},
+            experience_level="mid",
+        )
+        create_campaign_rounds(campaign)
+        r1 = campaign.rounds.get(round_number=1)
+        self.assertEqual(r1.status, "schedulable")
+
+        env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            res = self.client.post(f"/api/interviews/rounds/{r1.id}/start/", {}, format="json")
+
+        self.assertEqual(res.status_code, 200, res.content)
+        body = res.json()
+        self.assertEqual(body["status"], "in_progress")
+        # The interviewer intro must be present and non-empty.
+        self.assertIn("intro", body)
+        self.assertTrue(body["intro"]["content"].strip())
+
     def test_voice_config_free_browser(self):
         res = self.client.get("/api/interviews/voice/config/")
         self.assertEqual(res.status_code, 200)

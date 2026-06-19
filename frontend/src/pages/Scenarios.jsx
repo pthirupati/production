@@ -230,11 +230,26 @@ export default function Scenarios() {
   const currentPage = parseInt(searchParams.get('page') || '1', 10)
 
   const filters = {
-    technology: searchParams.get('technology') || '',
+    technology:  searchParams.get('technology')  || '',
     difficulty:  searchParams.get('difficulty')  || '',
     type:        searchParams.get('type')        || '',
+    category:    searchParams.get('category')    || '',
     tag:         searchParams.get('tag')         || '',
     search:      searchParams.get('search')      || '',
+  }
+
+  // The `technology` URL param can be either a numeric PK (from the filter
+  // chips) or a slug (when linked from a technology page, e.g.
+  // /scenarios?technology=vmware). Route it to the matching backend param so
+  // the server filters by the right field instead of 500-ing on a slug-as-id.
+  const buildQueryFilters = () => {
+    const { technology, ...rest } = filters
+    const q = { ...rest }
+    if (technology) {
+      if (/^\d+$/.test(technology)) q.technology = technology
+      else q.technology_slug = technology
+    }
+    return q
   }
 
   const setFilter = (key, value) => {
@@ -255,7 +270,12 @@ export default function Scenarios() {
 
   const clearFilters = () => setSearchParams({})
   const hasFilters = Object.values(filters).some(Boolean)
-  const activeFilterCount = [filters.technology, filters.difficulty, filters.type, filters.tag].filter(Boolean).length
+  const activeFilterCount = [filters.technology, filters.difficulty, filters.type, filters.category, filters.tag].filter(Boolean).length
+
+  // The active technology filter may be stored as an id (chips) or a slug
+  // (links from a technology page). Match on either so the chip highlights.
+  const isTechActive = (tech) =>
+    filters.technology === String(tech.id) || filters.technology === tech.slug
 
   useEffect(() => {
     getTechnologies().then(setTechnologies).catch(console.error)
@@ -264,7 +284,7 @@ export default function Scenarios() {
 
   useEffect(() => {
     setLoading(true)
-    scenarioApi.getScenarios({ ...filters, page: currentPage })
+    scenarioApi.getScenarios({ ...buildQueryFilters(), page: currentPage })
       .then(data => {
         if (data?.results) {
           setScenarios(data.results)
@@ -397,9 +417,9 @@ export default function Scenarios() {
               {technologies.map(tech => (
                 <button
                   key={tech.id}
-                  onClick={() => setFilter('technology', filters.technology === String(tech.id) ? '' : String(tech.id))}
+                  onClick={() => setFilter('technology', isTechActive(tech) ? '' : String(tech.id))}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    filters.technology === String(tech.id)
+                    isTechActive(tech)
                       ? 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20'
                       : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
                   }`}

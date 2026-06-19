@@ -216,10 +216,22 @@ export default function ScenarioDetail() {
     ? (ratings.reduce((s, r) => s + (r.score || 0), 0) / ratings.length).toFixed(1)
     : null
 
-  const startButton = (
+  const locked = scenario.is_accessible === false
+
+  // When the user isn't subscribed, the scenario stays fully viewable but the
+  // "Start" action is replaced by a Subscribe CTA that routes to pricing.
+  const startButton = locked ? (
+    <Link
+      to={`/pricing?technology=${scenario.technology?.slug || ''}`}
+      className="btn-primary w-full sm:w-auto px-8 py-3.5 text-base flex items-center justify-center gap-2.5"
+    >
+      <Lock size={18} />
+      Subscribe to start
+    </Link>
+  ) : (
     <button
       onClick={handleStartLab}
-      disabled={starting || !!limitInfo || scenario.is_accessible === false}
+      disabled={starting || !!limitInfo}
       className="btn-primary w-full sm:w-auto px-8 py-3.5 text-base flex items-center justify-center gap-2.5 disabled:opacity-50"
     >
       {starting ? (

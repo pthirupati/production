@@ -58,18 +58,43 @@ def _profile_for_round(round_obj: InterviewRound) -> dict:
 
 
 def start_round(round_obj: InterviewRound) -> dict:
-    # Re-fetch with lock to prevent concurrent starts
+    # Re-fetch with lock to prevent concurrent starts.
+    # "schedulable" is the initial status of round 1 (and of unlocked later
+    # rounds); the start endpoint allows starting directly from it, so it must
+    # be a valid startable status here too — otherwise we return a payload with
+    # no "message" key and the view 500s with KeyError.
     from django.db import transaction as db_transaction
     with db_transaction.atomic():
         locked = InterviewRound.objects.select_for_update().get(pk=round_obj.pk)
-        if locked.status not in ("scheduled", "ready"):
-            # Already started or ended by a concurrent request
+        if locked.status == "in_progress":
+            # Already started — return the existing intro so the caller can resume
+            # instead of 500ing. Idempotent restart.
             round_obj.status = locked.status
-            return {"already_started": True}
+            round_obj.started_at = locked.started_at
+            round_obj.ends_at = locked.ends_at
+            existing_intro = (
+                locked.messages.filter(role="interviewer", message_type="introduction")
+                .order_by("created_at")
+                .first()
+            )
+            if existing_intro:
+                return {
+                    "message": existing_intro,
+                    "ends_at": locked.ends_at.isoformat() if locked.ends_at else None,
+                    "already_started": True,
+                }
+            # In progress but somehow no intro — fall through to create one below
+            # without resetting the running timer.
+        elif locked.status not in ("scheduled", "ready", "schedulable"):
+            # Ended/cancelled/locked — not startable. Signal to the caller.
+            round_obj.status = locked.status
+            return {"not_startable": True, "status": locked.status}
         now = timezone.now()
+        was_in_progress = locked.status == "in_progress"
         locked.status = "in_progress"
-        locked.started_at = now
-        locked.ends_at = now + timedelta(minutes=locked.duration_minutes + locked.extension_minutes)
+        if not was_in_progress:
+            locked.started_at = now
+            locked.ends_at = now + timedelta(minutes=locked.duration_minutes + locked.extension_minutes)
         locked.save(update_fields=["status", "started_at", "ends_at"])
     round_obj.status = "in_progress"
     round_obj.started_at = locked.started_at
@@ -81,20 +106,25 @@ def start_round(round_obj: InterviewRound) -> dict:
         mark_sample_used(campaign.user)
 
     snap = _profile_for_round(round_obj)
+    # Resolve these defensively: snapshot values can be explicitly None (not just
+    # missing), and "None + ' role'" would raise TypeError and 500 the start.
+    level = snap.get("experience_level") or "mid"
+    target_role = snap.get("target_role") or ""
+    company = snap.get("current_company") or "your current company"
     if getattr(campaign, "is_sample", False):
         intro = (
             f"Hi, I'm {round_obj.persona_name}. Welcome to your free {round_obj.duration_minutes}-minute sample interview. "
             "We'll cover a few quick technical questions so you can experience voice Q&A, scoring, and feedback. "
             "Camera and mic must stay on. This is a preview — subscribe for full 3–5 round cycles and certificates. "
-            f"What are you currently working on as a {snap.get('target_role') or snap.get('experience_level', 'mid')}-level engineer?"
+            f"What are you currently working on as a {target_role or level}-level engineer?"
         )
     else:
         tpl = INTRO_TEMPLATES.get(round_obj.round_type, INTRO_TEMPLATES["technical"])
         intro = tpl.format(
-            persona=round_obj.persona_name,
+            persona=round_obj.persona_name or "your interviewer",
             minutes=round_obj.duration_minutes,
-            company=snap.get("current_company") or "your current company",
-            role=snap.get("target_role") or snap.get("experience_level", "mid") + " role",
+            company=company,
+            role=target_role or f"{level} role",
         )
     msg = InterviewMessage.objects.create(
         round=round_obj,
@@ -157,6 +187,9 @@ def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
 
 def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | None = None) -> dict:
     meta = metadata or {}
+    # Tell the scorer which round type this is so behavioral/HR answers are
+    # weighted on STAR coverage rather than always defaulting to "technical".
+    meta.setdefault("round_type", round_obj.round_type)
     last_q_msg = (
         round_obj.messages.filter(role="interviewer", question__isnull=False)
         .order_by("-created_at")
@@ -188,16 +221,21 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         {"role": m.role, "content": m.content[:200]}
         for m in round_obj.messages.order_by("-created_at")[:6]
     ]
-    reply = generate_interviewer_reply(
-        persona_name=round_obj.persona_name,
-        round_type=round_obj.round_type,
-        question_text=last_q_msg.content if last_q_msg else "",
-        candidate_answer=answer_text,
-        score_hint=score_result,
-        profile_snapshot=_profile_for_round(round_obj),
-        conversation_tail=list(reversed(tail)),
-        strong_streak=round_obj.strong_answers_streak,
-    )
+    # The reply uses the free rule-based engine; guard it anyway so a single bad
+    # answer or snapshot can never 500 the live interview.
+    try:
+        reply = generate_interviewer_reply(
+            persona_name=round_obj.persona_name,
+            round_type=round_obj.round_type,
+            question_text=last_q_msg.content if last_q_msg else "",
+            candidate_answer=answer_text,
+            score_hint=score_result,
+            profile_snapshot=_profile_for_round(round_obj),
+            conversation_tail=list(reversed(tail)),
+            strong_streak=round_obj.strong_answers_streak,
+        )
+    except Exception:  # noqa: BLE001
+        reply = "Got it — thanks. Let's keep going."
 
     interviewer_msg = InterviewMessage.objects.create(
         round=round_obj,
@@ -209,7 +247,10 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
 
     next_q = None
     if round_obj.questions_asked < _target_question_count(round_obj):
-        next_q = ask_next_question(round_obj)
+        try:
+            next_q = ask_next_question(round_obj)
+        except Exception:  # noqa: BLE001
+            next_q = None
 
     return {
         "candidate_message": cand_msg,

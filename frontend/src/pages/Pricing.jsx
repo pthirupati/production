@@ -478,7 +478,7 @@ export default function Pricing() {
         </nav>
         <PlatformBanners config={platformConfig} showMaintenance showPromo />
         {mobileNavOpen && (
-          <div className="md:hidden border-t border-surface-800/50 bg-surface-950/95 backdrop-blur-xl px-4 py-3 flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
+          <div className="lg:hidden border-t border-surface-800/50 bg-surface-950/95 backdrop-blur-xl px-4 py-3 flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
             {PUBLIC_NAV_LINKS.map(({ to, label }) => (
               <Link key={to} to={to} onClick={() => setMobileNavOpen(false)} className="text-sm text-surface-300 py-2">
                 {label}

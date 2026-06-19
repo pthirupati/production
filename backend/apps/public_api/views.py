@@ -72,8 +72,15 @@ def _lab_infra_type(scenario):
 
 
 def _mark_accessible(scenario_data_list, subscribed_tech_ids):
-    """Add is_accessible flag to serialized scenario data."""
-    for item in scenario_data_list:
+    """Add is_accessible flag to serialized scenario data.
+
+    `subscribed_tech_ids` is None for staff/admin (full access), or a set of
+    technology IDs the user is subscribed to (empty set for anonymous users).
+    Defensive against malformed items so listing endpoints never 500.
+    """
+    for item in scenario_data_list or []:
+        if not isinstance(item, dict):
+            continue
         if subscribed_tech_ids is None:
             # Staff/admin — full access
             item["is_accessible"] = True
@@ -138,8 +145,29 @@ class PlatformConfigView(APIView):
         cached = cache.get("platform_config_public")
         if cached is not None:
             return Response(cached)
-        payload = public_config_payload()
-        cache.set("platform_config_public", payload, 60)  # 1 min
+        # Public bootstrap endpoint hit by every page (layout, pricing,
+        # changelog). Must never 500 — fall back to safe defaults so pages
+        # still render without login if settings can't be read.
+        try:
+            payload = public_config_payload()
+            cache.set("platform_config_public", payload, 60)  # 1 min
+        except Exception:
+            logger.exception("PlatformConfigView failed — returning safe defaults")
+            from django.conf import settings as dj_settings
+            payload = {
+                "primary_email": getattr(dj_settings, "PRIMARY_EMAIL", ""),
+                "support_email": getattr(dj_settings, "SUPPORT_EMAIL", ""),
+                "maintenance_mode": False,
+                "maintenance_message": None,
+                "maintenance_banner_enabled": False,
+                "promo_banners_enabled": False,
+                "promo_banners": [],
+                "theme_colors": {},
+                "changelog": [],
+                "platform_stats": {},
+                "support_bot": {"enabled": True, "name": "FixitLab Assistant"},
+                "interview_enabled": True,
+            }
         return Response(payload)
 
 
@@ -266,7 +294,14 @@ class ScenariosListView(APIView):
         is_free = request.query_params.get("free")
 
         if tech_id:
-            qs = qs.filter(technology_id=tech_id)
+            # `technology` is an integer PK filter. Frontends sometimes pass a
+            # slug here by mistake — treat a non-numeric value as a slug instead
+            # of letting Django raise ValueError (which would 500 the endpoint).
+            tech_id_str = str(tech_id).strip()
+            if tech_id_str.isdigit():
+                qs = qs.filter(technology_id=int(tech_id_str))
+            elif tech_id_str:
+                qs = qs.filter(technology__slug=tech_id_str)
         if tech_slug:
             qs = qs.filter(technology__slug=tech_slug)
         if difficulty:
@@ -296,12 +331,21 @@ class ScenariosListView(APIView):
         # Pagination
         from rest_framework.pagination import PageNumberPagination
         paginator = PageNumberPagination()
-        paginator.page_size = int(request.query_params.get("page_size", 50))
+        try:
+            page_size = int(request.query_params.get("page_size", 50))
+        except (TypeError, ValueError):
+            page_size = 50
+        paginator.page_size = max(1, min(page_size, 200))
         paginator.page_size_query_param = "page_size"
         paginator.max_page_size = 200
-        page = paginator.paginate_queryset(qs, request)
+        try:
+            page = paginator.paginate_queryset(qs, request)
+        except Exception:
+            # Bad `page` query param (e.g. non-numeric / out of range) must not 500.
+            page = None
         if page is None:
             page = list(qs)
+            paginator = None
 
         serializer = ScenarioListSerializer(page, many=True)
         data = serializer.data
@@ -322,13 +366,19 @@ class ScenariosListView(APIView):
         subscribed = _get_subscribed_tech_ids(request.user if request.user.is_authenticated else None)
         _mark_accessible(data, subscribed)
 
-        response = paginator.get_paginated_response(data)
+        if paginator is not None:
+            response = paginator.get_paginated_response(data)
+            payload = response.data
+        else:
+            # No pagination applied — still return the paginated envelope shape
+            # the frontend expects (results/count) so the response is consistent.
+            payload = {"count": len(data), "next": None, "previous": None, "results": data}
 
         # Cache anonymous list result to reduce DB load on repeated browses
         if not request.user.is_authenticated:
-            cache.set(cache_key, response.data, 120)  # 2 min
+            cache.set(cache_key, payload, 120)  # 2 min
 
-        return response
+        return Response(payload)
 
 
 class ScenarioDetailView(APIView):
@@ -355,7 +405,8 @@ class ScenarioDetailView(APIView):
 
         # Check subscription access
         subscribed = _get_subscribed_tech_ids(request.user if request.user.is_authenticated else None)
-        if getattr(scenario.technology, "coming_soon", False):
+        tech = scenario.technology  # may be None for orphaned rows
+        if getattr(tech, "coming_soon", False):
             data["is_accessible"] = False
             data["coming_soon"] = True
         elif subscribed is None:
@@ -1582,13 +1633,24 @@ class PlatformStatsView(APIView):
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
-        data = {
-            "total_scenarios": Scenario.objects.filter(is_active=True).count(),
-            "total_users": User.objects.filter(is_active=True).count(),
-            "total_completions": UserScenarioProgress.objects.filter(completed=True).count(),
-            "total_technologies": Technology.objects.filter(is_active=True).count(),
-        }
-        cache.set("platform_stats", data, 120)  # 2 min
+        # Public landing/about stats — never 500. On any DB error return zeros;
+        # the About page already overlays sensible display defaults.
+        try:
+            data = {
+                "total_scenarios": Scenario.objects.filter(is_active=True).count(),
+                "total_users": User.objects.filter(is_active=True).count(),
+                "total_completions": UserScenarioProgress.objects.filter(completed=True).count(),
+                "total_technologies": Technology.objects.filter(is_active=True).count(),
+            }
+            cache.set("platform_stats", data, 120)  # 2 min
+        except Exception:
+            logger.exception("PlatformStatsView failed — returning zeros")
+            data = {
+                "total_scenarios": 0,
+                "total_users": 0,
+                "total_completions": 0,
+                "total_technologies": 0,
+            }
         return Response(data)
 
 
@@ -2000,9 +2062,20 @@ class BlogListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        from apps.adminpanel.models import BlogPost
+        # Public marketing page — must NEVER 500. The frontend ships a static
+        # fallback catalog, so on any DB error we return an empty list and let
+        # the client render its built-in posts instead of a "Server error".
+        try:
+            from apps.adminpanel.models import BlogPost
 
-        posts = BlogPost.objects.filter(is_published=True).order_by("-published_at", "-created_at")[:50]
+            posts = list(
+                BlogPost.objects.filter(is_published=True)
+                .order_by("-published_at", "-created_at")[:50]
+            )
+        except Exception:
+            logger.exception("BlogListView failed — returning empty list")
+            return Response([])
+
         return Response([
             {
                 "slug": p.slug,
@@ -2022,9 +2095,19 @@ class BlogDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, slug):
-        from apps.adminpanel.models import BlogPost
+        # Public marketing page — must NEVER 500. A missing post (or any DB
+        # error) returns 404 so the client falls back to its static article
+        # catalog rather than showing a server-error toast.
+        try:
+            from apps.adminpanel.models import BlogPost
 
-        post = get_object_or_404(BlogPost, slug=slug, is_published=True)
+            post = BlogPost.objects.get(slug=slug, is_published=True)
+        except Exception as exc:
+            from apps.adminpanel.models import BlogPost as _BP
+            if not isinstance(exc, _BP.DoesNotExist):
+                logger.exception("BlogDetailView failed for slug=%s", slug)
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
         return Response({
             "slug": post.slug,
             "title": post.title,

@@ -588,7 +588,7 @@ export default function BlogPost() {
 
   useEffect(() => {
     setLoading(true)
-    api.get(`/blog/${slug}/`)
+    api.get(`/blog/${slug}/`, { silentError: true })
       .then(res => {
         const apiPost = res.data
         const rich = blogContent[slug]
@@ -605,7 +605,7 @@ export default function BlogPost() {
   }, [slug])
 
   useEffect(() => {
-    api.get('/blog/')
+    api.get('/blog/', { silentError: true })
       .then(res => {
         const list = (res.data || []).filter(p => p.slug !== slug).slice(0, 3)
         setRelated(list)

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
-import { Calendar, Play, CheckCircle2, Lock, Award, ChevronRight, Trash2, X } from 'lucide-react'
+import { Calendar, Play, CheckCircle2, Lock, Award, ChevronRight, ChevronLeft, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader } from '../../components/design'
 
@@ -76,6 +76,12 @@ export default function InterviewCampaign() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+      <Link
+        to="/interviews"
+        className="text-xs text-surface-500 hover:text-white inline-flex items-center gap-1"
+      >
+        <ChevronLeft size={14} /> Back to interviews
+      </Link>
       <PageHeader
         eyebrow="AI Interview Studio"
         title={campaign.title}

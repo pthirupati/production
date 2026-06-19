@@ -404,13 +404,62 @@ class InterviewRoundStartView(APIView):
             except Exception:
                 pass
 
-        if round_obj.status not in ("scheduled", "ready", "schedulable"):
+        if round_obj.status not in ("scheduled", "ready", "schedulable", "in_progress"):
             return Response({"error": "Round not ready to start"}, status=400)
 
-        result = engine.start_round(round_obj)
-        first_q = engine.ask_next_question(round_obj)
+        # The interview must work with the free rule-based engine and no paid API.
+        # Wrap the engine calls so any optional/edge failure degrades gracefully
+        # to a 400 (or a usable payload) instead of a raw 500 "Server error".
+        try:
+            result = engine.start_round(round_obj)
+        except Exception:  # noqa: BLE001 - never surface a 500 from start
+            import logging
+
+            logging.getLogger(__name__).exception("start_round failed for %s", round_id)
+            return Response(
+                {"error": "Could not start the interview. Please try again."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if result.get("not_startable"):
+            return Response(
+                {"error": f"Round not ready to start (status={result.get('status')})"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        intro_msg = result.get("message")
+        if intro_msg is None:
+            # Defensive: start_round should always return a message here, but if a
+            # concurrent/edge path didn't, fetch the latest intro rather than 500.
+            intro_msg = (
+                round_obj.messages.filter(role="interviewer", message_type="introduction")
+                .order_by("-created_at")
+                .first()
+            )
+
+        # The first question is optional — if the question bank is empty or
+        # selection fails for any reason, the room still opens with the intro and
+        # the candidate can proceed; the next /message/ call will fetch a question.
+        first_q = None
+        if result.get("already_started"):
+            # Resuming an in-progress round (e.g. a page reload): reuse the last
+            # unanswered question instead of generating a duplicate.
+            first_q = (
+                round_obj.messages.filter(role="interviewer", question__isnull=False)
+                .order_by("-created_at")
+                .first()
+            )
+        else:
+            try:
+                first_q = engine.ask_next_question(round_obj)
+            except Exception:  # noqa: BLE001
+                import logging
+
+                logging.getLogger(__name__).exception("ask_next_question failed for %s", round_id)
+
         payload = InterviewRoundSerializer(round_obj).data
-        payload["intro"] = InterviewMessageSerializer(result["message"]).data
+        if intro_msg is not None:
+            payload["intro"] = InterviewMessageSerializer(intro_msg).data
         if first_q:
             payload["first_question"] = InterviewMessageSerializer(first_q).data
         return Response(payload)

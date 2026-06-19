@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import { adminApi } from '../../api/admin'
 import { useInterviewVoice } from '../../hooks/useInterviewVoice'
@@ -277,6 +277,24 @@ export default function InterviewRoom() {
     navigate('/interviews')
   }
 
+  // Visible "Back" exit. While a round is live, confirm first (the round keeps
+  // running on the server — the candidate can resume from the campaign page).
+  // Always releases the camera/mic so the device light turns off on exit.
+  const exitToList = (dest = '/interviews') => {
+    if (started && !observerMode) {
+      const ok = window.confirm(
+        'Leave the interview? The round stays in progress — you can resume it from your interviews page. ' +
+        'To finish and get your report, use "End round" instead.'
+      )
+      if (!ok) return
+    }
+    stopRecording()
+    stopMediaStream(streamRef.current)
+    streamRef.current = null
+    setMediaStream(null)
+    navigate(dest)
+  }
+
   const rescheduleRound = async () => {
     if (!rescheduleAt) {
       toast.error('Pick a date and time')
@@ -491,9 +509,13 @@ export default function InterviewRoom() {
       <>
       <div className="max-w-lg mx-auto p-8 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between gap-2">
-          <Link to={`/interviews/campaign/${round.campaign_id || ''}`} className="text-xs text-surface-500 hover:text-white inline-flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => exitToList(round.campaign_id ? `/interviews/campaign/${round.campaign_id}` : '/interviews')}
+            className="text-xs text-surface-500 hover:text-white inline-flex items-center gap-1"
+          >
             <ArrowLeft size={14} /> Back
-          </Link>
+          </button>
           <button type="button" onClick={cancelInterview} className="text-xs text-red-400 hover:text-red-300 inline-flex items-center gap-1">
             <X size={14} /> Cancel
           </button>
@@ -655,9 +677,13 @@ export default function InterviewRoom() {
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-surface-950">
       <header className="flex items-center justify-between px-4 py-2 border-b border-surface-800 bg-surface-900/80 gap-2 overflow-x-auto">
         <div className="min-w-0 shrink">
-          <Link to={`/interviews/campaign/${round.campaign_id || ''}`} className="text-[10px] text-surface-500 hover:text-white inline-flex items-center gap-1">
-            <ArrowLeft size={12} /> Back
-          </Link>
+          <button
+            type="button"
+            onClick={() => exitToList('/interviews')}
+            className="text-[10px] text-surface-500 hover:text-white inline-flex items-center gap-1"
+          >
+            <ArrowLeft size={12} /> Back to interviews
+          </button>
           <p className="text-xs text-indigo-400">{round.persona_name}</p>
           <p className="text-sm font-medium text-white truncate">{round.title}</p>
         </div>

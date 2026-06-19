@@ -140,13 +140,24 @@ def _platform_stats() -> dict:
     if cached is not None:
         return cached
     User = get_user_model()
-    data = {
-        "total_scenarios": Scenario.objects.filter(is_active=True).count(),
-        "total_users": User.objects.filter(is_active=True).count(),
-        "total_completions": UserScenarioProgress.objects.filter(completed=True).count(),
-        "total_technologies": Technology.objects.filter(is_active=True).count(),
-    }
-    cache.set("public_platform_stats", data, 120)
+    try:
+        data = {
+            "total_scenarios": Scenario.objects.filter(is_active=True).count(),
+            "total_users": User.objects.filter(is_active=True).count(),
+            "total_completions": UserScenarioProgress.objects.filter(completed=True).count(),
+            "total_technologies": Technology.objects.filter(is_active=True).count(),
+        }
+        cache.set("public_platform_stats", data, 120)
+    except Exception:
+        # Stats are non-critical for the public config payload — degrade to
+        # zeros rather than failing the whole /config/ bootstrap response.
+        logger.warning("public platform stats query failed", exc_info=True)
+        data = {
+            "total_scenarios": 0,
+            "total_users": 0,
+            "total_completions": 0,
+            "total_technologies": 0,
+        }
     return data
 
 

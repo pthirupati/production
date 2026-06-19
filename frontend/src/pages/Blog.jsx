@@ -65,7 +65,7 @@ export default function Blog() {
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    api.get('/blog/')
+    api.get('/blog/', { silentError: true })
       .then(res => setPosts(mergePosts(res.data)))
       .catch(() => setPosts(BLOG_FALLBACK_POSTS))
       .finally(() => setLoading(false))
