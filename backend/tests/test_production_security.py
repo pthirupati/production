@@ -85,8 +85,9 @@ class JWTSecurityTestCase(APITestCase):
         iat_time = decoded['iat']
         lifetime_seconds = exp_time - iat_time
         
-        # Should be approximately 1 hour (3600 seconds)
-        self.assertAlmostEqual(lifetime_seconds, 3600, delta=60)
+        from django.conf import settings
+        expected = int(settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds())
+        self.assertAlmostEqual(lifetime_seconds, expected, delta=60)
 
     def test_refresh_token_lifetime_seven_days(self):
         """Test that refresh token lifetime is 7 days."""
@@ -132,7 +133,7 @@ class DuplicateLoginPreventionTestCase(APITestCase):
         
         # Verify Device A token works
         self.client_a.credentials(HTTP_AUTHORIZATION=f'Bearer {token_a}')
-        response = self.client_a.get('/api/auth/profile')
+        response = self.client_a.get('/api/auth/profile/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
         # Device B: Second login (same user)
@@ -144,12 +145,12 @@ class DuplicateLoginPreventionTestCase(APITestCase):
         
         # Device B token should work
         self.client_b.credentials(HTTP_AUTHORIZATION=f'Bearer {token_b}')
-        response = self.client_b.get('/api/auth/profile')
+        response = self.client_b.get('/api/auth/profile/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
         # Device A token should NOW be invalid (session invalidated)
         self.client_a.credentials(HTTP_AUTHORIZATION=f'Bearer {token_a}')
-        response = self.client_a.get('/api/auth/profile')
+        response = self.client_a.get('/api/auth/profile/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_session_tracker_records_session(self):
@@ -229,7 +230,7 @@ class APIAuthenticationTestCase(APITestCase):
     def test_unauthenticated_request_denied(self):
         """Test that unauthenticated requests are denied."""
         # Attempt to access protected endpoint without token
-        response = self.client.get('/api/auth/profile')
+        response = self.client.get('/api/auth/profile/')
         
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -245,14 +246,14 @@ class APIAuthenticationTestCase(APITestCase):
         
         # Use token
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
-        response = self.client.get('/api/auth/profile')
+        response = self.client.get('/api/auth/profile/')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_invalid_token_denied(self):
         """Test that invalid tokens are rejected."""
         self.client.credentials(HTTP_AUTHORIZATION='Bearer invalid_token_xyz')
-        response = self.client.get('/api/auth/profile')
+        response = self.client.get('/api/auth/profile/')
         
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -339,16 +340,17 @@ class ScenarioPermissionsTestCase(APITestCase):
         )
         
         self.tech = Technology.objects.create(
-            name='Linux',
-            description='Linux fundamentals',
-            price=499,
-            is_active=True
+            name='Linux-Security', slug='linux-security',
+            description='Linux fundamentals', price=499, is_active=True
         )
         
         self.free_scenario = Scenario.objects.create(
             title='Free Linux Basics',
             description='Free intro scenario',
             technology=self.tech,
+            slug='free-linux-basics-test',
+            category='Linux',
+            difficulty='easy',
             is_free=True,
             is_active=True
         )
@@ -357,6 +359,9 @@ class ScenarioPermissionsTestCase(APITestCase):
             title='Advanced Linux',
             description='Advanced paid scenario',
             technology=self.tech,
+            slug='advanced-linux-test',
+            category='Linux',
+            difficulty='hard',
             is_free=False,
             is_active=True
         )

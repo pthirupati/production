@@ -185,15 +185,17 @@ class TokenHelper:
         """
         refresh = RefreshToken.for_user(user)
         
-        # Generate and assign unique JTI for this token
+        # Generate and assign unique JTI for this token (same on access + refresh)
         jti = TokenHelper.generate_token_jti()
         refresh['jti'] = jti
+        access = refresh.access_token
+        access['jti'] = jti
         
         # Record session
         SessionTracker.record_session(user.id, jti, ip_address, user_agent)
         
         return {
-            "access": str(refresh.access_token),
+            "access": str(access),
             "refresh": str(refresh),
             "jti": jti,
         }
@@ -215,16 +217,19 @@ def mask_pii(text):
     # Email masking
     if '@' in text:
         local, domain = text.split('@', 1)
-        if len(local) > 3:
-            masked = local[:2] + '*' * (len(local) - 3) + local[-1]
-        else:
+        if len(local) <= 2:
             masked = '*' * len(local)
+        else:
+            masked = local[:2] + '***'
         return f"{masked}@{domain}"
     
-    # Phone number masking (common Indian format: +91-9876543210)
+    # Phone number masking (common formats: +91-9876543210, +1-5551234567)
     if text.startswith('+') and len(text) > 8:
-        # Keep country code and last 4 digits
-        return text[:5] + '*' * (len(text) - 9) + text[-4:]
+        if text.startswith('+91'):
+            return text[:7] + '****' + text[-4:]
+        if text.startswith('+1'):
+            return text[:5] + '****' + text[-4:]
+        return text[:5] + '*' * max(4, len(text) - 9) + text[-4:]
     
     # Credit card masking (show only last 4 digits)
     if len(text) >= 13 and text.replace('-', '').isdigit():
