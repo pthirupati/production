@@ -6,6 +6,7 @@ import api from '../api/client'
 import { subscriptionApi } from '../api/subscriptions'
 import { jiraApi } from '../api/jira'
 import { useAuthStore } from '../store/authStore'
+import { authApi } from '../api/auth'
 import {
   Target, Trophy, Zap, Clock, TrendingUp, ArrowRight,
   CheckCircle2, Award, BookOpen, Play, Star,
@@ -17,7 +18,7 @@ import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
 import { ACHIEVEMENT_META } from '../utils/constants'
 import ActivityHeatmap from '../components/ActivityHeatmap'
 import OnboardingTour from '../components/OnboardingTour'
-import { PageHeader, FixitPanel, FixitStatCard } from '../components/design'
+import { FixitPanel, FixitStatCard } from '../components/design'
 
 function OnboardingChecklist({ subscriptions, progress, profile }) {
   const [dismissed, setDismissed] = useState(
@@ -149,6 +150,7 @@ export default function Dashboard() {
   const [bookmarks, setBookmarks] = useState([])
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [interviewEntitlement, setInterviewEntitlement] = useState(null)
+  const [profile, setProfile] = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -160,7 +162,8 @@ export default function Dashboard() {
       scenarioApi.getBookmarks().catch(() => []),
       api.get('/notifications/', { silentError: true }).catch(() => ({ data: { notifications: [] } })),
       import('../api/interviews').then(m => m.interviewsApi.getEntitlement()).catch(() => null),
-    ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes, interviewEnt]) => {
+      authApi.getProfile().catch(() => null),
+    ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes, interviewEnt, prof]) => {
       if (!prog) setLoadError(true)
       setProgress(prog)
       setAchievements(ach)
@@ -172,6 +175,7 @@ export default function Dashboard() {
       const notifs = notifRes?.data?.notifications || notifRes?.data?.results || []
       setUnreadNotifications(Array.isArray(notifs) ? notifs.filter(n => !(n.read ?? n.is_read)).length : 0)
       setInterviewEntitlement(interviewEnt)
+      setProfile(prof)
     }).finally(() => setLoading(false))
   }, [])
 
@@ -230,7 +234,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 relative">
+    <div className="flex flex-col gap-[22px] w-full relative">
       <OnboardingTour />
 
       {loadError && (
@@ -245,26 +249,10 @@ export default function Dashboard() {
         </div>
       )}
 
-      <PageHeader
-        eyebrow="Dashboard"
-        title={`Welcome back, ${user?.first_name || user?.username || 'there'}`}
-        subtitle="Track your progress, manage labs, and keep levelling up."
-        actions={
-          <div className="flex items-center gap-3 shrink-0">
-            {activeLabs.length > 0 && (
-              <Link to={`/lab/${activeLabs[0].id}`} className="btn-primary flex items-center gap-2 shadow-lg shadow-accent-cyan/25 animate-pulse-glow text-sm">
-                <Play size={15} /> Resume Lab
-              </Link>
-            )}
-            <Link to="/subscriptions" className="btn-secondary flex items-center gap-2 text-sm"><CreditCard size={14} /> Subscriptions</Link>
-          </div>
-        }
-      />
-
       <OnboardingChecklist
         subscriptions={subscriptions.filter(s => s.is_active)}
         progress={progress}
-        profile={user}
+        profile={profile}
       />
 
       {/* ═══ HERO HEADER ═══ */}

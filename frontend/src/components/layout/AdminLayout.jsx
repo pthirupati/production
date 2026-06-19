@@ -1,12 +1,11 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useAuthStore } from '../../store/authStore'
 import { useThemeStore } from '../../store/themeStore'
 import { useState } from 'react'
 import {
-  LayoutDashboard, Target, Cpu, Users, MonitorPlay, ArrowLeft, Shield, Sun, Moon,
-  CreditCard, MessageSquare, Wrench, Menu, X, Ticket, Activity, ScrollText, FileText, Tag, ShieldAlert,
-  BarChart3, Building2, Mic2, Award
+  LayoutDashboard, Target, Cpu, Users, MonitorPlay, ArrowLeft, Shield, Menu, X, Ticket, Activity, ScrollText, FileText, Tag, ShieldAlert,
+  BarChart3, Building2, Mic2, Award,
 } from 'lucide-react'
+import AdminTopbar from './AdminTopbar'
 
 const NAV_GROUPS = [
   {
@@ -52,31 +51,24 @@ const NAV_GROUPS = [
 function SidebarContent({ location, theme, toggleTheme, onNav, navigate }) {
   return (
     <>
-      {/* Header */}
-      <div className="shrink-0 flex items-center gap-3 px-5 py-5 border-b border-surface-700/30">
-        <div className="w-9 h-9 rounded-[11px] fixit-logo-mark flex items-center justify-center">
-          <Shield size={16} className="text-white" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-bold text-white tracking-tight">Admin Panel</span>
-          <p className="text-[10px] text-surface-500 mt-0.5">FixitLab Operations</p>
-        </div>
-        <button
-          onClick={toggleTheme}
-          className="p-1.5 text-surface-400 hover:text-accent-amber rounded-lg hover:bg-surface-800/60 transition-colors shrink-0"
-          aria-label="Toggle theme"
-        >
-          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-        </button>
+      <div className="shrink-0 px-3 pt-[18px] pb-3">
+        <Link to="/admin" className="flex items-center gap-2.5 px-2 no-underline" onClick={onNav}>
+          <span className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center bg-gradient-to-br from-accent-purple to-accent-cyan shadow-[0_6px_20px_rgba(178,102,224,.4)]">
+            <Shield size={16} className="text-white" />
+          </span>
+          <div className="leading-tight">
+            <span className="block font-display font-extrabold text-base text-white tracking-tight">FixitLab</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-accent-purple/80">Admin</span>
+          </div>
+        </Link>
       </div>
 
-      {/* Nav groups */}
-      <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-4">
+      <div className="h-px bg-white/[0.06] mx-3 mb-3" />
+
+      <nav className="flex-1 min-h-0 overflow-y-auto px-2 space-y-4">
         {NAV_GROUPS.map(group => (
           <div key={group.label}>
-            <p className="text-[10px] font-semibold text-surface-600 uppercase tracking-widest px-3 mb-1.5">
-              {group.label}
-            </p>
+            <p className="text-[10px] font-semibold text-white/35 uppercase tracking-widest px-3 mb-1.5">{group.label}</p>
             <div className="space-y-0.5">
               {group.items.map(({ path, icon: Icon, label }) => {
                 const active = location.pathname === path
@@ -85,15 +77,14 @@ function SidebarContent({ location, theme, toggleTheme, onNav, navigate }) {
                     key={path}
                     to={path}
                     onClick={onNav}
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-[9px] text-[13px] font-medium transition-all no-underline ${
                       active
-                        ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20'
-                        : 'text-surface-400 hover:text-surface-100 hover:bg-surface-800/60'
+                        ? 'text-white bg-gradient-to-r from-accent-purple/18 to-accent-cyan/8 border border-accent-purple/25 shadow-[inset_0_0_0_1px_rgba(109,120,255,.15)]'
+                        : 'text-white/62 hover:text-white hover:bg-white/[0.05]'
                     }`}
                   >
-                    <Icon size={16} className={active ? 'text-accent-purple' : ''} />
+                    <Icon size={16} className={active ? 'text-accent-purple' : 'text-white/50'} />
                     <span className="truncate">{label}</span>
-                    {active && <div className="ml-auto w-1 h-1 rounded-full bg-accent-purple shrink-0" />}
                   </Link>
                 )
               })}
@@ -102,15 +93,14 @@ function SidebarContent({ location, theme, toggleTheme, onNav, navigate }) {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="shrink-0 p-3 border-t border-surface-700/30 space-y-1">
+      <div className="shrink-0 p-3 mt-auto">
         <button
           type="button"
           onClick={() => { navigate('/dashboard'); onNav?.() }}
-          className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-surface-400 hover:text-surface-100 hover:bg-surface-800/60 transition-all"
+          className="flex items-center gap-2 w-full px-3 py-2.5 rounded-[10px] text-xs font-semibold text-white/60 bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.07] hover:text-white transition-all"
         >
-          <ArrowLeft size={15} />
-          Back to App
+          <ArrowLeft size={14} />
+          Exit to app
         </button>
       </div>
     </>
@@ -120,62 +110,41 @@ function SidebarContent({ location, theme, toggleTheme, onNav, navigate }) {
 export default function AdminLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="h-screen flex overflow-hidden bg-surface-950 relative">
-      {/* Subtle background — less intense than main app, keeps focus on data */}
+    <div className="h-screen flex overflow-hidden bg-[#080a16] relative">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent-purple/3 via-transparent to-accent-cyan/2" />
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full bg-accent-purple/4 blur-[120px] translate-x-1/4 -translate-y-1/4" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-accent-cyan/3 blur-[100px] -translate-x-1/4 translate-y-1/4" />
+        <div className="absolute inset-0 bg-[#080a16]" />
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-accent-purple/[0.05] blur-[120px]" />
       </div>
 
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex lg:flex-col w-[248px] shrink-0 h-screen fx-sidebar relative z-10">
-        <SidebarContent
-          location={location}
-          theme={theme}
-          toggleTheme={toggleTheme}
-          onNav={() => {}}
-          navigate={navigate}
-        />
+      <aside className="hidden lg:flex lg:flex-col w-[236px] shrink-0 h-screen fx-admin-sidebar relative z-10">
+        <SidebarContent location={location} theme={theme} toggleTheme={toggleTheme} onNav={() => {}} navigate={navigate} />
       </aside>
 
-      {/* Mobile sidebar overlay */}
-      <aside className={`
-        lg:hidden fixed inset-y-0 left-0 z-50 w-[248px] flex flex-col h-screen fx-sidebar
-        transform transition-transform duration-300
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        <SidebarContent
-          location={location}
-          theme={theme}
-          toggleTheme={toggleTheme}
-          onNav={() => setMobileOpen(false)}
-          navigate={navigate}
-        />
+      <aside className={`lg:hidden fixed inset-y-0 left-0 z-50 w-[236px] flex flex-col h-screen fx-admin-sidebar transform transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <SidebarContent location={location} theme={theme} toggleTheme={toggleTheme} onNav={() => setMobileOpen(false)} navigate={navigate} />
       </aside>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setMobileOpen(false)} />
-      )}
+      {mobileOpen && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setMobileOpen(false)} />}
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 relative z-10">
-        {/* Mobile header */}
-        <header className="shrink-0 lg:hidden flex items-center gap-3 px-4 py-3 border-b border-surface-700/30 bg-surface-900/90 backdrop-blur-xl">
-          <button type="button" onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-surface-400 hover:text-white">
+        <div className="lg:hidden shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-[#0b0e1d]/90">
+          <button type="button" onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-white/50">
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <Shield size={16} className="text-accent-purple" />
-          <span className="font-bold text-white text-sm">Admin Panel</span>
-        </header>
+          <span className="font-bold text-white text-sm">Admin</span>
+        </div>
 
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
-          <Outlet />
+        <AdminTopbar />
+
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:px-7 lg:py-[26px]">
+          <div className="max-w-[1320px] w-full mx-auto">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { AdminPageHeader } from '../../components/design'
 import { adminApi } from '../../api/admin'
 import toast from 'react-hot-toast'
 import {
@@ -236,9 +235,12 @@ export default function AdminDashboard() {
     fetchData()
     const overviewInterval = setInterval(fetchOverview, 60000)
     const healthInterval = setInterval(fetchHealth, 120000)
+    const onRefresh = () => fetchData(true)
+    window.addEventListener('fixitlab-admin-refresh', onRefresh)
     return () => {
       clearInterval(overviewInterval)
       clearInterval(healthInterval)
+      window.removeEventListener('fixitlab-admin-refresh', onRefresh)
     }
   }, [fetchData, fetchOverview, fetchHealth])
 
@@ -328,14 +330,26 @@ export default function AdminDashboard() {
   const containers = health?.containers || []
 
   return (
-    <div className="space-y-7 animate-fade-in">
+    <div className="flex flex-col gap-[22px] animate-fx-rise">
 
-      <AdminPageHeader
-        title="Admin Overview"
-        subtitle="Platform health, monitoring & real-time statistics"
-        onRefresh={() => fetchData(true)}
-        refreshing={refreshing}
-      />
+      <div className="relative overflow-hidden rounded-[18px] px-6 py-6 border border-white/[0.09] bg-[radial-gradient(120%_160%_at_0%_0%,#221553_0%,#16102e_55%,#0c0e1c_100%)]">
+        <div aria-hidden className="absolute -top-14 -right-5 w-[280px] h-[200px] bg-accent-purple/20 blur-[44px] pointer-events-none" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="font-display font-extrabold text-[26px] tracking-tight text-white m-0">Admin overview</h1>
+            <p className="text-[13.5px] text-white/55 mt-1.5 mb-0">Platform health, monitoring & real-time statistics</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => fetchData(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-[10px] text-xs font-semibold text-white/80 bg-white/[0.06] border border-white/14 hover:border-accent-purple/40 transition-colors self-start"
+          >
+            <RotateCcw size={14} className={refreshing ? 'animate-spin' : ''} />
+            Refresh data
+          </button>
+        </div>
+      </div>
 
       {/* ── KPI Stat Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
