@@ -134,14 +134,22 @@ def _enrich_inventory(state: dict) -> None:
             net.setdefault("security_mac_changes", True)
 
     for ds in state.get("datastores", []):
-        used_pct = round(((ds["capacity_gb"] - ds["free_gb"]) / ds["capacity_gb"]) * 100, 1) if ds.get("capacity_gb") else 0
-        ds.setdefault("used_pct", used_pct)
+        cap = ds.get("capacity_gb") or 0
+        used_pct = round(((cap - ds["free_gb"]) / cap) * 100, 1) if cap else 0
+        free_pct = round((ds["free_gb"] / cap) * 100, 1) if cap else 100
+        # Recompute every refresh so the warning tracks current free space
+        # (datastores fill/empty as VMs are created, cloned, or deleted).
+        ds["used_pct"] = used_pct
+        ds["free_pct"] = free_pct
         ds.setdefault("vmfs_uuid", f"5f8{abs(hash(ds['id'])) & 0xFFFFFFFFFFF:011x}")
         ds.setdefault("extent_name", f"naa.6000C29{abs(hash(ds['id'])) & 0xFFFFFFFF:08x}")
-        if used_pct >= 90:
-            ds.setdefault("warning", "critical")
-        elif used_pct >= 80:
-            ds.setdefault("warning", "warning")
+        # Capacity health: <5% free is critical, <15% free is a warning banner.
+        if free_pct < 5:
+            ds["warning"] = "critical"
+        elif free_pct < 15:
+            ds["warning"] = "warning"
+        else:
+            ds["warning"] = None
 
     for host in state.get("hosts", []):
         if not host.get("vmnics"):
@@ -196,6 +204,24 @@ def _enrich_inventory(state: dict) -> None:
         vm.setdefault("scsi_controllers", [
             {"id": "scsi0", "type": "LSI Logic SAS", "shared_bus": "none", "slot": 16},
         ])
+        # VM Options defaults (boot, firewall, power behaviour) so the expanded
+        # Edit Settings → VM Options tab always has values to render.
+        vm.setdefault("boot_delay_ms", 0)
+        vm.setdefault("boot_firmware", vm.get("firmware", "BIOS"))
+        vm.setdefault("boot_order", ["disk", "network", "cdrom"])
+        vm.setdefault("enter_bios_on_boot", False)
+        vm.setdefault("firewall_enabled", True)
+        vm.setdefault("reboot_power_action", "restart")  # restart | shutdown | poweroff
+        vm.setdefault("resume_behavior", "powerOn")
+        # vmware_tools_status mirrors `tools` but is the field the UI binds the
+        # "Upgrade VMware Tools" button to (current | upgradeAvailable | notRunning).
+        if not vm.get("vmware_tools_status"):
+            if vm.get("tools") == "ok":
+                vm["vmware_tools_status"] = "current"
+            elif vm.get("tools") in ("old", "upgradeAvailable"):
+                vm["vmware_tools_status"] = "upgradeAvailable"
+            else:
+                vm["vmware_tools_status"] = "notRunning"
         ds_id = vm.get("datastore_id") or "ds-01"
         net_id = vm.get("network_id") or "net-01"
         net = net_by_id.get(net_id, {})
@@ -609,6 +635,23 @@ def _base_inventory() -> dict:
             "Virtual Machine Administrator", "Network Administrator", "Storage Administrator",
             "No Access",
         ],
+        # vSphere SSO users for the Users & Roles panel. lab_vmware is the
+        # default training operator (password lab_vmware@123).
+        "vcenter_users": [
+            {"id": "user-admin", "username": "administrator@vsphere.local", "role": "Administrator",
+             "enabled": True, "builtin": True, "last_login": "Today 09:14"},
+            {"id": "user-lab", "username": "lab_vmware", "role": "Virtual Machine User",
+             "enabled": True, "builtin": True, "last_login": "Today 08:40"},
+        ],
+        # Alarm/alert definitions surfaced in the Alarms config panel.
+        "alarm_definitions": [
+            {"id": "alarmdef-cpu", "name": "Virtual machine CPU usage", "entity_type": "VirtualMachine",
+             "metric": "cpu.usage", "operator": ">", "threshold": 90, "severity": "warning", "enabled": True},
+            {"id": "alarmdef-mem", "name": "Virtual machine memory usage", "entity_type": "VirtualMachine",
+             "metric": "mem.usage", "operator": ">", "threshold": 90, "severity": "warning", "enabled": True},
+            {"id": "alarmdef-ds", "name": "Datastore usage on disk", "entity_type": "Datastore",
+             "metric": "disk.used", "operator": ">", "threshold": 85, "severity": "critical", "enabled": True},
+        ],
         "vsan": {
             "enabled": True,
             "health": "healthy",
@@ -748,6 +791,13 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "nsx_enabled": state.get("nsx", {}).get("enabled", False),
             "srm_enabled": state.get("srm", {}).get("enabled", False),
             "vami_pending": state.get("vami", {}).get("pending_patches", 0),
+            "vcenter_users_total": len(state.get("vcenter_users", [])),
+            "alarm_definitions_total": len(state.get("alarm_definitions", [])),
+            # Datastores at/under the low-free-space threshold, for tree badges + banners.
+            "datastores_low_space": [
+                {"name": d["name"], "id": d["id"], "free_pct": d.get("free_pct", 100), "warning": d.get("warning")}
+                for d in state.get("datastores", []) if d.get("warning")
+            ],
         },
     }
 
@@ -1221,16 +1271,170 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "SSO account unlocked"}
 
-    if action == "upgrade_tools":
+    if action in ("upgrade_tools", "upgrade_vmware_tools"):
         vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
         if not vm:
             return {"ok": False, "error": "VM not found"}
         vm["tools"] = "ok"
         vm["tools_version"] = "12389"
+        vm["vmware_tools_status"] = "current"
         events.append(_event(f"VMware Tools upgraded on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Upgrade VMware Tools", vm["name"]))
         _save_session(str(session_id), entry)
-        return {"ok": True, "message": f"Tools upgraded on {vm['name']}"}
+        return {"ok": True, "message": f"VMware Tools upgraded to current on {vm['name']}"}
+
+    if action == "edit_vm_options":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        changed = []
+        if "boot_delay_ms" in payload:
+            vm["boot_delay_ms"] = max(0, int(payload["boot_delay_ms"]))
+            changed.append("boot delay")
+        if "boot_firmware" in payload:
+            fw = str(payload["boot_firmware"]).upper()
+            vm["boot_firmware"] = "EFI" if fw == "EFI" else "BIOS"
+            changed.append("firmware")
+        if "boot_order" in payload and isinstance(payload["boot_order"], list):
+            vm["boot_order"] = [str(d) for d in payload["boot_order"]]
+            changed.append("boot order")
+        if "enter_bios_on_boot" in payload:
+            vm["enter_bios_on_boot"] = bool(payload["enter_bios_on_boot"])
+            changed.append("force BIOS setup")
+        if "firewall_enabled" in payload:
+            vm["firewall_enabled"] = bool(payload["firewall_enabled"])
+            changed.append("guest firewall")
+        if "reboot_power_action" in payload:
+            act = str(payload["reboot_power_action"])
+            vm["reboot_power_action"] = act if act in ("restart", "shutdown", "poweroff") else "restart"
+            changed.append("reboot behaviour")
+        if "resume_behavior" in payload:
+            vm["resume_behavior"] = str(payload["resume_behavior"]) or "powerOn"
+            changed.append("resume behaviour")
+        if not changed:
+            return {"ok": False, "error": "No VM options changed"}
+        events.append(_event(f"VM options updated on {vm['name']}: {', '.join(changed)}", "info", vm["name"]))
+        tasks.insert(0, _task("Edit Virtual Machine Options", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"{vm['name']} VM options updated: {', '.join(changed)}"}
+
+    if action == "create_vcenter_user":
+        username = (payload.get("username") or "").strip()
+        password = (payload.get("password") or "").strip()
+        role = (payload.get("role") or "Read Only").strip()
+        if not username:
+            return {"ok": False, "error": "Username is required"}
+        if not password or len(password) < 6:
+            return {"ok": False, "error": "Password must be at least 6 characters"}
+        users = state.setdefault("vcenter_users", [])
+        if any(u["username"].lower() == username.lower() for u in users):
+            return {"ok": False, "error": f"User '{username}' already exists"}
+        if role not in state.get("roles_catalog", []):
+            return {"ok": False, "error": f"Unknown role: {role}"}
+        user = {
+            "id": f"user-{int(time.time()) % 100000}",
+            "username": username, "role": role, "enabled": True,
+            "builtin": False, "last_login": "Never",
+        }
+        users.append(user)
+        # Creating the lab operator also satisfies permission-style scenarios.
+        if state.get("user_missing") and username == "lab_vmware":
+            state["user_missing"] = False
+        events.append(_event(f"Created vCenter user {username} with role {role}", "info", "SSO"))
+        tasks.insert(0, _task("Create User", username))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"User '{username}' created with role {role}", "user_id": user["id"]}
+
+    if action == "reset_user_password":
+        user_id = payload.get("user_id")
+        username = payload.get("username")
+        new_password = (payload.get("password") or payload.get("new_password") or "").strip()
+        if not new_password or len(new_password) < 6:
+            return {"ok": False, "error": "New password must be at least 6 characters"}
+        users = state.get("vcenter_users", [])
+        user = next((u for u in users if u["id"] == user_id or u["username"] == username), None)
+        if not user:
+            return {"ok": False, "error": "User not found"}
+        user["password_reset_at"] = _now_iso()
+        events.append(_event(f"Password reset for {user['username']}", "info", "SSO"))
+        tasks.insert(0, _task("Reset Password", user["username"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Password reset for {user['username']}"}
+
+    if action == "assign_user_role":
+        user_id = payload.get("user_id")
+        username = payload.get("username")
+        role = (payload.get("role") or "").strip()
+        if role not in state.get("roles_catalog", []):
+            return {"ok": False, "error": f"Unknown role: {role}"}
+        users = state.get("vcenter_users", [])
+        user = next((u for u in users if u["id"] == user_id or u["username"] == username), None)
+        if not user:
+            return {"ok": False, "error": "User not found"}
+        user["role"] = role
+        events.append(_event(f"Assigned role {role} to {user['username']}", "info", "SSO"))
+        tasks.insert(0, _task("Assign Role", user["username"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"{user['username']} is now {role}"}
+
+    if action == "delete_vcenter_user":
+        user_id = payload.get("user_id")
+        username = payload.get("username")
+        users = state.get("vcenter_users", [])
+        user = next((u for u in users if u["id"] == user_id or u["username"] == username), None)
+        if not user:
+            return {"ok": False, "error": "User not found"}
+        if user.get("builtin"):
+            return {"ok": False, "error": "Cannot delete a built-in user"}
+        state["vcenter_users"] = [u for u in users if u["id"] != user["id"]]
+        events.append(_event(f"Deleted vCenter user {user['username']}", "warning", "SSO"))
+        tasks.insert(0, _task("Delete User", user["username"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"User '{user['username']}' deleted"}
+
+    if action == "create_alarm_definition":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Alarm name is required"}
+        defs = state.setdefault("alarm_definitions", [])
+        alarm_def = {
+            "id": f"alarmdef-{int(time.time()) % 100000}",
+            "name": name,
+            "entity_type": payload.get("entity_type") or "VirtualMachine",
+            "metric": payload.get("metric") or "cpu.usage",
+            "operator": payload.get("operator") or ">",
+            "threshold": int(payload.get("threshold") or 90),
+            "severity": payload.get("severity") or "warning",
+            "enabled": bool(payload.get("enabled", True)),
+        }
+        defs.append(alarm_def)
+        events.append(_event(f"Alarm definition '{name}' created", "info", "vCenter"))
+        tasks.insert(0, _task("Create Alarm Definition", name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Alarm '{name}' created", "alarm_id": alarm_def["id"]}
+
+    if action == "toggle_alarm_definition":
+        def_id = payload.get("alarm_def_id") or payload.get("id")
+        defs = state.get("alarm_definitions", [])
+        alarm_def = next((d for d in defs if d["id"] == def_id), None)
+        if not alarm_def:
+            return {"ok": False, "error": "Alarm definition not found"}
+        alarm_def["enabled"] = not alarm_def.get("enabled", True)
+        state_label = "enabled" if alarm_def["enabled"] else "disabled"
+        events.append(_event(f"Alarm '{alarm_def['name']}' {state_label}", "info", "vCenter"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Alarm '{alarm_def['name']}' {state_label}"}
+
+    if action == "delete_alarm_definition":
+        def_id = payload.get("alarm_def_id") or payload.get("id")
+        defs = state.get("alarm_definitions", [])
+        before = len(defs)
+        state["alarm_definitions"] = [d for d in defs if d["id"] != def_id]
+        if len(state["alarm_definitions"]) == before:
+            return {"ok": False, "error": "Alarm definition not found"}
+        events.append(_event("Alarm definition removed", "info", "vCenter"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Alarm definition removed"}
 
     if action == "answer_question":
         vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
@@ -1777,6 +1981,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "VM must be powered on to upgrade tools"}
         vm["tools"] = "ok"
         vm["tools_version"] = "12389"
+        vm["vmware_tools_status"] = "current"
         events.append(_event(f"VMware Tools upgraded on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Upgrade VMware Tools", vm["name"]))
         _save_session(str(session_id), entry)

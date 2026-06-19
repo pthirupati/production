@@ -15,6 +15,7 @@ import { ConfirmDialog } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
 import JiraTicketLink from '../components/JiraTicketLink'
 import LabTerminal from '../components/LabTerminal'
+import CodingIDE from '../components/ide/CodingIDE'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
@@ -782,6 +783,9 @@ export default function LabRunner() {
   const isVmwareLab = (scenario?.slug || '').includes('vmware')
     || scenario?.technology?.slug === 'vmware'
     || scenario?.simulation_type === 'vmware'
+  // Coding scenarios open the browser IDE instead of a terminal. Mirrors the
+  // vmware detection above; backed by the scenario.coding_mode flag.
+  const isCodingLab = Boolean(scenario?.coding_mode)
 
   const labUnavailable = session && !['RUNNING', 'PROVISIONING'].includes(session.status)
 
@@ -817,6 +821,77 @@ export default function LabRunner() {
   }
   const solved = validationResult?.passed
   const expired = validationResult?.expired
+
+  // The CodingIDE grades on the backend through the SAME completion path as
+  // ValidateLabView, so when it reports solved the scenario is already complete.
+  // Here we only run the post-completion UI (toast, timer stop, lab close) —
+  // mirroring handleValidate's success branch without re-validating.
+  const handleCodingSolved = (result) => {
+    setValidationResult(result)
+    setSidebarTab('result')
+    stopTimer()
+    if (labChannelRef.current) {
+      labChannelRef.current.postMessage({
+        type: 'lab_stopped', sessionId, reason: 'completed',
+        closingDelayMs: LAB_CLOSE_SECONDS * 1000,
+      })
+    }
+    const slug = session?.scenario?.slug || session?.scenario_detail?.slug || ''
+    scheduleLabClose(result, slug)
+  }
+
+  // ── Coding IDE layout (browser editor instead of terminal) ──
+  if (isCodingLab) {
+    return (
+      <div className="fixed inset-0 sm:relative flex flex-col bg-surface-950 sm:min-h-[100dvh] sm:h-[100dvh] z-20">
+        <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-surface-900 border-b border-surface-700/50">
+          <div className="flex items-center gap-3 min-w-0">
+            <h2 className="text-sm font-semibold text-white truncate max-w-[280px]">
+              {scenario.title || 'Coding Challenge'}
+            </h2>
+            {scenario.difficulty && <span className={`badge-${scenario.difficulty} text-[10px] py-0`}>{scenario.difficulty}</span>}
+            {session?.jira_issue_key && (
+              <JiraTicketLink
+                issueKey={session.jira_issue_key}
+                issueUrl={session.jira_issue_url || `/jira/${session.jira_issue_key}`}
+                className="text-[10px]"
+              />
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <LabTimerBadge variant="desktop" />
+            <button
+              onClick={() => setShowStopConfirm(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-red-500/30 text-red-400 bg-red-500/10 hover:bg-red-500/20 text-xs"
+            >
+              <StopCircle size={13} /> Stop
+            </button>
+          </div>
+        </div>
+        {closingIn != null && (
+          <div className="shrink-0 px-4 py-2 bg-accent-green/15 border-b border-accent-green/30 text-center text-sm text-accent-green font-medium animate-pulse">
+            Challenge solved — lab is closing in {closingIn}s…
+          </div>
+        )}
+        <CodingIDE
+          sessionId={sessionId}
+          scenario={scenario}
+          solved={solved}
+          onSolved={handleCodingSolved}
+        />
+        <ConfirmDialog
+          open={showStopConfirm}
+          onClose={() => !stopping && setShowStopConfirm(false)}
+          title={stopping ? 'Stopping Lab...' : 'Stop Lab?'}
+          message={stopping ? 'Stopping lab environment...' : 'Are you sure you want to stop? Your progress will be lost.'}
+          confirmLabel={stopping ? 'Stopping...' : 'Stop Lab'}
+          danger
+          onConfirm={handleStop}
+          loading={stopping}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 sm:relative flex flex-col bg-surface-950 sm:min-h-[100dvh] sm:h-[100dvh] z-20">

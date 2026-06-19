@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import StatusIcon from './StatusIconInline'
 
-function TreeRow({ depth = 0, label, status, active, onClick, onContextMenu, badge, caret, expanded, onToggle, hasChildren }) {
+function TreeRow({ depth = 0, label, status, active, onClick, onContextMenu, badge, badgeColor, caret, expanded, onToggle, hasChildren }) {
   return (
     <div
       role="button"
@@ -23,7 +23,13 @@ function TreeRow({ depth = 0, label, status, active, onClick, onContextMenu, bad
       ) : <span className="w-2.5 shrink-0" />}
       {status != null && <StatusIcon status={status} size={8} />}
       <span className="truncate flex-1">{label}</span>
-      {badge && <span className="text-[8px] bg-[#F5A623] text-[#1B2A3B] rounded px-1 font-bold">{badge}</span>}
+      {badge && (
+        <span
+          className="text-[8px] rounded px-1 font-bold leading-[1.4]"
+          style={{ background: badgeColor || '#F5A623', color: '#1B2A3B' }}
+          title={badgeColor === '#D9534F' ? 'Datastore full' : badgeColor === '#F5A623' ? 'Low free space' : undefined}
+        >{badge}</span>
+      )}
     </div>
   )
 }
@@ -176,6 +182,8 @@ export default function VmwareInventoryTree({
           depth={1}
           label={ds.name}
           status={ds.accessible ? 'connected' : 'disconnected'}
+          badge={ds.warning === 'critical' ? '!' : ds.warning === 'warning' ? '⚠' : null}
+          badgeColor={ds.warning === 'critical' ? '#D9534F' : ds.warning === 'warning' ? '#F5A623' : null}
           active={selectedNode.type === 'datastore' && selectedNode.id === ds.id}
           onClick={() => { setSelectedNode({ type: 'datastore', id: ds.id }); setActiveTab('summary') }}
         />

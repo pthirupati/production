@@ -6,6 +6,7 @@ from apps.vmware_sim.engine import (
     _ensure_session,
     apply_action,
     drop_session,
+    get_state,
     validate_vmware_lab,
 )
 
@@ -78,7 +79,69 @@ class VMwareAdvancedTests(TestCase):
         apply_action(sid, "configure_srm")
         apply_action(sid, "srm_test_recovery")
         apply_action(sid, "srm_failover")
-        from apps.vmware_sim.engine import get_state
         state = get_state(sid)["inventory"]
         web = next(v for v in state["vms"] if v["name"] == "web-prod-01")
         self.assertEqual(web.get("host_id"), "host-dr-01")
+
+    def test_upgrade_vmware_tools_sets_status_current(self):
+        sid = self._session("vmware-guest-powered-off")
+        # web-prod-01 starts powered off with tools notRunning in this scenario.
+        res = apply_action(sid, "upgrade_vmware_tools", {"vm_name": "web-prod-01"})
+        self.assertTrue(res["ok"], res)
+        state = get_state(sid)["inventory"]
+        web = next(v for v in state["vms"] if v["name"] == "web-prod-01")
+        self.assertEqual(web["vmware_tools_status"], "current")
+        self.assertEqual(web["tools"], "ok")
+
+    def test_create_vcenter_user_and_assign_role(self):
+        sid = self._session("vmware-guest-powered-off")
+        # Reject weak password.
+        bad = apply_action(sid, "create_vcenter_user", {"username": "ops_user", "password": "123", "role": "Read Only"})
+        self.assertFalse(bad["ok"])
+        # Create a valid user, then change its role.
+        ok = apply_action(sid, "create_vcenter_user", {
+            "username": "ops_user", "password": "Sup3rSecret", "role": "Read Only",
+        })
+        self.assertTrue(ok["ok"], ok)
+        users = get_state(sid)["inventory"]["vcenter_users"]
+        self.assertTrue(any(u["username"] == "ops_user" for u in users))
+        # Duplicate username is rejected.
+        dup = apply_action(sid, "create_vcenter_user", {"username": "ops_user", "password": "Sup3rSecret"})
+        self.assertFalse(dup["ok"])
+        # Role assignment + password reset succeed.
+        role_res = apply_action(sid, "assign_user_role", {"username": "ops_user", "role": "Virtual Machine Administrator"})
+        self.assertTrue(role_res["ok"], role_res)
+        reset_res = apply_action(sid, "reset_user_password", {"username": "ops_user", "password": "An0therPass"})
+        self.assertTrue(reset_res["ok"], reset_res)
+        users = get_state(sid)["inventory"]["vcenter_users"]
+        self.assertEqual(next(u for u in users if u["username"] == "ops_user")["role"], "Virtual Machine Administrator")
+
+    def test_default_lab_user_present(self):
+        sid = self._session("vmware-guest-powered-off")
+        users = get_state(sid)["inventory"]["vcenter_users"]
+        self.assertTrue(any(u["username"] == "lab_vmware" for u in users))
+
+    def test_datastore_low_space_warning_flag(self):
+        sid = self._session("datastore-almost-full")
+        summary = get_state(sid)["summary"]
+        inv = get_state(sid)["inventory"]
+        # The almost-full scenario leaves a datastore under the 15% free threshold.
+        low = summary["datastores_low_space"]
+        self.assertTrue(low, "expected at least one datastore flagged low on space")
+        flagged_names = {d["name"] for d in low}
+        for ds in inv["datastores"]:
+            if ds["name"] in flagged_names:
+                self.assertIn(ds["warning"], ("warning", "critical"))
+                self.assertLess(ds["free_pct"], 15)
+
+    def test_create_alarm_definition(self):
+        sid = self._session("vmware-guest-powered-off")
+        before = len(get_state(sid)["inventory"]["alarm_definitions"])
+        res = apply_action(sid, "create_alarm_definition", {
+            "name": "Custom disk latency", "entity_type": "Datastore",
+            "metric": "disk.latency", "operator": ">", "threshold": 30, "severity": "warning",
+        })
+        self.assertTrue(res["ok"], res)
+        defs = get_state(sid)["inventory"]["alarm_definitions"]
+        self.assertEqual(len(defs), before + 1)
+        self.assertTrue(any(d["name"] == "Custom disk latency" for d in defs))

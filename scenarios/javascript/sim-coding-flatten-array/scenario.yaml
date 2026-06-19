@@ -1,0 +1,73 @@
+title: "Coding: Flatten a Nested Array"
+slug: sim-coding-flatten-array
+category: JavaScript Development
+description: |
+  Implement flatten(arr) which takes an arbitrarily nested array of numbers and
+  returns a new, single-level array with all the numbers in their original
+  left-to-right order. Do not mutate the input. You may not use
+  Array.prototype.flat(Infinity).
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Implement flatten(arr) for arbitrarily nested arrays
+  - Preserve element order; do not mutate the input
+  - Pass all visible and hidden tests, including deep nesting
+initial_state: A browser IDE opens with solution.js containing a stub to implement.
+solution_explanation: |
+  Recurse over the array: for each element, if it is an array, concatenate the
+  result of flatten() on it; otherwise push the value. A reduce with recursion,
+  or an explicit stack-based iterative approach, both work.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  instructions: |
+    Implement flatten(arr) so it returns a single-level array of all numbers,
+    in order, from an arbitrarily nested array.
+      flatten([1, [2, [3, [4]], 5]]) -> [1, 2, 3, 4, 5]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+    - path: solution.js
+      content: |
+        function flatten(arr) {
+          // TODO: return a new flat array of all numbers, in order.
+        }
+  visible_tests:
+    - name: already flat
+      code: |
+        assert(JSON.stringify(flatten([1, 2, 3])) === JSON.stringify([1, 2, 3]));
+    - name: one level of nesting
+      code: |
+        assert(JSON.stringify(flatten([1, [2, 3], 4])) === JSON.stringify([1, 2, 3, 4]));
+    - name: example from the brief
+      code: |
+        assert(JSON.stringify(flatten([1, [2, [3, [4]], 5]])) === JSON.stringify([1, 2, 3, 4, 5]));
+  hidden_tests:
+    - name: empty and nested-empty arrays
+      code: |
+        assert(JSON.stringify(flatten([])) === JSON.stringify([]));
+        assert(JSON.stringify(flatten([[], [[]], []])) === JSON.stringify([]));
+    - name: deep nesting
+      code: |
+        const deep = [1, [2, [3, [4, [5, [6]]]]]];
+        assert(JSON.stringify(flatten(deep)) === JSON.stringify([1, 2, 3, 4, 5, 6]));
+    - name: does not mutate the input
+      code: |
+        const input = [1, [2, [3]]];
+        const snapshot = JSON.stringify(input);
+        flatten(input);
+        assert(JSON.stringify(input) === snapshot, "input was mutated");
+hints:
+  - content: Think recursively. For each element, is it an array or a value?
+    cost: 10
+    order: 1
+  - content: "Use Array.isArray(el): if true, recurse and concat the result; otherwise push el."
+    cost: 20
+    order: 2

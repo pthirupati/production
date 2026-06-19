@@ -26,6 +26,8 @@ from apps.question_bank.serializers import (
 from apps.labs.models import LabSession
 from apps.labs.serializers import LabSessionSerializer
 from apps.labs.provisioner import get_provisioner, terminate_lab_session, DockerProvisioner
+from apps.labs.completion import finalize_validated_session
+from apps.question_bank.scenario_copy import public_objectives
 from apps.hints.models import Hint
 from apps.progress.models import UserScenarioProgress, UserAchievement
 from apps.billing.services import can_start_lab
@@ -909,80 +911,11 @@ class ValidateLabView(APIView):
                     passed = exit_code == 0
 
             if passed:
-                elapsed = (timezone.now() - session.started_at).total_seconds()
-                time_bonus = max(0, int(session.time_remaining * 100 / session.duration_limit))
-                hint_penalty = session.hints_used * 10
-                score = max(10, 100 + time_bonus - hint_penalty)
-
-                session.validation_passed = True
-                session.score = score
-                session.status = "COMPLETED"
-                session.ended_at = timezone.now()
-                session.save(update_fields=["validation_passed", "score", "status", "ended_at"])
-
-                sync_lab_completed(session, score=score, time_taken=int(elapsed))
-                try:
-                    from apps.jira_integration.simulated import schedule_jira_reset_after_lab_close
-                    schedule_jira_reset_after_lab_close(session)
-                except Exception as e:
-                    logger.warning(f"Jira reset schedule failed: {e}")
-                try:
-                    from apps.accounts.models import OrganizationMember
-                    from apps.accounts.webhooks import fire_org_webhook
-                    membership = OrganizationMember.objects.filter(user=request.user).select_related("organization").first()
-                    if membership:
-                        fire_org_webhook(membership.organization, "lab.completed", {
-                            "user": request.user.username,
-                            "scenario": session.scenario.slug,
-                            "score": score,
-                        })
-                except Exception:
-                    pass
-
-                from apps.jira_integration.helpers import is_jira_closed
-                from apps.jira_integration.models import UserScenarioJiraTicket
-
-                ticket = UserScenarioJiraTicket.objects.filter(
-                    user=request.user, issue_key=session.jira_issue_key
-                ).first()
-                jira_closed = ticket and is_jira_closed(ticket.jira_status or "")
-
-                if jira_closed:
-                    from apps.jira_integration.completion import finalize_lab_completion_if_ready
-                    finalize_lab_completion_if_ready(session)
-                    completion_message = "Congratulations! Challenge solved and Jira ticket closed!"
-                else:
-                    completion_message = (
-                        "Validation passed! Update the Jira ticket status and close it "
-                        "to mark this scenario complete."
-                    )
-
-                terminate_lab_session(provisioner, session)
-
-                from apps.progress.learning_path import sync_learning_path_on_completion
-                sync_learning_path_on_completion(request.user, session.scenario)
-
-                try:
-                    from apps.notifications.tasks import send_lab_completion_notification
-                    send_lab_completion_notification.delay(
-                        user_id=request.user.id,
-                        scenario_id=session.scenario_id,
-                        score=score,
-                        time_seconds=int(elapsed),
-                    )
-                except Exception:
-                    pass  # never fail validation due to email errors
-
-                return Response({
-                    "passed": True,
-                    "score": score,
-                    "output": output,
-                    "time_taken": int(elapsed),
-                    "message": completion_message,
-                    "jira_pending_close": not jira_closed,
-                    "scenario_completed": jira_closed or session.completion_finalized,
-                    "solution": session.scenario.solution_explanation or None,
-                })
+                # Single shared completion path — see apps.labs.completion.
+                from apps.labs.completion import finalize_validated_session
+                payload = finalize_validated_session(session, request.user, provisioner)
+                payload["output"] = output
+                return Response(payload)
             else:
                 return Response({
                     "passed": False,
@@ -993,6 +926,158 @@ class ValidateLabView(APIView):
         except Exception as e:
             logger.error(f"Validation error: {e}")
             return Response({"error": "Validation failed"}, status=500)
+
+
+def public_coding_spec(scenario):
+    """Return a coding_spec safe to send to the browser (HIDDEN tests stripped).
+
+    The browser gets starter files, the entrypoint, the language, and the
+    VISIBLE test cases (names + code, since they run client-side). HIDDEN test
+    source is NEVER included — only the count, so the UI can say "N hidden
+    tests". Hidden tests run exclusively on the backend.
+    """
+    spec = dict(scenario.coding_spec or {})
+    visible = spec.get("visible_tests") or []
+    hidden = spec.get("hidden_tests") or []
+    return {
+        "language": spec.get("language", "python"),
+        "files": spec.get("files", []),
+        "entrypoint": spec.get("entrypoint", ""),
+        "instructions": spec.get("instructions", "") or scenario.description,
+        "visible_tests": [
+            {"name": t.get("name", f"test_{i}"), "code": t.get("code", "")}
+            for i, t in enumerate(visible)
+        ],
+        "hidden_test_count": len(hidden),
+        "starter_note": spec.get("starter_note", ""),
+    }
+
+
+class CodingSpecView(APIView):
+    """Serve the coding-IDE spec for a running session (hidden tests stripped)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = get_object_or_404(LabSession, pk=session_id, user=request.user)
+        scenario = session.scenario
+        if not getattr(scenario, "coding_mode", False):
+            return Response({"error": "Not a coding scenario"}, status=400)
+        return Response({
+            "coding_mode": True,
+            "scenario": {
+                "slug": scenario.slug,
+                "title": scenario.title,
+                "description": scenario.description,
+                "objectives": public_objectives(scenario.objectives),
+                "difficulty": scenario.difficulty,
+            },
+            "spec": public_coding_spec(scenario),
+            "status": session.status,
+            "validation_passed": session.validation_passed,
+        })
+
+
+class CodeValidateView(APIView):
+    """Grade a coding submission against HIDDEN tests on the backend.
+
+    Integrity (the platform's #1 rule): clicking Check NEVER auto-completes a
+    scenario. We run the user's real code against the scenario's hidden +
+    visible tests in a sandboxed subprocess (apps.labs.code_exec). Only when
+    EVERY required test genuinely passes do we mark the session complete — via
+    the SAME finalize_validated_session() path as the terminal validator. If a
+    language can't be safely auto-graded, we return needs_review, never a pass.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        from apps.labs.code_exec import grade_submission
+
+        session = get_object_or_404(
+            LabSession, pk=session_id, user=request.user, status="RUNNING"
+        )
+        scenario = session.scenario
+        if not getattr(scenario, "coding_mode", False):
+            return Response({"error": "Not a coding scenario"}, status=400)
+
+        spec = scenario.coding_spec or {}
+        language = (request.data.get("language") or spec.get("language") or "python").lower()
+
+        # Accept either a single concatenated source string, or a {path: content}
+        # map of files. We grade the entrypoint file's content (multi-file
+        # projects concatenate non-entry files first so helpers are in scope).
+        user_code = self._resolve_user_code(request.data, spec)
+        if not user_code.strip():
+            return Response({"error": "No code submitted"}, status=400)
+
+        visible = spec.get("visible_tests") or []
+        hidden = spec.get("hidden_tests") or []
+        # Run BOTH visible and hidden tests on the backend for the authoritative
+        # verdict. The browser may have run visible tests already, but the
+        # backend re-runs everything so the pass decision is never client-trusted.
+        all_tests = (
+            [{"name": t.get("name", f"v{i}"), "code": t.get("code", ""), "hidden": False}
+             for i, t in enumerate(visible)]
+            + [{"name": t.get("name", f"h{i}"), "code": t.get("code", ""), "hidden": True}
+               for i, t in enumerate(hidden)]
+        )
+
+        result = grade_submission(language, user_code, all_tests,
+                                  timeout=int(spec.get("timeout", 8)))
+
+        # Reveal hidden test names only once the scenario is already solved.
+        already_solved = session.validation_passed
+        payload = result.public_dict(reveal_hidden_names=already_solved)
+
+        if result.needs_review:
+            payload["passed"] = False
+            payload["message"] = (
+                result.error
+                or "This submission needs manual review and was not auto-graded."
+            )
+            return Response(payload)
+
+        if result.all_passed:
+            provisioner = None
+            try:
+                provisioner = get_provisioner(session.provider or "simulation")
+            except Exception:
+                provisioner = None
+            completion = finalize_validated_session(session, request.user, provisioner)
+            payload.update(completion)
+            payload["passed"] = True
+            payload["message"] = "All tests passed! " + completion.get("message", "")
+            return Response(payload)
+
+        payload["passed"] = False
+        payload["message"] = (
+            "Some tests failed — your code ran but did not pass every check."
+            if result.ran else
+            (result.error or "Your code did not run.")
+        )
+        return Response(payload)
+
+    @staticmethod
+    def _resolve_user_code(data, spec) -> str:
+        """Build the single source string to grade from the request payload."""
+        code = data.get("code")
+        if isinstance(code, str) and code.strip():
+            return code
+
+        files = data.get("files")
+        if isinstance(files, dict) and files:
+            entrypoint = data.get("entrypoint") or spec.get("entrypoint") or ""
+            parts = []
+            # Non-entry files first (so functions they define are in scope),
+            # entrypoint last.
+            for path, content in files.items():
+                if path != entrypoint and isinstance(content, str):
+                    parts.append(content)
+            if entrypoint and isinstance(files.get(entrypoint), str):
+                parts.append(files[entrypoint])
+            elif not parts and files:
+                parts = [c for c in files.values() if isinstance(c, str)]
+            return "\n\n".join(parts)
+        return ""
 
 
 class ActiveLabsView(APIView):
@@ -1053,6 +1138,9 @@ class LabSessionStatusView(APIView):
                 "difficulty": session.scenario.difficulty,
                 "description": session.scenario.description,
                 "instructions": getattr(session.scenario, "instructions", "") or "",
+                "lab_mode": session.scenario.lab_mode,
+                "simulation_type": session.scenario.simulation_type,
+                "coding_mode": bool(getattr(session.scenario, "coding_mode", False)),
                 "technology": {
                     "name": session.scenario.technology.name,
                     "slug": session.scenario.technology.slug,

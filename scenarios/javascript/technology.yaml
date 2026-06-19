@@ -1,0 +1,9 @@
+name: JavaScript Development
+slug: javascript
+description: Browser-based JavaScript coding challenges — implement and debug functions in a full in-browser IDE with instant feedback and server-graded hidden tests.
+icon: code
+color: amber
+order: 16
+price: 499
+is_active: true
+coming_soon: false

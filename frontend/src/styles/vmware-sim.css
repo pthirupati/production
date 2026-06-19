@@ -22,7 +22,7 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.vmware-sim button:not(.vm-btn-green) {
+.vmware-sim button:not(.vm-btn-green):not(.vm-btn-amber):not(.vm-btn-blue):not(.vm-btn-red) {
   color: var(--vm-text);
 }
 .vmware-sim .vm-actions-menu button,
@@ -451,6 +451,14 @@
   background: var(--vm-green);
   color: #fff;
   box-shadow: 0 4px 12px -4px var(--vm-green);
+}
+.vm-btn-amber {
+  border-color: rgba(245, 166, 35, 0.45);
+  background: rgba(245, 166, 35, 0.14);
+  color: var(--vm-amber);
+}
+.vm-btn-amber:hover:not(:disabled) {
+  background: rgba(245, 166, 35, 0.24);
 }
 
 /* ── Modals ── */

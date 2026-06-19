@@ -15,6 +15,8 @@ import VmwareLifecyclePanel from '../../components/vmware/VmwareLifecyclePanel'
 import NsxMicroSegmentationPanel from '../../components/vmware/NsxMicroSegmentationPanel'
 import SrmDisasterRecoveryPanel from '../../components/vmware/SrmDisasterRecoveryPanel'
 import VamiAppliancePanel from '../../components/vmware/VamiAppliancePanel'
+import VmwareAlarmDefinitionsPanel from '../../components/vmware/VmwareAlarmDefinitionsPanel'
+import VmwareUsersRolesPanel from '../../components/vmware/VmwareUsersRolesPanel'
 import VmCreateWizard from '../../components/vmware/wizards/VmCreateWizard'
 import VmwareInventoryTree from '../../components/vmware/VmwareInventoryTree'
 import VmwareConsole from '../../components/vmware/VmwareConsole'
@@ -276,25 +278,54 @@ function CreateVmModal({ hosts, datastores, networks, onClose, onAction }) {
   )
 }
 
-/* ─── Edit VM Modal ──────────────────────────────────────────────────── */
+/* ─── Edit VM Modal (Virtual Hardware + VM Options tabs) ──────────────── */
 function EditVmModal({ vm, networks, onClose, onAction }) {
+  const [tab, setTab] = useState('hardware')
   const [cpu, setCpu] = useState(String(vm.cpu))
   const [memGb, setMemGb] = useState(String(Math.round(vm.memory_mb / 1024)))
   const [annotation, setAnnotation] = useState(vm.annotation || '')
   const [netId, setNetId] = useState(vm.network_id || '')
+  // VM Options
+  const [bootDelay, setBootDelay] = useState(String(vm.boot_delay_ms ?? 0))
+  const [firmware, setFirmware] = useState(vm.boot_firmware || vm.firmware || 'BIOS')
+  const [enterBios, setEnterBios] = useState(!!vm.enter_bios_on_boot)
+  const [firewall, setFirewall] = useState(vm.firewall_enabled !== false)
+  const [rebootAction, setRebootAction] = useState(vm.reboot_power_action || 'restart')
+  const [bootOrder, setBootOrder] = useState(vm.boot_order || ['disk', 'network', 'cdrom'])
   const [acting, setActing] = useState(false)
   const [error, setError] = useState('')
   const isPoweredOn = vm.power === 'poweredOn'
 
+  const moveBoot = (idx, dir) => {
+    setBootOrder(prev => {
+      const next = [...prev]
+      const j = idx + dir
+      if (j < 0 || j >= next.length) return prev
+      ;[next[idx], next[j]] = [next[j], next[idx]]
+      return next
+    })
+  }
+
   const save = async () => {
     setActing(true); setError('')
     try {
+      // Hardware / general
       const payload = { vm_id: vm.id, annotation }
       if (!isPoweredOn) { payload.cpu = parseInt(cpu); payload.memory_mb = parseInt(memGb) * 1024 }
       if (netId !== vm.network_id) {
         await onAction('change_network', { vm_id: vm.id, network_id: netId })
       }
       await onAction('edit_vm', payload)
+      // VM Options (separate action so it works even while powered on)
+      await onAction('edit_vm_options', {
+        vm_id: vm.id,
+        boot_delay_ms: parseInt(bootDelay) || 0,
+        boot_firmware: firmware,
+        enter_bios_on_boot: enterBios,
+        firewall_enabled: firewall,
+        reboot_power_action: rebootAction,
+        boot_order: bootOrder,
+      })
       onClose()
     } catch (e) {
       setError(e?.response?.data?.error || 'Save failed')
@@ -303,41 +334,102 @@ function EditVmModal({ vm, networks, onClose, onAction }) {
 
   return (
     <div className="vm-modal-overlay">
-      <div className="vm-modal w-[420px] max-w-[95vw]">
+      <div className="vm-modal w-[480px] max-w-[95vw]">
         <div className="vm-modal-header">
           <span>Edit Settings — {vm.name}</span>
           <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
         </div>
+        <div className="flex border-b border-[#2d3a4a] bg-[#16222f]">
+          {[['hardware', 'Virtual Hardware'], ['options', 'VM Options']].map(([id, label]) => (
+            <button key={id} type="button" onClick={() => setTab(id)}
+              className={`px-4 py-2 text-xs font-semibold border-b-2 ${tab === id ? 'border-[#00C8FF] text-white bg-[rgba(0,200,255,.08)]' : 'border-transparent text-[#8fa5b8] hover:text-white'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="vm-modal-body space-y-3">
-          {isPoweredOn && (
-            <div className="text-[11px] text-[#F5A623] bg-[rgba(245,166,35,.12)] border border-[rgba(245,166,35,.25)] rounded p-2">
-              CPU and Memory cannot be changed while the VM is powered on.
+          {tab === 'hardware' && (
+            <>
+              {isPoweredOn && (
+                <div className="text-[11px] text-[#F5A623] bg-[rgba(245,166,35,.12)] border border-[rgba(245,166,35,.25)] rounded p-2">
+                  CPU and Memory cannot be changed while the VM is powered on.
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-[#8fa5b8] mb-1">CPUs</label>
+                  <select value={cpu} onChange={e => setCpu(e.target.value)} disabled={isPoweredOn} className="vm-input !pl-3 disabled:opacity-50">
+                    {['1','2','4','8','16'].map(v => <option key={v} value={v}>{v} vCPU{v !== '1' ? 's' : ''}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-[#8fa5b8] mb-1">Memory (GB)</label>
+                  <select value={memGb} onChange={e => setMemGb(e.target.value)} disabled={isPoweredOn} className="vm-input !pl-3 disabled:opacity-50">
+                    {['1','2','4','8','16','32','64'].map(v => <option key={v} value={v}>{v} GB</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs text-[#8fa5b8] mb-1">Network</label>
+                  <select value={netId} onChange={e => setNetId(e.target.value)} className="vm-input !pl-3">
+                    {networks.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs text-[#8fa5b8] mb-1">Annotation / Notes</label>
+                  <textarea value={annotation} onChange={e => setAnnotation(e.target.value)} rows={2} className="vm-input !pl-3 resize-none" />
+                </div>
+              </div>
+            </>
+          )}
+          {tab === 'options' && (
+            <div className="space-y-3.5">
+              <div className="text-[11px] font-bold text-[#8fa5b8] uppercase tracking-wide">Boot Options</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-[#8fa5b8] mb-1">Boot delay (ms)</label>
+                  <input type="number" min="0" step="500" value={bootDelay} onChange={e => setBootDelay(e.target.value)} className="vm-input !pl-3" />
+                </div>
+                <div>
+                  <label className="block text-xs text-[#8fa5b8] mb-1">Firmware</label>
+                  <select value={firmware} onChange={e => setFirmware(e.target.value)} className="vm-input !pl-3">
+                    <option value="BIOS">BIOS</option>
+                    <option value="EFI">EFI</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-[#8fa5b8] mb-1">Boot order</label>
+                <div className="space-y-1.5">
+                  {bootOrder.map((dev, i) => (
+                    <div key={dev} className="flex items-center gap-2 bg-[#16222f] border border-[#2d3a4a] rounded px-2.5 py-1.5">
+                      <span className="text-[10px] text-[#8fa5b8] w-4">{i + 1}.</span>
+                      <span className="text-xs text-[#E8EDF2] capitalize flex-1">{dev}</span>
+                      <button type="button" onClick={() => moveBoot(i, -1)} disabled={i === 0} className="vm-btn text-[10px] py-0.5 px-2 disabled:opacity-30">↑</button>
+                      <button type="button" onClick={() => moveBoot(i, 1)} disabled={i === bootOrder.length - 1} className="vm-btn text-[10px] py-0.5 px-2 disabled:opacity-30">↓</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-[#E8EDF2] cursor-pointer">
+                <input type="checkbox" checked={enterBios} onChange={e => setEnterBios(e.target.checked)} />
+                Force entry into BIOS/EFI setup screen on next boot
+              </label>
+
+              <div className="text-[11px] font-bold text-[#8fa5b8] uppercase tracking-wide pt-1 border-t border-[#22303f] mt-1">VMware Tools / Power</div>
+              <div>
+                <label className="block text-xs text-[#8fa5b8] mb-1">Reboot / Restart Guest behaviour</label>
+                <select value={rebootAction} onChange={e => setRebootAction(e.target.value)} className="vm-input !pl-3">
+                  <option value="restart">Restart guest OS (graceful)</option>
+                  <option value="shutdown">Shut down then power on</option>
+                  <option value="poweroff">Hard power cycle</option>
+                </select>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-[#E8EDF2] cursor-pointer">
+                <input type="checkbox" checked={firewall} onChange={e => setFirewall(e.target.checked)} />
+                Guest OS firewall enabled
+              </label>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-[#8fa5b8] mb-1">CPUs</label>
-              <select value={cpu} onChange={e => setCpu(e.target.value)} disabled={isPoweredOn} className="vm-input !pl-3 disabled:opacity-50">
-                {['1','2','4','8','16'].map(v => <option key={v} value={v}>{v} vCPU{v !== '1' ? 's' : ''}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-[#8fa5b8] mb-1">Memory (GB)</label>
-              <select value={memGb} onChange={e => setMemGb(e.target.value)} disabled={isPoweredOn} className="vm-input !pl-3 disabled:opacity-50">
-                {['1','2','4','8','16','32','64'].map(v => <option key={v} value={v}>{v} GB</option>)}
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs text-[#8fa5b8] mb-1">Network</label>
-              <select value={netId} onChange={e => setNetId(e.target.value)} className="vm-input !pl-3">
-                {networks.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs text-[#8fa5b8] mb-1">Annotation / Notes</label>
-              <textarea value={annotation} onChange={e => setAnnotation(e.target.value)} rows={2} className="vm-input !pl-3 resize-none" />
-            </div>
-          </div>
           {error && <p className="text-xs text-[#D9534F]">{error}</p>}
         </div>
         <div className="vm-modal-footer">
@@ -456,6 +548,55 @@ function DeployFromTemplateModal({ templates, hosts, onClose, onAction }) {
   )
 }
 
+/* ─── Task / Event detail popover ────────────────────────────────────── */
+function TaskEventDetailModal({ item, onClose }) {
+  if (!item) return null
+  const isTask = item.kind === 'task'
+  const d = item.data || {}
+  const severity = (d.severity || '').toLowerCase()
+  const sevColor = severity === 'critical' ? '#D9534F' : severity === 'warning' ? '#F5A623' : '#5DB85D'
+  const rows = isTask
+    ? [
+        ['Task', d.name],
+        ['Status', <span className={d.status === 'success' ? 'text-[#5DB85D]' : 'text-[#D9534F]'}>{d.status === 'success' ? '✓ ' : '✗ '}{d.result || d.status}</span>],
+        ['Target', d.target],
+        ['Initiator', d.initiator || 'root'],
+        ['Queued', fmtTime(d.queued)],
+        ['Started', fmtTime(d.started)],
+        ['Completed', fmtTime(d.completed)],
+        ['Duration', d.completed && d.started ? `${Math.max(1, Math.round((new Date(d.completed) - new Date(d.started)) / 1000))}s` : '—'],
+        ['Task ID', <span className="font-mono text-[10px]">{d.id || '—'}</span>],
+      ]
+    : [
+        ['Severity', <span style={{ color: sevColor }} className="font-semibold uppercase">{d.severity || 'info'}</span>],
+        ['Entity', d.entity || '—'],
+        ['User', d.user || 'root'],
+        ['Time', fmtTime(d.time)],
+        ['Message', d.message],
+      ]
+  return (
+    <div className="vm-modal-overlay" onClick={onClose}>
+      <div className="vm-modal w-[440px] max-w-[95vw]" onClick={e => e.stopPropagation()}>
+        <div className="vm-modal-header">
+          <span>{isTask ? 'Task details' : 'Event details'}{d.target || d.entity ? ` — ${d.target || d.entity}` : ''}</span>
+          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+        </div>
+        <div className="vm-modal-body">
+          {rows.map(([label, value]) => (
+            <div key={label} className="vm-info-row">
+              <span className="vm-info-label">{label}</span>
+              <span className="vm-info-value break-words">{value ?? '—'}</span>
+            </div>
+          ))}
+        </div>
+        <div className="vm-modal-footer">
+          <button type="button" onClick={onClose} className="vm-btn vm-btn-blue">Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Main component ─────────────────────────────────────────────────── */
 export default function VMwareSimulator() {
   const { sessionId: paramSessionId } = useParams()
@@ -491,6 +632,8 @@ export default function VMwareSimulator() {
   const [vcAuth, setVcAuth] = useState(() => isVcenterAuthenticated())
   const [ctxMenu, setCtxMenu] = useState(null)
   const [vmToast, setVmToast] = useState(null)
+  // Task/Event detail popover (gap: tasks & events should be clickable).
+  const [detailItem, setDetailItem] = useState(null)
   const rootRef = useRef(null)
   const actionsRef = useRef(null)
 
@@ -546,6 +689,7 @@ export default function VMwareSimulator() {
       if (e.key === 'Escape') {
         setConsoleVm(null)
         setCtxMenu(null)
+        setDetailItem(null)
         setActionsMenuOpen(false)
         setShowSnapshotModal(false)
         setShowMigrateModal(false)
@@ -676,6 +820,8 @@ export default function VMwareSimulator() {
   const contentLibrary = inv.content_library || []
   const permissions = inv.permissions || []
   const rolesCatalog = inv.roles_catalog || []
+  const vcenterUsers = inv.vcenter_users || []
+  const alarmDefinitions = inv.alarm_definitions || []
   const vsan = inv.vsan || {}
   const vswitches = inv.vswitches || []
   const datacenters = inv.datacenters || []
@@ -696,6 +842,28 @@ export default function VMwareSimulator() {
   const activeAlarms = alarms.filter(a => a.status === 'active')
 
   const toggleSection = (k) => setExpandedSections(p => ({ ...p, [k]: !p[k] }))
+
+  /* ── Resolve a task target / event entity name to an inventory node and
+        select it, then open a detail popover with the full record. ── */
+  const selectByTargetName = (name) => {
+    if (!name) return
+    const vm = vms.find(v => v.name === name)
+    if (vm) { setSelectedNode({ type: 'vm', id: vm.id }); setActiveTab('summary'); return }
+    const host = hosts.find(h => h.name === name)
+    if (host) { setSelectedNode({ type: 'host', id: host.id }); setActiveTab('summary'); return }
+    const ds = datastores.find(d => d.name === name)
+    if (ds) { setSelectedNode({ type: 'datastore', id: ds.id }); setActiveTab('summary'); return }
+    const net = networks.find(n => n.name === name)
+    if (net) { setSelectedNode({ type: 'network', id: net.id }); setActiveTab('summary') }
+  }
+  const openTaskDetail = (task) => {
+    selectByTargetName(task?.target)
+    setDetailItem({ kind: 'task', data: task })
+  }
+  const openEventDetail = (ev) => {
+    selectByTargetName(ev?.entity)
+    setDetailItem({ kind: 'event', data: ev })
+  }
 
   /* ── VM toolbar actions ── */
   const renderVmToolbar = (vm) => {
@@ -745,8 +913,9 @@ export default function VMwareSimulator() {
       <ToolbarSep />
       <div className="relative" ref={actionsRef}>
         <button
+          type="button"
           onClick={() => setActionsMenuOpen(v => !v)}
-          className="px-2.5 py-1 text-[11px] border border-[#aab] rounded bg-[#e4e9f0] hover:bg-[#d8dfe8] flex items-center gap-1"
+          className="vm-btn flex items-center gap-1"
         >
           Actions <span className="text-[9px]">▼</span>
         </button>
@@ -804,20 +973,36 @@ export default function VMwareSimulator() {
         {/* ── Main content ──────────────────────────────────────────── */}
         <main className="vm-main">
 
-          {/* Datastore full incident banner */}
-          {datastores.some(d => d.free_gb / d.capacity_gb < 0.05) && (() => {
-            const criticalDs = datastores.find(d => d.free_gb / d.capacity_gb < 0.05)
-            const pct = criticalDs ? Math.round((1 - criticalDs.free_gb / criticalDs.capacity_gb) * 100) : 0
+          {/* Datastore capacity incident banner — critical (<5% free) takes
+              precedence over a low-space warning (<15% free). */}
+          {(() => {
+            const criticalDs = datastores.find(d => d.capacity_gb && d.free_gb / d.capacity_gb < 0.05)
+            const warnDs = !criticalDs && datastores.find(d => d.capacity_gb && d.free_gb / d.capacity_gb < 0.15)
+            const ds = criticalDs || warnDs
+            if (!ds) return null
+            const usedPct = Math.round((1 - ds.free_gb / ds.capacity_gb) * 100)
+            const isCritical = !!criticalDs
             return (
-            <div className="vm-banner-warning">
-              <span className="shrink-0">⚠</span>
-              <span>{criticalDs?.name || 'Datastore-01'} is full ({pct}%). VMs on it are not responding and snapshots are blocked. Reboot a VM to recover it, or free space.</span>
-              <div className="flex-1" />
-              <button type="button" className="shrink-0 px-3 py-1 rounded-md border-none bg-[#F5A623] text-[#1B1B2F] text-[11.5px] font-bold cursor-pointer"
-                onClick={() => runAction('expand_datastore', { datastore: criticalDs?.name, gb: 500 })}>
-                Free space
-              </button>
-            </div>
+              <div className="vm-banner-warning" style={isCritical ? { background: 'rgba(217,83,79,.15)', borderBottomColor: 'var(--vm-red)', color: '#f5a0a0' } : undefined}>
+                <span className="shrink-0">⚠</span>
+                {isCritical ? (
+                  <span>{ds.name} is full ({usedPct}% used). VMs on it are not responding and snapshots are blocked. Reboot a VM to recover it, or free space.</span>
+                ) : (
+                  <span>{ds.name} is low on space — only {fmtBytes(ds.free_gb)} ({(ds.free_pct ?? Math.round((ds.free_gb / ds.capacity_gb) * 100))}%) free. Free up space or increase capacity to avoid VM impact.</span>
+                )}
+                <div className="flex-1" />
+                <button type="button"
+                  className={`shrink-0 vm-btn ${isCritical ? 'vm-btn-red' : 'vm-btn-amber'} text-[11.5px] py-1 px-3`}
+                  onClick={() => { setSelectedNode({ type: 'datastore', id: ds.id }); setActiveTab('summary') }}>
+                  View datastore
+                </button>
+                <button type="button"
+                  className="shrink-0 vm-btn vm-btn-blue text-[11.5px] py-1 px-3"
+                  disabled={acting}
+                  onClick={() => runAction('expand_datastore', { datastore: ds.name, gb: 500 })}>
+                  Increase capacity
+                </button>
+              </div>
             )
           })()}
 
@@ -952,6 +1137,14 @@ export default function VMwareSimulator() {
                 </div>
               )}
 
+              {selectedNode.type === 'vcenter' && activeTab === 'users' && (
+                <VmwareUsersRolesPanel users={vcenterUsers} rolesCatalog={rolesCatalog} onAction={runAction} acting={acting} />
+              )}
+
+              {selectedNode.type === 'vcenter' && activeTab === 'alarms' && (
+                <VmwareAlarmDefinitionsPanel alarmDefinitions={alarmDefinitions} onAction={runAction} acting={acting} />
+              )}
+
               {selectedNode.type === 'datacenter' && activeTab === 'summary' && (
                 <ContentPanel title={datacenters.find(d => d.id === selectedNode.id)?.name || 'Datacenter'}>
                   <InfoRow label="Site" value={datacenters.find(d => d.id === selectedNode.id)?.site || 'primary'} />
@@ -1016,10 +1209,10 @@ export default function VMwareSimulator() {
                         <InfoRow label="IP address" value={selectedHost.ip} />
                         <InfoRow label="SSH" value={selectedHost.ssh_enabled ? 'Enabled' : 'Disabled'} />
                         <InfoRow label="HA" value={<span className={summary.cluster_ha ? 'text-[#2db52d]' : 'text-[#e0412b]'}>{summary.cluster_ha ? 'Enabled' : 'Disabled'}</span>} />
-                        <InfoRow label="DRS" value={<span className={summary.cluster_drs ? 'text-[#2db52d]' : 'text-[#888]'}>{summary.cluster_drs ? 'Enabled' : 'Disabled'}</span>} />
+                        <InfoRow label="DRS" value={<span className={summary.cluster_drs ? 'text-[#2db52d]' : 'text-[#8fa5b8]'}>{summary.cluster_drs ? 'Enabled' : 'Disabled'}</span>} />
                         {!summary.cluster_ha && (
-                          <button onClick={() => runAction('enable_ha')} disabled={acting}
-                            className="mt-1 w-full py-1 text-[11px] bg-[#5b9bd5] text-white rounded hover:bg-[#4a8ac4] disabled:opacity-50">
+                          <button type="button" onClick={() => runAction('enable_ha')} disabled={acting}
+                            className="mt-1 w-full justify-center vm-btn vm-btn-blue text-[11px] py-1">
                             Enable HA
                           </button>
                         )}
@@ -1030,7 +1223,7 @@ export default function VMwareSimulator() {
                           <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-[#9b59b6]" /> Consumed host memory</span>
                         </div>
                         <PerfChart cpuPct={selectedHost.cpu_pct} memPct={selectedHost.mem_pct} perfHistory={selectedHost.perf_history} />
-                        <div className="flex justify-between text-[10px] text-[#888] mt-1">
+                        <div className="flex justify-between text-[10px] text-[#8fa5b8] mt-1">
                           <span>60 min ago</span><span>Now</span>
                         </div>
                       </ContentPanel>
@@ -1057,9 +1250,9 @@ export default function VMwareSimulator() {
                         { label: 'Storage', pct: selectedHost.storage_pct, color: '#e67e22', detail: `${fmtBytes(datastores.reduce((s, d) => s + d.capacity_gb, 0))} total` },
                       ].map(({ label, pct, color, detail }) => (
                         <div key={label}>
-                          <div className="flex justify-between text-[11px] mb-1"><span className="font-semibold">{label}</span><span className="text-[#666]">{pct}%</span></div>
+                          <div className="flex justify-between text-[11px] mb-1"><span className="font-semibold text-[#E8EDF2]">{label}</span><span className="text-[#8fa5b8]">{pct}%</span></div>
                           <UsageBar pct={pct} color={color} />
-                          <p className="text-[10px] text-[#888] mt-0.5">{detail}</p>
+                          <p className="text-[10px] text-[#8fa5b8] mt-0.5">{detail}</p>
                         </div>
                       ))}
                     </div>
@@ -1069,14 +1262,14 @@ export default function VMwareSimulator() {
                   </ContentPanel>
                   <ContentPanel title="Alarms">
                     {activeAlarms.length === 0 ? (
-                      <p className="text-[#888] text-[11px]">No active alarms</p>
+                      <p className="text-[#8FA5B8] text-[11px]">No active alarms</p>
                     ) : activeAlarms.map(a => (
-                      <div key={a.id} className="flex items-center gap-2 py-1.5 border-b border-[#eee] last:border-0">
-                        <span className={`text-[10px] font-bold px-1 rounded ${a.severity === 'critical' ? 'bg-[#fde8e4] text-[#c03]' : 'bg-[#fef9e4] text-[#a07]'}`}>{a.severity.toUpperCase()}</span>
-                        <span className="text-[11px] flex-1">{a.name}</span>
-                        <span className="text-[10px] text-[#888]">{a.entity}</span>
-                        <button onClick={() => runAction('acknowledge_alarm', { alarm_id: a.id })} disabled={acting}
-                          className="text-[10px] text-[#5b9bd5] hover:underline disabled:opacity-50">Ack</button>
+                      <div key={a.id} className="flex items-center gap-2 py-1.5 border-b border-[#22303f] last:border-0">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${a.severity === 'critical' ? 'bg-[rgba(217,83,79,.2)] text-[#D9534F]' : 'bg-[rgba(245,166,35,.2)] text-[#F5A623]'}`}>{a.severity}</span>
+                        <span className="text-[11px] flex-1 text-[#E8EDF2]">{a.name}</span>
+                        <span className="text-[10px] text-[#8FA5B8]">{a.entity}</span>
+                        <button type="button" onClick={() => runAction('acknowledge_alarm', { alarm_id: a.id })} disabled={acting}
+                          className="vm-btn text-[10px] py-0.5 px-2">Ack</button>
                       </div>
                     ))}
                   </ContentPanel>
@@ -1089,28 +1282,28 @@ export default function VMwareSimulator() {
                   <ContentPanel title="Cluster settings">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <p className="text-[11px] font-semibold mb-1">vSphere HA</p>
+                        <p className="text-[11px] font-semibold mb-1 text-[#E8EDF2]">vSphere HA</p>
                         <div className="flex items-center gap-2">
                           <StatusIcon status={summary.cluster_ha ? 'connected' : 'disconnected'} />
-                          <span className="text-[11px]">{summary.cluster_ha ? 'Enabled' : 'Disabled'}</span>
+                          <span className="text-[11px] text-[#E8EDF2]">{summary.cluster_ha ? 'Enabled' : 'Disabled'}</span>
                           {summary.cluster_ha
-                            ? <button onClick={() => runAction('disable_ha')} disabled={acting} className="ml-auto text-[11px] border border-[#ccc] px-2 py-0.5 rounded hover:bg-[#f0f0f0] disabled:opacity-50">Disable</button>
-                            : <button onClick={() => runAction('enable_ha')} disabled={acting} className="ml-auto text-[11px] bg-[#5b9bd5] text-white px-2 py-0.5 rounded hover:bg-[#4a8ac4] disabled:opacity-50">Enable</button>
+                            ? <button type="button" onClick={() => runAction('disable_ha')} disabled={acting} className="ml-auto vm-btn text-[11px] py-0.5 px-2.5">Disable</button>
+                            : <button type="button" onClick={() => runAction('enable_ha')} disabled={acting} className="ml-auto vm-btn vm-btn-blue text-[11px] py-0.5 px-2.5">Enable</button>
                           }
                         </div>
                       </div>
                       <div>
-                        <p className="text-[11px] font-semibold mb-1">vSphere DRS</p>
+                        <p className="text-[11px] font-semibold mb-1 text-[#E8EDF2]">vSphere DRS</p>
                         <div className="flex items-center gap-2">
                           <StatusIcon status={summary.cluster_drs ? 'connected' : 'disconnected'} />
-                          <span className="text-[11px]">{summary.cluster_drs ? 'Enabled' : 'Disabled'}</span>
+                          <span className="text-[11px] text-[#E8EDF2]">{summary.cluster_drs ? 'Enabled' : 'Disabled'}</span>
                           {!summary.cluster_drs && (
-                            <button onClick={() => runAction('enable_drs')} disabled={acting} className="ml-auto text-[11px] bg-[#5b9bd5] text-white px-2 py-0.5 rounded hover:bg-[#4a8ac4] disabled:opacity-50">Enable</button>
+                            <button type="button" onClick={() => runAction('enable_drs')} disabled={acting} className="ml-auto vm-btn vm-btn-blue text-[11px] py-0.5 px-2.5">Enable</button>
                           )}
                           {summary.cluster_drs && (
                             <>
-                              <button onClick={() => runAction('run_drs')} disabled={acting} className="ml-auto text-[11px] border border-[#2d3a4a] text-[#5b9bf5] px-2 py-0.5 rounded hover:bg-[#243447] disabled:opacity-50">Run DRS</button>
-                              <button onClick={() => runAction('disable_drs')} disabled={acting} className="text-[11px] border border-[#2d3a4a] px-2 py-0.5 rounded hover:bg-[#243447] disabled:opacity-50">Disable</button>
+                              <button type="button" onClick={() => runAction('run_drs')} disabled={acting} className="ml-auto vm-btn vm-btn-blue text-[11px] py-0.5 px-2.5">Run DRS</button>
+                              <button type="button" onClick={() => runAction('disable_drs')} disabled={acting} className="vm-btn text-[11px] py-0.5 px-2.5">Disable</button>
                             </>
                           )}
                         </div>
@@ -1151,6 +1344,7 @@ export default function VMwareSimulator() {
                   <VmwareScenarioActions selectedVm={selectedVm} onAction={runAction} acting={acting} />
                   <VmwareDvsEditor vswitches={vswitches} onAction={runAction} acting={acting} />
                   <VmwareVsanDashboard vsan={vsan} clusterVsan={summary.cluster_vsan || inv.cluster_vsan} onAction={runAction} acting={acting} />
+                  <VmwareAlarmDefinitionsPanel alarmDefinitions={alarmDefinitions} onAction={runAction} acting={acting} />
                 </div>
               )}
 
@@ -1253,6 +1447,7 @@ export default function VMwareSimulator() {
                       { label: 'Reset', action: 'reboot', show: selectedVm.power === 'poweredOn' },
                       { label: 'Suspend', action: 'suspend', show: selectedVm.power === 'poweredOn' },
                       { label: 'Take Snapshot', action: '__snapshot__', show: true },
+                      { label: 'Upgrade VMware Tools', action: 'upgrade_vmware_tools', show: (selectedVm.vmware_tools_status || (selectedVm.tools === 'ok' ? 'current' : 'notRunning')) !== 'current', amber: true },
                       { label: 'Launch Console', action: '__console__', show: true, blue: true },
                     ].filter(a => a.show).map(a => (
                       <button
@@ -1264,7 +1459,7 @@ export default function VMwareSimulator() {
                           else if (a.action === '__console__') setConsoleVm(selectedVm)
                           else runAction(a.action, { vm_id: selectedVm.id })
                         }}
-                        className={`vm-btn text-[11.5px] py-1.5 px-3 ${a.green ? 'vm-btn-green' : a.red ? 'vm-btn-red' : a.blue ? 'vm-btn-blue' : ''}`}
+                        className={`vm-btn text-[11.5px] py-1.5 px-3 ${a.green ? 'vm-btn-green' : a.red ? 'vm-btn-red' : a.blue ? 'vm-btn-blue' : a.amber ? 'vm-btn-amber' : ''}`}
                       >
                         {a.label}
                       </button>
@@ -1275,7 +1470,23 @@ export default function VMwareSimulator() {
                       <InfoRow label="Guest OS" value={selectedVm.guest_os_version} />
                       <InfoRow label="Hostname" value={selectedVm.hostname} />
                       <InfoRow label="IP address" value={selectedVm.ip} />
-                      <InfoRow label="VMware Tools" value={selectedVm.tools === 'ok' ? 'Running' : 'Not Running'} valueColor={selectedVm.tools === 'ok' ? '#5DB85D' : '#D9534F'} />
+                      <InfoRow
+                        label="VMware Tools"
+                        value={(() => {
+                          const ts = selectedVm.vmware_tools_status || (selectedVm.tools === 'ok' ? 'current' : 'notRunning')
+                          const text = ts === 'current' ? 'Running (current)' : ts === 'upgradeAvailable' ? 'Upgrade available' : 'Not running'
+                          return (
+                            <span className="flex items-center gap-2">
+                              <span style={{ color: ts === 'current' ? '#5DB85D' : ts === 'upgradeAvailable' ? '#F5A623' : '#D9534F' }}>{text}</span>
+                              {ts !== 'current' && (
+                                <button type="button" disabled={acting}
+                                  onClick={() => runAction('upgrade_vmware_tools', { vm_id: selectedVm.id })}
+                                  className="vm-btn vm-btn-amber text-[10px] py-0.5 px-2">Upgrade</button>
+                              )}
+                            </span>
+                          )
+                        })()}
+                      />
                       <InfoRow label="VM hardware" value={selectedVm.hardware_version} />
                       <InfoRow label="Annotation" value={selectedVm.annotation || '—'} />
                     </ContentPanel>
@@ -1346,7 +1557,7 @@ export default function VMwareSimulator() {
                         </thead>
                         <tbody>
                           {recentTasks.filter(t => t.target === selectedVm.name).slice(0, 8).map((t, i) => (
-                            <tr key={t.id || i}>
+                            <tr key={t.id || i} className="cursor-pointer" title="Click for task details" onClick={() => openTaskDetail(t)}>
                               <td>{t.name}</td>
                               <td className="text-[#5b9bf5]">{t.target}</td>
                               <td><span className={t.status === 'success' ? 'text-[#5DB85D]' : 'text-[#D9534F]'}>{t.result}</span></td>
@@ -1442,7 +1653,7 @@ export default function VMwareSimulator() {
                           </thead>
                           <tbody>
                             {recentTasks.filter(t => t.target === selectedVm.name).slice(0, 10).map((t, i) => (
-                              <tr key={t.id || i}>
+                              <tr key={t.id || i} className="cursor-pointer" title="Click for task details" onClick={() => openTaskDetail(t)}>
                                 <td>{t.name}</td>
                                 <td><span className={t.status === 'success' ? 'text-[#5DB85D]' : 'text-[#D9534F]'}>{t.result}</span></td>
                                 <td className="font-mono text-[#8fa5b8]">{fmtTime(t.started)}</td>
@@ -1467,7 +1678,7 @@ export default function VMwareSimulator() {
                           </thead>
                           <tbody>
                             {[...events].filter(ev => ev.entity === selectedVm.name).reverse().slice(0, 20).map((ev, i) => (
-                              <tr key={i}>
+                              <tr key={i} className="cursor-pointer" title="Click for event details" onClick={() => openEventDetail(ev)}>
                                 <td className="font-mono whitespace-nowrap">{ev.time?.slice(11, 19)}</td>
                                 <td>
                                   <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${ev.severity === 'critical' ? 'bg-[rgba(217,83,79,.2)] text-[#D9534F]' : ev.severity === 'warning' ? 'bg-[rgba(245,166,35,.2)] text-[#F5A623]' : 'bg-[rgba(93,184,93,.2)] text-[#5DB85D]'}`}>
@@ -1610,28 +1821,28 @@ export default function VMwareSimulator() {
                 </ContentPanel>
               )}
               {selectedHost && activeTab === 'users' && (
-                <ContentPanel title={`Local users — ${selectedHost.name}`}>
-                  <div className="flex justify-end mb-2">
-                    <button type="button" onClick={() => toast('Add user simulated')} className="vm-btn vm-btn-blue text-[11px]">Add user…</button>
-                  </div>
-                  <table className="vm-table">
-                    <thead><tr>{['Username', 'Role', 'Status', 'Last login'].map(h => <th key={h}>{h}</th>)}</tr></thead>
-                    <tbody>
-                      {[
-                        { user: 'root', role: 'Administrator', status: 'Enabled', login: 'Today 09:14' },
-                        { user: 'dcui', role: 'Administrator', status: 'Enabled', login: 'Yesterday' },
-                        { user: 'vpxuser', role: 'System', status: 'Enabled', login: 'Today 08:02' },
-                      ].map(r => (
-                        <tr key={r.user}>
-                          <td className="text-[#5b9bf5]">{r.user}</td>
-                          <td>{r.role}</td>
-                          <td className="text-[#5DB85D] font-semibold">{r.status}</td>
-                          <td className="text-[#8FA5B8]">{r.login}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </ContentPanel>
+                <div className="space-y-3">
+                  <ContentPanel title={`ESXi local users — ${selectedHost.name}`}>
+                    <table className="vm-table">
+                      <thead><tr>{['Username', 'Role', 'Status', 'Last login'].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                      <tbody>
+                        {[
+                          { user: 'root', role: 'Administrator', status: 'Enabled', login: 'Today 09:14' },
+                          { user: 'dcui', role: 'Administrator', status: 'Enabled', login: 'Yesterday' },
+                          { user: 'vpxuser', role: 'System', status: 'Enabled', login: 'Today 08:02' },
+                        ].map(r => (
+                          <tr key={r.user}>
+                            <td className="text-[#5b9bf5]">{r.user}</td>
+                            <td>{r.role}</td>
+                            <td className="text-[#5DB85D] font-semibold">{r.status}</td>
+                            <td className="text-[#8FA5B8]">{r.login}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </ContentPanel>
+                  <VmwareUsersRolesPanel users={vcenterUsers} rolesCatalog={rolesCatalog} onAction={runAction} acting={acting} />
+                </div>
               )}
 
               {/* ── HOST UPDATES ─────────────────────────────────── */}
@@ -1642,15 +1853,16 @@ export default function VMwareSimulator() {
               {/* ── DATASTORE ────────────────────────────────────── */}
               {selectedDs && activeTab === 'summary' && (
                 <div className="space-y-3">
-                  {(selectedDs.warning === 'critical' || selectedDs.free_gb < selectedDs.capacity_gb * 0.1) && (
+                  {selectedDs.warning === 'critical' && (
                     <div className="rounded-lg border border-[#D9534F]/50 bg-[rgba(217,83,79,.12)] px-3 py-2 text-xs text-[#f5a0a0] flex items-center gap-2">
                       <span className="font-bold uppercase text-[10px]">Alarm</span>
-                      Datastore space usage is critically high ({(((selectedDs.capacity_gb - selectedDs.free_gb) / selectedDs.capacity_gb) * 100).toFixed(0)}% used)
+                      Datastore space usage is critically high — only {fmtBytes(selectedDs.free_gb)} ({selectedDs.free_pct ?? (((selectedDs.free_gb) / selectedDs.capacity_gb) * 100).toFixed(0)}%) free
                     </div>
                   )}
-                  {selectedDs.warning === 'warning' && selectedDs.free_gb >= selectedDs.capacity_gb * 0.1 && (
-                    <div className="rounded-lg border border-[#F5A623]/50 bg-[rgba(245,166,35,.12)] px-3 py-2 text-xs text-[#f5c97a]">
-                      Warning: Datastore free space below 20%
+                  {selectedDs.warning === 'warning' && (
+                    <div className="rounded-lg border border-[#F5A623]/50 bg-[rgba(245,166,35,.12)] px-3 py-2 text-xs text-[#f5c97a] flex items-center gap-2">
+                      <span className="font-bold uppercase text-[10px]">Warning</span>
+                      Datastore free space is below 15% — only {fmtBytes(selectedDs.free_gb)} ({selectedDs.free_pct ?? (((selectedDs.free_gb) / selectedDs.capacity_gb) * 100).toFixed(0)}%) free
                     </div>
                   )}
                   <ContentPanel title="Datastore details">
@@ -1809,14 +2021,15 @@ export default function VMwareSimulator() {
                       </thead>
                       <tbody>
                         {[...events].reverse().map((ev, i) => (
-                          <tr key={i} className="cursor-pointer">
+                          <tr key={i} className="cursor-pointer" title="Click for event details"
+                            onClick={() => openEventDetail(ev)}>
                             <td className="font-mono whitespace-nowrap text-[#8FA5B8]">{ev.time?.slice(11, 19)}</td>
                             <td>
                               <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${ev.severity === 'critical' ? 'bg-[rgba(217,83,79,.2)] text-[#D9534F]' : ev.severity === 'warning' ? 'bg-[rgba(245,166,35,.2)] text-[#F5A623]' : 'bg-[rgba(93,184,93,.2)] text-[#5DB85D]'}`}>
                                 {ev.severity.toUpperCase()}
                               </span>
                             </td>
-                            <td className="text-[#5b9bf5]">{ev.entity}</td>
+                            <td className="text-[#5b9bf5] underline decoration-dotted underline-offset-2">{ev.entity}</td>
                             <td>{ev.message}</td>
                           </tr>
                         ))}
@@ -1871,9 +2084,10 @@ export default function VMwareSimulator() {
                 </thead>
                 <tbody>
                   {recentTasks.slice(0, 15).map((t, i) => (
-                    <tr key={t.id || i}>
+                    <tr key={t.id || i} className="cursor-pointer" title="Click for task details"
+                      onClick={() => openTaskDetail(t)}>
                       <td className="whitespace-nowrap">{t.name}</td>
-                      <td className="text-[#5b9bf5]">{t.target}</td>
+                      <td className="text-[#5b9bf5] underline decoration-dotted underline-offset-2">{t.target}</td>
                       <td>{t.initiator}</td>
                       <td className="font-mono text-[#8fa5b8]">{fmtTime(t.queued)}</td>
                       <td className="font-mono text-[#8fa5b8]">{fmtTime(t.started)}</td>
@@ -1915,6 +2129,10 @@ export default function VMwareSimulator() {
           kind={vmToast.kind}
           onDone={() => setVmToast(null)}
         />
+      )}
+
+      {detailItem && (
+        <TaskEventDetailModal item={detailItem} onClose={() => setDetailItem(null)} />
       )}
 
       {/* Modals */}
@@ -1995,7 +2213,8 @@ function getTabs(type) {
   if (type === 'datastore') return ['summary', 'monitor', 'permissions', 'hosts', 'vms']
   if (type === 'network') return ['summary', 'permissions', 'hosts', 'vms']
   if (type === 'template') return ['summary']
-  if (type === 'vcenter' || type === 'datacenter' || type === 'nsx' || type === 'srm' || type === 'vami') return ['summary']
+  if (type === 'vcenter') return ['summary', 'users', 'alarms']
+  if (type === 'datacenter' || type === 'nsx' || type === 'srm' || type === 'vami') return ['summary']
   return ['summary']
 }
 

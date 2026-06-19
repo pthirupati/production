@@ -16,6 +16,19 @@ export const labApi = {
     return data
   },
 
+  // ── Coding IDE scenarios ──
+  async getCodingSpec(sessionId) {
+    const { data } = await api.get(`/labs/${sessionId}/coding-spec/`)
+    return data
+  },
+
+  // Submit code for the authoritative backend grade (hidden tests). `payload`
+  // is { language, files: {path: content}, entrypoint } or { language, code }.
+  async codeValidate(sessionId, payload) {
+    const { data } = await api.post(`/labs/${sessionId}/code-validate/`, payload)
+    return data
+  },
+
   async getHints(sessionId) {
     const { data } = await api.get(`/labs/${sessionId}/hints/`)
     return data

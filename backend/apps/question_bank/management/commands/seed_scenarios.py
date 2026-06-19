@@ -202,6 +202,8 @@ class Command(BaseCommand):
                         "scenario_type": data.get("scenario_type", "fix"),
                         "requires_companion_hosts": data.get("requires_companion_hosts", False),
                         "dual_terminal": data.get("dual_terminal", False),
+                        "coding_mode": data.get("coding_mode", False),
+                        "coding_spec": data.get("coding_spec", {}) or {},
                     },
                 )
 

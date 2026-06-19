@@ -1,0 +1,76 @@
+title: "Coding: Implement Two-Sum"
+slug: sim-coding-two-sum
+category: Python Development
+description: |
+  Implement two_sum(nums, target) which returns the indices of the two numbers
+  in `nums` that add up to `target`. Exactly one solution exists per input, and
+  you may not use the same element twice. Return the indices as a list [i, j]
+  with i < j.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Implement two_sum(nums, target) -> [i, j]
+  - Return indices in ascending order (i < j)
+  - Pass all visible and hidden tests, including a large input
+initial_state: A browser IDE opens with solution.py containing a stub to implement.
+solution_explanation: |
+  A single-pass hash map gives O(n): for each value, check whether
+  target - value was already seen; if so return its stored index and the
+  current index. Otherwise store value -> index. A brute-force double loop also
+  passes the correctness tests.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  instructions: |
+    Implement two_sum(nums, target). Return the two indices (ascending) of the
+    elements that sum to target. Assume exactly one valid answer exists.
+      two_sum([2, 7, 11, 15], 9) -> [0, 1]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+    - path: solution.py
+      content: |
+        def two_sum(nums, target):
+            # TODO: return [i, j] (i < j) such that nums[i] + nums[j] == target
+            pass
+  visible_tests:
+    - name: basic example
+      code: |
+        assert two_sum([2, 7, 11, 15], 9) == [0, 1], two_sum([2, 7, 11, 15], 9)
+    - name: answer at the end
+      code: |
+        assert two_sum([3, 2, 4], 6) == [1, 2], two_sum([3, 2, 4], 6)
+    - name: indices ascending
+      code: |
+        r = two_sum([3, 3], 6)
+        assert r == [0, 1], r
+  hidden_tests:
+    - name: negative numbers
+      code: |
+        r = two_sum([-3, 4, 3, 90], 0)
+        assert r == [0, 2], r
+    - name: does not reuse the same element
+      code: |
+        r = two_sum([5, 1, 5], 10)
+        assert r[0] != r[1] and sorted(r) == r
+        assert {5} == {[5,1,5][r[0]], [5,1,5][r[1]]}
+    - name: large input performance
+      code: |
+        nums = list(range(1, 100001))
+        target = 199999  # 99999 + 100000 -> indices 99998, 99999
+        r = two_sum(nums, target)
+        assert r == [99998, 99999], r
+hints:
+  - content: A nested double loop works but is O(n^2). What if you remembered numbers you've already seen?
+    cost: 10
+    order: 1
+  - content: Use a dict mapping value -> index. For each num, look up target - num; if present, you found the pair.
+    cost: 20
+    order: 2

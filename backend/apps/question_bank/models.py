@@ -166,6 +166,26 @@ class Scenario(models.Model):
         help_text="Technology persona when lab_mode=simulation (one unified engine)",
     )
 
+    # ── Browser coding IDE scenarios ──
+    # When coding_mode is True, the lab opens a full in-browser IDE (CodeMirror +
+    # Pyodide / Web Worker execution) instead of a terminal. coding_spec carries
+    # the starter files, visible tests, and HIDDEN tests. Hidden test logic is
+    # NEVER sent to the client — it is executed server-side by the
+    # /labs/<id>/code-validate/ endpoint. See apps.labs.code_exec.
+    coding_mode = models.BooleanField(
+        default=False,
+        help_text="Open a browser coding IDE (CodeMirror + sandboxed run) instead of a terminal",
+    )
+    coding_spec = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Coding scenario definition: {language, files:[{path,content,readonly}], "
+            "entrypoint, visible_tests:[...], hidden_tests:[...]}. "
+            "hidden_tests are stripped from public API responses and only run on the backend."
+        ),
+    )
+
     time_limit = models.PositiveIntegerField(default=600, help_text="Time limit in seconds (default 10 min)")
     max_score = models.PositiveIntegerField(default=100)
     definition_path = models.CharField(max_length=255, blank=True)
