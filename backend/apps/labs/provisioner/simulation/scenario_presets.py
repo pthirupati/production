@@ -196,6 +196,37 @@ def _preset_network_nic(state: RHELOSState) -> None:
     init_network_ops(state, "10.0.0.20/24")
 
 
+def _preset_disk_missing(state: RHELOSState) -> None:
+    """A freshly attached disk is invisible to the kernel until a SCSI rescan.
+
+    Workflow: lsblk does not show /dev/sdc → echo to the scsi scan node (or
+    rescan-scsi-bus.sh) → /dev/sdc appears → mkfs → mount → df.
+    """
+    state.add_block_device("/dev/sdc", "20G", "disk", present=False)
+    state._mkdir("/mnt")
+    state._mkdir("/mnt/data")
+
+
+def _preset_mkfs_mount(state: RHELOSState) -> None:
+    """A spare disk is present but unformatted; user must mkfs + mount it."""
+    state.add_block_device("/dev/sdc", "20G", "disk", present=True)
+    state._mkdir("/mnt")
+    state._mkdir("/mnt/data")
+
+
+def _preset_selinux_port(state: RHELOSState) -> None:
+    """SELinux is Enforcing and blocks a non-standard service port until the
+    admin adds a port label (semanage port) — or relabels with restorecon."""
+    state.selinux_mode = "Enforcing"
+    state._mkdir("/var/www/html")
+    state._write_file("/var/www/html/index.html", "<html><body>OK</body></html>\n")
+
+
+def _preset_swap_add(state: RHELOSState) -> None:
+    """A disk is available to be turned into additional swap."""
+    state.add_block_device("/dev/sdc", "4G", "disk", present=True)
+
+
 _PRESETS: dict[str, callable] = {
     "broken-nginx": _preset_broken_nginx,
     "sim-broken-nginx": _preset_broken_nginx,
@@ -224,4 +255,8 @@ _PRESETS: dict[str, callable] = {
     "sim-rhel-lvm-extend": _preset_lvm_extend,
     "lvm-extend": _preset_lvm_extend,
     "sim-rhel-network-nic": _preset_network_nic,
+    "sim-rhel-disk-missing": _preset_disk_missing,
+    "sim-rhel-mkfs-mount": _preset_mkfs_mount,
+    "sim-rhel-selinux-port": _preset_selinux_port,
+    "sim-rhel-swap-add": _preset_swap_add,
 }

@@ -68,10 +68,14 @@ class SimulationStreamHolder:
         session = self._get_editor() if self._get_editor else None
         if not session:
             return
-        if session.editor_type == "vi" and chunk == ":":
+        # Enter vi command mode on a ":" — handle both the char-by-char case and
+        # batched input (e.g. the whole ":wq\r" arriving in one chunk).
+        if session.editor_type == "vi" and not self._vi_cmd_buf.startswith(":") and chunk.startswith(":"):
             self._vi_cmd_buf = ":"
             self._emit(":")
-            return
+            chunk = chunk[1:]
+            if not chunk:
+                return
         if self._vi_cmd_buf.startswith(":"):
             self._vi_cmd_buf += chunk
             if "\r" in self._vi_cmd_buf or "\n" in self._vi_cmd_buf:
@@ -94,7 +98,10 @@ class SimulationStreamHolder:
         self._emit("\x1b[2J\x1b[H")
         self._emit(out)
         if closed:
-            if session.modified and self._save_editor:
+            # Persist if the buffer ever diverged from disk. `dirty` stays True
+            # after Ctrl+O (which clears `modified`), so Ctrl+O then Ctrl+X no
+            # longer discards the write.
+            if getattr(session, "dirty", session.modified) and self._save_editor:
                 self._save_editor(session.path, session.content())
             elif self._clear_editor:
                 self._clear_editor()

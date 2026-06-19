@@ -13,6 +13,10 @@ class EditorSession:
         self.row = 0
         self.col = 0
         self.modified = False
+        # True once the buffer has diverged from disk (any edit OR an explicit
+        # Ctrl+O write). Drives save-on-close so Ctrl+O then Ctrl+X never
+        # discards edits. Stays True after Ctrl+O clears `modified`.
+        self.dirty = False
         self.status = ""
 
     def render(self, width: int = 80) -> str:
@@ -44,12 +48,14 @@ class EditorSession:
                 self.row += 1
                 self.col = 0
                 self.modified = True
+                self.dirty = True
             elif ch == "\x7f" or ch == "\b":
                 if self.col > 0:
                     line = self.lines[self.row]
                     self.lines[self.row] = line[: self.col - 1] + line[self.col :]
                     self.col -= 1
                     self.modified = True
+                    self.dirty = True
                 elif self.row > 0:
                     prev = self.lines[self.row - 1]
                     cur = self.lines.pop(self.row)
@@ -57,10 +63,12 @@ class EditorSession:
                     self.col = len(prev)
                     self.lines[self.row] = prev + cur
                     self.modified = True
+                    self.dirty = True
             elif ch == "\x18":  # Ctrl+X exit
                 closed = True
-            elif ch == "\x0f":  # Ctrl+O save
+            elif ch == "\x0f":  # Ctrl+O write out: persists but keeps editing
                 self.modified = False
+                self.dirty = True  # stays True so close still flushes to VFS
                 self.status = "Wrote " + str(len(self.content()))
             elif ch == "\x1b":
                 continue  # ignore lone escape in nano simple mode
@@ -69,6 +77,7 @@ class EditorSession:
                 self.lines[self.row] = line[: self.col] + ch + line[self.col :]
                 self.col += 1
                 self.modified = True
+                self.dirty = True
 
         out_parts.append(self.render())
         return "".join(out_parts), closed

@@ -67,8 +67,17 @@ def hostname_for_type(sim_type: str, slug: str = "") -> str:
 
 
 def boot_console_for(scenario_slug: str, sim_type: str) -> bool:
-    """RHEL boot/GRUB console at lab start."""
-    s = scenario_slug.lower()
-    if sim_type == "rhel":
-        return any(k in s for k in ("boot", "grub", "initramfs", "mbr", "kernel-panic", "dracut", "patching"))
-    return False
+    """Show the RHEL boot/GRUB console at lab start.
+
+    Gate on the SCENARIO (boot-related slug keywords) rather than the persona.
+    Previously this only fired for sim_type=="rhel", so the rich boot sequence
+    (GRUB menu, kernel select, initramfs, mount, login) was dead for the far more
+    common "generic" persona. Non-boot scenarios still get an immediate shell.
+    """
+    s = (scenario_slug or "").lower()
+    if sim_type in ("windows", "terraform", "devops", "networking"):
+        # These personas have their own surfaces and never use the RHEL boot flow.
+        return False
+    return any(k in s for k in (
+        "boot", "grub", "initramfs", "mbr", "kernel-panic", "dracut", "patching",
+    ))

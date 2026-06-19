@@ -39,6 +39,20 @@ class SimProcess:
     command: str
 
 
+@dataclass
+class SimBlockDevice:
+    """A whole disk, partition, or LV as seen by lsblk/blkid/mkfs/mount."""
+    name: str                       # /dev/sdb, /dev/sdb1, /dev/mapper/rhel-data
+    size: str = "50G"
+    dev_type: str = "disk"          # disk | part | lvm
+    parent: str = ""                # parent device name for partitions
+    fstype: str = ""                # xfs | ext4 | swap | "" (unformatted)
+    uuid: str = ""                  # populated when formatted
+    mountpoint: str = ""            # current mount target ("" = unmounted)
+    present: bool = True            # False until a SCSI rescan reveals it
+    removable: bool = False
+
+
 class RHELOSState:
     """Mutable in-memory RHEL-like system state."""
 
@@ -90,6 +104,18 @@ class RHELOSState:
         self.storage_disk_provisioned: bool = True
         self.pending_nic_config: str = "10.0.0.20/24"
         self.network_nic_provisioned: bool = True
+        # SELinux: mode round-trips via getenforce/setenforce; ports/fcontexts
+        # are state that semanage mutates and restorecon/chcon read.
+        self.selinux_mode: str = "Enforcing"  # Enforcing | Permissive | Disabled
+        self.selinux_ports: dict[str, list[int]] = {}   # type -> [ports]
+        self.selinux_fcontexts: list[dict] = []          # {path, type}
+        self.file_contexts: dict[str, str] = {}          # path -> selinux context
+        # Block-device model for storage/filesystem scenarios.
+        self.block_devices: dict[str, SimBlockDevice] = {}
+        self.hidden_block_devices: dict[str, SimBlockDevice] = {}  # revealed by SCSI rescan
+        self.swaps: dict[str, dict] = {}  # device -> {"size": kb, "used": kb}
+        self.mounts: dict[str, dict] = {}  # mountpoint -> {"device", "fstype", "size_kb"}
+        self.disk_rescanned: bool = False
         self.editor = None  # EditorSession when nano/vi active
         self.network_ifs: dict[str, dict] = {
             "lo": {"up": True, "addrs": ["127.0.0.1/8"]},
@@ -100,6 +126,7 @@ class RHELOSState:
         self.lvm = LVMState()
         self.firewall = FirewallState()
         self._init_base_system()
+        self._init_block_devices()
 
     def _init_base_system(self) -> None:
         self.users["root"] = SimUser("root", 0, 0, "/root", "/bin/bash", "root")
@@ -139,6 +166,65 @@ class RHELOSState:
             SimProcess(892, "nginx", 0.0, 0.2, "nginx: worker process"),
         ]
         self.pid_counter = 900
+
+    def _init_block_devices(self) -> None:
+        """Seed the default disk layout: sda (boot + LVM PV) plus a spare sdb."""
+        self.block_devices = {
+            "/dev/sda": SimBlockDevice("/dev/sda", "50G", "disk"),
+            "/dev/sda1": SimBlockDevice("/dev/sda1", "1G", "part", parent="/dev/sda",
+                                        fstype="xfs", uuid="aaaa1111-boot", mountpoint="/boot"),
+            "/dev/sda2": SimBlockDevice("/dev/sda2", "49G", "part", parent="/dev/sda",
+                                        fstype="LVM2_member", uuid="bbbb2222-pv"),
+            "/dev/sdb": SimBlockDevice("/dev/sdb", "50G", "disk"),
+        }
+        # Root + swap LVs exposed as device-mapper block devices.
+        self.block_devices["/dev/mapper/rhel-root"] = SimBlockDevice(
+            "/dev/mapper/rhel-root", "40G", "lvm", parent="/dev/sda2",
+            fstype="xfs", uuid="cccc3333-root", mountpoint="/")
+        self.block_devices["/dev/mapper/rhel-swap"] = SimBlockDevice(
+            "/dev/mapper/rhel-swap", "8G", "lvm", parent="/dev/sda2",
+            fstype="swap", uuid="dddd4444-swap", mountpoint="[SWAP]")
+        self.swaps["/dev/mapper/rhel-swap"] = {"size": 8 * 1024 * 1024, "used": 0}
+
+    def gen_uuid(self) -> str:
+        import uuid as _uuid
+        return str(_uuid.uuid4())
+
+    def add_block_device(self, name: str, size: str = "50G", dev_type: str = "disk",
+                         present: bool = True, **kw) -> "SimBlockDevice":
+        """Register a disk/partition; when present=False it is hidden until a
+        SCSI rescan reveals it (the classic disk-missing workflow)."""
+        dev = SimBlockDevice(name, size, dev_type, present=present, **kw)
+        if present:
+            self.block_devices[name] = dev
+        else:
+            dev.present = False
+            self.hidden_block_devices[name] = dev
+        return dev
+
+    def reveal_hidden_disks(self) -> list[str]:
+        """A SCSI rescan / rescan-scsi-bus.sh makes pending disks appear."""
+        revealed = []
+        self.disk_rescanned = True
+        for name, dev in list(self.hidden_block_devices.items()):
+            dev.present = True
+            self.block_devices[name] = dev
+            del self.hidden_block_devices[name]
+            revealed.append(name)
+        return revealed
+
+    def find_block_device(self, ref: str) -> "SimBlockDevice | None":
+        """Resolve a device by /dev path, UUID=, or bare UUID."""
+        if not ref:
+            return None
+        if ref.startswith("UUID="):
+            ref = ref.split("=", 1)[1].strip('"')
+        if ref in self.block_devices:
+            return self.block_devices[ref]
+        for dev in self.block_devices.values():
+            if dev.uuid and dev.uuid == ref:
+                return dev
+        return None
 
     def _mkdir(self, path: str) -> None:
         self.vfs[path] = {"type": "dir", "entries": {}}
@@ -263,6 +349,14 @@ class RHELOSState:
         other.lvm = copy.deepcopy(self.lvm)
         other.firewall = copy.deepcopy(self.firewall)
         other.network_ifs = copy.deepcopy(self.network_ifs)
+        other.block_devices = copy.deepcopy(self.block_devices)
+        other.hidden_block_devices = copy.deepcopy(self.hidden_block_devices)
+        other.swaps = copy.deepcopy(self.swaps)
+        other.mounts = copy.deepcopy(self.mounts)
+        other.selinux_mode = self.selinux_mode
+        other.selinux_ports = copy.deepcopy(self.selinux_ports)
+        other.selinux_fcontexts = copy.deepcopy(self.selinux_fcontexts)
+        other.file_contexts = copy.deepcopy(self.file_contexts)
         other.emergency_mode = self.emergency_mode
         other.fstab_valid = self.fstab_valid
         other.editor = None

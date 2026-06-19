@@ -56,6 +56,22 @@ class RHELShell:
                     break
             return "\n".join(chunks)
 
+        # Pipelines: run each stage, feeding the previous stdout as stdin to the
+        # next. Only a handful of stages consume stdin (grep, awk, wc, sort,
+        # head, tail, sed); the rest ignore it as a real shell would.
+        if "|" in line and not self._is_quoted_pipe(line):
+            stages = [s.strip() for s in self._split_pipes(line)]
+            if len(stages) > 1:
+                data = ""
+                for idx, stage in enumerate(stages):
+                    data = self.run_with_stdin(stage, data if idx > 0 else None)
+                return data
+
+        # Pull trailing redirections (cmd > file, >> file, 2> file, 2>&1) off
+        # the line so EVERY command — not just echo — can capture stdout/stderr
+        # to the VFS. Returns the cleaned command plus redirect targets.
+        line, redirect = self._extract_redirect(line)
+
         for handler in self._extra_handlers:
             try:
                 parts = shlex.split(line)
@@ -64,12 +80,12 @@ class RHELShell:
             result = handler(parts, line)
             if result is not None:
                 self.state.last_exit_code = 0 if not result.startswith("bash:") else 127
-                return result
+                return self._apply_redirect(result, redirect)
 
         try:
             parts = shlex.split(line)
         except ValueError as exc:
-            return f"bash: {exc}"
+            return self._apply_redirect(f"bash: {exc}", redirect)
 
         if not parts:
             return ""
@@ -180,7 +196,33 @@ class RHELShell:
             "netstat": self._cmd_netstat,
             "lsof": self._cmd_lsof,
             "mount": self._cmd_mount,
+            "umount": self._cmd_umount,
             "fdisk": self._cmd_fdisk,
+            "parted": self._cmd_parted,
+            "lvcreate": self._cmd_lvcreate,
+            "mkfs": self._cmd_mkfs,
+            "mkfs.xfs": self._cmd_mkfs,
+            "mkfs.ext4": self._cmd_mkfs,
+            "mkfs.ext3": self._cmd_mkfs,
+            "blkid": self._cmd_blkid,
+            "lsblk": self._cmd_lsblk,
+            "mkswap": self._cmd_mkswap,
+            "swapon": self._cmd_swapon,
+            "swapoff": self._cmd_swapoff,
+            "fsck": self._cmd_fsck,
+            "fsck.xfs": self._cmd_fsck,
+            "fsck.ext4": self._cmd_fsck,
+            "xfs_repair": self._cmd_xfs_repair,
+            "resize2fs": self._cmd_resize2fs,
+            "xfs_growfs": self._cmd_xfs_growfs,
+            "rescan-scsi-bus.sh": self._cmd_rescan_scsi,
+            "partprobe": self._cmd_partprobe,
+            "getenforce": self._cmd_getenforce,
+            "setenforce": self._cmd_setenforce,
+            "sestatus": self._cmd_sestatus,
+            "semanage": self._cmd_semanage,
+            "restorecon": self._cmd_restorecon,
+            "chcon": self._cmd_chcon,
             "virsh": self._cmd_virsh,
             "esxcli": self._cmd_esxcli,
             "vmware-toolbox-cmd": self._cmd_vmware,
@@ -191,9 +233,188 @@ class RHELShell:
         fn = dispatch.get(cmd)
         if fn:
             out = fn(parts)
+            return self._apply_redirect(out, redirect)
+
+        return self._apply_redirect(f"bash: {cmd}: command not found", redirect)
+
+    @staticmethod
+    def _split_pipes(line: str) -> list[str]:
+        """Split on `|` that is not inside quotes."""
+        parts: list[str] = []
+        buf = ""
+        quote = ""
+        i = 0
+        while i < len(line):
+            ch = line[i]
+            if quote:
+                buf += ch
+                if ch == quote:
+                    quote = ""
+            elif ch in ("'", '"'):
+                quote = ch
+                buf += ch
+            elif ch == "|":
+                # `||` is logical-or, not a pipe — bail out.
+                if i + 1 < len(line) and line[i + 1] == "|":
+                    return [line]
+                parts.append(buf)
+                buf = ""
+            else:
+                buf += ch
+            i += 1
+        parts.append(buf)
+        return parts
+
+    @staticmethod
+    def _is_quoted_pipe(line: str) -> bool:
+        """True when every `|` in the line sits inside quotes (nothing to split)."""
+        return len(RHELShell._split_pipes(line)) == 1
+
+    def run_with_stdin(self, line: str, stdin: str | None) -> str:
+        """Run a single command stage with optional piped stdin."""
+        prev = getattr(self, "_stdin", None)
+        self._stdin = stdin
+        try:
+            return self.run(line)
+        finally:
+            self._stdin = prev
+
+    def _stdin_lines(self) -> list[str] | None:
+        data = getattr(self, "_stdin", None)
+        if data is None:
+            return None
+        return data.splitlines()
+
+    def _extract_redirect(self, line: str) -> tuple[str, dict | None]:
+        """Split trailing redirection operators off a command line.
+
+        Recognizes ``> f``, ``>> f``, ``2> f``, ``2>> f`` and ``2>&1``. Returns
+        the command text with redirects removed and a dict describing where
+        stdout/stderr should go (or None when there is no redirection).
+        """
+        if ">" not in line:
+            return line, None
+        try:
+            tokens = shlex.split(line, posix=True)
+        except ValueError:
+            return line, None
+        cmd_tokens: list[str] = []
+        redirect: dict = {"stdout": None, "stderr": None, "append": False,
+                          "stderr_append": False, "merge": False, "raw": line}
+        found = False
+        i = 0
+        while i < len(tokens):
+            tok = tokens[i]
+            if tok in (">", ">>", "2>", "2>>") and i + 1 < len(tokens):
+                target = tokens[i + 1]
+                if tok == ">":
+                    redirect["stdout"] = target
+                elif tok == ">>":
+                    redirect["stdout"] = target
+                    redirect["append"] = True
+                elif tok == "2>":
+                    redirect["stderr"] = target
+                elif tok == "2>>":
+                    redirect["stderr"] = target
+                    redirect["stderr_append"] = True
+                found = True
+                i += 2
+                continue
+            if tok == "2>&1":
+                redirect["merge"] = True
+                found = True
+                i += 1
+                continue
+            # Glued forms like ">/tmp/f" or "2>/tmp/f".
+            m = re.match(r"^(2?>>?)(\S+)$", tok)
+            if m and not tok.startswith("/") and m.group(1):
+                op, target = m.group(1), m.group(2)
+                if op == ">":
+                    redirect["stdout"] = target
+                elif op == ">>":
+                    redirect["stdout"] = target
+                    redirect["append"] = True
+                elif op == "2>":
+                    redirect["stderr"] = target
+                elif op == "2>>":
+                    redirect["stderr"] = target
+                    redirect["stderr_append"] = True
+                found = True
+                i += 1
+                continue
+            cmd_tokens.append(tok)
+            i += 1
+        if not found:
+            return line, None
+        # Re-quote tokens so the rebuilt line survives a second shlex.split.
+        rebuilt = " ".join(shlex.quote(t) for t in cmd_tokens)
+        return rebuilt, redirect
+
+    @staticmethod
+    def _looks_like_stderr(out: str) -> bool:
+        """Heuristic: does this output represent an error (stderr)?
+
+        Used so `2> file` captures error text while `> file` captures normal
+        output. We can't truly split streams in the sim, so we match the common
+        ``cmd: ... No such file`` / permission / invalid-argument shapes plus the
+        bash-level prefixes.
+        """
+        if not out:
+            return False
+        first = out.splitlines()[0]
+        if first.startswith("bash:") or first.startswith("-bash:"):
+            return True
+        markers = (
+            "No such file or directory", "Permission denied", "command not found",
+            "cannot stat", "cannot access", "cannot open", "cannot remove",
+            "Invalid regular expression", "No such device", "not found",
+            "is a directory", "missing operand", "Operation not permitted",
+        )
+        # A leading "<cmd>: <message>" line that carries one of these markers.
+        if re.match(r"^[\w./-]+:\s", first) and any(m in out for m in markers):
+            return True
+        return False
+
+    def _apply_redirect(self, out: str, redirect: dict | None) -> str:
+        """Route command output to the VFS per the parsed redirection."""
+        if not redirect:
+            return out
+        out = out or ""
+        is_err = self._looks_like_stderr(out)
+        payload = out if out.endswith("\n") or out == "" else out + "\n"
+
+        # Writing to a SCSI host scan node triggers a bus rescan, revealing any
+        # disk that was provisioned but not yet visible to the kernel.
+        target = redirect.get("stdout") or redirect.get("stderr") or ""
+        if "/sys/class/scsi_host/" in target and target.endswith("/scan"):
+            self.state.reveal_hidden_disks()
+            return ""
+
+        # 2>&1 with a stdout target sends everything to the stdout file.
+        if redirect.get("merge") and redirect.get("stdout"):
+            self.state.write_file(redirect["stdout"], payload,
+                                  append=redirect.get("append", False))
+            return ""
+
+        if redirect.get("stderr") is not None and is_err:
+            self.state.write_file(redirect["stderr"], payload,
+                                  append=redirect.get("stderr_append", False))
+            return ""
+
+        if redirect.get("stdout") is not None:
+            if is_err and not redirect.get("merge"):
+                # stderr is not captured by `>`; surface it on the terminal.
+                return out
+            self.state.write_file(redirect["stdout"], payload,
+                                  append=redirect.get("append", False))
+            return ""
+
+        if redirect.get("stderr") is not None:
+            # `2> file` on a successful command: nothing to write, swallow stdout? No —
+            # stdout still goes to the terminal.
             return out
 
-        return f"bash: {cmd}: command not found"
+        return out
 
     def create_stream_handler(self):
         shell = self
@@ -251,6 +472,9 @@ class RHELShell:
         return "\n".join(out)
 
     def _cmd_echo(self, p: list[str]) -> str:
+        # Redirection (> >> 2>) is handled centrally in run()/_apply_redirect,
+        # so by the time echo runs the line is already clean. We still guard the
+        # legacy in-text form for any direct callers.
         text = " ".join(p[1:])
         if ">>" in text:
             left, right = text.split(">>", 1)
@@ -274,12 +498,15 @@ class RHELShell:
     def _cmd_rm(self, p: list[str]) -> str:
         if len(p) < 2:
             return "rm: missing operand"
-        for f in p[1:]:
-            if f.startswith("-"):
-                continue
+        recursive = any(a in ("-r", "-R", "-rf", "-fr", "-ra") or ("r" in a[1:] and a.startswith("-")) for a in p[1:] if a.startswith("-"))
+        targets = [f for f in p[1:] if not f.startswith("-")]
+        if not targets:
+            return "rm: missing operand"
+        for f in targets:
             ap = self.state.resolve_path(f)
-            if ap in self.state.vfs:
-                del self.state.vfs[ap]
+            if self.state.is_dir(ap) and not recursive:
+                return f"rm: cannot remove '{f}': Is a directory"
+            self._remove_path(ap)
         return ""
 
     def _cmd_touch(self, p: list[str]) -> str:
@@ -291,16 +518,66 @@ class RHELShell:
         return ""
 
     def _cmd_cp(self, p: list[str]) -> str:
-        if len(p) < 3:
+        recursive = any(a in ("-r", "-R", "-a", "-rf", "-ra") for a in p[1:])
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if len(args) < 2:
             return "cp: missing file operand"
-        src = self.state.read_file(p[1])
-        if src is None:
-            return f"cp: cannot stat '{p[1]}': No such file or directory"
-        self.state.write_file(p[2], src)
-        return ""
+        src, dst = args[0], args[-1]
+        ok, err = self._copy_path(src, dst, recursive)
+        return "" if ok else err
+
+    def _copy_path(self, src: str, dst: str, recursive: bool) -> tuple[bool, str]:
+        """Copy a file or (with recursive) a directory tree within the VFS."""
+        src_ap = self.state.resolve_path(src)
+        dst_ap = self.state.resolve_path(dst)
+        if self.state.is_dir(src_ap):
+            if not recursive:
+                return False, f"cp: -r not specified; omitting directory '{src}'"
+            # If dst is an existing directory, copy into it under the basename.
+            if self.state.is_dir(dst_ap):
+                dst_ap = dst_ap.rstrip("/") + "/" + src_ap.rstrip("/").split("/")[-1]
+            self.state._mkdir(dst_ap)
+            prefix = src_ap.rstrip("/") + "/"
+            for path in sorted(self.state.vfs):
+                if not path.startswith(prefix):
+                    continue
+                rel = path[len(prefix):]
+                new_path = dst_ap.rstrip("/") + "/" + rel
+                node = self.state.vfs.get(path)
+                if isinstance(node, dict) and node.get("type") == "dir":
+                    self.state._mkdir(new_path)
+                else:
+                    self.state.write_file(new_path, self.state.read_file(path) or "")
+            return True, ""
+        content = self.state.read_file(src_ap)
+        if content is None:
+            return False, f"cp: cannot stat '{src}': No such file or directory"
+        # Copying a file onto a directory drops it inside the directory.
+        if self.state.is_dir(dst_ap):
+            dst_ap = dst_ap.rstrip("/") + "/" + src_ap.split("/")[-1]
+        self.state.write_file(dst_ap, content)
+        return True, ""
 
     def _cmd_mv(self, p: list[str]) -> str:
-        return self._cmd_cp(p) + (self._cmd_rm(["rm", p[1]]) if len(p) >= 3 else "")
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if len(args) < 2:
+            return "mv: missing file operand"
+        src, dst = args[0], args[-1]
+        # Atomic: only remove the source once the copy succeeds. A failed copy
+        # must leave the source intact and surface the error (no concatenation).
+        ok, err = self._copy_path(src, dst, recursive=True)
+        if not ok:
+            return err
+        self._remove_path(self.state.resolve_path(src))
+        return ""
+
+    def _remove_path(self, ap: str) -> None:
+        """Delete a VFS node and any descendants (for dirs)."""
+        if ap in self.state.vfs:
+            del self.state.vfs[ap]
+        prefix = ap.rstrip("/") + "/"
+        for path in [k for k in self.state.vfs if k.startswith(prefix)]:
+            del self.state.vfs[path]
 
     def _cmd_whoami(self, p: list[str]) -> str:
         return self.state.current_user
@@ -486,17 +763,96 @@ class RHELShell:
         return ""
 
     def _cmd_grep(self, p: list[str]) -> str:
-        if len(p) < 2:
-            return "Usage: grep pattern [file...]"
-        pattern = p[1].lstrip("-").replace("'", "")
-        files = [x for x in p[2:] if not x.startswith("-")] or [self.state.cwd]
-        matches = []
+        # Parse flags: -i (ignore case), -v (invert), -c (count), -r/-R
+        # (recursive), -q (quiet), -n (line numbers), -E (ERE — no-op here).
+        flags = set()
+        args: list[str] = []
+        for tok in p[1:]:
+            if tok.startswith("-") and len(tok) > 1 and not tok[1].isdigit():
+                for ch in tok[1:]:
+                    flags.add(ch)
+            else:
+                args.append(tok)
+        if not args:
+            return "Usage: grep [OPTION]... PATTERN [FILE]..."
+        pattern = args[0]
+        stdin_lines = self._stdin_lines()
+        targets = args[1:]
+        if not targets and stdin_lines is None:
+            targets = [self.state.cwd]
+        recursive = "r" in flags or "R" in flags
+        ignore_case = "i" in flags
+        invert = "v" in flags
+        count_only = "c" in flags
+        quiet = "q" in flags
+        show_num = "n" in flags
+
+        # Build the list of files to search, expanding directories under -r.
+        files: list[str] = []
+        for t in targets:
+            ap = self.state.resolve_path(t)
+            if self.state.is_dir(ap):
+                if recursive:
+                    prefix = ap.rstrip("/") + "/"
+                    for fp in sorted(self.state.vfs):
+                        node = self.state.vfs.get(fp)
+                        if fp.startswith(prefix) and isinstance(node, dict) and node.get("type") == "file":
+                            files.append(fp)
+                # Non-recursive grep of a directory is an error in real grep, but
+                # we silently skip to stay lenient for validators.
+            else:
+                files.append(t)
+
+        try:
+            rx = re.compile(pattern, re.IGNORECASE if ignore_case else 0)
+        except re.error:
+            # Match real grep's behaviour instead of bubbling up a Python error.
+            self.state.last_exit_code = 2
+            return f"grep: {pattern}: Invalid regular expression"
+
+        multi = len(files) > 1 or recursive
+        matches: list[str] = []
+        per_file_count: dict[str, int] = {}
+        # Pipe input: grep with no file operand filters stdin line-by-line.
+        if not files and stdin_lines is not None:
+            count = 0
+            for line in stdin_lines:
+                hit = bool(rx.search(line))
+                if invert:
+                    hit = not hit
+                if hit:
+                    count += 1
+                    matches.append(line)
+            self.state.last_exit_code = 0 if matches else 1
+            if count_only:
+                return str(count)
+            if quiet:
+                return ""
+            return "\n".join(matches)
         for f in files:
             content = self.state.read_file(f)
-            if content:
-                for i, line in enumerate(content.splitlines(), 1):
-                    if pattern in line or (pattern and re.search(pattern, line)):
-                        matches.append(f"{f}:{line}" if len(files) > 1 or f != self.state.cwd else line)
+            if content is None:
+                continue
+            per_file_count.setdefault(f, 0)
+            for i, line in enumerate(content.splitlines(), 1):
+                hit = bool(rx.search(line))
+                if invert:
+                    hit = not hit
+                if hit:
+                    per_file_count[f] += 1
+                    prefix = ""
+                    if multi:
+                        prefix += f"{f}:"
+                    if show_num:
+                        prefix += f"{i}:"
+                    matches.append(f"{prefix}{line}")
+        if count_only:
+            if multi:
+                return "\n".join(f"{f}:{c}" for f, c in per_file_count.items())
+            return str(sum(per_file_count.values()))
+        self.state.last_exit_code = 0 if matches else 1
+        if quiet:
+            return ""
         return "\n".join(matches) if matches else ""
 
     def _cmd_sed(self, p: list[str]) -> str:
@@ -518,9 +874,12 @@ class RHELShell:
 
     def _cmd_head(self, p: list[str]) -> str:
         n = 10
-        f = p[-1]
         if "-n" in p:
             n = int(p[p.index("-n") + 1])
+        files = [a for a in p[1:] if not a.startswith("-") and not a.isdigit()]
+        if not files and self._stdin_lines() is not None:
+            return "\n".join(self._stdin_lines()[:n])
+        f = files[-1] if files else p[-1]
         content = self.state.read_file(f)
         if content is None:
             return f"head: cannot open '{f}' for reading: No such file or directory"
@@ -528,19 +887,31 @@ class RHELShell:
 
     def _cmd_tail(self, p: list[str]) -> str:
         n = 10
-        f = p[-1]
         if "-n" in p:
-            n = int(p[p.index("-n") + 1])
+            n = int(p[p.index("-n") + 1].lstrip("+"))
+        files = [a for a in p[1:] if not a.startswith("-") and not a.isdigit()]
+        if not files and self._stdin_lines() is not None:
+            return "\n".join(self._stdin_lines()[-n:])
+        f = files[-1] if files else p[-1]
         content = self.state.read_file(f)
         if content is None:
             return f"tail: cannot open '{f}' for reading: No such file or directory"
         return "\n".join(content.splitlines()[-n:])
 
     def _cmd_wc(self, p: list[str]) -> str:
-        f = p[-1]
+        files = [a for a in p[1:] if not a.startswith("-")]
+        if not files and self._stdin_lines() is not None:
+            content = (getattr(self, "_stdin", "") or "")
+            lines = content.count("\n") + (1 if content and not content.endswith("\n") else 0)
+            if "-l" in p:
+                return f"      {lines}"
+            return f"  {lines}  {len(content.split())}  {len(content)}"
+        f = files[-1] if files else p[-1]
         content = self.state.read_file(f) or ""
         lines = content.count("\n")
         words = len(content.split())
+        if "-l" in p:
+            return f"      {lines} {f}"
         return f"  {lines}  {words}  {len(content)} {f}"
 
     def _cmd_chmod(self, p: list[str]) -> str:
@@ -573,7 +944,19 @@ class RHELShell:
         return f"--------------e------- {f}"
 
     def _cmd_df(self, p: list[str]) -> str:
-        return self.state.lvm.format_df()
+        base = self.state.lvm.format_df()
+        # Append any extra filesystems mounted at runtime (mkfs + mount workflow).
+        extra = []
+        for mp, info in self.state.mounts.items():
+            if mp in ("/", "/boot", "[SWAP]"):
+                continue
+            size_k = info.get("size_kb") or 0
+            used = int(size_k * 0.03)
+            avail = size_k - used
+            extra.append(f"{info['device']:<32} {size_k:>10} {used:>8} {avail:>10}   3% {mp}")
+        if extra:
+            return base + "\n" + "\n".join(extra)
+        return base
 
     def _cmd_free(self, p: list[str]) -> str:
         return "               total        used        free      shared  buff/cache   available\nMem:        16384000     2048000    12000000       64000     2336000    14000000\nSwap:        4194300           0     4194300"
@@ -862,17 +1245,206 @@ class RHELShell:
         return "\n".join(results[:50])
 
     def _cmd_awk(self, p: list[str]) -> str:
-        return "awk: processed (simulation)"
+        """Support the common awk forms: `{print $N}`, `-F sep`, and `/pat/`.
+
+        Reads from a file argument or piped stdin. Falls back to printing input
+        lines untouched for unsupported programs rather than erroring.
+        """
+        field_sep = None
+        args = p[1:]
+        program = None
+        file_arg = None
+        i = 0
+        while i < len(args):
+            tok = args[i]
+            if tok == "-F" and i + 1 < len(args):
+                field_sep = args[i + 1]
+                i += 2
+                continue
+            if tok.startswith("-F"):
+                field_sep = tok[2:]
+                i += 1
+                continue
+            if program is None:
+                program = tok
+            elif file_arg is None and not tok.startswith("-"):
+                file_arg = tok
+            i += 1
+
+        if program is None:
+            return ""
+        program = program.strip()
+
+        # Source lines: file arg wins, else piped stdin, else nothing.
+        if file_arg is not None:
+            content = self.state.read_file(file_arg)
+            if content is None:
+                return f"awk: can't open file {file_arg}"
+            lines = content.splitlines()
+        else:
+            lines = self._stdin_lines() or []
+
+        # Optional /pattern/ guard, optionally followed by an action block.
+        pat = None
+        m = re.match(r"^/(.*?)/\s*(\{.*\})?\s*$", program)
+        if m:
+            try:
+                pat = re.compile(m.group(1))
+            except re.error:
+                pat = None
+            action = m.group(2) or "{print $0}"
+        else:
+            action = program
+
+        def split_fields(ln: str) -> list[str]:
+            if field_sep:
+                return ln.split(field_sep)
+            return ln.split()
+
+        out_lines: list[str] = []
+        print_m = re.match(r"^\{\s*print\s*(.*?)\s*\}$", action)
+        for ln in lines:
+            if pat is not None and not pat.search(ln):
+                continue
+            if print_m is None:
+                # Unsupported action — emulate the default {print $0}.
+                out_lines.append(ln)
+                continue
+            spec = print_m.group(1).strip()
+            fields = split_fields(ln)
+            if spec in ("", "$0"):
+                out_lines.append(ln)
+                continue
+            # Build the printed record from $N tokens and literal separators.
+            rendered_parts: list[str] = []
+            for piece in spec.split(","):
+                piece = piece.strip()
+                fm = re.match(r"^\$(\d+)$", piece)
+                if fm:
+                    n = int(fm.group(1))
+                    if n == 0:
+                        rendered_parts.append(ln)
+                    elif 1 <= n <= len(fields):
+                        rendered_parts.append(fields[n - 1])
+                    else:
+                        rendered_parts.append("")
+                elif piece == "NF":
+                    rendered_parts.append(str(len(fields)))
+                else:
+                    rendered_parts.append(piece.strip('"'))
+            out_lines.append(" ".join(rendered_parts))
+        return "\n".join(out_lines)
 
     def _cmd_sort(self, p: list[str]) -> str:
-        f = p[-1] if len(p) > 1 and not p[-1].startswith("-") else None
-        if f:
-            content = self.state.read_file(f) or ""
-            return "\n".join(sorted(content.splitlines()))
-        return ""
+        reverse = "-r" in p
+        numeric = "-n" in p
+        files = [a for a in p[1:] if not a.startswith("-")]
+        if files:
+            lines = (self.state.read_file(files[-1]) or "").splitlines()
+        elif self._stdin_lines() is not None:
+            lines = self._stdin_lines()
+        else:
+            return ""
+        key = (lambda s: (float(re.match(r"-?\d+(\.\d+)?", s.strip()).group()) if re.match(r"-?\d+", s.strip()) else 0)) if numeric else None
+        return "\n".join(sorted(lines, key=key, reverse=reverse))
 
     def _cmd_tar(self, p: list[str]) -> str:
-        return "tar: archive operation complete (simulation)"
+        """Create/extract tar archives inside the VFS.
+
+        The archive payload is stored as a JSON manifest (path -> content) so
+        extraction can faithfully rebuild the captured files/dirs. Supports
+        -c/-x with optional -z and -v, -f <archive>, and -C <dir>.
+        """
+        import json
+        flags = ""
+        archive = None
+        change_dir = None
+        members: list[str] = []
+        verbose = False
+        i = 1
+        while i < len(p):
+            tok = p[i]
+            if tok.startswith("-") and tok != "-":
+                opt = tok.lstrip("-")
+                # -f / -C may be glued to the flag cluster (e.g. -czf name).
+                if "f" in opt:
+                    flags += opt.replace("f", "")
+                    if i + 1 < len(p):
+                        archive = p[i + 1]
+                        i += 2
+                        continue
+                elif "C" in opt:
+                    flags += opt.replace("C", "")
+                    if i + 1 < len(p):
+                        change_dir = p[i + 1]
+                        i += 2
+                        continue
+                else:
+                    flags += opt
+                if "v" in opt:
+                    verbose = True
+                i += 1
+                continue
+            if archive is None and ("f" in flags) and archive is None:
+                archive = tok
+            else:
+                members.append(tok)
+            i += 1
+
+        create = "c" in flags
+        extract = "x" in flags
+        listing = "t" in flags
+        if not archive:
+            return "tar: refusing to read archive contents from terminal"
+
+        if create:
+            manifest: dict[str, str] = {}
+            for member in members:
+                ap = self.state.resolve_path(member)
+                if self.state.is_dir(ap):
+                    prefix = ap.rstrip("/") + "/"
+                    manifest[ap] = "\0DIR\0"
+                    for path in sorted(self.state.vfs):
+                        if path.startswith(prefix):
+                            node = self.state.vfs.get(path)
+                            if isinstance(node, dict) and node.get("type") == "dir":
+                                manifest[path] = "\0DIR\0"
+                            else:
+                                manifest[path] = self.state.read_file(path) or ""
+                else:
+                    content = self.state.read_file(ap)
+                    if content is None:
+                        return f"tar: {member}: Cannot stat: No such file or directory"
+                    manifest[ap] = content
+            self.state.write_file(archive, "TARSIM1\n" + json.dumps(manifest))
+            return "\n".join(members) if verbose else ""
+
+        if extract or listing:
+            raw = self.state.read_file(archive)
+            if raw is None:
+                return f"tar: {archive}: Cannot open: No such file or directory"
+            if not raw.startswith("TARSIM1\n"):
+                return f"tar: {archive}: not a recognized archive (simulation)"
+            try:
+                manifest = json.loads(raw[len("TARSIM1\n"):])
+            except json.JSONDecodeError:
+                return f"tar: {archive}: corrupt archive"
+            base = self.state.resolve_path(change_dir) if change_dir else None
+            names = []
+            for path, content in manifest.items():
+                target = path
+                if base:
+                    target = base.rstrip("/") + "/" + path.lstrip("/")
+                names.append(path)
+                if listing:
+                    continue
+                if content == "\0DIR\0":
+                    self.state._mkdir(target)
+                else:
+                    self.state.write_file(target, content)
+            return "\n".join(names) if (verbose or listing) else ""
+
+        return "tar: you must specify one of the -c, -x, or -t options"
 
     def _cmd_ln(self, p: list[str]) -> str:
         if len(p) >= 3:
@@ -1074,13 +1646,460 @@ class RHELShell:
                 self.state.mount_filesystems_fixed = True
                 self.state.fstab_valid = True
                 return "mount: mounting all filesystems in /etc/fstab"
-        return self.state.lvm.format_mount()
+            # Mount every fstab entry that maps to a known formatted device.
+            self._mount_from_fstab()
+            return ""
+        # `mount` with no args lists current mounts.
+        args = [a for a in p[1:] if not a.startswith("-")]
+        # Drop a `-t <type>` pair from the positional args.
+        if "-t" in p:
+            ti = p.index("-t")
+            if ti + 1 < len(p) and p[ti + 1] in args:
+                args.remove(p[ti + 1])
+        if len(args) < 2:
+            return self._format_mount_table()
+        device, mountpoint = args[0], args[1]
+        dev = self.state.find_block_device(device)
+        if dev is None:
+            return f"mount: {device}: can't find in /etc/fstab or block devices"
+        if not dev.fstype:
+            return (f"mount: {mountpoint}: wrong fs type, bad option, bad superblock on {dev.name},\n"
+                    f"       missing codepage or helper program, or other error.")
+        if not self.state.is_dir(self.state.resolve_path(mountpoint)) and mountpoint not in ("[SWAP]",):
+            self.state._mkdir(self.state.resolve_path(mountpoint))
+        dev.mountpoint = mountpoint
+        self.state.mounts[mountpoint] = {
+            "device": dev.name, "fstype": dev.fstype,
+            "size_kb": self.state.lvm._size_to_kb(dev.size),
+        }
+        return ""
+
+    def _mount_from_fstab(self) -> None:
+        fstab = self.state.read_file("/etc/fstab") or ""
+        for raw in fstab.splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            cols = line.split()
+            if len(cols) < 2:
+                continue
+            dev = self.state.find_block_device(cols[0])
+            if dev and dev.fstype and dev.fstype != "swap":
+                dev.mountpoint = cols[1]
+                self.state.mounts[cols[1]] = {
+                    "device": dev.name, "fstype": dev.fstype,
+                    "size_kb": self.state.lvm._size_to_kb(dev.size),
+                }
+
+    def _format_mount_table(self) -> str:
+        lines = [self.state.lvm.format_mount()]
+        for mp, info in self.state.mounts.items():
+            if mp in ("/", "/boot", "[SWAP]"):
+                continue
+            lines.append(f"{info['device']} on {mp} type {info['fstype']} (rw,relatime)")
+        return "\n".join(lines)
+
+    def _cmd_umount(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
+            return "umount: bad usage"
+        target = args[0]
+        for mp, info in list(self.state.mounts.items()):
+            if mp == target or info["device"] == target:
+                dev = self.state.find_block_device(info["device"])
+                if dev:
+                    dev.mountpoint = ""
+                del self.state.mounts[mp]
+                return ""
+        dev = self.state.find_block_device(target)
+        if dev and dev.mountpoint:
+            dev.mountpoint = ""
+            return ""
+        return f"umount: {target}: not mounted"
 
     def _cmd_fdisk(self, p: list[str]) -> str:
         if len(p) > 1 and p[1] == "-l":
-            return self.state.lvm.format_fdisk()
+            return self._format_fdisk_list()
         dev = p[-1] if len(p) > 1 else "/dev/sda"
-        return self.state.lvm.format_fdisk() if dev.startswith("/dev/sd") else f"fdisk: cannot open {dev}"
+        if not dev.startswith("/dev/"):
+            return f"fdisk: cannot open {dev}: No such file or directory"
+        bdev = self.state.find_block_device(dev)
+        if bdev is None:
+            return f"fdisk: cannot open {dev}: No such file or directory"
+        # Non-interactive create: add the next partition on this disk.
+        part = self._create_partition(dev)
+        if part:
+            return (f"Welcome to fdisk.\nCreated a new partition {part.name.replace(dev, '').lstrip('p') or '1'} "
+                    f"of type 'Linux'.\nThe partition table has been altered.\nSyncing disks.")
+        return self._format_fdisk_list()
+
+    def _format_fdisk_list(self) -> str:
+        lines = []
+        disks = [d for d in self.state.block_devices.values() if d.dev_type == "disk" and d.present]
+        for disk in disks:
+            lines.append(f"Disk {disk.name}: {disk.size}")
+            for part in self.state.block_devices.values():
+                if part.parent == disk.name and part.dev_type == "part":
+                    lines.append(f"{part.name:<12} 2048 104857566 104855519 {part.size:>5} 83 Linux")
+        return "\n".join(lines) if lines else self.state.lvm.format_fdisk()
+
+    def _create_partition(self, disk: str):
+        """Add the next sequential partition to a whole disk."""
+        from .rhel_os import SimBlockDevice
+        existing = [d for d in self.state.block_devices
+                    if d.startswith(disk) and d != disk and d[len(disk):].lstrip("p").isdigit()]
+        idx = len(existing) + 1
+        # /dev/sdb -> /dev/sdb1 ; /dev/nvme0n1 -> /dev/nvme0n1p1
+        sep = "p" if disk[-1].isdigit() else ""
+        part_name = f"{disk}{sep}{idx}"
+        if part_name in self.state.block_devices:
+            return self.state.block_devices[part_name]
+        part = SimBlockDevice(part_name, "50G", "part", parent=disk)
+        self.state.block_devices[part_name] = part
+        return part
+
+    def _cmd_parted(self, p: list[str]) -> str:
+        # parted /dev/sdb --script mkpart primary xfs 0% 100%  (or mklabel gpt)
+        args = p[1:]
+        device = next((a for a in args if a.startswith("/dev/")), None)
+        line = " ".join(args)
+        if not device:
+            return "parted: no device specified"
+        if self.state.find_block_device(device) is None:
+            return f"Error: Could not stat device {device} - No such file or directory."
+        if "mklabel" in line or "mktable" in line:
+            return ""
+        if "mkpart" in line:
+            part = self._create_partition(device)
+            return "" if part else "parted: failed to create partition"
+        if "print" in line:
+            return self._format_fdisk_list()
+        return ""
+
+    def _cmd_partprobe(self, p: list[str]) -> str:
+        return ""
+
+    def _cmd_rescan_scsi(self, p: list[str]) -> str:
+        revealed = self.state.reveal_hidden_disks()
+        if revealed:
+            return "\n".join(f"OLD: Host: scsi0 Channel: 00  ... new device {d}" for d in revealed) + \
+                   f"\n{len(revealed)} new or changed device(s) found."
+        return "0 new or changed device(s) found."
+
+    def _cmd_lvcreate(self, p: list[str]) -> str:
+        # lvcreate -L 10G -n data rhel   OR   lvcreate -l 100%FREE -n data rhel
+        name = None
+        size = "1G"
+        vg = None
+        i = 1
+        while i < len(p):
+            tok = p[i]
+            if tok in ("-n", "--name") and i + 1 < len(p):
+                name = p[i + 1]; i += 2; continue
+            if tok in ("-L", "--size") and i + 1 < len(p):
+                size = p[i + 1]; i += 2; continue
+            if tok in ("-l", "--extents") and i + 1 < len(p):
+                size = "10G"; i += 2; continue  # treat %FREE as a nominal size
+            if not tok.startswith("-"):
+                vg = tok
+            i += 1
+        if not name or not vg:
+            return "  Please specify a logical volume name and volume group."
+        ok, msg = self.state.lvm.lvcreate(name, vg, size)
+        if ok:
+            # Expose the new LV as a block device so mkfs/mount can target it.
+            from .rhel_os import SimBlockDevice
+            lv = self.state.lvm.lvs.get(f"{vg}/{name}")
+            path = lv.lv_path if lv else f"/dev/mapper/{vg}-{name}"
+            self.state.block_devices[path] = SimBlockDevice(
+                path, lv.size if lv else size, "lvm", parent=vg)
+            # Also expose the canonical /dev/<vg>/<name> alias.
+            alias = f"/dev/{vg}/{name}"
+            self.state.block_devices[alias] = self.state.block_devices[path]
+        return msg
+
+    def _cmd_mkfs(self, p: list[str]) -> str:
+        # mkfs -t xfs /dev/sdb1   OR   mkfs.xfs /dev/sdb1   OR   mkfs.ext4 ...
+        fstype = "ext4"
+        if "." in p[0]:
+            fstype = p[0].split(".", 1)[1]
+        device = None
+        i = 1
+        while i < len(p):
+            tok = p[i]
+            if tok in ("-t", "--type") and i + 1 < len(p):
+                fstype = p[i + 1]; i += 2; continue
+            if tok.startswith("-"):
+                i += 1; continue
+            device = tok
+            i += 1
+        if not device:
+            return f"mkfs.{fstype}: no device specified"
+        dev = self.state.find_block_device(device)
+        if dev is None:
+            return f"mkfs.{fstype}: cannot open {device}: No such file or directory"
+        if dev.mountpoint:
+            return f"mkfs.{fstype}: {device} is mounted; will not make a filesystem here!"
+        dev.fstype = fstype
+        dev.uuid = self.state.gen_uuid()
+        return (f"meta-data=/dev/{device.split('/')[-1]}  isize=512\n"
+                f"Creating filesystem with type {fstype} on {device}\n"
+                f"Filesystem UUID: {dev.uuid}\ndone")
+
+    def _cmd_blkid(self, p: list[str]) -> str:
+        # Optionally query a single device.
+        targets = [a for a in p[1:] if a.startswith("/dev/")]
+        lines = []
+        devs = (self.state.find_block_device(t) for t in targets) if targets else \
+               (d for d in self.state.block_devices.values() if d.present)
+        seen = set()
+        for dev in devs:
+            if dev is None or dev.name in seen or not dev.fstype:
+                continue
+            seen.add(dev.name)
+            label = "LVM2_member" if dev.fstype == "LVM2_member" else dev.fstype
+            lines.append(f'{dev.name}: UUID="{dev.uuid}" TYPE="{label}"')
+        return "\n".join(lines)
+
+    def _cmd_lsblk(self, p: list[str]) -> str:
+        lines = ["NAME            MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT"]
+        disks = [d for d in self.state.block_devices.values() if d.dev_type == "disk" and d.present]
+        for disk in sorted(disks, key=lambda d: d.name):
+            short = disk.name.replace("/dev/", "")
+            lines.append(f"{short:<15} 8:0    0 {disk.size:>5}  0 disk")
+            children = [c for c in self.state.block_devices.values()
+                        if c.parent == disk.name and c.present]
+            for part in sorted(children, key=lambda d: d.name):
+                pshort = part.name.replace("/dev/", "")
+                mp = part.mountpoint or ""
+                lines.append(f"`-{pshort:<13} 8:1    0 {part.size:>5}  0 {part.dev_type:<4} {mp}")
+                # LVs carved from this partition.
+                for lv in self.state.block_devices.values():
+                    if lv.dev_type == "lvm" and lv.parent in (part.name, "rhel") and lv.name.startswith("/dev/mapper"):
+                        lvshort = lv.name.replace("/dev/mapper/", "")
+                        lines.append(f"  `-{lvshort:<11} 253:0  0 {lv.size:>5}  0 lvm  {lv.mountpoint or ''}")
+        return "\n".join(lines)
+
+    def _cmd_mkswap(self, p: list[str]) -> str:
+        device = next((a for a in p[1:] if not a.startswith("-")), None)
+        if not device:
+            return "mkswap: no device specified"
+        dev = self.state.find_block_device(device)
+        if dev is None:
+            return f"mkswap: cannot open {device}: No such file or directory"
+        dev.fstype = "swap"
+        dev.uuid = self.state.gen_uuid()
+        self.state.swaps[dev.name] = {"size": self.state.lvm._size_to_kb(dev.size), "used": 0}
+        return f"Setting up swapspace version 1, size = {dev.size}\nno label, UUID={dev.uuid}"
+
+    def _cmd_swapon(self, p: list[str]) -> str:
+        if "-a" in p or "--all" in p:
+            for dev in self.state.block_devices.values():
+                if dev.fstype == "swap":
+                    self.state.swaps.setdefault(
+                        dev.name, {"size": self.state.lvm._size_to_kb(dev.size), "used": 0})
+                    dev.mountpoint = "[SWAP]"
+            return ""
+        if "-s" in p or "--show" in p:
+            lines = ["Filename                Type        Size    Used    Priority"]
+            for name, info in self.state.swaps.items():
+                lines.append(f"{name:<24}partition   {info['size']}    {info['used']}    -2")
+            return "\n".join(lines)
+        device = next((a for a in p[1:] if not a.startswith("-")), None)
+        if not device:
+            return "swapon: need a device"
+        dev = self.state.find_block_device(device)
+        if dev is None:
+            return f"swapon: cannot open {device}: No such file or directory"
+        if dev.fstype != "swap":
+            return f"swapon: {device}: read swap header failed (run mkswap first)"
+        self.state.swaps[dev.name] = {"size": self.state.lvm._size_to_kb(dev.size), "used": 0}
+        dev.mountpoint = "[SWAP]"
+        return ""
+
+    def _cmd_swapoff(self, p: list[str]) -> str:
+        if "-a" in p:
+            for dev in self.state.block_devices.values():
+                if dev.fstype == "swap":
+                    dev.mountpoint = ""
+            self.state.swaps.clear()
+            return ""
+        device = next((a for a in p[1:] if not a.startswith("-")), None)
+        if device:
+            dev = self.state.find_block_device(device)
+            if dev:
+                dev.mountpoint = ""
+            self.state.swaps.pop(dev.name if dev else device, None)
+        return ""
+
+    def _cmd_fsck(self, p: list[str]) -> str:
+        device = next((a for a in p[1:] if a.startswith("/dev/")), None)
+        if not device:
+            return "fsck: no device specified"
+        dev = self.state.find_block_device(device)
+        if dev is None:
+            return f"fsck: cannot open {device}: No such file or directory"
+        if dev.mountpoint:
+            return f"fsck: {device} is mounted.\ne2fsck: Cannot continue, aborting."
+        return f"fsck from util-linux\n{device}: clean, files/blocks"
+
+    def _cmd_xfs_repair(self, p: list[str]) -> str:
+        device = next((a for a in p[1:] if a.startswith("/dev/")), None)
+        if not device:
+            return "xfs_repair: no device specified"
+        dev = self.state.find_block_device(device)
+        if dev is None:
+            return f"xfs_repair: {device}: No such file or directory"
+        if dev.mountpoint:
+            return (f"xfs_repair: {device} contains a mounted filesystem\n"
+                    f"xfs_repair: cannot repair a mounted filesystem")
+        return ("Phase 1 - find and verify superblock...\n"
+                "Phase 7 - verify and correct link counts...\ndone")
+
+    def _cmd_resize2fs(self, p: list[str]) -> str:
+        device = next((a for a in p[1:] if a.startswith("/dev/")), None)
+        if not device:
+            return "resize2fs: no device specified"
+        dev = self.state.find_block_device(device)
+        if dev is None:
+            return f"resize2fs: cannot open {device}: No such file or directory"
+        # Grow recorded size to track the underlying LV after lvextend.
+        lv = next((l for l in self.state.lvm.lvs.values() if l.lv_path == device), None)
+        if lv:
+            dev.size = lv.size.replace(".00g", "G").replace("g", "G")
+            mp = dev.mountpoint
+            if mp in self.state.mounts:
+                self.state.mounts[mp]["size_kb"] = self.state.lvm._size_to_kb(lv.size)
+        return f"resize2fs: The filesystem on {device} is now resized."
+
+    def _cmd_xfs_growfs(self, p: list[str]) -> str:
+        target = next((a for a in p[1:] if not a.startswith("-")), None)
+        if not target:
+            return "xfs_growfs: no mountpoint specified"
+        # xfs_growfs takes a mountpoint; map back to its LV to grow the size.
+        lv = next((l for l in self.state.lvm.lvs.values() if l.mount == target), None)
+        if lv:
+            dev = self.state.find_block_device(lv.lv_path)
+            if dev:
+                dev.size = lv.size.replace(".00g", "G").replace("g", "G")
+            if target in self.state.mounts:
+                self.state.mounts[target]["size_kb"] = self.state.lvm._size_to_kb(lv.size)
+        return "data blocks changed"
+
+    # ── SELinux ──────────────────────────────────────────────────────
+
+    def _cmd_getenforce(self, p: list[str]) -> str:
+        return self.state.selinux_mode
+
+    def _cmd_setenforce(self, p: list[str]) -> str:
+        if len(p) < 2:
+            return "usage: setenforce [ Enforcing | Permissive | 1 | 0 ]"
+        arg = p[1]
+        if arg in ("1", "Enforcing", "enforcing"):
+            if self.state.selinux_mode == "Disabled":
+                return "setenforce: SELinux is disabled"
+            self.state.selinux_mode = "Enforcing"
+        elif arg in ("0", "Permissive", "permissive"):
+            if self.state.selinux_mode == "Disabled":
+                return "setenforce: SELinux is disabled"
+            self.state.selinux_mode = "Permissive"
+        else:
+            return f"setenforce: invalid argument '{arg}'"
+        return ""
+
+    def _cmd_sestatus(self, p: list[str]) -> str:
+        mode = self.state.selinux_mode
+        enabled = "enabled" if mode != "Disabled" else "disabled"
+        current = mode if mode != "Disabled" else "disabled"
+        return (
+            f"SELinux status:                 {enabled}\n"
+            f"SELinuxfs mount:                /sys/fs/selinux\n"
+            f"SELinux root directory:         /etc/selinux\n"
+            f"Loaded policy name:             targeted\n"
+            f"Current mode:                   {current.lower()}\n"
+            f"Mode from config file:          {('enforcing' if mode != 'Disabled' else 'disabled')}\n"
+            f"Policy MLS status:              enabled\n"
+            f"Policy deny_unknown status:     allowed\n"
+            f"Max kernel policy version:      33"
+        )
+
+    def _cmd_semanage(self, p: list[str]) -> str:
+        if len(p) < 2:
+            return "semanage: missing subcommand"
+        sub = p[1]
+        if sub == "port":
+            if "-a" in p or "--add" in p:
+                # semanage port -a -t http_port_t -p tcp 8080
+                sel_type = self._opt_value(p, "-t") or self._opt_value(p, "--type")
+                port = next((a for a in p[2:] if a.isdigit()), None)
+                if sel_type and port:
+                    self.state.selinux_ports.setdefault(sel_type, [])
+                    if int(port) not in self.state.selinux_ports[sel_type]:
+                        self.state.selinux_ports[sel_type].append(int(port))
+                return ""
+            if "-l" in p or "--list" in p:
+                lines = ["SELinux Port Type              Proto    Port Number"]
+                for t, ports in self.state.selinux_ports.items():
+                    lines.append(f"{t:<30} tcp      {', '.join(str(x) for x in ports)}")
+                return "\n".join(lines)
+            return ""
+        if sub == "fcontext":
+            if "-a" in p or "--add" in p:
+                sel_type = self._opt_value(p, "-t") or self._opt_value(p, "--type")
+                path = p[-1]
+                if sel_type and path:
+                    self.state.selinux_fcontexts.append({"path": path, "type": sel_type})
+                return ""
+            if "-l" in p or "--list" in p:
+                return "\n".join(f"{e['path']}    {e['type']}" for e in self.state.selinux_fcontexts)
+            return ""
+        return f"semanage: unsupported object '{sub}' (simulation)"
+
+    @staticmethod
+    def _opt_value(p: list[str], flag: str) -> str | None:
+        if flag in p:
+            idx = p.index(flag)
+            if idx + 1 < len(p):
+                return p[idx + 1]
+        return None
+
+    def _cmd_restorecon(self, p: list[str]) -> str:
+        # restorecon -Rv /path : apply the matching fcontext rule to the file.
+        paths = [a for a in p[1:] if not a.startswith("-")]
+        verbose = any("v" in a for a in p[1:] if a.startswith("-"))
+        out = []
+        for path in paths:
+            ap = self.state.resolve_path(path)
+            ctx = None
+            for rule in self.state.selinux_fcontexts:
+                if rule["path"].rstrip("(/.*)").rstrip("/") in ap or ap.startswith(rule["path"].split("(")[0].rstrip("/")):
+                    ctx = rule["type"]
+            if ctx is None:
+                ctx = "default_t"
+            self.state.file_contexts[ap] = f"system_u:object_r:{ctx}:s0"
+            if verbose:
+                out.append(f"Relabeled {ap} to {self.state.file_contexts[ap]}")
+        return "\n".join(out)
+
+    def _cmd_chcon(self, p: list[str]) -> str:
+        # chcon -t httpd_sys_content_t /var/www/html/index.html
+        sel_type = self._opt_value(p, "-t") or self._opt_value(p, "--type")
+        full_ctx = self._opt_value(p, "--reference")
+        paths = [a for a in p[1:] if not a.startswith("-") and a != sel_type]
+        # A bare context string form: chcon system_u:object_r:httpd_sys_content_t:s0 file
+        if not sel_type and not full_ctx and len(paths) >= 2 and ":" in paths[0]:
+            ctx = paths[0]
+            paths = paths[1:]
+            for path in paths:
+                self.state.file_contexts[self.state.resolve_path(path)] = ctx
+            return ""
+        for path in paths:
+            ap = self.state.resolve_path(path)
+            if self.state.find_block_device(ap) is None and self.state.read_file(ap) is None and not self.state.is_dir(ap):
+                return f"chcon: cannot access '{path}': No such file or directory"
+            if sel_type:
+                self.state.file_contexts[ap] = f"unconfined_u:object_r:{sel_type}:s0"
+        return ""
 
     def _cmd_virsh(self, p: list[str]) -> str:
         if len(p) > 1 and p[1] == "list":

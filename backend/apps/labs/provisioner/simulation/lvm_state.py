@@ -67,6 +67,22 @@ class LVMState:
         self.vgs[vg].size = "98.00g"
         return True, f"  Volume group \"{vg}\" successfully extended"
 
+    def lvcreate(self, name: str, vg: str, size: str) -> tuple[bool, str]:
+        if vg not in self.vgs:
+            return False, f"  Volume group \"{vg}\" not found"
+        key = f"{vg}/{name}"
+        if key in self.lvs:
+            return False, f"  Logical Volume \"{name}\" already exists in volume group \"{vg}\"."
+        size_norm = (size or "1g").lower().replace("g", ".00g") if "." not in (size or "") else size
+        lv_path = f"/dev/mapper/{vg}-{name}"
+        self.lvs[key] = SimLV(name, vg, size_norm, "", lv_path)
+        # Reduce VG free space.
+        free_kb = self._size_to_kb(self.vgs[vg].free)
+        used_kb = self._size_to_kb(size_norm)
+        new_free = max(0, free_kb - used_kb)
+        self.vgs[vg].free = f"{new_free / (1024 * 1024):.2f}g"
+        return True, f"  Logical volume \"{name}\" created."
+
     def lvextend(self, lv_path: str, size: str) -> tuple[bool, str]:
         key = lv_path.replace("/dev/mapper/", "").replace("/", "/")
         if key not in self.lvs and lv_path not in self.lvs:

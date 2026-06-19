@@ -11,11 +11,33 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
   const [password, setPassword] = useState('')
   const [cmd, setCmd] = useState('')
   const [histIdx, setHistIdx] = useState(-1)
+  const [editor, setEditor] = useState(null)
   const inputRef = useRef(null)
+  const editorRef = useRef(null)
 
   const append = useCallback((text) => {
     setLines(prev => [...prev, ...(Array.isArray(text) ? text : [text])])
   }, [])
+
+  const finishEditor = (save) => {
+    if (save && editor) { shell.saveFile(editor.path || '/root/scratch.txt', editorRef.current?.value ?? editor.content); append(editor.path ? `"${editor.path}" written` : '"scratch.txt" written') }
+    else if (editor) append(editor.tool === 'nano' ? '(cancelled)' : 'E37: no write since last change')
+    setEditor(null)
+  }
+
+  const onEditorKeyDown = (e) => {
+    if (editor?.tool === 'nano') {
+      if (e.ctrlKey && (e.key === 'o' || e.key === 'x' || e.key === 'O' || e.key === 'X')) { e.preventDefault(); finishEditor(true) }
+      else if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); finishEditor(false) }
+    }
+  }
+  const onEditorCommand = (e) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const c = e.target.value.trim(); e.target.value = ''
+    if (c === ':wq' || c === ':x' || c === ':w' || c === ':wq!') finishEditor(true)
+    else if (c === ':q' || c === ':q!') finishEditor(false)
+  }
 
   const onKeyDown = (e) => {
     if (phase === 'failed') return
@@ -38,6 +60,7 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
       append(`${shell.prompt()} ${cmd}`)
       const result = shell.run(cmd)
       if (result.clear) setLines([])
+      else if (result.editor) { setEditor(result.editor); setTimeout(() => editorRef.current?.focus(), 0) }
       else append(result.lines)
       setCmd('')
       setHistIdx(-1)
@@ -67,10 +90,26 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
             <input ref={inputRef} autoFocus type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={onKeyDown} className="flex-1 bg-transparent border-none outline-none text-[#E8EDF2] font-mono" />
           </div>
         )}
-        {phase === 'shell' && (
+        {phase === 'shell' && !editor && (
           <div className="flex items-center mt-1">
             <span className="text-[#5DB85D]">{shell.prompt()}</span>
             <input ref={inputRef} autoFocus value={cmd} onChange={e => setCmd(e.target.value)} onKeyDown={onKeyDown} className="flex-1 bg-transparent border-none outline-none text-[#E8EDF2] font-mono ml-1" spellCheck={false} />
+          </div>
+        )}
+        {phase === 'shell' && editor && (
+          <div className="mt-1 border border-[#2d3a4a] rounded overflow-hidden">
+            <div className="px-2 py-1 bg-[#1b2a3b] text-[#8fa5b8] text-[10px]">
+              <span className="text-[#5DB85D]">{editor.tool === 'nano' ? 'GNU nano' : 'VIM'}</span> {editor.path || '[No Name]'}
+            </div>
+            <textarea ref={editorRef} defaultValue={editor.content} onKeyDown={onEditorKeyDown} spellCheck={false} rows={10} className="w-full resize-y bg-[#05090f] text-[#E8EDF2] font-mono text-[11px] leading-relaxed p-2 border-none outline-none" />
+            {editor.tool === 'nano' ? (
+              <div className="px-2 py-1 bg-[#1b2a3b] text-[#8fa5b8] text-[10px]">^O Write Out   ^X Exit   ^C Cancel</div>
+            ) : (
+              <div className="px-2 py-1 bg-[#1b2a3b] flex items-center gap-1 text-[10px]">
+                <span className="text-[#8fa5b8]">command:</span>
+                <input onKeyDown={onEditorCommand} placeholder=":wq save · :q! quit" spellCheck={false} className="flex-1 bg-transparent border-none outline-none text-[#E8EDF2] caret-[#5DB85D] placeholder:text-[#4a5a6a]" />
+              </div>
+            )}
           </div>
         )}
         {phase === 'failed' && (

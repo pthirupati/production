@@ -32,8 +32,10 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
   const [loginUser, setLoginUser] = useState('')
   const [loginPass, setLoginPass] = useState('')
   const [loginStep, setLoginStep] = useState('user') // user | pass
+  const [editor, setEditor] = useState(null) // { tool, path, content }
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
+  const editorRef = useRef(null)
 
   useEffect(() => {
     if (vm?.power !== 'poweredOn') {
@@ -109,6 +111,10 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [lines, phase, grubSel, grubCount, loginStep])
 
+  useEffect(() => {
+    if (editor) editorRef.current?.focus()
+  }, [editor])
+
   const append = useCallback((text) => {
     setLines(prev => [...prev, ...(Array.isArray(text) ? text : [text])])
   }, [])
@@ -117,6 +123,7 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
     const result = shell.run(raw)
     if (result.clear) { setLines([]); return }
     if (result.exit) { onClose(); return }
+    if (result.editor) { setEditor(result.editor); return }
     append(result.lines)
     if (result.sideEffect && onGuestAction) onGuestAction(result.sideEffect)
     if (vm?.boot_failure && (raw.includes('fsck') || raw.includes('exit') || raw.includes('reboot'))) {
@@ -155,15 +162,56 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
     }
   }, [append, loginPass, loginStep, loginUser, vm])
 
+  const finishEditor = useCallback((save) => {
+    if (save && editor) {
+      shell.saveFile(editor.path || '/root/scratch.txt', editorRef.current?.value ?? editor.content)
+      append(editor.path ? `"${editor.path}" written` : '"scratch.txt" written')
+    } else if (editor) {
+      append(editor.tool === 'nano' ? '(cancelled)' : 'E37: file not saved (use :wq to save)')
+    }
+    setEditor(null)
+  }, [append, editor, shell])
+
+  const onEditorKeyDown = (e) => {
+    // nano: Ctrl+O save, Ctrl+X exit (save then exit), Ctrl+C cancel
+    if (editor?.tool === 'nano') {
+      if (e.ctrlKey && (e.key === 'o' || e.key === 'O')) { e.preventDefault(); finishEditor(true) }
+      else if (e.ctrlKey && (e.key === 'x' || e.key === 'X')) { e.preventDefault(); finishEditor(true) }
+      else if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); finishEditor(false) }
+      return
+    }
+    // vi/vim: Esc then :wq / :x save+quit, :q! quit without save (handled in the command line input)
+    if (e.key === 'Escape') { e.preventDefault() }
+  }
+
+  const onEditorCommand = (e) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const c = e.target.value.trim()
+    e.target.value = ''
+    if (c === ':wq' || c === ':x' || c === ':wq!' || c === ':w') finishEditor(true)
+    else if (c === ':q' || c === ':q!') finishEditor(false)
+  }
+
   const onKeyDown = (e) => {
     if (phase === 'hung') {
       e.preventDefault()
       append('(no response — guest OS is hung)')
       return
     }
+    // Esc during boot/POST jumps straight to the GRUB menu (prompt text promises this)
+    if ((phase === 'post' || phase === 'initramfs') && e.key === 'Escape') {
+      e.preventDefault()
+      setBootIdx(BOOT_SEQUENCE.length)
+      setGrubSel(0)
+      setGrubCount(8)
+      setPhase('grub')
+      return
+    }
     if (phase === 'grub') {
       if (e.key === 'ArrowUp') { e.preventDefault(); setGrubSel(s => Math.max(0, s - 1)) }
       else if (e.key === 'ArrowDown') { e.preventDefault(); setGrubSel(s => Math.min(GRUB_ENTRIES.length - 1, s + 1)) }
+      else if (e.key === 'Escape') { e.preventDefault(); setGrubCount(c => Math.max(c, 8)) }
       else if (e.key === 'Enter') {
         e.preventDefault()
         setPhase('initramfs')
@@ -249,16 +297,49 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
               )}
             </div>
           )}
-          {phase === 'shell' && (
+          {phase === 'shell' && !editor && (
             <div className="flex items-center mt-1">
               <span className="text-[#5DB85D] whitespace-nowrap">{shell.prompt()}</span>
               <input ref={inputRef} autoFocus value={cmd} onChange={e => setCmd(e.target.value)} onKeyDown={onKeyDown} spellCheck={false} autoComplete="off" className="flex-1 bg-transparent border-none outline-none text-[#E8EDF2] font-mono text-[12.5px] caret-[#5DB85D] ml-1" />
             </div>
           )}
-          {(phase === 'grub' || phase === 'post') && <input ref={inputRef} className="sr-only" onKeyDown={onKeyDown} autoFocus readOnly tabIndex={0} />}
+          {phase === 'shell' && editor && (
+            <div className="fixed inset-0 z-10 flex items-stretch bg-[#05090f]" onMouseDown={e => e.stopPropagation()}>
+              <div className="flex flex-col w-full h-full">
+                <div className="shrink-0 px-3 py-1.5 bg-[#1B2A3B] text-[#8FA5B8] text-[11px] font-mono flex items-center gap-2">
+                  <span className="text-[#5DB85D]">{editor.tool === 'nano' ? 'GNU nano 6.2' : 'VIM — VI iMproved'}</span>
+                  <span>{editor.path || '[No Name]'}</span>
+                </div>
+                <textarea
+                  ref={editorRef}
+                  defaultValue={editor.content}
+                  onKeyDown={onEditorKeyDown}
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="flex-1 w-full resize-none bg-[#05090f] text-[#E8EDF2] font-mono text-[12.5px] leading-relaxed p-3 border-none outline-none"
+                />
+                {editor.tool === 'nano' ? (
+                  <div className="shrink-0 px-3 py-1.5 bg-[#1B2A3B] text-[#8FA5B8] text-[11px] font-mono">
+                    ^O Write Out   ^X Exit   ^C Cancel
+                  </div>
+                ) : (
+                  <div className="shrink-0 px-3 py-1.5 bg-[#1B2A3B] flex items-center gap-1 text-[11px] font-mono">
+                    <span className="text-[#8FA5B8]">command:</span>
+                    <input
+                      onKeyDown={onEditorCommand}
+                      placeholder=":wq to save · :q! to quit"
+                      spellCheck={false}
+                      className="flex-1 bg-transparent border-none outline-none text-[#E8EDF2] caret-[#5DB85D] placeholder:text-[#4a5a6a]"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {(phase === 'grub' || phase === 'post' || phase === 'initramfs') && <input ref={inputRef} className="sr-only" onKeyDown={onKeyDown} autoFocus tabIndex={0} />}
         </div>
         <div className="shrink-0 px-3.5 py-2 bg-[#1B2A3B] border-t border-[#2D3A4A] text-[10.5px] text-[#8FA5B8] font-mono">
-          {phase === 'shell' ? 'Type help for 150+ simulated commands · ↑/↓ history' : phase === 'login' ? LOGIN_HINT : phase === 'grub' ? 'GRUB menu — arrow keys work' : 'Booting guest OS…'}
+          {editor ? (editor.tool === 'nano' ? 'nano — ^O save · ^X exit · ^C cancel' : 'vi — type :wq to save · :q! to quit') : phase === 'shell' ? 'Type help · real filesystem, vi/nano edit & save, 180+ commands · ↑/↓ history' : phase === 'login' ? LOGIN_HINT : phase === 'grub' ? 'GRUB menu — ↑/↓ select · Enter boot' : 'Booting guest OS… — press Esc for the GRUB menu'}
         </div>
       </div>
     </div>
