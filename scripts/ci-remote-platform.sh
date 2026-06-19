@@ -12,7 +12,8 @@ ENV_FILE="${ENV_FILE:-.env.production}"
 
 chmod +x scripts/platform-start.sh scripts/platform-stop.sh scripts/build-scenario-images.sh \
   scripts/startup.sh scripts/ensure-ssl-certs.sh scripts/sync-production-env.sh \
-  scripts/validate-scenario-images.sh scripts/ci-post-deploy-verify.sh scripts/run-full-e2e.sh 2>/dev/null || true
+  scripts/validate-scenario-images.sh scripts/ci-post-deploy-verify.sh scripts/run-full-e2e.sh \
+  scripts/vault/lib.sh scripts/vault/ensure-network.sh 2>/dev/null || true
 
 case "$ACTION" in
   deploy)

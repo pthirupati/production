@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify Vault Prometheus metrics endpoint (port 8201).
+# Verify Vault Prometheus metrics endpoint (port 8203).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -13,7 +13,7 @@ fi
 
 _check_metrics() {
   docker run --rm --network container:fixitlab_vault curlimages/curl:8.5.0 -sf \
-    "http://127.0.0.1:8201/v1/sys/metrics?format=prometheus" 2>/dev/null \
+    "http://127.0.0.1:8203/v1/sys/metrics?format=prometheus" 2>/dev/null \
     | head -c 400 | grep -q vault
 }
 
@@ -34,5 +34,5 @@ if _check_metrics; then
   exit 0
 fi
 
-echo "ERROR: Vault metrics endpoint failed on :8201"
+echo "ERROR: Vault metrics endpoint failed on :8203"
 exit 1

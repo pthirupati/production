@@ -211,15 +211,20 @@ def cleanup_orphaned_containers():
         logger.error(f"Docker cleanup failed: {e}")
         results["docker_error"] = str(e)
 
-    # Clean up AWS EC2 instances (if configured)
+    # Clean up AWS EC2 instances (if fully configured)
     try:
         from django.conf import settings
-        if getattr(settings, "AWS_ACCESS_KEY_ID", ""):
+        if (
+            getattr(settings, "AWS_ACCESS_KEY_ID", "")
+            and getattr(settings, "AWS_SECRET_ACCESS_KEY", "")
+            and getattr(settings, "AWS_LAB_SUBNET_ID", "")
+            and getattr(settings, "AWS_LAB_SECURITY_GROUP_ID", "")
+        ):
             ec2_provisioner = get_provisioner("aws_ec2")
             ec2_cleaned = ec2_provisioner.cleanup_expired(max_age_seconds=7200)
             results["aws_ec2"] = ec2_cleaned
     except Exception as e:
-        logger.error(f"EC2 cleanup failed: {e}")
+        logger.warning(f"EC2 cleanup skipped: {e}")
         results["aws_ec2_error"] = str(e)
 
     # Clean up DigitalOcean droplets (if configured)

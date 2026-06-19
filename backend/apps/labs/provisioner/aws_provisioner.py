@@ -571,6 +571,10 @@ echo "FixitLab setup complete" >> /var/log/fixitlab-setup.log
 
     def cleanup_expired(self, max_age_seconds=3600):
         """Terminate all FixitLab EC2 instances older than max_age_seconds."""
+        if not getattr(settings, "AWS_ACCESS_KEY_ID", "") or not getattr(settings, "AWS_SECRET_ACCESS_KEY", ""):
+            return 0
+        if not getattr(settings, "AWS_LAB_SUBNET_ID", "") or not getattr(settings, "AWS_LAB_SECURITY_GROUP_ID", ""):
+            return 0
         try:
             response = self.ec2_client.describe_instances(
                 Filters=[
@@ -593,5 +597,5 @@ echo "FixitLab setup complete" >> /var/log/fixitlab-setup.log
 
             return terminated
         except Exception as e:
-            logger.error(f"EC2 cleanup failed: {e}")
+            logger.warning(f"EC2 cleanup skipped: {e}")
             return 0

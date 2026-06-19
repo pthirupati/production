@@ -368,6 +368,11 @@ jobs:
             echo "All containers healthy."
 
             echo ""
+            echo "=== Vault network ==="
+            chmod +x scripts/vault/ensure-network.sh scripts/vault/lib.sh 2>/dev/null || true
+            ./scripts/vault/ensure-network.sh || echo "WARN: Vault network check failed"
+
+            echo ""
             echo "=== Last 100 log lines per service ==="
             for SVC in backend gateway celery_worker celery_beat celery_provisioning; do
               echo "--- ${SVC} ---"

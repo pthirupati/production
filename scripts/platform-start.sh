@@ -51,6 +51,19 @@ if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; th
   bash "$ROOT/scripts/vault/ensure-network.sh" 2>/dev/null || true
 fi
 
+# Pin all app services to fixitlab_net (migrate off legacy fixitlab_fixitlab_net)
+if docker network inspect fixitlab_fixitlab_net >/dev/null 2>&1; then
+  BACKEND_ON_LEGACY="$(docker inspect fixitlab-backend-1 --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' 2>/dev/null \
+    | grep -q fixitlab_fixitlab_net && echo yes || echo no)"
+  if [ "$BACKEND_ON_LEGACY" = "yes" ]; then
+    echo "Migrating app containers to fixitlab_net..."
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --force-recreate \
+      vault backend celery_worker celery_provisioning celery_maintenance celery_beat gateway frontend-prod
+    bash "$ROOT/scripts/vault/unseal.sh" 2>/dev/null || true
+    bash "$ROOT/scripts/vault/ensure-network.sh" 2>/dev/null || true
+  fi
+fi
+
 # Always unseal Vault after containers start (Vault always starts sealed after restart)
 if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; then
   echo "Auto-unsealing Vault..."

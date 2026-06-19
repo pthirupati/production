@@ -10,7 +10,9 @@ services:
 
   vault:
     networks:
-      - fixitlab_net
+      fixitlab_net:
+        aliases:
+          - vault
 
   gateway:
     build:

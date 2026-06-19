@@ -11,9 +11,9 @@ listener "tcp" {
   tls_disable = 1
 }
 
-# Prometheus metrics — localhost only (unauthenticated, internal only)
+# Prometheus metrics — localhost only (8203 avoids cluster listener port clash on 8201)
 listener "tcp" {
-  address     = "127.0.0.1:8201"
+  address     = "127.0.0.1:8203"
   tls_disable = 1
   telemetry {
     unauthenticated_metrics_access = true
@@ -26,7 +26,8 @@ telemetry {
 }
 
 # Advertise the internal Docker hostname so other containers can reach Vault
-api_addr = "http://vault:8200"
+api_addr     = "http://vault:8200"
+cluster_addr = "http://127.0.0.1:8202"
 
 default_lease_ttl = "768h"
 max_lease_ttl     = "8760h"
