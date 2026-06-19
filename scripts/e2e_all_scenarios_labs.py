@@ -443,6 +443,13 @@ def main():
             if not fresh:
                 stats.skip(f"[{tech.slug}/{sc.slug}]", "scenario missing after refresh")
                 continue
+            # Coding-IDE scenarios validate through the dedicated code-validate
+            # endpoint (hidden tests run in a backend sandbox), not the shell
+            # check flow exercised here. They have their own coverage in
+            # tests/test_coding_ide.py, so skip them in the shell E2E.
+            if getattr(fresh, "coding_mode", False):
+                stats.skip(f"[{tech.slug}/{sc.slug}]", "coding-mode scenario (validated via code-validate)")
+                continue
             # Re-apply subs — parallel E2E jobs may revoke test subscriptions mid-run.
             user_a = refresh_test_user(user_a)
             user_b = refresh_test_user(user_b) if user_b else None
