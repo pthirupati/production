@@ -25,6 +25,7 @@ import json
 import os
 import shutil
 import signal
+import functools
 import subprocess
 import sys
 import tempfile
@@ -110,13 +111,18 @@ def language_runtime_available(language: str) -> bool:
 
 # ── low-level: run one program in a sandbox ────────────────────────────────
 
-def _posix_preexec():
+def _posix_preexec(limit_address_space: bool = True):
     """Drop the child into its own process group and apply resource limits.
 
     Running in a new session means a timeout can kill the WHOLE group (so a
     forked grandchild can't outlive the grade). Resource limits are best-effort:
     not every platform supports every limit, and we never want limit-setting to
     crash the grader, so each is guarded.
+
+    `limit_address_space` is skipped for runtimes like Node/V8 that reserve a
+    large *virtual* address space at startup — an RLIMIT_AS that is fine for
+    CPython makes node abort immediately on Linux. Node memory is instead bounded
+    by --max-old-space-size plus the CPU limit and wall-clock timeout.
     """
     try:
         os.setsid()
@@ -124,11 +130,13 @@ def _posix_preexec():
         pass
     try:
         import resource
-        for res, soft, hard in (
+        limits = [
             (resource.RLIMIT_CPU, _CPU_SECONDS, _CPU_SECONDS),
-            (resource.RLIMIT_AS, _ADDRESS_SPACE_BYTES, _ADDRESS_SPACE_BYTES),
             (resource.RLIMIT_FSIZE, _FILE_SIZE_BYTES, _FILE_SIZE_BYTES),
-        ):
+        ]
+        if limit_address_space:
+            limits.append((resource.RLIMIT_AS, _ADDRESS_SPACE_BYTES, _ADDRESS_SPACE_BYTES))
+        for res, soft, hard in limits:
             try:
                 resource.setrlimit(res, (soft, hard))
             except (ValueError, OSError):
@@ -156,9 +164,13 @@ def _run_program(
     cwd: str,
     timeout: int,
     stdin_data: str = "",
+    limit_address_space: bool = True,
 ) -> tuple[int | None, str, str, bool]:
     """Run argv in cwd. Returns (returncode, stdout, stderr, timed_out)."""
-    preexec = _posix_preexec if os.name == "posix" else None
+    preexec = (
+        functools.partial(_posix_preexec, limit_address_space=limit_address_space)
+        if os.name == "posix" else None
+    )
     try:
         proc = subprocess.Popen(
             argv,
@@ -359,7 +371,12 @@ def grade_submission(
             node = shutil.which("node") or "node"
             argv = [node, script]
 
-        rc, stdout, stderr, timed_out = _run_program(argv, workdir, timeout)
+        # Node/V8 reserves a huge virtual address space at startup, so RLIMIT_AS
+        # (sized for CPython) would make it abort on Linux. Skip the AS limit for
+        # node; --max-old-space-size + RLIMIT_CPU + the timeout still bound it.
+        rc, stdout, stderr, timed_out = _run_program(
+            argv, workdir, timeout, limit_address_space=(lang != "javascript"),
+        )
 
         if timed_out:
             return GradeResult(
