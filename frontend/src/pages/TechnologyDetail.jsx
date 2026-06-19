@@ -204,7 +204,10 @@ export default function TechnologyDetail() {
   }, [techDetail])
 
   const isSubscribed = useMemo(() => {
-    return (techDetail?.scenarios || []).some(s => s.is_accessible !== false)
+    const scenarios = techDetail?.scenarios || []
+    const paid = scenarios.filter(s => !s.is_free)
+    if (!paid.length) return false
+    return paid.some(s => s.is_accessible !== false)
   }, [techDetail])
 
   if (loading) {

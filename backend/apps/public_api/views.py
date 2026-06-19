@@ -55,6 +55,20 @@ def _get_subscribed_tech_ids(user):
     return get_subscribed_technology_ids(user)
 
 
+def _lab_infra_type(scenario):
+    """Resolve provisioner type — handles stale DB rows for simulation-only tech."""
+    lab_mode = getattr(scenario, "lab_mode", "docker") or "docker"
+    if lab_mode == "simulation":
+        return "simulation"
+    from apps.labs.provisioner.simulation.sim_types import normalize_sim_type
+    sim_type = normalize_sim_type(getattr(scenario, "simulation_type", None))
+    if sim_type in ("terraform", "windows"):
+        return "simulation"
+    if lab_mode in ("aws_ec2", "digitalocean"):
+        return lab_mode
+    return getattr(scenario, "infrastructure_type", "docker") or "docker"
+
+
 def _mark_accessible(scenario_data_list, subscribed_tech_ids):
     """Add is_accessible flag to serialized scenario data."""
     for item in scenario_data_list:
@@ -638,13 +652,7 @@ class StartLabView(APIView):
                 logger.info(f"Auto-terminated session {existing.id} for new lab start")
 
             # Determine infrastructure type from scenario
-            lab_mode = getattr(scenario, "lab_mode", "docker") or "docker"
-            if lab_mode == "simulation":
-                infra_type = "simulation"
-            elif lab_mode in ("aws_ec2", "digitalocean"):
-                infra_type = lab_mode
-            else:
-                infra_type = getattr(scenario, "infrastructure_type", "docker") or "docker"
+            infra_type = _lab_infra_type(scenario)
 
             # Create a fresh session — always, regardless of prior completion
             session = LabSession.objects.create(

@@ -306,7 +306,8 @@ jobs:
             git reset --hard "origin/${{ inputs.git_ref }}"
             chmod +x scripts/ci-remote-platform.sh scripts/platform-start.sh scripts/sync-production-env.sh \
               scripts/build-scenario-images.sh scripts/validate-scenario-images.sh \
-              scripts/ci-post-deploy-verify.sh scripts/run-full-e2e.sh scripts/cleanup-test-data.py
+              scripts/ci-post-deploy-verify.sh scripts/run-full-e2e.sh scripts/cleanup-test-data.py \
+              scripts/ci-e2e-session-mode.sh
             export BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
             ./scripts/ci-remote-platform.sh deploy
 
@@ -416,16 +417,46 @@ jobs:
                 --verbosity=2
 
   # ─────────────────────────────────────────────────────────────
-  # E2E-LABS — all-scenarios lab provisioning test
+  # PREPARE-E2E — disable JWT session enforcement on live backend
+  # (parallel E2E logins otherwise invalidate each other's tokens)
   # ─────────────────────────────────────────────────────────────
-  e2e-labs:
-    name: E2E — lab provisioning (all scenarios)
+  prepare-e2e:
+    name: Prepare E2E session mode
     needs: [deploy]
     if: |
       always() &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_e2e &&
       needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Disable JWT session enforcement for E2E
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/fixitlab
+            chmod +x scripts/ci-e2e-session-mode.sh
+            ./scripts/ci-e2e-session-mode.sh disable
+
+  # ─────────────────────────────────────────────────────────────
+  # E2E-LABS — all-scenarios lab provisioning test
+  # ─────────────────────────────────────────────────────────────
+  e2e-labs:
+    name: E2E — lab provisioning (all scenarios)
+    needs: [deploy, prepare-e2e]
+    if: |
+      always() &&
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      inputs.run_e2e &&
+      needs.deploy.result == 'success' &&
+      needs.prepare-e2e.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: production
@@ -475,12 +506,13 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   e2e-api:
     name: E2E — API (internal + external)
-    needs: [deploy]
+    needs: [deploy, prepare-e2e]
     if: |
       always() &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_e2e &&
-      needs.deploy.result == 'success'
+      needs.deploy.result == 'success' &&
+      needs.prepare-e2e.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
@@ -525,12 +557,13 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   e2e-interviews:
     name: E2E — interview studio
-    needs: [deploy]
+    needs: [deploy, prepare-e2e]
     if: |
       always() &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_e2e &&
-      needs.deploy.result == 'success'
+      needs.deploy.result == 'success' &&
+      needs.prepare-e2e.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -572,7 +605,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   cleanup:
     name: Cleanup E2E test data
-    needs: [deploy, verify-health, test-units, e2e-labs, e2e-api, e2e-interviews, smoke]
+    needs: [deploy, verify-health, test-units, prepare-e2e, e2e-labs, e2e-api, e2e-interviews, smoke]
     if: always() && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -590,12 +623,25 @@ jobs:
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
               python /scripts/cleanup-test-data.py || echo "WARN: cleanup completed with warnings"
 
+      - name: Restore JWT session enforcement
+        if: always()
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            cd /opt/fixitlab
+            chmod +x scripts/ci-e2e-session-mode.sh
+            ./scripts/ci-e2e-session-mode.sh restore || echo "WARN: could not restore JWT session mode"
+
   # ─────────────────────────────────────────────────────────────
   # SUMMARY — collects all job results
   # ─────────────────────────────────────────────────────────────
   summary:
     name: Pipeline summary
-    needs: [deploy, verify-health, test-units, e2e-labs, e2e-api, e2e-interviews, smoke, cleanup]
+    needs: [deploy, verify-health, test-units, prepare-e2e, e2e-labs, e2e-api, e2e-interviews, smoke, cleanup]
     if: always() && (inputs.action == 'launch' || inputs.action == 'deploy')
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -622,6 +668,7 @@ jobs:
             echo "| deploy | \`${{ needs.deploy.result }}\` |"
             echo "| verify-health | \`${{ needs.verify-health.result }}\` |"
             echo "| test-units | \`${{ needs.test-units.result }}\` |"
+            echo "| prepare-e2e | \`${{ needs.prepare-e2e.result }}\` |"
             echo "| e2e-labs | \`${{ needs.e2e-labs.result }}\` |"
             echo "| e2e-api | \`${{ needs.e2e-api.result }}\` |"
             echo "| e2e-interviews | \`${{ needs.e2e-interviews.result }}\` |"

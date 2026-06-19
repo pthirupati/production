@@ -19,7 +19,11 @@ from django.db import close_old_connections, connection
 
 from apps.billing.models import Plan, Subscription, TechnologySubscription
 from apps.labs.provisioner.docker_provisioner import DockerProvisioner
+from apps.labs.provisioner.simulation.sim_types import normalize_sim_type
 from apps.question_bank.models import Scenario, Technology
+
+# Simulation-only personas — no per-scenario Docker image required
+_SIMULATION_ONLY_TYPES = frozenset({"terraform", "windows", "vmware"})
 
 User = get_user_model()
 PREFIX = os.environ.get("DOCKER_SCENARIO_IMAGE_PREFIX", "fixitlab/scenario-")
@@ -63,7 +67,8 @@ def discover_catalog():
         slug = sc.slug or ""
         if sc.technology and getattr(sc.technology, "coming_soon", False):
             continue
-        if getattr(sc, "lab_mode", "") == "simulation":
+        sim_type = normalize_sim_type(getattr(sc, "simulation_type", None))
+        if getattr(sc, "lab_mode", "") == "simulation" or sim_type in _SIMULATION_ONLY_TYPES:
             deployable.append(sc)
             continue
         if image_exists(slug):

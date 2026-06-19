@@ -166,7 +166,12 @@ class Command(BaseCommand):
 
                 slug = data.get("slug", scenario_dir)
                 if merge_only and Scenario.objects.filter(slug=slug).exists():
-                    self.stdout.write(f"  Skipped (exists): {slug}")
+                    Scenario.objects.filter(slug=slug).update(
+                        lab_mode=lab_mode,
+                        simulation_type=sim_type,
+                        infrastructure_type=infra,
+                    )
+                    self.stdout.write(f"  Synced lab metadata: {slug} ({lab_mode}/{sim_type})")
                     continue
 
                 scenario, created = Scenario.objects.update_or_create(

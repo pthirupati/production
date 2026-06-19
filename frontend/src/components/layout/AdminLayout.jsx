@@ -3,7 +3,7 @@ import { useThemeStore } from '../../store/themeStore'
 import { useState } from 'react'
 import {
   LayoutDashboard, Target, Cpu, Users, MonitorPlay, ArrowLeft, Shield, Menu, X, Ticket, Activity, ScrollText, FileText, Tag, ShieldAlert,
-  BarChart3, Building2, Mic2, Award,
+  BarChart3, Building2, Mic2, Award, CreditCard, MessageSquare, Wrench,
 } from 'lucide-react'
 import AdminTopbar from './AdminTopbar'
 

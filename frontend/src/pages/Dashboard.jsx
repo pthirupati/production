@@ -6,7 +6,6 @@ import api from '../api/client'
 import { subscriptionApi } from '../api/subscriptions'
 import { jiraApi } from '../api/jira'
 import { useAuthStore } from '../store/authStore'
-import { authApi } from '../api/auth'
 import {
   Target, Trophy, Zap, Clock, TrendingUp, ArrowRight,
   CheckCircle2, Award, BookOpen, Play, Star,
@@ -20,15 +19,17 @@ import ActivityHeatmap from '../components/ActivityHeatmap'
 import OnboardingTour from '../components/OnboardingTour'
 import { FixitPanel, FixitStatCard } from '../components/design'
 
-function OnboardingChecklist({ subscriptions, progress, profile }) {
+function OnboardingChecklist({ subscriptions, progress, jiraTickets, interviewEntitlement }) {
   const [dismissed, setDismissed] = useState(
     () => localStorage.getItem('onboarding_dismissed') === '1'
   )
 
   const hasSubscription = subscriptions?.length > 0
   const hasCompletedScenario = (progress?.summary?.completed || 0) > 0
-  const hasInterview = (progress?.interview_rounds_count || 0) > 0
-  const jiraConnected = profile?.jira_connected === true
+  const hasInterview =
+    (interviewEntitlement?.interviews_used || 0) > 0 ||
+    interviewEntitlement?.sample_interview_used === true
+  const jiraConnected = (jiraTickets?.length || 0) > 0
 
   // Only show to new users who haven't dismissed and have no activity
   const isNewUser = !hasSubscription && !hasCompletedScenario && !hasInterview && !jiraConnected
@@ -150,7 +151,6 @@ export default function Dashboard() {
   const [bookmarks, setBookmarks] = useState([])
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [interviewEntitlement, setInterviewEntitlement] = useState(null)
-  const [profile, setProfile] = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -162,8 +162,7 @@ export default function Dashboard() {
       scenarioApi.getBookmarks().catch(() => []),
       api.get('/notifications/', { silentError: true }).catch(() => ({ data: { notifications: [] } })),
       import('../api/interviews').then(m => m.interviewsApi.getEntitlement()).catch(() => null),
-      authApi.getProfile().catch(() => null),
-    ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes, interviewEnt, prof]) => {
+    ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes, interviewEnt]) => {
       if (!prog) setLoadError(true)
       setProgress(prog)
       setAchievements(ach)
@@ -175,7 +174,6 @@ export default function Dashboard() {
       const notifs = notifRes?.data?.notifications || notifRes?.data?.results || []
       setUnreadNotifications(Array.isArray(notifs) ? notifs.filter(n => !(n.read ?? n.is_read)).length : 0)
       setInterviewEntitlement(interviewEnt)
-      setProfile(prof)
     }).finally(() => setLoading(false))
   }, [])
 
@@ -252,7 +250,8 @@ export default function Dashboard() {
       <OnboardingChecklist
         subscriptions={subscriptions.filter(s => s.is_active)}
         progress={progress}
-        profile={profile}
+        jiraTickets={jiraTickets}
+        interviewEntitlement={interviewEntitlement}
       />
 
       {/* ═══ HERO HEADER ═══ */}
