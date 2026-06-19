@@ -419,6 +419,8 @@ GITHUB_OAUTH_CALLBACK_URL = env("GITHUB_OAUTH_CALLBACK_URL", default="")
 # When true, skip Gmail/SendGrid/SMTP delivery (E2E/CI). OTP still stored in DB.
 SKIP_EMAIL_TESTS = env.bool("SKIP_EMAIL_TESTS", default=False)
 E2E_TEST_EMAIL_SUFFIXES = ("@fixitlab-test.local",)
+# When false, skip JWT session invalidation checks (parallel E2E logins).
+JWT_SESSION_ENFORCEMENT = env.bool("JWT_SESSION_ENFORCEMENT", default=True)
 
 # --------------------------------------------------
 # Configurable Contact Emails

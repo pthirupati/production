@@ -1,0 +1,78 @@
+import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { ArrowRight, Play } from 'lucide-react'
+import { HeroShowcase } from '../../../components/marketing'
+import { fadeUp, staggerContainer } from '../../../ui/motion'
+
+export default function HeroSection({ technologies, stats = {} }) {
+  const techCount = technologies.filter(t => !t.coming_soon).length || stats.total_technologies || 8
+
+  return (
+    <section id="top" className="fx-hero">
+      <div className="fx-hero-bg" aria-hidden="true" />
+      <div className="fx-hero-grid-bg" aria-hidden="true" data-parallax="0.06" />
+      <div
+        className="fx-hero-orb"
+        aria-hidden="true"
+        style={{ top: '-180px', left: '8%', width: 560, height: 560, background: 'radial-gradient(circle, var(--fx-ac3) 0%, transparent 65%)', opacity: 0.3, animation: 'fxFloat 13s ease-in-out infinite' }}
+      />
+      <div
+        className="fx-hero-orb"
+        aria-hidden="true"
+        style={{ top: 80, right: -100, width: 520, height: 520, background: 'radial-gradient(circle, var(--fx-ac2) 0%, transparent 65%)', opacity: 0.26, animation: 'fxFloatX 16s ease-in-out infinite' }}
+      />
+      <div
+        className="fx-hero-orb"
+        aria-hidden="true"
+        style={{ bottom: -220, left: '38%', width: 480, height: 480, background: 'radial-gradient(circle, var(--fx-ac) 0%, transparent 65%)', opacity: 0.22, animation: 'fxMorph 18s ease-in-out infinite' }}
+      />
+
+      <motion.div
+        className="fx-hero-inner"
+        initial="hidden"
+        animate="visible"
+        variants={staggerContainer}
+      >
+        <div>
+          <motion.div className="fx-hero-eyebrow" variants={fadeUp}>
+            <span className="fx-pulse-dot" style={{ background: '#56e0b0' }} />
+            Live break-fix labs · AI interviews
+          </motion.div>
+          <motion.h1 className="fx-hero-h1" variants={fadeUp}>
+            Break things.<br />
+            <span className="fx-hero-gradient-text">Fix them.</span> Get hired.
+          </motion.h1>
+          <motion.p className="fx-hero-lead" variants={fadeUp}>
+            Practice real incident response on live cloud environments — Linux, Docker, Kubernetes, networking and more. Timed challenges, instant validation, and AI mock interviews that get you job-ready.
+          </motion.p>
+          <motion.div className="fx-hero-cta-row" variants={fadeUp}>
+            <Link to="/register" data-magnetic className="fx-btn-primary">
+              Start fixing free <ArrowRight size={17} />
+            </Link>
+            <Link to="/register" className="fx-btn-secondary">
+              <Play size={16} fill="currentColor" stroke="none" /> Browse challenges
+            </Link>
+          </motion.div>
+          <motion.div className="fx-hero-stats" variants={fadeUp}>
+            <div>
+              <div className="fx-hero-stat-val">{stats.total_technologies || techCount}</div>
+              <div className="fx-hero-stat-label">Technologies</div>
+            </div>
+            <div>
+              <div className="fx-hero-stat-val">{stats.total_scenarios || '360+'}</div>
+              <div className="fx-hero-stat-label">Live scenarios</div>
+            </div>
+            <div>
+              <div className="fx-hero-stat-val">{stats.total_users ? `${stats.total_users}+` : '10k+'}</div>
+              <div className="fx-hero-stat-label">Engineers training</div>
+            </div>
+          </motion.div>
+        </div>
+
+        <motion.div variants={fadeUp} className="order-first lg:order-none">
+          <HeroShowcase />
+        </motion.div>
+      </motion.div>
+    </section>
+  )
+}

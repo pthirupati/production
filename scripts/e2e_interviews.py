@@ -93,6 +93,12 @@ def run_interview_e2e(s: Suite) -> None:
         return
     s.record("Interview user auth", True)
 
+    # Re-authenticate admin — parallel E2E / OTP setup may rotate session JTIs
+    admin_token, _ = login(ADMIN_EMAIL, ADMIN_PASSWORD)
+    if not admin_token:
+        s.record("Interview admin re-login", False)
+        return
+
     st, ent = api("GET", "/api/interviews/entitlement/", token=user_token)
     s.record("GET user entitlement", st == 200, st)
 

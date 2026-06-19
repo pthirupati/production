@@ -495,8 +495,14 @@ jobs:
           script: |
             set -e
             cd /opt/fixitlab
+            EMAIL="${{ secrets.PROD_SUPERUSER_EMAIL }}"
+            PASS="${{ secrets.PROD_SUPERUSER_PASSWORD }}"
+            if [ -z "$EMAIL" ]; then EMAIL="${{ secrets.STAGING_SUPERUSER_EMAIL }}"; fi
+            if [ -z "$PASS" ]; then PASS="${{ secrets.STAGING_SUPERUSER_PASSWORD }}"; fi
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
-              env E2E_SKIP_LAB=0 RUN_FULL_E2E=1 E2E_SKIP_DUPLICATE_LABS=1 E2E_SKIP_CLEANUP=1 E2E_PRESERVE_LAB_USERS=1 \
+              env SUPERUSER_EMAIL="$EMAIL" SUPERUSER_PASSWORD="$PASS" \
+              JWT_SESSION_ENFORCEMENT=0 E2E_SKIP_EMAIL=1 \
+              E2E_SKIP_LAB=0 RUN_FULL_E2E=1 E2E_SKIP_DUPLICATE_LABS=1 E2E_SKIP_CLEANUP=1 E2E_PRESERVE_LAB_USERS=1 \
               python /scripts/e2e_production_test.py
 
       - name: External API E2E (through gateway)
@@ -539,7 +545,13 @@ jobs:
           script: |
             set -e
             cd /opt/fixitlab
+            EMAIL="${{ secrets.PROD_SUPERUSER_EMAIL }}"
+            PASS="${{ secrets.PROD_SUPERUSER_PASSWORD }}"
+            if [ -z "$EMAIL" ]; then EMAIL="${{ secrets.STAGING_SUPERUSER_EMAIL }}"; fi
+            if [ -z "$PASS" ]; then PASS="${{ secrets.STAGING_SUPERUSER_PASSWORD }}"; fi
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              env SUPERUSER_EMAIL="$EMAIL" SUPERUSER_PASSWORD="$PASS" \
+              JWT_SESSION_ENFORCEMENT=0 E2E_SKIP_EMAIL=1 \
               python /scripts/e2e_interviews.py
 
   # ─────────────────────────────────────────────────────────────

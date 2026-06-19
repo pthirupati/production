@@ -187,7 +187,7 @@ def require_session_valid(view_func):
             return view_func(request, *args, **kwargs)
         
         # Check if JWT session is valid
-        if hasattr(request, 'jwt_jti'):
+        if hasattr(request, 'jwt_jti') and getattr(settings, "JWT_SESSION_ENFORCEMENT", True):
             from common.security import SessionTracker
             if not SessionTracker.is_session_valid(request.user.id, request.jwt_jti):
                 logger.warning(

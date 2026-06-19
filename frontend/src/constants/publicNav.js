@@ -1,12 +1,10 @@
 /** Shared public marketing navigation links */
 export const PUBLIC_NAV_PRIMARY = [
-  { to: '/scenarios', label: 'Scenarios' },
-  { to: '/mock-interviews', label: 'Mock Interviews' },
-  { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/pricing', label: 'Pricing' },
-  { to: '/technologies', label: 'Technology' },
-  { to: '/verify-certificate', label: 'Verify Certificate' },
+  { to: '/mock-interviews', label: 'Mock Interviews' },
+  { to: '/#tech', label: 'Technologies' },
   { to: '/about', label: 'About' },
+  { to: '/verify-certificate', label: 'Verify Certificate' },
 ]
 
 export const PUBLIC_NAV_SECONDARY = [

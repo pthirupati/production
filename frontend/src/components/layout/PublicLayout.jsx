@@ -17,11 +17,10 @@ const FOOTER_SECTIONS = [
   {
     title: 'Product',
     links: [
-      { to: '/scenarios', label: 'Scenarios' },
+      { to: '/#tech', label: 'Technologies' },
       { to: '/mock-interviews', label: 'Mock Interviews' },
       { to: '/pricing', label: 'Pricing' },
-      { to: '/leaderboard', label: 'Leaderboard' },
-      { to: '/technologies', label: 'Technologies' },
+      { to: '/register', label: 'Get Started' },
     ],
   },
   {
@@ -29,7 +28,6 @@ const FOOTER_SECTIONS = [
     links: [
       { to: '/blog', label: 'Blog' },
       { to: '/faq', label: 'FAQ' },
-      { to: '/community', label: 'Community' },
       { to: '/verify-certificate', label: 'Verify Certificate' },
     ],
   },
