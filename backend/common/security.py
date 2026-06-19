@@ -226,7 +226,7 @@ def mask_pii(text):
     # Phone number masking (common formats: +91-9876543210, +1-5551234567)
     if text.startswith('+') and len(text) > 8:
         if text.startswith('+91'):
-            return text[:7] + '****' + text[-4:]
+            return text[:6] + '****' + text[-4:]
         if text.startswith('+1'):
             return text[:5] + '****' + text[-4:]
         return text[:5] + '*' * max(4, len(text) - 9) + text[-4:]
