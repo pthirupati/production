@@ -1,0 +1,25 @@
+title: Guest Disk Not Visible After Add
+slug: vmware-guest-disk-missing
+category: VMware vSphere
+description: |
+  A new virtual disk was added to web-prod-01 from vCenter but the Linux guest does not see it.
+  Rescan the SCSI bus, create a filesystem, and mount the disk.
+difficulty: hard
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 1200
+max_score: 100
+is_free: false
+objectives:
+  - Power on web-prod-01 and open the web console
+  - Rescan SCSI host (echo "- - -" > /sys/class/scsi_host/host0/scan)
+  - Verify disk with lsblk, create ext4 filesystem, mount to /data
+initial_state: New 20 GB disk attached at vSphere layer but hidden from guest OS.
+hints:
+  - content: "In console run: echo '- - -' > /sys/class/scsi_host/host0/scan then lsblk"
+    cost: 15
+    order: 1
+  - content: "mkfs.ext4 /dev/sdb && mkdir -p /data && mount /dev/sdb /data"
+    cost: 20
+    order: 2

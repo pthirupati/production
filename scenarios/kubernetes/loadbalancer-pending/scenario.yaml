@@ -1,0 +1,18 @@
+title: LoadBalancer Service Pending
+slug: k8s-loadbalancer-pending
+category: Kubernetes
+difficulty: medium
+description: |
+  A LoadBalancer Service never receives an external IP. Diagnose and apply the correct Service manifest.
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Inspect frontend Service status
+  - Apply LoadBalancer Service fix via kubectl apply
+hints:
+  - content: "kubectl get svc frontend -o wide and apply corrected LoadBalancer manifest"
+    cost: 10
+    order: 1

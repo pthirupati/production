@@ -1,8 +1,18 @@
 import { useState } from 'react'
 
+const ROLES = [
+  { id: 'Administrator', label: 'Administrator — full access' },
+  { id: 'Virtual Machine Administrator', label: 'VM Administrator' },
+  { id: 'Virtual Machine User', label: 'VM User — power ops only' },
+  { id: 'Read Only', label: 'Read Only' },
+  { id: 'Network Administrator', label: 'Network Administrator' },
+  { id: 'Storage Administrator', label: 'Storage Administrator' },
+]
+
 const VCENTER_USER = 'lab_vmware'
 const VCENTER_PASS = 'lab_vmware@123'
 const STORAGE_KEY = 'fixitlab_vcenter_auth'
+const ROLE_KEY = 'fixitlab_vcenter_role'
 
 export function isVcenterAuthenticated() {
   try {
@@ -12,21 +22,32 @@ export function isVcenterAuthenticated() {
   }
 }
 
-export function setVcenterAuthenticated() {
+export function getVcenterRole() {
+  try {
+    return sessionStorage.getItem(ROLE_KEY) || 'Administrator'
+  } catch {
+    return 'Administrator'
+  }
+}
+
+export function setVcenterAuthenticated(role = 'Administrator') {
   try {
     sessionStorage.setItem(STORAGE_KEY, '1')
+    sessionStorage.setItem(ROLE_KEY, role)
   } catch { /* ignore */ }
 }
 
 export function clearVcenterAuth() {
   try {
     sessionStorage.removeItem(STORAGE_KEY)
+    sessionStorage.removeItem(ROLE_KEY)
   } catch { /* ignore */ }
 }
 
 export default function VmwareLoginGate({ onAuthenticated }) {
   const [user, setUser] = useState('')
   const [pass, setPass] = useState('')
+  const [role, setRole] = useState('Administrator')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -36,8 +57,8 @@ export default function VmwareLoginGate({ onAuthenticated }) {
     setError('')
     setTimeout(() => {
       if (user === VCENTER_USER && pass === VCENTER_PASS) {
-        setVcenterAuthenticated()
-        onAuthenticated()
+        setVcenterAuthenticated(role)
+        onAuthenticated(role)
       } else {
         setError('Invalid credentials. Use lab_vmware / lab_vmware@123 for training labs.')
       }
@@ -60,6 +81,12 @@ export default function VmwareLoginGate({ onAuthenticated }) {
           <div>
             <label className="block text-[11px] text-[#8fa5b8] mb-1.5 uppercase tracking-wide">Password</label>
             <input type="password" value={pass} onChange={e => setPass(e.target.value)} className="vm-input !pl-3 w-full" autoComplete="current-password" />
+          </div>
+          <div>
+            <label className="block text-[11px] text-[#8fa5b8] mb-1.5 uppercase tracking-wide">Role (RBAC)</label>
+            <select value={role} onChange={e => setRole(e.target.value)} className="vm-input !pl-3 w-full">
+              {ROLES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+            </select>
           </div>
           {error && <p className="text-xs text-[#D9534F]">{error}</p>}
           <button type="submit" disabled={loading} className="vm-btn vm-btn-blue w-full justify-center py-2.5 text-sm font-semibold">

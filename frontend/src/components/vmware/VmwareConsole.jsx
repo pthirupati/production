@@ -1,20 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createLinuxShell, BOOT_SEQUENCE, GRUB_ENTRIES } from './linuxShell'
+import { createWindowsShell, WIN_BOOT_SEQUENCE, WIN_LOGIN_HINT } from './windowsShell'
 
 const LOGIN_HINT = 'Hint: username root, password root13'
 
-function guestUser(vm) {
-  return vm?.guest_os?.includes('Windows') ? 'Administrator' : 'root'
+function isWindowsGuest(vm) {
+  return (vm?.guest_os || '').includes('Windows') || (vm?.guest_os_version || '').includes('Windows')
 }
 
-export default function VmwareConsole({ vm, onClose }) {
-  const shell = useMemo(() => createLinuxShell(vm), [vm?.id, vm?.hostname, vm?.ip, vm?.disk_gb, vm?.memory_mb, vm?.cpu])
+function guestUser(vm) {
+  return isWindowsGuest(vm) ? 'Administrator' : 'root'
+}
+
+export default function VmwareConsole({ vm, onClose, onGuestAction }) {
+  const isWin = isWindowsGuest(vm)
+  const shell = useMemo(() => (
+    isWin ? createWindowsShell(vm) : createLinuxShell(vm)
+  ), [isWin, vm?.id, vm?.hostname, vm?.ip, vm?.disk_gb, vm?.memory_mb, vm?.cpu, vm?.guest_disk_hidden, vm?.kernel_module_missing])
   const [lines, setLines] = useState([])
   const [cmd, setCmd] = useState('')
   const [histIdx, setHistIdx] = useState(-1)
   const [phase, setPhase] = useState(() => {
     if (vm?.guest_hung) return 'hung'
-    if (vm?.power === 'poweredOn') return 'login'
+    if (vm?.boot_failure) return 'initramfs'
+    if (vm?.power === 'poweredOn') return isWindowsGuest(vm) ? 'winboot' : 'login'
     return 'post'
   })
   const [grubSel, setGrubSel] = useState(0)
@@ -47,6 +56,23 @@ export default function VmwareConsole({ vm, onClose }) {
       setBootIdx(0)
     }
   }, [vm?.id, vm?.power, vm?.name, vm?.guest_hung])
+
+  useEffect(() => {
+    if (phase === 'winboot') {
+      setLines(WIN_BOOT_SEQUENCE)
+      const t = setTimeout(() => setPhase('login'), 2500)
+      return () => clearTimeout(t)
+    }
+    if (phase === 'initramfs' && vm?.boot_failure) {
+      setLines([
+        'Give root password for maintenance',
+        '(or type Control-D to continue):',
+        'Entering recovery mode — run fsck or exit to continue boot.',
+      ])
+      setPhase('shell')
+    }
+    return undefined
+  }, [phase, vm?.boot_failure])
 
   useEffect(() => {
     if (phase !== 'post') return undefined
@@ -92,7 +118,13 @@ export default function VmwareConsole({ vm, onClose }) {
     if (result.clear) { setLines([]); return }
     if (result.exit) { onClose(); return }
     append(result.lines)
-  }, [append, onClose, shell])
+    if (result.sideEffect && onGuestAction) onGuestAction(result.sideEffect)
+    if (vm?.boot_failure && (raw.includes('fsck') || raw.includes('exit') || raw.includes('reboot'))) {
+      onGuestAction?.({ action: 'guest_fix_boot', vm_id: vm.id })
+      setPhase('login')
+      append('System boot resumed.')
+    }
+  }, [append, onClose, onGuestAction, shell, vm?.boot_failure, vm?.id])
 
   const tryLogin = useCallback(() => {
     if (loginStep === 'user') {
@@ -109,6 +141,10 @@ export default function VmwareConsole({ vm, onClose }) {
         `Welcome to FixitLab simulated ${vm?.guest_os_version || 'Linux'}.`,
         '',
       ])
+      setPhase('shell')
+      setCmd('')
+    } else if (isWin && loginUser === 'Administrator' && loginPass === 'P@ssw0rd123') {
+      append([WIN_LOGIN_HINT, `Welcome to ${vm?.guest_os_version || 'Windows Server'}.`, ''])
       setPhase('shell')
       setCmd('')
     } else {

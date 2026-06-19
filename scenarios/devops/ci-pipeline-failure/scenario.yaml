@@ -1,0 +1,19 @@
+title: CI Pipeline Failure on Deploy Stage
+slug: devops-ci-pipeline-failure
+category: DevOps
+difficulty: hard
+description: |
+  GitLab CI pipeline fails at deploy stage due to missing kubeconfig and wrong image tag.
+  Fix pipeline variables and redeploy.
+lab_mode: simulation
+simulation_type: devops
+time_limit: 1200
+max_score: 100
+is_free: false
+objectives:
+  - Identify failing deploy job in pipeline logs
+  - Fix KUBECONFIG and IMAGE_TAG variables
+hints:
+  - content: "Check deploy job logs for 'unauthorized' or 'image not found'"
+    cost: 10
+    order: 1

@@ -1,0 +1,19 @@
+title: HPA Not Scaling Under Load
+slug: k8s-hpa-scaling
+category: Kubernetes
+difficulty: medium
+description: |
+  HorizontalPodAutoscaler is misconfigured and worker deployment does not scale under CPU pressure.
+  Fix HPA metrics target and min/max replicas.
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Inspect HPA and deployment worker
+  - Apply corrected HorizontalPodAutoscaler manifest
+hints:
+  - content: "kubectl get hpa worker and apply HPA with valid metrics and scaleTargetRef"
+    cost: 10
+    order: 1

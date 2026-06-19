@@ -1,0 +1,18 @@
+title: Create Filesystem on New Disk
+slug: linux-disk-create-filesystem
+category: Storage
+difficulty: medium
+description: |
+  A visible but unformatted disk must be partitioned, formatted with ext4, and mounted at /data.
+lab_mode: simulation
+simulation_type: rhel
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Format /dev/sdb with mkfs.ext4
+  - Mount to /data and verify with df -h
+hints:
+  - content: "mkfs.ext4 /dev/sdb && mkdir -p /data && mount /dev/sdb /data"
+    cost: 10
+    order: 1

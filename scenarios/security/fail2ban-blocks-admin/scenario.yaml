@@ -1,0 +1,18 @@
+title: fail2ban Blocks Admin SSH
+slug: security-fail2ban-blocks-admin
+category: Security
+difficulty: medium
+description: |
+  Admin SSH access is blocked after brute-force triggers fail2ban. Unban IP and whitelist admin subnet.
+lab_mode: simulation
+simulation_type: rhel
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Check fail2ban status and banned IPs
+  - Unban admin IP and add to ignoreip
+hints:
+  - content: "fail2ban-client status sshd && fail2ban-client set sshd unbanip ADMIN_IP"
+    cost: 10
+    order: 1

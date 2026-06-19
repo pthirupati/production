@@ -1,0 +1,21 @@
+title: ESXi Host Patch Pending Reboot
+slug: vmware-esxi-patch-pending
+category: VMware vSphere
+description: |
+  ESXi host has pending security patches that require installation from the Updates tab.
+  Install patches and clear compliance alarms.
+difficulty: medium
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: Medium
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Select esxi-01 host → Updates tab
+  - Check for updates and install pending ESXi patches
+initial_state: Host reports 3 pending ESXi patches.
+hints:
+  - content: "Host → Updates → Check for updates → Install updates"
+    cost: 10
+    order: 1

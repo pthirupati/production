@@ -1,0 +1,18 @@
+title: BGP Session Down Between Routers
+slug: networking-bgp-session-down
+category: Networking
+difficulty: hard
+description: |
+  BGP peering between core routers is down causing route withdrawal. Restore the BGP session.
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+objectives:
+  - Verify BGP state with show ip bgp summary
+  - Fix AS number or neighbor authentication mismatch
+hints:
+  - content: "Compare configured remote-as with peer router; check MD5 password"
+    cost: 15
+    order: 1

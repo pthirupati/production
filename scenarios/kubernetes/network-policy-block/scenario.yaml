@@ -1,0 +1,18 @@
+title: NetworkPolicy Blocks Backend Traffic
+slug: k8s-network-policy-block
+category: Kubernetes
+difficulty: hard
+description: |
+  Pods cannot reach the backend service due to a restrictive NetworkPolicy. Create an allow policy.
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Identify blocked traffic with kubectl logs
+  - Apply NetworkPolicy allowing frontend → backend on port 9090
+hints:
+  - content: "kubectl apply NetworkPolicy with ingress from app=frontend to app=backend"
+    cost: 15
+    order: 1

@@ -1,0 +1,20 @@
+title: Deploy VM from Content Library OVF
+slug: vmware-ovf-content-library
+category: VMware vSphere
+description: |
+  Deploy a new Linux VM from the FixitLab content library OVF template using the OVF deploy wizard.
+difficulty: easy
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: Low
+time_limit: 600
+max_score: 100
+is_free: true
+objectives:
+  - Open content library (O button in inventory)
+  - Deploy tiny-linux.ova to the cluster
+initial_state: Content library contains OVF templates ready to deploy.
+hints:
+  - content: "Inventory toolbar → O → select tiny-linux.ova → Deploy"
+    cost: 5
+    order: 1

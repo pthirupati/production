@@ -5,6 +5,13 @@ import toast from 'react-hot-toast'
 import VmwareLoginGate, { isVcenterAuthenticated } from '../../components/vmware/VmwareLoginGate'
 import VmwareScenarioActions from '../../components/vmware/VmwareScenarioActions'
 import VmwareLabChrome from '../../components/vmware/VmwareLabChrome'
+import VmotionWizard from '../../components/vmware/wizards/VmotionWizard'
+import StorageVmotionWizard from '../../components/vmware/wizards/StorageVmotionWizard'
+import VmwareOvfDeployModal from '../../components/vmware/VmwareOvfDeployModal'
+import VmwareDvsEditor from '../../components/vmware/VmwareDvsEditor'
+import VmwareVsanDashboard from '../../components/vmware/VmwareVsanDashboard'
+import VmwarePermissionsPanel from '../../components/vmware/VmwarePermissionsPanel'
+import VmwareLifecyclePanel from '../../components/vmware/VmwareLifecyclePanel'
 import VmwareInventoryTree from '../../components/vmware/VmwareInventoryTree'
 import VmwareConsole from '../../components/vmware/VmwareConsole'
 import VmwareContextMenu from '../../components/vmware/VmwareContextMenu'
@@ -44,17 +51,16 @@ function UsageBar({ pct, color = '#2D7CFF' }) {
 }
 
 /* ─── Simulated sparkline chart ─────────────────────────────────────── */
-function PerfChart({ cpuPct = 30, memPct = 50 }) {
+function PerfChart({ cpuPct = 30, memPct = 50, perfHistory = null }) {
   const W = 560, H = 120
-  // Stabilize points so the chart doesn't redraw on every parent re-render.
-  const cpuPts = useMemo(
-    () => Array.from({ length: 20 }, (_, i) => cpuPct + Math.sin(i * 0.6) * 10 + (((i * 17 + cpuPct * 3) % 17) - 8) * 0.5),
-    [cpuPct],
-  )
-  const memPts = useMemo(
-    () => Array.from({ length: 20 }, (_, i) => memPct + Math.sin(i * 0.4) * 8 + (((i * 13 + memPct * 5) % 13) - 6) * 0.5),
-    [memPct],
-  )
+  const cpuPts = useMemo(() => {
+    if (perfHistory?.cpu?.length >= 2) return perfHistory.cpu
+    return Array.from({ length: 20 }, (_, i) => cpuPct + Math.sin(i * 0.6) * 10 + (((i * 17 + cpuPct * 3) % 17) - 8) * 0.5)
+  }, [cpuPct, perfHistory?.cpu])
+  const memPts = useMemo(() => {
+    if (perfHistory?.mem?.length >= 2) return perfHistory.mem
+    return Array.from({ length: 20 }, (_, i) => memPct + Math.sin(i * 0.4) * 8 + (((i * 13 + memPct * 5) % 13) - 6) * 0.5)
+  }, [memPct, perfHistory?.mem])
   const toSvg = (pts) => pts.map((v, i) => `${(i / 19) * W},${H - (v / 100) * H}`).join(' ')
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block">
@@ -465,6 +471,9 @@ export default function VMwareSimulator() {
   const [showEditVmModal, setShowEditVmModal] = useState(false)
   const [showCloneVmModal, setShowCloneVmModal] = useState(false)
   const [showDeployTemplateModal, setShowDeployTemplateModal] = useState(false)
+  const [showVmotionWizard, setShowVmotionWizard] = useState(false)
+  const [showStorageVmotionWizard, setShowStorageVmotionWizard] = useState(false)
+  const [showOvfModal, setShowOvfModal] = useState(false)
   const [pendingDeleteVm, setPendingDeleteVm] = useState(null)
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false)
   const [inventorySearch, setInventorySearch] = useState('')
@@ -496,6 +505,12 @@ export default function VMwareSimulator() {
   }, [sessionId, scenarioSlug])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (activeTab !== 'monitor') return undefined
+    const t = setInterval(() => { load() }, 5000)
+    return () => clearInterval(t)
+  }, [activeTab, load])
 
   useEffect(() => {
     const onFs = () => setIsFullscreen(!!document.fullscreenElement)
@@ -536,23 +551,34 @@ export default function VMwareSimulator() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const runAction = async (action, payload = {}) => {
+  const runAction = async (action, payload = {}, options = {}) => {
+    const { silent = false } = options
     setActing(true)
-    setActionsMenuOpen(false)
+    if (!silent) setActionsMenuOpen(false)
     try {
       const res = await vmwareApi.action(sessionId, action, payload)
       if (res.state) setState(res.state)
       else await load()
       const msg = res.message || 'Action completed'
-      setVmToast({ message: msg, kind: 'success' })
-      toast.success(msg, { style: { background: '#1b2a3b', color: '#e8edf2', border: '1px solid #2d3a4a', fontSize: '12px' } })
+      if (!silent) {
+        setVmToast({ message: msg, kind: 'success' })
+        toast.success(msg, { style: { background: '#1b2a3b', color: '#e8edf2', border: '1px solid #2d3a4a', fontSize: '12px' } })
+      }
+      return res
     } catch (err) {
       const errMsg = err.response?.data?.error || 'Action failed'
-      setVmToast({ message: errMsg, kind: 'error' })
-      toast.error(errMsg, { style: { background: '#1b2a3b', color: '#f08080', border: '1px solid #2d3a4a', fontSize: '12px' } })
+      if (!silent) {
+        setVmToast({ message: errMsg, kind: 'error' })
+        toast.error(errMsg, { style: { background: '#1b2a3b', color: '#f08080', border: '1px solid #2d3a4a', fontSize: '12px' } })
+      }
+      throw err
     } finally {
       setActing(false)
     }
+  }
+
+  const handleGuestAction = (sideEffect) => {
+    if (sideEffect?.action) runAction(sideEffect.action, sideEffect)
   }
 
   const handleCtxAction = (action, payload) => {
@@ -609,6 +635,11 @@ export default function VMwareSimulator() {
   const events = inv.events || []
   const recentTasks = inv.recent_tasks || []
   const templates = inv.templates || []
+  const contentLibrary = inv.content_library || []
+  const permissions = inv.permissions || []
+  const rolesCatalog = inv.roles_catalog || []
+  const vsan = inv.vsan || {}
+  const vswitches = inv.vswitches || []
   const invSearch = inventorySearch.trim().toLowerCase()
   const filterLabel = (label) => !invSearch || label.toLowerCase().includes(invSearch)
 
@@ -641,6 +672,8 @@ export default function VMwareSimulator() {
         <ToolbarSep />
         <ToolbarBtn onClick={() => setShowSnapshotModal(true)} disabled={acting} label="Take Snapshot" />
         <ToolbarBtn onClick={() => setShowMigrateModal(true)} disabled={acting} label="Migrate…" />
+        <ToolbarBtn onClick={() => setShowVmotionWizard(true)} disabled={acting} label="vMotion Wizard…" />
+        <ToolbarBtn onClick={() => setShowStorageVmotionWizard(true)} disabled={acting} label="Storage vMotion…" />
         <ToolbarBtn onClick={() => setShowCloneVmModal(true)} disabled={acting} label="Clone…" />
         <ToolbarSep />
         <ToolbarBtn onClick={() => setShowEditVmModal(true)} disabled={acting} label="Edit Settings…" />
@@ -717,6 +750,7 @@ export default function VMwareSimulator() {
             onVmContextMenu={openVmContext}
             onCreateVm={() => setShowCreateVmModal(true)}
             onDeployTemplate={() => setShowDeployTemplateModal(true)}
+            onDeployOvf={() => setShowOvfModal(true)}
           />
         </aside>
 
@@ -906,7 +940,7 @@ export default function VMwareSimulator() {
                           <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-[#4c9be8]" /> Consumed host CPU</span>
                           <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-[#9b59b6]" /> Consumed host memory</span>
                         </div>
-                        <PerfChart cpuPct={selectedHost.cpu_pct} memPct={selectedHost.mem_pct} />
+                        <PerfChart cpuPct={selectedHost.cpu_pct} memPct={selectedHost.mem_pct} perfHistory={selectedHost.perf_history} />
                         <div className="flex justify-between text-[10px] text-[#888] mt-1">
                           <span>60 min ago</span><span>Now</span>
                         </div>
@@ -1026,6 +1060,8 @@ export default function VMwareSimulator() {
                     ))}
                   </ContentPanel>
                   <VmwareScenarioActions selectedVm={selectedVm} onAction={runAction} acting={acting} />
+                  <VmwareDvsEditor vswitches={vswitches} onAction={runAction} acting={acting} />
+                  <VmwareVsanDashboard vsan={vsan} clusterVsan={summary.cluster_vsan || inv.cluster_vsan} onAction={runAction} acting={acting} />
                 </div>
               )}
 
@@ -1048,7 +1084,8 @@ export default function VMwareSimulator() {
 
               {/* ── HOST PERMISSIONS ─────────────────────────────── */}
               {selectedHost && activeTab === 'permissions' && (
-                <PermissionsPanel entityName={selectedHost.name} definedIn={selectedHost.name} />
+                <VmwarePermissionsPanel entityName={selectedHost.name} entityId={selectedHost.id} entityType="host"
+                  permissions={permissions} rolesCatalog={rolesCatalog} onAction={runAction} acting={acting} />
               )}
 
               {/* ── HOST DATASTORES ──────────────────────────────── */}
@@ -1272,7 +1309,7 @@ export default function VMwareSimulator() {
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-sm font-bold text-[#4c9be8]">{selectedVm.cpu_pct}%</span>
                         </div>
-                        <PerfChart cpuPct={selectedVm.cpu_pct} memPct={0} />
+                        <PerfChart cpuPct={selectedVm.cpu_pct} memPct={0} perfHistory={selectedVm.perf_history ? { cpu: selectedVm.perf_history.cpu, mem: [] } : null} />
                       </>
                     )}
                   </ContentPanel>
@@ -1284,7 +1321,7 @@ export default function VMwareSimulator() {
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-sm font-bold text-[#9b59b6]">{selectedVm.mem_pct}%</span>
                         </div>
-                        <PerfChart cpuPct={0} memPct={selectedVm.mem_pct} />
+                        <PerfChart cpuPct={0} memPct={selectedVm.mem_pct} perfHistory={selectedVm.perf_history ? { cpu: [], mem: selectedVm.perf_history.mem } : null} />
                       </>
                     )}
                   </ContentPanel>
@@ -1432,7 +1469,8 @@ export default function VMwareSimulator() {
 
               {/* ── VM PERMISSIONS / NETWORKS / UPDATES ──────────── */}
               {selectedVm && activeTab === 'permissions' && (
-                <PermissionsPanel entityName={selectedVm.name} definedIn={selectedVm.name} />
+                <VmwarePermissionsPanel entityName={selectedVm.name} entityId={selectedVm.id} entityType="vm"
+                  permissions={permissions} rolesCatalog={rolesCatalog} onAction={runAction} acting={acting} />
               )}
               {selectedVm && activeTab === 'networks' && (
                 <ContentPanel title={`Network adapters — ${selectedVm.name}`}>
@@ -1471,27 +1509,7 @@ export default function VMwareSimulator() {
                 </ContentPanel>
               )}
               {selectedVm && activeTab === 'updates' && (
-                <div className="space-y-3">
-                  <div className="vm-panel p-4 flex items-center gap-3.5">
-                    <span className="w-11 h-11 rounded-[11px] flex items-center justify-center bg-[rgba(93,184,93,.12)] text-[#5DB85D] text-lg">✓</span>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-white m-0">VMware Tools is up to date</p>
-                      <p className="text-xs text-[#8FA5B8] m-0 mt-1">{selectedVm.name} · Guest OS: {selectedVm.guest_os_version || selectedVm.guest_os}</p>
-                    </div>
-                    <button type="button" onClick={() => setVmToast({ message: 'VMware Tools current', kind: 'success' })} className="vm-btn vm-btn-blue text-xs py-2 px-4">
-                      Check for updates
-                    </button>
-                  </div>
-                  <ContentPanel title="Installed components">
-                    <table className="vm-table">
-                      <thead><tr>{['Component', 'Version', 'Status'].map(h => <th key={h}>{h}</th>)}</tr></thead>
-                      <tbody>
-                        <tr><td>VMware Tools</td><td className="font-mono text-[#8FA5B8]">12.3.5</td><td className="text-[#5DB85D] font-semibold">Current</td></tr>
-                        <tr><td>Guest OS patches</td><td className="font-mono text-[#8FA5B8]">Latest</td><td className="text-[#5DB85D] font-semibold">Current</td></tr>
-                      </tbody>
-                    </table>
-                  </ContentPanel>
-                </div>
+                <VmwareLifecyclePanel target={selectedVm} targetType="vm" updates={inv.updates} onAction={runAction} acting={acting} />
               )}
 
               {/* ── HOST VMs / USERS ─────────────────────────────── */}
@@ -1529,42 +1547,7 @@ export default function VMwareSimulator() {
 
               {/* ── HOST UPDATES ─────────────────────────────────── */}
               {selectedHost && activeTab === 'updates' && (
-                <div className="space-y-3">
-                  <div className="vm-panel p-4 flex items-center gap-3.5">
-                    <span className="w-11 h-11 rounded-[11px] flex items-center justify-center bg-[rgba(93,184,93,.12)] text-[#5DB85D]">✓</span>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-white m-0">{selectedHost.name} is up to date</p>
-                      <p className="text-xs text-[#8FA5B8] m-0 mt-1">ESXi {selectedHost.version} · Last checked just now</p>
-                    </div>
-                    <button type="button" onClick={() => setVmToast({ message: 'No updates available', kind: 'success' })} className="vm-btn vm-btn-blue text-xs py-2 px-4">
-                      Check for updates
-                    </button>
-                  </div>
-                  <ContentPanel title="Installed components">
-                    <table className="vm-table">
-                      <thead>
-                        <tr>
-                          {['Component', 'Version', 'Vendor', 'Status'].map(h => <th key={h}>{h}</th>)}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          { comp: 'VMware ESXi', ver: selectedHost.version, vendor: 'VMware', status: 'Current', color: '#5DB85D' },
-                          { comp: 'VMware Tools', ver: '12.3.5', vendor: 'VMware', status: 'Current', color: '#5DB85D' },
-                          { comp: 'vCenter Agent', ver: '8.0.2', vendor: 'VMware', status: 'Current', color: '#5DB85D' },
-                          { comp: 'NIC Driver', ver: '1.9.4', vendor: 'Intel', status: 'Current', color: '#5DB85D' },
-                        ].map(row => (
-                          <tr key={row.comp}>
-                            <td>{row.comp}</td>
-                            <td className="font-mono text-[#8FA5B8]">{row.ver}</td>
-                            <td className="text-[#8FA5B8]">{row.vendor}</td>
-                            <td style={{ color: row.color, fontWeight: 600 }}>{row.status}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </ContentPanel>
-                </div>
+                <VmwareLifecyclePanel target={selectedHost} targetType="host" updates={inv.updates} onAction={runAction} acting={acting} />
               )}
 
               {/* ── DATASTORE ────────────────────────────────────── */}
@@ -1608,7 +1591,8 @@ export default function VMwareSimulator() {
 
               {/* ── DATASTORE MONITOR ────────────────────────────── */}
               {selectedDs && activeTab === 'permissions' && (
-                <PermissionsPanel entityName={selectedDs.name} definedIn={selectedDs.name} />
+                <VmwarePermissionsPanel entityName={selectedDs.name} entityId={selectedDs.id} entityType="datastore"
+                  permissions={permissions} rolesCatalog={rolesCatalog} onAction={runAction} acting={acting} />
               )}
 
               {selectedDs && activeTab === 'monitor' && (
@@ -1669,7 +1653,8 @@ export default function VMwareSimulator() {
 
               {/* ── NETWORK ──────────────────────────────────────── */}
               {selectedNet && activeTab === 'permissions' && (
-                <PermissionsPanel entityName={selectedNet.name} definedIn={selectedNet.name} />
+                <VmwarePermissionsPanel entityName={selectedNet.name} entityId={selectedNet.id} entityType="network"
+                  permissions={permissions} rolesCatalog={rolesCatalog} onAction={runAction} acting={acting} />
               )}
 
               {selectedNet && activeTab === 'summary' && (
@@ -1821,7 +1806,7 @@ export default function VMwareSimulator() {
 
       {/* Console + context menu */}
       {consoleVm && (
-        <VmwareConsole vm={consoleVm} onClose={() => setConsoleVm(null)} />
+        <VmwareConsole vm={consoleVm} onClose={() => setConsoleVm(null)} onGuestAction={handleGuestAction} />
       )}
       {ctxMenu && (
         <VmwareContextMenu
@@ -1864,6 +1849,17 @@ export default function VMwareSimulator() {
       {showDeployTemplateModal && templates.length > 0 && (
         <DeployFromTemplateModal templates={templates} hosts={hosts}
           onClose={() => setShowDeployTemplateModal(false)} onAction={runAction} />
+      )}
+      {showVmotionWizard && selectedVm && (
+        <VmotionWizard vm={selectedVm} hosts={hosts} onClose={() => setShowVmotionWizard(false)} onAction={runAction} />
+      )}
+      {showStorageVmotionWizard && selectedVm && (
+        <StorageVmotionWizard vm={selectedVm} datastores={datastores}
+          onClose={() => setShowStorageVmotionWizard(false)} onAction={runAction} onRefresh={load} />
+      )}
+      {showOvfModal && contentLibrary.length > 0 && (
+        <VmwareOvfDeployModal contentLibrary={contentLibrary} hosts={hosts} datastores={datastores} networks={networks}
+          onClose={() => setShowOvfModal(false)} onAction={runAction} />
       )}
       {pendingDeleteVm && (
         <div className="vm-modal-overlay">

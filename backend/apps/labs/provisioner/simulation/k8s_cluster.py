@@ -151,6 +151,34 @@ class K8sCluster:
             self.services = [
                 K8sService("api", selector={"app": "api", "version": "v2"}, endpoints=[]),
             ]
+        elif "rollout" in s or "deployment-failed" in s:
+            self.deployments = [K8sDeployment("web", image="web:v2", ready=0, replicas=3)]
+            self.pods = [
+                K8sPod("web-aaa", status="CrashLoopBackOff", ready="0/1", restarts=4, labels={"app": "web"}, image="web:v2"),
+                K8sPod("web-bbb", status="ImagePullBackOff", ready="0/1", labels={"app": "web"}, image="web:v2"),
+            ]
+            self.services = [K8sService("web", selector={"app": "web"}, endpoints=[])]
+            self.rollout_failed = True
+        elif "loadbalancer" in s or "lb-pending" in s:
+            self.deployments = [K8sDeployment("frontend", selector={"app": "frontend"})]
+            self.pods = [K8sPod("frontend-xyz", labels={"app": "frontend"})]
+            self.services = [K8sService("frontend", type="LoadBalancer", selector={"app": "frontend"}, endpoints=["10.244.1.5:80"])]
+            self.lb_pending = True
+        elif "gateway" in s:
+            self.deployments = [K8sDeployment("api", selector={"app": "api"})]
+            self.pods = [K8sPod("api-abc", labels={"app": "api"})]
+            self.services = [K8sService("api", selector={"app": "api"}, endpoints=["10.244.1.5:8080"])]
+            self.gateway_broken = True
+        elif "network-policy" in s or "netpol" in s:
+            self.deployments = [K8sDeployment("backend", selector={"app": "backend"})]
+            self.pods = [K8sPod("backend-1", labels={"app": "backend"})]
+            self.services = [K8sService("backend", selector={"app": "backend"}, endpoints=["10.244.1.5:9090"])]
+            self.netpol_blocks = True
+        elif "hpa" in s or "autoscale" in s:
+            self.deployments = [K8sDeployment("worker", replicas=1, ready=1)]
+            self.pods = [K8sPod("worker-1", labels={"app": "worker"})]
+            self.services = [K8sService("worker", selector={"app": "worker"}, endpoints=["10.244.1.5:8080"])]
+            self.hpa_broken = True
         else:
             self.deployments = [K8sDeployment("nginx", image="nginx:broken")]
             self.pods = [
@@ -234,14 +262,16 @@ class K8sCluster:
         dep_name = dep_name.split("/")[-1]
         for d in self.deployments:
             if d.name == dep_name or dep_name in d.name:
-                if "broken" in d.image:
-                    d.image = d.image.replace("broken", "latest")
+                if "broken" in d.image or "v2" in d.image:
+                    d.image = d.image.replace("broken", "latest").replace(":v2", ":v1")
+                d.ready = d.replicas
+                self.rollout_failed = False
                 for p in self.pods:
                     if d.name in p.name:
                         p.status = "Running"
                         p.ready = "1/1"
                         p.restarts = 0
-                        p.image = d.image
+                        p.image = d.image.replace("broken", "latest").replace(":v2", ":v1")
                 self._sync_endpoints()
                 return f"deployment.apps/{d.name} restarted"
         return f"Error from server (NotFound): deployments.apps \"{dep_name}\" not found"
@@ -261,6 +291,24 @@ class K8sCluster:
                     s.selector = {"app": "api"}
                     self._sync_endpoints()
             return "service/api configured"
+        if "kind: NetworkPolicy" in content or "networkpolicy" in content.lower():
+            self.netpol_blocks = False
+            return "networkpolicy.networking.k8s.io/allow-backend created"
+        if "kind: HTTPRoute" in content or "gateway" in content.lower():
+            self.gateway_broken = False
+            return "httproute.gateway.networking.k8s.io/api-route configured"
+        if "type: LoadBalancer" in content:
+            for s in self.services:
+                if s.type == "LoadBalancer":
+                    s.type = "LoadBalancer"
+                    self.lb_pending = False
+            return "service/frontend configured"
+        if "HorizontalPodAutoscaler" in content or "kind: HPA" in content:
+            self.hpa_broken = False
+            return "horizontalpodautoscaler.autoscaling/worker configured"
+        if "kind: Role" in content or "kind: RoleBinding" in content:
+            self.rbac_forbidden = False
+            return "rolebinding.rbac.authorization.k8s.io/app-sa-binding created"
         return "configured"
 
     def _sync_endpoints(self) -> None:
@@ -276,6 +324,16 @@ class K8sCluster:
         if getattr(self, "ingress_broken", False):
             return False
         if getattr(self, "service_port_wrong", False):
+            return False
+        if getattr(self, "rollout_failed", False):
+            return False
+        if getattr(self, "lb_pending", False):
+            return False
+        if getattr(self, "gateway_broken", False):
+            return False
+        if getattr(self, "netpol_blocks", False):
+            return False
+        if getattr(self, "hpa_broken", False):
             return False
         if any(n.status != "Ready" for n in self.nodes):
             return False

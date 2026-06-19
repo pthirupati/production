@@ -1,0 +1,21 @@
+title: Guest Kernel Module Missing
+slug: vmware-guest-kernel-module
+category: VMware vSphere
+description: |
+  web-prod-01 networking fails because a required kernel module is not loaded.
+  Use the guest console to load the module with modprobe.
+difficulty: medium
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: Medium
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Open console on web-prod-01
+  - Load missing module (modprobe nf_conntrack)
+initial_state: nf_conntrack module not loaded — connectivity degraded.
+hints:
+  - content: "Run modprobe nf_conntrack and verify with lsmod"
+    cost: 10
+    order: 1

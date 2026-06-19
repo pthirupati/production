@@ -1,0 +1,18 @@
+title: Gateway API HTTPRoute Misconfigured
+slug: k8s-gateway-api-routing
+category: Kubernetes
+difficulty: hard
+description: |
+  Gateway API HTTPRoute returns 404 for the api service. Fix routing rules and backend references.
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: false
+objectives:
+  - Inspect Gateway and HTTPRoute resources
+  - Apply corrected HTTPRoute for api service
+hints:
+  - content: "kubectl apply -f httproute with correct backendRefs to api Service"
+    cost: 15
+    order: 1

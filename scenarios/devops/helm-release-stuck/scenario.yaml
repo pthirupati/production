@@ -1,0 +1,19 @@
+title: Helm Release Stuck Pending Upgrade
+slug: devops-helm-release-stuck
+category: DevOps
+difficulty: medium
+description: |
+  Helm release is stuck in pending-upgrade state after a failed chart values change.
+  Roll back or complete the upgrade.
+lab_mode: simulation
+simulation_type: devops
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Run helm history and identify failed revision
+  - helm rollback or helm upgrade --force
+hints:
+  - content: "helm history release-name && helm rollback release-name REV"
+    cost: 10
+    order: 1

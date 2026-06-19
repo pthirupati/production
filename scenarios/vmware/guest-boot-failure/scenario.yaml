@@ -1,0 +1,21 @@
+title: Guest OS Boot Failure (initramfs)
+slug: vmware-guest-boot-failure
+category: VMware vSphere
+description: |
+  web-prod-01 powers on but drops to initramfs/recovery shell after a failed patch.
+  Diagnose from the VMware web console and recover the boot process.
+difficulty: hard
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: Critical
+time_limit: 1200
+max_score: 100
+is_free: false
+objectives:
+  - Open web console and identify boot failure
+  - Run fsck or exit recovery shell to complete boot
+initial_state: Guest drops to maintenance shell on power-on.
+hints:
+  - content: "In recovery shell run fsck -y /dev/sda1 or type exit to continue boot"
+    cost: 15
+    order: 1

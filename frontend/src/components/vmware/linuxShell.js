@@ -63,6 +63,10 @@ export function createLinuxShell(vm) {
   const env = { USER: 'root', HOME: '/root', SHELL: '/bin/bash', PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' }
   const history = []
   const vfs = { ...FS, '/etc/hostname': hostname }
+  let diskRescanned = !vm?.guest_disk_hidden
+  let diskFormatted = !!vm?.guest_disk_formatted
+  let diskMounted = !!vm?.guest_disk_mounted
+  let moduleLoaded = !vm?.kernel_module_missing
 
   const prompt = () => `root@${hostname}:${cwd.path === '/root' ? '~' : cwd.path}$`
 
@@ -74,6 +78,7 @@ export function createLinuxShell(vm) {
     const cmd = parts[0].toLowerCase()
     const args = parts.slice(1)
     const out = []
+    let sideEffect = null
 
     const notFound = () => out.push(`bash: ${cmd}: command not found`)
 
@@ -90,6 +95,13 @@ export function createLinuxShell(vm) {
     else if (cmd === 'uname') {
       if (args[0] === '-a') out.push(`Linux ${hostname} 5.15.0-91-generic #101-Ubuntu SMP x86_64 GNU/Linux`)
       else out.push('Linux')
+    }
+    else if (cmd === 'echo' && line.includes('scsi_host') && line.includes('scan')) {
+      if (vm?.guest_disk_hidden) {
+        diskRescanned = true
+        out.push('')
+        sideEffect = { action: 'guest_rescan_scsi', vm_id: vm?.id }
+      } else out.push('')
     }
     else if (cmd === 'echo') out.push(args.join(' ').replace(/^["']|["']$/g, ''))
     else if (cmd === 'env' || cmd === 'printenv') Object.entries(env).forEach(([k, v]) => out.push(`${k}=${v}`))
@@ -176,10 +188,33 @@ export function createLinuxShell(vm) {
     else if (cmd === 'useradd' || cmd === 'userdel' || cmd === 'usermod') out.push('')
     else if (cmd === 'passwd') out.push('passwd: all authentication tokens updated successfully.')
     else if (cmd === 'su' || cmd === 'sudo') out.push('[root@host]# (simulated privilege elevation)')
-    else if (cmd === 'fdisk' || cmd === 'parted') out.push('Disk /dev/sda: 80 GiB\nDevice     Boot Start End Sectors Size Type\n/dev/sda1  *    2048  end  ...  80G Linux filesystem')
-    else if (cmd === 'lsblk' || cmd === 'blkid') out.push('NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINT\nsda    8:0    0  80G  0 disk \n└─sda1 8:1    0  80G  0 part /')
+    else if (cmd === 'fdisk' || cmd === 'parted') {
+      if (diskRescanned) out.push('Disk /dev/sda: 80 GiB\n/dev/sda1 *\n\nDisk /dev/sdb: 20 GiB — new disk (no partition table)')
+      else out.push('Disk /dev/sda: 80 GiB\nDevice     Boot Start End Sectors Size Type\n/dev/sda1  *    2048  end  ...  80G Linux filesystem')
+    }
+    else if (cmd === 'lsblk' || cmd === 'blkid') {
+      if (diskRescanned || !vm?.guest_disk_hidden) {
+        out.push('NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINT\nsda    8:0    0  80G  0 disk \n└─sda1 8:1    0  80G  0 part /\nsdb    8:16   0  20G  0 disk ' + (diskMounted ? '\n└─sdb1 8:17   0  20G  0 part /data' : ''))
+      } else out.push('NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINT\nsda    8:0    0  80G  0 disk \n└─sda1 8:1    0  80G  0 part /')
+    }
     else if (cmd === 'lvs' || cmd === 'vgs' || cmd === 'pvs') out.push('  (no LVM volumes configured in this lab VM)')
-    else if (cmd === 'mkfs' || cmd === 'mke2fs') out.push('Creating filesystem, done.')
+    else if (cmd === 'mkfs' || cmd === 'mke2fs') {
+      if (args.some(a => a.includes('sdb')) && diskRescanned) {
+        diskFormatted = true
+        out.push('Creating filesystem with ext4 on /dev/sdb...')
+        sideEffect = { action: 'guest_format_disk', vm_id: vm?.id }
+      } else out.push('mkfs: specify device (e.g. mkfs.ext4 /dev/sdb)')
+    }
+    else if (cmd === 'mount') {
+      const dev = args[0] || ''
+      const mnt = args[1] || '/data'
+      if (dev.includes('sdb') && diskFormatted) {
+        diskMounted = true
+        out.push('')
+        sideEffect = { action: 'guest_mount_disk', vm_id: vm?.id }
+      } else if (!diskFormatted && dev.includes('sdb')) out.push('mount: unknown filesystem type — run mkfs first')
+      else out.push(`mount: ${dev || 'missing operand'}`)
+    }
     else if (cmd === 'getenforce') out.push('Enforcing')
     else if (cmd === 'setenforce') out.push('')
     else if (cmd === 'sestatus') out.push('SELinux status: enabled\nCurrent mode: enforcing')
@@ -193,8 +228,18 @@ export function createLinuxShell(vm) {
     else if (cmd === 'which' || cmd === 'whereis' || cmd === 'type') out.push(args[0] ? `/usr/bin/${args[0]}` : '')
     else if (cmd === 'man') out.push(`No manual entry for ${args[0] || cmd} (simulated)`)
     else if (cmd === 'lscpu') out.push(`Architecture: x86_64\nCPU(s): ${vm?.cpu || 2}`)
-    else if (cmd === 'lsmod') out.push('Module                  Size  Used by\nxfs                   987136  1')
-    else if (cmd === 'modprobe' || cmd === 'insmod' || cmd === 'rmmod') out.push('')
+    else if (cmd === 'lsmod') {
+      if (moduleLoaded) out.push('Module                  Size  Used by\nxfs                   987136  1\nnf_conntrack          131072  1')
+      else out.push('Module                  Size  Used by\nxfs                   987136  1')
+    }
+    else if (cmd === 'modprobe' || cmd === 'insmod') {
+      const mod = args[0] || 'nf_conntrack'
+      if (vm?.kernel_module_missing && (mod.includes('nf_conntrack') || mod.includes('bridge'))) {
+        moduleLoaded = true
+        out.push('')
+        sideEffect = { action: 'guest_load_module', vm_id: vm?.id, module: mod }
+      } else out.push('')
+    }
     else if (cmd === 'reboot' || cmd === 'shutdown' || cmd === 'poweroff' || cmd === 'halt') out.push('System going down for reboot NOW')
     else if (cmd === 'init' || cmd === 'telinit') out.push(`Init simulated: runlevel ${args[0] || '3'}`)
     else if (['awk', 'sed', 'cut', 'sort', 'uniq', 'tr', 'tee', 'xargs'].includes(cmd)) out.push('(simulated text processing)')
@@ -204,7 +249,7 @@ export function createLinuxShell(vm) {
     else if (cmd === 'ansible' || cmd === 'terraform') out.push(`${cmd}: simulated orchestration tool`)
     else notFound()
 
-    return { lines: out.length ? out : [''], prompt: prompt() }
+    return { lines: out.length ? out : [''], prompt: prompt(), sideEffect }
   }
 
   return { run, prompt, history, pkgManager: () => pkgManager(vm) }

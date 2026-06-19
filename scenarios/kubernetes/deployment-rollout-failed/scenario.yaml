@@ -1,0 +1,19 @@
+title: Deployment Rollout Failed
+slug: k8s-deployment-rollout-failed
+category: Kubernetes
+difficulty: hard
+description: |
+  A Deployment rollout is stuck with CrashLoopBackOff and ImagePullBackOff pods after a bad image tag push.
+  Roll back or restart the rollout with a valid image.
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Inspect deployment web and failing pods
+  - Fix rollout (kubectl rollout restart deployment/web)
+hints:
+  - content: "kubectl describe pod and kubectl rollout restart deployment/web"
+    cost: 10
+    order: 1

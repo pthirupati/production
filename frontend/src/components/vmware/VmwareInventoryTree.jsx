@@ -32,7 +32,7 @@ export default function VmwareInventoryTree({
   inv, hosts, vms, templates = [], datastores, networks,
   filterLabel,
   selectedNode, setSelectedNode, setActiveTab,
-  onVmContextMenu, onCreateVm, onDeployTemplate,
+  onVmContextMenu, onCreateVm, onDeployTemplate, onDeployOvf,
 }) {
   const [exp, setExp] = useState({ vcenter: true, dc: true, cluster: true, hosts: {}, vms: true, templates: true, storage: true, net: false })
   const toggle = (k) => setExp(p => ({ ...p, [k]: !p[k] }))
@@ -48,6 +48,9 @@ export default function VmwareInventoryTree({
         <div className="flex gap-1">
           {templates.length > 0 && onDeployTemplate && (
             <button type="button" onClick={onDeployTemplate} title="Deploy from template" className="w-[22px] h-[22px] flex items-center justify-center rounded-[5px] border border-[#2d3a4a] bg-[#243447] text-[#F5A623] text-[10px] leading-none font-bold">T</button>
+          )}
+          {onDeployOvf && (
+            <button type="button" onClick={onDeployOvf} title="Deploy OVF from content library" className="w-[22px] h-[22px] flex items-center justify-center rounded-[5px] border border-[#2d3a4a] bg-[#243447] text-[#5DB85D] text-[10px] leading-none font-bold">O</button>
           )}
           <button type="button" onClick={onCreateVm} title="New VM" className="w-[22px] h-[22px] flex items-center justify-center rounded-[5px] border border-[#2d3a4a] bg-[#243447] text-[#00C8FF] text-[15px] leading-none">+</button>
         </div>

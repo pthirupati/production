@@ -1,0 +1,20 @@
+title: Rescan SCSI Bus for Missing Disk
+slug: linux-disk-missing-rescan
+category: Storage
+difficulty: medium
+description: |
+  A new disk was attached at the hypervisor but is not visible inside the Linux guest.
+  Rescan the SCSI host and verify with lsblk.
+lab_mode: simulation
+simulation_type: rhel
+time_limit: 900
+max_score: 100
+is_free: false
+objectives:
+  - Run echo "- - -" > /sys/class/scsi_host/host0/scan
+  - Confirm new disk appears in lsblk output
+initial_state: Simulated RHEL server with hidden /dev/sdb disk.
+hints:
+  - content: "echo '- - -' > /sys/class/scsi_host/host0/scan && lsblk"
+    cost: 10
+    order: 1

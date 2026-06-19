@@ -161,8 +161,59 @@ def apply_vmware_scenario_preset(state: dict, scenario_slug: str) -> None:
     elif "vsan-disk" in slug or "vsan" in slug:
         state["cluster_vsan"] = True
         state["vsan_disk_unclaimed"] = True
+        vsan = state.setdefault("vsan", {})
+        vsan["enabled"] = True
+        vsan["health"] = "warning"
+        vsan["cluster_status"] = "degraded"
+        vsan["unclaimed_disks"] = [
+            {"id": "naa.6000C29b1", "host": "esxi-02.fixitlab.local", "size_tb": 1.8, "state": "eligible"},
+        ]
+        vsan["components_healthy"] = False
         events.append(_event("vSAN disk claim failed on esxi-02", "critical", "esxi-02.fixitlab.local"))
         _set_validation(state, vsan_disks_claimed=True)
+
+    elif "guest-disk" in slug or "disk-missing" in slug or "disk-not-visible" in slug:
+        if web:
+            web["power"] = "poweredOn"
+            web["tools"] = "ok"
+            web["guest_disk_hidden"] = True
+            web["guest_disk_visible"] = False
+            web["guest_disk_mounted"] = False
+        events.append(_event("New disk not visible in guest OS on web-prod-01", "warning", "web-prod-01"))
+        alarm("alm-disk", "Guest disk not mounted", "web-prod-01", "warning")
+        _set_validation(state, target_vm="web-prod-01", guest_disk_mounted=True)
+
+    elif "boot-failure" in slug or "initramfs" in slug or "guest-boot" in slug:
+        if web:
+            web["power"] = "poweredOn"
+            web["boot_failure"] = True
+            web["guest_hung"] = False
+        events.append(_event("Guest OS boot failure on web-prod-01 — drops to initramfs", "critical", "web-prod-01"))
+        _set_validation(state, target_vm="web-prod-01", boot_resolved=True)
+
+    elif "kernel-module" in slug or "module-missing" in slug:
+        if web:
+            web["power"] = "poweredOn"
+            web["kernel_module_missing"] = True
+        events.append(_event("Required kernel module not loaded on web-prod-01", "warning", "web-prod-01"))
+        _set_validation(state, target_vm="web-prod-01", kernel_module_loaded=True)
+
+    elif "patch-pending" in slug or "esxi-patch" in slug or "host-patch" in slug:
+        h = state["hosts"][0]
+        h["pending_patches"] = 3
+        h["patch_reboot_required"] = True
+        state.setdefault("updates", {})["hosts"] = {h["name"]: {"pending": 3}}
+        events.append(_event(f"ESXi patches pending on {h['name']}", "warning", h["name"]))
+        _set_validation(state, host_patches_installed=True)
+
+    elif "permission" in slug or "rbac" in slug:
+        state["permission_missing"] = True
+        events.append(_event("Required vCenter permission missing for lab operator", "warning", "DC-Prod"))
+        _set_validation(state, permission_assigned=True)
+
+    elif "ovf-deploy" in slug or "content-library" in slug:
+        events.append(_event("Deploy VM from content library OVF required", "info", "FixitLab Library"))
+        _set_validation(state, ovf_deployed=True)
 
     elif "storage-vmotion" in slug or "vmotion-stuck" in slug:
         state["storage_vmotion_stuck"] = True

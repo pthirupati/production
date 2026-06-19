@@ -249,6 +249,29 @@ def _enrich_inventory(state: dict) -> None:
             vm["mac"] = primary.get("mac_address", mac)
 
 
+def _tick_performance(state: dict) -> None:
+    """Advance live-ish performance samples for charts."""
+    for host in state.get("hosts", []):
+        if host.get("status") == "connected" and not host.get("maintenance"):
+            host["cpu_pct"] = max(5, min(95, int((host.get("cpu_pct") or 35) + (random.random() - 0.5) * 5)))
+            host["mem_pct"] = max(10, min(95, int((host.get("mem_pct") or 50) + (random.random() - 0.5) * 4)))
+            host["storage_pct"] = max(10, min(95, int((host.get("storage_pct") or 40) + (random.random() - 0.5) * 3)))
+        hist = host.setdefault("perf_history", {"cpu": [], "mem": []})
+        hist["cpu"] = (hist.get("cpu") or [])[-19:] + [host.get("cpu_pct", 0)]
+        hist["mem"] = (hist.get("mem") or [])[-19:] + [host.get("mem_pct", 0)]
+    for vm in state.get("vms", []):
+        if vm.get("power") == "poweredOn":
+            vm["cpu_pct"] = max(1, min(99, int((vm.get("cpu_pct") or 20) + (random.random() - 0.5) * 6)))
+            vm["mem_pct"] = max(1, min(99, int((vm.get("mem_pct") or 50) + (random.random() - 0.5) * 4)))
+            vm["disk_io_mbps"] = max(0, int((vm.get("disk_io_mbps") or 5) + (random.random() - 0.5) * 8))
+            vm["net_mbps"] = max(0, int((vm.get("net_mbps") or 10) + (random.random() - 0.5) * 10))
+            hist = vm.setdefault("perf_history", {"cpu": [], "mem": [], "disk": [], "net": []})
+            hist["cpu"] = (hist.get("cpu") or [])[-19:] + [vm.get("cpu_pct", 0)]
+            hist["mem"] = (hist.get("mem") or [])[-19:] + [vm.get("mem_pct", 0)]
+            hist["disk"] = (hist.get("disk") or [])[-19:] + [vm.get("disk_io_mbps", 0)]
+            hist["net"] = (hist.get("net") or [])[-19:] + [vm.get("net_mbps", 0)]
+
+
 def _base_inventory() -> dict:
     return {
         "datacenter": "DC-Prod",
@@ -572,6 +595,56 @@ def _base_inventory() -> dict:
         "events": [],
         "recent_tasks": [],
         "validation": {"target_vm": "web-prod-01", "require_power": "poweredOn"},
+
+        "permissions": [
+            {"id": "perm-root", "entity": "vCenter", "entity_id": "vcenter", "entity_type": "vcenter",
+             "principal": "VSPHERE.LOCAL\\Administrators", "role": "Administrator", "propagate": True},
+            {"id": "perm-lab", "entity": "DC-Prod", "entity_id": "dc-prod", "entity_type": "datacenter",
+             "principal": "lab_vmware", "role": "Virtual Machine User", "propagate": True},
+        ],
+        "roles_catalog": [
+            "Administrator", "Read Only", "Virtual Machine User", "Virtual Machine Power User",
+            "Virtual Machine Administrator", "Network Administrator", "Storage Administrator",
+            "No Access",
+        ],
+        "vsan": {
+            "enabled": True,
+            "health": "healthy",
+            "cluster_status": "online",
+            "disk_groups": [
+                {
+                    "host": "esxi-01.fixitlab.local",
+                    "disks": [
+                        {"id": "naa.6000C29a1", "tier": "cache", "status": "in_use", "size_tb": 0.4},
+                        {"id": "naa.6000C29a2", "tier": "capacity", "status": "in_use", "size_tb": 1.8},
+                    ],
+                },
+            ],
+            "unclaimed_disks": [],
+            "resync_percent": 100,
+            "components_healthy": True,
+        },
+        "content_library": [
+            {
+                "id": "cl-fixitlab",
+                "name": "FixitLab Content Library",
+                "type": "local",
+                "items": [
+                    {"id": "ovf-tiny-linux", "name": "tiny-linux.ova", "size_mb": 256,
+                     "os": "Linux", "description": "Minimal Ubuntu OVA for lab deploy"},
+                    {"id": "ovf-win2019", "name": "win2019-template.ova", "size_mb": 4096,
+                     "os": "Windows", "description": "Windows Server 2019 template OVA"},
+                    {"id": "ovf-rhel8", "name": "rhel8-minimal.ova", "size_mb": 512,
+                     "os": "Linux", "description": "RHEL 8 minimal OVA"},
+                ],
+            },
+        ],
+        "updates": {
+            "vcenter": {"available": False, "current": "7.0.3", "latest": "7.0.3"},
+            "hosts": {},
+            "vms_tools_pending": [],
+        },
+        "storage_vmotion_jobs": [],
     }
 
 
@@ -599,6 +672,8 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
     state = copy.deepcopy(entry["state"])
     _enrich_inventory(state)
+    _tick_performance(state)
+    vsan = state.get("vsan") or {}
     return {
         "session_id": str(session_id),
         "scenario_slug": entry.get("scenario_slug") or scenario_slug,
@@ -611,9 +686,13 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "active_alarms": len([a for a in state.get("alarms", []) if a.get("status") == "active"]),
             "cluster_ha": state.get("cluster_ha", True),
             "cluster_drs": state.get("cluster_drs", True),
+            "cluster_vsan": state.get("cluster_vsan", vsan.get("enabled", False)),
+            "vsan_health": vsan.get("health", "healthy"),
             "linux_ssh_ok": state.get("linux_ssh_ok", True),
             "jira_incident_updated": state.get("jira_incident_updated", False),
             "customer_reboot_approved": state.get("customer_reboot_approved", False),
+            "storage_vmotion_stuck": state.get("storage_vmotion_stuck", False),
+            "vcenter_role": state.get("vcenter_role", "Administrator"),
         },
     }
 
@@ -1021,13 +1100,6 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "Admission control resolved"}
 
-    if action == "claim_vsan_disk":
-        state["vsan_disk_unclaimed"] = False
-        events.append(_event("vSAN disk claimed on esxi-02", "info", "esxi-02.fixitlab.local"))
-        tasks.insert(0, _task("Claim vSAN Disk", "esxi-02.fixitlab.local"))
-        _save_session(str(session_id), entry)
-        return {"ok": True, "message": "vSAN disk claimed"}
-
     if action == "complete_storage_vmotion":
         state["storage_vmotion_stuck"] = False
         events.append(_event("Storage vMotion completed", "info", "web-prod-01"))
@@ -1376,6 +1448,285 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} moved to network '{net['name']}'"}
 
+    if action == "vmotion_precheck":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        target = _find_host(state, host_name=payload.get("target_host"))
+        if not vm or not target:
+            return {"ok": False, "error": "VM or target host not found"}
+        checks = [
+            {"name": "Compatibility", "passed": target.get("status") == "connected", "detail": "CPU compatibility OK"},
+            {"name": "Network", "passed": True, "detail": "All port groups available on destination"},
+            {"name": "Storage", "passed": True, "detail": "Shared datastore accessible"},
+            {"name": "Resources", "passed": not target.get("maintenance"), "detail": "Host not in maintenance"},
+        ]
+        return {"ok": True, "checks": checks, "ready": all(c["passed"] for c in checks)}
+
+    if action == "start_storage_vmotion":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        target_ds = _find_ds(state, ds_id=payload.get("target_datastore_id"), ds_name=payload.get("target_datastore"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        if not target_ds:
+            return {"ok": False, "error": "Target datastore not found"}
+        if vm.get("power") != "poweredOff" and vm.get("power") != "poweredOn":
+            return {"ok": False, "error": "VM must be powered on or off for storage vMotion"}
+        job_id = f"svm-{int(time.time()) % 100000}"
+        job = {
+            "id": job_id, "vm_id": vm["id"], "vm_name": vm["name"],
+            "source_datastore_id": vm.get("datastore_id"),
+            "target_datastore_id": target_ds["id"],
+            "progress": 0, "status": "running",
+        }
+        state.setdefault("storage_vmotion_jobs", []).insert(0, job)
+        state["storage_vmotion_stuck"] = False
+        events.append(_event(f"Storage vMotion started for {vm['name']} → {target_ds['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Relocate Virtual Machine", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Storage vMotion started", "job_id": job_id, "progress": 0}
+
+    if action == "advance_storage_vmotion":
+        job_id = payload.get("job_id")
+        jobs = state.get("storage_vmotion_jobs") or []
+        job = next((j for j in jobs if j["id"] == job_id), jobs[0] if jobs else None)
+        if not job:
+            return {"ok": False, "error": "No storage vMotion job in progress"}
+        job["progress"] = min(100, job.get("progress", 0) + int(payload.get("step", 25)))
+        if job["progress"] >= 100:
+            job["status"] = "completed"
+            vm = _find_vm(state, job.get("vm_id"))
+            if vm:
+                vm["datastore_id"] = job["target_datastore_id"]
+            state["storage_vmotion_stuck"] = False
+            events.append(_event(f"Storage vMotion completed for {job['vm_name']}", "info", job["vm_name"]))
+            tasks.insert(0, _task("Storage vMotion completed", job["vm_name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "progress": job["progress"], "status": job["status"]}
+
+    if action == "deploy_ovf":
+        item_name = (payload.get("ovf_name") or payload.get("name") or "").strip()
+        lib = state.get("content_library") or []
+        item = None
+        for cl in lib:
+            item = next((i for i in cl.get("items", []) if i["name"] == item_name), None)
+            if item:
+                break
+        if not item:
+            return {"ok": False, "error": f"OVF/OVA '{item_name}' not found in content library"}
+        vm_name = (payload.get("vm_name") or item["name"].replace(".ova", "").replace(".ovf", "")).strip()
+        if any(v["name"] == vm_name for v in state["vms"]):
+            return {"ok": False, "error": f"VM '{vm_name}' already exists"}
+        host_id = payload.get("host_id") or state["hosts"][0]["id"]
+        is_windows = "windows" in item.get("os", "").lower() or "win" in item_name.lower()
+        vm_id = f"vm-{vm_name.lower().replace(' ', '-')}-{int(time.time()) % 100000}"
+        vm = {
+            "id": vm_id, "name": vm_name, "host_id": host_id,
+            "datastore_id": payload.get("datastore_id") or "ds-01",
+            "network_id": payload.get("network_id") or "net-02",
+            "resource_pool_id": "rp-prod", "power": "poweredOff",
+            "cpu": 2, "memory_mb": 4096, "disk_gb": 40,
+            "guest_os": "Microsoft Windows Server 2019 (64-bit)" if is_windows else "Ubuntu Linux (64-bit)",
+            "guest_os_version": "Windows Server 2019" if is_windows else "Ubuntu 22.04 LTS",
+            "ip": "—", "hostname": f"{vm_name}.fixitlab.local",
+            "tools": "notRunning", "tools_version": "11333", "hardware_version": "vmx-19",
+            "annotation": f"Deployed from OVF {item_name}", "snapshots": [],
+            "cpu_pct": 0, "mem_pct": 0, "disk_io_mbps": 0, "net_mbps": 0,
+            "from_ovf": item_name,
+        }
+        state["vms"].append(vm)
+        _enrich_inventory(state)
+        events.append(_event(f"Deployed {vm_name} from OVF {item_name}", "info", vm_name))
+        tasks.insert(0, _task("Deploy OVF Template", vm_name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Deployed {vm_name} from {item_name}", "vm_id": vm_id}
+
+    if action == "assign_permission":
+        entity = payload.get("entity") or payload.get("entity_name") or "DC-Prod"
+        principal = (payload.get("principal") or payload.get("user") or "").strip()
+        role = (payload.get("role") or "Read Only").strip()
+        if not principal:
+            return {"ok": False, "error": "User or group name required"}
+        perm = {
+            "id": f"perm-{int(time.time()) % 100000}",
+            "entity": entity, "entity_id": payload.get("entity_id", entity.lower()),
+            "entity_type": payload.get("entity_type", "inventory"),
+            "principal": principal, "role": role,
+            "propagate": bool(payload.get("propagate", True)),
+        }
+        state.setdefault("permissions", []).append(perm)
+        if state.get("permission_missing") and principal == "lab_vmware":
+            state["permission_missing"] = False
+        events.append(_event(f"Assigned {role} to {principal} on {entity}", "info", entity))
+        tasks.insert(0, _task("Assign Role", entity))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"{role} assigned to {principal}"}
+
+    if action == "revoke_permission":
+        perm_id = payload.get("permission_id")
+        perms = state.get("permissions") or []
+        before = len(perms)
+        state["permissions"] = [p for p in perms if p.get("id") != perm_id]
+        if len(state["permissions"]) == before:
+            return {"ok": False, "error": "Permission not found"}
+        events.append(_event("Permission revoked", "info", payload.get("entity", "inventory")))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Permission revoked"}
+
+    if action == "set_vcenter_role":
+        role = (payload.get("role") or "Administrator").strip()
+        if role not in state.get("roles_catalog", []):
+            return {"ok": False, "error": f"Unknown role: {role}"}
+        state["vcenter_role"] = role
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Session role set to {role}"}
+
+    if action == "update_dvs":
+        dvs_name = (payload.get("dvs_name") or payload.get("name") or "dvSwitch-Prod").strip()
+        dvs = next((v for v in state.get("vswitches", []) if v["name"] == dvs_name), None)
+        if not dvs:
+            return {"ok": False, "error": f"Distributed switch '{dvs_name}' not found"}
+        if "mtu" in payload:
+            dvs["mtu"] = int(payload["mtu"])
+            if int(payload["mtu"]) == 9000:
+                state["dv_switch_mtu_mismatch"] = False
+        if payload.get("uplinks"):
+            dvs["uplinks"] = payload["uplinks"]
+        if payload.get("teaming"):
+            dvs["teaming"] = payload["teaming"]
+        if payload.get("portgroups"):
+            dvs["portgroups"] = payload["portgroups"]
+        events.append(_event(f"Updated distributed switch {dvs_name}", "info", dvs_name))
+        tasks.insert(0, _task("Reconfigure Distributed Switch", dvs_name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"{dvs_name} updated"}
+
+    if action == "claim_vsan_disk":
+        disk_id = payload.get("disk_id")
+        vsan = state.setdefault("vsan", {})
+        unclaimed = vsan.get("unclaimed_disks") or []
+        if disk_id:
+            disk = next((d for d in unclaimed if d["id"] == disk_id), None)
+            if not disk:
+                return {"ok": False, "error": f"Disk {disk_id} not found or already claimed"}
+            unclaimed.remove(disk)
+            vsan.setdefault("disk_groups", []).append({
+                "host": disk.get("host", "esxi-02.fixitlab.local"),
+                "disks": [{**disk, "tier": "capacity", "status": "in_use"}],
+            })
+        state["vsan_disk_unclaimed"] = len(unclaimed) > 0
+        vsan["unclaimed_disks"] = unclaimed
+        vsan["health"] = "healthy" if not unclaimed else "warning"
+        vsan["components_healthy"] = not unclaimed
+        events.append(_event("vSAN disk claimed", "info", disk_id or "esxi-02"))
+        tasks.insert(0, _task("Claim vSAN Disk", disk_id or "disk"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "vSAN disk claimed"}
+
+    if action == "rescan_hba":
+        host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
+        if not host:
+            host = state["hosts"][0]
+        host["hba_rescan_done"] = True
+        events.append(_event(f"Rescan all HBAs on {host['name']}", "info", host["name"]))
+        tasks.insert(0, _task("Rescan Storage", host["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "HBA rescan completed"}
+
+    if action == "guest_rescan_scsi":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        vm["guest_disk_rescanned"] = True
+        vm["guest_disk_visible"] = True
+        events.append(_event(f"SCSI rescan completed in guest {vm['name']}", "info", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Guest disk visible after SCSI rescan"}
+
+    if action == "guest_format_disk":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        if not vm.get("guest_disk_visible") and vm.get("guest_disk_hidden"):
+            return {"ok": False, "error": "Disk not visible — rescan SCSI bus first"}
+        vm["guest_disk_formatted"] = True
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Filesystem created on new disk"}
+
+    if action == "guest_mount_disk":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        if not vm.get("guest_disk_formatted"):
+            return {"ok": False, "error": "Create a filesystem before mounting"}
+        vm["guest_disk_mounted"] = True
+        vm.pop("guest_disk_hidden", None)
+        events.append(_event(f"Data disk mounted in {vm['name']}", "info", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Disk mounted successfully"}
+
+    if action == "guest_load_module":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        vm["kernel_module_missing"] = False
+        events.append(_event(f"Kernel module loaded in {vm['name']}", "info", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Kernel module loaded"}
+
+    if action == "guest_fix_boot":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        vm["boot_failure"] = False
+        events.append(_event(f"Guest boot issue resolved on {vm['name']}", "info", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Boot failure resolved"}
+
+    if action == "check_updates":
+        target = payload.get("target") or "all"
+        pending = []
+        if target in ("host", "all"):
+            for host in state["hosts"]:
+                cnt = host.get("pending_patches", 0)
+                if cnt:
+                    pending.append(f"{host['name']}: {cnt} ESXi patches")
+        if target in ("vm", "all"):
+            for vm in state["vms"]:
+                if vm.get("tools") == "old":
+                    pending.append(f"{vm['name']}: VMware Tools update")
+        state.setdefault("updates", {})["last_check"] = _now_iso()
+        _save_session(str(session_id), entry)
+        return {"ok": True, "pending": pending, "message": "No updates" if not pending else f"{len(pending)} update(s) available"}
+
+    if action == "install_updates":
+        target_type = payload.get("target_type") or "host"
+        if target_type == "host":
+            host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
+            if host:
+                host["pending_patches"] = 0
+                host.pop("patch_reboot_required", None)
+        elif target_type == "vm":
+            vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+            if vm:
+                vm["tools"] = "ok"
+                vm.pop("tools_outdated", None)
+        events.append(_event("Updates installed", "info", target_type))
+        tasks.insert(0, _task("Install Updates", target_type))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Updates installed successfully"}
+
+    if action == "install_tools_update":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        if vm.get("power") != "poweredOn":
+            return {"ok": False, "error": "VM must be powered on to upgrade tools"}
+        vm["tools"] = "ok"
+        vm["tools_version"] = "12389"
+        events.append(_event(f"VMware Tools upgraded on {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Upgrade VMware Tools", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"VMware Tools upgraded on {vm['name']}"}
+
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
@@ -1518,6 +1869,31 @@ def validate_vmware_lab(session_id: str, scenario_slug: str = "") -> tuple[bool,
         if rules.get("max_cpu_ready_pct") is not None:
             if vm.get("cpu_ready_pct", 0) > rules["max_cpu_ready_pct"]:
                 return False, f"{target} CPU ready time is too high — migrate or reduce load"
+
+        if rules.get("guest_disk_mounted"):
+            if not vm.get("guest_disk_mounted"):
+                return False, f"{target} data disk not mounted — rescan SCSI, create filesystem, and mount"
+
+        if rules.get("boot_resolved"):
+            if vm.get("boot_failure"):
+                return False, f"{target} guest OS boot failure not resolved"
+
+        if rules.get("kernel_module_loaded"):
+            if vm.get("kernel_module_missing"):
+                return False, f"{target} required kernel module not loaded"
+
+    if rules.get("host_patches_installed"):
+        for host in state["hosts"]:
+            if host.get("pending_patches", 0) > 0:
+                return False, f"Install pending patches on {host['name']}"
+
+    if rules.get("permission_assigned"):
+        if state.get("permission_missing") and len(state.get("permissions", [])) < 3:
+            return False, "Assign required vCenter permission to lab operator"
+
+    if rules.get("ovf_deployed"):
+        if not any(v.get("from_ovf") for v in state.get("vms", [])):
+            return False, "Deploy a VM from the content library OVF"
 
     if rules:
         return True, "Validation passed — issue resolved"
