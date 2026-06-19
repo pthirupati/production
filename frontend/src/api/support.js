@@ -10,4 +10,14 @@ export const supportApi = {
     const { data } = await api.post('/support/chat/', { message, page_path: pagePath })
     return data
   },
+
+  async sendFeedback({ message, reply, helpful, pagePath = '' }) {
+    const { data } = await api.post('/support/feedback/', {
+      message,
+      reply,
+      helpful,
+      page_path: pagePath,
+    })
+    return data
+  },
 }

@@ -1219,22 +1219,35 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "MTU mismatch fixed"}
 
-    if action == "create_portgroup":
+    if action in ("create_portgroup", "create_network"):
         pg_name = (payload.get("name") or state.get("portgroup_missing") or "Prod-VLAN-200").strip()
         if not pg_name:
             return {"ok": False, "error": "Port group name required"}
         if any(n.get("name") == pg_name for n in state.get("networks", [])):
             return {"ok": False, "error": f"Port group '{pg_name}' already exists"}
-        net_id = f"net-{pg_name.lower().replace(' ', '-')}"
-        state.setdefault("networks", []).append({
-            "id": net_id, "name": pg_name, "type": "portgroup",
-            "vlan": payload.get("vlan") or 200, "switch": "dvSwitch-Prod",
-        })
+        # Switch the port group lives on; default to a distributed switch for
+        # scenario compatibility, but honour an explicit switch from the UI.
+        switch = (payload.get("switch") or "dvSwitch-Prod").strip()
+        sw = next((v for v in state.get("vswitches", []) if v.get("name") == switch), None)
+        # vlan may legitimately be 0 ("All"), so only fall back when the key is absent.
+        vlan_raw = payload.get("vlan", payload.get("vlan_id"))
+        vlan = int(vlan_raw) if vlan_raw not in (None, "") else 200
+        net_id = f"net-{pg_name.lower().replace(' ', '-')}-{int(time.time()) % 100000}"
+        pg_type = "distributed" if (sw and sw.get("type") == "distributed") else "standard"
+        net = {
+            "id": net_id, "name": pg_name, "type": pg_type,
+            "vlan": vlan, "vlan_id": vlan, "switch": switch,
+            "hosts": [h["id"] for h in state.get("hosts", [])],
+        }
+        state.setdefault("networks", []).append(net)
+        if sw is not None:
+            sw.setdefault("portgroups", []).append(pg_name)
         state.pop("portgroup_missing", None)
-        events.append(_event(f"Created port group {pg_name}", "info", "dvSwitch-Prod"))
+        _enrich_inventory(state)
+        events.append(_event(f"Created port group {pg_name} (VLAN {vlan})", "info", switch))
         tasks.insert(0, _task("Create Port Group", pg_name))
         _save_session(str(session_id), entry)
-        return {"ok": True, "message": f"Port group '{pg_name}' created"}
+        return {"ok": True, "message": f"Port group '{pg_name}' (VLAN {vlan}) created", "network_id": net_id}
 
     if action == "resolve_vmotion":
         state["vmotion_failed"] = False
@@ -1669,21 +1682,294 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if not vm:
             return {"ok": False, "error": "VM not found"}
         add_gb = max(10, int(payload.get("size_gb") or 100))
+        # provisioning: "thin" (default) or "thick"; UI may pass thin=False directly.
+        thin = payload.get("thin")
+        if thin is None:
+            thin = str(payload.get("provisioning", "thin")).lower() != "thick"
+        thin = bool(thin)
         _enrich_inventory(state)
         disks = vm.setdefault("disks", [])
-        next_unit = max((d.get("scsi_unit", 0) for d in disks), default=-1) + 1
-        disk_id = f"{vm['id']}-disk{next_unit}"
-        ds_id = vm.get("datastore_id") or (state["datastores"][0]["id"] if state["datastores"] else "")
-        new_disk = _make_disk(disk_id, add_gb, ds_id, 0, next_unit)
+        # SCSI unit 7 is reserved for the controller, so skip it when auto-assigning.
+        used_units = {d.get("scsi_unit", 0) for d in disks}
+        next_unit = 0
+        while next_unit in used_units or next_unit == 7:
+            next_unit += 1
+        disk_id = f"{vm['id']}-disk{next_unit}-{int(time.time()) % 100000}"
+        ds_id = payload.get("datastore_id") or vm.get("datastore_id") or (state["datastores"][0]["id"] if state["datastores"] else "")
+        new_disk = _make_disk(disk_id, add_gb, ds_id, 0, next_unit, thin=thin)
         disks.append(new_disk)
         vm["disk_gb"] = sum(d.get("capacity_gb", 0) for d in disks)
         ds = _find_ds(state, ds_id=ds_id)
         if ds and ds["free_gb"] >= add_gb:
             ds["free_gb"] -= add_gb
-        events.append(_event(f"Added {add_gb} GB disk ({new_disk['scsi_id']}) to {vm['name']}", "info", vm["name"]))
+        prov = "thin" if thin else "thick"
+        events.append(_event(f"Added {add_gb} GB {prov} disk ({new_disk['scsi_id']}) to {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Add Hard Disk", vm["name"]))
         _save_session(str(session_id), entry)
-        return {"ok": True, "message": f"Added {add_gb} GB disk at SCSI 0:{next_unit}"}
+        return {"ok": True, "message": f"Added {add_gb} GB {prov} disk at SCSI 0:{next_unit}"}
+
+    if action == "remove_disk":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        disks = vm.get("disks") or []
+        disk_id = payload.get("disk_id")
+        scsi_id = payload.get("scsi_id")
+        disk = next(
+            (d for d in disks if d.get("id") == disk_id or (scsi_id and d.get("scsi_id") == scsi_id)),
+            None,
+        )
+        if not disk:
+            return {"ok": False, "error": "Disk not found"}
+        if disk.get("scsi_unit") == 0 and disk.get("scsi_controller", 0) == 0:
+            return {"ok": False, "error": "Cannot remove the boot disk (SCSI 0:0)"}
+        freed = disk.get("capacity_gb", 0)
+        vm["disks"] = [d for d in disks if d is not disk]
+        vm["disk_gb"] = sum(d.get("capacity_gb", 0) for d in vm["disks"])
+        ds = _find_ds(state, ds_id=disk.get("datastore_id") or vm.get("datastore_id"))
+        if ds:
+            ds["free_gb"] = min(ds["capacity_gb"], ds["free_gb"] + freed)
+        events.append(_event(f"Removed disk {disk.get('scsi_id', '')} ({freed} GB) from {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Remove Hard Disk", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Removed {freed} GB disk from {vm['name']}"}
+
+    if action in ("add_nic", "add_network_adapter"):
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        net_id = payload.get("network_id") or vm.get("network_id") or (state["networks"][0]["id"] if state["networks"] else None)
+        net = next((n for n in state.get("networks", []) if n["id"] == net_id), None)
+        if not net:
+            return {"ok": False, "error": "Port group / network not found"}
+        _enrich_inventory(state)
+        nics = vm.setdefault("nics", [])
+        idx = len(nics) + 1
+        nic_id = f"{vm['id']}-nic{idx}-{int(time.time()) % 100000}"
+        mac = _vmware_mac(nic_id)
+        adapter_type = payload.get("adapter_type") or "Vmxnet3"
+        nic = _make_nic(
+            nic_id, net_id, net.get("name", "VM Network"), mac,
+            vlan_id=net.get("vlan_id", net.get("vlan")),
+            connected=True, adapter_type=adapter_type,
+            portgroup_key=net.get("portgroup_key", ""),
+        )
+        nic["label"] = f"Network adapter {idx}"
+        nics.append(nic)
+        events.append(_event(f"Added {adapter_type} network adapter on {net.get('name')} to {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Add Network Adapter", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Added network adapter (MAC {mac}) to {vm['name']}"}
+
+    if action in ("remove_nic", "remove_network_adapter"):
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        nics = vm.get("nics") or []
+        if len(nics) <= 1:
+            return {"ok": False, "error": "Cannot remove the last network adapter"}
+        nic_id = payload.get("nic_id")
+        nic = next((n for n in nics if n.get("id") == nic_id), None)
+        if not nic:
+            return {"ok": False, "error": "Network adapter not found"}
+        vm["nics"] = [n for n in nics if n is not nic]
+        # Keep the VM's primary network_id consistent with the remaining first NIC.
+        vm["network_id"] = vm["nics"][0].get("network_id", vm.get("network_id"))
+        events.append(_event(f"Removed {nic.get('label', 'network adapter')} from {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Remove Network Adapter", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Removed network adapter from {vm['name']}"}
+
+    if action == "create_vswitch":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "vSwitch name is required"}
+        switches = state.setdefault("vswitches", [])
+        if any(v.get("name") == name for v in switches):
+            return {"ok": False, "error": f"vSwitch '{name}' already exists"}
+        sw_type = "distributed" if str(payload.get("type", "standard")).lower() in ("distributed", "dvs", "dswitch") else "standard"
+        mtu = int(payload.get("mtu") or 1500)
+        uplinks = payload.get("uplinks") or []
+        if isinstance(uplinks, str):
+            uplinks = [u.strip() for u in uplinks.split(",") if u.strip()]
+        vsw = {
+            "id": f"vsw-{name.lower().replace(' ', '-')}-{int(time.time()) % 100000}",
+            "name": name,
+            "type": sw_type,
+            "ports": int(payload.get("ports") or (256 if sw_type == "distributed" else 120)),
+            "mtu": mtu,
+            "uplinks": uplinks,
+            "portgroups": [],
+        }
+        if sw_type == "distributed":
+            vsw["version"] = "7.0.3"
+            vsw["hosts"] = [h["id"] for h in state.get("hosts", [])]
+        else:
+            vsw["host"] = payload.get("host_id") or (state["hosts"][0]["id"] if state["hosts"] else "")
+        switches.append(vsw)
+        events.append(_event(f"Created {sw_type} switch {name}", "info", name))
+        tasks.insert(0, _task("Add Virtual Switch", name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"{sw_type.capitalize()} switch '{name}' created", "vswitch_id": vsw["id"]}
+
+    if action == "remove_vswitch":
+        sw_id = payload.get("vswitch_id") or payload.get("id")
+        sw_name = payload.get("name")
+        switches = state.get("vswitches") or []
+        vsw = next((v for v in switches if v.get("id") == sw_id or v.get("name") == sw_name), None)
+        if not vsw:
+            return {"ok": False, "error": "vSwitch not found"}
+        if vsw.get("name") in ("vSwitch0",):
+            return {"ok": False, "error": "Cannot remove the management switch vSwitch0"}
+        attached = [n for n in state.get("networks", []) if n.get("switch") == vsw.get("name")]
+        if attached:
+            return {"ok": False, "error": f"Remove its {len(attached)} port group(s) first"}
+        state["vswitches"] = [v for v in switches if v is not vsw]
+        events.append(_event(f"Removed virtual switch {vsw.get('name')}", "warning", vsw.get("name", "")))
+        tasks.insert(0, _task("Remove Virtual Switch", vsw.get("name", "")))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"vSwitch '{vsw.get('name')}' removed"}
+
+    if action == "remove_portgroup":
+        net_id = payload.get("network_id") or payload.get("id")
+        net_name = payload.get("name")
+        nets = state.get("networks") or []
+        net = next((n for n in nets if n.get("id") == net_id or n.get("name") == net_name), None)
+        if not net:
+            return {"ok": False, "error": "Port group not found"}
+        in_use = [v for v in state.get("vms", []) if v.get("network_id") == net["id"]]
+        if in_use:
+            return {"ok": False, "error": f"Port group in use by {len(in_use)} VM(s) — move them first"}
+        state["networks"] = [n for n in nets if n is not net]
+        for vsw in state.get("vswitches", []):
+            if net.get("name") in (vsw.get("portgroups") or []):
+                vsw["portgroups"] = [p for p in vsw["portgroups"] if p != net["name"]]
+        events.append(_event(f"Removed port group {net.get('name')}", "warning", net.get("switch", "")))
+        tasks.insert(0, _task("Remove Port Group", net.get("name", "")))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Port group '{net.get('name')}' removed"}
+
+    if action == "create_datastore":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Datastore name is required"}
+        if _find_ds(state, ds_name=name):
+            return {"ok": False, "error": f"Datastore '{name}' already exists"}
+        ds_type = str(payload.get("type") or "VMFS").upper()
+        if ds_type not in ("VMFS", "NFS", "VSAN"):
+            ds_type = "VMFS"
+        capacity = max(10, int(payload.get("capacity_gb") or 512))
+        ds = {
+            "id": f"ds-{name.lower().replace(' ', '-')}-{int(time.time()) % 100000}",
+            "name": name,
+            "type": ds_type,
+            "version": "VMFS 6.82" if ds_type == "VMFS" else ("NFS 4.1" if ds_type == "NFS" else "vSAN 7.0"),
+            "capacity_gb": capacity,
+            "free_gb": capacity,
+            "accessible": True,
+            "hosts": payload.get("hosts") or [h["id"] for h in state.get("hosts", [])],
+            "vms": [],
+        }
+        state.setdefault("datastores", []).append(ds)
+        _enrich_inventory(state)
+        events.append(_event(f"Created {ds_type} datastore {name} ({capacity} GB)", "info", name))
+        tasks.insert(0, _task("Create Datastore", name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"{ds_type} datastore '{name}' created", "datastore_id": ds["id"]}
+
+    if action == "remove_datastore":
+        ds = _find_ds(state, ds_id=payload.get("datastore_id"), ds_name=payload.get("name") or payload.get("datastore"))
+        if not ds:
+            return {"ok": False, "error": "Datastore not found"}
+        if ds.get("vms"):
+            return {"ok": False, "error": f"Datastore has {len(ds['vms'])} VM(s) — relocate them first"}
+        state["datastores"] = [d for d in state.get("datastores", []) if d is not ds]
+        events.append(_event(f"Removed datastore {ds.get('name')}", "warning", ds.get("name", "")))
+        tasks.insert(0, _task("Remove Datastore", ds.get("name", "")))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Datastore '{ds.get('name')}' removed"}
+
+    if action == "create_cluster":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Cluster name is required"}
+        dcs = state.setdefault("datacenters", [])
+        dc = next((d for d in dcs if d.get("id") == payload.get("datacenter_id")), dcs[0] if dcs else None)
+        if dc is None:
+            dc = {"id": "dc-prod", "name": "DC-Prod", "site": "primary", "clusters": []}
+            dcs.append(dc)
+        clusters = dc.setdefault("clusters", [])
+        if any(c.get("name") == name for c in clusters):
+            return {"ok": False, "error": f"Cluster '{name}' already exists"}
+        cluster = {
+            "id": f"cluster-{name.lower().replace(' ', '-')}-{int(time.time()) % 100000}",
+            "name": name,
+            "hosts": [],
+            "ha": bool(payload.get("ha", True)),
+            "drs": bool(payload.get("drs", True)),
+            "vsan": bool(payload.get("vsan", False)),
+        }
+        clusters.append(cluster)
+        feats = [f for f, on in (("HA", cluster["ha"]), ("DRS", cluster["drs"]), ("vSAN", cluster["vsan"])) if on]
+        events.append(_event(f"Created cluster {name}" + (f" with {', '.join(feats)}" if feats else ""), "info", name))
+        tasks.insert(0, _task("Create Cluster", name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Cluster '{name}' created" + (f" ({', '.join(feats)})" if feats else ""), "cluster_id": cluster["id"]}
+
+    if action == "add_host_uplink":
+        host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
+        if not host:
+            return {"ok": False, "error": "Host not found"}
+        # Ensure the default vmnic0-3 exist before numbering the next uplink, so
+        # we don't collide with the on-read enriched adapters (e.g. a 2nd "vmnic0").
+        _enrich_inventory(state)
+        vmnics = host.setdefault("vmnics", [])
+        nums = [int(v["name"][5:]) for v in vmnics if v.get("name", "").startswith("vmnic") and v["name"][5:].isdigit()]
+        idx = (max(nums) + 1) if nums else 0
+        name = f"vmnic{idx}"
+        switch = payload.get("switch") or (state["vswitches"][0]["name"] if state.get("vswitches") else "vSwitch0")
+        uplink = {
+            "id": f"{host['id']}-{name}",
+            "name": name,
+            "mac_address": _vmware_mac(f"{host['id']}-{name}-{int(time.time())}"),
+            "pci_id": f"0000:0{6 + idx // 2}:00.{idx % 2}",
+            "driver": "bnxtnet",
+            "speed_mbps": int(payload.get("speed_mbps") or 10000),
+            "status": "up",
+            "switch": switch,
+            "duplex": "full",
+        }
+        vmnics.append(uplink)
+        host["network_adapters"] = len(vmnics)
+        for vsw in state.get("vswitches", []):
+            if vsw.get("name") == switch:
+                vsw.setdefault("uplinks", []).append(name)
+        events.append(_event(f"Added uplink {name} to {switch} on {host['name']}", "info", host["name"]))
+        tasks.insert(0, _task("Add Physical Adapter", host["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Added uplink {name} to {switch}"}
+
+    if action == "remove_host_uplink":
+        host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
+        if not host:
+            return {"ok": False, "error": "Host not found"}
+        vmnics = host.get("vmnics") or []
+        nic_id = payload.get("uplink_id") or payload.get("nic_id")
+        name = payload.get("name")
+        uplink = next((v for v in vmnics if v.get("id") == nic_id or v.get("name") == name), None)
+        if not uplink:
+            return {"ok": False, "error": "Uplink not found"}
+        if len(vmnics) <= 1:
+            return {"ok": False, "error": "Cannot remove the last physical uplink"}
+        host["vmnics"] = [v for v in vmnics if v is not uplink]
+        host["network_adapters"] = len(host["vmnics"])
+        for vsw in state.get("vswitches", []):
+            if uplink.get("name") in (vsw.get("uplinks") or []):
+                vsw["uplinks"] = [u for u in vsw["uplinks"] if u != uplink["name"]]
+        events.append(_event(f"Removed uplink {uplink.get('name')} from {host['name']}", "warning", host["name"]))
+        tasks.insert(0, _task("Remove Physical Adapter", host["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Removed uplink {uplink.get('name')}"}
 
     if action == "change_network":
         vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))

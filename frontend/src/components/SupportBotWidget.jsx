@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Bot, X, Send, Minimize2, MessageCircle } from 'lucide-react'
+import { Bot, X, Send, Minimize2, MessageCircle, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { supportApi } from '../api/support'
 import { useAuthStore } from '../store/authStore'
 
@@ -24,7 +24,15 @@ function TypingIndicator({ name }) {
   )
 }
 
-function BotMessage({ text, name }) {
+function BotMessage({ text, name, onFeedback }) {
+  const [rated, setRated] = useState(null)
+
+  const rate = (helpful) => {
+    if (rated) return
+    setRated(helpful ? 'up' : 'down')
+    onFeedback?.(helpful)
+  }
+
   return (
     <div className="flex items-start gap-2 max-w-[92%]">
       <div className="w-7 h-7 rounded-full fixit-logo-mark flex items-center justify-center shrink-0 mt-0.5">
@@ -33,6 +41,35 @@ function BotMessage({ text, name }) {
       <div className="bg-surface-800/90 border border-white/[0.08] rounded-2xl rounded-tl-sm px-4 py-2.5">
         <p className="text-[10px] text-accent-cyan/90 font-medium mb-1">{name}</p>
         <p className="text-sm text-surface-200 whitespace-pre-wrap leading-relaxed">{text}</p>
+        {onFeedback && (
+          <div className="mt-2 pt-1.5 flex items-center gap-2 border-t border-white/[0.06]">
+            {rated ? (
+              <span className="text-[10px] text-surface-500">
+                {rated === 'up' ? 'Thanks for the feedback!' : 'Thanks — we’ll improve this answer.'}
+              </span>
+            ) : (
+              <>
+                <span className="text-[10px] text-surface-500">Was this helpful?</span>
+                <button
+                  type="button"
+                  onClick={() => rate(true)}
+                  className="p-1 rounded-md text-surface-400 hover:text-accent-cyan hover:bg-surface-700/50 transition-colors"
+                  aria-label="Helpful"
+                >
+                  <ThumbsUp size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => rate(false)}
+                  className="p-1 rounded-md text-surface-400 hover:text-accent-purple hover:bg-surface-700/50 transition-colors"
+                  aria-label="Not helpful"
+                >
+                  <ThumbsDown size={13} />
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -121,7 +158,7 @@ export default function SupportBotWidget() {
         new Promise((r) => setTimeout(r, delay)),
       ])
       setTyping(false)
-      setMessages((prev) => [...prev, { role: 'bot', text: result.reply }])
+      setMessages((prev) => [...prev, { role: 'bot', text: result.reply, query: trimmed }])
       if (result.suggestions?.length) {
         setSuggestions(result.suggestions)
       }
@@ -132,6 +169,17 @@ export default function SupportBotWidget() {
     } finally {
       setSending(false)
     }
+  }
+
+  const submitFeedback = (botMsg, helpful) => {
+    supportApi
+      .sendFeedback({
+        message: botMsg.query || '',
+        reply: botMsg.text || '',
+        helpful,
+        pagePath: pathname,
+      })
+      .catch(() => {})
   }
 
   const hideFab = () => {
@@ -188,7 +236,12 @@ export default function SupportBotWidget() {
               m.role === 'user' ? (
                 <UserMessage key={i} text={m.text} />
               ) : (
-                <BotMessage key={i} text={m.text} name={botName} />
+                <BotMessage
+                  key={i}
+                  text={m.text}
+                  name={botName}
+                  onFeedback={m.query ? (helpful) => submitFeedback(m, helpful) : undefined}
+                />
               )
             )}
             {typing && <TypingIndicator name={botName} />}

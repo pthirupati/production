@@ -92,6 +92,10 @@ export default function VmwareLoginGate({ onAuthenticated }) {
           <button type="submit" disabled={loading} className="vm-btn vm-btn-blue w-full justify-center py-2.5 text-sm font-semibold">
             {loading ? 'Signing in…' : 'Login'}
           </button>
+          <button type="button" onClick={() => { setUser(VCENTER_USER); setPass(VCENTER_PASS); setError('') }}
+            className="vm-btn w-full justify-center py-2 text-xs">
+            Use lab credentials (autofill)
+          </button>
           <p className="text-[10px] text-[#8fa5b8] text-center leading-relaxed">
             Training credentials: <span className="font-mono text-[#E8EDF2]">lab_vmware</span> / <span className="font-mono text-[#E8EDF2]">lab_vmware@123</span>
           </p>

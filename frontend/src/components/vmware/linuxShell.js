@@ -612,6 +612,129 @@ function groupName(gid) {
   return ({ 0: 'root', 12: 'mail', 27: 'mysql', 74: 'sshd', 990: 'nginx', 1000: 'devops' })[gid] || String(gid)
 }
 
+/* ------------------------------------------------------------------ *
+ * Package-manager simulation (realistic dnf/yum + apt transactions)
+ * ------------------------------------------------------------------ *
+ * The React console drives the y/N prompt and the timed progress stream,
+ * but the *content* of every phase lives here so both the web console and
+ * the SSH terminal render byte-identical output.
+ */
+
+// A few packages that ship plausible dependencies, sizes, and versions.
+const PKG_CATALOG = {
+  nginx: { ver: '1:1.20.1', rel: '14.el9', repo: 'epel', sizeK: 36, deps: ['nginx-filesystem', 'nginx-core'] },
+  httpd: { ver: '2.4.57', rel: '5.el9', repo: 'rhel-9-appstream', sizeK: 48, deps: ['httpd-core', 'httpd-tools', 'mod_http2'] },
+  git: { ver: '2.39.3', rel: '1.el9', repo: 'rhel-9-appstream', sizeK: 54, deps: ['git-core', 'perl-Git'] },
+  vim: { ver: '8.2.2637', rel: '20.el9', repo: 'rhel-9-appstream', sizeK: 58, deps: ['vim-common', 'vim-filesystem'] },
+  'vim-enhanced': { ver: '8.2.2637', rel: '20.el9', repo: 'rhel-9-appstream', sizeK: 58, deps: ['vim-common', 'vim-filesystem'] },
+  htop: { ver: '3.2.1', rel: '1.el9', repo: 'epel', sizeK: 17, deps: [] },
+  wget: { ver: '1.21.1', rel: '7.el9', repo: 'rhel-9-baseos', sizeK: 21, deps: [] },
+  curl: { ver: '7.76.1', rel: '26.el9', repo: 'rhel-9-baseos', sizeK: 22, deps: ['libcurl'] },
+  tmux: { ver: '3.2a', rel: '5.el9', repo: 'rhel-9-appstream', sizeK: 24, deps: [] },
+  mysql: { ver: '8.0.36', rel: '1.el9', repo: 'rhel-9-appstream', sizeK: 95, deps: ['mysql-common', 'mysql-libs'] },
+  'mysql-server': { ver: '8.0.36', rel: '1.el9', repo: 'rhel-9-appstream', sizeK: 120, deps: ['mysql', 'mysql-common'] },
+  docker: { ver: '24.0.7', rel: '1.el9', repo: 'docker-ce', sizeK: 110, deps: ['containerd.io', 'docker-ce-cli'] },
+}
+
+function pkgInfo(name) {
+  return PKG_CATALOG[name] || { ver: '1.0.0', rel: '1.el9', repo: 'rhel-9-appstream', sizeK: 28, deps: [] }
+}
+
+// dnf/yum: "Dependencies resolved" + the table + transaction summary (shown BEFORE the y/N prompt).
+function dnfResolveLines(mgr, pkgs, action = 'install') {
+  const lines = ['Last metadata expiration check: 0:14:22 ago on ' + new Date().toUTCString().replace('GMT', 'UTC') + '.']
+  if (action === 'remove') {
+    lines.push('Dependencies resolved.', '================================================================================',
+      ' Package            Arch        Version              Repository           Size',
+      '================================================================================', 'Removing:')
+    pkgs.forEach(p => { const i = pkgInfo(p); lines.push(` ${p.padEnd(18)} x86_64      ${(i.ver + '-' + i.rel).padEnd(20)} @${i.repo.padEnd(18)} ${i.sizeK} k`) })
+    lines.push('', 'Transaction Summary',
+      '================================================================================',
+      `Remove  ${pkgs.length} Package${pkgs.length > 1 ? 's' : ''}`, '', 'Freed space: ' + (pkgs.length * 1.2).toFixed(1) + ' M')
+    return lines
+  }
+  // install/upgrade
+  const all = []
+  pkgs.forEach(p => { all.push({ name: p, dep: false, ...pkgInfo(p) }); pkgInfo(p).deps.forEach(d => all.push({ name: d, dep: true, ...pkgInfo(d) })) })
+  lines.push('Dependencies resolved.',
+    '================================================================================',
+    ' Package            Arch        Version              Repository           Size',
+    '================================================================================', 'Installing:')
+  all.filter(p => !p.dep).forEach(p => lines.push(` ${p.name.padEnd(18)} x86_64      ${(p.ver + '-' + p.rel).padEnd(20)} ${p.repo.padEnd(20)} ${p.sizeK} k`))
+  const deps = all.filter(p => p.dep)
+  if (deps.length) {
+    lines.push('Installing dependencies:')
+    deps.forEach(p => lines.push(` ${p.name.padEnd(18)} x86_64      ${(p.ver + '-' + p.rel).padEnd(20)} ${p.repo.padEnd(20)} ${p.sizeK} k`))
+  }
+  const total = all.reduce((s, p) => s + p.sizeK, 0)
+  lines.push('', 'Transaction Summary',
+    '================================================================================',
+    `Install  ${all.length} Package${all.length > 1 ? 's' : ''}`, '',
+    `Total download size: ${total} k`, `Installed size: ${(total * 3.4 / 1024).toFixed(1)} M`)
+  return lines
+}
+
+// dnf/yum: the streamed download + transaction phases (shown AFTER 'y', one chunk per tick).
+function dnfProgressChunks(pkgs, action = 'install') {
+  const all = []
+  if (action === 'remove') {
+    const chunks = [['Running transaction check', 'Running transaction test', 'Transaction test succeeded', 'Running transaction']]
+    pkgs.forEach((p, i) => chunks.push([`  Erasing          : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${pkgs.length}`,
+      `  Verifying        : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${pkgs.length}`]))
+    chunks.push(['', 'Removed:', ...pkgs.map(p => `  ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64`), '', 'Complete!'])
+    return chunks
+  }
+  pkgs.forEach(p => { all.push(p); pkgInfo(p).deps.forEach(d => all.push(d)) })
+  const chunks = [['Downloading Packages:']]
+  all.forEach(p => { const i = pkgInfo(p); chunks.push([`(${all.indexOf(p) + 1}/${all.length}): ${p}-${i.ver}-${i.rel}.x86_64.rpm        ${i.sizeK} kB/s | ${i.sizeK} kB     00:00`]) })
+  chunks.push(['--------------------------------------------------------------------------------',
+    `Total                                           ${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB/s | ${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB     00:01`,
+    'Running transaction check', 'Transaction check succeeded.', 'Running transaction test', 'Transaction test succeeded.', 'Running transaction'])
+  all.forEach((p, i) => chunks.push([`  Installing       : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${all.length}`]))
+  all.forEach((p, i) => chunks.push([`  Verifying        : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${all.length}`]))
+  chunks.push(['', 'Installed:', ...all.map(p => `  ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64`), '', 'Complete!'])
+  return chunks
+}
+
+// apt: the resolution block shown BEFORE the "Do you want to continue? [Y/n]" prompt.
+function aptResolveLines(pkgs, action = 'install') {
+  const lines = ['Reading package lists... Done', 'Building dependency tree... Done', 'Reading state information... Done']
+  if (action === 'remove' || action === 'purge') {
+    lines.push('The following packages will be REMOVED:', '  ' + pkgs.join(' '), '',
+      `0 upgraded, 0 newly installed, ${pkgs.length} to remove and 0 not upgraded.`,
+      `After this operation, ${(pkgs.length * 1.4).toFixed(1)} MB disk space will be freed.`)
+    return lines
+  }
+  const deps = []
+  pkgs.forEach(p => pkgInfo(p).deps.forEach(d => deps.push(d)))
+  if (deps.length) lines.push('The following additional packages will be installed:', '  ' + deps.join(' '))
+  lines.push('The following NEW packages will be installed:', '  ' + [...pkgs, ...deps].join(' '), '',
+    `0 upgraded, ${pkgs.length + deps.length} newly installed, 0 to remove and 0 not upgraded.`,
+    `Need to get ${((pkgs.length + deps.length) * 1.1).toFixed(1)} MB of archives.`,
+    `After this operation, ${((pkgs.length + deps.length) * 4.2).toFixed(1)} MB of additional disk space will be used.`)
+  return lines
+}
+
+// apt: streamed Get/Unpacking/Setting up phases (shown AFTER 'Y').
+function aptProgressChunks(pkgs, action = 'install') {
+  const all = []
+  pkgs.forEach(p => { all.push(p); pkgInfo(p).deps.forEach(d => all.push(d)) })
+  if (action === 'remove' || action === 'purge') {
+    const chunks = [['(Reading database ... 184221 files and directories currently installed.)']]
+    pkgs.forEach(p => chunks.push([`Removing ${p} (${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1) ...`]))
+    chunks.push(['Processing triggers for man-db (2.10.2-1) ...'])
+    return chunks
+  }
+  const chunks = []
+  all.forEach((p, i) => chunks.push([`Get:${i + 1} http://archive.ubuntu.com/ubuntu jammy/main amd64 ${p} amd64 ${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1 [${pkgInfo(p).sizeK} kB]`]))
+  chunks.push([`Fetched ${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB in 1s (${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB/s)`,
+    '(Reading database ... 184221 files and directories currently installed.)'])
+  all.forEach((p, i) => chunks.push([`Selecting previously unselected package ${p}.`, `Unpacking ${p} (${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1) ...`]))
+  all.forEach(p => chunks.push([`Setting up ${p} (${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1) ...`]))
+  chunks.push(['Processing triggers for man-db (2.10.2-1) ...', 'Processing triggers for libc-bin (2.35-0ubuntu3) ...'])
+  return chunks
+}
+
 export function createLinuxShell(vm) {
   const family = guestOsFamily(vm)
   const isRhel = family === 'rhel'
@@ -1236,7 +1359,10 @@ export function createLinuxShell(vm) {
       const rawSvc = positional[1] || ''
       const svc = rawSvc.replace(/\.service$/, '')
       const s = services[svc]
-      if (!sub || sub === 'list-units') {
+      if (sub === 'reboot') return { lines: ['Rebooting…'], prompt: prompt(), reboot: { single: false } }
+      else if (sub === 'poweroff' || sub === 'halt') return { lines: ['Powering off…'], prompt: prompt(), poweroff: true }
+      else if (sub === 'rescue' || sub === 'emergency') return { lines: [`Reaching ${sub}.target…`], prompt: prompt(), reboot: { single: true } }
+      else if (!sub || sub === 'list-units') {
         emit(['  UNIT                LOAD   ACTIVE   SUB     DESCRIPTION',
           ...Object.entries(services).map(([n, v]) => `  ${(n + '.service').padEnd(20)}loaded ${v.active.padEnd(8)}${v.active === 'active' ? 'running' : 'dead   '} ${v.desc}`)])
       } else if (sub === 'status') {
@@ -1312,10 +1438,33 @@ export function createLinuxShell(vm) {
     /* =================== packages =================== */
     else if (lc === 'dnf' || lc === 'yum') {
       const sub = positional[0]
-      const pkg = positional[1] || 'package'
-      if (sub === 'install') emit(['Last metadata expiration check: 0:12:33 ago.', 'Dependencies resolved.', '========================================', ` Installing: ${pkg}`, '========================================', 'Downloading Packages:', 'Running transaction', `  Installing : ${pkg}-1.0-1.el9.x86_64`, 'Complete!'])
-      else if (sub === 'remove' || sub === 'erase') emit(['Dependencies resolved.', `  Removing: ${pkg}`, 'Complete!'])
-      else if (sub === 'update' || sub === 'upgrade') emit(['Last metadata expiration check: 0:05:01 ago.', 'Dependencies resolved.', 'Nothing to do.', 'Complete!'])
+      const pkgs = positional.slice(1).filter(p => !p.startsWith('-'))
+      const pkg = pkgs[0] || 'package'
+      if (sub === 'install' || sub === 'reinstall' || sub === 'remove' || sub === 'erase' || sub === 'upgrade' || sub === 'update') {
+        const action = (sub === 'remove' || sub === 'erase') ? 'remove' : 'install'
+        // bare `dnf update` with no package and nothing to do
+        if ((sub === 'update' || sub === 'upgrade') && !pkgs.length) {
+          emit(['Last metadata expiration check: 0:05:01 ago.', 'Dependencies resolved.', 'Nothing to do.', 'Complete!'])
+        } else {
+          const resolve = dnfResolveLines(lc, pkgs.length ? pkgs : [pkg], action)
+          const chunks = dnfProgressChunks(pkgs.length ? pkgs : [pkg], action)
+          if (has('-y') || has('--assumeyes')) {
+            // proceed immediately, but still stream the progress
+            return { lines: resolve, prompt: prompt(), stream: { chunks, doneLines: [] } }
+          }
+          // ask first; the console renders the prompt and waits for y/N
+          return {
+            lines: resolve,
+            prompt: prompt(),
+            confirm: {
+              promptText: 'Is this ok [y/N]: ',
+              defaultYes: false,
+              onYesStream: { chunks },
+              onNoLines: ['Operation aborted.'],
+            },
+          }
+        }
+      }
       else if (sub === 'list') emit(['Installed Packages', 'bash.x86_64          5.1.8-6.el9       @anaconda', `nginx.x86_64         1:1.20.1-14.el9   @epel`])
       else if (sub === 'search') emit([`========== Name Matched: ${pkg} ==========`, `${pkg}.x86_64 : The ${pkg} package`])
       else if (sub === 'info') emit([`Name         : ${pkg}`, `Version      : 1.20.1`, `Repository   : epel`, `Summary      : ${pkg} package`])
@@ -1326,10 +1475,27 @@ export function createLinuxShell(vm) {
     }
     else if (lc === 'apt' || lc === 'apt-get') {
       const sub = positional[0]
-      const pkg = positional[1] || 'package'
+      const pkgs = positional.slice(1).filter(p => !p.startsWith('-'))
+      const pkg = pkgs[0] || 'package'
       if (sub === 'update') emit(['Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease', 'Get:2 http://security.ubuntu.com/ubuntu jammy-security InRelease', 'Reading package lists... Done'])
-      else if (sub === 'install') emit(['Reading package lists... Done', 'Building dependency tree... Done', `The following NEW packages will be installed:`, `  ${pkg}`, `Setting up ${pkg} (1.20.1-1ubuntu1) ...`, 'Processing triggers for man-db (2.10.2-1) ...'])
-      else if (sub === 'remove' || sub === 'purge') emit(['Reading package lists... Done', `The following packages will be REMOVED:`, `  ${pkg}`, `Removing ${pkg} (1.20.1-1ubuntu1) ...`])
+      else if (sub === 'install' || sub === 'remove' || sub === 'purge' || sub === 'reinstall') {
+        const action = (sub === 'remove' || sub === 'purge') ? 'remove' : 'install'
+        const resolve = aptResolveLines(pkgs.length ? pkgs : [pkg], action)
+        const chunks = aptProgressChunks(pkgs.length ? pkgs : [pkg], action)
+        if (has('-y') || has('--yes') || has('--assume-yes')) {
+          return { lines: resolve, prompt: prompt(), stream: { chunks, doneLines: [] } }
+        }
+        return {
+          lines: resolve,
+          prompt: prompt(),
+          confirm: {
+            promptText: 'Do you want to continue? [Y/n] ',
+            defaultYes: true,
+            onYesStream: { chunks },
+            onNoLines: ['Abort.'],
+          },
+        }
+      }
       else if (sub === 'upgrade' || sub === 'dist-upgrade' || sub === 'full-upgrade') emit(['Reading package lists... Done', 'Calculating upgrade... Done', '0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.'])
       else if (sub === 'list') emit(['Listing... Done', `nginx/jammy,now 1.18.0-6ubuntu14 amd64 [installed]`])
       else if (sub === 'search') emit([`${pkg}/jammy 1.20.1 amd64`, `  ${pkg} package`])
@@ -1370,9 +1536,12 @@ export function createLinuxShell(vm) {
     }
     else if (lc === 'su') emit('')
     else if (lc === 'sudo') {
-      const rest = positional.join(' ')
-      if (!rest) emit('usage: sudo command')
-      else { const r = run(rest); return { lines: r.lines, prompt: prompt(), sideEffect: r.sideEffect, editor: r.editor } }
+      // strip leading sudo options (-i, -u user, -s, -E) then run the rest verbatim (flags preserved)
+      let rest = args.slice()
+      while (rest.length && rest[0].startsWith('-')) { if (rest[0] === '-u') rest = rest.slice(2); else rest = rest.slice(1) }
+      const cmdline = rest.join(' ')
+      if (!cmdline) emit('usage: sudo command')
+      else { const r = run(cmdline); return { ...r, prompt: prompt() } }
     }
     else if (lc === 'last' || lc === 'lastlog' || lc === 'who' || lc === 'w') {
       if (lc === 'w') emit(['14:22:01 up 14 days,  3:22,  1 user,  load average: 0.08, 0.12, 0.09', 'USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT', `root     pts/0    ${gw}      08:01    0.00s  0.04s  0.00s w`])
@@ -1622,7 +1791,12 @@ export function createLinuxShell(vm) {
     }
 
     /* =================== power =================== */
-    else if (['reboot', 'shutdown', 'poweroff', 'halt'].includes(lc)) emit('Connection to host closed by remote host. (simulated reboot — reopen console)')
+    else if (['reboot', 'shutdown', 'poweroff', 'halt'].includes(lc)) {
+      // `shutdown -h now` / poweroff / halt power the guest OFF; reboot replays boot.
+      const halts = lc === 'poweroff' || lc === 'halt' || (lc === 'shutdown' && (has('-h') || has('-P') || has('-H')))
+      const reboots = lc === 'reboot' || (lc === 'shutdown' && (has('-r') || !halts))
+      return { lines: [reboots ? 'Rebooting…' : 'Powering off…'], prompt: prompt(), reboot: reboots ? { single: false } : undefined, poweroff: halts ? true : undefined }
+    }
     else if (lc === 'systemd-analyze') emit('Startup finished in 1.842s (kernel) + 4.221s (userspace) = 6.063s\nmulti-user.target reached after 4.118s in userspace.')
     else if (lc === 'init' || lc === 'telinit' || lc === 'runlevel') emit(lc === 'runlevel' ? 'N 5' : '')
     else if (lc === 'chroot') emit('')
@@ -1670,24 +1844,157 @@ function buildHelp(isRhel) {
   Other     env export history clear exit help  — 180+ commands recognized`.split('\n')
 }
 
-export const BOOT_SEQUENCE = [
-  '[    0.000000] Linux version 5.15.0-91-generic (build@fixitlab) #101 SMP',
-  '[    0.342891] BIOS-provided physical RAM map:',
-  '[    0.891234] systemd[1]: systemd 249 running in system mode (+PAM)',
-  '[    1.234567] systemd[1]: Reached target Local File Systems.',
-  '[    2.100000] cloud-init: Cloud-init v. 23.1.1 running init-local',
-  '[    3.445000] Loading initial ramdisk ...',
-  '[    4.120000] Begin: Loading essential drivers ... done.',
-  '[    5.890000] Begin: Mounting root file system ... done.',
-  '[    6.234000] systemd[1]: Started FixitLab simulated guest.',
-  '[    7.001000] Started Network Manager.',
-  '[    8.442000] Started OpenSSH server.',
+/* ------------------------------------------------------------------ *
+ * Realistic, time-paced boot / reboot sequence
+ * ------------------------------------------------------------------ *
+ * The VmwareConsole component schedules each stage with setTimeout using the
+ * per-stage `delay` (ms). A full run lands around 45-70s. Everything is data
+ * so the pacing logic in React stays trivial and interruptible.
+ */
+
+// SeaBIOS / POST — printed first, before the GRUB menu.
+export const POST_LINES = [
+  'SeaBIOS (version fixitlab-1.16.0)',
+  'Machine UUID 564d8a1f-2b3c-4d5e-6f70-8192a3b4c5d6',
+  '',
+  'iPXE (https://ipxe.org) 00:03.0 — PCI booting disabled',
+  'Booting from Hard Disk...',
+  'GRUB loading.',
+  'Welcome to GRUB!',
+  '',
 ]
 
-export const GRUB_ENTRIES = [
-  'Ubuntu, with Linux 5.15.0-91-generic',
-  'Ubuntu, with Linux 5.15.0-91-generic (recovery mode)',
-  'Ubuntu, with Linux 5.15.0-88-generic',
-  'Advanced options for Ubuntu',
-  'UEFI Firmware Settings',
-]
+const KERNEL_PRIMARY = '5.15.0-91-generic'
+const KERNEL_OLDER = '5.15.0-88-generic'
+
+// GRUB menu entries are distro-flavoured; index 1 is always the rescue/recovery entry.
+export function buildGrubEntries(vm) {
+  const isRhel = guestOsFamily(vm) === 'rhel'
+  if (isRhel) {
+    return [
+      'Red Hat Enterprise Linux (5.14.0-362.el9.x86_64) 9.3 (Plow)',
+      'Red Hat Enterprise Linux (5.14.0-362.el9.x86_64) 9.3 (Plow) — rescue mode',
+      'Red Hat Enterprise Linux (5.14.0-284.el9.x86_64) 9.3 (Plow)',
+      'UEFI Firmware Settings',
+    ]
+  }
+  return [
+    `Ubuntu, with Linux ${KERNEL_PRIMARY}`,
+    `Advanced options for Ubuntu — recovery mode (${KERNEL_PRIMARY})`,
+    `Ubuntu, with Linux ${KERNEL_OLDER}`,
+    'UEFI Firmware Settings',
+  ]
+}
+
+// Back-compat aliases (legacy importers).
+export const GRUB_ENTRIES = buildGrubEntries({})
+export const BOOT_SEQUENCE = [] // superseded by buildBootStages(); kept so old imports don't crash.
+
+// Build the full kernel→initramfs→mount→systemd→login stage list.
+// Each item: { text: string|string[], delay: ms-before-printing-this-line }.
+// `single` => single-user / rescue mode (drops to a maintenance shell, no graphical login).
+export function buildBootStages(vm, { single = false } = {}) {
+  const isRhel = guestOsFamily(vm) === 'rhel'
+  const hostname = (vm?.hostname || vm?.name || (isRhel ? 'rhel-app01' : 'ubuntu-app01')).split('.')[0]
+  const memMb = vm?.memory_mb || 4096
+  const cpu = vm?.cpu || 2
+  const kver = isRhel ? '5.14.0-362.el9.x86_64' : KERNEL_PRIMARY
+  const s = []
+  // PACE scales the relative per-stage delays so a full boot lands ~50-60s (the
+  // user wants the reboot to take "atleast 1 min"), with a floor so no two lines
+  // appear in the same frame.
+  const PACE = 3.2
+  const push = (text, delay) => s.push({ text, delay: Math.max(160, Math.round(delay * PACE)) })
+
+  // ---- early kernel ----
+  push(`Loading Linux ${kver} ...`, 250)
+  push('Loading initial ramdisk ...', 700)
+  push('', 300)
+  push(`[    0.000000] Linux version ${kver} (mockbuild@fixitlab) (gcc 11.4.0) #1 SMP`, 600)
+  push('[    0.000000] Command line: BOOT_IMAGE=/boot/vmlinuz-' + kver + ' root=UUID=8f3b2c1a ro' + (single ? ' single' : ' quiet'), 200)
+  push(`[    0.004000] x86/fpu: Supporting XSAVE feature 0x002: 'SSE registers'`, 220)
+  push(`[    0.118000] Memory: ${memMb * 1024}K/${memMb * 1024}K available (${cpu} CPUs)`, 260)
+  push('[    0.342891] ACPI: Core revision 20210730', 200)
+  push('[    0.512300] smpboot: Allowing ' + cpu + ' CPUs, 0 hotplug CPUs', 240)
+  push('[    0.884512] pci 0000:00:0f.0: [15ad:0405] VMware SVGA II Adapter', 200)
+  push('[    1.024000] sd 0:0:0:0: [sda] Attached SCSI disk', 280)
+  push('[    1.210400] vmxnet3 0000:0b:00.0 eth0: NIC Link is Up 10000 Mbps', 220)
+
+  // ---- initramfs / dracut ----
+  if (isRhel) {
+    push('[    1.640000] dracut: dracut-057-21.git20230214.el9', 350)
+    push('[    1.920000] dracut: Mounted root filesystem /dev/mapper/rootvg-root', 380)
+    push('[    2.140000] systemd[1]: Switching root.', 300)
+  } else {
+    push('Begin: Loading essential drivers ... done.', 360)
+    push('Begin: Running /scripts/init-premount ... done.', 320)
+    push('Begin: Mounting root file system ... Begin: Running /scripts/local-top ... done.', 360)
+    push('Begin: Running /scripts/local-premount ... done.', 300)
+  }
+  push('[    2.418000] EXT4-fs (sda2): mounted filesystem with ordered data mode.', 420)
+
+  // ---- systemd takes over ----
+  push(`[    2.612000] systemd[1]: systemd 252 running in system mode`, 380)
+  push(`[    2.640000] systemd[1]: Detected virtualization vmware.`, 200)
+  push(`[    2.680000] systemd[1]: Detected architecture x86-64.`, 180)
+  push('', 150)
+  push(isRhel ? 'Welcome to Red Hat Enterprise Linux 9.3 (Plow)!' : 'Welcome to Ubuntu 22.04.4 LTS!', 250)
+  push('', 150)
+
+  // ---- filesystem mounts (explicit, as the user asked) ----
+  push(okLine('Created slice Slice /system.'), 220)
+  push(okLine('Reached target Local Encrypted Volumes.'), 200)
+  push(okLine('Started Journal Service.'), 260)
+  push(okLine('Mounting /boot (xfs) ...'), 320)
+  push(okLine('Mounted /boot.'), 280)
+  push(okLine('Activating swap /dev/mapper/rootvg-swap ...'), 300)
+  push(okLine('Activated swap /dev/mapper/rootvg-swap.'), 240)
+  push(okLine('Reached target Swaps.'), 180)
+  push(okLine('Mounting /dev/shm (tmpfs) ...'), 260)
+  push(okLine('Mounted /dev/shm.'), 220)
+  push(okLine('Reached target Local File Systems.'), 200)
+
+  if (single) {
+    // single-user / rescue: stop here and hand the user a maintenance shell
+    push('', 200)
+    push('You are in rescue mode. After logging in, type "journalctl -xb" to view', 250)
+    push('system logs, "systemctl reboot" to reboot, or "exit" to continue booting.', 200)
+    push('', 150)
+    push('Give root password for maintenance', 300)
+    push('(or press Control-D to continue): ', 200)
+    return s
+  }
+
+  // ---- normal multi-user unit start-up, one [ OK ] at a time ----
+  const units = [
+    'Started udev Kernel Device Manager.',
+    'Started Network Manager.',
+    'Reached target Network.',
+    'Started Network Name Resolution.',
+    'Started Hostname Service.',
+    'Started Login Service.',
+    'Started irqbalance daemon.',
+    'Started System Logging Service.',
+    'Started Self Monitoring and Reporting Technology (SMART) Daemon.',
+    'Started NTP client/server (chronyd).',
+    isRhel ? 'Started firewalld - dynamic firewall daemon.' : 'Started Uncomplicated firewall.',
+    'Started D-Bus System Message Bus.',
+    'Started OpenSSH server daemon.',
+    'Started Docker Application Container Engine.',
+    'Started MySQL Server.',
+    'Started Command Scheduler (crond).',
+    'Started Permit User Sessions.',
+    'Started Getty on tty1.',
+    'Reached target Login Prompts.',
+    'Reached target Multi-User System.',
+    'Reached target Graphical Interface.',
+  ]
+  units.forEach((u, i) => push(okLine(u), 180 + (i % 4) * 70))
+
+  push('', 250)
+  return s
+}
+
+function okLine(text) {
+  return `[  OK  ] ${text}`
+}

@@ -21,6 +21,14 @@ import VmCreateWizard from '../../components/vmware/wizards/VmCreateWizard'
 import VmwareInventoryTree from '../../components/vmware/VmwareInventoryTree'
 import VmwareConsole from '../../components/vmware/VmwareConsole'
 import VmwareContextMenu from '../../components/vmware/VmwareContextMenu'
+import {
+  AddDiskModal,
+  AddNicModal,
+  CreateVswitchModal,
+  CreatePortGroupModal,
+  CreateDatastoreModal,
+  CreateClusterModal,
+} from '../../components/vmware/VmwareResourceModals'
 import VmModal from '../../components/vmware/VmModal'
 import VmConfigurePanel from '../../components/vmware/VmConfigurePanel'
 import VmwareToast from '../../components/vmware/VmwareToast'
@@ -621,6 +629,13 @@ export default function VMwareSimulator() {
   const [showVmotionWizard, setShowVmotionWizard] = useState(false)
   const [showStorageVmotionWizard, setShowStorageVmotionWizard] = useState(false)
   const [showOvfModal, setShowOvfModal] = useState(false)
+  // Resource-management modals (add disk/NIC, create switch/portgroup/datastore/cluster).
+  const [showAddDiskModal, setShowAddDiskModal] = useState(false)
+  const [showAddNicModal, setShowAddNicModal] = useState(false)
+  const [showCreateVswitchModal, setShowCreateVswitchModal] = useState(false)
+  const [showCreatePortGroupModal, setShowCreatePortGroupModal] = useState(false)
+  const [showCreateDatastoreModal, setShowCreateDatastoreModal] = useState(false)
+  const [showCreateClusterModal, setShowCreateClusterModal] = useState(false)
   const [pendingDeleteVm, setPendingDeleteVm] = useState(null)
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false)
   const [inventorySearch, setInventorySearch] = useState('')
@@ -630,6 +645,10 @@ export default function VMwareSimulator() {
   const [monRange, setMonRange] = useState('1H')
   const [consoleVm, setConsoleVm] = useState(null)
   const [vcAuth, setVcAuth] = useState(() => isVcenterAuthenticated())
+  // Credentials hint near the simulator — dismissible, remembered per session.
+  const [credsHintDismissed, setCredsHintDismissed] = useState(() => {
+    try { return sessionStorage.getItem('fixitlab_vmware_creds_hint') === '1' } catch { return false }
+  })
   const [ctxMenu, setCtxMenu] = useState(null)
   const [vmToast, setVmToast] = useState(null)
   // Task/Event detail popover (gap: tasks & events should be clickable).
@@ -697,6 +716,12 @@ export default function VMwareSimulator() {
         setShowEditVmModal(false)
         setShowCloneVmModal(false)
         setShowDeployTemplateModal(false)
+        setShowAddDiskModal(false)
+        setShowAddNicModal(false)
+        setShowCreateVswitchModal(false)
+        setShowCreatePortGroupModal(false)
+        setShowCreateDatastoreModal(false)
+        setShowCreateClusterModal(false)
         setPendingDeleteVm(null)
       }
     }
@@ -753,12 +778,33 @@ export default function VMwareSimulator() {
     } else if (action === '__edit__') {
       setSelectedNode({ type: 'vm', id: payload.id })
       setShowEditVmModal(true)
+    } else if (action === '__add_disk__') {
+      setSelectedNode({ type: 'vm', id: payload.id })
+      setShowAddDiskModal(true)
+    } else if (action === '__add_nic__') {
+      setSelectedNode({ type: 'vm', id: payload.id })
+      setShowAddNicModal(true)
+    } else if (action === '__console__') {
+      setConsoleVm(payload)
     } else if (action === '__delete__') {
       setPendingDeleteVm(payload)
     } else if (action === '__suspend__') {
-      toast('Suspend simulated')
+      runAction('suspend', { vm_id: payload.id })
     } else if (action === '__rename__') {
-      toast('Rename simulated — use Edit Settings')
+      setSelectedNode({ type: 'vm', id: payload.id })
+      setShowEditVmModal(true)
+    } else if (action === '__create_vm__') {
+      setShowCreateVmModal(true)
+    } else if (action === '__create_vswitch__') {
+      setShowCreateVswitchModal(true)
+    } else if (action === '__create_portgroup__') {
+      setShowCreatePortGroupModal(true)
+    } else if (action === '__create_datastore__') {
+      setShowCreateDatastoreModal(true)
+    } else if (action === '__browse_ds__') {
+      setSelectedNode({ type: 'datastore', id: payload.id }); setActiveTab('vms')
+    } else if (action === '__net_edit__') {
+      setSelectedNode({ type: 'network', id: payload.id }); setActiveTab('summary')
     } else {
       runAction(action, payload)
     }
@@ -766,7 +812,15 @@ export default function VMwareSimulator() {
 
   const openVmContext = (e, vm) => {
     e.preventDefault()
-    setCtxMenu({ x: e.clientX, y: e.clientY, vm })
+    e.stopPropagation()
+    setCtxMenu({ x: e.clientX, y: e.clientY, kind: 'vm', vm })
+  }
+
+  // Right-click handler shared by host / datastore / network tree rows and rows.
+  const openNodeContext = (e, kind, node) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setCtxMenu({ x: e.clientX, y: e.clientY, kind, node })
   }
 
   if (loading) {
@@ -888,6 +942,8 @@ export default function VMwareSimulator() {
         <ToolbarBtn onClick={() => setShowStorageVmotionWizard(true)} disabled={acting} label="Storage vMotion…" />
         <ToolbarBtn onClick={() => setShowCloneVmModal(true)} disabled={acting} label="Clone…" />
         <ToolbarSep />
+        <ToolbarBtn onClick={() => setShowAddDiskModal(true)} disabled={acting} label="Add Disk…" />
+        <ToolbarBtn onClick={() => setShowAddNicModal(true)} disabled={acting} label="Add Network Adapter…" />
         <ToolbarBtn onClick={() => setShowEditVmModal(true)} disabled={acting} label="Edit Settings…" />
         <ToolbarBtn onClick={() => setPendingDeleteVm(vm)} disabled={isOn || acting} label="Delete" red />
         <div className="flex-1" />
@@ -902,6 +958,11 @@ export default function VMwareSimulator() {
       <ToolbarBtn onClick={() => { }} disabled label="Get vCenter Server" blue />
       <ToolbarSep />
       <ToolbarBtn onClick={() => setShowCreateVmModal(true)} disabled={acting} label="Create/Register VM" />
+      <ToolbarSep />
+      <ToolbarBtn onClick={() => setShowCreateVswitchModal(true)} disabled={acting} label="Add vSwitch…" />
+      <ToolbarBtn onClick={() => setShowCreatePortGroupModal(true)} disabled={acting} label="Add Port Group…" />
+      <ToolbarBtn onClick={() => setShowCreateDatastoreModal(true)} disabled={acting} label="New Datastore…" />
+      <ToolbarBtn onClick={() => setShowCreateClusterModal(true)} disabled={acting} label="New Cluster…" />
       <ToolbarSep />
       {host.maintenance
         ? <ToolbarBtn onClick={() => runAction('exit_maintenance', { host_name: host.name })} disabled={acting} label="Exit Maintenance Mode" />
@@ -944,6 +1005,24 @@ export default function VMwareSimulator() {
         vms={vms}
         summary={summary}
       />
+
+      {/* vCenter credentials hint — shown wherever the simulator is involved. */}
+      {!credsHintDismissed && (
+        <div className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-[#2D3A4A] bg-[rgba(45,124,255,.08)] text-[11.5px]">
+          <span className="text-[#5b9bf5] font-semibold">vCenter sign-in</span>
+          <span className="text-[#8fa5b8]">Use</span>
+          <code className="font-mono text-[#E8EDF2] bg-[#16222f] border border-[#2D3A4A] rounded px-1.5 py-0.5">lab_vmware</code>
+          <span className="text-[#8fa5b8]">/</span>
+          <code className="font-mono text-[#E8EDF2] bg-[#16222f] border border-[#2D3A4A] rounded px-1.5 py-0.5">lab_vmware@123</code>
+          <button type="button"
+            onClick={() => { navigator.clipboard?.writeText('lab_vmware@123').catch(() => {}); setVmToast({ message: 'Password copied to clipboard', kind: 'success' }) }}
+            className="vm-btn text-[10px] py-0.5 px-2 ml-1">Copy password</button>
+          <div className="flex-1" />
+          <button type="button"
+            onClick={() => { try { sessionStorage.setItem('fixitlab_vmware_creds_hint', '1') } catch { /* ignore */ } setCredsHintDismissed(true) }}
+            className="text-[#8fa5b8] hover:text-white px-1" title="Dismiss">✕</button>
+        </div>
+      )}
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
@@ -1014,7 +1093,14 @@ export default function VMwareSimulator() {
             <span className="text-white">{selectedVm?.name || selectedHost?.name || selectedDs?.name || selectedNet?.name || selectedTemplate?.name || 'Inventory'}</span>
           </div>
 
-          <div className="vm-object-bar">
+          <div className="vm-object-bar"
+            onContextMenu={(e) => {
+              if (selectedVm) openVmContext(e, selectedVm)
+              else if (selectedHost) openNodeContext(e, 'host', selectedHost)
+              else if (selectedDs) openNodeContext(e, 'datastore', selectedDs)
+              else if (selectedNet) openNodeContext(e, 'network', selectedNet)
+            }}
+            title="Right-click for actions">
             {selectedVm && <StatusIcon status={selectedVm.power} size={12} />}
             {selectedHost && <StatusIcon status={selectedHost.status} size={12} />}
             {selectedDs && <StatusIcon status={selectedDs.accessible ? 'connected' : 'disconnected'} size={12} />}
@@ -1043,25 +1129,29 @@ export default function VMwareSimulator() {
                   <div className="vm-actions-menu">
                     <ActionsMenuItem label="Create VM…" onClick={() => { setShowCreateVmModal(true); setActionsMenuOpen(false) }} />
                     <ActionsMenuItem label={`${selectedHost.ssh_enabled ? 'Disable' : 'Enable'} SSH`} onClick={() => runAction('toggle_ssh', { host_name: selectedHost.name })} />
-                    <ActionsMenuItem label="Reboot Host" onClick={() => toast('Host reboot simulated')} />
-                    <ActionsMenuItem label="Enter Maintenance Mode" onClick={() => runAction('enter_maintenance', { host_name: selectedHost.name })} />
+                    <ActionsMenuItem label={selectedHost.maintenance ? 'Exit Maintenance Mode' : 'Enter Maintenance Mode'} onClick={() => runAction(selectedHost.maintenance ? 'exit_maintenance' : 'enter_maintenance', { host_name: selectedHost.name })} />
                     <div className="h-px bg-[#2D3A4A] my-1" />
-                    <ActionsMenuItem label="Add Permission…" onClick={() => toast('Add permission simulated')} />
+                    <ActionsMenuItem label="Add Networking — vSwitch…" onClick={() => { setShowCreateVswitchModal(true); setActionsMenuOpen(false) }} />
+                    <ActionsMenuItem label="Add Networking — Port Group…" onClick={() => { setShowCreatePortGroupModal(true); setActionsMenuOpen(false) }} />
+                    <ActionsMenuItem label="New Datastore…" onClick={() => { setShowCreateDatastoreModal(true); setActionsMenuOpen(false) }} />
+                    <ActionsMenuItem label="New Cluster…" onClick={() => { setShowCreateClusterModal(true); setActionsMenuOpen(false) }} />
                   </div>
                 )}
                 {actionsMenuOpen && selectedVm && (
                   <div className="vm-actions-menu">
                     <ActionsMenuItem label="Power On" onClick={() => runAction('power_on', { vm_id: selectedVm.id })} disabled={selectedVm.power === 'poweredOn' || acting} />
                     <ActionsMenuItem label="Power Off" onClick={() => runAction('power_off', { vm_id: selectedVm.id })} disabled={selectedVm.power === 'poweredOff' || acting} />
-                    <ActionsMenuItem label="Suspend" onClick={() => toast('Suspend simulated')} disabled={selectedVm.power !== 'poweredOn'} />
+                    <ActionsMenuItem label="Suspend" onClick={() => runAction('suspend', { vm_id: selectedVm.id })} disabled={selectedVm.power !== 'poweredOn' || acting} />
                     <ActionsMenuItem label="Reset" onClick={() => runAction('reboot', { vm_id: selectedVm.id })} disabled={selectedVm.power !== 'poweredOn' || acting} />
                     <div className="h-px bg-[#2D3A4A] my-1" />
                     <ActionsMenuItem label="Take Snapshot…" onClick={() => { setShowSnapshotModal(true); setActionsMenuOpen(false) }} />
                     <ActionsMenuItem label="Clone…" onClick={() => { setShowCloneVmModal(true); setActionsMenuOpen(false) }} />
                     <ActionsMenuItem label="Migrate…" onClick={() => { setShowMigrateModal(true); setActionsMenuOpen(false) }} />
+                    <div className="h-px bg-[#2D3A4A] my-1" />
+                    <ActionsMenuItem label="Add Disk…" onClick={() => { setShowAddDiskModal(true); setActionsMenuOpen(false) }} />
+                    <ActionsMenuItem label="Add Network Adapter…" onClick={() => { setShowAddNicModal(true); setActionsMenuOpen(false) }} />
                     <ActionsMenuItem label="Edit Settings…" onClick={() => { setShowEditVmModal(true); setActionsMenuOpen(false) }} />
                     <ActionsMenuItem label="Convert to Template…" onClick={() => { runAction('convert_to_template', { vm_id: selectedVm.id }); setActionsMenuOpen(false) }} disabled={selectedVm.power !== 'poweredOff' || acting} />
-                    <ActionsMenuItem label="Rename…" onClick={() => toast('Rename simulated — use Edit Settings')} />
                     <div className="h-px bg-[#2D3A4A] my-1" />
                     <ActionsMenuItem label="Open Console" onClick={() => { setConsoleVm(selectedVm); setActionsMenuOpen(false) }} />
                     <ActionsMenuItem label="Delete from Disk" color="#D9534F" onClick={() => { setPendingDeleteVm(selectedVm); setActionsMenuOpen(false) }} disabled={selectedVm.power === 'poweredOn'} />
@@ -1093,8 +1183,19 @@ export default function VMwareSimulator() {
           {selectedHost && renderHostToolbar(selectedHost)}
           {selectedDs && (
             <div className="vm-toolbar-row">
-              <ToolbarBtn onClick={() => { }} disabled label="Register VM" />
+              <ToolbarBtn onClick={() => setShowCreateDatastoreModal(true)} disabled={acting} label="New Datastore…" />
               <ToolbarBtn onClick={() => runAction('expand_datastore', { datastore: selectedDs.name, gb: 500 })} disabled={acting} label="Increase Capacity" />
+              <ToolbarBtn onClick={() => runAction('remove_datastore', { datastore_id: selectedDs.id })} disabled={acting || (selectedDs.vms?.length > 0)} label="Remove Datastore" red />
+              <div className="flex-1" />
+              <RefreshBtn onClick={load} />
+            </div>
+          )}
+          {selectedNet && (
+            <div className="vm-toolbar-row">
+              <ToolbarBtn onClick={() => setShowCreatePortGroupModal(true)} disabled={acting} label="New Port Group / VLAN…" />
+              <ToolbarBtn onClick={() => setShowCreateVswitchModal(true)} disabled={acting} label="New vSwitch…" />
+              <ToolbarBtn onClick={() => runAction('remove_portgroup', { network_id: selectedNet.id })}
+                disabled={acting || vms.some(v => v.network_id === selectedNet.id)} label="Remove Port Group" red />
               <div className="flex-1" />
               <RefreshBtn onClick={load} />
             </div>
@@ -1151,6 +1252,29 @@ export default function VMwareSimulator() {
                   <InfoRow label="Linked" value={datacenters.find(d => d.id === selectedNode.id)?.linked !== false ? 'Yes' : 'No'} />
                   <InfoRow label="Hosts" value={String(hosts.filter(h => (h.datacenter_id || 'dc-prod') === selectedNode.id).length)} />
                   <InfoRow label="VMs" value={String(vms.filter(v => hosts.some(h => h.id === v.host_id && (h.datacenter_id || 'dc-prod') === selectedNode.id)).length)} />
+                  <InfoRow label="Clusters" value={String((datacenters.find(d => d.id === selectedNode.id)?.clusters || []).length)} />
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <button type="button" onClick={() => setShowCreateClusterModal(true)} className="vm-btn vm-btn-blue text-xs">New Cluster…</button>
+                    <button type="button" onClick={() => setShowCreateDatastoreModal(true)} className="vm-btn text-xs">New Datastore…</button>
+                    <button type="button" onClick={() => setShowCreateVswitchModal(true)} className="vm-btn text-xs">New vSwitch…</button>
+                    <button type="button" onClick={() => setShowCreatePortGroupModal(true)} className="vm-btn text-xs">New Port Group / VLAN…</button>
+                  </div>
+                  {(datacenters.find(d => d.id === selectedNode.id)?.clusters || []).length > 0 && (
+                    <table className="vm-table mt-3">
+                      <thead><tr>{['Cluster', 'Hosts', 'HA', 'DRS', 'vSAN'].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                      <tbody>
+                        {(datacenters.find(d => d.id === selectedNode.id)?.clusters || []).map(c => (
+                          <tr key={c.id}>
+                            <td className="text-[#5b9bf5]">{c.name}</td>
+                            <td>{(c.hosts || []).length}</td>
+                            <td className={c.ha ? 'text-[#5DB85D]' : 'text-[#8fa5b8]'}>{c.ha ? 'On' : 'Off'}</td>
+                            <td className={c.drs ? 'text-[#5DB85D]' : 'text-[#8fa5b8]'}>{c.drs ? 'On' : 'Off'}</td>
+                            <td className={c.vsan ? 'text-[#5DB85D]' : 'text-[#8fa5b8]'}>{c.vsan ? 'On' : 'Off'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </ContentPanel>
               )}
 
@@ -1329,15 +1453,28 @@ export default function VMwareSimulator() {
                         ))}
                       </tbody>
                     </table>
+                    <div className="flex gap-2 mt-3 mb-1">
+                      <button type="button" onClick={() => setShowCreateVswitchModal(true)} disabled={acting} className="vm-btn vm-btn-blue text-[11px]">New vSwitch…</button>
+                      <button type="button" onClick={() => setShowCreatePortGroupModal(true)} disabled={acting} className="vm-btn text-[11px]">New Port Group / VLAN…</button>
+                      <button type="button" onClick={() => runAction('add_host_uplink', { host_id: selectedHost.id })} disabled={acting} className="vm-btn text-[11px]">Add uplink (vmnic)</button>
+                    </div>
                     {(inv.vswitches || []).map(vsw => (
                       <div key={vsw.id} className="border border-[#2D3A4A] rounded p-2.5 mb-2 mt-3 bg-[#16222f]">
-                        <p className="text-[11px] font-semibold text-[#E8EDF2]">{vsw.name} <span className="text-[10px] text-[#8FA5B8] font-normal">({vsw.type})</span></p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-[11px] font-semibold text-[#E8EDF2] m-0">{vsw.name} <span className="text-[10px] text-[#8FA5B8] font-normal">({vsw.type})</span></p>
+                          <div className="flex-1" />
+                          {vsw.name !== 'vSwitch0' && (
+                            <button type="button" disabled={acting}
+                              onClick={() => runAction('remove_vswitch', { vswitch_id: vsw.id })}
+                              className="vm-btn vm-btn-red text-[10px] py-0.5 px-2">Remove</button>
+                          )}
+                        </div>
                         <div className="grid grid-cols-3 gap-1 mt-1 text-[10px] text-[#8FA5B8]">
                           <span>Ports: {vsw.ports}</span>
                           <span>MTU: {vsw.mtu}</span>
-                          <span>Uplinks: {vsw.uplinks?.join(', ')}</span>
+                          <span>Uplinks: {vsw.uplinks?.join(', ') || '—'}</span>
                         </div>
-                        <p className="text-[10px] text-[#8FA5B8] mt-0.5">Port groups: {vsw.portgroups?.join(', ')}</p>
+                        <p className="text-[10px] text-[#8FA5B8] mt-0.5">Port groups: {vsw.portgroups?.join(', ') || '—'}</p>
                       </div>
                     ))}
                   </ContentPanel>
@@ -1387,6 +1524,7 @@ export default function VMwareSimulator() {
                         const usedPct = (((ds.capacity_gb - ds.free_gb) / ds.capacity_gb) * 100).toFixed(0)
                         return (
                           <tr key={ds.id} className="cursor-pointer"
+                            onContextMenu={(e) => openNodeContext(e, 'datastore', ds)}
                             onClick={() => { setSelectedNode({ type: 'datastore', id: ds.id }); setActiveTab('summary') }}>
                             <td className="text-[#5b9bf5]">{ds.name}</td>
                             <td>{ds.type}</td>
@@ -1423,6 +1561,7 @@ export default function VMwareSimulator() {
                     <tbody>
                       {networks.filter(n => n.hosts?.includes(selectedHost.id)).map((net) => (
                         <tr key={net.id} className="cursor-pointer"
+                          onContextMenu={(e) => openNodeContext(e, 'network', net)}
                           onClick={() => { setSelectedNode({ type: 'network', id: net.id }); setActiveTab('summary') }}>
                           <td className="text-[#5b9bf5]">{net.name}</td>
                           <td>{net.type}</td>
@@ -1433,7 +1572,10 @@ export default function VMwareSimulator() {
                       ))}
                     </tbody>
                   </table>
-                  <button type="button" onClick={() => toast('Add port group simulated')} className="mt-3 vm-btn vm-btn-blue text-[11px]">Add port group…</button>
+                  <div className="flex gap-2 mt-3">
+                    <button type="button" onClick={() => setShowCreatePortGroupModal(true)} className="vm-btn vm-btn-blue text-[11px]">Add port group / VLAN…</button>
+                    <button type="button" onClick={() => setShowCreateVswitchModal(true)} className="vm-btn text-[11px]">Add vSwitch…</button>
+                  </div>
                 </ContentPanel>
               )}
 
@@ -1494,7 +1636,7 @@ export default function VMwareSimulator() {
                       <ContentPanel title="Virtual disks">
                         <table className="vm-table">
                           <thead>
-                            <tr>{['Disk', 'SCSI ID', 'Size', 'Mode', 'Datastore'].map(h => <th key={h}>{h}</th>)}</tr>
+                            <tr>{['Disk', 'SCSI ID', 'Size', 'Mode', 'Datastore', ''].map((h, hi) => <th key={hi}>{h}</th>)}</tr>
                           </thead>
                           <tbody>
                             {selectedVm.disks.map((d, i) => (
@@ -1504,10 +1646,19 @@ export default function VMwareSimulator() {
                                 <td>{d.capacity_gb} GB</td>
                                 <td>{d.thin_provisioned ? 'Thin' : 'Thick'}</td>
                                 <td className="text-[#5b9bf5]">{datastores.find(ds => ds.id === d.datastore_id)?.name || d.datastore_id}</td>
+                                <td className="text-right">
+                                  {(d.scsi_id !== '0:0') && (
+                                    <button type="button" disabled={acting}
+                                      onClick={() => runAction('remove_disk', { vm_id: selectedVm.id, disk_id: d.id })}
+                                      className="vm-btn vm-btn-red text-[10px] py-0.5 px-2">Remove</button>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
+                        <button type="button" disabled={acting} onClick={() => setShowAddDiskModal(true)}
+                          className="mt-2 vm-btn vm-btn-blue text-[11px]">Add disk…</button>
                       </ContentPanel>
                     )}
                     <div className="space-y-4">
@@ -1777,7 +1928,7 @@ export default function VMwareSimulator() {
                   <table className="vm-table">
                     <thead>
                       <tr>
-                        {['Adapter', 'Network', 'VLAN', 'MAC address', 'Status', 'Type', 'Port group'].map(h => <th key={h}>{h}</th>)}
+                        {['Adapter', 'Network', 'VLAN', 'MAC address', 'Status', 'Type', 'Port group', ''].map((h, hi) => <th key={hi}>{h}</th>)}
                       </tr>
                     </thead>
                     <tbody>
@@ -1789,6 +1940,7 @@ export default function VMwareSimulator() {
                         connected: !selectedVm.network_disconnected,
                       }]).map((nic, i) => {
                         const net = networks.find(n => n.id === (nic.network_id || selectedVm.network_id))
+                        const canRemove = nic.id && (selectedVm.nics?.length || 0) > 1
                         return (
                           <tr key={nic.id || i}>
                             <td>{nic.label || `Network adapter ${i + 1}`}</td>
@@ -1800,12 +1952,19 @@ export default function VMwareSimulator() {
                             </td>
                             <td className="text-[#8FA5B8]">{nic.adapter_type || 'VMXNET3'}</td>
                             <td className="font-mono text-[10px] text-[#8FA5B8]">{nic.portgroup_key || net?.portgroup_key || '—'}</td>
+                            <td className="text-right">
+                              {canRemove && (
+                                <button type="button" disabled={acting}
+                                  onClick={() => runAction('remove_nic', { vm_id: selectedVm.id, nic_id: nic.id })}
+                                  className="vm-btn vm-btn-red text-[10px] py-0.5 px-2">Remove</button>
+                              )}
+                            </td>
                           </tr>
                         )
                       })}
                     </tbody>
                   </table>
-                  <button type="button" onClick={() => setShowEditVmModal(true)} className="mt-3 vm-btn vm-btn-blue text-[11px]">Add network adapter…</button>
+                  <button type="button" onClick={() => setShowAddNicModal(true)} className="mt-3 vm-btn vm-btn-blue text-[11px]">Add network adapter…</button>
                 </ContentPanel>
               )}
               {selectedVm && activeTab === 'updates' && (
@@ -2115,7 +2274,9 @@ export default function VMwareSimulator() {
         <VmwareContextMenu
           x={ctxMenu.x}
           y={ctxMenu.y}
+          kind={ctxMenu.kind || 'vm'}
           vm={ctxMenu.vm}
+          node={ctxMenu.node}
           onClose={() => setCtxMenu(null)}
           onAction={handleCtxAction}
           onConsole={setConsoleVm}
@@ -2177,6 +2338,30 @@ export default function VMwareSimulator() {
       {showOvfModal && contentLibrary.length > 0 && (
         <VmwareOvfDeployModal contentLibrary={contentLibrary} hosts={hosts} datastores={datastores} networks={networks}
           onClose={() => setShowOvfModal(false)} onAction={runAction} />
+      )}
+      {showAddDiskModal && selectedVm && (
+        <AddDiskModal vm={selectedVm} datastores={datastores}
+          onClose={() => setShowAddDiskModal(false)} onAction={runAction} />
+      )}
+      {showAddNicModal && selectedVm && (
+        <AddNicModal vm={selectedVm} networks={networks}
+          onClose={() => setShowAddNicModal(false)} onAction={runAction} />
+      )}
+      {showCreateVswitchModal && (
+        <CreateVswitchModal hosts={hosts}
+          onClose={() => setShowCreateVswitchModal(false)} onAction={runAction} />
+      )}
+      {showCreatePortGroupModal && (
+        <CreatePortGroupModal vswitches={vswitches}
+          onClose={() => setShowCreatePortGroupModal(false)} onAction={runAction} />
+      )}
+      {showCreateDatastoreModal && (
+        <CreateDatastoreModal
+          onClose={() => setShowCreateDatastoreModal(false)} onAction={runAction} />
+      )}
+      {showCreateClusterModal && (
+        <CreateClusterModal datacenters={datacenters}
+          onClose={() => setShowCreateClusterModal(false)} onAction={runAction} />
       )}
       {pendingDeleteVm && (
         <div className="vm-modal-overlay">

@@ -145,3 +145,109 @@ class VMwareAdvancedTests(TestCase):
         defs = get_state(sid)["inventory"]["alarm_definitions"]
         self.assertEqual(len(defs), before + 1)
         self.assertTrue(any(d["name"] == "Custom disk latency" for d in defs))
+
+    def test_add_and_remove_disk(self):
+        sid = self._session("vmware-guest-powered-off")
+        web = next(v for v in get_state(sid)["inventory"]["vms"] if v["name"] == "web-prod-01")
+        before_disks = len(web["disks"])
+        # Add a thick-provisioned disk; SCSI unit should be auto-assigned 0:1.
+        add = apply_action(sid, "add_disk", {"vm_name": "web-prod-01", "size_gb": 50, "thin": False})
+        self.assertTrue(add["ok"], add)
+        web = next(v for v in get_state(sid)["inventory"]["vms"] if v["name"] == "web-prod-01")
+        self.assertEqual(len(web["disks"]), before_disks + 1)
+        new_disk = web["disks"][-1]
+        self.assertEqual(new_disk["scsi_id"], "0:1")
+        self.assertFalse(new_disk["thin_provisioned"])
+        # Boot disk (0:0) cannot be removed.
+        boot = next(d for d in web["disks"] if d["scsi_id"] == "0:0")
+        bad = apply_action(sid, "remove_disk", {"vm_name": "web-prod-01", "disk_id": boot["id"]})
+        self.assertFalse(bad["ok"])
+        # The added disk removes cleanly.
+        rem = apply_action(sid, "remove_disk", {"vm_name": "web-prod-01", "disk_id": new_disk["id"]})
+        self.assertTrue(rem["ok"], rem)
+        web = next(v for v in get_state(sid)["inventory"]["vms"] if v["name"] == "web-prod-01")
+        self.assertEqual(len(web["disks"]), before_disks)
+
+    def test_add_and_remove_network_adapter(self):
+        sid = self._session("vmware-guest-powered-off")
+        web = next(v for v in get_state(sid)["inventory"]["vms"] if v["name"] == "web-prod-01")
+        before = len(web["nics"])
+        add = apply_action(sid, "add_nic", {"vm_name": "web-prod-01", "network_id": "net-03"})
+        self.assertTrue(add["ok"], add)
+        web = next(v for v in get_state(sid)["inventory"]["vms"] if v["name"] == "web-prod-01")
+        self.assertEqual(len(web["nics"]), before + 1)
+        new_nic = web["nics"][-1]
+        self.assertEqual(new_nic["network_id"], "net-03")
+        rem = apply_action(sid, "remove_nic", {"vm_name": "web-prod-01", "nic_id": new_nic["id"]})
+        self.assertTrue(rem["ok"], rem)
+        web = next(v for v in get_state(sid)["inventory"]["vms"] if v["name"] == "web-prod-01")
+        self.assertEqual(len(web["nics"]), before)
+        # Cannot remove the last adapter.
+        last = web["nics"][0]
+        bad = apply_action(sid, "remove_nic", {"vm_name": "web-prod-01", "nic_id": last["id"]})
+        self.assertFalse(bad["ok"])
+
+    def test_create_vswitch_and_portgroup_and_remove(self):
+        sid = self._session("vmware-guest-powered-off")
+        sw = apply_action(sid, "create_vswitch", {"name": "vSwitch-Lab", "type": "standard", "mtu": 9000})
+        self.assertTrue(sw["ok"], sw)
+        switches = get_state(sid)["inventory"]["vswitches"]
+        self.assertTrue(any(v["name"] == "vSwitch-Lab" for v in switches))
+        # Create a VLAN-tagged port group on the new switch.
+        pg = apply_action(sid, "create_portgroup", {"name": "Lab-VLAN-300", "vlan": 300, "switch": "vSwitch-Lab"})
+        self.assertTrue(pg["ok"], pg)
+        nets = get_state(sid)["inventory"]["networks"]
+        lab_net = next(n for n in nets if n["name"] == "Lab-VLAN-300")
+        self.assertEqual(lab_net["vlan_id"], 300)
+        self.assertEqual(lab_net["switch"], "vSwitch-Lab")
+        # Switch with an attached port group refuses removal until the PG is gone.
+        blocked = apply_action(sid, "remove_vswitch", {"name": "vSwitch-Lab"})
+        self.assertFalse(blocked["ok"])
+        self.assertTrue(apply_action(sid, "remove_portgroup", {"network_id": lab_net["id"]})["ok"])
+        self.assertTrue(apply_action(sid, "remove_vswitch", {"name": "vSwitch-Lab"})["ok"])
+        names = {v["name"] for v in get_state(sid)["inventory"]["vswitches"]}
+        self.assertNotIn("vSwitch-Lab", names)
+
+    def test_create_datastore(self):
+        sid = self._session("vmware-guest-powered-off")
+        before = len(get_state(sid)["inventory"]["datastores"])
+        res = apply_action(sid, "create_datastore", {"name": "ds-lab-nvme", "type": "VMFS", "capacity_gb": 1024})
+        self.assertTrue(res["ok"], res)
+        dss = get_state(sid)["inventory"]["datastores"]
+        self.assertEqual(len(dss), before + 1)
+        new_ds = next(d for d in dss if d["name"] == "ds-lab-nvme")
+        self.assertEqual(new_ds["capacity_gb"], 1024)
+        self.assertEqual(new_ds["free_gb"], 1024)
+        # Duplicate name is rejected.
+        self.assertFalse(apply_action(sid, "create_datastore", {"name": "ds-lab-nvme", "capacity_gb": 100})["ok"])
+
+    def test_create_cluster(self):
+        sid = self._session("vmware-guest-powered-off")
+        res = apply_action(sid, "create_cluster", {"name": "Cluster-Edge", "ha": True, "drs": True, "vsan": False})
+        self.assertTrue(res["ok"], res)
+        dcs = get_state(sid)["inventory"]["datacenters"]
+        all_clusters = [c for dc in dcs for c in dc.get("clusters", [])]
+        edge = next(c for c in all_clusters if c["name"] == "Cluster-Edge")
+        self.assertTrue(edge["ha"])
+        self.assertTrue(edge["drs"])
+        self.assertFalse(edge["vsan"])
+        # Duplicate cluster name in the same datacenter is rejected.
+        dup = apply_action(sid, "create_cluster", {"name": "Cluster-Edge", "datacenter_id": dcs[0]["id"]})
+        self.assertFalse(dup["ok"])
+
+    def test_add_and_remove_host_uplink(self):
+        sid = self._session("vmware-guest-powered-off")
+        host0 = get_state(sid)["inventory"]["hosts"][0]
+        before = [v["name"] for v in host0["vmnics"]]
+        # New uplink must take the next free vmnicN (no collision with the defaults).
+        add = apply_action(sid, "add_host_uplink", {"host_id": "host-01", "switch": "vSwitch0"})
+        self.assertTrue(add["ok"], add)
+        host0 = get_state(sid)["inventory"]["hosts"][0]
+        names = [v["name"] for v in host0["vmnics"]]
+        self.assertEqual(len(names), len(before) + 1)
+        self.assertEqual(len(set(names)), len(names), "uplink names must be unique")
+        new_name = names[-1]
+        rem = apply_action(sid, "remove_host_uplink", {"host_id": "host-01", "name": new_name})
+        self.assertTrue(rem["ok"], rem)
+        host0 = get_state(sid)["inventory"]["hosts"][0]
+        self.assertEqual([v["name"] for v in host0["vmnics"]], before)

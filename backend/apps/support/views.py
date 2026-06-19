@@ -3,7 +3,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.throttles import StrictAnonRateThrottle
-from .service import generate_support_reply, support_bot_config
+from .service import (
+    generate_support_reply,
+    record_support_feedback,
+    support_bot_config,
+)
 
 
 class SupportBotConfigView(APIView):
@@ -54,3 +58,25 @@ class SupportBotChatView(APIView):
             page_path=page_path,
         )
         return Response(result)
+
+
+class SupportBotFeedbackView(APIView):
+    """POST /api/support/feedback/ — thumbs up/down on a bot reply."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
+
+    def post(self, request):
+        helpful = bool(request.data.get("helpful"))
+        message = (request.data.get("message") or "")[:1000]
+        reply = (request.data.get("reply") or "")[:2000]
+        page_path = (request.data.get("page_path") or "")[:500]
+        username = request.user.get_username() if request.user.is_authenticated else ""
+        record_support_feedback(
+            message=message,
+            reply=reply,
+            helpful=helpful,
+            page_path=page_path,
+            username=username,
+        )
+        return Response({"ok": True})
