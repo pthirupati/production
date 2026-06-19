@@ -193,6 +193,8 @@ def run_public_tests(s: Suite):
             encoded in login_url,
             detail="matches canonical callback" if encoded in login_url else login_url[:120],
         )
+    elif status == 200:
+        s.record("GitHub OAuth callback_url", True, detail="GitHub OAuth disabled — skipped")
 
 
 def run_auth_registration(s: Suite) -> tuple[str | None, str, str]:

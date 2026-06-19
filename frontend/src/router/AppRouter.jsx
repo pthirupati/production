@@ -122,6 +122,10 @@ export default function AppRouter() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/about" element={<About />} />
+        <Route path="/technologies" element={<PublicLayout><Technologies /></PublicLayout>} />
+        <Route path="/technologies/:slug" element={<PublicLayout><TechnologyDetail /></PublicLayout>} />
+        <Route path="/scenarios" element={<PublicLayout><Scenarios /></PublicLayout>} />
+        <Route path="/scenarios/:slug" element={<PublicLayout><ScenarioDetail /></PublicLayout>} />
         <Route path="/blog" element={<PublicLayout><Blog /></PublicLayout>} />
         <Route path="/blog/:slug" element={<PublicLayout><BlogPost /></PublicLayout>} />
         <Route path="/privacy" element={<Privacy />} />
@@ -142,10 +146,6 @@ export default function AppRouter() {
         {/* Protected routes */}
         <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/technologies" element={<Technologies />} />
-          <Route path="/technologies/:slug" element={<TechnologyDetail />} />
-          <Route path="/scenarios" element={<Scenarios />} />
-          <Route path="/scenarios/:slug" element={<ScenarioDetail />} />
           <Route path="/lab/:sessionId" element={<LabRunner />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/bookmarks" element={<Bookmarks />} />

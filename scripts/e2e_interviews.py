@@ -11,7 +11,7 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
-from e2e_production_test import Suite, api, err_msg, login  # noqa: E402
+from e2e_production_test import Suite, api, err_msg, login, clear_rate_limit_cache  # noqa: E402
 
 ADMIN_EMAIL = os.environ.get("SUPERUSER_EMAIL", "")
 ADMIN_PASSWORD = os.environ.get("SUPERUSER_PASSWORD", "")
@@ -19,6 +19,7 @@ ADMIN_PASSWORD = os.environ.get("SUPERUSER_PASSWORD", "")
 
 def run_interview_e2e(s: Suite) -> None:
     print("\n=== Interview Studio E2E ===")
+    clear_rate_limit_cache()
 
     st, data = api("GET", "/api/interviews/plans/")
     s.record("GET interview plans", st == 200, st, err_msg(data))
@@ -65,8 +66,10 @@ def run_interview_e2e(s: Suite) -> None:
     st, otp_data = api("POST", "/api/auth/send-otp/", data={"email": user_email})
     if st == 200:
         try:
-            sys.path.insert(0, "/app")
-            os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+            for path in ("/app", "/backend", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))):
+                if path not in sys.path:
+                    sys.path.insert(0, path)
+            os.environ.setdefault("DJANGO_SETTINGS_MODULE", os.environ.get("DJANGO_SETTINGS_MODULE", "config.settings"))
             import django
             django.setup()
             from apps.accounts.models import EmailVerificationOTP

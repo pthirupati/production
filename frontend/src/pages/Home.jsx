@@ -10,6 +10,9 @@ import { scenarioApi } from '../api/scenarios'
 import api from '../api/client'
 import { PlatformBanners } from '../components/PlatformBanners'
 import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_SECONDARY, PUBLIC_NAV_LINKS } from '../constants/publicNav'
+import { mergeTechnologies } from '../constants/techCatalog'
+import { FxPageChrome, HeroShowcase, TechCardGrid } from '../components/marketing'
+import { useFxPage } from '../hooks/useFxPage'
 import {
   Terminal, Shield, Clock, Trophy, Zap, Server,
   Cloud, Lock, Cpu, ArrowRight, CheckCircle2,
@@ -54,6 +57,8 @@ export default function Home() {
   const [activeTestimonial, setActiveTestimonial] = useState(0)
   const [counted, setCounted]                     = useState(false)
   const mouseRef = useRef({ x: 0, y: 0 })
+  const rootRef = useRef(null)
+  const { progressRef, toTopRef, spotRef, initMagnetic } = useFxPage()
 
   useEffect(() => {
     const handleMouse = (e) => {
@@ -79,7 +84,9 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    getTechnologies().then(setTechnologies).catch(() => {})
+    getTechnologies()
+      .then(data => setTechnologies(mergeTechnologies(data)))
+      .catch(() => setTechnologies(mergeTechnologies([])))
     scenarioApi.getPlatformStats().then(setStats).catch(() => {})
     api.get('/config/').then(res => {
       setPlatformConfig(res.data)
@@ -96,13 +103,17 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [])
 
+  useEffect(() => {
+    initMagnetic(rootRef.current)
+  }, [initMagnetic, technologies])
+
   const { pathname } = useLocation()
   const navActive = (to) => pathname === to || (to !== '/' && pathname.startsWith(to))
   const techIcons = { Linux: Server, AWS: Cloud, Kubernetes: Cpu, Docker: Monitor, Networking: Globe, 'GPU & NVIDIA': Cpu }
 
   return (
-    <div className="min-h-screen bg-surface-950">
-      <div className="cursor-spotlight" aria-hidden="true" />
+    <div id="top" ref={rootRef} className="min-h-screen bg-[#080a16] fx-marketing-page">
+      <FxPageChrome progressRef={progressRef} toTopRef={toTopRef} spotRef={spotRef} showSpotlight={false} />
 
       {/* ─── Sticky Navbar ─── */}
       <div className="sticky top-0 z-50">
@@ -184,173 +195,52 @@ export default function Home() {
       {/* ─── end Navbar ─── */}
 
 
-      {/* ═══════════════════════════════════════════
-          SECTION 1 — HERO
-          Left: terminal demo  |  Right: copy + CTAs
-      ═══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden min-h-[min(88vh,920px)] flex items-center mesh-gradient">
-        {/* Background layers */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 hero-gradient" />
-          <div className="absolute inset-0 cyber-grid opacity-60" />
-          {/* Deep 3D glow orbs */}
-          <div className="glow-orb-cyan   absolute -top-40  left-1/4  animate-morph" style={{ width: '700px', height: '700px' }} />
-          <div className="glow-orb-purple absolute  top-1/3 -right-20 animate-float" style={{ width: '560px', height: '560px' }} />
-          <div className="glow-orb-pink   absolute -bottom-40 right-1/3 animate-morph" style={{ animationDelay: '3s', width: '480px', height: '480px' }} />
-          <div className="glow-orb-blue absolute bottom-0 left-0 animate-float" style={{ animationDelay: '5s', width: '400px', height: '400px', opacity: '0.35' }} />
-          {/* Slow rotating dashed rings (nested for depth) */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] opacity-[0.06] animate-rotate-slow">
-            <div className="w-full h-full rounded-full border-2 border-dashed border-accent-cyan" />
-          </div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[640px] h-[640px] opacity-[0.04]" style={{ animation: 'rotate-slow 20s linear infinite reverse' }}>
-            <div className="w-full h-full rounded-full border border-dashed border-accent-purple" />
-          </div>
-          {/* Floating particles */}
-          {[...Array(20)].map((_, i) => (
-            <div
-              key={i}
-              className="particle"
-              style={{
-                width:  `${2 + (i % 5) * 1.5}px`,
-                height: `${2 + (i % 5) * 1.5}px`,
-                background: i % 4 === 0
-                  ? 'rgb(var(--a-cyan)   / 0.6)'
-                  : i % 4 === 1
-                    ? 'rgb(var(--a-purple) / 0.5)'
-                    : i % 4 === 2
-                      ? 'rgb(var(--a-pink)   / 0.5)'
-                      : 'rgb(var(--a-blue)   / 0.5)',
-                top:  `${5  + i * 5}%`,
-                left: `${3  + i * 5}%`,
-                animationDelay:    `${i * 0.4}s`,
-                animationDuration: `${7 + (i % 5) * 1.2}s`,
-                boxShadow: i % 3 === 0 ? '0 0 8px rgb(var(--a-cyan)/0.6)' : undefined,
-              }}
-            />
-          ))}
-          <div className="orb orb-indigo" style={{ width: 400, height: 400, top: '10%', left: '-10%' }} />
-          <div className="orb orb-cyan" style={{ width: 300, height: 300, top: '30%', right: '-5%' }} />
-          <div className="orb orb-purple" style={{ width: 350, height: 350, bottom: '10%', left: '30%' }} />
-        </div>
-        {/* 3D perspective floor grid at hero bottom */}
-        <div className="hero-3d-floor">
-          <div className="hero-3d-floor-inner" />
-        </div>
+      {/* ═══ HERO — Claude mockup layout (copy left, showcase right) ═══ */}
+      <section className="fx-hero">
+        <div className="fx-hero-bg" aria-hidden="true" />
+        <div className="fx-hero-grid-bg" aria-hidden="true" data-parallax="0.06" />
+        <div className="fx-hero-orb" aria-hidden="true" style={{ top: '-180px', left: '8%', width: 560, height: 560, background: 'radial-gradient(circle, var(--fx-ac3) 0%, transparent 65%)', opacity: 0.3, animation: 'fxFloat 13s ease-in-out infinite' }} />
+        <div className="fx-hero-orb" aria-hidden="true" style={{ top: 80, right: -100, width: 520, height: 520, background: 'radial-gradient(circle, var(--fx-ac2) 0%, transparent 65%)', opacity: 0.26, animation: 'fxFloatX 16s ease-in-out infinite' }} />
+        <div className="fx-hero-orb" aria-hidden="true" style={{ bottom: -220, left: '38%', width: 480, height: 480, background: 'radial-gradient(circle, var(--fx-ac) 0%, transparent 65%)', opacity: 0.22, animation: 'fxMorph 18s ease-in-out infinite' }} />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 relative w-full">
-          <div className="grid lg:grid-cols-2 gap-10 xl:gap-16 items-center">
-
-            {/* LEFT col — Terminal demo */}
-            <div className="hidden lg:block animate-slide-up">
-              <div className="relative">
-                <div className="absolute -inset-8 bg-gradient-to-r from-accent-cyan/15 via-accent-blue/10 to-accent-purple/8 rounded-3xl blur-3xl" />
-                <div className="absolute -inset-1 bg-gradient-to-br from-accent-cyan/8 to-accent-purple/8 rounded-2xl blur-xl" />
-                <div className="glass-3d p-1 card-3d-deep gradient-border holo-card relative depth-shadow">
-                  {/* Live badge */}
-                  <div className="absolute -top-4 -left-4 bg-surface-800/90 backdrop-blur-xl border border-accent-green/30 rounded-xl px-4 py-2 text-xs text-accent-green font-semibold flex items-center gap-2 z-10 shadow-lg shadow-accent-green/10">
-                    <div className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
-                    Live Session
-                  </div>
-                  {/* Timer badge */}
-                  <div className="absolute -top-4 right-4 bg-surface-800/90 backdrop-blur-xl border border-accent-amber/30 rounded-xl px-4 py-2 text-xs text-accent-amber font-semibold flex items-center gap-2 z-10 shadow-lg shadow-accent-amber/10">
-                    <Clock size={11} /> 12:34 remaining
-                  </div>
-
-                  {/* Terminal chrome */}
-                  <div className="bg-surface-950 rounded-lg overflow-hidden">
-                    <div className="flex items-center gap-2 px-4 py-3 bg-surface-900/80 border-b border-surface-700/50">
-                      <div className="w-3 h-3 rounded-full bg-accent-red/80" />
-                      <div className="w-3 h-3 rounded-full bg-accent-amber/80" />
-                      <div className="w-3 h-3 rounded-full bg-accent-green/80" />
-                      <span className="ml-3 text-xs text-surface-500 font-mono">root@fixitlab ~ broken-nginx</span>
-                    </div>
-                    <div className="p-5 font-mono text-sm leading-loose text-left min-h-[268px]">
-                      <p><span className="text-accent-green">root@lab</span>:<span className="text-accent-blue">~</span># <span className="text-surface-200">systemctl status nginx</span></p>
-                      <p className="text-accent-red">● nginx.service - A high performance web server</p>
-                      <p className="text-surface-500 pl-3">Active: <span className="text-accent-red font-semibold">failed</span> (Result: exit-code)</p>
-                      <p className="mt-2"><span className="text-accent-green">root@lab</span>:<span className="text-accent-blue">~</span># <span className="text-surface-200">nginx -t</span></p>
-                      <p className="text-accent-red">nginx: [emerg] unknown directive &quot;listn&quot;</p>
-                      <p className="mt-2"><span className="text-accent-green">root@lab</span>:<span className="text-accent-blue">~</span># <span className="text-accent-amber">vim /etc/nginx/sites-available/default</span></p>
-                      <p><span className="text-accent-green">root@lab</span>:<span className="text-accent-blue">~</span># <span className="text-surface-200">systemctl restart nginx</span></p>
-                      <p className="text-accent-green mt-2">● nginx.service - Active: <span className="font-semibold">active (running)</span></p>
-                      <p className="text-accent-green mt-3 font-bold flex items-center gap-2">
-                        <CheckCircle2 size={14} /> Challenge solved! Score: 185/200
-                      </p>
-                    </div>
-                  </div>
-                </div>
+        <div className="fx-hero-inner">
+          <div>
+            <div className="fx-hero-eyebrow">
+              <span className="fx-pulse-dot" style={{ background: '#56e0b0' }} />
+              Live break-fix labs · AI interviews
+            </div>
+            <h1 className="fx-hero-h1">
+              Break things.<br />
+              <span className="fx-hero-gradient-text">Fix them.</span> Get hired.
+            </h1>
+            <p className="fx-hero-lead">
+              Practice real incident response on live cloud environments — Linux, Docker, Kubernetes, networking and more. Timed challenges, instant validation, and AI mock interviews that get you job-ready.
+            </p>
+            <div className="fx-hero-cta-row">
+              <Link to="/register" data-magnetic className="fx-btn-primary">
+                Start fixing free <ArrowRight size={17} />
+              </Link>
+              <Link to="/scenarios" className="fx-btn-secondary">
+                <Play size={16} fill="currentColor" stroke="none" /> Browse challenges
+              </Link>
+            </div>
+            <div className="fx-hero-stats">
+              <div>
+                <div className="fx-hero-stat-val">{technologies.filter(t => !t.coming_soon).length || stats.total_technologies || 8}</div>
+                <div className="fx-hero-stat-label">Technologies</div>
+              </div>
+              <div>
+                <div className="fx-hero-stat-val">3</div>
+                <div className="fx-hero-stat-label">Challenge modes</div>
+              </div>
+              <div>
+                <div className="fx-hero-stat-val">30s</div>
+                <div className="fx-hero-stat-label">To launch a live lab</div>
               </div>
             </div>
-
-            {/* RIGHT col — copy + CTAs */}
-            <div className="animate-slide-up">
-              {/* Eyebrow */}
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-cyan/10 border border-accent-cyan/20 text-accent-cyan text-sm mb-8 backdrop-blur-sm">
-                <Sparkles size={14} className="animate-pulse" /> Build. Break. Fix. Learn.
-              </div>
-
-              {/* Headline */}
-              <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] font-black text-white leading-[1.08] mb-5 tracking-tight max-w-xl">
-                Master{' '}
-                <span className="relative inline-block">
-                  <span
-                    className="text-transparent bg-clip-text bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple animate-text-gradient text-glow-cyan"
-                    style={{ backgroundSize: '200% auto' }}
-                  >
-                    Technology
-                  </span>
-                  <span
-                    className="absolute -bottom-2 left-0 w-full h-1 bg-gradient-to-r from-accent-cyan via-accent-purple to-accent-pink rounded-full animate-shimmer"
-                    style={{ backgroundSize: '200% 100%' }}
-                  />
-                </span>
-                <br />by breaking things.
-              </h1>
-
-              {/* Sub-copy */}
-              <p className="text-base lg:text-lg text-surface-300 max-w-lg mb-8 leading-relaxed">
-                Practice real-world skills on live environments — Linux, Docker, databases, cloud, networking, and more. Timed challenges, auto-validation, hints, and a global leaderboard.
-              </p>
-
-              {/* CTAs */}
-              <div className="flex flex-col sm:flex-row gap-4 mb-12">
-                <Link
-                  to="/register"
-                  className="group btn-primary magnetic-btn text-base px-8 py-4 flex items-center justify-center gap-2 shadow-lg shadow-accent-cyan/25 hover:shadow-accent-cyan/45 transition-all"
-                >
-                  Start Fixing for Free
-                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <Link
-                  to="/scenarios"
-                  className="btn-secondary text-base px-8 py-4 flex items-center justify-center gap-2"
-                >
-                  <Play size={16} /> Browse Challenges
-                </Link>
-              </div>
-
-              {/* Live stats — only render when data is available */}
-              {stats.total_scenarios > 0 && (
-                <div className="flex flex-wrap items-center gap-4 pt-8 border-t border-surface-700/30">
-                  {[
-                    { val: `${stats.total_scenarios}+`,                    label: 'Scenarios', icon: Target,       color: 'cyan'   },
-                    { val: `${stats.total_users?.toLocaleString()}+`,       label: 'Engineers', icon: Users,        color: 'purple' },
-                    { val: `${stats.total_completions?.toLocaleString()}+`, label: 'Solves',    icon: CheckCircle2, color: 'green'  },
-                  ].map(({ val, label, icon: Icon, color }) => (
-                    <div key={label} className="stat-badge-3d flex items-center gap-3 px-5 py-3 reveal">
-                      <div className={`w-10 h-10 rounded-lg bg-accent-${color}/15 border border-accent-${color}/20 flex items-center justify-center shrink-0`}>
-                        <Icon size={18} className={`text-accent-${color}`} />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-black text-white leading-none" data-target={val}>{val}</p>
-                        <p className="text-xs text-surface-400 uppercase tracking-wider mt-0.5">{label}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
+          </div>
+          <div className="order-first lg:order-none">
+            <HeroShowcase />
           </div>
         </div>
       </section>
@@ -412,71 +302,36 @@ export default function Home() {
       <div className="section-divider" />
 
 
-      {/* ═══════════════════════════════════════════
-          SECTION 4 — TECHNOLOGIES GRID
-          Live techs first, coming_soon last with badge
-      ═══════════════════════════════════════════ */}
+      {/* ═══ TECHNOLOGIES — Claude mockup grid ═══ */}
       <section className="relative overflow-hidden py-20 lg:py-24">
         <div className="absolute inset-0 section-gradient" />
-        <div className="glow-orb-cyan   absolute -right-40 top-1/2 -translate-y-1/2" />
-        <div className="glow-orb-green  absolute -left-40  bottom-0" />
+        <div className="fx-parallax-orb absolute -right-40 top-1/2 -translate-y-1/2" style={{ width: 400, height: 400, background: 'radial-gradient(circle, var(--fx-ac3) 0%, transparent 68%)', opacity: 0.12 }} />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-green/10 border border-accent-green/20 text-accent-green text-xs font-bold uppercase tracking-widest mb-5">
-              <Layers size={13} /> Technologies
+        <div className="max-w-[1180px] mx-auto px-7 relative z-[2]">
+          <div className="fx-section-header justify-center text-center mb-12">
+            <div>
+              <div className="fx-section-eyebrow justify-center">
+                <Layers size={13} /> Learning paths
+              </div>
+              <h2 className="fx-section-title">Technologies</h2>
+              <p className="fx-section-sub mx-auto">Choose a technology to explore its challenges.</p>
             </div>
-            <h2 className="text-4xl lg:text-5xl font-black text-white mb-4 leading-tight reveal">
-              Choose Your{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-green to-accent-cyan">
-                Technology
-              </span>
-            </h2>
-            <p className="text-surface-400 max-w-xl mx-auto text-lg">
-              Subscribe per technology. Cancel anytime.
-            </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-            {[
-              ...technologies.filter(t => !t.coming_soon),
-              ...technologies.filter(t =>  t.coming_soon),
-            ].map(tech => {
-              const Icon = techIcons[tech.name] || Server
+          <TechCardGrid
+            technologies={technologies}
+            linkTo={(tech) => (tech.coming_soon ? '#' : `/technologies/${tech.slug}`)}
+          />
 
-              if (tech.coming_soon) {
-                return (
-                  <div key={tech.id} className="glass-card p-8 text-center relative opacity-50 cursor-default">
-                    <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-accent-amber/10 border border-accent-amber/25 text-accent-amber text-[10px] font-bold tracking-wider uppercase">
-                      Coming Soon
-                    </div>
-                    <div className="w-[68px] h-[68px] rounded-2xl bg-surface-800 border border-surface-700 flex items-center justify-center mx-auto mb-5">
-                      <Icon size={32} className="text-surface-600" />
-                    </div>
-                    <h3 className="text-base font-bold text-surface-500">{tech.name}</h3>
-                  </div>
-                )
-              }
-
-              return (
-                <Link
-                  to={isAuthenticated ? '/technologies' : '/register'}
-                  key={tech.id}
-                  className="glass-3d card-3d-deep holo-card p-8 text-center group transition-all duration-400 reveal"
-                >
-                  <div className="w-[68px] h-[68px] rounded-2xl bg-gradient-to-br from-accent-cyan/15 to-accent-purple/15 border border-accent-cyan/20 flex items-center justify-center mx-auto mb-5 group-hover:scale-110 group-hover:border-accent-cyan/40 transition-all duration-300">
-                    <Icon size={32} className="text-accent-cyan group-hover:text-white transition-colors" />
-                  </div>
-                  <h3 className="text-base font-bold text-white mb-1.5">{tech.name}</h3>
-                  <p className="text-xs text-surface-500">
-                    {tech.scenario_count || 0} scenario{tech.scenario_count !== 1 ? 's' : ''}
-                  </p>
-                  <div className="mt-5 flex items-center justify-center gap-1 text-xs text-accent-cyan opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300 font-semibold">
-                    Explore <ChevronRight size={12} />
-                  </div>
-                </Link>
-              )
-            })}
+          <div className="fx-cta-strip mt-10">
+            <div className="fx-cta-strip-glow" aria-hidden="true" />
+            <div className="relative">
+              <h2>Not sure where to start?</h2>
+              <p>Browse the full challenge library and filter by technology, difficulty, and type.</p>
+            </div>
+            <Link to="/scenarios" data-magnetic className="fx-btn-primary relative shrink-0">
+              Browse scenarios <ArrowRight size={15} />
+            </Link>
           </div>
         </div>
       </section>
