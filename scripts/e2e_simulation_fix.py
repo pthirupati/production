@@ -297,7 +297,14 @@ def _apply_simulation_fix(session) -> tuple[bool, str]:
         if "lvm" in slug:
             apply_team_ops_action(engine, "storage_disk_added", slug)
             shell.run("pvcreate /dev/sdb")
-            shell.run("vgextend rhel /dev/sdb")
+            # Extend whichever VG this scenario actually uses (rhel, fixitlab, …)
+            # instead of assuming "rhel" — otherwise vgextend no-ops and the PV
+            # never joins a VG (e.g. lvm-add-pv-extend uses the "fixitlab" VG).
+            vgs = list(getattr(getattr(state, "lvm", None), "vgs", {}) or {})
+            for vg in (vgs or ["rhel"]):
+                shell.run(f"vgextend {vg} /dev/sdb")
+            for vg in (vgs or ["rhel"]):
+                shell.run(f"lvextend -r -l +100%FREE /dev/{vg}/datalv")
             return True, "storage disk provisioned"
 
         if "network-nic" in slug:
