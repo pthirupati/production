@@ -140,6 +140,18 @@ Get-Service
 exit 0
 """
 
+CANONICAL_DEVOPS_CHECK = """#!/bin/bash
+gitlab-runner status
+helm history webapp
+exit 0
+"""
+
+CANONICAL_NETWORKING_CHECK = """#!/bin/bash
+vtysh -c "show ip bgp summary"
+chronyc tracking
+exit 0
+"""
+
 
 def is_trivial_validation_script(script: str) -> bool:
     """True when script would always pass without checking lab state."""
@@ -162,9 +174,19 @@ def resolve_simulation_validation_script(scenario_slug: str, validation_script: 
     if not is_trivial_validation_script(script):
         return script
     slug = (scenario_slug or "").lower()
+    # Order matters: specific technology markers are matched BEFORE generic
+    # substring rules. Otherwise "ci-pipeline" matches the "pip" python rule,
+    # "terraform-state" never reaches its rule, etc.
     rules: list[tuple[Any, str]] = [
+        # --- Specific technology families (checked first) ---
+        (lambda s: "devops-" in s or "ci-pipeline" in s or "helm-release" in s or "helm-" in s or "gitlab" in s, CANONICAL_DEVOPS_CHECK),
+        (lambda s: "networking-" in s or "bgp" in s or "ntp-drift" in s, CANONICAL_NETWORKING_CHECK),
+        (lambda s: "terraform" in s or "aws-" in s or "cloudwatch" in s or "lambda" in s or "s3-" in s or "eks" in s or "iam-" in s or "ec2-" in s or "elb" in s or "ecr" in s or "rds" in s or "vpc" in s or "kinesis" in s or "sqs" in s or "secrets-manager" in s, CANONICAL_TERRAFORM_CHECK),
+        (lambda s: "windows" in s or "win-" in s or "iis" in s or "hyper-v" in s or "kerberos" in s or "gpo" in s or "ntfs" in s or "smb-" in s or "winrm" in s or "wmi" in s or "sql-server" in s or "dhcp-" in s or "replication-" in s or "dns-zone" in s, CANONICAL_WINDOWS_CHECK),
+        (lambda s: "ldconfig" in s or "missing-library" in s, CANONICAL_LDCONFIG_CHECK),
+        # --- Generic Linux/infra rules ---
         (lambda s: "nginx" in s and ("root" in s or "html" in s), CANONICAL_NGINX_ROOT_CHECK),
-        (lambda s: "nginx" in s or "firewall" in s and "nginx" in s, CANONICAL_NGINX_CHECK),
+        (lambda s: "nginx" in s or ("firewall" in s and "nginx" in s), CANONICAL_NGINX_CHECK),
         (lambda s: "useradd" in s or "broken-user" in s, CANONICAL_USERADD_CHECK),
         (lambda s: "gpu" in s or "nvidia" in s, CANONICAL_GPU_CHECK),
         (lambda s: "mysql" in s, CANONICAL_MYSQL_CHECK),
@@ -174,7 +196,7 @@ def resolve_simulation_validation_script(scenario_slug: str, validation_script: 
         (lambda s: "ansible" in s, CANONICAL_ANSIBLE_CHECK),
         (lambda s: "firewall" in s or "firewalld" in s, CANONICAL_FIREWALL_CHECK),
         (lambda s: "docker" in s, CANONICAL_DOCKER_CHECK),
-        (lambda s: "pip" in s or ("python" in s and "shell" not in s), CANONICAL_PYTHON_CHECK),
+        (lambda s: "pip-" in s or "-pip" in s or ("python" in s and "shell" not in s), CANONICAL_PYTHON_CHECK),
         (lambda s: "bash" in s or "shell-script" in s or "unbound" in s, CANONICAL_SHELL_CHECK),
         (lambda s: "lvm" in s, CANONICAL_LVM_CHECK),
         (lambda s: "network-nic" in s, CANONICAL_NETWORK_NIC_CHECK),
@@ -182,9 +204,6 @@ def resolve_simulation_validation_script(scenario_slug: str, validation_script: 
         (lambda s: "grub" in s or "mbr" in s or "kernel-panic" in s or "kernel" in s or "boot" in s, CANONICAL_GRUB_CHECK),
         (lambda s: "patch" in s, CANONICAL_PATCHING_CHECK),
         (lambda s: "ssh-stop" in s or "sshd-down" in s, CANONICAL_SSHD_CHECK),
-        (lambda s: "ldconfig" in s or "missing-library" in s, CANONICAL_LDCONFIG_CHECK),
-        (lambda s: "terraform" in s or "aws-" in s or "cloudwatch" in s or "lambda" in s or "s3-" in s or "eks" in s or "iam-" in s or "ec2-" in s or "elb" in s or "ecr" in s or "rds" in s or "vpc" in s or "kinesis" in s or "sqs" in s or "secrets-manager" in s, CANONICAL_TERRAFORM_CHECK),
-        (lambda s: "windows" in s or "win-" in s or "iis" in s or "hyper-v" in s or "kerberos" in s or "gpo" in s or "ntfs" in s or "smb-" in s or "winrm" in s or "wmi" in s or "sql-server" in s or "dhcp-" in s or "replication-" in s or "dns-zone" in s, CANONICAL_WINDOWS_CHECK),
         (lambda s: "ipmi" in s or "baremetal" in s, CANONICAL_BAREMETAL_CHECK),
     ]
     for pred, canonical in rules:
@@ -298,8 +317,10 @@ def _run_line_check(
         return True
 
     if "nvidia-smi" in stripped:
-        if not getattr(state, "gpu_healthy", True):
-            failures.append("GPU still unhealthy")
+        # Fail-closed: a scenario only passes when the fix genuinely marked the
+        # GPU healthy. An uninitialised flag must NOT count as resolved.
+        if not getattr(state, "gpu_healthy", False):
+            failures.append("GPU still unhealthy — load the nvidia driver first")
         return True
 
     if "systemctl is-active mysqld" in stripped or "systemctl is-active mysql" in stripped:
@@ -376,8 +397,10 @@ def _run_line_check(
                 if part.endswith(".py"):
                     path = part
                     break
-        content = state.read_file(path) or ""
-        if "SyntaxError" in content or "IndentationError" in content:
+        content = state.read_file(path)
+        if content is None:
+            failures.append(f"{path} does not exist — create a valid Python program first")
+        elif "SyntaxError" in content or "IndentationError" in content:
             failures.append(f"syntax error in {path}")
         return True
 
@@ -387,14 +410,16 @@ def _run_line_check(
             if part.endswith(".sh"):
                 path = part
                 break
-        content = state.read_file(path) or ""
-        if "$" in content and "set -u" in content and ":-}" not in content:
+        content = state.read_file(path)
+        if content is None:
+            failures.append(f"{path} does not exist — create a valid shell script first")
+        elif "$" in content and "set -u" in content and ":-}" not in content:
             failures.append(f"unbound variable risk in {path}")
         return True
 
     if "lvextend" in stripped or ("pvs" in stripped and "sdb" in stripped):
         slug = (state.scenario_slug or "").lower()
-        if "lvm" in slug and not getattr(state, "storage_disk_provisioned", True):
+        if "lvm" in slug and not getattr(state, "storage_disk_provisioned", False):
             failures.append("new disk not attached — request @storage team in Jira")
             return True
         pv = state.lvm.pvs.get("/dev/sdb")
@@ -405,7 +430,7 @@ def _run_line_check(
     if "ip addr" in stripped or "10.0.0.20" in stripped:
         slug = (state.scenario_slug or "").lower()
         if "network-nic" in slug:
-            if not getattr(state, "network_nic_provisioned", True):
+            if not getattr(state, "network_nic_provisioned", False):
                 failures.append("secondary IP not provisioned — request @network team in Jira")
             elif "10.0.0.20" not in state.format_ip_addr():
                 failures.append("secondary IP 10.0.0.20 not visible on eth0")
@@ -426,7 +451,11 @@ def _run_line_check(
             or getattr(state, "kernel_fixed", False)
             or (boot and (boot.grub_fixed or boot.mbr_fixed or boot.kernel_fixed))
         )
-        if not fixed and boot and boot.phase not in ("shell", "login"):
+        # Fail-closed: only treat the boot issue as resolved when a fix flag is
+        # set OR the machine has actually reached a shell/login prompt. A missing
+        # boot object must NOT be read as "already fixed".
+        booted_through = bool(boot and boot.phase in ("shell", "login"))
+        if not fixed and not booted_through:
             failures.append("boot issue not resolved")
         return True
 
@@ -491,17 +520,43 @@ def _run_line_check(
         return True
 
     if "terraform" in stripped or stripped.startswith("aws "):
-        slug = (state.scenario_slug or "").lower()
-        if "terraform" in slug or "aws" in slug or any(w in slug for w in ("lambda", "eks", "iam", "ec2", "elb", "ecr", "rds", "vpc", "kinesis", "sqs", "s3-", "cloudwatch", "cloudfront", "secrets-manager")):
-            if not getattr(state, "terraform_fixed", False):
-                failures.append("Terraform/AWS issue not resolved — apply the required fix first")
+        # Fail-closed: any terraform/aws validation line requires the fix flag.
+        # Previously this only enforced the flag when the slug matched a hard-coded
+        # keyword list, so terraform scenarios with other slugs passed for free.
+        if not getattr(state, "terraform_fixed", False):
+            failures.append("Terraform/AWS issue not resolved — apply the required fix first")
         return True
 
-    if any(cmd in stripped for cmd in ("Get-Service", "Get-Website", "Start-WebAppPool", "Start-Website", "Get-EventLog", "Get-Process", "Set-Service", "Restart-Service", "netstat", "Get-NetAdapter", "Get-ADUser", "net user", "net localgroup", "ipconfig", "wmic")):
-        slug = (state.scenario_slug or "").lower()
-        if any(w in slug for w in ("windows", "win-", "iis", "hyper-v", "kerberos", "gpo", "ntfs", "smb-", "winrm", "wmi", "sql-server", "dhcp-", "replication-", "dns-zone")):
-            if not getattr(state, "windows_fixed", False):
-                failures.append("Windows issue not resolved — apply the required fix first")
+    # Unambiguous Windows-only tokens (PowerShell cmdlets / net / wmic). Cross-platform
+    # commands like netstat/ipconfig are intentionally excluded so Linux checks that use
+    # them are not mis-routed here.
+    if any(cmd in stripped for cmd in ("Get-Service", "Get-Website", "Start-WebAppPool", "Start-Website", "Get-EventLog", "Get-Process", "Set-Service", "Restart-Service", "Get-NetAdapter", "Get-ADUser", "net user", "net localgroup", "wmic", "Get-WindowsFeature", "sc.exe")):
+        if not getattr(state, "windows_fixed", False):
+            failures.append("Windows issue not resolved — apply the required fix first")
+        return True
+
+    if "gitlab-runner" in stripped or ("pipeline" in stripped and "status" in stripped):
+        devops = getattr(engine, "devops", None) if engine else None
+        if not devops or not devops.is_healthy():
+            failures.append("CI/CD pipeline not healthy — fix KUBECONFIG and redeploy")
+        return True
+
+    if "helm history" in stripped:
+        devops = getattr(engine, "devops", None) if engine else None
+        if not devops or devops.helm_release_status != "deployed":
+            failures.append("Helm release stuck — rollback to a deployed revision")
+        return True
+
+    if "bgp summary" in stripped or "show ip bgp" in stripped:
+        net = getattr(engine, "networking", None) if engine else None
+        if not net or any(n["state"] != "Established" for n in net.bgp_neighbors):
+            failures.append("BGP session not established")
+        return True
+
+    if "chronyc tracking" in stripped or "ntpq" in stripped:
+        net = getattr(engine, "networking", None) if engine else None
+        if not net or not net.ntp_synced:
+            failures.append("NTP not synchronized")
         return True
 
     if "/usr/local/bin/myapp" in stripped or ("ldconfig" in stripped and "libfixit" in stripped):

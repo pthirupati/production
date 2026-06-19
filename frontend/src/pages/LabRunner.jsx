@@ -16,6 +16,7 @@ import JiraTicketPanel from '../components/JiraTicketPanel'
 import JiraTicketLink from '../components/JiraTicketLink'
 import LabTerminal from '../components/LabTerminal'
 import SimLabTips from '../components/SimLabTips'
+import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
 import SimLabWizard from '../components/SimLabWizard'
 import useLabShortcuts from '../hooks/useLabShortcuts'
@@ -943,7 +944,10 @@ export default function LabRunner() {
                   )}
 
                   {(scenario.lab_mode === 'simulation' || session?.provider === 'simulation') && (
-                    <SimLabTips scenario={scenario} />
+                    <>
+                      <SimLabTips scenario={scenario} />
+                      <DevOpsNetworkingSimToolkit scenario={scenario} onRunCommand={sendSimCommand} />
+                    </>
                   )}
 
                   {/* Reminder to stop lab */}

@@ -1,0 +1,23 @@
+title: Create IIS Website
+slug: create-iis-site-do
+technology: Windows Server
+category: Build Lab
+difficulty: easy
+scenario_type: do
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+lab_mode: docker
+jira_priority: Low
+is_free: false
+description: |
+  Task lab — Create site, app pool, and verify HTTP 200.
+objectives:
+  - Complete the build task from scratch
+  - Pass validation when finished
+initial_state: |
+  Greenfield environment — nothing pre-configured for this task.
+hints:
+  - order: 1
+    cost: 10
+    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."

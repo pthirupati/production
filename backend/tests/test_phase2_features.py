@@ -126,3 +126,92 @@ class Phase2UnifiedBillingTest(TestCase):
         self.assertIn("technology_subscriptions", res.data)
         self.assertIn("gateways", res.data)
         self.assertEqual(len(res.data["technology_subscriptions"]), 1)
+
+
+class PublicEndpointsEmptyDBTest(TestCase):
+    """Public/bootstrap endpoints must return 200 (never 500) on an empty DB.
+
+    A 500 here would blank the public marketing pages and fire the global
+    'Server error' toast in the SPA. These guard against regressions where a
+    cached/list endpoint throws instead of returning sensible empty defaults.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_public_endpoints_return_200_when_empty(self):
+        for path in [
+            "/api/config/",
+            "/api/technologies/",
+            "/api/scenarios/",
+            "/api/categories/",
+            "/api/tags/",
+            "/api/stats/",
+            "/api/leaderboard/",
+            "/api/blog/",
+        ]:
+            res = self.client.get(path)
+            self.assertEqual(
+                res.status_code, 200, f"{path} returned {res.status_code}, expected 200"
+            )
+
+    def test_catalog_list_endpoints_return_lists(self):
+        # With no scenarios/tags/technologies, list endpoints must still return
+        # an array (not 500). Technologies may be non-empty due to seed
+        # migrations, so assert shape rather than emptiness.
+        for path in ["/api/technologies/", "/api/categories/", "/api/tags/"]:
+            res = self.client.get(path)
+            self.assertEqual(res.status_code, 200)
+            self.assertIsInstance(res.data, list, f"{path} did not return a list")
+
+
+class LearningPathMalformedDataTest(TestCase):
+    """A malformed learning_path (seeded from YAML) must not 500 the
+    technology-detail / scenario endpoints that overlay learning-path progress."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="lp", email="lp@test.com", password="pass12345!"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_learning_path_as_list_of_strings(self):
+        Technology.objects.create(
+            name="StrPath", slug="strpath", is_active=True,
+            learning_path=["a-slug", "b-slug"],
+        )
+        res = self.client.get("/api/technologies/strpath/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(
+            res.data["technology"]["learning_path_progress"]["steps_total"], 2
+        )
+
+    def test_learning_path_non_list_is_ignored(self):
+        Technology.objects.create(
+            name="BadPath", slug="badpath", is_active=True,
+            learning_path={"unexpected": "dict"},
+        )
+        res = self.client.get("/api/technologies/badpath/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(
+            res.data["technology"]["learning_path_progress"]["steps_total"], 0
+        )
+
+
+class SubscriptionResilienceTest(TestCase):
+    """The /plan/ endpoint must auto-provision a free plan (not 500) for a user
+    who has no subscription yet."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="noplan", email="noplan@test.com", password="pass12345!"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_plan_endpoint_auto_creates_free_when_none(self):
+        res = self.client.get("/api/plan/")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("usage", res.data)
+        self.assertIn("plan", res.data)

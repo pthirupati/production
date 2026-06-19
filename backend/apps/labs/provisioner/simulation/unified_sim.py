@@ -7,7 +7,9 @@ import time
 
 from .base_sim import BaseRHELSimulator
 from .boot_sequence import BootState
+from .devops_state import DevOpsState
 from .k8s_cluster import K8sCluster
+from .networking_state import NetworkingState
 from .rhel_shell import RHELShell
 from .shell import SimulationStreamHolder
 from .sim_types import boot_console_for, hostname_for_type, normalize_sim_type
@@ -31,6 +33,8 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
         super().__init__(scenario_slug=scenario_slug, hostname=hostname)
 
         self.cluster: K8sCluster | None = None
+        self.devops: DevOpsState | None = None
+        self.networking: NetworkingState | None = None
         self._ssh_key_fixed = False
         self._container_running = False
         self._power_state = "on"

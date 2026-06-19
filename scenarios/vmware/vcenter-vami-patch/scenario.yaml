@@ -1,0 +1,23 @@
+---
+slug: vcenter-vami-patch
+title: "vCenter VAMI Pending Appliance Patches"
+technology: VMware
+category: vCenter Administration
+difficulty: medium
+scenario_type: fix
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  vCenter appliance has pending VAMI patches. Stage and install updates via VAMI.
+objectives:
+  - Check pending patches in VAMI
+  - Stage and install appliance patches
+hints:
+  - order: 1
+    cost: 10
+    content: "Use the inventory tree and platform services panels in the VMware simulator."

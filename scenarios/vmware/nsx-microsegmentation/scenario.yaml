@@ -1,0 +1,23 @@
+---
+slug: nsx-microsegmentation
+title: "NSX-T Micro-Segmentation Rule Missing"
+technology: VMware
+category: vCenter Administration
+difficulty: medium
+scenario_type: fix
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  Production tier requires NSX-T DFW micro-segmentation. Connect NSX and create the rule.
+objectives:
+  - Connect NSX-T manager
+  - Create required DFW allow rule for prod tier
+hints:
+  - order: 1
+    cost: 10
+    content: "Use the inventory tree and platform services panels in the VMware simulator."

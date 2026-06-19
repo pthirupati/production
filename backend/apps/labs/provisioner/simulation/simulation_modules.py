@@ -5,7 +5,9 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING
 
+from .devops_state import DevOpsState
 from .k8s_cluster import K8sCluster
+from .networking_state import NetworkingState
 from .rhel_os import SimService
 from .rhel_shell import RHELShell
 
@@ -44,6 +46,10 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
             state._write_file("/opt/app/main.py", 'import requests\n# missing package\n')
         else:
             state._write_file("/opt/app/main.py", 'print("hello"\n')
+    elif sim_type == "devops" or "devops" in slug or "ci-pipeline" in slug or "helm" in slug:
+        state.hostname = "gitlab-runner"
+    elif sim_type == "networking" or "bgp" in slug or "ntp-drift" in slug:
+        state.hostname = "core-router"
 
     if "unbound" in slug:
         state._mkdir("/opt/scripts")
@@ -86,11 +92,19 @@ def register_modules(engine: "UnifiedSimulationEngine", shell: RHELShell | None 
         _register_database(engine, sh)
     if "docker" in modules:
         _register_docker(engine, sh)
+    if "devops" in modules:
+        _register_devops(engine, sh)
+    if "networking" in modules:
+        _register_networking(engine, sh)
 
 
 def _modules_for_type(sim_type: str) -> set[str]:
     if sim_type == "generic":
-        return {"gpu", "kubernetes", "ansible", "baremetal", "database", "docker"}
+        return {"gpu", "kubernetes", "ansible", "baremetal", "database", "docker", "devops", "networking"}
+    if sim_type == "devops":
+        return {"devops", "docker"}
+    if sim_type == "networking":
+        return {"networking"}
     return {sim_type, "docker"} if sim_type == "rhel" else {sim_type}
 
 
@@ -297,5 +311,55 @@ def _register_docker(engine: "UnifiedSimulationEngine", shell: RHELShell) -> Non
             if engine._container_running:
                 return "CONTAINER ID   IMAGE          STATUS         NAMES\nabc123   nginx:latest   Up 1 second   web"
             return "CONTAINER ID   IMAGE          STATUS                     NAMES\nabc123   nginx:latest   Exited (1)   web"
+        return None
+    shell.register_handler(handler)
+
+
+def _register_devops(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
+    if not engine.devops:
+        engine.devops = DevOpsState(engine.scenario_slug)
+
+    def handler(parts, line):
+        low = line.strip().lower()
+        d = engine.devops
+        if low.startswith("gitlab-runner") or ("pipeline" in low and "status" in low):
+            return d.gitlab_pipeline()
+        if low.startswith("helm history"):
+            return d.helm_history()
+        if low.startswith("helm rollback"):
+            parts_list = line.split()
+            rev = int(parts_list[-1]) if parts_list[-1].isdigit() else 3
+            return d.helm_rollback("webapp", rev)
+        if "export kubeconfig" in low or "kubectl config" in low:
+            d.kubeconfig_valid = True
+            d.pipeline_status = "success"
+            return ""
+        if "glab ci" in low or "gitlab-ci" in low or "fix pipeline" in low:
+            return d.fix_pipeline()
+        if low.startswith("helm upgrade") or low.startswith("helm install"):
+            d.helm_release_status = "deployed"
+            return "Release webapp has been upgraded. Happy Helming!"
+        return None
+    shell.register_handler(handler)
+
+
+def _register_networking(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
+    if not engine.networking:
+        engine.networking = NetworkingState(engine.scenario_slug)
+
+    def handler(parts, line):
+        low = line.strip().lower()
+        n = engine.networking
+        if "bgp summary" in low or "show ip bgp" in low or "vtysh" in low:
+            return n.bgp_summary()
+        if "router bgp" in low or ("neighbor" in low and "remote-as" in low):
+            return n.fix_bgp()
+        if "chronyc tracking" in low or "ntpq" in low:
+            return n.chrony_tracking()
+        if "chronyc makestep" in low or "ntpdate" in low:
+            return n.sync_ntp()
+        if "ip link set" in low and "mtu" in low:
+            n.interface_mtu = 1500
+            return ""
         return None
     shell.register_handler(handler)

@@ -16,3 +16,6 @@ venv/
 node_modules/
 frontend/dist/
 *.pem
+
+# Claude Code local session data & worktrees
+.claude/

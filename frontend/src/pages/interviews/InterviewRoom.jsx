@@ -6,8 +6,10 @@ import { useInterviewVoice } from '../../hooks/useInterviewVoice'
 import {
   getMediaErrorMessage,
   isMediaDevicesSupported,
+  isPermissionDeniedError,
   requestUserMedia,
   stopMediaStream,
+  streamHasLiveTrack,
 } from '../../utils/mediaDevices'
 import InterviewVideoPreview from '../../components/interviews/InterviewVideoPreview'
 import { PageHeader } from '../../components/design'
@@ -35,6 +37,10 @@ export default function InterviewRoom() {
   const streamRef = useRef(null)
   const audioCtxRef = useRef(null)
   const rafRef = useRef(null)
+  // Serializes media requests so the proactive prompt, the buttons, and
+  // "Try again" never run getUserMedia concurrently (concurrent calls race and
+  // one rejects with NotReadable/NotAllowed even though access was granted).
+  const mediaInFlightRef = useRef(null)
   const recorderRef = useRef(null)
   const recChunksRef = useRef([])
   const [mediaStream, setMediaStream] = useState(null)
@@ -65,22 +71,27 @@ export default function InterviewRoom() {
 
   const endsAt = round?.ends_at ? new Date(round.ends_at).getTime() : null
 
-  // Proactively request permissions when preflight loads — triggers browser dialog
-  // immediately (like Google Meet), before the user clicks any button.
+  // Proactively request permissions when preflight loads — triggers the browser
+  // dialog immediately (like Google Meet), before the user clicks any button.
+  // Goes through the same acquireMedia() path as the buttons so a grant attaches
+  // the stream and clears any error automatically (no manual re-click needed).
   useEffect(() => {
     if (!preflight || !isMediaDevicesSupported()) return
-    navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-      .then(stream => {
-        stream.getAudioTracks().forEach(t => { t.enabled = true })
-        stream.getVideoTracks().forEach(t => { t.enabled = true })
-        syncMediaState(stream)
-      })
-      .catch(() => {
-        navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-          .then(stream => { stream.getAudioTracks().forEach(t => { t.enabled = true }); syncMediaState(stream) })
-          .catch(() => {})
-      })
+    // Silent: don't surface an error banner on the auto-prompt. If the user
+    // dismisses the native dialog they can still click Enable / Try again.
+    acquireMedia('both', { silent: true })
   }, [preflight]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Recover automatically when a device is plugged in or permission is granted
+  // after the fact — re-attempt acquisition so video/mic turn on without a reload.
+  useEffect(() => {
+    if (!preflight || !navigator.mediaDevices?.addEventListener) return
+    const onDeviceChange = () => {
+      if (!micOn || !cameraOn) acquireMedia('both', { silent: true })
+    }
+    navigator.mediaDevices.addEventListener('devicechange', onDeviceChange)
+    return () => navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange)
+  }, [preflight, micOn, cameraOn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => {
@@ -135,74 +146,79 @@ export default function InterviewRoom() {
     setCameraOn(!!videoTrack?.enabled)
   }
 
-  const runEnableMic = async () => {
-    const { stream } = await requestUserMedia({ audio: true, video: false }, streamRef.current)
-    streamRef.current = stream
-    stream.getAudioTracks().forEach((t) => { t.enabled = true })
-    syncMediaState(stream)
-    toast.success('Microphone enabled')
-  }
+  // Single, serialized media-acquisition path used by the proactive prompt, the
+  // Enable/Mic/Camera buttons, the in-room toggles, and "Try again". Centralizing
+  // it guarantees: (1) only one getUserMedia runs at a time, (2) a successful
+  // stream is authoritative — we attach it and clear any error, and (3) the
+  // "blocked" error is only shown after a real getUserMedia rejection, never
+  // because of a race with another in-flight request.
+  const acquireMedia = (type = 'both', { silent = false } = {}) => {
+    // Coalesce concurrent callers onto the in-flight promise.
+    if (mediaInFlightRef.current) return mediaInFlightRef.current
 
-  const runEnableCamera = async () => {
-    const { stream } = await requestUserMedia({ audio: false, video: true }, streamRef.current)
-    streamRef.current = stream
-    stream.getVideoTracks().forEach((t) => { t.enabled = true })
-    syncMediaState(stream)
-    toast.success('Camera enabled')
-  }
+    const constraints =
+      type === 'audio' ? { audio: true, video: false } :
+      type === 'video' ? { audio: false, video: true } :
+      { audio: true, video: true }
 
-  const runEnableBoth = async () => {
-    const { stream } = await requestUserMedia({ audio: true, video: true }, streamRef.current)
-    streamRef.current = stream
-    stream.getAudioTracks().forEach((t) => { t.enabled = true })
-    stream.getVideoTracks().forEach((t) => { t.enabled = true })
-    syncMediaState(stream)
-    toast.success('Camera and microphone ready')
-  }
-
-  const executeMediaRequest = async (type) => {
-    // Camera/microphone access requires HTTPS (or localhost).
-    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      const msg = 'Camera and microphone access requires a secure (HTTPS) connection. Please open this page over HTTPS and try again.'
-      setMediaError(msg)
-      toast.error(msg)
-      return
-    }
-    if (!isMediaDevicesSupported()) {
-      const msg = getMediaErrorMessage({ name: 'NotSupportedError' })
-      setMediaError(msg)
-      toast.error(msg)
-      return
-    }
-    setMediaLoading(true)
-    setMediaError('')
-    try {
-      if (type === 'audio') await runEnableMic()
-      else if (type === 'video') await runEnableCamera()
-      else await runEnableBoth()
-    } catch (err) {
-      const msg = getMediaErrorMessage(err)
-      setMediaError(msg)
-      toast.error(msg)
-      if (type === 'both') {
-        try {
-          if (!streamRef.current?.getAudioTracks().length) await runEnableMic()
-          if (!streamRef.current?.getVideoTracks().length) await runEnableCamera()
-          if (streamRef.current?.getAudioTracks().length && streamRef.current?.getVideoTracks().length) {
-            setMediaError('')
-          }
-        } catch {
-          /* partial failure already surfaced */
-        }
+    const run = async () => {
+      // Camera/microphone access requires HTTPS (or localhost).
+      const host = window.location.hostname
+      if (window.location.protocol !== 'https:' && host !== 'localhost' && host !== '127.0.0.1') {
+        const msg = 'Camera and microphone access requires a secure (HTTPS) connection. Please open this page over HTTPS and try again.'
+        setMediaError(msg)
+        if (!silent) toast.error(msg)
+        return
       }
-    } finally {
-      setMediaLoading(false)
+      if (!isMediaDevicesSupported()) {
+        const msg = getMediaErrorMessage({ name: 'NotSupportedError' })
+        setMediaError(msg)
+        if (!silent) toast.error(msg)
+        return
+      }
+
+      setMediaLoading(true)
+      try {
+        // requestUserMedia falls back gracefully (e.g. video fails -> audio-only)
+        // and merges into the existing stream.
+        const { stream, audio, video } = await requestUserMedia(constraints, streamRef.current)
+        stream.getAudioTracks().forEach((t) => { t.enabled = true })
+        stream.getVideoTracks().forEach((t) => { t.enabled = true })
+        syncMediaState(stream)
+        // Success is authoritative: clear any stale "blocked" banner.
+        setMediaError('')
+        if (!silent) {
+          if (audio && video) toast.success('Camera and microphone ready')
+          else if (video) toast.success('Camera enabled')
+          else if (audio) toast.success('Microphone enabled')
+        }
+      } catch (err) {
+        // If a working track already exists (e.g. a concurrent/prior request
+        // succeeded, or video failed but audio is live), do NOT paint an error.
+        if (streamHasLiveTrack(streamRef.current, constraints) ||
+            streamHasLiveTrack(streamRef.current)) {
+          syncMediaState(streamRef.current)
+          setMediaError('')
+          return
+        }
+        const msg = getMediaErrorMessage(err)
+        setMediaError(msg)
+        // Only nag with a toast for a genuine permission denial, and never on
+        // the silent auto-prompt (the user may simply not have answered yet).
+        if (!silent && isPermissionDeniedError(err)) toast.error(msg)
+      } finally {
+        setMediaLoading(false)
+      }
     }
+
+    const promise = run().finally(() => { mediaInFlightRef.current = null })
+    mediaInFlightRef.current = promise
+    return promise
   }
 
-  const enableMic = () => executeMediaRequest('audio')
-  const enableCamera = () => executeMediaRequest('video')
-  const enableMedia = () => executeMediaRequest('both')
+  const enableMic = () => acquireMedia('audio')
+  const enableCamera = () => acquireMedia('video')
+  const enableMedia = () => acquireMedia('both')
 
   useEffect(() => {
     if (observerToken) {
@@ -563,7 +579,13 @@ export default function InterviewRoom() {
                 Safari: Settings → Safari → Camera &amp; Microphone → Allow.
               </p>
             )}
-            <button type="button" onClick={() => { setMediaError(''); enableMedia() }} className="text-amber-300 underline hover:text-amber-100">
+            <button
+              type="button"
+              onClick={enableMedia}
+              disabled={mediaLoading}
+              className="text-amber-300 underline hover:text-amber-100 disabled:opacity-50 inline-flex items-center gap-1"
+            >
+              {mediaLoading && <Loader2 size={12} className="animate-spin" />}
               Try again
             </button>
           </div>
@@ -698,7 +720,7 @@ export default function InterviewRoom() {
                 onClick={async () => {
                   const t = streamRef.current?.getAudioTracks()[0]
                   if (!t) {
-                    await executeMediaRequest('audio')
+                    await acquireMedia('audio')
                     return
                   }
                   t.enabled = !t.enabled
@@ -713,7 +735,7 @@ export default function InterviewRoom() {
                 onClick={async () => {
                   const t = streamRef.current?.getVideoTracks()[0]
                   if (!t) {
-                    await executeMediaRequest('video')
+                    await acquireMedia('video')
                     return
                   }
                   t.enabled = !t.enabled

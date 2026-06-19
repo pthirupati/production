@@ -7,7 +7,21 @@ from apps.progress.models import LearningPathProgress, UserScenarioProgress
 
 def _path_slugs(technology) -> list[str]:
     path = getattr(technology, "learning_path", None) or []
-    return [s.get("scenario_slug") for s in path if s.get("scenario_slug")]
+    if not isinstance(path, (list, tuple)):
+        return []
+    slugs: list[str] = []
+    for step in path:
+        # Tolerate both shapes seeded from YAML: a list of dicts
+        # ({"scenario_slug": "..."}) or a plain list of slug strings.
+        if isinstance(step, dict):
+            slug = step.get("scenario_slug")
+        elif isinstance(step, str):
+            slug = step
+        else:
+            slug = None
+        if slug:
+            slugs.append(slug)
+    return slugs
 
 
 def get_learning_path_progress(user, technology) -> dict:

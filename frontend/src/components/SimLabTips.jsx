@@ -57,6 +57,14 @@ export function tipsForScenario(scenario) {
     tips.unshift(...SIM_LAB_TIPS.boot)
   }
   if (slug.includes('nginx')) tips.unshift(...SIM_LAB_TIPS.nginx)
+  if (slug.includes('ci-pipeline') || slug.includes('helm') || scenario?.simulation_type === 'devops') {
+    tips.unshift('Use DevOps Toolkit buttons to inject gitlab-runner / helm commands')
+    tips.unshift('Fix KUBECONFIG before redeploying the pipeline')
+  }
+  if (slug.includes('bgp') || slug.includes('ntp') || scenario?.simulation_type === 'networking') {
+    tips.unshift('Use Networking Toolkit for BGP summary and NTP status')
+    tips.unshift('Match remote-as with the peer router configuration')
+  }
   return [...new Set(tips)].slice(0, 8)
 }
 

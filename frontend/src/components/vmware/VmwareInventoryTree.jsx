@@ -28,18 +28,80 @@ function TreeRow({ depth = 0, label, status, active, onClick, onContextMenu, bad
   )
 }
 
+function DcClusterTree({
+  dc, depth, hosts, vms, filterLabel, selectedNode, setSelectedNode, setActiveTab,
+  onVmContextMenu, exp, setExp,
+}) {
+  const dcHosts = hosts.filter(h => (h.datacenter_id || 'dc-prod') === dc.id && filterLabel(h.name))
+  const cluster = dc.clusters?.[0]
+
+  return (
+    <>
+      <TreeRow
+        depth={depth}
+        label={dc.name}
+        badge={dc.linked === false && dc.site === 'recovery' ? 'DR' : null}
+        hasChildren
+        expanded={exp[`dc-${dc.id}`]}
+        onToggle={() => setExp(p => ({ ...p, [`dc-${dc.id}`]: !p[`dc-${dc.id}`] }))}
+        onClick={() => { setSelectedNode({ type: 'datacenter', id: dc.id }); setActiveTab('summary') }}
+        active={selectedNode.type === 'datacenter' && selectedNode.id === dc.id}
+      />
+      {exp[`dc-${dc.id}`] && (
+        <>
+          <TreeRow
+            depth={depth + 1}
+            label={cluster?.name || 'Cluster-01'}
+            hasChildren
+            expanded={exp[`cluster-${dc.id}`]}
+            onToggle={() => setExp(p => ({ ...p, [`cluster-${dc.id}`]: !p[`cluster-${dc.id}`] }))}
+            onClick={() => setExp(p => ({ ...p, [`cluster-${dc.id}`]: !p[`cluster-${dc.id}`] }))}
+          />
+          {exp[`cluster-${dc.id}`] && dcHosts.map(host => (
+            <div key={host.id}>
+              <TreeRow
+                depth={depth + 2}
+                label={host.name}
+                status={host.status}
+                active={selectedNode.type === 'host' && selectedNode.id === host.id}
+                badge={host.maintenance ? 'M' : null}
+                hasChildren
+                expanded={exp.hosts[host.id]}
+                onToggle={() => setExp(p => ({ ...p, hosts: { ...p.hosts, [host.id]: !p.hosts[host.id] } }))}
+                onClick={() => { setSelectedNode({ type: 'host', id: host.id }); setActiveTab('summary') }}
+              />
+              {exp.hosts[host.id] && vms.filter(v => v.host_id === host.id && filterLabel(v.name)).map(vm => (
+                <TreeRow
+                  key={vm.id}
+                  depth={depth + 3}
+                  label={vm.name}
+                  status={vm.power}
+                  active={selectedNode.type === 'vm' && selectedNode.id === vm.id}
+                  onClick={() => { setSelectedNode({ type: 'vm', id: vm.id }); setActiveTab('summary') }}
+                  onContextMenu={e => { e.preventDefault(); onVmContextMenu(e, vm) }}
+                />
+              ))}
+            </div>
+          ))}
+        </>
+      )}
+    </>
+  )
+}
+
 export default function VmwareInventoryTree({
   inv, hosts, vms, templates = [], datastores, networks,
+  datacenters = [], linkedMode = false,
   filterLabel,
   selectedNode, setSelectedNode, setActiveTab,
-  onVmContextMenu, onCreateVm, onDeployTemplate, onDeployOvf,
+  onVmContextMenu, onCreateVm, onDeployTemplate, onDeployOvf, onCreateVmWizard,
 }) {
-  const [exp, setExp] = useState({ vcenter: true, dc: true, cluster: true, hosts: {}, vms: true, templates: true, storage: true, net: false })
+  const [exp, setExp] = useState({ vcenter: true, templates: true, storage: true, net: false, platform: true, hosts: {} })
   const toggle = (k) => setExp(p => ({ ...p, [k]: !p[k] }))
 
-  const filteredHosts = hosts.filter(h => filterLabel(h.name))
-  const filteredVms = vms.filter(v => filterLabel(v.name))
   const filteredTemplates = templates.filter(t => filterLabel(t.name))
+  const visibleDcs = (datacenters.length ? datacenters : [{ id: 'dc-prod', name: inv.datacenter || 'DC-Prod', clusters: [{ name: inv.cluster || 'Cluster-01' }] }])
+    .filter(dc => dc.site !== 'recovery' || linkedMode)
 
   return (
     <>
@@ -52,45 +114,43 @@ export default function VmwareInventoryTree({
           {onDeployOvf && (
             <button type="button" onClick={onDeployOvf} title="Deploy OVF from content library" className="w-[22px] h-[22px] flex items-center justify-center rounded-[5px] border border-[#2d3a4a] bg-[#243447] text-[#5DB85D] text-[10px] leading-none font-bold">O</button>
           )}
-          <button type="button" onClick={onCreateVm} title="New VM" className="w-[22px] h-[22px] flex items-center justify-center rounded-[5px] border border-[#2d3a4a] bg-[#243447] text-[#00C8FF] text-[15px] leading-none">+</button>
+          <button type="button" onClick={onCreateVmWizard || onCreateVm} title="New VM Wizard" className="w-[22px] h-[22px] flex items-center justify-center rounded-[5px] border border-[#2d3a4a] bg-[#243447] text-[#00C8FF] text-[15px] leading-none">+</button>
         </div>
       </div>
 
-      <TreeRow depth={0} label="vCenter Server" hasChildren caret expanded={exp.vcenter} onToggle={() => toggle('vcenter')} onClick={() => toggle('vcenter')} />
-      {exp.vcenter && (
+      <TreeRow
+        depth={0}
+        label="vCenter Server"
+        hasChildren
+        caret
+        expanded={exp.vcenter}
+        onToggle={() => toggle('vcenter')}
+        active={selectedNode.type === 'vcenter'}
+        onClick={() => { setSelectedNode({ type: 'vcenter', id: 'vcenter' }); setActiveTab('summary') }}
+      />
+      {exp.vcenter && visibleDcs.map(dc => (
+        <DcClusterTree
+          key={dc.id}
+          dc={dc}
+          depth={1}
+          hosts={hosts}
+          vms={vms}
+          filterLabel={filterLabel}
+          selectedNode={selectedNode}
+          setSelectedNode={setSelectedNode}
+          setActiveTab={setActiveTab}
+          onVmContextMenu={onVmContextMenu}
+          exp={exp}
+          setExp={setExp}
+        />
+      ))}
+
+      <TreeRow depth={0} label="Platform Services" hasChildren expanded={exp.platform} onToggle={() => toggle('platform')} onClick={() => toggle('platform')} />
+      {exp.platform && (
         <>
-          <TreeRow depth={1} label={inv.datacenter || 'DC-Prod'} hasChildren expanded={exp.dc} onToggle={() => toggle('dc')} onClick={() => toggle('dc')} />
-          {exp.dc && (
-            <>
-              <TreeRow depth={2} label={inv.cluster || 'Cluster-01'} hasChildren expanded={exp.cluster} onToggle={() => toggle('cluster')} onClick={() => toggle('cluster')} />
-              {exp.cluster && filteredHosts.map(host => (
-                <div key={host.id}>
-                  <TreeRow
-                    depth={3}
-                    label={host.name}
-                    status={host.status}
-                    active={selectedNode.type === 'host' && selectedNode.id === host.id}
-                    badge={host.maintenance ? 'M' : null}
-                    hasChildren
-                    expanded={exp.hosts[host.id]}
-                    onToggle={() => setExp(p => ({ ...p, hosts: { ...p.hosts, [host.id]: !p.hosts[host.id] } }))}
-                    onClick={() => { setSelectedNode({ type: 'host', id: host.id }); setActiveTab('summary') }}
-                  />
-                  {exp.hosts[host.id] && filteredVms.filter(v => v.host_id === host.id).map(vm => (
-                    <TreeRow
-                      key={vm.id}
-                      depth={4}
-                      label={vm.name}
-                      status={vm.power}
-                      active={selectedNode.type === 'vm' && selectedNode.id === vm.id}
-                      onClick={() => { setSelectedNode({ type: 'vm', id: vm.id }); setActiveTab('summary') }}
-                      onContextMenu={e => { e.preventDefault(); onVmContextMenu(e, vm) }}
-                    />
-                  ))}
-                </div>
-              ))}
-            </>
-          )}
+          <TreeRow depth={1} label="NSX-T" active={selectedNode.type === 'nsx'} onClick={() => { setSelectedNode({ type: 'nsx', id: 'nsx' }); setActiveTab('summary') }} />
+          <TreeRow depth={1} label="Site Recovery" active={selectedNode.type === 'srm'} onClick={() => { setSelectedNode({ type: 'srm', id: 'srm' }); setActiveTab('summary') }} />
+          <TreeRow depth={1} label="VAMI Updates" active={selectedNode.type === 'vami'} onClick={() => { setSelectedNode({ type: 'vami', id: 'vami' }); setActiveTab('summary') }} />
         </>
       )}
 

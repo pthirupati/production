@@ -607,9 +607,20 @@ CACHES = {
         "LOCATION": f"redis://{_redis_auth}{_redis_host}:{_redis_port}/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            # Resilience: if Redis is unreachable/slow/pool-exhausted, treat the
+            # cache as a miss instead of raising. Cached endpoints (technologies,
+            # scenarios, stats, /config/, leaderboard, progress) all do
+            # cache.get(...) at the top — without this, a Redis hiccup turns
+            # EVERY one of them into a 500, blanking public pages and firing the
+            # global "Server error" toast site-wide. With IGNORE_EXCEPTIONS they
+            # fall through to the DB and serve fresh data instead.
+            "IGNORE_EXCEPTIONS": True,
         },
     }
 }
+
+# Log the swallowed Redis errors (at WARNING) so degraded cache is observable.
+DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
 
 # --------------------------------------------------
 # Security (all environments)

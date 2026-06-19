@@ -12,6 +12,10 @@ import VmwareDvsEditor from '../../components/vmware/VmwareDvsEditor'
 import VmwareVsanDashboard from '../../components/vmware/VmwareVsanDashboard'
 import VmwarePermissionsPanel from '../../components/vmware/VmwarePermissionsPanel'
 import VmwareLifecyclePanel from '../../components/vmware/VmwareLifecyclePanel'
+import NsxMicroSegmentationPanel from '../../components/vmware/NsxMicroSegmentationPanel'
+import SrmDisasterRecoveryPanel from '../../components/vmware/SrmDisasterRecoveryPanel'
+import VamiAppliancePanel from '../../components/vmware/VamiAppliancePanel'
+import VmCreateWizard from '../../components/vmware/wizards/VmCreateWizard'
 import VmwareInventoryTree from '../../components/vmware/VmwareInventoryTree'
 import VmwareConsole from '../../components/vmware/VmwareConsole'
 import VmwareContextMenu from '../../components/vmware/VmwareContextMenu'
@@ -461,6 +465,7 @@ export default function VMwareSimulator() {
   const scenarioSlug = searchParams.get('scenario') || ''
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [acting, setActing] = useState(false)
   const [selectedNode, setSelectedNode] = useState({ type: 'host', id: null })
   const [activeTab, setActiveTab] = useState('summary')
@@ -468,6 +473,7 @@ export default function VMwareSimulator() {
   const [showSnapshotModal, setShowSnapshotModal] = useState(false)
   const [showMigrateModal, setShowMigrateModal] = useState(false)
   const [showCreateVmModal, setShowCreateVmModal] = useState(false)
+  const [showCreateVmWizard, setShowCreateVmWizard] = useState(false)
   const [showEditVmModal, setShowEditVmModal] = useState(false)
   const [showCloneVmModal, setShowCloneVmModal] = useState(false)
   const [showDeployTemplateModal, setShowDeployTemplateModal] = useState(false)
@@ -493,16 +499,25 @@ export default function VMwareSimulator() {
     try {
       const data = await vmwareApi.getState(sessionId, scenarioSlug)
       setState(data)
+      setLoadFailed(false)
       if (!initialSelectionDone.current && data.inventory?.hosts?.length) {
         setSelectedNode({ type: 'host', id: data.inventory.hosts[0].id })
         initialSelectionDone.current = true
       }
     } catch {
-      toast.error('Could not load VMware simulator')
+      // getState already falls back to the demo sandbox on 4xx; reaching here
+      // means a genuine network/auth failure. Offer a retry instead of a dead end.
+      setLoadFailed(true)
     } finally {
       setLoading(false)
     }
   }, [sessionId, scenarioSlug])
+
+  const retryLoad = useCallback(() => {
+    setLoading(true)
+    setLoadFailed(false)
+    load()
+  }, [load])
 
   useEffect(() => { load() }, [load])
 
@@ -621,6 +636,29 @@ export default function VMwareSimulator() {
     )
   }
 
+  if (loadFailed) {
+    return (
+      <div className="vmware-sim vm-loading">
+        <div className="text-center max-w-sm px-6">
+          <p className="text-[#e6edf3] text-base font-semibold mb-2">Could not reach the VMware simulator</p>
+          <p className="text-[#8fa5b8] text-sm mb-4">
+            The lab service didn’t respond. Check your connection and try again — your progress is preserved.
+          </p>
+          <button
+            onClick={retryLoad}
+            className="px-4 py-2 rounded text-sm font-semibold"
+            style={{ background: '#2D7CFF', color: '#fff' }}
+          >
+            Retry
+          </button>
+          <Link to={`/lab/${sessionId || ''}`} className="block mt-3 text-[#5aa3ff] text-xs hover:underline">
+            ← Back to lab
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   if (!vcAuth) {
     return <VmwareLoginGate onAuthenticated={() => setVcAuth(true)} />
   }
@@ -640,6 +678,12 @@ export default function VMwareSimulator() {
   const rolesCatalog = inv.roles_catalog || []
   const vsan = inv.vsan || {}
   const vswitches = inv.vswitches || []
+  const datacenters = inv.datacenters || []
+  const nsx = inv.nsx || {}
+  const srm = inv.srm || {}
+  const vami = inv.vami || {}
+  const resourcePools = inv.resource_pools || []
+  const linkedMode = summary.linked_mode || inv.linked_mode
   const invSearch = inventorySearch.trim().toLowerCase()
   const filterLabel = (label) => !invSearch || label.toLowerCase().includes(invSearch)
 
@@ -743,12 +787,15 @@ export default function VMwareSimulator() {
             templates={templates}
             datastores={datastores}
             networks={networks}
+            datacenters={datacenters}
+            linkedMode={linkedMode}
             filterLabel={filterLabel}
             selectedNode={selectedNode}
             setSelectedNode={setSelectedNode}
             setActiveTab={setActiveTab}
             onVmContextMenu={openVmContext}
             onCreateVm={() => setShowCreateVmModal(true)}
+            onCreateVmWizard={() => setShowCreateVmWizard(true)}
             onDeployTemplate={() => setShowDeployTemplateModal(true)}
             onDeployOvf={() => setShowOvfModal(true)}
           />
@@ -883,6 +930,48 @@ export default function VMwareSimulator() {
 
           <div className="flex flex-1 min-h-0 overflow-hidden">
             <div className="vm-content">
+
+              {/* ── VCENTER / PLATFORM ───────────────────────────── */}
+              {selectedNode.type === 'vcenter' && activeTab === 'summary' && (
+                <div className="space-y-3">
+                  <ContentPanel title="vCenter Server">
+                    <InfoRow label="Version" value={`${inv.vcenter_version || '7.0.3'} (build ${inv.vcenter_build || '—'})`} />
+                    <InfoRow label="Enhanced Linked Mode" value={linkedMode ? 'Enabled' : 'Disabled'} />
+                    <InfoRow label="NSX-T" value={nsx.enabled ? 'Connected' : 'Not connected'} />
+                    <InfoRow label="SRM" value={srm.enabled ? 'Configured' : 'Not configured'} />
+                    <InfoRow label="VAMI patches pending" value={String(vami.pending_patches ?? 0)} />
+                  </ContentPanel>
+                  {!linkedMode && (
+                    <div className="vm-panel-body border border-[#2d3a4a] rounded-lg p-3">
+                      <p className="text-xs text-[#8FA5B8] mb-2">DC-DR is not visible until Enhanced Linked Mode is enabled.</p>
+                      <button type="button" disabled={acting} onClick={() => runAction('enable_linked_mode')} className="vm-btn vm-btn-blue text-xs">
+                        Enable Enhanced Linked Mode
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedNode.type === 'datacenter' && activeTab === 'summary' && (
+                <ContentPanel title={datacenters.find(d => d.id === selectedNode.id)?.name || 'Datacenter'}>
+                  <InfoRow label="Site" value={datacenters.find(d => d.id === selectedNode.id)?.site || 'primary'} />
+                  <InfoRow label="Linked" value={datacenters.find(d => d.id === selectedNode.id)?.linked !== false ? 'Yes' : 'No'} />
+                  <InfoRow label="Hosts" value={String(hosts.filter(h => (h.datacenter_id || 'dc-prod') === selectedNode.id).length)} />
+                  <InfoRow label="VMs" value={String(vms.filter(v => hosts.some(h => h.id === v.host_id && (h.datacenter_id || 'dc-prod') === selectedNode.id)).length)} />
+                </ContentPanel>
+              )}
+
+              {selectedNode.type === 'nsx' && activeTab === 'summary' && (
+                <NsxMicroSegmentationPanel nsx={nsx} onAction={runAction} acting={acting} />
+              )}
+
+              {selectedNode.type === 'srm' && activeTab === 'summary' && (
+                <SrmDisasterRecoveryPanel srm={srm} linkedMode={linkedMode} onAction={runAction} acting={acting} />
+              )}
+
+              {selectedNode.type === 'vami' && activeTab === 'summary' && (
+                <VamiAppliancePanel vami={vami} vcenterVersion={inv.vcenter_version} onAction={runAction} acting={acting} />
+              )}
 
               {/* ── HOST SUMMARY ─────────────────────────────────── */}
               {selectedHost && activeTab === 'summary' && (
@@ -1839,6 +1928,16 @@ export default function VMwareSimulator() {
         <CreateVmModal hosts={hosts} datastores={datastores} networks={networks}
           onClose={() => setShowCreateVmModal(false)} onAction={runAction} />
       )}
+      {showCreateVmWizard && (
+        <VmCreateWizard
+          hosts={hosts}
+          datastores={datastores}
+          networks={networks}
+          resourcePools={resourcePools}
+          onClose={() => setShowCreateVmWizard(false)}
+          onAction={runAction}
+        />
+      )}
       {showEditVmModal && selectedVm && (
         <EditVmModal vm={selectedVm} networks={networks}
           onClose={() => setShowEditVmModal(false)} onAction={runAction} />
@@ -1896,6 +1995,7 @@ function getTabs(type) {
   if (type === 'datastore') return ['summary', 'monitor', 'permissions', 'hosts', 'vms']
   if (type === 'network') return ['summary', 'permissions', 'hosts', 'vms']
   if (type === 'template') return ['summary']
+  if (type === 'vcenter' || type === 'datacenter' || type === 'nsx' || type === 'srm' || type === 'vami') return ['summary']
   return ['summary']
 }
 

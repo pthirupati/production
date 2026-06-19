@@ -293,6 +293,38 @@ def apply_vmware_scenario_preset(state: dict, scenario_slug: str) -> None:
         events.append(_event("SSO administrator account locked", "critical", "vCenter"))
         _set_validation(state, vcenter_sso_unlocked=True)
 
+    elif "linked-mode" in slug or "linked-datacenter" in slug:
+        state["linked_mode"] = False
+        for dc in state.get("datacenters", []):
+            if dc.get("site") == "recovery":
+                dc["linked"] = False
+        events.append(_event("DC-DR not visible — enable Enhanced Linked Mode", "warning", "vCenter"))
+        _set_validation(state, linked_mode_enabled=True)
+
+    elif "nsx" in slug or "microseg" in slug:
+        state.setdefault("nsx", {})["enabled"] = False
+        state["nsx"]["microseg_missing"] = True
+        events.append(_event("NSX-T micro-segmentation rule missing for prod tier", "critical", "NSX"))
+        _set_validation(state, nsx_microseg_configured=True)
+
+    elif "srm" in slug or "disaster-recovery" in slug or "site-recovery" in slug:
+        srm = state.setdefault("srm", {})
+        srm["enabled"] = False
+        srm["replication_ok"] = False
+        events.append(_event("SRM replication not configured between DC-Prod and DC-DR", "critical", "SRM"))
+        _set_validation(state, srm_recovery_tested=True)
+
+    elif "vami" in slug or "vcenter-patch" in slug:
+        vami = state.setdefault("vami", {})
+        vami["pending_patches"] = 2
+        state["vcenter_cert_expired"] = False
+        events.append(_event("vCenter VAMI has pending appliance patches", "warning", "VAMI"))
+        _set_validation(state, vami_patches_installed=True)
+
+    elif "vm-wizard" in slug or ("create-vm" in slug and "do" in slug):
+        events.append(_event("Create a new VM using the 14-step wizard", "info", "vCenter"))
+        _set_validation(state, wizard_vm_created=True)
+
     else:
         # Unmapped VMware slug: fail validation until learner powers on web-prod-01
         # (default inventory already has it on — force a real broken state)

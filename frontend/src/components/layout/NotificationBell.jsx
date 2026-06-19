@@ -32,15 +32,34 @@ export default function NotificationBell({ variant = 'default' }) {
     }
   }, [])
 
-  // Position the panel relative to the bell using a portal
+  // Position the panel relative to the bell using a portal.
+  // Right-aligned to the bell and clamped inside the viewport on both axes so
+  // it never renders off-screen (the previous math could push `top` negative
+  // on short viewports, hiding the panel). Recomputes on scroll/resize so the
+  // fixed-position panel stays anchored to the bell.
   useEffect(() => {
-    if (!open || !btnRef.current) return
-    const rect = btnRef.current.getBoundingClientRect()
-    // Open upward-right from the bell icon
-    setPos({
-      top: Math.min(rect.bottom + 8, window.innerHeight - 420),
-      left: Math.max(8, rect.left - 280),
-    })
+    if (!open) return
+    const PANEL_W = 320 // matches w-80
+    const MARGIN = 8
+    const reposition = () => {
+      if (!btnRef.current) return
+      const rect = btnRef.current.getBoundingClientRect()
+      const panelH = panelRef.current?.offsetHeight || 420
+      const maxTop = Math.max(MARGIN, window.innerHeight - panelH - MARGIN)
+      const maxLeft = Math.max(MARGIN, window.innerWidth - PANEL_W - MARGIN)
+      setPos({
+        top: Math.min(rect.bottom + MARGIN, maxTop),
+        // Align the panel's right edge with the bell's right edge.
+        left: Math.min(maxLeft, Math.max(MARGIN, rect.right - PANEL_W)),
+      })
+    }
+    reposition()
+    window.addEventListener('resize', reposition)
+    window.addEventListener('scroll', reposition, true)
+    return () => {
+      window.removeEventListener('resize', reposition)
+      window.removeEventListener('scroll', reposition, true)
+    }
   }, [open])
 
   // Close on outside click

@@ -408,14 +408,14 @@ export default function Pricing() {
       {/* Navbar */}
       <div className="sticky top-0 z-50 relative">
         <nav className="border-b border-surface-800/50 backdrop-blur-xl bg-surface-950/90">
-          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2.5">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+            <Link to="/" className="flex items-center gap-2.5 shrink-0">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-cyan to-blue-600 flex items-center justify-center">
                 <span className="text-white font-bold text-sm">F</span>
               </div>
               <span className="text-xl font-bold text-white">FixitLab</span>
             </Link>
-            <div className="hidden md:flex items-center gap-5">
+            <div className="hidden lg:flex items-center gap-4 min-w-0">
               {PUBLIC_NAV_PRIMARY.map(({ to, label }) => (
                 <Link key={to} to={to} className="text-sm text-surface-400 hover:text-white transition-colors relative group whitespace-nowrap">
                   {label}
@@ -425,13 +425,13 @@ export default function Pricing() {
             </div>
             <button
               type="button"
-              className="md:hidden p-2 text-surface-400 hover:text-white"
+              className="lg:hidden p-2 text-surface-400 hover:text-white shrink-0"
               onClick={() => setMobileNavOpen(v => !v)}
               aria-label="Menu"
             >
               {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               {/* Currency toggle */}
               <div className="flex bg-surface-800/60 rounded-lg border border-surface-700/40 overflow-hidden">
                 <button

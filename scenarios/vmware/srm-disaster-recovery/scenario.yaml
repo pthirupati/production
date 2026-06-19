@@ -1,0 +1,24 @@
+---
+slug: srm-disaster-recovery
+title: "SRM Site Recovery Not Configured"
+technology: VMware
+category: vCenter Administration
+difficulty: medium
+scenario_type: fix
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  Site Recovery Manager replication between DC-Prod and DC-DR is missing. Configure and test recovery.
+objectives:
+  - Enable linked mode if needed
+  - Configure SRM protection groups
+  - Run recovery plan test
+hints:
+  - order: 1
+    cost: 10
+    content: "Use the inventory tree and platform services panels in the VMware simulator."

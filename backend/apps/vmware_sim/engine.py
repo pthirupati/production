@@ -311,6 +311,7 @@ def _base_inventory() -> dict:
                 "power_policy": "High Performance",
                 "ntp_server": "pool.ntp.org",
                 "dns_servers": ["8.8.8.8", "8.8.4.4"],
+                "datacenter_id": "dc-prod",
             },
             {
                 "id": "host-02",
@@ -340,6 +341,7 @@ def _base_inventory() -> dict:
                 "power_policy": "Balanced",
                 "ntp_server": "pool.ntp.org",
                 "dns_servers": ["8.8.8.8", "8.8.4.4"],
+                "datacenter_id": "dc-prod",
             },
         ],
 
@@ -645,6 +647,55 @@ def _base_inventory() -> dict:
             "vms_tools_pending": [],
         },
         "storage_vmotion_jobs": [],
+
+        "linked_mode": False,
+        "datacenters": [
+            {
+                "id": "dc-prod",
+                "name": "DC-Prod",
+                "site": "primary",
+                "clusters": [{"id": "cluster-01", "name": "Cluster-01", "hosts": ["host-01", "host-02"]}],
+            },
+            {
+                "id": "dc-dr",
+                "name": "DC-DR",
+                "site": "recovery",
+                "linked": False,
+                "clusters": [{"id": "cluster-dr", "name": "Cluster-DR", "hosts": ["host-dr-01"]}],
+            },
+        ],
+        "nsx": {
+            "enabled": False,
+            "manager": "nsx-mgr.fixitlab.local",
+            "version": "4.1.0",
+            "segments": [
+                {"id": "seg-prod", "name": "Prod-Segment", "vlan": 120, "subnets": ["10.20.30.0/24"]},
+            ],
+            "firewall_rules": [
+                {"id": "rule-1", "name": "Allow-SSH", "action": "ALLOW", "source": "any", "dest": "any", "service": "SSH"},
+            ],
+            "dfw_enabled": True,
+            "microseg_missing": False,
+        },
+        "srm": {
+            "enabled": False,
+            "site_a": "DC-Prod",
+            "site_b": "DC-DR",
+            "protection_groups": [],
+            "recovery_plans": [],
+            "replication_ok": False,
+            "last_test": None,
+            "failover_ready": False,
+        },
+        "vami": {
+            "appliance": "vCenter Server Appliance",
+            "version": "7.0.3",
+            "build": "20328353",
+            "pending_patches": 0,
+            "stage": "idle",
+            "stage_progress": 0,
+            "last_backup": "2026-06-01T00:00:00Z",
+        },
     }
 
 
@@ -693,6 +744,10 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "customer_reboot_approved": state.get("customer_reboot_approved", False),
             "storage_vmotion_stuck": state.get("storage_vmotion_stuck", False),
             "vcenter_role": state.get("vcenter_role", "Administrator"),
+            "linked_mode": state.get("linked_mode", False),
+            "nsx_enabled": state.get("nsx", {}).get("enabled", False),
+            "srm_enabled": state.get("srm", {}).get("enabled", False),
+            "vami_pending": state.get("vami", {}).get("pending_patches", 0),
         },
     }
 
@@ -1727,6 +1782,161 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"VMware Tools upgraded on {vm['name']}"}
 
+    if action == "enable_linked_mode":
+        state["linked_mode"] = True
+        for dc in state.get("datacenters", []):
+            if dc.get("site") == "recovery":
+                dc["linked"] = True
+        if not any(h["id"] == "host-dr-01" for h in state["hosts"]):
+            state["hosts"].append({
+                "id": "host-dr-01", "name": "esxi-dr-01.fixitlab.local", "ip": "192.168.20.11",
+                "status": "connected", "connection_state": "connected", "maintenance": False,
+                "version": "7.0.3", "build": "20328353", "vendor": "VMware, Inc.",
+                "model": "VMware Virtual Platform", "cpu_model": "Intel(R) Xeon", "cpu_sockets": 2,
+                "cpu_cores_per_socket": 8, "cpu_mhz": 2900, "memory_gb": 128, "cpu_pct": 22,
+                "mem_pct": 38, "storage_pct": 45, "ssh_enabled": False, "ntp_synced": True,
+                "dns_servers": ["8.8.8.8"], "ntp_server": "pool.ntp.org", "power_policy": "balanced",
+                "network_adapters": 4, "datacenter_id": "dc-dr",
+            })
+        events.append(_event("Enhanced linked mode enabled — DC-DR linked to vCenter", "info", "vCenter"))
+        tasks.insert(0, _task("Enable Linked Mode", "vCenter"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Linked mode enabled — DC-DR visible"}
+
+    if action == "enable_nsx":
+        nsx = state.setdefault("nsx", {})
+        nsx["enabled"] = True
+        nsx["microseg_missing"] = False
+        events.append(_event("NSX-T manager connected", "info", nsx.get("manager", "NSX")))
+        tasks.insert(0, _task("Configure NSX-T", "NSX"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "NSX-T enabled"}
+
+    if action == "create_nsx_firewall_rule":
+        nsx = state.setdefault("nsx", {})
+        rule = {
+            "id": f"rule-{int(time.time()) % 100000}",
+            "name": payload.get("name", "Lab-Rule"),
+            "action": payload.get("action", "ALLOW"),
+            "source": payload.get("source", "any"),
+            "dest": payload.get("dest", "any"),
+            "service": payload.get("service", "ANY"),
+        }
+        nsx.setdefault("firewall_rules", []).append(rule)
+        nsx["microseg_missing"] = False
+        events.append(_event(f"NSX DFW rule '{rule['name']}' created", "info", "NSX"))
+        tasks.insert(0, _task("Create DFW Rule", rule["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Firewall rule {rule['name']} created"}
+
+    if action == "configure_srm":
+        srm = state.setdefault("srm", {})
+        srm["enabled"] = True
+        srm["replication_ok"] = True
+        srm["protection_groups"] = [{"name": "PG-Prod", "vms": ["web-prod-01", "api-prod-01"]}]
+        srm["recovery_plans"] = [{"name": "RP-Prod-DR", "status": "ready"}]
+        events.append(_event("SRM site pairing configured", "info", "SRM"))
+        tasks.insert(0, _task("Configure SRM", "SRM"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "SRM replication configured"}
+
+    if action == "srm_test_recovery":
+        srm = state.setdefault("srm", {})
+        if not srm.get("enabled"):
+            return {"ok": False, "error": "SRM must be configured first"}
+        srm["last_test"] = _now_iso()
+        srm["failover_ready"] = True
+        events.append(_event("SRM recovery plan test completed successfully", "info", "SRM"))
+        tasks.insert(0, _task("Test Recovery Plan", "RP-Prod-DR"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Recovery plan test passed"}
+
+    if action == "srm_failover":
+        srm = state.setdefault("srm", {})
+        if not srm.get("failover_ready") and not srm.get("replication_ok"):
+            return {"ok": False, "error": "Run recovery plan test before failover"}
+        srm["failover_executed"] = True
+        for vm in state["vms"]:
+            if vm["name"] in ("web-prod-01", "api-prod-01"):
+                vm["host_id"] = "host-dr-01"
+                vm["datacenter_id"] = "dc-dr"
+        events.append(_event("SRM planned migration executed to DC-DR", "critical", "SRM"))
+        tasks.insert(0, _task("Execute Failover", "RP-Prod-DR"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Failover to DC-DR completed"}
+
+    if action == "vami_check_patches":
+        vami = state.setdefault("vami", {})
+        pending = vami.get("pending_patches", 0)
+        patches = []
+        if pending:
+            patches = [f"VCenter patch {vami.get('version')} build+1"] * pending
+        _save_session(str(session_id), entry)
+        return {"ok": True, "pending": patches, "count": pending}
+
+    if action == "vami_stage_patches":
+        vami = state.setdefault("vami", {})
+        vami["stage"] = "staging"
+        vami["stage_progress"] = 0
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Patches staging started", "progress": 0}
+
+    if action == "vami_advance_stage":
+        vami = state.setdefault("vami", {})
+        if vami.get("stage") not in ("staging", "installing"):
+            return {"ok": False, "error": "No VAMI operation in progress"}
+        vami["stage_progress"] = min(100, vami.get("stage_progress", 0) + int(payload.get("step", 25)))
+        if vami["stage_progress"] >= 100:
+            vami["stage"] = "installing"
+            vami["stage_progress"] = 0
+        _save_session(str(session_id), entry)
+        return {"ok": True, "stage": vami["stage"], "progress": vami["stage_progress"]}
+
+    if action == "vami_install_patches":
+        vami = state.setdefault("vami", {})
+        vami["pending_patches"] = 0
+        vami["stage"] = "idle"
+        vami["stage_progress"] = 100
+        state["vcenter_cert_expired"] = False
+        events.append(_event("vCenter VAMI patches installed — appliance reboot may be required", "info", "VAMI"))
+        tasks.insert(0, _task("Install VAMI Patches", "vCenter"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "VAMI patches installed successfully"}
+
+    if action == "create_vm_wizard":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "VM name required"}
+        if any(v["name"] == name for v in state["vms"]):
+            return {"ok": False, "error": f"VM '{name}' already exists"}
+        vm_id = f"vm-{name.lower().replace(' ', '-')}-{int(time.time()) % 100000}"
+        vm = {
+            "id": vm_id, "name": name,
+            "host_id": payload.get("host_id") or state["hosts"][0]["id"],
+            "datastore_id": payload.get("datastore_id") or "ds-01",
+            "network_id": payload.get("network_id") or "net-02",
+            "resource_pool_id": payload.get("resource_pool_id") or "rp-prod",
+            "power": payload.get("power", "poweredOff"),
+            "cpu": int(payload.get("cpu", 2)),
+            "memory_mb": int(payload.get("memory_mb", 4096)),
+            "disk_gb": int(payload.get("disk_gb", 40)),
+            "guest_os": payload.get("guest_os", "Ubuntu Linux (64-bit)"),
+            "guest_os_version": payload.get("guest_os_version", payload.get("guest_os", "Linux")),
+            "ip": "—", "hostname": f"{name}.fixitlab.local",
+            "tools": "notRunning", "tools_version": "11333", "hardware_version": "vmx-19",
+            "annotation": payload.get("annotation", "Created via New VM wizard"),
+            "snapshots": [], "cpu_pct": 0, "mem_pct": 0, "disk_io_mbps": 0, "net_mbps": 0,
+            "wizard_created": True,
+            "cd_dvd": payload.get("cd_dvd", "Client Device"),
+            "firmware": payload.get("firmware", "BIOS"),
+        }
+        state["vms"].append(vm)
+        _enrich_inventory(state)
+        events.append(_event(f"Created VM {name} via New Virtual Machine wizard", "info", name))
+        tasks.insert(0, _task("Create Virtual Machine", name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"VM '{name}' created", "vm_id": vm_id}
+
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
@@ -1894,6 +2104,28 @@ def validate_vmware_lab(session_id: str, scenario_slug: str = "") -> tuple[bool,
     if rules.get("ovf_deployed"):
         if not any(v.get("from_ovf") for v in state.get("vms", [])):
             return False, "Deploy a VM from the content library OVF"
+
+    if rules.get("linked_mode_enabled"):
+        if not state.get("linked_mode"):
+            return False, "Enable Enhanced Linked Mode to attach DC-DR"
+
+    if rules.get("nsx_microseg_configured"):
+        nsx = state.get("nsx", {})
+        if not nsx.get("enabled") or nsx.get("microseg_missing"):
+            return False, "Configure NSX-T and create required DFW micro-segmentation rule"
+
+    if rules.get("srm_recovery_tested"):
+        srm = state.get("srm", {})
+        if not srm.get("last_test") and not srm.get("failover_ready"):
+            return False, "Configure SRM and run recovery plan test"
+
+    if rules.get("vami_patches_installed"):
+        if state.get("vami", {}).get("pending_patches", 0) > 0:
+            return False, "Install pending vCenter VAMI patches"
+
+    if rules.get("wizard_vm_created"):
+        if not any(v.get("wizard_created") for v in state.get("vms", [])):
+            return False, "Create a VM using the New Virtual Machine wizard"
 
     if rules:
         return True, "Validation passed — issue resolved"

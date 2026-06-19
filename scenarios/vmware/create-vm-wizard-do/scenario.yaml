@@ -1,0 +1,23 @@
+---
+slug: create-vm-wizard-do
+title: "Create VM Using New Virtual Machine Wizard"
+technology: VMware
+category: vCenter Administration
+difficulty: medium
+scenario_type: do
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  Build lab — create a new VM using the full 14-step New Virtual Machine wizard.
+objectives:
+  - Launch New VM wizard
+  - Complete all 14 steps and create the VM
+hints:
+  - order: 1
+    cost: 10
+    content: "Use the inventory tree and platform services panels in the VMware simulator."

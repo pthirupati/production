@@ -1,0 +1,23 @@
+---
+slug: linked-mode-datacenter
+title: "Enhanced Linked Mode — DC-DR Not Visible"
+technology: VMware
+category: vCenter Administration
+difficulty: medium
+scenario_type: fix
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: vmware
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  Recovery datacenter DC-DR is not linked to vCenter. Enable Enhanced Linked Mode.
+objectives:
+  - Enable Enhanced Linked Mode
+  - Verify DC-DR and esxi-dr-01 appear in inventory
+hints:
+  - order: 1
+    cost: 10
+    content: "Use the inventory tree and platform services panels in the VMware simulator."

@@ -18,6 +18,25 @@ export function isMediaDevicesSupported() {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 }
 
+export function isPermissionDeniedError(err) {
+  const name = err?.name || ''
+  return name === 'NotAllowedError' || name === 'PermissionDeniedError'
+}
+
+/**
+ * True when the stream currently holds at least one live track of the kind(s)
+ * requested. Used to make a successful getUserMedia authoritative over a racing
+ * rejection — if media is actually live we must never show a "blocked" error.
+ */
+export function streamHasLiveTrack(stream, { audio = false, video = false } = {}) {
+  if (!stream) return false
+  const live = (t) => t.readyState === 'live'
+  if (audio && stream.getAudioTracks().some(live)) return true
+  if (video && stream.getVideoTracks().some(live)) return true
+  if (!audio && !video) return stream.getTracks().some(live)
+  return false
+}
+
 export function getMediaErrorMessage(err) {
   const name = err?.name || ''
   if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
@@ -146,7 +165,10 @@ export async function requestUserMedia(
     }
   }
 
-  if (!stream || (!gotAudio && audio) || (!gotVideo && video)) {
+  // Only fail when we obtained nothing at all. A partial success (e.g. mic
+  // granted but camera busy/denied) is returned so callers can fall back to
+  // audio-only instead of surfacing a "blocked" error over a working stream.
+  if (!stream || (!gotAudio && !gotVideo)) {
     throw lastError || new Error('Could not enable requested devices')
   }
 

@@ -3246,10 +3246,10 @@ body::after {
 .fx-marketing-nav-links {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 2px;
   margin-left: 6px;
   min-width: 0;
-  overflow-x: auto;
 }
 .fx-marketing-nav-link {
   font-size: 14px;
@@ -3352,6 +3352,17 @@ body::after {
 [data-theme="light"] .fx-marketing-nav-link-active {
   color: rgb(15 23 42);
 }
+[data-theme="light"] .fx-marketing-nav-link:hover,
+[data-theme="light"] .fx-marketing-nav-link-active {
+  background: rgb(var(--a-cyan) / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(var(--a-cyan) / 0.3);
+}
+/* Header CTA is a white button in dark mode — invisible on the light page, so use the brand gradient */
+[data-theme="light"] .fx-marketing-nav-cta {
+  color: rgb(255 255 255);
+  background: linear-gradient(135deg, var(--fx-ac), var(--fx-ac2));
+  box-shadow: 0 4px 16px rgb(109 120 255 / 0.3);
+}
 [data-theme="light"] .fx-marketing-footer {
   background: rgb(248 250 252);
   border-top: 1px solid rgb(226 232 240);
@@ -3424,6 +3435,49 @@ body::after {
 [data-theme="light"] .text-white\/55,
 [data-theme="light"] .text-white\/52 {
   color: rgb(71 85 105);
+}
+
+/* Marketing tech cards — opaque white text on faint glass was invisible in light mode */
+[data-theme="light"] .fx-tech-card,
+[data-theme="light"] .fx-feature-card {
+  background: rgb(255 255 255);
+  border-color: rgb(226 232 240);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.05), 0 4px 16px rgb(0 0 0 / 0.04);
+}
+[data-theme="light"] .fx-tech-name,
+[data-theme="light"] .fx-feature-card h3,
+[data-theme="light"] .fx-how-step h3 {
+  color: rgb(15 23 42);
+}
+[data-theme="light"] .fx-tech-tag,
+[data-theme="light"] .fx-feature-card p,
+[data-theme="light"] .fx-how-step p {
+  color: rgb(71 85 105);
+}
+
+/* Marketing tech marquee strip */
+[data-theme="light"] .fx-marquee-section {
+  border-color: rgb(226 232 240);
+}
+[data-theme="light"] .fx-marquee-label {
+  color: rgb(100 116 139);
+}
+[data-theme="light"] .fx-marquee-pill {
+  background: rgb(255 255 255);
+  border-color: rgb(226 232 240);
+}
+[data-theme="light"] .fx-marquee-pill-name {
+  color: rgb(30 41 59);
+}
+[data-theme="light"] .fx-marquee-pill-count {
+  color: rgb(100 116 139);
+}
+
+/* Testimonial card surface */
+[data-theme="light"] .fx-testimonial-card {
+  background: rgb(255 255 255);
+  border-color: rgb(226 232 240);
+  box-shadow: 0 10px 40px -20px rgb(0 0 0 / 0.18);
 }
 
 /* VMware simulator always uses dark UI — ignore global light text overrides */

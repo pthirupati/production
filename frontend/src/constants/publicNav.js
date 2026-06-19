@@ -1,13 +1,18 @@
-/** Shared public marketing navigation links */
+/**
+ * Shared public marketing navigation links.
+ * PRIMARY is the desktop header row — kept to the essential destinations so the
+ * header never overflows / forces a horizontal scrollbar on narrow laptops.
+ * Less-used links live in SECONDARY (mobile drawer + footer only).
+ */
 export const PUBLIC_NAV_PRIMARY = [
   { to: '/pricing', label: 'Pricing' },
   { to: '/mock-interviews', label: 'Mock Interviews' },
   { to: '/#tech', label: 'Technologies' },
   { to: '/about', label: 'About' },
-  { to: '/verify-certificate', label: 'Verify Certificate' },
 ]
 
 export const PUBLIC_NAV_SECONDARY = [
+  { to: '/verify-certificate', label: 'Verify Certificate' },
   { to: '/blog', label: 'Blog' },
   { to: '/changelog', label: 'Changelog' },
   { to: '/faq', label: 'FAQ' },
