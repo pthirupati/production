@@ -307,7 +307,7 @@ jobs:
             chmod +x scripts/ci-remote-platform.sh scripts/platform-start.sh scripts/sync-production-env.sh \
               scripts/build-scenario-images.sh scripts/validate-scenario-images.sh \
               scripts/ci-post-deploy-verify.sh scripts/run-full-e2e.sh scripts/cleanup-test-data.py \
-              scripts/ci-e2e-session-mode.sh
+              scripts/ci-e2e-session-mode.sh scripts/vault/lib.sh scripts/vault/ensure-network.sh
             export BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
             ./scripts/ci-remote-platform.sh deploy
 

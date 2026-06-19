@@ -41,9 +41,12 @@ if ! docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps | tee /tmp/fixi
   fail=1
 fi
 
-# ── 1b. Vault metrics (when Vault is enabled) ──
+# ── 1b. Vault network + metrics (when Vault is enabled) ──
 echo ""
-echo ">>> [1b/7] Vault metrics"
+echo ">>> [1b/7] Vault network and metrics"
+if [ -x "$ROOT/scripts/vault/ensure-network.sh" ]; then
+  bash "$ROOT/scripts/vault/ensure-network.sh" || echo "WARN: Vault network check failed"
+fi
 if [ -x "$ROOT/scripts/vault/check-metrics.sh" ]; then
   if bash "$ROOT/scripts/vault/check-metrics.sh"; then
     echo "  ✓ Vault metrics OK"

@@ -25,7 +25,10 @@ fi
 
 bash "$ROOT/scripts/vault/unseal.sh"
 
-TOKEN="$(docker compose -f docker-compose.vault.yml exec -T vault \
+# shellcheck source=lib.sh
+source "$ROOT/scripts/vault/lib.sh"
+
+TOKEN="$(vault_compose exec -T vault \
   vault write -field=token auth/approle/login role_id="$ROLE_ID" secret_id="$SECRET_ID")"
 
 export VAULT_TOKEN="$TOKEN"

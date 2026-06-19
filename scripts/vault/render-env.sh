@@ -13,6 +13,9 @@ chmod +x "$ROOT/scripts/vault/"*.sh "$ROOT/scripts/vault/env-kv-helper.py"
 
 bash "$ROOT/scripts/vault/unseal.sh"
 
+# shellcheck source=lib.sh
+source "$ROOT/scripts/vault/lib.sh"
+
 ROLE_ID="${VAULT_ROLE_ID:-}"
 SECRET_ID="${VAULT_SECRET_ID:-}"
 APPROLE_FILE="${VAULT_APPROLE_FILE:-$ROOT/deploy/vault-approle.env}"
@@ -28,10 +31,10 @@ if [ -z "$ROLE_ID" ] || [ -z "$SECRET_ID" ]; then
   exit 1
 fi
 
-export VAULT_TOKEN="$(docker compose -f docker-compose.vault.yml exec -T vault \
+export VAULT_TOKEN="$(vault_compose exec -T vault \
   vault write -field=token auth/approle/login role_id="$ROLE_ID" secret_id="$SECRET_ID")"
 
-JSON="$(docker compose -f docker-compose.vault.yml exec -T -e VAULT_TOKEN vault \
+JSON="$(vault_compose exec -T -e VAULT_TOKEN vault \
   vault kv get -format=json "$KV_PATH")"
 
 mkdir -p "$(dirname "$OUT")"

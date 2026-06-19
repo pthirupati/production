@@ -18,7 +18,9 @@ services:
       - vault_data:/vault/data
     environment:
       VAULT_ADDR: http://127.0.0.1:8200
-      VAULT_API_ADDR: http://127.0.0.1:8200
+      VAULT_API_ADDR: http://vault:8200
+    networks:
+      - fixitlab_net
     healthcheck:
       test: ["CMD-SHELL", "code=$$(vault status -format=yaml >/dev/null 2>&1; echo $$?); test $$code -eq 0 -o $$code -eq 2"]
       interval: 10s
@@ -26,6 +28,11 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+
+networks:
+  fixitlab_net:
+    name: fixitlab_net
+    external: true
 
 volumes:
   vault_data:

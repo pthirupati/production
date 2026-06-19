@@ -22,6 +22,9 @@ fi
 chmod +x "$ROOT/scripts/vault/"*.sh
 bash "$ROOT/scripts/vault/unseal.sh"
 
+# shellcheck source=lib.sh
+source "$ROOT/scripts/vault/lib.sh"
+
 export VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
 export VAULT_TOKEN="$(python3 -c "import json; print(json.load(open('$INIT_FILE'))['root_token'])")"
 
@@ -30,9 +33,9 @@ python3 "$ROOT/scripts/vault/env-kv-helper.py" env-to-json "$ENV_FILE" > "$TMP_J
 chmod 600 "$TMP_JSON"
 
 docker cp "$TMP_JSON" fixitlab_vault:/tmp/vault-seed.json
-docker compose -f docker-compose.vault.yml exec -T -e VAULT_TOKEN vault \
+vault_compose exec -T -e VAULT_TOKEN vault \
   vault kv put "$KV_PATH" @/tmp/vault-seed.json
-docker compose -f docker-compose.vault.yml exec -T vault rm -f /tmp/vault-seed.json
+vault_compose exec -T vault rm -f /tmp/vault-seed.json
 
 rm -f "$TMP_JSON"
 echo "[vault] Updated $KV_PATH from $ENV_FILE"

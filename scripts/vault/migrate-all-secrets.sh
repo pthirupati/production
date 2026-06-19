@@ -45,8 +45,11 @@ APPROLE_FILE="${VAULT_APPROLE_FILE:-$ROOT/deploy/vault-approle.env}"
 
 bash "$ROOT/scripts/vault/start.sh"
 
+# shellcheck source=lib.sh
+source "$ROOT/scripts/vault/lib.sh"
+
 VAULT_INITIALIZED=false
-if docker compose -f docker-compose.vault.yml exec -T vault vault status -format=json 2>/dev/null \
+if vault_compose exec -T vault vault status -format=json 2>/dev/null \
   | grep -q '"initialized":true'; then
   VAULT_INITIALIZED=true
 fi

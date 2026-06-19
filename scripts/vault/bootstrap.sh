@@ -29,10 +29,13 @@ chmod 700 "$(dirname "$INIT_FILE")" 2>/dev/null || true
 chmod +x "$ROOT/scripts/vault/"*.sh "$ROOT/scripts/vault/env-kv-helper.py"
 bash "$ROOT/scripts/vault/start.sh"
 
+# shellcheck source=lib.sh
+source "$ROOT/scripts/vault/lib.sh"
+
 export VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
 
 _vault() {
-  docker compose -f docker-compose.vault.yml exec -T -e VAULT_ADDR -e VAULT_TOKEN vault vault "$@"
+  vault_compose exec -T -e VAULT_ADDR -e VAULT_TOKEN vault vault "$@"
 }
 
 # ── Init (once) ──
@@ -87,9 +90,9 @@ python3 "$ROOT/scripts/vault/env-kv-helper.py" env-to-json "$ENV_FILE" > "$TMP_J
 chmod 600 "$TMP_JSON"
 
 docker cp "$TMP_JSON" fixitlab_vault:/tmp/vault-seed.json
-docker compose -f docker-compose.vault.yml exec -T -e VAULT_TOKEN vault \
+vault_compose exec -T -e VAULT_TOKEN vault \
   vault kv put "$KV_PATH" @/tmp/vault-seed.json
-docker compose -f docker-compose.vault.yml exec -T vault rm -f /tmp/vault-seed.json
+vault_compose exec -T vault rm -f /tmp/vault-seed.json
 
 rm -f "$TMP_JSON"
 echo "  ✓ Seeded Vault path: $KV_PATH ($(grep -c '^[A-Z]' "$ENV_FILE" || echo 0) keys from env file)"

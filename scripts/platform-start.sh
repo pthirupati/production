@@ -18,6 +18,10 @@ _env_true() {
 chmod +x "$ROOT/scripts/sync-production-env.sh" "$ROOT/scripts/ensure-ssl-certs.sh" "$ROOT/scripts/startup.sh" \
   "$ROOT/scripts/vault/"*.sh "$ROOT/scripts/vault/env-kv-helper.py" 2>/dev/null || true
 
+# Networks must exist before Vault (app containers resolve vault on fixitlab_net)
+docker network inspect fixitlab_labs >/dev/null 2>&1 || docker network create fixitlab_labs
+docker network inspect fixitlab_net >/dev/null 2>&1 || docker network create fixitlab_net
+
 # Vault must be up before render-env (when enabled via env or local approle file)
 if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; then
   bash "$ROOT/scripts/vault/start.sh" 2>/dev/null || true
@@ -25,15 +29,14 @@ if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; th
   VAULT_CFG_MARKER="/tmp/fixitlab-vault-config-hash"
   if [ -n "$VAULT_CFG_HASH" ] && [ -f "$VAULT_CFG_MARKER" ] && [ "$(cat "$VAULT_CFG_MARKER")" != "$VAULT_CFG_HASH" ]; then
     echo "Vault config changed — recreating container"
-    docker compose -f docker-compose.vault.yml up -d --force-recreate vault 2>/dev/null || true
+    # shellcheck source=lib.sh
+    source "$ROOT/scripts/vault/lib.sh"
+    vault_compose up -d --force-recreate vault 2>/dev/null || true
     bash "$ROOT/scripts/vault/unseal.sh" 2>/dev/null || true
+    bash "$ROOT/scripts/vault/ensure-network.sh" 2>/dev/null || true
   fi
   [ -n "$VAULT_CFG_HASH" ] && echo "$VAULT_CFG_HASH" > "$VAULT_CFG_MARKER"
 fi
-
-# Networks must exist before Vault seed/render and compose up
-docker network inspect fixitlab_labs >/dev/null 2>&1 || docker network create fixitlab_labs
-docker network inspect fixitlab_net >/dev/null 2>&1 || docker network create fixitlab_net
 
 bash "$ROOT/scripts/sync-production-env.sh" "$ROOT/.env.production"
 ENV_FILE=".env.production"
@@ -42,6 +45,11 @@ echo "=== FixitLab Platform START ==="
 echo "Compose: $COMPOSE_FILE | Env: $ENV_FILE"
 
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
+
+# Ensure Vault is on the same network as backend (fixes legacy standalone vault compose)
+if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; then
+  bash "$ROOT/scripts/vault/ensure-network.sh" 2>/dev/null || true
+fi
 
 # Always unseal Vault after containers start (Vault always starts sealed after restart)
 if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; then

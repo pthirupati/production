@@ -3,7 +3,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$ROOT"
+# shellcheck source=lib.sh
+source "$ROOT/scripts/vault/lib.sh"
 
 if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx fixitlab_vault; then
   echo "[vault-metrics] Vault container not running — skipped"
@@ -23,8 +24,9 @@ fi
 
 echo "[vault-metrics] Metrics not ready — recreating Vault with latest config..."
 chmod +x "$ROOT/scripts/vault/"*.sh 2>/dev/null || true
-docker compose -f docker-compose.vault.yml up -d --force-recreate vault
+vault_compose up -d --force-recreate vault
 bash "$ROOT/scripts/vault/unseal.sh" 2>/dev/null || true
+bash "$ROOT/scripts/vault/ensure-network.sh" 2>/dev/null || true
 sleep 3
 
 if _check_metrics; then

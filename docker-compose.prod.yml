@@ -366,6 +366,7 @@ volumes:
 
 networks:
   fixitlab_net:
+    name: fixitlab_net
     driver: bridge
   # External — created by platform-start.sh; avoids compose label conflicts
   fixitlab_labs:

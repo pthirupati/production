@@ -3,7 +3,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$ROOT"
+# shellcheck source=lib.sh
+source "$ROOT/scripts/vault/lib.sh"
 
 export VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
 
@@ -21,7 +22,7 @@ if [ -z "$UNSEAL_KEY" ]; then
   exit 1
 fi
 
-status="$(docker compose -f docker-compose.vault.yml exec -T vault vault status -format=json 2>/dev/null || echo '{}')"
+status="$(vault_compose exec -T vault vault status -format=json 2>/dev/null || echo '{}')"
 sealed="$(echo "$status" | python3 -c "import json,sys; print(json.load(sys.stdin).get('sealed', True))" 2>/dev/null || echo True)"
 
 if [ "$sealed" = "False" ]; then
@@ -29,5 +30,5 @@ if [ "$sealed" = "False" ]; then
   exit 0
 fi
 
-docker compose -f docker-compose.vault.yml exec -T vault vault operator unseal "$UNSEAL_KEY" >/dev/null
+vault_compose exec -T vault vault operator unseal "$UNSEAL_KEY" >/dev/null
 echo "Vault unsealed"
