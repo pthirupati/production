@@ -197,6 +197,13 @@ def register_sim_session(session_id: str, resource_id: str, sim_type: str, state
             "state": state,
             "streams": {},
         }
+    # Stamp the lab session id onto the OS state so the cross-technology VMware
+    # bridge (keyed by session id in the shared cache) can be consulted from the
+    # terminal engine — even though the two simulators run in different workers.
+    engine = state.get("engine") if isinstance(state, dict) else None
+    os_state = getattr(getattr(engine, "shell", None), "state", None)
+    if os_state is not None:
+        os_state.session_id = str(session_id)
 
 
 def get_sim_session(session_id: str) -> dict | None:

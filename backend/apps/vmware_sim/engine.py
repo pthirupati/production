@@ -24,6 +24,16 @@ def _session_key(session_id: str) -> str:
     return f"vmware_session:{session_id}"
 
 
+def _cross_tech_config(scenario_slug: str | None) -> dict | None:
+    """Bridge config for a cross-technology scenario, or None. Import is local so
+    the VMware app keeps no hard dependency on the labs simulation package."""
+    try:
+        from apps.labs.provisioner.simulation.vmware_bridge import cross_tech_config
+        return cross_tech_config(scenario_slug or "")
+    except Exception:
+        return None
+
+
 def _load_session(session_id: str) -> dict | None:
     data = cache.get(_session_key(str(session_id)))
     if data is None:
@@ -966,6 +976,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["alarms"] = [a for a in state.get("alarms", []) if a.get("entity") != vm["name"]]
         events.append(_event(f"VM {vm['name']} rebooted", "info", vm["name"]))
         tasks.insert(0, _task("Restart Virtual Machine", vm["name"]))
+        # Cross-tech: resetting a hung guest from VMware makes the Linux terminal
+        # responsive again (server-hung-needs-vmware-reset).
+        cfg = _cross_tech_config(entry.get("scenario_slug"))
+        if cfg and cfg.get("action") == "reset":
+            from apps.labs.provisioner.simulation.vmware_bridge import record_vm_reset
+            record_vm_reset(str(session_id))
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} restarted"}
 
@@ -1750,8 +1766,27 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         prov = "thin" if thin else "thick"
         events.append(_event(f"Added {add_gb} GB {prov} disk ({new_disk['scsi_id']}) to {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Add Hard Disk", vm["name"]))
+        # ── Cross-technology bridge ──────────────────────────────────────────
+        # For a cross-tech lab the disk we just attached at the hypervisor must
+        # become visible in the Linux lab terminal — but only after the operator
+        # forces a SCSI rescan (or, for the reboot scenario, a reboot). Record a
+        # pending hot-added disk keyed by this lab session id so the terminal
+        # engine (a different worker) can reveal it. Harmless for VMware-only labs.
+        bridge_msg = ""
+        cfg = _cross_tech_config(entry.get("scenario_slug"))
+        if cfg and cfg.get("action") == "add_disk":
+            from apps.labs.provisioner.simulation.vmware_bridge import record_pending_disk
+            dev = record_pending_disk(
+                str(session_id), add_gb, requires_reboot=bool(cfg.get("requires_reboot")),
+            )
+            reveal = "reboot the guest" if cfg.get("requires_reboot") else "rescan the SCSI bus in the terminal"
+            bridge_msg = f" The guest will not see {dev} until you {reveal}."
+            events.append(_event(
+                f"Hot-add propagated to guest {vm['name']} as {dev} (pending {('reboot' if cfg.get('requires_reboot') else 'SCSI rescan')})",
+                "info", vm["name"],
+            ))
         _save_session(str(session_id), entry)
-        return {"ok": True, "message": f"Added {add_gb} GB {prov} disk at SCSI 0:{next_unit}"}
+        return {"ok": True, "message": f"Added {add_gb} GB {prov} disk at SCSI 0:{next_unit}.{bridge_msg}"}
 
     if action == "remove_disk":
         vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
@@ -1803,8 +1838,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         nics.append(nic)
         events.append(_event(f"Added {adapter_type} network adapter on {net.get('name')} to {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Add Network Adapter", vm["name"]))
+        nic_msg = ""
+        cfg = _cross_tech_config(entry.get("scenario_slug"))
+        if cfg and cfg.get("action") == "add_nic":
+            from apps.labs.provisioner.simulation.vmware_bridge import record_pending_nic
+            record_pending_nic(str(session_id))
+            nic_msg = " The guest sees the new link only after a rescan / ip link set up."
         _save_session(str(session_id), entry)
-        return {"ok": True, "message": f"Added network adapter (MAC {mac}) to {vm['name']}"}
+        return {"ok": True, "message": f"Added network adapter (MAC {mac}) to {vm['name']}.{nic_msg}"}
 
     if action in ("remove_nic", "remove_network_adapter"):
         vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))

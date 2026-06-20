@@ -335,8 +335,12 @@ export default function LabRunner() {
           }
           setSession(sessionData)
 
-          // Redirect VMware simulation labs to the dedicated vSphere simulator UI
-          if (lab.scenario?.simulation_type === 'vmware' || lab.scenario?.technology?.slug === 'vmware') {
+          // Redirect pure VMware simulation labs to the dedicated vSphere simulator
+          // UI. Cross-technology labs are NOT redirected — they open the Linux
+          // terminal and merely surface an "Open VMware" link (handled below), since
+          // the fix happens in the terminal after the VMware-side hardware change.
+          const isCrossTech = Boolean(lab.scenario?.cross_technology)
+          if (!isCrossTech && (lab.scenario?.simulation_type === 'vmware' || lab.scenario?.technology?.slug === 'vmware')) {
             navigate(`/vmware-sim?session=${sessionId}&scenario=${lab.scenario?.slug || ''}`, { replace: true })
             return
           }
@@ -781,9 +785,14 @@ export default function LabRunner() {
   const useDualPane = Boolean(scenario.dual_terminal && labHosts.length >= 2)
   const dualHosts = useDualPane ? labHosts.slice(0, 2) : []
   const isSimulationLab = session?.provider === 'simulation' || scenario.lab_mode === 'simulation'
-  const isVmwareLab = (scenario?.slug || '').includes('vmware')
-    || scenario?.technology?.slug === 'vmware'
+  // Cross-technology labs (shared server in both VMware + terminal) open the Linux
+  // terminal but expose an "Open VMware" link so the hypervisor-side step can be
+  // performed in the SAME lab session.
+  const isCrossTech = Boolean(scenario?.cross_technology)
+  const isVmwareLab = !isCrossTech && (
+    scenario?.technology?.slug === 'vmware'
     || scenario?.simulation_type === 'vmware'
+  )
   // coding_mode scenarios open a browser surface instead of a terminal. Prompt
   // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
   // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
@@ -1329,6 +1338,17 @@ export default function LabRunner() {
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#4fa7e8]/40 text-[#4fa7e8] bg-[#4fa7e8]/10 hover:bg-[#4fa7e8]/20 text-[10px] font-medium"
             >
               <ExternalLink size={12} /> vCenter Simulator
+            </Link>
+          )}
+          {isCrossTech && (scenario?.vmware_link !== false) && (
+            <Link
+              to={`/vmware/${sessionId}?scenario=${scenario?.slug || ''}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="This server also lives in VMware. Open the vCenter simulator to perform the hypervisor-side step (e.g. add a disk), then return here and rescan/reboot."
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#4fa7e8]/50 text-[#4fa7e8] bg-[#4fa7e8]/10 hover:bg-[#4fa7e8]/20 text-[10px] font-semibold"
+            >
+              <ExternalLink size={12} /> Open VMware (same server)
             </Link>
           )}
           {isSimulationLab && (

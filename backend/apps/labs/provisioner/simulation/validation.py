@@ -274,6 +274,32 @@ def _run_line_check(
     failures: list[str],
 ) -> bool:
     """Return True if this line was recognized as a validation check."""
+    # ── Cross-technology (VMware ⇄ terminal) checks run FIRST ──
+    # These scenarios reuse common probes (systemctl is-active nginx, ip addr)
+    # whose generic handlers appear later in this function; running the cross-tech
+    # logic up front keeps the bridge semantics (fail-closed until the VMware
+    # action + terminal fix) from being shadowed.
+    _xslug0 = (getattr(state, "scenario_slug", "") or "").lower()
+    if _xslug0.startswith("linux-server-hung-needs-vmware-reset") and (
+        "is-active nginx" in stripped or "uptime" in stripped or "pgrep" in stripped
+    ):
+        if state.recover_from_vmware_reset() and "nginx" in state.services:
+            state.services["nginx"].active = "active"
+            state.services["nginx"].sub_state = "running"
+        if getattr(state, "server_hung", False):
+            failures.append("guest is hung — reset web-prod-01 from the VMware simulator (Power → Reset)")
+        else:
+            nginx = state.services.get("nginx")
+            if not nginx or nginx.active != "active":
+                failures.append("nginx not running after reset — start it from the recovered terminal")
+        return True
+    if _xslug0 == "linux-nic-add-vmware-rescan" and ("ip addr" in stripped or "10.0.0.30" in stripped):
+        if "10.0.0.30" not in state.format_ip_addr():
+            failures.append(
+                "secondary interface not up — add a NIC in VMware, rescan, then configure 10.0.0.30/24"
+            )
+        return True
+
     if stripped.startswith("HTTP_CODE=") or stripped.startswith("HTTP_CODE=$(curl"):
         code = _curl_http_code(state)
         if code != "200":
@@ -415,6 +441,31 @@ def _run_line_check(
             failures.append(f"{path} does not exist — create a valid shell script first")
         elif "$" in content and "set -u" in content and ":-}" not in content:
             failures.append(f"unbound variable risk in {path}")
+        return True
+
+    # ── Cross-technology VMware-disk LVM extend (rescan / reboot / datastore) ──
+    # Fail-closed chain: the disk must be (1) added in VMware → revealed in the
+    # guest (visible /dev/sdc), (2) initialised as a PV inside vgdata, and (3) the
+    # lvdata LV genuinely grown past its original 20G. Any earlier step missing
+    # keeps the check failing.
+    _xslug = (state.scenario_slug or "").lower()
+    _IS_CROSS_LVM = _xslug in (
+        "linux-lvm-extend-vmware-disk-rescan",
+        "linux-lvm-extend-vmware-disk-reboot",
+        "linux-datastore-full-add-disk-vmware",
+    )
+    if _IS_CROSS_LVM and ("lvextend" in stripped or "lvs" in stripped or "vgs" in stripped
+                          or ("pvs" in stripped and ("sdc" in stripped or "vgdata" in stripped))):
+        from .lvm_state import LVMState
+        sdc = state.find_block_device("/dev/sdc")
+        pv = state.lvm.pvs.get("/dev/sdc")
+        lv = state.lvm.lvs.get("vgdata/lvdata")
+        if sdc is None:
+            failures.append("/dev/sdc not visible — add a disk in VMware, then rescan the SCSI bus (or reboot)")
+        elif not pv or pv.vg != "vgdata":
+            failures.append("/dev/sdc not added to vgdata — pvcreate /dev/sdc && vgextend vgdata /dev/sdc")
+        elif not lv or LVMState._size_to_kb(lv.size) <= LVMState._size_to_kb("20.00g"):
+            failures.append("lvdata not extended — lvextend -r -l +100%FREE /dev/vgdata/lvdata")
         return True
 
     if "lvextend" in stripped or ("pvs" in stripped and "sdb" in stripped):

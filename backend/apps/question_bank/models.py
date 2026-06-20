@@ -176,6 +176,21 @@ class Scenario(models.Model):
         default=False,
         help_text="Open a browser coding IDE (CodeMirror + sandboxed run) instead of a terminal",
     )
+
+    # ── Cross-technology scenarios (VMware ⇄ Linux terminal) ──
+    # When cross_technology is True the SAME server exists in both the VMware
+    # simulator and the Linux lab terminal for one lab session, and an action in
+    # VMware (e.g. Add Hard Disk) reflects in the terminal after a rescan/reboot.
+    # vmware_link tells the LabRunner to surface an "Open VMware" affordance so the
+    # operator can perform the hypervisor-side step.
+    cross_technology = models.BooleanField(
+        default=False,
+        help_text="Server is shared across the VMware simulator and the Linux terminal in one session",
+    )
+    vmware_link = models.BooleanField(
+        default=False,
+        help_text="Surface an 'Open VMware' link in the lab so the user can perform the hypervisor-side action",
+    )
     coding_spec = models.JSONField(
         default=dict,
         blank=True,

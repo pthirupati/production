@@ -179,8 +179,18 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
         self._grub_countdown_token += 1
 
     def _reboot_from_shell(self) -> str:
+        # Cross-technology bridge: a reboot reveals any VMware-hot-added disk that
+        # a SCSI rescan could not (Scenario B), recovers a guest that VMware reset,
+        # and surfaces a hot-added NIC. Safe no-ops when nothing is pending.
+        st = self.shell.state
+        revealed = st.reveal_hidden_disks(after_reboot=True)
+        st.reveal_bridge_nic()
+        st.recover_from_vmware_reset()
         if not self.boot:
-            return "\r\n\x1b[1;33mSystem rebooting...\x1b[0m\r\n"
+            extra = ""
+            if revealed:
+                extra = f"\r\n\x1b[2m[ OK ] Detected new block device(s): {', '.join(revealed)}\x1b[0m\r\n"
+            return f"\r\n\x1b[1;33mSystem rebooting...\x1b[0m{extra}\r\n"
         self._sync_boot_to_state()
         if self.boot.issue == "patching" and not self.shell.state.patching_done:
             return (

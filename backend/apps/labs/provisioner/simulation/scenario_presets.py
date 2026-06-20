@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .rhel_os import RHELOSState, SimUser
+from .rhel_os import RHELOSState, SimBlockDevice, SimUser
 
 
 def apply_scenario_preset(slug: str, state: RHELOSState) -> None:
@@ -274,6 +274,74 @@ def _preset_lvm_create_mount(state: RHELOSState) -> None:
     state.add_block_device("/dev/sdc", "20G", "disk", present=True)
     state.lvm.pvs["/dev/sdc"] = SimPV("/dev/sdc", vg="", size="20.00g", free="20.00g")
     state._mkdir("/data")
+
+
+def _preset_cross_lvm_vmware(state: RHELOSState, *, requires_reboot: bool = False) -> None:
+    """Cross-technology LVM extend: /data is full and there is NO spare disk.
+
+    The ONLY way to add capacity is to add a virtual disk in the VMware
+    simulator (same server, same lab session). The hot-added disk is invisible
+    to the guest until a SCSI rescan (rescan variant) or a reboot (reboot
+    variant) — at which point /dev/sdc appears and can be pvcreate'd, added to
+    the vgdata VG, and the lvdata LV extended. Fail-closed: no spare disk exists
+    locally, and validation only passes once the LV is genuinely extended.
+    """
+    from .lvm_state import SimLV, SimPV, SimVG
+
+    # Build a dedicated data VG/LV mounted at /data that is (nearly) full.
+    state.lvm.pvs = {
+        "/dev/sda2": SimPV("/dev/sda2", "rhel", "48.00g", "0"),
+        "/dev/sdb": SimPV("/dev/sdb", "vgdata", "20.00g", "0"),
+    }
+    state.lvm.vgs["vgdata"] = SimVG("vgdata", "20.00g", "0", ["/dev/sdb"])
+    state.lvm.lvs["vgdata/lvdata"] = SimLV("lvdata", "vgdata", "20.00g", "/data", "/dev/mapper/vgdata-lvdata")
+    state.block_devices["/dev/mapper/vgdata-lvdata"] = SimBlockDevice(
+        "/dev/mapper/vgdata-lvdata", "20G", "lvm", parent="/dev/sdb",
+        fstype="xfs", uuid="eeee5555-data", mountpoint="/data")
+    state.mounts["/data"] = {"device": "/dev/mapper/vgdata-lvdata", "fstype": "xfs", "size_kb": 20 * 1024 * 1024}
+    state._mkdir("/data")
+    # No spare disk is present and none is pending until VMware adds one. The
+    # cross-tech bridge (keyed by session id) supplies /dev/sdc on rescan/reboot —
+    # NOT the Jira @storage-team flow. Leave storage_disk_provisioned True and the
+    # pending device unset so pvcreate is not Jira-gated once the disk is revealed.
+    state.storage_disk_provisioned = True
+    state.pending_storage_device = ""
+
+
+def _preset_cross_lvm_vmware_rescan(state: RHELOSState) -> None:
+    _preset_cross_lvm_vmware(state, requires_reboot=False)
+
+
+def _preset_cross_lvm_vmware_reboot(state: RHELOSState) -> None:
+    _preset_cross_lvm_vmware(state, requires_reboot=True)
+
+
+def _preset_cross_datastore_full(state: RHELOSState) -> None:
+    """Datastore-full variant: /var/lib/docker (on /data LV) is out of space.
+
+    Same mechanic as the LVM-extend rescan scenario — add a disk in VMware, rescan,
+    then extend the data LV — framed as 'the datastore filled, grow the volume'.
+    """
+    _preset_cross_lvm_vmware(state, requires_reboot=False)
+    state._mkdir("/var/lib/docker")
+
+
+def _preset_cross_server_hung(state: RHELOSState) -> None:
+    """The guest kernel is hung; the terminal is unresponsive to fixes until the
+    VM is reset from the VMware simulator (Power → Reset). After the reset the
+    operator confirms the service is healthy from the terminal."""
+    state.server_hung = True
+    # The web service is reported down while the guest is wedged.
+    if "nginx" in state.services:
+        state.services["nginx"].active = "failed"
+        state.services["nginx"].sub_state = "failed"
+
+
+def _preset_cross_nic_add(state: RHELOSState) -> None:
+    """A second NIC must be added in VMware; the guest sees the new link only
+    after a rescan / `ip link set up`, then it is given the 10.0.0.30 address."""
+    state.network_nic_provisioned = False
+    state.pending_nic_config = "10.0.0.30/24"
 
 
 def _preset_default_gateway_missing(state: RHELOSState) -> None:
@@ -3493,6 +3561,12 @@ _PRESETS: dict[str, callable] = {
     "linux-disk-missing-rescan-fs": _preset_disk_missing_fs,
     "linux-swap-not-active": _preset_swap_not_active,
     "linux-lvm-create-mount": _preset_lvm_create_mount,
+    # Cross-technology (VMware ⇄ terminal) scenarios
+    "linux-lvm-extend-vmware-disk-rescan": _preset_cross_lvm_vmware_rescan,
+    "linux-lvm-extend-vmware-disk-reboot": _preset_cross_lvm_vmware_reboot,
+    "linux-datastore-full-add-disk-vmware": _preset_cross_datastore_full,
+    "linux-server-hung-needs-vmware-reset": _preset_cross_server_hung,
+    "linux-nic-add-vmware-rescan": _preset_cross_nic_add,
     "linux-default-gateway-missing": _preset_default_gateway_missing,
     "linux-sysctl-ip-forward": _preset_sysctl_ip_forward,
     "linux-kernel-module-not-loaded": _preset_kernel_module_not_loaded,

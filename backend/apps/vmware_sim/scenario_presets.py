@@ -51,6 +51,30 @@ def apply_vmware_scenario_preset(state: dict, scenario_slug: str) -> None:
             "severity": severity, "status": "active", "time": events[-1]["time"] if events else "",
         })
 
+    # ── Cross-technology scenarios (VMware ⇄ Linux terminal, shared session) ──
+    # These slugs come from the LINUX scenario; the VMware inventory just needs
+    # web-prod-01 in the right power state so the hardware action the lab expects
+    # (Add Hard Disk / Add Network Adapter / Reset) is available on a running VM.
+    if slug in ("linux-lvm-extend-vmware-disk-rescan",
+                "linux-lvm-extend-vmware-disk-reboot",
+                "linux-datastore-full-add-disk-vmware",
+                "linux-nic-add-vmware-rescan"):
+        if web:
+            web["power"] = "poweredOn"
+            web["tools"] = "ok"
+        events.append(_event(
+            "web-prod-01 needs additional hardware — add it via Edit Settings", "info", "web-prod-01"))
+        return
+    if slug == "linux-server-hung-needs-vmware-reset":
+        if web:
+            web["power"] = "poweredOn"
+            web["guest_hung"] = True
+            web["tools"] = "toolsNotRunning"
+        events.append(_event(
+            "Guest heartbeat lost on web-prod-01 — VM is hung, reset required", "critical", "web-prod-01"))
+        alarm("alm-cross-hung", "Guest heartbeat lost", "web-prod-01")
+        return
+
     # ── New scenarios (wave 4): each reuses an existing validation rule AND
     # an existing e2e fix substring, so they fail-closed before the fix and
     # pass after. Matched FIRST so their distinct slugs don't fall through to

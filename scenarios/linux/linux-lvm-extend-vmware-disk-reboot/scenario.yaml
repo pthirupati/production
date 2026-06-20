@@ -1,0 +1,44 @@
+title: Grow /data — Add a Disk in VMware that Only Appears After a Reboot
+slug: linux-lvm-extend-vmware-disk-reboot
+difficulty: hard
+category: Linux Administration
+description: |
+  Like the rescan scenario, /data on web-prod-01 is full and you must ADD A NEW
+  VIRTUAL DISK in the vCenter simulator first. The twist: this controller does NOT
+  surface the hot-added disk to a live SCSI rescan — rescan-scsi-bus.sh finds
+  nothing. You must REBOOT the server from the terminal; after it comes back up the
+  kernel enumerates /dev/sdc at boot, and you can then extend the vgdata volume
+  group and the lvdata logical volume online.
+initial_state: |
+  Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator. /data
+  is full (XFS on /dev/mapper/vgdata-lvdata, VG vgdata has 0 free extents). After you
+  add a disk in VMware, a SCSI rescan will NOT reveal it — only a reboot will.
+objectives:
+  - Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01
+  - Try a SCSI rescan and observe the disk does NOT appear (the controller needs a re-enumeration)
+  - Reboot the server from the terminal so the kernel discovers /dev/sdc at boot
+  - After reboot, add /dev/sdc to LVM (pvcreate /dev/sdc; vgextend vgdata /dev/sdc)
+  - Extend the LV and filesystem (lvextend -r -l +100%FREE /dev/vgdata/lvdata) and verify with df -h
+lab_mode: simulation
+simulation_type: generic
+cross_technology: true
+vmware_link: true
+time_limit: 1200
+max_score: 100
+is_free: false
+hints:
+  - content: 'No spare disk exists. Open the VMware simulator (toolbar) and add a Hard Disk to web-prod-01 via Edit Settings.'
+    cost: 10
+    order: 1
+  - content: 'rescan-scsi-bus.sh will report 0 new devices for this controller — the disk only enumerates at boot. Reboot the server (type: reboot).'
+    cost: 15
+    order: 2
+  - content: 'After the reboot, lsblk shows /dev/sdc. Add it to LVM: pvcreate /dev/sdc && vgextend vgdata /dev/sdc.'
+    cost: 20
+    order: 3
+  - content: 'Grow the volume and filesystem: lvextend -r -l +100%FREE /dev/vgdata/lvdata, then confirm with vgs, lvs and df -h /data.'
+    cost: 20
+    order: 4
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

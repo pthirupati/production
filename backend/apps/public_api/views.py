@@ -1347,6 +1347,11 @@ class LabSessionStatusView(APIView):
                 "lab_mode": session.scenario.lab_mode,
                 "simulation_type": session.scenario.simulation_type,
                 "coding_mode": bool(getattr(session.scenario, "coding_mode", False)),
+                # Cross-technology flags so the LabRunner surfaces the "Open VMware"
+                # link for a shared-server scenario (e.g. add a disk in VMware that
+                # then appears in this terminal after a rescan/reboot).
+                "cross_technology": bool(getattr(session.scenario, "cross_technology", False)),
+                "vmware_link": bool(getattr(session.scenario, "vmware_link", False)),
                 # coding_kind lets the frontend route coding_mode scenarios to the
                 # right surface without fetching the full spec — "prompt" opens the
                 # PromptPlayground, anything else opens the code IDE.

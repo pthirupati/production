@@ -9,11 +9,13 @@ from io import StringIO
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import BasePermission
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Count, Q, Avg, Sum, F
 from django.http import HttpResponse
 from django.utils import timezone
+from django.utils.crypto import constant_time_compare
 from django.core.cache import cache
 from django.db.models.functions import TruncDate
 from datetime import timedelta
@@ -2730,6 +2732,153 @@ class AdminMonitoringContainerLogsView(APIView):
             })
         except Exception as exc:
             return Response({"error": str(exc), "lines": []}, status=404)
+
+
+# ─── Fleet Server Monitoring (CPU / Memory / Disk / Load per node) ─────
+
+class _IsAdminOrAgentToken(BasePermission):
+    """Allow staff/superuser admins OR a peer node presenting the shared
+    MONITORING_AGENT_TOKEN via the X-Monitoring-Token header.
+
+    This lets the fleet aggregator pull a remote node's metrics without a
+    logged-in admin session, while keeping the endpoint closed to the public.
+    """
+
+    def has_permission(self, request, view):
+        user = getattr(request, "user", None)
+        if user and user.is_authenticated and user.is_staff:
+            return True
+        token = getattr(settings, "MONITORING_AGENT_TOKEN", "") or ""
+        if token:
+            presented = request.META.get("HTTP_X_MONITORING_TOKEN", "")
+            if presented and constant_time_compare(presented, token):
+                return True
+        return False
+
+
+class AdminNodeMetricsView(APIView):
+    """GET /api/admin/monitoring/metrics/ — host metrics for THIS node only.
+
+    Returns hostname, ip, cpu, memory, disk, load, uptime and process count for
+    the server actually serving the request. Briefly cached. Never 500s — on any
+    failure it returns safe ``None`` defaults with ``status: "online"`` so the
+    dashboard can always render a card.
+    """
+
+    permission_classes = [_IsAdminOrAgentToken]
+    CACHE_KEY = "admin_node_metrics_v1"
+    CACHE_TTL = 5  # seconds — dashboard polls ~10s; keep it fresh but cheap
+
+    def get(self, request):
+        from .server_metrics import collect_local_metrics
+
+        if request.query_params.get("refresh") != "1":
+            cached = cache.get(self.CACHE_KEY)
+            if cached is not None:
+                return Response(cached)
+        try:
+            data = collect_local_metrics(
+                node_name=getattr(settings, "MONITORING_NODE_NAME", "") or None
+            )
+        except Exception as exc:  # defensive — collector is already guarded
+            logger.warning("Node metrics collection failed: %s", exc)
+            data = {"name": "local", "status": "online", "error": str(exc), "is_local": True}
+        cache.set(self.CACHE_KEY, data, self.CACHE_TTL)
+        return Response(data)
+
+
+class AdminFleetMonitoringView(APIView):
+    """GET /api/admin/monitoring/fleet/ — metrics for EVERY configured node.
+
+    Always includes the local node, then fetches each peer listed in
+    ``settings.MONITORING_SERVERS`` by calling its own metrics endpoint
+    (best-effort, short timeout). Unreachable peers are returned with
+    ``status: "offline"`` and an ``error`` — this view NEVER 500s.
+    """
+
+    permission_classes = [IsPlatformAdmin]
+    CACHE_KEY = "admin_fleet_metrics_v1"
+    CACHE_TTL = 8
+
+    def get(self, request):
+        from .server_metrics import collect_local_metrics
+
+        if request.query_params.get("refresh") != "1":
+            cached = cache.get(self.CACHE_KEY)
+            if cached is not None:
+                return Response(cached)
+
+        nodes = []
+
+        # 1) Local node — always present.
+        try:
+            local = collect_local_metrics(
+                node_name=getattr(settings, "MONITORING_NODE_NAME", "") or None
+            )
+        except Exception as exc:
+            local = {"name": "local", "status": "online", "error": str(exc), "is_local": True}
+        nodes.append(local)
+
+        # 2) Remote peers (best-effort).
+        for spec in getattr(settings, "MONITORING_SERVERS", []) or []:
+            nodes.append(self._fetch_peer(spec))
+
+        online = sum(1 for n in nodes if n.get("status") == "online")
+        payload = {
+            "nodes": nodes,
+            "total": len(nodes),
+            "online": online,
+            "offline": len(nodes) - online,
+            "collected_at": timezone.now().isoformat(),
+        }
+        cache.set(self.CACHE_KEY, payload, self.CACHE_TTL)
+        return Response(payload)
+
+    @staticmethod
+    def _parse_spec(spec):
+        """'name=https://host[:port]' | '=url' | 'url' → (name, base_url)."""
+        spec = (spec or "").strip()
+        if "=" in spec:
+            name, _, url = spec.partition("=")
+            name, url = name.strip(), url.strip()
+        else:
+            name, url = "", spec
+        if not url:
+            return None, None
+        if not url.startswith(("http://", "https://")):
+            url = "http://" + url
+        return (name or url), url.rstrip("/")
+
+    def _fetch_peer(self, spec):
+        name, base_url = self._parse_spec(spec)
+        if not base_url:
+            return {"name": str(spec), "status": "offline", "error": "invalid server spec", "is_local": False}
+
+        path = getattr(settings, "MONITORING_METRICS_PATH", "/api/admin/monitoring/metrics/")
+        url = f"{base_url}{path}"
+        token = getattr(settings, "MONITORING_AGENT_TOKEN", "") or ""
+        headers = {"X-Monitoring-Token": token} if token else {}
+
+        try:
+            import requests
+
+            resp = requests.get(url, headers=headers, timeout=4)
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, dict):
+                    data["name"] = data.get("name") or name
+                    data["status"] = "online"
+                    data["is_local"] = False
+                    return data
+            return {
+                "name": name, "status": "offline", "is_local": False,
+                "error": f"HTTP {resp.status_code}", "ip": base_url,
+            }
+        except Exception as exc:
+            return {
+                "name": name, "status": "offline", "is_local": False,
+                "error": str(exc)[:120], "ip": base_url,
+            }
 
 
 # ─── Coupon Management ────────────────────────────────────────────────

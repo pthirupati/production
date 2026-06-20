@@ -19,6 +19,8 @@ from .views import (
     AdminMonitoringContainersView,
     AdminMonitoringContainerDetailView,
     AdminMonitoringContainerLogsView,
+    AdminNodeMetricsView,
+    AdminFleetMonitoringView,
     AdminAnalyticsView,
     AdminSystemHealthView,
     AdminAuditLogView,
@@ -138,6 +140,8 @@ urlpatterns = [
     path("labs/terminate-idle/", AdminTerminateAllIdleLabsView.as_view()),
 
     # Monitoring
+    path("monitoring/metrics/", AdminNodeMetricsView.as_view()),
+    path("monitoring/fleet/", AdminFleetMonitoringView.as_view()),
     path("monitoring/containers/", AdminMonitoringContainersView.as_view()),
     path("monitoring/containers/<str:container_id>/", AdminMonitoringContainerDetailView.as_view()),
     path("monitoring/containers/<str:container_id>/logs/", AdminMonitoringContainerLogsView.as_view()),

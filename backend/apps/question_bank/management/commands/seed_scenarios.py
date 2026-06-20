@@ -205,6 +205,8 @@ class Command(BaseCommand):
                         "dual_terminal": data.get("dual_terminal", False),
                         "coding_mode": data.get("coding_mode", False),
                         "coding_spec": data.get("coding_spec", {}) or {},
+                        "cross_technology": data.get("cross_technology", False),
+                        "vmware_link": data.get("vmware_link", False),
                     },
                 )
 

@@ -446,6 +446,12 @@ class RHELShell:
         target = redirect.get("stdout") or redirect.get("stderr") or ""
         if "/sys/class/scsi_host/" in target and target.endswith("/scan"):
             self.state.reveal_hidden_disks()
+            self.state.reveal_bridge_nic()
+            return ""
+        # A PCI rescan likewise surfaces a hot-added NIC for cross-tech scenarios.
+        if "/sys/bus/pci/rescan" in target:
+            self.state.reveal_bridge_nic()
+            self.state.reveal_hidden_disks()
             return ""
 
         # 2>&1 with a stdout target sends everything to the stdout file.
@@ -1082,6 +1088,11 @@ class RHELShell:
                 dev = "eth0"
                 if "dev" in p:
                     dev = p[p.index("dev") + 1]
+                # Cross-tech: a NIC added in VMware appears only after the guest
+                # discovers it (a rescan). Pull it from the bridge on demand so the
+                # operator can configure the new link they just added in VMware.
+                if dev not in self.state.network_ifs:
+                    self.state.reveal_bridge_nic()
                 if dev not in self.state.network_ifs:
                     self.state.network_ifs[dev] = {"up": True, "addrs": []}
                 if addr not in self.state.network_ifs[dev]["addrs"]:
@@ -1640,12 +1651,21 @@ class RHELShell:
         dev = p[-1] if len(p) > 1 else ""
         if dev not in self.state.lvm.pvs:
             pending = getattr(self.state, "pending_storage_device", "/dev/sdb")
+            # Jira-gated LVM scenarios: the pending device stays unusable until the
+            # storage team provisions it, even though it may exist as a block device.
             if not self.state.storage_disk_provisioned and dev == pending:
                 return (
                     f"  Device {dev} not found.\n"
                     f"  Comment on Jira: @storage team please add a disk for LVM extension.\n"
                     f"  Wait ~30s, then run fdisk -l or echo 1 > /sys/class/scsi_host/host0/scan"
                 )
+            # Otherwise, if the kernel can see the block device (e.g. it was just
+            # revealed by a SCSI rescan or reboot — including a disk hot-added in
+            # VMware via the cross-tech bridge), pvcreate succeeds and registers it.
+            if self.state.find_block_device(dev) is not None:
+                from .lvm_state import SimPV
+                self.state.lvm.pvs[dev] = SimPV(dev, "", "50.00g", "50.00g")
+                return f'  Physical volume "{dev}" successfully created.'
             return f"  Device {dev} not found"
         ok, msg = self.state.lvm.pvcreate(dev)
         return msg if ok else f"  {msg}"
@@ -1669,8 +1689,31 @@ class RHELShell:
     def _cmd_lvextend(self, p: list[str]) -> str:
         if len(p) < 2:
             return "lvextend: missing argument"
-        lv = p[1]
-        size = p[-1] if p[-1].startswith("+") or p[-1].endswith("G") else ""
+        # Parse flags: -L/-l carry the new/added size, -r resizes the fs, and the
+        # LV path is the first non-flag, non-size token (e.g. /dev/vgdata/lvdata).
+        lv = ""
+        size = ""
+        i = 1
+        while i < len(p):
+            tok = p[i]
+            if tok in ("-L", "--size", "-l", "--extents") and i + 1 < len(p):
+                size = p[i + 1]
+                i += 2
+                continue
+            if tok in ("-r", "--resizefs", "-n", "-y", "--yes"):
+                i += 1
+                continue
+            if tok.startswith("/dev/") or "/" in tok:
+                lv = tok
+            elif not size and (tok.startswith("+") or tok.endswith("G") or "%" in tok):
+                size = tok
+            i += 1
+        if not lv:
+            lv = p[-1]
+        # Normalise "+100%FREE"/"100%FREE" to "+100%FREE" so the LV genuinely grows
+        # by the VG's free space (the freshly-added PV) rather than no-opping.
+        if size and "%" in size and not size.startswith("+"):
+            size = "+" + size
         ok, msg = self.state.lvm.lvextend(lv, size)
         return msg
 
@@ -1839,6 +1882,8 @@ class RHELShell:
 
     def _cmd_rescan_scsi(self, p: list[str]) -> str:
         revealed = self.state.reveal_hidden_disks()
+        # A bus rescan also surfaces a NIC hot-added in VMware for this session.
+        self.state.reveal_bridge_nic()
         if revealed:
             return "\n".join(f"OLD: Host: scsi0 Channel: 00  ... new device {d}" for d in revealed) + \
                    f"\n{len(revealed)} new or changed device(s) found."

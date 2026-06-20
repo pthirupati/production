@@ -1,6 +1,7 @@
 from pathlib import Path
 import environ
 import os
+import socket
 from datetime import timedelta
 
 # --------------------------------------------------
@@ -470,6 +471,27 @@ DOCKER_NETWORK = env("DOCKER_NETWORK", default="fixitlab_labs")
 DOCKER_SCENARIO_IMAGE_PREFIX = env("DOCKER_SCENARIO_IMAGE_PREFIX", default="fixitlab/scenario-")
 DOCKER_CONTAINER_MEMORY_LIMIT = env("DOCKER_CONTAINER_MEMORY_LIMIT", default="512m")
 DOCKER_CONTAINER_CPU_LIMIT = env.float("DOCKER_CONTAINER_CPU_LIMIT", default=1.0)
+
+# --------------------------------------------------
+# Fleet server monitoring (FREE — no paid APM)
+# --------------------------------------------------
+# Friendly name for THIS node, shown on its monitoring card.
+MONITORING_NODE_NAME = env("MONITORING_NODE_NAME", default="") or socket.gethostname()
+# Shared secret an aggregator presents to a remote node's metrics endpoint
+# (header: X-Monitoring-Token). Lets the fleet endpoint pull peer metrics
+# without a logged-in admin session. Optional — admins are always allowed.
+MONITORING_AGENT_TOKEN = env("MONITORING_AGENT_TOKEN", default="")
+# Comma-separated list of peer nodes to aggregate in the fleet view, e.g.
+#   MONITORING_SERVERS="web1=https://10.0.0.11,web2=https://10.0.0.12:8000"
+# Each entry is "name=base_url"; "=base_url" or bare "base_url" also work.
+# The aggregator appends the metrics path to base_url and reads each peer.
+MONITORING_SERVERS = [
+    s.strip() for s in env("MONITORING_SERVERS", default="").split(",") if s.strip()
+]
+# Path appended to each peer base_url to fetch its node metrics.
+MONITORING_METRICS_PATH = env(
+    "MONITORING_METRICS_PATH", default="/api/admin/monitoring/metrics/"
+)
 
 # AWS provisioning (for later)
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")

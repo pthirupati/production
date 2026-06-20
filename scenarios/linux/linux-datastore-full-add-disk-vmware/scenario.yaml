@@ -1,0 +1,41 @@
+title: Datastore Full — Add Capacity in VMware and Extend the Data Volume
+slug: linux-datastore-full-add-disk-vmware
+difficulty: medium
+category: Linux Administration
+description: |
+  web-prod-01 has run out of space on its data volume (mounted at /data, used by
+  /var/lib/docker), and the underlying datastore has no free room for the existing
+  disk to grow. This is a CROSS-TECHNOLOGY task: add a NEW virtual disk to the VM in
+  the vCenter simulator, rescan the SCSI bus in the terminal so /dev/sdc appears,
+  then add it to the vgdata volume group and extend the lvdata logical volume to
+  reclaim space for the application.
+initial_state: |
+  Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator. /data
+  is a full XFS filesystem on /dev/mapper/vgdata-lvdata; vgdata has 0 free extents and
+  no spare disk is attached. /var/lib/docker lives on /data.
+objectives:
+  - Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01
+  - Rescan the SCSI bus in the terminal so /dev/sdc is discovered
+  - Add the disk to LVM (pvcreate /dev/sdc; vgextend vgdata /dev/sdc)
+  - Extend the data LV and filesystem (lvextend -r -l +100%FREE /dev/vgdata/lvdata)
+  - Verify /data has free space again with df -h
+lab_mode: simulation
+simulation_type: generic
+cross_technology: true
+vmware_link: true
+time_limit: 1200
+max_score: 100
+is_free: false
+hints:
+  - content: 'The datastore/volume is full and cannot grow in place. Open the VMware simulator (toolbar) and add a Hard Disk to web-prod-01.'
+    cost: 10
+    order: 1
+  - content: 'Reveal the new disk with a SCSI rescan: echo "- - -" > /sys/class/scsi_host/host0/scan (or rescan-scsi-bus.sh), then lsblk.'
+    cost: 15
+    order: 2
+  - content: 'pvcreate /dev/sdc; vgextend vgdata /dev/sdc; then lvextend -r -l +100%FREE /dev/vgdata/lvdata. Confirm with df -h /data.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: High

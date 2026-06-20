@@ -51,6 +51,7 @@ class SimBlockDevice:
     mountpoint: str = ""            # current mount target ("" = unmounted)
     present: bool = True            # False until a SCSI rescan reveals it
     removable: bool = False
+    needs_reboot: bool = False      # hidden disk a rescan won't reveal — needs reboot
 
 
 class RHELOSState:
@@ -116,6 +117,10 @@ class RHELOSState:
         self.swaps: dict[str, dict] = {}  # device -> {"size": kb, "used": kb}
         self.mounts: dict[str, dict] = {}  # mountpoint -> {"device", "fstype", "size_kb"}
         self.disk_rescanned: bool = False
+        # Cross-technology bridge (VMware ⇄ this terminal). session_id keys the
+        # shared cache; server_hung models a guest hung until reset from VMware.
+        self.session_id: str = ""
+        self.server_hung: bool = False
         self.editor = None  # EditorSession when nano/vi active
         self.network_ifs: dict[str, dict] = {
             "lo": {"up": True, "addrs": ["127.0.0.1/8"]},
@@ -202,16 +207,73 @@ class RHELOSState:
             self.hidden_block_devices[name] = dev
         return dev
 
-    def reveal_hidden_disks(self) -> list[str]:
-        """A SCSI rescan / rescan-scsi-bus.sh makes pending disks appear."""
+    def reveal_hidden_disks(self, after_reboot: bool = False) -> list[str]:
+        """A SCSI rescan / rescan-scsi-bus.sh makes pending disks appear.
+
+        Two sources are drained: (1) locally pre-seeded hidden_block_devices (the
+        classic single-engine disk-missing flow), and (2) the cross-technology
+        VMware bridge — disks hot-added in the VMware simulator for THIS lab
+        session. Bridge disks flagged requires_reboot stay invisible to a plain
+        rescan and only appear once `after_reboot` is True (Scenario B)."""
         revealed = []
         self.disk_rescanned = True
         for name, dev in list(self.hidden_block_devices.items()):
+            if getattr(dev, "needs_reboot", False) and not after_reboot:
+                continue
             dev.present = True
             self.block_devices[name] = dev
             del self.hidden_block_devices[name]
             revealed.append(name)
+        revealed.extend(self._reveal_bridge_disks(after_reboot=after_reboot))
         return revealed
+
+    def _reveal_bridge_disks(self, after_reboot: bool = False) -> list[str]:
+        """Pull disks hot-added in the VMware simulator for this lab session."""
+        if not self.session_id:
+            return []
+        try:
+            from .vmware_bridge import consume_revealed_disks
+        except Exception:
+            return []
+        revealed = []
+        for disk in consume_revealed_disks(self.session_id, after_reboot=after_reboot):
+            dev = disk.get("dev") or "/dev/sdc"
+            size = f"{int(disk.get('size_gb', 50))}G"
+            # The disk arrives bare (no partition table / no LVM metadata) — the
+            # operator must pvcreate/vgextend/lvextend to actually use it.
+            self.block_devices[dev] = SimBlockDevice(dev, size, "disk", present=True)
+            self.hidden_block_devices.pop(dev, None)
+            revealed.append(dev)
+        return revealed
+
+    def reveal_bridge_nic(self) -> bool:
+        """A rescan / ifup surfaces a NIC hot-added in VMware for this session."""
+        if not self.session_id:
+            return False
+        try:
+            from .vmware_bridge import consume_pending_nic
+        except Exception:
+            return False
+        nic = consume_pending_nic(self.session_id)
+        if not nic:
+            return False
+        ip = nic.get("ip", "10.0.0.30/24")
+        name = f"eth{len(self.network_ifs) - 1}"  # lo + eth0 already present → eth1
+        self.network_ifs[name] = {"up": True, "addrs": [ip]}
+        return True
+
+    def recover_from_vmware_reset(self) -> bool:
+        """If the guest was hung and VMware reset it for this session, recover."""
+        if not self.server_hung or not self.session_id:
+            return False
+        try:
+            from .vmware_bridge import was_vm_reset
+        except Exception:
+            return False
+        if was_vm_reset(self.session_id):
+            self.server_hung = False
+            return True
+        return False
 
     def find_block_device(self, ref: str) -> "SimBlockDevice | None":
         """Resolve a device by /dev path, UUID=, or bare UUID."""

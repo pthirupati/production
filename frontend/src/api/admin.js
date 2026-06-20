@@ -298,6 +298,17 @@ export const adminApi = {
     return data
   },
 
+  // Fleet server monitoring (CPU/mem/disk/load per node)
+  async getNodeMetrics() {
+    const { data } = await api.get('/admin/monitoring/metrics/')
+    return data
+  },
+
+  async getFleetMetrics() {
+    const { data } = await api.get('/admin/monitoring/fleet/')
+    return data
+  },
+
   async getMonitoringLogs(id, params = {}) {
     const qs = new URLSearchParams(params).toString()
     const { data } = await api.get(qs ? `/admin/monitoring/containers/${id}/logs/?${qs}` : `/admin/monitoring/containers/${id}/logs/`)

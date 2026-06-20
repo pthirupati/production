@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { adminApi } from '../../api/admin'
+import ServerMonitoring from '../../components/admin/ServerMonitoring'
 import toast from 'react-hot-toast'
 import {
   Users, Target, MonitorPlay, TrendingUp,
@@ -540,6 +541,9 @@ export default function AdminDashboard() {
           </div>
         ) : null}
       </div>
+
+      {/* ── Server Monitoring (per-node CPU / memory / disk / load) ── */}
+      <ServerMonitoring refreshMs={10000} />
 
       {/* ── System Containers ── */}
       {containers.length > 0 && (

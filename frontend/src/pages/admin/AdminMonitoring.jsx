@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
+import ServerMonitoring from '../../components/admin/ServerMonitoring'
 import {
   Activity, Container, Terminal, Cpu, HardDrive,
   Filter, CheckCircle2, XCircle, AlertCircle, RotateCcw,
@@ -276,6 +277,9 @@ export default function AdminMonitoring() {
           ))}
         </div>
       )}
+
+      {/* ── Server Monitoring (per-node host metrics) ── */}
+      <ServerMonitoring refreshMs={10000} />
 
       {/* ── Alerts: unhealthy containers callout ── */}
       {unhealthyContainers.length > 0 && (

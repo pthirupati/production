@@ -97,6 +97,26 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
         "storage_disk_provisioned": st.storage_disk_provisioned,
         "pending_nic_config": st.pending_nic_config,
         "network_nic_provisioned": st.network_nic_provisioned,
+        # Cross-technology VMware bridge linkage — must round-trip so a rescan or
+        # reboot on a different worker still finds the hot-added disk in cache.
+        "session_id": getattr(st, "session_id", ""),
+        "server_hung": getattr(st, "server_hung", False),
+        "block_devices": {
+            k: {
+                "name": v.name, "size": v.size, "dev_type": v.dev_type,
+                "parent": v.parent, "fstype": v.fstype, "uuid": v.uuid,
+                "mountpoint": v.mountpoint, "present": v.present,
+                "removable": v.removable, "needs_reboot": getattr(v, "needs_reboot", False),
+            } for k, v in st.block_devices.items()
+        },
+        "hidden_block_devices": {
+            k: {
+                "name": v.name, "size": v.size, "dev_type": v.dev_type,
+                "parent": v.parent, "fstype": v.fstype, "uuid": v.uuid,
+                "mountpoint": v.mountpoint, "present": v.present,
+                "removable": v.removable, "needs_reboot": getattr(v, "needs_reboot", False),
+            } for k, v in st.hidden_block_devices.items()
+        },
         # Fix-flags read by the validator — must survive a Redis round-trip or
         # cross-worker validation reads them as unfixed (e.g. ldconfig in CI).
         "ldconfig_updated": getattr(st, "ldconfig_updated", False),
@@ -175,6 +195,17 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
     st.pending_nic_config = data.get("pending_nic_config", "10.0.0.20/24")
     st.network_nic_provisioned = data.get("network_nic_provisioned", True)
     st.network_ifs = data.get("network_ifs", st.network_ifs)
+    st.session_id = data.get("session_id", "")
+    st.server_hung = data.get("server_hung", False)
+    # Restore the block-device model (the preset already seeded a default set in
+    # __init__; replace it with the snapshot so revealed/hidden disks persist).
+    from .rhel_os import SimBlockDevice
+    bd = data.get("block_devices")
+    if bd is not None:
+        st.block_devices = {k: SimBlockDevice(**v) for k, v in bd.items()}
+    hbd = data.get("hidden_block_devices")
+    if hbd is not None:
+        st.hidden_block_devices = {k: SimBlockDevice(**v) for k, v in hbd.items()}
     st._scenario_preset_applied = True
 
     lvm_data = data.get("lvm", {})

@@ -93,13 +93,33 @@ class LVMState:
         lv = self.lvs.get(key)
         if not lv:
             return False, f"  Logical volume {lv_path} not found"
-        if size and size.startswith("+"):
-            old_kb = self._size_to_kb(lv.size)
+        vg = self.vgs.get(lv.vg)
+        free_kb = self._size_to_kb(vg.free) if vg else 0
+        if size and "%" in size:
+            # +100%FREE / 100%FREE consume the VG's free extents. With no free
+            # space (no new PV added to the VG) the extend cannot grow — this is
+            # the fail-closed gate for the cross-tech "extend after adding a disk"
+            # scenarios: lvextend only succeeds once vgextend added the new PV.
+            if free_kb <= 0:
+                return False, (
+                    f"  Insufficient free space: 0 extents free in volume group {lv.vg}. "
+                    f"Add a physical volume (pvcreate + vgextend) first."
+                )
+            lv.size = f"{(self._size_to_kb(lv.size) + free_kb) // (1024 * 1024)}.00g"
+            if vg:
+                vg.free = "0"
+        elif size and size.startswith("+"):
             add_kb = self._size_to_kb(size[1:])
-            new_kb = old_kb + add_kb
-            lv.size = f"{new_kb // (1024 * 1024)}.00g"
+            if free_kb < add_kb:
+                return False, (
+                    f"  Insufficient free space ({add_kb // (1024 * 1024)} extents required) "
+                    f"in volume group {lv.vg}. Add a physical volume first."
+                )
+            lv.size = f"{(self._size_to_kb(lv.size) + add_kb) // (1024 * 1024)}.00g"
+            if vg:
+                vg.free = f"{max(0, free_kb - add_kb) / (1024 * 1024):.2f}g"
         elif size:
-            lv.size = size.replace("+", "").replace("L", "g") if size else "50.00g"
+            lv.size = size.replace("+", "").replace("L", "g")
         return True, f"  Logical volume {lv.lv_path} successfully resized."
 
     def format_pvs(self) -> str:
@@ -163,9 +183,20 @@ class LVMState:
 
     @staticmethod
     def _size_to_kb(size: str) -> int:
-        s = (size or "40g").lower().replace(" ", "")
+        s = (size or "").lower().replace(" ", "").rstrip("ib")
+        if not s:
+            return 41943040  # default 40g when truly unspecified
         if s.endswith("g"):
             return int(float(s[:-1]) * 1024 * 1024)
         if s.endswith("m"):
             return int(float(s[:-1]) * 1024)
-        return 52428800
+        if s.endswith("t"):
+            return int(float(s[:-1]) * 1024 * 1024 * 1024)
+        if s.endswith("k"):
+            return int(float(s[:-1]))
+        # A bare number (e.g. "0", "58.00") is treated as gigabytes — this is how
+        # VG/LV free/size values are stored throughout the sim.
+        try:
+            return int(float(s) * 1024 * 1024)
+        except ValueError:
+            return 41943040

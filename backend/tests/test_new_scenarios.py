@@ -502,3 +502,196 @@ class JavaScenarioCatalogTests(SimpleTestCase):
             offenders, [],
             f"these java simulation scenarios have trivial check.sh: {offenders}",
         )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Cross-technology (VMware ⇄ Linux terminal) scenarios.
+# Proves: the same lab session id bridges the two simulators; the terminal
+# does NOT see a VMware-added disk until a SCSI rescan (Scenario A) or a reboot
+# (Scenario B); and validation is fail-closed until the LVM/filesystem is
+# actually extended in the terminal.
+# ──────────────────────────────────────────────────────────────────────
+
+from django.core.cache import cache as _dj_cache  # noqa: E402
+
+from apps.labs.provisioner.simulation import vmware_bridge as _bridge  # noqa: E402
+from apps.labs.provisioner.simulation.unified_sim import (  # noqa: E402
+    UnifiedSimulationEngine,
+)
+from apps.vmware_sim.engine import _ensure_session as _vmw_ensure  # noqa: E402
+from apps.vmware_sim.engine import apply_action as _vmw_action  # noqa: E402
+
+_CROSS_DIRS = {
+    "linux-lvm-extend-vmware-disk-rescan": "linux/linux-lvm-extend-vmware-disk-rescan",
+    "linux-lvm-extend-vmware-disk-reboot": "linux/linux-lvm-extend-vmware-disk-reboot",
+    "linux-datastore-full-add-disk-vmware": "linux/linux-datastore-full-add-disk-vmware",
+    "linux-server-hung-needs-vmware-reset": "linux/linux-server-hung-needs-vmware-reset",
+    "linux-nic-add-vmware-rescan": "linux/linux-nic-add-vmware-rescan",
+}
+
+
+class CrossTechBridgeTests(SimpleTestCase):
+    def setUp(self):
+        _dj_cache.clear()
+
+    def _engine(self, slug, sid):
+        eng = UnifiedSimulationEngine(scenario_slug=slug, simulation_type="generic")
+        eng.shell.state.session_id = sid
+        _vmw_ensure(sid, slug)
+        return eng
+
+    def test_check_scripts_non_trivial(self):
+        for slug, rel in _CROSS_DIRS.items():
+            script = _load_check(rel)
+            self.assertFalse(
+                is_trivial_validation_script(script),
+                f"{slug}: check.sh is trivial",
+            )
+
+    def test_cross_tech_registry_matches_scenarios(self):
+        for slug in _CROSS_DIRS:
+            self.assertTrue(
+                _bridge.is_cross_tech_scenario(slug),
+                f"{slug} missing from CROSS_TECH_SCENARIOS registry",
+            )
+
+    def test_scenario_A_rescan_reveals_disk_then_passes(self):
+        """Scenario A: VMware add_disk sets a pending disk; the terminal does NOT
+        see it until a SCSI rescan; validation fails before LVM extend, passes after."""
+        slug = "linux-lvm-extend-vmware-disk-rescan"
+        sid = "test-xtech-A"
+        eng = self._engine(slug, sid)
+        st = eng.shell.state
+        script = _load_check(_CROSS_DIRS[slug])
+
+        # Fresh broken lab: no spare disk, validation fails.
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, f"passed before any action: {msg}")
+        self.assertIsNone(st.find_block_device("/dev/sdc"))
+
+        # VMware add_disk → pending disk recorded on the bridge.
+        res = _vmw_action(sid, "add_disk", {"vm_name": "web-prod-01", "size_gb": 50})
+        self.assertTrue(res.get("ok"))
+        self.assertTrue(_bridge.has_pending_disk(sid))
+
+        # Terminal still cannot see it until a rescan.
+        self.assertIsNone(st.find_block_device("/dev/sdc"))
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "passed after VMware add but before terminal rescan")
+
+        # SCSI rescan reveals /dev/sdc.
+        eng.shell.run('echo "- - -" > /sys/class/scsi_host/host0/scan')
+        self.assertIsNotNone(st.find_block_device("/dev/sdc"))
+
+        # Revealed but not yet in LVM → still fails.
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "passed after rescan but before LVM extend")
+
+        # Apply the real LVM extend.
+        eng.shell.run("pvcreate /dev/sdc")
+        eng.shell.run("vgextend vgdata /dev/sdc")
+        eng.shell.run("lvextend -r -l +100%FREE /dev/vgdata/lvdata")
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertTrue(ok, f"failed after full fix: {msg}")
+
+    def test_scenario_B_rescan_does_not_reveal_only_reboot_does(self):
+        """Scenario B: after VMware add_disk, a SCSI rescan does NOT reveal the
+        disk — only a reboot does — then the LVM extend passes."""
+        slug = "linux-lvm-extend-vmware-disk-reboot"
+        sid = "test-xtech-B"
+        eng = self._engine(slug, sid)
+        st = eng.shell.state
+        script = _load_check(_CROSS_DIRS[slug])
+
+        _vmw_action(sid, "add_disk", {"vm_name": "web-prod-01", "size_gb": 50})
+
+        # A rescan must NOT reveal a reboot-gated disk.
+        eng.shell.run("rescan-scsi-bus.sh")
+        self.assertIsNone(
+            st.find_block_device("/dev/sdc"),
+            "reboot-gated disk wrongly revealed by a rescan",
+        )
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "passed after rescan for a reboot-only disk")
+
+        # Reboot reveals it.
+        eng._reboot_from_shell()
+        self.assertIsNotNone(st.find_block_device("/dev/sdc"))
+
+        eng.shell.run("pvcreate /dev/sdc")
+        eng.shell.run("vgextend vgdata /dev/sdc")
+        eng.shell.run("lvextend -r -l +100%FREE /dev/vgdata/lvdata")
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertTrue(ok, f"failed after reboot + LVM extend: {msg}")
+
+    def test_premature_lvextend_is_fail_closed(self):
+        """Extending the LV before adding the new PV must not grow it (no free PE)."""
+        slug = "linux-lvm-extend-vmware-disk-rescan"
+        eng = self._engine(slug, "test-xtech-premature")
+        st = eng.shell.state
+        before = st.lvm.lvs["vgdata/lvdata"].size
+        out = eng.shell.run("lvextend -r -l +100%FREE /dev/vgdata/lvdata")
+        self.assertIn("Insufficient free space", out)
+        self.assertEqual(st.lvm.lvs["vgdata/lvdata"].size, before)
+
+    def test_server_hung_needs_vmware_reset(self):
+        """The hung guest cannot be fixed from the terminal; only a VMware reset
+        recovers it, after which nginx validates active."""
+        slug = "linux-server-hung-needs-vmware-reset"
+        sid = "test-xtech-hung"
+        eng = self._engine(slug, sid)
+        st = eng.shell.state
+        script = _load_check(_CROSS_DIRS[slug])
+
+        self.assertTrue(st.server_hung)
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "hung guest passed before reset")
+
+        # Trying to start nginx in the terminal cannot un-hang the kernel.
+        eng.shell.run("systemctl start nginx")
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "hung guest passed by a terminal-only start")
+
+        # VMware reset (the VM is powered on + hung in the VMware preset).
+        res = _vmw_action(sid, "reboot", {"vm_name": "web-prod-01"})
+        self.assertTrue(res.get("ok"), res.get("error"))
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertTrue(ok, f"failed after VMware reset: {msg}")
+
+    def test_nic_add_in_vmware_then_configured(self):
+        slug = "linux-nic-add-vmware-rescan"
+        sid = "test-xtech-nic"
+        eng = self._engine(slug, sid)
+        st = eng.shell.state
+        script = _load_check(_CROSS_DIRS[slug])
+
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "nic scenario passed before any action")
+
+        _vmw_action(sid, "add_nic", {"vm_name": "web-prod-01"})
+        eng.shell.run("rescan-scsi-bus.sh")
+        eng.shell.run("ip addr add 10.0.0.30/24 dev eth1")
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertTrue(ok, f"failed after NIC add + configure: {msg}")
+
+    def test_pending_disk_survives_snapshot_round_trip(self):
+        """The session linkage + revealed disks must persist across a snapshot
+        restore (cross-worker safety)."""
+        from apps.labs.provisioner.simulation.sim_persistence import (
+            restore_engine,
+            snapshot_engine,
+        )
+
+        slug = "linux-lvm-extend-vmware-disk-rescan"
+        sid = "test-xtech-snap"
+        eng = self._engine(slug, sid)
+        _vmw_action(sid, "add_disk", {"vm_name": "web-prod-01", "size_gb": 50})
+        eng.shell.run('echo "- - -" > /sys/class/scsi_host/host0/scan')
+        self.assertIsNotNone(eng.shell.state.find_block_device("/dev/sdc"))
+
+        snap = snapshot_engine(eng)
+        restored = restore_engine(snap)
+        self.assertIsNotNone(restored)
+        self.assertEqual(restored.shell.state.session_id, sid)
+        # The revealed /dev/sdc must still be present after restore.
+        self.assertIsNotNone(restored.shell.state.find_block_device("/dev/sdc"))

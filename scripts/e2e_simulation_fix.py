@@ -97,6 +97,45 @@ def _apply_simulation_fix(session) -> tuple[bool, str]:
     state = shell.state
 
     try:
+        # ── Cross-technology (VMware ⇄ terminal) scenarios — matched FIRST ──
+        # These slugs contain substrings ("vmware", "boot", "lvm", "disk") that
+        # several generic branches below would otherwise grab. They are LINUX
+        # terminal labs whose fix is the VMware-side hardware change (via the
+        # bridge) PLUS the terminal-side rescan/reboot + LVM/NIC step.
+        from apps.labs.provisioner.simulation.vmware_bridge import (
+            cross_tech_config,
+            record_pending_disk,
+            record_pending_nic,
+            record_vm_reset,
+        )
+        xcfg = cross_tech_config(slug)
+        if xcfg:
+            sid = str(session.id)
+            state.session_id = sid
+            action = xcfg.get("action")
+            if action == "add_disk":
+                record_pending_disk(sid, 50, requires_reboot=bool(xcfg.get("requires_reboot")))
+                if xcfg.get("requires_reboot"):
+                    state.reveal_hidden_disks(after_reboot=True)
+                else:
+                    shell.run('echo "- - -" > /sys/class/scsi_host/host0/scan')
+                shell.run("pvcreate /dev/sdc")
+                shell.run("vgextend vgdata /dev/sdc")
+                shell.run("lvextend -r -l +100%FREE /dev/vgdata/lvdata")
+                return True, "cross-tech disk added in VMware, revealed, and LVM extended"
+            if action == "reset":
+                record_vm_reset(sid)
+                state.recover_from_vmware_reset()
+                if "nginx" in state.services:
+                    state.services["nginx"].active = "active"
+                    state.services["nginx"].sub_state = "running"
+                return True, "cross-tech hung guest reset from VMware"
+            if action == "add_nic":
+                record_pending_nic(sid)
+                shell.run("rescan-scsi-bus.sh")
+                shell.run("ip addr add 10.0.0.30/24 dev eth1")
+                return True, "cross-tech NIC added in VMware and configured"
+
         # ── Real-state generated scenarios (services + config markers) ──
         # Matched FIRST by exact slug so generic substring rules below don't
         # mis-handle them. Service scenarios start the failed unit; marker

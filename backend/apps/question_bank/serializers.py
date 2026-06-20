@@ -38,7 +38,7 @@ class ScenarioListSerializer(serializers.ModelSerializer):
             "is_free", "attempts_count", "completions_count", "completion_rate",
             "is_bookmarked", "blocked_commands",
             "lab_mode", "simulation_type", "dual_terminal", "requires_companion_hosts",
-            "interview_mode", "coding_mode", "created_at",
+            "interview_mode", "coding_mode", "cross_technology", "vmware_link", "created_at",
         ]
 
 
@@ -60,7 +60,8 @@ class ScenarioDetailSerializer(serializers.ModelSerializer):
             "avg_completion_time", "hints_count", "is_bookmarked",
             "blocked_commands", "infrastructure_type",
             "lab_mode", "simulation_type", "dual_terminal", "requires_companion_hosts",
-            "interview_mode", "coding_mode", "created_at", "updated_at",
+            "interview_mode", "coding_mode", "cross_technology", "vmware_link",
+            "created_at", "updated_at",
         ]
 
     def get_objectives(self, scenario):
@@ -90,6 +91,7 @@ class ScenarioAdminSerializer(serializers.ModelSerializer):
             "jira_priority", "jira_issue_template",
             "requires_companion_hosts", "dual_terminal", "lab_mode", "simulation_type",
             "docker_privileged", "coding_mode", "coding_spec",
+            "cross_technology", "vmware_link",
             "time_limit", "max_score",
             "definition_path", "is_free", "is_active", "interview_mode",
             "attempts_count", "completions_count", "avg_completion_time",
