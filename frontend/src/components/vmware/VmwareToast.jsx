@@ -9,8 +9,8 @@ export default function VmwareToast({ message, kind = 'success', onDone }) {
 
   if (!message) return null
 
-  const dot = kind === 'error' ? '#D9534F' : kind === 'warn' ? '#F5A623' : '#5DB85D'
-  const border = kind === 'error' ? 'rgba(217,83,79,.45)' : kind === 'warn' ? 'rgba(245,166,35,.45)' : 'rgba(93,184,93,.45)'
+  const dot = kind === 'error' ? '#D9534F' : kind === 'warn' ? '#F5A623' : kind === 'info' ? '#2D7CFF' : '#5DB85D'
+  const border = kind === 'error' ? 'rgba(217,83,79,.45)' : kind === 'warn' ? 'rgba(245,166,35,.45)' : kind === 'info' ? 'rgba(45,124,255,.45)' : 'rgba(93,184,93,.45)'
 
   return (
     <div

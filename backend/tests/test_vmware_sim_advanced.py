@@ -235,6 +235,123 @@ class VMwareAdvancedTests(TestCase):
         dup = apply_action(sid, "create_cluster", {"name": "Cluster-Edge", "datacenter_id": dcs[0]["id"]})
         self.assertFalse(dup["ok"])
 
+    def test_add_host(self):
+        sid = self._session("vmware-guest-powered-off")
+        before = len(get_state(sid)["inventory"]["hosts"])
+        res = apply_action(sid, "add_host", {"name": "esxi-03.fixitlab.local", "ip": "192.168.10.13", "memory_gb": 256})
+        self.assertTrue(res["ok"], res)
+        hosts = get_state(sid)["inventory"]["hosts"]
+        self.assertEqual(len(hosts), before + 1)
+        new_host = next(h for h in hosts if h["name"] == "esxi-03.fixitlab.local")
+        self.assertEqual(new_host["status"], "connected")
+        self.assertEqual(new_host["memory_gb"], 256)
+        # New host is attached to the datacenter's first cluster.
+        dcs = get_state(sid)["inventory"]["datacenters"]
+        dc_hosts = [h for dc in dcs for c in dc.get("clusters", []) for h in c.get("hosts", [])]
+        self.assertIn(new_host["id"], dc_hosts)
+        # Duplicate add is rejected.
+        self.assertFalse(apply_action(sid, "add_host", {"name": "esxi-03.fixitlab.local"})["ok"])
+
+    def test_new_resource_pool(self):
+        sid = self._session("vmware-guest-powered-off")
+        before = len(get_state(sid)["inventory"]["resource_pools"])
+        res = apply_action(sid, "new_resource_pool", {
+            "name": "RP-QA", "cpu_shares": "high", "mem_limit_mb": 8192,
+        })
+        self.assertTrue(res["ok"], res)
+        pools = get_state(sid)["inventory"]["resource_pools"]
+        self.assertEqual(len(pools), before + 1)
+        qa = next(p for p in pools if p["name"] == "RP-QA")
+        self.assertEqual(qa["cpu_shares"], "high")
+        self.assertEqual(qa["mem_limit_mb"], 8192)
+        # Empty name is rejected.
+        self.assertFalse(apply_action(sid, "new_resource_pool", {"name": "  "})["ok"])
+
+    def test_new_vapp_and_power(self):
+        sid = self._session("vmware-guest-powered-off")
+        res = apply_action(sid, "new_vapp", {"name": "vApp-Web", "vms": ["vm-api"]})
+        self.assertTrue(res["ok"], res)
+        vapps = get_state(sid)["inventory"]["vapps"]
+        self.assertTrue(any(v["name"] == "vApp-Web" for v in vapps))
+        vapp_id = next(v for v in vapps if v["name"] == "vApp-Web")["id"]
+        # Powering the vApp on powers on its member VMs.
+        on = apply_action(sid, "vapp_power", {"vapp_id": vapp_id, "op": "on"})
+        self.assertTrue(on["ok"], on)
+        inv = get_state(sid)["inventory"]
+        api = next(v for v in inv["vms"] if v["id"] == "vm-api")
+        self.assertEqual(api["power"], "poweredOn")
+        self.assertEqual(next(v for v in inv["vapps"] if v["id"] == vapp_id)["power"], "poweredOn")
+        # Duplicate name rejected.
+        self.assertFalse(apply_action(sid, "new_vapp", {"name": "vApp-Web"})["ok"])
+
+    def test_create_datastore_cluster(self):
+        sid = self._session("vmware-guest-powered-off")
+        res = apply_action(sid, "create_datastore_cluster", {
+            "name": "DSC-Prod", "sdrs_enabled": True, "datastore_ids": ["ds-01", "ds-02"],
+        })
+        self.assertTrue(res["ok"], res)
+        inv = get_state(sid)["inventory"]
+        dsc = next(c for c in inv["datastore_clusters"] if c["name"] == "DSC-Prod")
+        self.assertTrue(dsc["sdrs_enabled"])
+        self.assertEqual(set(dsc["datastore_ids"]), {"ds-01", "ds-02"})
+        # Member datastores are tagged with the pod id.
+        ds01 = next(d for d in inv["datastores"] if d["id"] == "ds-01")
+        self.assertEqual(ds01.get("datastore_cluster_id"), dsc["id"])
+        # Toggle SDRS off.
+        off = apply_action(sid, "toggle_datastore_sdrs", {"datastore_cluster_id": dsc["id"], "sdrs_enabled": False})
+        self.assertTrue(off["ok"], off)
+        self.assertFalse(next(c for c in get_state(sid)["inventory"]["datastore_clusters"] if c["id"] == dsc["id"])["sdrs_enabled"])
+        # Duplicate name rejected.
+        self.assertFalse(apply_action(sid, "create_datastore_cluster", {"name": "DSC-Prod"})["ok"])
+
+    def test_assign_role_and_permission(self):
+        sid = self._session("vmware-guest-powered-off")
+        before = len(get_state(sid)["inventory"]["permissions"])
+        # assign_role is an alias of assign_permission and mutates state.
+        res = apply_action(sid, "assign_role", {
+            "entity": "DC-Prod", "entity_id": "dc-prod", "entity_type": "datacenter",
+            "principal": "ops_user", "role": "Virtual Machine Power User",
+        })
+        self.assertTrue(res["ok"], res)
+        perms = get_state(sid)["inventory"]["permissions"]
+        self.assertEqual(len(perms), before + 1)
+        added = next(p for p in perms if p["principal"] == "ops_user")
+        self.assertEqual(added["role"], "Virtual Machine Power User")
+        # Revoking removes it.
+        rev = apply_action(sid, "revoke_permission", {"permission_id": added["id"]})
+        self.assertTrue(rev["ok"], rev)
+        self.assertFalse(any(p["principal"] == "ops_user" for p in get_state(sid)["inventory"]["permissions"]))
+        # Missing principal is rejected.
+        self.assertFalse(apply_action(sid, "assign_role", {"entity": "DC-Prod", "principal": ""})["ok"])
+
+    def test_add_folder(self):
+        sid = self._session("vmware-guest-powered-off")
+        for ftype in ("host", "vm", "storage", "network"):
+            res = apply_action(sid, "add_folder", {"name": f"{ftype.capitalize()}-Folder", "folder_type": ftype})
+            self.assertTrue(res["ok"], res)
+        folders = get_state(sid)["inventory"]["folders"]
+        self.assertEqual(len(folders), 4)
+        self.assertEqual({f["folder_type"] for f in folders}, {"host", "vm", "storage", "network"})
+        # Duplicate (same name + type) is rejected.
+        self.assertFalse(apply_action(sid, "add_folder", {"name": "Vm-Folder", "folder_type": "vm"})["ok"])
+
+    def test_create_custom_role(self):
+        sid = self._session("vmware-guest-powered-off")
+        res = apply_action(sid, "create_role", {"name": "Backup Operator", "privilege_groups": ["Datastore", "Virtual machine"]})
+        self.assertTrue(res["ok"], res)
+        inv = get_state(sid)["inventory"]
+        self.assertIn("Backup Operator", inv["roles_catalog"])
+        # The new role is usable for permission assignment immediately.
+        assign = apply_action(sid, "assign_role", {"principal": "backup_svc", "role": "Backup Operator", "entity": "DC-Prod"})
+        self.assertTrue(assign["ok"], assign)
+
+    def test_licensing_key_masked_in_state(self):
+        sid = self._session("vmware-guest-powered-off")
+        lic = get_state(sid)["inventory"]["licensing"]
+        self.assertTrue(lic["license_key_masked"].endswith(lic["license_key"].split("-")[-1]))
+        self.assertIn("XXXXX", lic["license_key_masked"])
+        self.assertTrue(lic["features"])
+
     def test_add_and_remove_host_uplink(self):
         sid = self._session("vmware-guest-powered-off")
         host0 = get_state(sid)["inventory"]["hosts"][0]

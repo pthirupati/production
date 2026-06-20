@@ -58,6 +58,16 @@ def _task(name: str, target: str, result: str = "Completed successfully") -> dic
     }
 
 
+def _mask_license_key(key: str) -> str:
+    """vSphere shows the last block only: XXXXX-XXXXX-XXXXX-XXXXX-9MKH4."""
+    if not key:
+        return ""
+    parts = key.split("-")
+    if len(parts) <= 1:
+        return key
+    return "-".join(["XXXXX"] * (len(parts) - 1) + [parts[-1]])
+
+
 def _vmware_mac(seed: str) -> str:
     """VMware-assigned OUI 00:50:56."""
     h = abs(hash(seed)) & 0xFFFFFF
@@ -121,6 +131,12 @@ def _make_nic(
 def _enrich_inventory(state: dict) -> None:
     """Add vSphere-realistic SCSI, MAC, and portgroup metadata."""
     net_by_id = {n["id"]: n for n in state.get("networks", [])}
+
+    # Licensing: expose a masked key for the Configure ▸ Licensing panel without
+    # ever shipping the full key to the client.
+    lic = state.get("licensing")
+    if isinstance(lic, dict) and lic.get("license_key"):
+        lic["license_key_masked"] = _mask_license_key(lic["license_key"])
 
     for net in state.get("networks", []):
         net.setdefault("vlan_id", net.get("vlan", 0))
@@ -487,6 +503,31 @@ def _base_inventory() -> dict:
             },
         ],
 
+        # vApps (multi-tier app containers) live under a cluster/host.
+        "vapps": [],
+        # Datastore clusters (SDRS pods) group datastores for Storage DRS.
+        "datastore_clusters": [],
+        # Inventory folders (host/vm/storage/network) created under a datacenter.
+        "folders": [],
+
+        # Host/vCenter licensing surfaced in the Configure ▸ Licensing panel.
+        "licensing": {
+            "product": "VMware vSphere 7 Enterprise Plus",
+            "license_key": "0J63K-4FH1M-A8XY2-0AHL2-9MKH4",
+            "expiry": "2027-03-31",
+            "capacity": "Unlimited CPUs",
+            "used": "4 of unlimited CPUs",
+            "features": [
+                "vSphere Distributed Switch",
+                "vSphere DRS",
+                "vSphere High Availability",
+                "vMotion / Storage vMotion",
+                "Fault Tolerance",
+                "Distributed Resource Scheduler",
+                "Host Profiles",
+            ],
+        },
+
         "templates": [
             {
                 "id": "tpl-rhel8",
@@ -793,6 +834,10 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "vami_pending": state.get("vami", {}).get("pending_patches", 0),
             "vcenter_users_total": len(state.get("vcenter_users", [])),
             "alarm_definitions_total": len(state.get("alarm_definitions", [])),
+            "resource_pools_total": len(state.get("resource_pools", [])),
+            "vapps_total": len(state.get("vapps", [])),
+            "datastore_clusters_total": len(state.get("datastore_clusters", [])),
+            "folders_total": len(state.get("folders", [])),
             # Datastores at/under the low-free-space threshold, for tree badges + banners.
             "datastores_low_space": [
                 {"name": d["name"], "id": d["id"], "free_pct": d.get("free_pct", 100), "warning": d.get("warning")}
@@ -2084,7 +2129,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Deployed {vm_name} from {item_name}", "vm_id": vm_id}
 
-    if action == "assign_permission":
+    if action in ("assign_permission", "assign_role"):
         entity = payload.get("entity") or payload.get("entity_name") or "DC-Prod"
         principal = (payload.get("principal") or payload.get("user") or "").strip()
         role = (payload.get("role") or "Read Only").strip()
@@ -2427,6 +2472,347 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         tasks.insert(0, _task("Create Virtual Machine", name))
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"VM '{name}' created", "vm_id": vm_id}
+
+    if action == "add_host":
+        name = (payload.get("name") or payload.get("hostname") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Host name or IP is required"}
+        if _find_host(state, host_name=name) or any(h.get("ip") == name for h in state["hosts"]):
+            return {"ok": False, "error": f"Host '{name}' is already in the inventory"}
+        ip = payload.get("ip") or (name if name.replace(".", "").isdigit() else f"192.168.10.{20 + len(state['hosts'])}")
+        host_id = f"host-{name.lower().replace('.', '-').replace(' ', '-')}-{int(time.time()) % 100000}"
+        dc_id = payload.get("datacenter_id") or "dc-prod"
+        host = {
+            "id": host_id,
+            "name": name if "." in name or not name.replace(".", "").isdigit() else f"esxi-{name}.fixitlab.local",
+            "ip": ip,
+            "status": "connected",
+            "connection_state": "connected",
+            "maintenance": False,
+            "version": payload.get("version") or "7.0.3",
+            "build": "20328353",
+            "vendor": "VMware, Inc.",
+            "model": payload.get("model") or "VMware Virtual Platform",
+            "cpu_model": payload.get("cpu_model") or "Intel(R) Xeon(R) Gold 6248R @ 3.00GHz",
+            "cpu_sockets": int(payload.get("cpu_sockets") or 2),
+            "cpu_cores_per_socket": int(payload.get("cpu_cores_per_socket") or 12),
+            "cpu_threads": int(payload.get("cpu_threads") or 48),
+            "cpu_mhz": int(payload.get("cpu_mhz") or 3000),
+            "cpu_pct": random.randint(8, 20),
+            "memory_gb": int(payload.get("memory_gb") or 128),
+            "mem_pct": random.randint(20, 40),
+            "network_mbps": 0,
+            "network_adapters": 4,
+            "storage_pct": random.randint(20, 40),
+            "uptime_seconds": 3600,
+            "vms": [],
+            "ssh_enabled": False,
+            "power_policy": "Balanced",
+            "ntp_server": "pool.ntp.org",
+            "ntp_synced": True,
+            "dns_servers": ["8.8.8.8", "8.8.4.4"],
+            "datacenter_id": dc_id,
+        }
+        state["hosts"].append(host)
+        _enrich_inventory(state)
+        # Attach to the target datacenter's first cluster if present.
+        for dc in state.get("datacenters", []):
+            if dc.get("id") == dc_id and dc.get("clusters"):
+                dc["clusters"][0].setdefault("hosts", []).append(host_id)
+                break
+        if state.get("host_missing"):
+            state["host_missing"] = False
+        events.append(_event(f"Added host {host['name']} to {dc_id}", "info", host["name"]))
+        tasks.insert(0, _task("Add Standalone Host", host["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Host '{host['name']}' added", "host_id": host_id}
+
+    if action == "new_resource_pool":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Resource pool name is required"}
+        pools = state.setdefault("resource_pools", [])
+        parent = payload.get("parent") or state.get("cluster") or "Cluster-01"
+        if any(p.get("name") == name and p.get("parent") == parent for p in pools):
+            return {"ok": False, "error": f"Resource pool '{name}' already exists under {parent}"}
+        pool = {
+            "id": f"rp-{name.lower().replace(' ', '-')}-{int(time.time()) % 100000}",
+            "name": name,
+            "parent": parent,
+            "parent_id": payload.get("parent_id") or "cluster-01",
+            "cpu_shares": payload.get("cpu_shares") or "normal",
+            "mem_shares": payload.get("mem_shares") or "normal",
+            "cpu_limit_mhz": int(payload.get("cpu_limit_mhz", -1)),
+            "mem_limit_mb": int(payload.get("mem_limit_mb", -1)),
+            "cpu_reservation_mhz": int(payload.get("cpu_reservation_mhz", 0)),
+            "mem_reservation_mb": int(payload.get("mem_reservation_mb", 0)),
+        }
+        pools.append(pool)
+        events.append(_event(f"Created resource pool {name} on {parent}", "info", name))
+        tasks.insert(0, _task("Create Resource Pool", name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Resource pool '{name}' created", "resource_pool_id": pool["id"]}
+
+    if action == "remove_resource_pool":
+        rp_id = payload.get("resource_pool_id") or payload.get("id")
+        pools = state.get("resource_pools") or []
+        pool = next((p for p in pools if p.get("id") == rp_id or p.get("name") == payload.get("name")), None)
+        if not pool:
+            return {"ok": False, "error": "Resource pool not found"}
+        if any(v.get("resource_pool_id") == pool["id"] for v in state.get("vms", [])):
+            return {"ok": False, "error": "Move the VMs out of this resource pool first"}
+        state["resource_pools"] = [p for p in pools if p is not pool]
+        events.append(_event(f"Removed resource pool {pool.get('name')}", "warning", pool.get("name", "")))
+        tasks.insert(0, _task("Remove Resource Pool", pool.get("name", "")))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Resource pool '{pool.get('name')}' removed"}
+
+    if action == "new_vapp":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "vApp name is required"}
+        vapps = state.setdefault("vapps", [])
+        if any(va.get("name") == name for va in vapps):
+            return {"ok": False, "error": f"vApp '{name}' already exists"}
+        vapp = {
+            "id": f"vapp-{name.lower().replace(' ', '-')}-{int(time.time()) % 100000}",
+            "name": name,
+            "parent": payload.get("parent") or state.get("cluster") or "Cluster-01",
+            "parent_id": payload.get("parent_id") or "cluster-01",
+            "power": "poweredOff",
+            "cpu_shares": payload.get("cpu_shares") or "normal",
+            "mem_shares": payload.get("mem_shares") or "normal",
+            "vms": payload.get("vms") or [],
+            "start_order": payload.get("start_order") or [],
+        }
+        vapps.append(vapp)
+        events.append(_event(f"Created vApp {name}", "info", name))
+        tasks.insert(0, _task("Create vApp", name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"vApp '{name}' created", "vapp_id": vapp["id"]}
+
+    if action == "vapp_power":
+        vapp = next((va for va in state.get("vapps", []) if va.get("id") == payload.get("vapp_id") or va.get("name") == payload.get("name")), None)
+        if not vapp:
+            return {"ok": False, "error": "vApp not found"}
+        op = payload.get("op") or "on"
+        new_power = "poweredOn" if op == "on" else "poweredOff"
+        vapp["power"] = new_power
+        for vid in vapp.get("vms", []):
+            vm = _find_vm(state, vm_id=vid)
+            if vm:
+                vm["power"] = new_power
+        events.append(_event(f"vApp {vapp['name']} powered {'on' if op == 'on' else 'off'}", "info", vapp["name"]))
+        tasks.insert(0, _task(f"Power {'On' if op == 'on' else 'Off'} vApp", vapp["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"vApp '{vapp['name']}' powered {'on' if op == 'on' else 'off'}"}
+
+    if action == "remove_vapp":
+        vapp = next((va for va in state.get("vapps", []) if va.get("id") == payload.get("vapp_id") or va.get("name") == payload.get("name")), None)
+        if not vapp:
+            return {"ok": False, "error": "vApp not found"}
+        state["vapps"] = [va for va in state.get("vapps", []) if va is not vapp]
+        events.append(_event(f"Removed vApp {vapp.get('name')}", "warning", vapp.get("name", "")))
+        tasks.insert(0, _task("Delete vApp", vapp.get("name", "")))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"vApp '{vapp.get('name')}' removed"}
+
+    if action == "create_datastore_cluster":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Datastore cluster name is required"}
+        clusters = state.setdefault("datastore_clusters", [])
+        if any(c.get("name") == name for c in clusters):
+            return {"ok": False, "error": f"Datastore cluster '{name}' already exists"}
+        member_ids = payload.get("datastore_ids") or payload.get("members") or []
+        if isinstance(member_ids, str):
+            member_ids = [m.strip() for m in member_ids.split(",") if m.strip()]
+        cluster = {
+            "id": f"dscl-{name.lower().replace(' ', '-')}-{int(time.time()) % 100000}",
+            "name": name,
+            "sdrs_enabled": bool(payload.get("sdrs_enabled", payload.get("sdrs", True))),
+            "automation_level": payload.get("automation_level") or "fullyAutomated",
+            "datastore_ids": member_ids,
+            "datacenter_id": payload.get("datacenter_id") or "dc-prod",
+        }
+        clusters.append(cluster)
+        # Tag member datastores so the tree/listing can show their pod membership.
+        for ds in state.get("datastores", []):
+            if ds["id"] in member_ids:
+                ds["datastore_cluster_id"] = cluster["id"]
+        sdrs = "SDRS on" if cluster["sdrs_enabled"] else "SDRS off"
+        events.append(_event(f"Created datastore cluster {name} ({sdrs})", "info", name))
+        tasks.insert(0, _task("Create Datastore Cluster", name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Datastore cluster '{name}' created ({sdrs})", "datastore_cluster_id": cluster["id"]}
+
+    if action == "add_folder":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Folder name is required"}
+        folder_type = str(payload.get("folder_type") or payload.get("type") or "vm").lower()
+        if folder_type not in ("host", "vm", "storage", "network", "datacenter"):
+            folder_type = "vm"
+        folders = state.setdefault("folders", [])
+        dc_id = payload.get("datacenter_id") or "dc-prod"
+        if any(f.get("name") == name and f.get("folder_type") == folder_type and f.get("datacenter_id") == dc_id for f in folders):
+            return {"ok": False, "error": f"A {folder_type} folder named '{name}' already exists"}
+        folder = {
+            "id": f"folder-{folder_type}-{name.lower().replace(' ', '-')}-{int(time.time()) % 100000}",
+            "name": name,
+            "folder_type": folder_type,
+            "datacenter_id": dc_id,
+        }
+        folders.append(folder)
+        events.append(_event(f"Created {folder_type} folder {name}", "info", name))
+        tasks.insert(0, _task("Create Folder", name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"{folder_type.capitalize()} folder '{name}' created", "folder_id": folder["id"]}
+
+    if action == "create_role":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Role name is required"}
+        catalog = state.setdefault("roles_catalog", [])
+        if name in catalog:
+            return {"ok": False, "error": f"Role '{name}' already exists"}
+        catalog.append(name)
+        priv_groups = payload.get("privilege_groups") or []
+        state.setdefault("custom_roles", []).append({
+            "id": f"role-{name.lower().replace(' ', '-')}-{int(time.time()) % 100000}",
+            "name": name,
+            "privilege_groups": priv_groups,
+            "cloneable": True,
+        })
+        events.append(_event(f"Created role {name}", "info", "SSO"))
+        tasks.insert(0, _task("Create Role", name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Role '{name}' created"}
+
+    if action == "set_user_enabled":
+        user_id = payload.get("user_id")
+        username = payload.get("username")
+        users = state.get("vcenter_users", [])
+        user = next((u for u in users if u["id"] == user_id or u["username"] == username), None)
+        if not user:
+            return {"ok": False, "error": "User not found"}
+        if user.get("builtin"):
+            return {"ok": False, "error": "Cannot disable a built-in user"}
+        user["enabled"] = bool(payload.get("enabled", not user.get("enabled", True)))
+        label = "enabled" if user["enabled"] else "disabled"
+        events.append(_event(f"User {user['username']} {label}", "info", "SSO"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"{user['username']} {label}"}
+
+    if action == "rescan_storage":
+        host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
+        if host:
+            host["hba_rescan_done"] = True
+        events.append(_event(f"Rescan storage on {host['name'] if host else 'all hosts'}", "info", host["name"] if host else "Cluster-01"))
+        tasks.insert(0, _task("Rescan Storage", host["name"] if host else "Datacenter"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Storage rescan completed"}
+
+    if action == "renew_host_cert":
+        host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
+        if not host:
+            return {"ok": False, "error": "Host not found"}
+        host["cert_renewed_at"] = _now_iso()
+        host.pop("cert_expired", None)
+        events.append(_event(f"Renewed certificate on {host['name']}", "info", host["name"]))
+        tasks.insert(0, _task("Renew Host Certificate", host["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Certificate renewed on {host['name']}"}
+
+    if action == "extract_host_profile":
+        host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
+        if not host:
+            return {"ok": False, "error": "Host not found"}
+        profile_name = payload.get("profile_name") or f"{host['name'].split('.')[0]}-profile"
+        host["host_profile"] = profile_name
+        state.setdefault("host_profiles", [])
+        if not any(p.get("name") == profile_name for p in state["host_profiles"]):
+            state["host_profiles"].append({
+                "id": f"hp-{int(time.time()) % 100000}", "name": profile_name,
+                "reference_host": host["name"], "compliant_hosts": [host["id"]],
+            })
+        events.append(_event(f"Extracted host profile {profile_name} from {host['name']}", "info", host["name"]))
+        tasks.insert(0, _task("Extract Host Profile", host["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Host profile '{profile_name}' extracted"}
+
+    if action == "export_system_logs":
+        host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
+        target = host["name"] if host else (state.get("cluster") or "Cluster-01")
+        events.append(_event(f"Exported system logs for {target}", "info", target))
+        tasks.insert(0, _task("Export System Logs", target))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"System logs bundle generated for {target}"}
+
+    if action == "migrate_vms_network":
+        src_id = payload.get("source_network_id")
+        dst_id = payload.get("target_network_id")
+        src = next((n for n in state.get("networks", []) if n["id"] == src_id), None)
+        dst = next((n for n in state.get("networks", []) if n["id"] == dst_id), None)
+        if not src or not dst:
+            return {"ok": False, "error": "Source and target networks are required"}
+        moved = 0
+        for vm in state.get("vms", []):
+            if vm.get("network_id") == src_id:
+                vm["network_id"] = dst_id
+                for nic in vm.get("nics", []):
+                    if nic.get("network_id") == src_id:
+                        nic["network_id"] = dst_id
+                        nic["network_name"] = dst["name"]
+                        nic["vlan_id"] = dst.get("vlan_id", dst.get("vlan"))
+                moved += 1
+        events.append(_event(f"Migrated {moved} VM(s) from {src['name']} to {dst['name']}", "info", dst["name"]))
+        tasks.insert(0, _task("Migrate VMs to Another Network", dst["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Migrated {moved} VM(s) to {dst['name']}"}
+
+    if action == "edit_default_vm_compat":
+        compat = payload.get("compatibility") or "vmx-19"
+        state["default_vm_compatibility"] = compat
+        events.append(_event(f"Default VM compatibility set to {compat}", "info", state.get("datacenter", "DC-Prod")))
+        tasks.insert(0, _task("Edit Default VM Compatibility", state.get("datacenter", "DC-Prod")))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Default VM compatibility set to {compat}"}
+
+    if action == "rename_object":
+        kind = payload.get("kind")
+        new_name = (payload.get("name") or payload.get("new_name") or "").strip()
+        if not new_name:
+            return {"ok": False, "error": "New name is required"}
+        obj = None
+        if kind == "datacenter":
+            obj = next((d for d in state.get("datacenters", []) if d["id"] == payload.get("id")), None)
+            if obj and obj["id"] in ("dc-prod",) and state.get("datacenter") == obj["name"]:
+                state["datacenter"] = new_name
+        elif kind == "datastore":
+            obj = _find_ds(state, ds_id=payload.get("id"))
+        elif kind == "network":
+            obj = next((n for n in state.get("networks", []) if n["id"] == payload.get("id")), None)
+        elif kind == "vm":
+            return apply_action(session_id, "edit_vm", {"vm_id": payload.get("id"), "name": new_name})
+        if not obj:
+            return {"ok": False, "error": "Object not found"}
+        old = obj.get("name")
+        obj["name"] = new_name
+        events.append(_event(f"Renamed {kind} {old} → {new_name}", "info", new_name))
+        tasks.insert(0, _task("Rename", new_name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Renamed to '{new_name}'"}
+
+    if action == "toggle_datastore_sdrs":
+        dscl = next((c for c in state.get("datastore_clusters", []) if c.get("id") == payload.get("datastore_cluster_id") or c.get("name") == payload.get("name")), None)
+        if not dscl:
+            return {"ok": False, "error": "Datastore cluster not found"}
+        dscl["sdrs_enabled"] = bool(payload.get("sdrs_enabled", not dscl.get("sdrs_enabled", True)))
+        label = "enabled" if dscl["sdrs_enabled"] else "disabled"
+        events.append(_event(f"Storage DRS {label} on {dscl['name']}", "info", dscl["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Storage DRS {label} on {dscl['name']}"}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

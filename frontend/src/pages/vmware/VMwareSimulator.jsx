@@ -21,6 +21,10 @@ import VmCreateWizard from '../../components/vmware/wizards/VmCreateWizard'
 import VmwareInventoryTree from '../../components/vmware/VmwareInventoryTree'
 import VmwareConsole from '../../components/vmware/VmwareConsole'
 import VmwareContextMenu from '../../components/vmware/VmwareContextMenu'
+import VmwareActionsMenu from '../../components/vmware/VmwareActionsMenu'
+import VmwareHostConfigurePanel from '../../components/vmware/VmwareHostConfigurePanel'
+import VmwareAdministration from '../../components/vmware/VmwareAdministration'
+import VmwareDatacenterDatastores from '../../components/vmware/VmwareDatacenterDatastores'
 import {
   AddDiskModal,
   AddNicModal,
@@ -28,6 +32,11 @@ import {
   CreatePortGroupModal,
   CreateDatastoreModal,
   CreateClusterModal,
+  AddHostModal,
+  CreateResourcePoolModal,
+  CreateVappModal,
+  CreateDatastoreClusterModal,
+  CreateFolderModal,
 } from '../../components/vmware/VmwareResourceModals'
 import VmModal from '../../components/vmware/VmModal'
 import VmConfigurePanel from '../../components/vmware/VmConfigurePanel'
@@ -636,6 +645,15 @@ export default function VMwareSimulator() {
   const [showCreatePortGroupModal, setShowCreatePortGroupModal] = useState(false)
   const [showCreateDatastoreModal, setShowCreateDatastoreModal] = useState(false)
   const [showCreateClusterModal, setShowCreateClusterModal] = useState(false)
+  // New-fidelity resource modals.
+  const [showAddHostModal, setShowAddHostModal] = useState(false)
+  const [showResourcePoolModal, setShowResourcePoolModal] = useState(false)
+  const [showVappModal, setShowVappModal] = useState(false)
+  const [showDatastoreClusterModal, setShowDatastoreClusterModal] = useState(false)
+  const [folderModalType, setFolderModalType] = useState(null) // 'host'|'vm'|'storage'|'network' or null
+  const [forceDvs, setForceDvs] = useState(false) // open vSwitch modal preset to distributed
+  const [topMenuOpen, setTopMenuOpen] = useState(false)
+  const topMenuRef = useRef(null)
   const [pendingDeleteVm, setPendingDeleteVm] = useState(null)
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false)
   const [inventorySearch, setInventorySearch] = useState('')
@@ -722,11 +740,23 @@ export default function VMwareSimulator() {
         setShowCreatePortGroupModal(false)
         setShowCreateDatastoreModal(false)
         setShowCreateClusterModal(false)
+        setShowAddHostModal(false)
+        setShowResourcePoolModal(false)
+        setShowVappModal(false)
+        setShowDatastoreClusterModal(false)
+        setFolderModalType(null)
+        setTopMenuOpen(false)
         setPendingDeleteVm(null)
       }
     }
     document.addEventListener('keydown', onEsc)
     return () => document.removeEventListener('keydown', onEsc)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e) => { if (topMenuRef.current && !topMenuRef.current.contains(e.target)) setTopMenuOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
   }, [])
 
   useEffect(() => {
@@ -766,47 +796,75 @@ export default function VMwareSimulator() {
   }
 
   const handleCtxAction = (action, payload) => {
-    if (action === '__snapshot__') {
-      setSelectedNode({ type: 'vm', id: payload.id })
-      setShowSnapshotModal(true)
-    } else if (action === '__clone__') {
-      setSelectedNode({ type: 'vm', id: payload.id })
-      setShowCloneVmModal(true)
-    } else if (action === '__migrate__') {
-      setSelectedNode({ type: 'vm', id: payload.id })
-      setShowMigrateModal(true)
-    } else if (action === '__edit__') {
-      setSelectedNode({ type: 'vm', id: payload.id })
-      setShowEditVmModal(true)
-    } else if (action === '__add_disk__') {
-      setSelectedNode({ type: 'vm', id: payload.id })
-      setShowAddDiskModal(true)
-    } else if (action === '__add_nic__') {
-      setSelectedNode({ type: 'vm', id: payload.id })
-      setShowAddNicModal(true)
-    } else if (action === '__console__') {
-      setConsoleVm(payload)
-    } else if (action === '__delete__') {
-      setPendingDeleteVm(payload)
-    } else if (action === '__suspend__') {
-      runAction('suspend', { vm_id: payload.id })
-    } else if (action === '__rename__') {
-      setSelectedNode({ type: 'vm', id: payload.id })
-      setShowEditVmModal(true)
-    } else if (action === '__create_vm__') {
-      setShowCreateVmModal(true)
-    } else if (action === '__create_vswitch__') {
-      setShowCreateVswitchModal(true)
-    } else if (action === '__create_portgroup__') {
-      setShowCreatePortGroupModal(true)
-    } else if (action === '__create_datastore__') {
-      setShowCreateDatastoreModal(true)
-    } else if (action === '__browse_ds__') {
-      setSelectedNode({ type: 'datastore', id: payload.id }); setActiveTab('vms')
-    } else if (action === '__net_edit__') {
-      setSelectedNode({ type: 'network', id: payload.id }); setActiveTab('summary')
-    } else {
-      runAction(action, payload)
+    const selVm = (p) => setSelectedNode({ type: 'vm', id: p.id })
+    switch (action) {
+      // ── VM sentinels ──
+      case '__snapshot__': selVm(payload); setShowSnapshotModal(true); break
+      case '__manage_snapshots__': selVm(payload); setActiveTab('snapshots'); break
+      case '__revert_latest__': {
+        const snaps = payload.snapshots || []
+        if (snaps.length) runAction('revert_snapshot', { vm_id: payload.id, snapshot_id: snaps[snaps.length - 1].id })
+        break
+      }
+      case '__consolidate__': runAction('take_snapshot', { vm_id: payload.id, snapshot_name: 'consolidate-helper' }); break
+      case '__clone__': selVm(payload); setShowCloneVmModal(true); break
+      case '__migrate__': selVm(payload); setShowMigrateModal(true); break
+      case '__edit__': selVm(payload); setShowEditVmModal(true); break
+      case '__add_disk__': selVm(payload); setShowAddDiskModal(true); break
+      case '__add_nic__': selVm(payload); setShowAddNicModal(true); break
+      case '__console__': setConsoleVm(payload); break
+      case '__delete__': setPendingDeleteVm(payload); break
+      case '__suspend__': runAction('suspend', { vm_id: payload.id }); break
+      case '__rename__': selVm(payload); setShowEditVmModal(true); break
+      case '__move_vm__': setVmToast({ message: `Use Migrate… to move ${payload.name} to another host or datastore`, kind: 'info' }); break
+      case '__ft_on__': setVmToast({ message: 'Fault Tolerance requires a second host with a dedicated FT logging NIC', kind: 'info' }); break
+      case '__assign_tag__': setVmToast({ message: 'Tag assigned (Category: Environment)', kind: 'success' }); break
+      case '__remove_tag__': setVmToast({ message: 'Tag removed', kind: 'success' }); break
+      case '__add_permission__':
+        setSelectedNode({ type: 'admin', id: 'admin' }); setActiveTab('summary')
+        break
+      // ── shared creation sentinels ──
+      case '__create_vm__': setShowCreateVmModal(true); break
+      case '__deploy_ovf__': setShowOvfModal(true); break
+      case '__create_vswitch__': setForceDvs(false); setShowCreateVswitchModal(true); break
+      case '__create_vswitch_dvs__': setForceDvs(true); setShowCreateVswitchModal(true); break
+      case '__create_portgroup__': setShowCreatePortGroupModal(true); break
+      case '__create_datastore__': setShowCreateDatastoreModal(true); break
+      case '__create_datastore_cluster__': setShowDatastoreClusterModal(true); break
+      case '__browse_ds__': setSelectedNode({ type: 'datastore', id: payload.id }); setActiveTab('vms'); break
+      case '__net_edit__': setSelectedNode({ type: 'network', id: payload.id }); setActiveTab('summary'); break
+      case '__rename_ds__': runAction('rename_object', { kind: 'datastore', id: payload.id, name: `${payload.name}-renamed` }); break
+      case '__rename_net__': runAction('rename_object', { kind: 'network', id: payload.id, name: `${payload.name}-renamed` }); break
+      case '__migrate_network__': {
+        const src = networks.find(n => n.id === payload.id) || networks[0]
+        const dst = networks.find(n => n.id !== src?.id)
+        if (src && dst) runAction('migrate_vms_network', { source_network_id: src.id, target_network_id: dst.id })
+        else setVmToast({ message: 'Need at least two networks to migrate between', kind: 'error' })
+        break
+      }
+      // ── host sentinels ──
+      case '__new_resource_pool__': setShowResourcePoolModal(true); break
+      case '__new_vapp__': setShowVappModal(true); break
+      case '__disconnect_host__': runAction('reconnect_host', { host_id: payload.id }); break // toggles connection (sim only reconnects)
+      case '__host_power_on__': setVmToast({ message: `${payload.name} is already powered on`, kind: 'info' }); break
+      case '__host_shutdown__': runAction('enter_maintenance', { host_id: payload.id }); break
+      case '__host_reboot__': setVmToast({ message: `Reboot of ${payload.name} simulated — host will reconnect`, kind: 'success' }); break
+      case '__attach_host_profile__': runAction('extract_host_profile', { host_id: payload.id }); break
+      case '__host_settings__': setSelectedNode({ type: 'host', id: payload.id }); setActiveTab('configure'); break
+      // ── datacenter sentinels ──
+      case '__add_host__': setShowAddHostModal(true); break
+      case '__new_cluster__': setShowCreateClusterModal(true); break
+      case '__new_folder_host__': setFolderModalType('host'); break
+      case '__new_folder_vm__': setFolderModalType('vm'); break
+      case '__new_folder_storage__': setFolderModalType('storage'); break
+      case '__new_folder_network__': setFolderModalType('network'); break
+      case '__edit_default_compat__': runAction('edit_default_vm_compat', { compatibility: 'vmx-19' }); break
+      case '__new_alarm_def__': setSelectedNode({ type: 'vcenter', id: 'vcenter' }); setActiveTab('alarms'); break
+      case '__move_dc__': setVmToast({ message: 'Move To is unavailable for the root datacenter', kind: 'info' }); break
+      case '__rename_dc__': runAction('rename_object', { kind: 'datacenter', id: payload.id, name: `${payload.name}-renamed` }); break
+      case '__delete_dc__': setVmToast({ message: 'The root datacenter cannot be deleted in this lab', kind: 'info' }); break
+      default:
+        runAction(action, payload)
     }
   }
 
@@ -883,6 +941,10 @@ export default function VMwareSimulator() {
   const srm = inv.srm || {}
   const vami = inv.vami || {}
   const resourcePools = inv.resource_pools || []
+  const vapps = inv.vapps || []
+  const datastoreClusters = inv.datastore_clusters || []
+  const folders = inv.folders || []
+  const licensing = inv.licensing || {}
   const linkedMode = summary.linked_mode || inv.linked_mode
   const invSearch = inventorySearch.trim().toLowerCase()
   const filterLabel = (label) => !invSearch || label.toLowerCase().includes(invSearch)
@@ -892,6 +954,7 @@ export default function VMwareSimulator() {
   const selectedDs = selectedNode.type === 'datastore' ? datastores.find(d => d.id === selectedNode.id) : null
   const selectedNet = selectedNode.type === 'network' ? networks.find(n => n.id === selectedNode.id) : null
   const selectedTemplate = selectedNode.type === 'template' ? templates.find(t => t.id === selectedNode.id) : null
+  const selectedDc = selectedNode.type === 'datacenter' ? (datacenters.find(d => d.id === selectedNode.id) || { id: selectedNode.id, name: inv.datacenter || 'DC-Prod' }) : null
 
   const activeAlarms = alarms.filter(a => a.status === 'active')
 
@@ -972,23 +1035,9 @@ export default function VMwareSimulator() {
         <ToolbarBtn onClick={() => runAction('reconnect_host', { host_name: host.name })} disabled={acting} label="Reconnect Host" blue />
       )}
       <ToolbarSep />
-      <div className="relative" ref={actionsRef}>
-        <button
-          type="button"
-          onClick={() => setActionsMenuOpen(v => !v)}
-          className="vm-btn flex items-center gap-1"
-        >
-          Actions <span className="text-[9px]">▼</span>
-        </button>
-        {actionsMenuOpen && (
-          <div className="absolute top-full left-0 mt-0.5 bg-[#243447] border border-[#2D3A4A] shadow-lg z-20 min-w-40 text-xs rounded-md overflow-hidden">
-            <ActionsMenuItem label={`${host.ssh_enabled ? 'Disable' : 'Enable'} SSH`} onClick={() => runAction('toggle_ssh', { host_name: host.name })} />
-            <ActionsMenuItem label="Reboot Host" onClick={() => toast('Host reboot simulated')} />
-            <ActionsMenuItem label="Shut Down Host" onClick={() => toast('Shutdown simulated')} />
-          </div>
-        )}
-      </div>
+      <ToolbarBtn onClick={() => runAction('toggle_ssh', { host_name: host.name })} disabled={acting} label={`${host.ssh_enabled ? 'Disable' : 'Enable'} SSH`} />
       <div className="flex-1" />
+      <span className="text-[10px] text-[#8FA5B8] mr-1">Use Actions ▾ above for the full host menu</span>
       <RefreshBtn onClick={load} />
     </div>
   )
@@ -1042,6 +1091,10 @@ export default function VMwareSimulator() {
             setSelectedNode={setSelectedNode}
             setActiveTab={setActiveTab}
             onVmContextMenu={openVmContext}
+            onHostContextMenu={(e, host) => openNodeContext(e, 'host', host)}
+            onDcContextMenu={(e, dc) => openNodeContext(e, 'datacenter', dc)}
+            onDsContextMenu={(e, ds) => openNodeContext(e, 'datastore', ds)}
+            onNetContextMenu={(e, net) => openNodeContext(e, 'network', net)}
             onCreateVm={() => setShowCreateVmModal(true)}
             onCreateVmWizard={() => setShowCreateVmWizard(true)}
             onDeployTemplate={() => setShowDeployTemplateModal(true)}
@@ -1086,11 +1139,40 @@ export default function VMwareSimulator() {
           })()}
 
           <div className="vm-breadcrumb">
+            {/* Top "Menu ▾" — vSphere shortcut menu incl. Administration. */}
+            <div className="relative mr-1" ref={topMenuRef}>
+              <button type="button" onClick={() => setTopMenuOpen(v => !v)}
+                className="flex items-center gap-1 text-[11px] font-semibold text-[#c3d3e3] hover:text-white px-2 py-0.5 rounded hover:bg-white/[0.06]">
+                Menu <span className="text-[8px]">▼</span>
+              </button>
+              {topMenuOpen && (
+                <div className="absolute top-full left-0 mt-1 z-[78] min-w-[200px] bg-[#243447] border border-[#2D3A4A] rounded-[7px] shadow-2xl py-1 animate-[vmScale_0.12s_both]">
+                  {[
+                    ['Home', () => { setSelectedNode({ type: 'vcenter', id: 'vcenter' }); setActiveTab('summary') }],
+                    ['Hosts and Clusters', () => { setSelectedNode({ type: 'datacenter', id: datacenters[0]?.id || 'dc-prod' }); setActiveTab('hosts') }],
+                    ['VMs and Templates', () => { setSelectedNode({ type: 'datacenter', id: datacenters[0]?.id || 'dc-prod' }); setActiveTab('vms') }],
+                    ['Storage', () => { setSelectedNode({ type: 'datacenter', id: datacenters[0]?.id || 'dc-prod' }); setActiveTab('datastores') }],
+                    ['Networking', () => { setSelectedNode({ type: 'datacenter', id: datacenters[0]?.id || 'dc-prod' }); setActiveTab('networks') }],
+                    ['__divider__'],
+                    ['Administration', () => { setSelectedNode({ type: 'admin', id: 'admin' }); setActiveTab('summary') }],
+                  ].map((item, i) => item[0] === '__divider__'
+                    ? <div key={`d-${i}`} className="h-px bg-[#2D3A4A] my-1" />
+                    : (
+                      <button key={item[0]} type="button"
+                        onClick={() => { item[1](); setTopMenuOpen(false) }}
+                        className="w-full text-left px-3 py-1.5 text-[12px] text-[#e8edf2] hover:bg-[#2d4057]">
+                        {item[0]}
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+            <span className="text-[#4a5a6d] text-[9px]">›</span>
             <span className="text-[#8fa5b8]">Home</span>
             <span className="text-[#4a5a6d] text-[9px]">›</span>
             <span className="text-[#8fa5b8]">{inv.datacenter || 'DC-Prod'}</span>
             <span className="text-[#4a5a6d] text-[9px]">›</span>
-            <span className="text-white">{selectedVm?.name || selectedHost?.name || selectedDs?.name || selectedNet?.name || selectedTemplate?.name || 'Inventory'}</span>
+            <span className="text-white">{selectedVm?.name || selectedHost?.name || selectedDs?.name || selectedNet?.name || selectedTemplate?.name || selectedDc?.name || (selectedNode.type === 'admin' ? 'Administration' : 'Inventory')}</span>
           </div>
 
           <div className="vm-object-bar"
@@ -1099,6 +1181,7 @@ export default function VMwareSimulator() {
               else if (selectedHost) openNodeContext(e, 'host', selectedHost)
               else if (selectedDs) openNodeContext(e, 'datastore', selectedDs)
               else if (selectedNet) openNodeContext(e, 'network', selectedNet)
+              else if (selectedDc) openNodeContext(e, 'datacenter', selectedDc)
             }}
             title="Right-click for actions">
             {selectedVm && <StatusIcon status={selectedVm.power} size={12} />}
@@ -1120,42 +1203,20 @@ export default function VMwareSimulator() {
               <span className="text-[11px] text-[#8fa5b8]">{selectedVm.guest_os_version} · {selectedVm.ip}</span>
             )}
             <div className="flex-1 min-w-[8px]" />
-            {(selectedVm || selectedHost) && (
+            {(selectedVm || selectedHost || selectedDc) && (
               <div className="relative" ref={actionsRef}>
                 <button type="button" onClick={() => setActionsMenuOpen(v => !v)} className="vm-actions-btn">
                   Actions <span className="text-[9px]">▼</span>
                 </button>
-                {actionsMenuOpen && selectedHost && (
-                  <div className="vm-actions-menu">
-                    <ActionsMenuItem label="Create VM…" onClick={() => { setShowCreateVmModal(true); setActionsMenuOpen(false) }} />
-                    <ActionsMenuItem label={`${selectedHost.ssh_enabled ? 'Disable' : 'Enable'} SSH`} onClick={() => runAction('toggle_ssh', { host_name: selectedHost.name })} />
-                    <ActionsMenuItem label={selectedHost.maintenance ? 'Exit Maintenance Mode' : 'Enter Maintenance Mode'} onClick={() => runAction(selectedHost.maintenance ? 'exit_maintenance' : 'enter_maintenance', { host_name: selectedHost.name })} />
-                    <div className="h-px bg-[#2D3A4A] my-1" />
-                    <ActionsMenuItem label="Add Networking — vSwitch…" onClick={() => { setShowCreateVswitchModal(true); setActionsMenuOpen(false) }} />
-                    <ActionsMenuItem label="Add Networking — Port Group…" onClick={() => { setShowCreatePortGroupModal(true); setActionsMenuOpen(false) }} />
-                    <ActionsMenuItem label="New Datastore…" onClick={() => { setShowCreateDatastoreModal(true); setActionsMenuOpen(false) }} />
-                    <ActionsMenuItem label="New Cluster…" onClick={() => { setShowCreateClusterModal(true); setActionsMenuOpen(false) }} />
-                  </div>
-                )}
-                {actionsMenuOpen && selectedVm && (
-                  <div className="vm-actions-menu">
-                    <ActionsMenuItem label="Power On" onClick={() => runAction('power_on', { vm_id: selectedVm.id })} disabled={selectedVm.power === 'poweredOn' || acting} />
-                    <ActionsMenuItem label="Power Off" onClick={() => runAction('power_off', { vm_id: selectedVm.id })} disabled={selectedVm.power === 'poweredOff' || acting} />
-                    <ActionsMenuItem label="Suspend" onClick={() => runAction('suspend', { vm_id: selectedVm.id })} disabled={selectedVm.power !== 'poweredOn' || acting} />
-                    <ActionsMenuItem label="Reset" onClick={() => runAction('reboot', { vm_id: selectedVm.id })} disabled={selectedVm.power !== 'poweredOn' || acting} />
-                    <div className="h-px bg-[#2D3A4A] my-1" />
-                    <ActionsMenuItem label="Take Snapshot…" onClick={() => { setShowSnapshotModal(true); setActionsMenuOpen(false) }} />
-                    <ActionsMenuItem label="Clone…" onClick={() => { setShowCloneVmModal(true); setActionsMenuOpen(false) }} />
-                    <ActionsMenuItem label="Migrate…" onClick={() => { setShowMigrateModal(true); setActionsMenuOpen(false) }} />
-                    <div className="h-px bg-[#2D3A4A] my-1" />
-                    <ActionsMenuItem label="Add Disk…" onClick={() => { setShowAddDiskModal(true); setActionsMenuOpen(false) }} />
-                    <ActionsMenuItem label="Add Network Adapter…" onClick={() => { setShowAddNicModal(true); setActionsMenuOpen(false) }} />
-                    <ActionsMenuItem label="Edit Settings…" onClick={() => { setShowEditVmModal(true); setActionsMenuOpen(false) }} />
-                    <ActionsMenuItem label="Convert to Template…" onClick={() => { runAction('convert_to_template', { vm_id: selectedVm.id }); setActionsMenuOpen(false) }} disabled={selectedVm.power !== 'poweredOff' || acting} />
-                    <div className="h-px bg-[#2D3A4A] my-1" />
-                    <ActionsMenuItem label="Open Console" onClick={() => { setConsoleVm(selectedVm); setActionsMenuOpen(false) }} />
-                    <ActionsMenuItem label="Delete from Disk" color="#D9534F" onClick={() => { setPendingDeleteVm(selectedVm); setActionsMenuOpen(false) }} disabled={selectedVm.power === 'poweredOn'} />
-                  </div>
+                {actionsMenuOpen && (
+                  <VmwareActionsMenu
+                    kind={selectedVm ? 'vm' : selectedHost ? 'host' : 'datacenter'}
+                    target={selectedVm || selectedHost || selectedDc}
+                    onAction={handleCtxAction}
+                    onConsole={setConsoleVm}
+                    onClose={() => setActionsMenuOpen(false)}
+                    acting={acting}
+                  />
                 )}
               </div>
             )}
@@ -1254,10 +1315,13 @@ export default function VMwareSimulator() {
                   <InfoRow label="VMs" value={String(vms.filter(v => hosts.some(h => h.id === v.host_id && (h.datacenter_id || 'dc-prod') === selectedNode.id)).length)} />
                   <InfoRow label="Clusters" value={String((datacenters.find(d => d.id === selectedNode.id)?.clusters || []).length)} />
                   <div className="flex flex-wrap gap-2 mt-3">
-                    <button type="button" onClick={() => setShowCreateClusterModal(true)} className="vm-btn vm-btn-blue text-xs">New Cluster…</button>
+                    <button type="button" onClick={() => setShowAddHostModal(true)} className="vm-btn vm-btn-blue text-xs">Add Host…</button>
+                    <button type="button" onClick={() => setShowCreateClusterModal(true)} className="vm-btn text-xs">New Cluster…</button>
+                    <button type="button" onClick={() => setShowResourcePoolModal(true)} className="vm-btn text-xs">New Resource Pool…</button>
+                    <button type="button" onClick={() => setShowVappModal(true)} className="vm-btn text-xs">New vApp…</button>
                     <button type="button" onClick={() => setShowCreateDatastoreModal(true)} className="vm-btn text-xs">New Datastore…</button>
-                    <button type="button" onClick={() => setShowCreateVswitchModal(true)} className="vm-btn text-xs">New vSwitch…</button>
-                    <button type="button" onClick={() => setShowCreatePortGroupModal(true)} className="vm-btn text-xs">New Port Group / VLAN…</button>
+                    <button type="button" onClick={() => { setForceDvs(true); setShowCreateVswitchModal(true) }} className="vm-btn text-xs">New Distributed Switch…</button>
+                    <button type="button" onClick={() => setFolderModalType('vm')} className="vm-btn text-xs">New Folder…</button>
                   </div>
                   {(datacenters.find(d => d.id === selectedNode.id)?.clusters || []).length > 0 && (
                     <table className="vm-table mt-3">
@@ -1275,7 +1339,143 @@ export default function VMwareSimulator() {
                       </tbody>
                     </table>
                   )}
+                  {/* Resource Pools */}
+                  {resourcePools.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-[11px] font-semibold text-[#E8EDF2] mb-1">Resource Pools</p>
+                      <table className="vm-table">
+                        <thead><tr>{['Resource Pool', 'Parent', 'CPU Shares', 'Mem Shares', 'CPU Limit', ''].map(h => <th key={h || 'x'}>{h}</th>)}</tr></thead>
+                        <tbody>
+                          {resourcePools.map(rp => (
+                            <tr key={rp.id}>
+                              <td className="text-[#5b9bf5]">{rp.name}</td>
+                              <td className="text-[#8FA5B8]">{rp.parent}</td>
+                              <td className="capitalize">{rp.cpu_shares}</td>
+                              <td className="capitalize">{rp.mem_shares}</td>
+                              <td>{rp.cpu_limit_mhz === -1 ? 'Unlimited' : `${rp.cpu_limit_mhz} MHz`}</td>
+                              <td>
+                                <button type="button" disabled={acting} onClick={() => runAction('remove_resource_pool', { resource_pool_id: rp.id })}
+                                  className="text-[10px] text-[#D9534F] hover:underline">Remove</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {/* vApps */}
+                  {vapps.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-[11px] font-semibold text-[#E8EDF2] mb-1">vApps</p>
+                      <table className="vm-table">
+                        <thead><tr>{['vApp', 'Power', 'VMs', ''].map(h => <th key={h || 'x'}>{h}</th>)}</tr></thead>
+                        <tbody>
+                          {vapps.map(va => (
+                            <tr key={va.id}>
+                              <td className="text-[#5b9bf5]">{va.name}</td>
+                              <td><span style={{ color: va.power === 'poweredOn' ? '#5DB85D' : '#8FA5B8' }}>{va.power}</span></td>
+                              <td>{(va.vms || []).length}</td>
+                              <td className="whitespace-nowrap">
+                                <button type="button" disabled={acting} onClick={() => runAction('vapp_power', { vapp_id: va.id, op: va.power === 'poweredOn' ? 'off' : 'on' })}
+                                  className="text-[10px] text-[#5b9bf5] hover:underline mr-2">{va.power === 'poweredOn' ? 'Power Off' : 'Power On'}</button>
+                                <button type="button" disabled={acting} onClick={() => runAction('remove_vapp', { vapp_id: va.id })}
+                                  className="text-[10px] text-[#D9534F] hover:underline">Delete</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {/* Folders */}
+                  {folders.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-[11px] font-semibold text-[#E8EDF2] mb-1">Folders</p>
+                      <div className="flex flex-wrap gap-2">
+                        {folders.map(f => (
+                          <span key={f.id} className="text-[11px] text-[#c3d3e3] bg-[#16222f] border border-[#22303f] rounded px-2 py-1">
+                            📁 {f.name} <span className="text-[#8FA5B8]">({f.folder_type})</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </ContentPanel>
+              )}
+
+              {/* ── DATACENTER tabs ──────────────────────────────── */}
+              {selectedNode.type === 'datacenter' && activeTab === 'datastores' && (
+                <VmwareDatacenterDatastores
+                  datastores={datastores}
+                  datastoreClusters={datastoreClusters}
+                  folders={folders}
+                  onNewDatastore={() => setShowCreateDatastoreModal(true)}
+                  onNewDatastoreCluster={() => setShowDatastoreClusterModal(true)}
+                  onNewFolder={() => setFolderModalType('storage')}
+                  onAction={runAction}
+                  acting={acting}
+                />
+              )}
+              {selectedNode.type === 'datacenter' && activeTab === 'hosts' && (
+                <ContentPanel title={`Hosts in ${selectedDc?.name}`}>
+                  <table className="vm-table">
+                    <thead><tr>{['', 'Name', 'State', 'IP', 'CPU', 'Memory', 'Cluster'].map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {hosts.filter(h => (h.datacenter_id || 'dc-prod') === selectedNode.id).map(h => (
+                        <tr key={h.id} className="cursor-pointer" onClick={() => { setSelectedNode({ type: 'host', id: h.id }); setActiveTab('summary') }}
+                          onContextMenu={(e) => openNodeContext(e, 'host', h)}>
+                          <td><StatusIcon status={h.status} /></td>
+                          <td className="text-[#5b9bf5]">{h.name}</td>
+                          <td>{h.maintenance ? 'Maintenance' : h.status}</td>
+                          <td className="text-[#8FA5B8] font-mono text-[10px]">{h.ip}</td>
+                          <td>{h.cpu_pct}%</td>
+                          <td>{h.mem_pct}%</td>
+                          <td className="text-[#8FA5B8]">{(selectedDc?.clusters || []).find(c => (c.hosts || []).includes(h.id))?.name || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <button type="button" onClick={() => setShowAddHostModal(true)} className="vm-btn vm-btn-blue text-[11px] mt-3">Add Host…</button>
+                </ContentPanel>
+              )}
+              {selectedNode.type === 'datacenter' && activeTab === 'vms' && (
+                <ContentPanel title={`Virtual Machines in ${selectedDc?.name}`}>
+                  <VmTable vms={vms.filter(v => hosts.some(h => h.id === v.host_id && (h.datacenter_id || 'dc-prod') === selectedNode.id))}
+                    onSelect={vm => { setSelectedNode({ type: 'vm', id: vm.id }); setActiveTab('summary') }}
+                    onAction={runAction} acting={acting} />
+                </ContentPanel>
+              )}
+              {selectedNode.type === 'datacenter' && activeTab === 'networks' && (
+                <ContentPanel title={`Networks in ${selectedDc?.name}`}>
+                  <table className="vm-table">
+                    <thead><tr>{['Name', 'Type', 'VLAN', 'vSwitch', 'VMs'].map(h => <th key={h}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {networks.map(net => (
+                        <tr key={net.id} className="cursor-pointer" onContextMenu={(e) => openNodeContext(e, 'network', net)}
+                          onClick={() => { setSelectedNode({ type: 'network', id: net.id }); setActiveTab('summary') }}>
+                          <td className="text-[#5b9bf5]">{net.name}</td>
+                          <td>{net.type}</td>
+                          <td>{net.vlan === 0 ? 'All (0)' : net.vlan}</td>
+                          <td className="text-[#8FA5B8]">{net.switch}</td>
+                          <td>{vms.filter(v => v.network_id === net.id).length}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="flex gap-2 mt-3">
+                    <button type="button" onClick={() => setShowCreatePortGroupModal(true)} className="vm-btn vm-btn-blue text-[11px]">New Port Group / VLAN…</button>
+                    <button type="button" onClick={() => { setForceDvs(true); setShowCreateVswitchModal(true) }} className="vm-btn text-[11px]">New Distributed Switch…</button>
+                  </div>
+                </ContentPanel>
+              )}
+              {selectedNode.type === 'datacenter' && activeTab === 'permissions' && (
+                <VmwarePermissionsPanel entityName={selectedDc?.name} entityId={selectedNode.id} entityType="datacenter"
+                  permissions={permissions} rolesCatalog={rolesCatalog} onAction={runAction} acting={acting} />
+              )}
+
+              {/* ── ADMINISTRATION (Menu ▸ Administration) ───────── */}
+              {((selectedNode.type === 'vcenter' && activeTab === 'administration') || selectedNode.type === 'admin') && (
+                <VmwareAdministration users={vcenterUsers} rolesCatalog={rolesCatalog} permissions={permissions} onAction={runAction} acting={acting} />
               )}
 
               {selectedNode.type === 'nsx' && activeTab === 'summary' && (
@@ -1403,6 +1603,18 @@ export default function VMwareSimulator() {
               {/* ── HOST CONFIGURE ───────────────────────────────── */}
               {selectedHost && activeTab === 'configure' && (
                 <div className="space-y-3">
+                  {/* Real vSphere Configure left sub-nav (Hardware / Networking /
+                      Storage / System ▸ Licensing / Health) driven by host state. */}
+                  <VmwareHostConfigurePanel
+                    host={selectedHost}
+                    datastores={datastores}
+                    networks={networks}
+                    vswitches={vswitches}
+                    vms={vms}
+                    licensing={licensing}
+                    onAction={handleCtxAction}
+                    acting={acting}
+                  />
                   <ContentPanel title="Cluster settings">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -2348,8 +2560,8 @@ export default function VMwareSimulator() {
           onClose={() => setShowAddNicModal(false)} onAction={runAction} />
       )}
       {showCreateVswitchModal && (
-        <CreateVswitchModal hosts={hosts}
-          onClose={() => setShowCreateVswitchModal(false)} onAction={runAction} />
+        <CreateVswitchModal hosts={hosts} defaultType={forceDvs ? 'distributed' : 'standard'}
+          onClose={() => { setShowCreateVswitchModal(false); setForceDvs(false) }} onAction={runAction} />
       )}
       {showCreatePortGroupModal && (
         <CreatePortGroupModal vswitches={vswitches}
@@ -2362,6 +2574,26 @@ export default function VMwareSimulator() {
       {showCreateClusterModal && (
         <CreateClusterModal datacenters={datacenters}
           onClose={() => setShowCreateClusterModal(false)} onAction={runAction} />
+      )}
+      {showAddHostModal && (
+        <AddHostModal datacenters={datacenters}
+          onClose={() => setShowAddHostModal(false)} onAction={runAction} />
+      )}
+      {showResourcePoolModal && (
+        <CreateResourcePoolModal parentName={inv.cluster || 'Cluster-01'}
+          onClose={() => setShowResourcePoolModal(false)} onAction={runAction} />
+      )}
+      {showVappModal && (
+        <CreateVappModal parentName={inv.cluster || 'Cluster-01'} vms={vms}
+          onClose={() => setShowVappModal(false)} onAction={runAction} />
+      )}
+      {showDatastoreClusterModal && (
+        <CreateDatastoreClusterModal datastores={datastores}
+          onClose={() => setShowDatastoreClusterModal(false)} onAction={runAction} />
+      )}
+      {folderModalType && (
+        <CreateFolderModal folderType={folderModalType} datacenters={datacenters}
+          onClose={() => setFolderModalType(null)} onAction={runAction} />
       )}
       {pendingDeleteVm && (
         <div className="vm-modal-overlay">
@@ -2398,8 +2630,10 @@ function getTabs(type) {
   if (type === 'datastore') return ['summary', 'monitor', 'permissions', 'hosts', 'vms']
   if (type === 'network') return ['summary', 'permissions', 'hosts', 'vms']
   if (type === 'template') return ['summary']
-  if (type === 'vcenter') return ['summary', 'users', 'alarms']
-  if (type === 'datacenter' || type === 'nsx' || type === 'srm' || type === 'vami') return ['summary']
+  if (type === 'vcenter') return ['summary', 'administration', 'users', 'alarms']
+  if (type === 'datacenter') return ['summary', 'hosts', 'vms', 'datastores', 'networks', 'permissions']
+  if (type === 'admin') return ['summary']
+  if (type === 'nsx' || type === 'srm' || type === 'vami') return ['summary']
   return ['summary']
 }
 
@@ -2561,19 +2795,6 @@ function PermissionsPanel({ entityName, definedIn }) {
   )
 }
 
-function ActionsMenuItem({ label, onClick, disabled, color }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="w-full text-left px-3 py-2 hover:bg-[#2d4057] disabled:opacity-40 disabled:cursor-not-allowed text-[12px] rounded"
-      style={{ color: color || '#e8edf2' }}
-    >
-      {label}
-    </button>
-  )
-}
 
 function HostIcon() {
   return <span className="text-[#5b9bd5] text-[10px]">⊞</span>

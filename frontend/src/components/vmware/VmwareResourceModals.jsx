@@ -121,9 +121,9 @@ export function AddNicModal({ vm, networks = [], onClose, onAction }) {
 }
 
 /* ─── Create Standard / Distributed vSwitch ──────────────────────────── */
-export function CreateVswitchModal({ hosts = [], onClose, onAction }) {
+export function CreateVswitchModal({ hosts = [], defaultType = 'standard', onClose, onAction }) {
   const [name, setName] = useState('')
-  const [type, setType] = useState('standard')
+  const [type, setType] = useState(defaultType)
   const [mtu, setMtu] = useState('1500')
   const [hostId, setHostId] = useState(hosts[0]?.id || '')
   const { acting, error, run } = useSubmit(onAction, onClose)
@@ -275,6 +275,218 @@ export function CreateClusterModal({ datacenters = [], onClose, onAction }) {
         {toggle(drs, setDrs, 'Turn ON vSphere DRS')}
         {toggle(vsan, setVsan, 'Enable vSAN')}
       </div>
+      {error && <p className="text-xs text-[#D9534F]">{error}</p>}
+    </Modal>
+  )
+}
+
+/* ─── Add Host ───────────────────────────────────────────────────────── */
+export function AddHostModal({ datacenters = [], onClose, onAction }) {
+  const [name, setName] = useState('')
+  const [ip, setIp] = useState('')
+  const [memGb, setMemGb] = useState('128')
+  const [dcId, setDcId] = useState(datacenters[0]?.id || 'dc-prod')
+  const { acting, error, run } = useSubmit(onAction, onClose)
+
+  return (
+    <Modal title="Add Host" onClose={onClose}
+      footer={<>
+        <button type="button" onClick={onClose} className="vm-btn">Cancel</button>
+        <button type="button" disabled={acting || !name.trim()} className="vm-btn vm-btn-blue"
+          onClick={() => run('add_host', { name: name.trim(), ip: ip.trim() || undefined, memory_gb: parseInt(memGb) || 128, datacenter_id: dcId })}>
+          {acting ? 'Adding…' : 'Add host'}
+        </button>
+      </>}>
+      <Field label="Host name or IP *">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="esxi-03.fixitlab.local" className="vm-input !pl-3" />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Management IP (optional)">
+          <input value={ip} onChange={e => setIp(e.target.value)} placeholder="192.168.10.13" className="vm-input !pl-3" />
+        </Field>
+        <Field label="Memory (GB)">
+          <select value={memGb} onChange={e => setMemGb(e.target.value)} className="vm-input !pl-3">
+            {['64', '128', '256', '512', '1024'].map(m => <option key={m} value={m}>{m} GB</option>)}
+          </select>
+        </Field>
+      </div>
+      {datacenters.length > 0 && (
+        <Field label="Datacenter">
+          <select value={dcId} onChange={e => setDcId(e.target.value)} className="vm-input !pl-3">
+            {datacenters.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </Field>
+      )}
+      <p className="text-[10px] text-[#8fa5b8]">The host is added in connected state and attached to the datacenter's first cluster.</p>
+      {error && <p className="text-xs text-[#D9534F]">{error}</p>}
+    </Modal>
+  )
+}
+
+/* ─── New Resource Pool ──────────────────────────────────────────────── */
+export function CreateResourcePoolModal({ parentName = 'Cluster-01', onClose, onAction }) {
+  const [name, setName] = useState('')
+  const [cpuShares, setCpuShares] = useState('normal')
+  const [memShares, setMemShares] = useState('normal')
+  const [cpuLimit, setCpuLimit] = useState('-1')
+  const [memLimit, setMemLimit] = useState('-1')
+  const { acting, error, run } = useSubmit(onAction, onClose)
+
+  return (
+    <Modal title={`New Resource Pool — ${parentName}`} onClose={onClose}
+      footer={<>
+        <button type="button" onClick={onClose} className="vm-btn">Cancel</button>
+        <button type="button" disabled={acting || !name.trim()} className="vm-btn vm-btn-blue"
+          onClick={() => run('new_resource_pool', {
+            name: name.trim(), parent: parentName, cpu_shares: cpuShares, mem_shares: memShares,
+            cpu_limit_mhz: parseInt(cpuLimit), mem_limit_mb: parseInt(memLimit),
+          })}>
+          {acting ? 'Creating…' : 'Create pool'}
+        </button>
+      </>}>
+      <Field label="Resource pool name *">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Production-RP" className="vm-input !pl-3" />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="CPU shares">
+          <select value={cpuShares} onChange={e => setCpuShares(e.target.value)} className="vm-input !pl-3">
+            {['low', 'normal', 'high'].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="Memory shares">
+          <select value={memShares} onChange={e => setMemShares(e.target.value)} className="vm-input !pl-3">
+            {['low', 'normal', 'high'].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="CPU limit (MHz, -1 = unlimited)">
+          <input type="number" value={cpuLimit} onChange={e => setCpuLimit(e.target.value)} className="vm-input !pl-3" />
+        </Field>
+        <Field label="Memory limit (MB, -1 = unlimited)">
+          <input type="number" value={memLimit} onChange={e => setMemLimit(e.target.value)} className="vm-input !pl-3" />
+        </Field>
+      </div>
+      {error && <p className="text-xs text-[#D9534F]">{error}</p>}
+    </Modal>
+  )
+}
+
+/* ─── New vApp ───────────────────────────────────────────────────────── */
+export function CreateVappModal({ parentName = 'Cluster-01', vms = [], onClose, onAction }) {
+  const [name, setName] = useState('')
+  const [selected, setSelected] = useState([])
+  const { acting, error, run } = useSubmit(onAction, onClose)
+  const toggleVm = (id) => setSelected(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id])
+
+  return (
+    <Modal title={`New vApp — ${parentName}`} onClose={onClose}
+      footer={<>
+        <button type="button" onClick={onClose} className="vm-btn">Cancel</button>
+        <button type="button" disabled={acting || !name.trim()} className="vm-btn vm-btn-blue"
+          onClick={() => run('new_vapp', { name: name.trim(), parent: parentName, vms: selected })}>
+          {acting ? 'Creating…' : 'Create vApp'}
+        </button>
+      </>}>
+      <Field label="vApp name *">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="3-Tier-App" className="vm-input !pl-3" />
+      </Field>
+      <Field label="Add virtual machines (optional)">
+        <div className="max-h-40 overflow-y-auto border border-[#2d3a4a] rounded bg-[#16222f] p-2 space-y-1">
+          {vms.length === 0 ? <p className="text-[10px] text-[#8fa5b8]">No VMs available</p> : vms.map(v => (
+            <label key={v.id} className="flex items-center gap-2 text-xs text-[#E8EDF2] cursor-pointer">
+              <input type="checkbox" checked={selected.includes(v.id)} onChange={() => toggleVm(v.id)} />
+              {v.name}
+            </label>
+          ))}
+        </div>
+      </Field>
+      <p className="text-[10px] text-[#8fa5b8]">Powering the vApp on/off cascades to its member VMs in start order.</p>
+      {error && <p className="text-xs text-[#D9534F]">{error}</p>}
+    </Modal>
+  )
+}
+
+/* ─── New Datastore Cluster (SDRS) ───────────────────────────────────── */
+export function CreateDatastoreClusterModal({ datastores = [], onClose, onAction }) {
+  const [name, setName] = useState('')
+  const [sdrs, setSdrs] = useState(true)
+  const [automation, setAutomation] = useState('fullyAutomated')
+  const [selected, setSelected] = useState([])
+  const { acting, error, run } = useSubmit(onAction, onClose)
+  const toggleDs = (id) => setSelected(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id])
+
+  return (
+    <Modal title="New Datastore Cluster" onClose={onClose}
+      footer={<>
+        <button type="button" onClick={onClose} className="vm-btn">Cancel</button>
+        <button type="button" disabled={acting || !name.trim()} className="vm-btn vm-btn-blue"
+          onClick={() => run('create_datastore_cluster', { name: name.trim(), sdrs_enabled: sdrs, automation_level: automation, datastore_ids: selected })}>
+          {acting ? 'Creating…' : 'Create cluster'}
+        </button>
+      </>}>
+      <Field label="Datastore cluster name *">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="SDRS-Prod" className="vm-input !pl-3" />
+      </Field>
+      <label className="flex items-center gap-2 text-xs text-[#E8EDF2] cursor-pointer">
+        <input type="checkbox" checked={sdrs} onChange={e => setSdrs(e.target.checked)} />
+        Turn ON Storage DRS
+      </label>
+      {sdrs && (
+        <Field label="Automation level">
+          <select value={automation} onChange={e => setAutomation(e.target.value)} className="vm-input !pl-3">
+            <option value="manual">No Automation (Manual Mode)</option>
+            <option value="fullyAutomated">Fully Automated</option>
+          </select>
+        </Field>
+      )}
+      <Field label="Member datastores">
+        <div className="max-h-40 overflow-y-auto border border-[#2d3a4a] rounded bg-[#16222f] p-2 space-y-1">
+          {datastores.length === 0 ? <p className="text-[10px] text-[#8fa5b8]">No datastores available</p> : datastores.map(d => (
+            <label key={d.id} className="flex items-center gap-2 text-xs text-[#E8EDF2] cursor-pointer">
+              <input type="checkbox" checked={selected.includes(d.id)} onChange={() => toggleDs(d.id)} />
+              {d.name} <span className="text-[10px] text-[#8fa5b8]">({d.type})</span>
+            </label>
+          ))}
+        </div>
+      </Field>
+      {error && <p className="text-xs text-[#D9534F]">{error}</p>}
+    </Modal>
+  )
+}
+
+/* ─── New Folder ─────────────────────────────────────────────────────── */
+export function CreateFolderModal({ folderType = 'vm', datacenters = [], onClose, onAction }) {
+  const [name, setName] = useState('')
+  const [type, setType] = useState(folderType)
+  const [dcId, setDcId] = useState(datacenters[0]?.id || 'dc-prod')
+  const { acting, error, run } = useSubmit(onAction, onClose)
+
+  return (
+    <Modal title="New Folder" onClose={onClose}
+      footer={<>
+        <button type="button" onClick={onClose} className="vm-btn">Cancel</button>
+        <button type="button" disabled={acting || !name.trim()} className="vm-btn vm-btn-blue"
+          onClick={() => run('add_folder', { name: name.trim(), folder_type: type, datacenter_id: dcId })}>
+          {acting ? 'Creating…' : 'Create folder'}
+        </button>
+      </>}>
+      <Field label="Folder name *">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Production" className="vm-input !pl-3" />
+      </Field>
+      <Field label="Folder type">
+        <select value={type} onChange={e => setType(e.target.value)} className="vm-input !pl-3">
+          <option value="host">Host Folder</option>
+          <option value="vm">VM Folder</option>
+          <option value="storage">Storage Folder</option>
+          <option value="network">Network Folder</option>
+        </select>
+      </Field>
+      {datacenters.length > 0 && (
+        <Field label="Datacenter">
+          <select value={dcId} onChange={e => setDcId(e.target.value)} className="vm-input !pl-3">
+            {datacenters.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </Field>
+      )}
       {error && <p className="text-xs text-[#D9534F]">{error}</p>}
     </Modal>
   )

@@ -36,7 +36,7 @@ function TreeRow({ depth = 0, label, status, active, onClick, onContextMenu, bad
 
 function DcClusterTree({
   dc, depth, hosts, vms, filterLabel, selectedNode, setSelectedNode, setActiveTab,
-  onVmContextMenu, exp, setExp,
+  onVmContextMenu, onHostContextMenu, onDcContextMenu, exp, setExp,
 }) {
   const dcHosts = hosts.filter(h => (h.datacenter_id || 'dc-prod') === dc.id && filterLabel(h.name))
   const cluster = dc.clusters?.[0]
@@ -51,6 +51,7 @@ function DcClusterTree({
         expanded={exp[`dc-${dc.id}`]}
         onToggle={() => setExp(p => ({ ...p, [`dc-${dc.id}`]: !p[`dc-${dc.id}`] }))}
         onClick={() => { setSelectedNode({ type: 'datacenter', id: dc.id }); setActiveTab('summary') }}
+        onContextMenu={onDcContextMenu ? (e => { e.preventDefault(); onDcContextMenu(e, dc) }) : undefined}
         active={selectedNode.type === 'datacenter' && selectedNode.id === dc.id}
       />
       {exp[`dc-${dc.id}`] && (
@@ -75,6 +76,7 @@ function DcClusterTree({
                 expanded={exp.hosts[host.id]}
                 onToggle={() => setExp(p => ({ ...p, hosts: { ...p.hosts, [host.id]: !p.hosts[host.id] } }))}
                 onClick={() => { setSelectedNode({ type: 'host', id: host.id }); setActiveTab('summary') }}
+                onContextMenu={onHostContextMenu ? (e => { e.preventDefault(); onHostContextMenu(e, host) }) : undefined}
               />
               {exp.hosts[host.id] && vms.filter(v => v.host_id === host.id && filterLabel(v.name)).map(vm => (
                 <TreeRow
@@ -100,7 +102,8 @@ export default function VmwareInventoryTree({
   datacenters = [], linkedMode = false,
   filterLabel,
   selectedNode, setSelectedNode, setActiveTab,
-  onVmContextMenu, onCreateVm, onDeployTemplate, onDeployOvf, onCreateVmWizard,
+  onVmContextMenu, onHostContextMenu, onDcContextMenu, onDsContextMenu, onNetContextMenu,
+  onCreateVm, onDeployTemplate, onDeployOvf, onCreateVmWizard,
 }) {
   const [exp, setExp] = useState({ vcenter: true, templates: true, storage: true, net: false, platform: true, hosts: {} })
   const toggle = (k) => setExp(p => ({ ...p, [k]: !p[k] }))
@@ -146,6 +149,8 @@ export default function VmwareInventoryTree({
           setSelectedNode={setSelectedNode}
           setActiveTab={setActiveTab}
           onVmContextMenu={onVmContextMenu}
+          onHostContextMenu={onHostContextMenu}
+          onDcContextMenu={onDcContextMenu}
           exp={exp}
           setExp={setExp}
         />
@@ -186,6 +191,7 @@ export default function VmwareInventoryTree({
           badgeColor={ds.warning === 'critical' ? '#D9534F' : ds.warning === 'warning' ? '#F5A623' : null}
           active={selectedNode.type === 'datastore' && selectedNode.id === ds.id}
           onClick={() => { setSelectedNode({ type: 'datastore', id: ds.id }); setActiveTab('summary') }}
+          onContextMenu={onDsContextMenu ? (e => { e.preventDefault(); onDsContextMenu(e, ds) }) : undefined}
         />
       ))}
 
@@ -198,8 +204,16 @@ export default function VmwareInventoryTree({
           status="connected"
           active={selectedNode.type === 'network' && selectedNode.id === net.id}
           onClick={() => { setSelectedNode({ type: 'network', id: net.id }); setActiveTab('summary') }}
+          onContextMenu={onNetContextMenu ? (e => { e.preventDefault(); onNetContextMenu(e, net) }) : undefined}
         />
       ))}
+
+      <TreeRow
+        depth={0}
+        label="Administration"
+        active={selectedNode.type === 'admin'}
+        onClick={() => { setSelectedNode({ type: 'admin', id: 'admin' }); setActiveTab('summary') }}
+      />
     </>
   )
 }
