@@ -29,6 +29,15 @@ export const labApi = {
     return data
   },
 
+  // Rule-based AI Mentor (free, NO LLM). Sends the user's current code + the
+  // latest run/test output and gets back explanations, concept teaching, and
+  // style/security suggestions. NEVER returns the reference solution unless
+  // `unlock_reference: true` is passed (the UI gates that behind a confirm).
+  async codeMentor(sessionId, payload) {
+    const { data } = await api.post(`/labs/${sessionId}/mentor/`, payload, { silentError: true })
+    return data
+  },
+
   // ── Prompt Engineering scenarios (rule-based, free — no LLM) ──
   // `submissions` is { exerciseId: promptText }. The backend re-checks each
   // prompt against the scenario's rubric and finalizes only when all pass.

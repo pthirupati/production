@@ -1,24 +1,36 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { indentUnit, indentOnInput, bracketMatching, foldGutter } from '@codemirror/language'
+import { searchKeymap, highlightSelectionMatches, openSearchPanel } from '@codemirror/search'
 import { python } from '@codemirror/lang-python'
 import { javascript } from '@codemirror/lang-javascript'
+import { json } from '@codemirror/lang-json'
+import { yaml } from '@codemirror/lang-yaml'
+import { markdown } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useThemeStore } from '../../store/themeStore'
 
 /**
- * Map a scenario language to the matching CodeMirror language extension.
- * Falls back to no language extension (plain text) for anything unknown so the
+ * Map a scenario language to the matching CodeMirror language extension, so the
+ * editor gets language-aware syntax highlighting, auto-indent and bracket
+ * matching. Unknown languages fall back to plain text (no extension) so the
  * editor never crashes on an unexpected language.
+ *
+ * TypeScript/JSX/TSX reuse the JS extension (configured for the dialect); JSON
+ * also falls back to the JS grammar if the dedicated parser is unavailable.
  */
 function languageExtension(language) {
   const lang = (language || '').toLowerCase()
-  if (lang === 'python') return python()
-  if (lang === 'javascript' || lang === 'js' || lang === 'node' || lang === 'nodejs') {
-    return javascript()
-  }
+  if (lang === 'python' || lang === 'py') return python()
+  if (['javascript', 'js', 'node', 'nodejs'].includes(lang)) return javascript()
+  if (['typescript', 'ts'].includes(lang)) return javascript({ typescript: true })
+  if (lang === 'jsx') return javascript({ jsx: true })
+  if (lang === 'tsx') return javascript({ jsx: true, typescript: true })
+  if (lang === 'json') return json()
+  if (lang === 'yaml' || lang === 'yml') return yaml()
+  if (lang === 'markdown' || lang === 'md') return markdown()
   return []
 }
 
@@ -39,14 +51,24 @@ const lightTheme = EditorView.theme({
  * Reusable CodeMirror 6 editor. Controlled-ish: `value` seeds the document and
  * pushes external updates in; `onChange` reports edits back to the parent.
  *
+ * Features: line numbers, fold gutter, auto-indent (indentOnInput + tab),
+ * bracket matching, language-aware highlighting, an in-editor search & replace
+ * panel (Mod-F / Mod-Alt-F, exposed imperatively as openSearch()), and a
+ * dark/light theme synced to the app theme store.
+ *
  * Props:
  *   value       current document text
  *   onChange    (text) => void
- *   language    'python' | 'javascript' | ...
+ *   language    'python' | 'javascript' | 'json' | 'yaml' | 'markdown' | ...
  *   readOnly    boolean
  *   onRun       optional () => void bound to Ctrl/Cmd-Enter
+ *   fontSize    optional number (px) for the editor font
+ * Ref handle: { openSearch(), focus() }
  */
-export default function CodeEditor({ value = '', onChange, language = 'python', readOnly = false, onRun }) {
+const CodeEditor = forwardRef(function CodeEditor(
+  { value = '', onChange, language = 'python', readOnly = false, onRun, fontSize = 13 },
+  ref,
+) {
   const hostRef = useRef(null)
   const viewRef = useRef(null)
   const onChangeRef = useRef(onChange)
@@ -54,9 +76,21 @@ export default function CodeEditor({ value = '', onChange, language = 'python', 
   const langCompartment = useRef(new Compartment())
   const themeCompartment = useRef(new Compartment())
   const readOnlyCompartment = useRef(new Compartment())
+  const fontCompartment = useRef(new Compartment())
 
   const theme = useThemeStore((s) => s.theme)
   const isDark = theme !== 'light'
+
+  // Imperative handle so the toolbar's Search button can open the panel.
+  useImperativeHandle(ref, () => ({
+    openSearch: () => { const v = viewRef.current; if (v) { openSearchPanel(v); v.focus() } },
+    focus: () => viewRef.current?.focus(),
+  }), [])
+
+  const fontTheme = (px) => EditorView.theme({
+    '&': { height: '100%', fontSize: `${px}px` },
+    '.cm-scroller': { fontFamily: '"JetBrains Mono", monospace' },
+  })
 
   // Keep latest callbacks without recreating the editor on every render.
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
@@ -85,6 +119,7 @@ export default function CodeEditor({ value = '', onChange, language = 'python', 
         lineNumbers(),
         highlightActiveLineGutter(),
         highlightActiveLine(),
+        highlightSelectionMatches(),
         foldGutter(),
         history(),
         indentOnInput(),
@@ -92,13 +127,15 @@ export default function CodeEditor({ value = '', onChange, language = 'python', 
         indentUnit.of('    '),
         EditorState.tabSize.of(4),
         runKeymap,
-        keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        // Search keymap first so Mod-F opens find/replace; indentWithTab before
+        // defaultKeymap so Tab indents in the editor.
+        keymap.of([indentWithTab, ...searchKeymap, ...defaultKeymap, ...historyKeymap]),
         langCompartment.current.of(languageExtension(language)),
         themeCompartment.current.of(isDark ? oneDark : lightTheme),
         readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
+        fontCompartment.current.of(fontTheme(fontSize)),
         updateListener,
         EditorView.lineWrapping,
-        EditorView.theme({ '&': { height: '100%', fontSize: '13px' }, '.cm-scroller': { fontFamily: '"JetBrains Mono", monospace' } }),
       ],
     })
 
@@ -133,5 +170,13 @@ export default function CodeEditor({ value = '', onChange, language = 'python', 
     viewRef.current?.dispatch({ effects: readOnlyCompartment.current.reconfigure(EditorState.readOnly.of(readOnly)) })
   }, [readOnly])
 
+  // React to font-size changes (zoom controls).
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: fontCompartment.current.reconfigure(fontTheme(fontSize)) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fontSize])
+
   return <div ref={hostRef} className="h-full w-full overflow-hidden text-left" />
-}
+})
+
+export default CodeEditor

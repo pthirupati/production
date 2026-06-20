@@ -152,6 +152,60 @@ class CodingIDEValidationTests(TestCase):
         self.assertNotIn("adds negatives", serialized)  # hidden test name absent
         self.assertNotIn("== -2", serialized)           # hidden test logic absent
 
+    # ── AI Mentor: explains errors WITHOUT leaking the reference solution ────
+
+    def test_mentor_explains_error_without_revealing_solution(self):
+        # Give the scenario a distinctive solution explanation so we can prove it
+        # never appears in the mentor's (locked) response.
+        self.scenario.solution_explanation = "ZZSECRETSOLUTIONZZ: just return a plus b."
+        self.scenario.save()
+        session = self._running_session()
+        resp = self.client.post(
+            f"/api/labs/{session.id}/mentor/",
+            {
+                "language": "python",
+                "code": "def add(a, b):\n    return a + c\n",  # NameError: c
+                "error": "NameError: name 'c' is not defined",
+                "test_results": [
+                    {"name": "adds negatives", "passed": False, "hidden": True},
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+
+        # It produced guidance and explicitly promises no solution leak.
+        self.assertTrue(body["notes"])
+        self.assertFalse(body["reveals_solution"])
+        kinds = {n["kind"] for n in body["notes"]}
+        self.assertIn("error", kinds)
+        blob = str(body).lower()
+        self.assertIn("nameerror", blob)  # it actually named the error
+
+        # Reference stays LOCKED — the answer/explanation is NOT in the response.
+        self.assertFalse(body["reference"]["unlocked"])
+        self.assertNotIn("solution_explanation", body["reference"])
+        self.assertNotIn("zzsecretsolutionzz", blob)  # the answer never leaks
+        # Hidden-test name must not leak through the mentor either.
+        self.assertNotIn("adds negatives", blob)
+        self.assertNotIn("== -2", str(body))
+
+    def test_mentor_reveals_reference_only_when_unlocked(self):
+        self.scenario.solution_explanation = "Return a + b; addition is commutative."
+        self.scenario.save()
+        session = self._running_session()
+        resp = self.client.post(
+            f"/api/labs/{session.id}/mentor/",
+            {"language": "python", "code": "def add(a,b): return 0",
+             "unlock_reference": True},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        ref = resp.json()["reference"]
+        self.assertTrue(ref["unlocked"])
+        self.assertIn("commutative", ref["solution_explanation"])
+
     def test_completed_session_cannot_be_revalidated(self):
         session = self._running_session()
         # First, solve it.

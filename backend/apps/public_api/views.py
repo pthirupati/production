@@ -1173,6 +1173,62 @@ class CodeValidateView(APIView):
         return ""
 
 
+class CodeMentorView(APIView):
+    """Rule-based AI Mentor for the coding IDE — FREE, no paid LLM.
+
+    Given the learner's current code plus the latest run/test output, returns
+    plain-language guidance (explain errors/stack traces, explain a failing test
+    *conceptually*, teach the concept, suggest style/complexity/security
+    improvements). See apps.labs.ide_mentor — it is pure pattern matching with
+    NO model call and NO network.
+
+    Integrity: this endpoint NEVER returns the reference solution. The mentor's
+    only inputs are the user's own code + public run output, so there is nothing
+    to leak. The reference walkthrough is exposed ONLY when the client POSTs
+    `unlock_reference: true` (the UI gates that behind an explicit confirm), and
+    even then it comes from the separate reference_payload() path — analysis and
+    the answer never travel together by accident.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        from apps.labs.ide_mentor import analyze, reference_payload
+
+        # Accept any non-terminal session the user owns (mentor stays useful even
+        # right after solving). It does not mutate session state.
+        session = get_object_or_404(LabSession, pk=session_id, user=request.user)
+        scenario = session.scenario
+        if not getattr(scenario, "coding_mode", False):
+            return Response({"error": "Not a coding scenario"}, status=400)
+
+        spec = scenario.coding_spec or {}
+        language = (request.data.get("language") or spec.get("language") or "python").lower()
+        code = request.data.get("code") or ""
+        if isinstance(code, dict):  # tolerate a {path: content} map
+            code = "\n\n".join(v for v in code.values() if isinstance(v, str))
+        output = request.data.get("output") or ""
+        error = request.data.get("error") or ""
+        test_results = request.data.get("test_results") or request.data.get("tests") or []
+        if not isinstance(test_results, list):
+            test_results = []
+        requested = request.data.get("requested") or "all"
+
+        # Explicit, confirmed unlock is the ONLY way the answer is returned.
+        unlock = bool(request.data.get("unlock_reference"))
+
+        report = analyze(
+            language=language,
+            code=str(code)[:20000],
+            output=str(output)[:20000],
+            error=str(error)[:20000],
+            test_results=test_results[:50],
+            requested=str(requested),
+        ).to_dict()
+
+        report["reference"] = reference_payload(scenario, unlocked=unlock)
+        return Response(report)
+
+
 class PromptValidateView(APIView):
     """Grade a Prompt Engineering ("prompt") scenario — rule-based, FREE.
 

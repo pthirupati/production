@@ -1,19 +1,30 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Play, CheckCircle2, XCircle, FileCode, Loader2, Terminal as TerminalIcon,
-  ListChecks, FileText, Lightbulb, Lock, EyeOff, AlertTriangle, Trophy, Timer,
+  ListChecks, FileText, Lightbulb, Lock, EyeOff, AlertTriangle, Trophy,
+  Sparkles, Search, Sun, Moon, ZoomIn, ZoomOut, Bug, ScrollText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CodeEditor from './CodeEditor'
+import MentorPanel from './MentorPanel'
 import { runPython, runPythonTests } from '../../utils/ide/pyodideRunner'
 import { runJavaScript, runJavaScriptTests } from '../../utils/ide/jsRunner'
 import { labApi } from '../../api/labs'
+import { useThemeStore } from '../../store/themeStore'
 
-const LANG_LABEL = { python: 'Python', javascript: 'JavaScript', js: 'JavaScript', bash: 'Bash' }
+const LANG_LABEL = {
+  python: 'Python', javascript: 'JavaScript', js: 'JavaScript', node: 'Node.js',
+  bash: 'Bash', typescript: 'TypeScript', json: 'JSON', yaml: 'YAML', markdown: 'Markdown',
+}
 
 function fileName(path) {
   const parts = (path || '').split('/')
   return parts[parts.length - 1] || path
+}
+
+function tsLine(text) {
+  const t = new Date().toLocaleTimeString()
+  return `[${t}] ${text}`
 }
 
 /** Small status pill for a single test row. */
@@ -41,11 +52,23 @@ function TestRow({ name, passed, message, hidden }) {
 /**
  * Browser coding IDE for coding_mode scenarios.
  *
- * Layout: file explorer (left) · editor+tabs (center) · instructions (right) ·
- * Output/Tests/Console (bottom). Python runs via Pyodide, JavaScript via a Web
- * Worker — both purely client-side for instant feedback. "Check Solution"
- * ALWAYS submits to the backend, which re-runs every visible + hidden test in a
- * sandbox; only the backend can mark the scenario solved.
+ * Layout: file explorer (left) · editor + tabs + bottom panel (center) ·
+ * instructions / AI-Mentor (right). Python runs via Pyodide, JavaScript via a
+ * Web Worker — both purely client-side for instant feedback.
+ *
+ * Bottom panel tabs (all wired to real run/grade content):
+ *   Terminal       — a transcript log of Run / Check actions + their results
+ *   Output         — stdout from the last Run / server grade
+ *   Logs           — stderr / console output
+ *   Test Results   — per-test pass/fail (hidden tests masked), local + server
+ *   Debug Console   — mentor summary + diagnostics (run/grade metadata)
+ *
+ * AI Mentor (right tab): rule-based, FREE — explains errors/tests/concepts and
+ * suggests improvements WITHOUT revealing the solution unless explicitly
+ * unlocked via a confirm gate.
+ *
+ * "Check Solution" ALWAYS submits to the backend, which re-runs every visible +
+ * hidden test in a sandbox; only the backend can mark the scenario solved.
  *
  * Props:
  *   sessionId   lab session UUID
@@ -62,20 +85,40 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const [readonlyPaths, setReadonlyPaths] = useState(new Set())
   const [activePath, setActivePath] = useState('')
 
-  const [bottomTab, setBottomTab] = useState('output') // output | tests | console
-  const [output, setOutput] = useState('')
-  const [consoleText, setConsoleText] = useState('')
-  const [testResults, setTestResults] = useState(null)  // { tests, passed_count, total_count, hidden_total }
+  // Bottom panel: terminal | output | logs | tests | debug
+  const [bottomTab, setBottomTab] = useState('output')
+  const [output, setOutput] = useState('')        // stdout
+  const [logsText, setLogsText] = useState('')     // stderr / console
+  const [terminalText, setTerminalText] = useState('')  // action transcript
+  const [debugText, setDebugText] = useState('')   // diagnostics + mentor summary
+  const [testResults, setTestResults] = useState(null)
   const [running, setRunning] = useState(false)
   const [checking, setChecking] = useState(false)
   const [pyLoading, setPyLoading] = useState(false)
   const [solved, setSolved] = useState(solvedProp)
+
+  // Right panel: 'instructions' | 'mentor'
+  const [rightTab, setRightTab] = useState('instructions')
+  const [mentor, setMentor] = useState(null)
+  const [mentorLoading, setMentorLoading] = useState(false)
+  // Latest run/grade context the mentor analyzes.
+  const lastCtx = useRef({ output: '', error: '', tests: [] })
+
+  const [fontSize, setFontSize] = useState(13)
+  const editorRef = useRef(null)
+  const theme = useThemeStore((s) => s.theme)
+  const toggleTheme = useThemeStore((s) => s.toggleTheme)
+  const isDark = theme !== 'light'
 
   const mountedRef = useRef(true)
   useEffect(() => () => { mountedRef.current = false }, [])
   useEffect(() => { if (solvedProp) setSolved(true) }, [solvedProp])
 
   const language = spec?.language || 'python'
+
+  const appendTerminal = useCallback((line) => {
+    setTerminalText((prev) => (prev ? prev + '\n' : '') + tsLine(line))
+  }, [])
 
   // ── Load the coding spec (hidden tests stripped server-side) ──
   useEffect(() => {
@@ -136,38 +179,44 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     setRunning(true)
     setBottomTab('output')
     setOutput('')
-    setConsoleText('')
+    setLogsText('')
+    appendTerminal(`$ run ${entrypoint || 'solution'} (${LANG_LABEL[language] || language})`)
     const source = composedSource()
+    let stdout = ''
+    let stderr = ''
     try {
       if (isPython) {
         setPyLoading(true)
         const res = await runPython(source)
         setPyLoading(false)
         if (!mountedRef.current) return
-        setOutput(res.stdout || (res.ok ? '(no output)' : ''))
-        if (res.stderr) setConsoleText(res.stderr)
-        if (res.error) {
-          setConsoleText((prev) => (prev ? prev + '\n' : '') + res.error)
-          setBottomTab('console')
-        }
+        stdout = res.stdout || (res.ok ? '(no output)' : '')
+        stderr = [res.stderr, res.error].filter(Boolean).join('\n')
+        setOutput(stdout)
+        if (stderr) { setLogsText(stderr); setBottomTab('logs') }
       } else if (isJs) {
         const res = await runJavaScript(source, { timeoutMs: 8000 })
         if (!mountedRef.current) return
-        setOutput(res.stdout || (res.ok ? '(no output)' : ''))
-        if (res.error) {
-          setConsoleText(res.error)
-          setBottomTab('console')
-        }
+        stdout = res.stdout || (res.ok ? '(no output)' : '')
+        stderr = res.error || ''
+        setOutput(stdout)
+        if (stderr) { setLogsText(stderr); setBottomTab('logs') }
       } else {
-        setOutput(`Running ${LANG_LABEL[language] || language} in the browser is not supported.\nUse "Check Solution" — the server will run and grade your code.`)
+        stdout = `Running ${LANG_LABEL[language] || language} in the browser is not supported.\nUse "Check Solution" — the server will run and grade your code.`
+        setOutput(stdout)
       }
+      appendTerminal(stderr ? 'run finished with errors (see Logs)' : 'run finished')
     } catch (err) {
-      setConsoleText(String(err?.message || err))
-      setBottomTab('console')
+      stderr = String(err?.message || err)
+      setLogsText(stderr)
+      setBottomTab('logs')
+      appendTerminal('run crashed (see Logs)')
     } finally {
       if (mountedRef.current) { setRunning(false); setPyLoading(false) }
+      lastCtx.current = { output: stdout, error: stderr, tests: lastCtx.current.tests }
+      setDebugText(tsLine(`Run · lang=${language} · stdout=${stdout.length}b · stderr=${stderr.length}b`))
     }
-  }, [running, checking, composedSource, isPython, isJs, language])
+  }, [running, checking, composedSource, isPython, isJs, language, entrypoint, appendTerminal])
 
   // ── Run visible tests in-browser for fast feedback (no completion here) ──
   const runVisibleTests = useCallback(async () => {
@@ -192,6 +241,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     setChecking(true)
     setBottomTab('tests')
     setTestResults(null)
+    appendTerminal('$ check-solution (grading on server: visible + hidden tests)')
 
     // Optional fast local preview of visible tests while the server grades.
     let localPreview = null
@@ -216,35 +266,84 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       })
       if (!mountedRef.current) return
 
+      const tests = result.tests || []
       setTestResults({
-        tests: result.tests || [],
+        tests,
         passed_count: result.passed_count ?? 0,
         total_count: result.total_count ?? 0,
         hidden_total: spec?.hidden_test_count || 0,
         preview: false,
       })
       if (result.stdout) setOutput(result.stdout)
+      // Feed the mentor's context from the authoritative grade.
+      lastCtx.current = { output: result.stdout || '', error: result.error || '', tests }
+      setDebugText(tsLine(
+        `Check · passed=${result.passed_count ?? 0}/${result.total_count ?? 0}` +
+        ` · hidden=${spec?.hidden_test_count || 0} · verdict=${result.passed ? 'PASS' : result.needs_review ? 'NEEDS_REVIEW' : 'FAIL'}`
+      ))
 
       if (result.needs_review) {
+        appendTerminal('server: needs manual review')
         toast(result.message || 'Submission needs manual review.', { icon: '🔎' })
         return
       }
       if (result.passed) {
         setSolved(true)
+        appendTerminal('server: ALL TESTS PASSED — solved')
         toast.success(result.message || 'All tests passed! Challenge solved.', { duration: 6000 })
         onSolved?.(result)
       } else {
-        if (result.error) {
-          setConsoleText(result.error)
-        }
+        if (result.error) { setLogsText(result.error) }
+        appendTerminal(`server: ${result.passed_count ?? 0}/${result.total_count ?? 0} passed — not solved`)
         toast(result.message || 'Some tests failed. Keep trying!', { icon: '🔍' })
       }
     } catch (err) {
+      appendTerminal('check failed (network/validation error)')
       toast.error(err?.response?.data?.error || 'Validation error')
     } finally {
       if (mountedRef.current) setChecking(false)
     }
-  }, [checking, running, solved, canRunInBrowser, runVisibleTests, sessionId, language, files, entrypoint, spec, onSolved])
+  }, [checking, running, solved, canRunInBrowser, runVisibleTests, sessionId, language, files, entrypoint, spec, onSolved, appendTerminal])
+
+  // ── AI Mentor (rule-based, free) ──
+  const askMentor = useCallback(async (requested = 'all', { unlock = false } = {}) => {
+    setRightTab('mentor')
+    setMentorLoading(true)
+    try {
+      const ctx = lastCtx.current
+      const data = await labApi.codeMentor(sessionId, {
+        language,
+        code: composedSource(),
+        output: ctx.output,
+        error: ctx.error,
+        test_results: ctx.tests,
+        requested,
+        unlock_reference: unlock,
+      })
+      if (!mountedRef.current) return
+      // Preserve an already-unlocked reference across follow-up asks.
+      setMentor((prev) => {
+        if (prev?.reference?.unlocked && data?.reference && !data.reference.unlocked) {
+          return { ...data, reference: prev.reference }
+        }
+        return data
+      })
+      if (data?.summary) setDebugText((p) => (p ? p + '\n' : '') + tsLine(`Mentor: ${data.summary}`))
+    } catch (err) {
+      if (mountedRef.current) {
+        setMentor({
+          summary: 'The mentor is offline right now.',
+          notes: [{ kind: 'info', title: 'Mentor unavailable', detail: 'Could not reach the mentor service. Your code still runs and grades normally.' }],
+          reveals_solution: false,
+          reference: { unlocked: false, reference_available: false },
+        })
+      }
+    } finally {
+      if (mountedRef.current) setMentorLoading(false)
+    }
+  }, [sessionId, language, composedSource])
+
+  const handleUnlockReference = useCallback(() => askMentor('all', { unlock: true }), [askMentor])
 
   if (loading) {
     return (
@@ -274,6 +373,15 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const hiddenCount = spec?.hidden_test_count || 0
   const objectives = scenario?.objectives || []
   const langLabel = LANG_LABEL[(language || '').toLowerCase()] || language
+  const mentorDisabled = !lastCtx.current.output && !lastCtx.current.error && !lastCtx.current.tests.length && !mentor
+
+  const BOTTOM_TABS = [
+    { key: 'terminal', label: 'Terminal', icon: TerminalIcon },
+    { key: 'output', label: 'Output', icon: ScrollText },
+    { key: 'logs', label: 'Logs', icon: FileText },
+    { key: 'tests', label: 'Test Results', icon: ListChecks },
+    { key: 'debug', label: 'Debug Console', icon: Bug },
+  ]
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-surface-950">
@@ -305,12 +413,43 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           {checking ? <Loader2 size={13} className="animate-spin" /> : solved ? <Trophy size={13} /> : <ListChecks size={13} />}
           {solved ? 'Solved' : 'Check Solution'}
         </button>
-        <span className="ml-auto text-[11px] text-surface-500 hidden sm:flex items-center gap-1">
+
+        {/* Editor controls */}
+        <div className="w-px h-5 bg-surface-700 mx-1" />
+        <button
+          onClick={() => editorRef.current?.openSearch()}
+          className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium border border-surface-700 text-surface-300 hover:border-accent-cyan hover:text-accent-cyan transition-colors"
+          title="Search & replace (Ctrl/Cmd+F)"
+        >
+          <Search size={13} /> <span className="hidden sm:inline">Find</span>
+        </button>
+        <div className="hidden sm:flex items-center gap-0.5">
+          <button onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="p-1.5 rounded text-surface-400 hover:text-surface-100" title="Zoom out"><ZoomOut size={13} /></button>
+          <button onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="p-1.5 rounded text-surface-400 hover:text-surface-100" title="Zoom in"><ZoomIn size={13} /></button>
+        </div>
+        <button
+          onClick={toggleTheme}
+          className="p-1.5 rounded text-surface-400 hover:text-accent-amber transition-colors"
+          title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+        >
+          {isDark ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
+        <button
+          onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+            rightTab === 'mentor' ? 'border-accent-purple/50 text-accent-purple bg-accent-purple/10' : 'border-surface-700 text-surface-300 hover:border-accent-purple hover:text-accent-purple'
+          }`}
+          title="Open the rule-based AI Mentor"
+        >
+          <Sparkles size={13} /> <span className="hidden md:inline">Mentor</span>
+        </button>
+
+        <span className="ml-auto text-[11px] text-surface-500 hidden lg:flex items-center gap-1">
           <EyeOff size={11} /> {hiddenCount} hidden test{hiddenCount === 1 ? '' : 's'} run on the server
         </span>
       </div>
 
-      {/* Main grid: explorer | editor | instructions */}
+      {/* Main grid: explorer | editor | right panel */}
       <div className="flex-1 flex min-h-0">
         {/* File explorer */}
         <div className="w-44 shrink-0 border-r border-surface-800 bg-surface-900/50 overflow-y-auto hidden md:block">
@@ -352,46 +491,54 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           <div className="flex-1 min-h-0 bg-surface-950">
             {activePath ? (
               <CodeEditor
+                ref={editorRef}
                 key={activePath}
                 value={files[activePath] ?? ''}
                 onChange={handleEditorChange}
                 language={language}
                 readOnly={solved || readonlyPaths.has(activePath)}
                 onRun={handleRun}
+                fontSize={fontSize}
               />
             ) : (
               <div className="h-full flex items-center justify-center text-surface-600 text-sm">No file open</div>
             )}
           </div>
 
-          {/* Bottom panel: Output / Tests / Console */}
+          {/* Bottom panel: Terminal / Output / Logs / Test Results / Debug Console */}
           <div className="shrink-0 h-56 flex flex-col border-t border-surface-800 bg-surface-950">
-            <div className="flex border-b border-surface-800 bg-surface-900">
-              {[
-                { key: 'output', label: 'Output', icon: TerminalIcon },
-                { key: 'tests', label: 'Test Results', icon: ListChecks },
-                { key: 'console', label: 'Console', icon: FileText },
-              ].map(({ key, label, icon: Icon }) => (
+            <div className="flex border-b border-surface-800 bg-surface-900 overflow-x-auto">
+              {BOTTOM_TABS.map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
                   onClick={() => setBottomTab(key)}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
                     bottomTab === key ? 'text-accent-cyan border-b-2 border-accent-cyan' : 'text-surface-500 hover:text-surface-300'
                   }`}
                 >
                   <Icon size={12} /> {label}
+                  {key === 'tests' && testResults && (
+                    <span className={`ml-1 text-[10px] px-1 rounded ${testResults.passed_count === testResults.total_count && testResults.total_count > 0 ? 'bg-accent-green/20 text-accent-green' : 'bg-surface-800 text-surface-400'}`}>
+                      {testResults.passed_count}/{testResults.total_count}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
             <div className="flex-1 overflow-auto p-3">
-              {bottomTab === 'output' && (
-                <pre className="text-xs font-mono text-surface-200 whitespace-pre-wrap break-words">
-                  {output || <span className="text-surface-600">Click Run to execute your code.</span>}
+              {bottomTab === 'terminal' && (
+                <pre className="text-xs font-mono text-surface-300 whitespace-pre-wrap break-words">
+                  {terminalText || <span className="text-surface-600">Run or Check Solution to see a session transcript here.</span>}
                 </pre>
               )}
-              {bottomTab === 'console' && (
+              {bottomTab === 'output' && (
+                <pre className="text-xs font-mono text-surface-200 whitespace-pre-wrap break-words">
+                  {output || <span className="text-surface-600">Click Run to execute your code. stdout appears here.</span>}
+                </pre>
+              )}
+              {bottomTab === 'logs' && (
                 <pre className="text-xs font-mono text-accent-red whitespace-pre-wrap break-words">
-                  {consoleText || <span className="text-surface-600">Errors and warnings appear here.</span>}
+                  {logsText || <span className="text-surface-600">stderr, console output and runtime errors appear here.</span>}
                 </pre>
               )}
               {bottomTab === 'tests' && (
@@ -418,68 +565,123 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
                   )}
                 </div>
               )}
+              {bottomTab === 'debug' && (
+                <div className="space-y-2">
+                  <pre className="text-xs font-mono text-accent-cyan whitespace-pre-wrap break-words">
+                    {debugText || <span className="text-surface-600">Diagnostics from each Run / Check (language, byte counts, verdict) and mentor summaries appear here.</span>}
+                  </pre>
+                  {(output || logsText || testResults) && (
+                    <button
+                      onClick={() => askMentor('all')}
+                      disabled={mentorLoading}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium border border-accent-purple/40 text-accent-purple hover:bg-accent-purple/10 disabled:opacity-50"
+                    >
+                      <Sparkles size={12} /> Ask the AI Mentor to diagnose this
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Instructions / requirements panel */}
-        <div className="w-72 shrink-0 border-l border-surface-800 bg-surface-900/50 overflow-y-auto hidden lg:block">
-          <div className="p-4 space-y-4">
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500 mb-1.5">Task</h3>
-              <p className="text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">
-                {spec?.instructions || scenario?.description || 'Implement the solution.'}
-              </p>
-            </div>
+        {/* Right panel: Instructions / AI Mentor (tabbed) */}
+        <div className="w-72 xl:w-80 shrink-0 border-l border-surface-800 bg-surface-900/50 hidden lg:flex flex-col min-h-0">
+          <div className="shrink-0 flex border-b border-surface-800">
+            <button
+              onClick={() => setRightTab('instructions')}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                rightTab === 'instructions' ? 'text-accent-cyan border-b-2 border-accent-cyan' : 'text-surface-500 hover:text-surface-300'
+              }`}
+            >
+              <FileText size={12} /> Instructions
+            </button>
+            <button
+              onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                rightTab === 'mentor' ? 'text-accent-purple border-b-2 border-accent-purple' : 'text-surface-500 hover:text-surface-300'
+              }`}
+            >
+              <Sparkles size={12} /> AI Mentor
+            </button>
+          </div>
 
-            {objectives.length > 0 && (
+          {rightTab === 'mentor' ? (
+            <MentorPanel
+              report={mentor}
+              loading={mentorLoading}
+              onAsk={(req) => askMentor(req)}
+              onUnlock={handleUnlockReference}
+              disabled={mentorDisabled}
+            />
+          ) : (
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500 mb-1.5">Requirements</h3>
-                <ul className="space-y-1.5">
-                  {objectives.map((obj, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
-                      <CheckCircle2 size={12} className="text-accent-cyan mt-0.5 shrink-0" />
-                      <span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {visibleTests.length > 0 && (
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500 mb-1.5">Visible tests</h3>
-                <ul className="space-y-1">
-                  {visibleTests.map((t, i) => (
-                    <li key={i} className="flex items-center gap-2 text-xs text-surface-400">
-                      <ListChecks size={11} className="text-surface-500 shrink-0" />
-                      <span className="truncate">{t.name}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="rounded-lg bg-surface-800/50 border border-surface-700/50 p-3">
-              <p className="text-[11px] text-surface-400 flex items-start gap-1.5">
-                <EyeOff size={12} className="text-accent-amber mt-0.5 shrink-0" />
-                <span>
-                  {hiddenCount > 0
-                    ? `${hiddenCount} hidden test${hiddenCount === 1 ? '' : 's'} run on the server when you click Check Solution. Your code must pass every test to solve this scenario.`
-                    : 'Your code is graded on the server. It must pass every test to solve this scenario.'}
-                </span>
-              </p>
-            </div>
-
-            {!canRunInBrowser && (
-              <div className="rounded-lg bg-accent-amber/5 border border-accent-amber/20 p-3">
-                <p className="text-[11px] text-accent-amber flex items-start gap-1.5">
-                  <Lightbulb size={12} className="mt-0.5 shrink-0" />
-                  <span>In-browser Run is unavailable for {langLabel}. Use Check Solution — the server runs and grades your code.</span>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500 mb-1.5">Task</h3>
+                <p className="text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">
+                  {spec?.instructions || scenario?.description || 'Implement the solution.'}
                 </p>
               </div>
-            )}
-          </div>
+
+              {objectives.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500 mb-1.5">Requirements</h3>
+                  <ul className="space-y-1.5">
+                    {objectives.map((obj, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
+                        <CheckCircle2 size={12} className="text-accent-cyan mt-0.5 shrink-0" />
+                        <span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {visibleTests.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500 mb-1.5">Visible tests</h3>
+                  <ul className="space-y-1">
+                    {visibleTests.map((t, i) => (
+                      <li key={i} className="flex items-center gap-2 text-xs text-surface-400">
+                        <ListChecks size={11} className="text-surface-500 shrink-0" />
+                        <span className="truncate">{t.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="rounded-lg bg-surface-800/50 border border-surface-700/50 p-3">
+                <p className="text-[11px] text-surface-400 flex items-start gap-1.5">
+                  <EyeOff size={12} className="text-accent-amber mt-0.5 shrink-0" />
+                  <span>
+                    {hiddenCount > 0
+                      ? `${hiddenCount} hidden test${hiddenCount === 1 ? '' : 's'} run on the server when you click Check Solution. Your code must pass every test to solve this scenario.`
+                      : 'Your code is graded on the server. It must pass every test to solve this scenario.'}
+                  </span>
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-accent-purple/5 border border-accent-purple/20 p-3">
+                <p className="text-[11px] text-surface-300 flex items-start gap-1.5">
+                  <Sparkles size={12} className="text-accent-purple mt-0.5 shrink-0" />
+                  <span>
+                    Stuck? Open the <button onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className="text-accent-purple underline">AI Mentor</button> — it explains
+                    errors and what failing tests check, and teaches the concept, without giving away the answer.
+                  </span>
+                </p>
+              </div>
+
+              {!canRunInBrowser && (
+                <div className="rounded-lg bg-accent-amber/5 border border-accent-amber/20 p-3">
+                  <p className="text-[11px] text-accent-amber flex items-start gap-1.5">
+                    <Lightbulb size={12} className="mt-0.5 shrink-0" />
+                    <span>In-browser Run is unavailable for {langLabel}. Use Check Solution — the server runs and grades your code.</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
