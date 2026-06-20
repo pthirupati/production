@@ -118,9 +118,18 @@ export const labApi = {
     return data
   },
 
-  async getLeaderboard(technologyId) {
-    const params = technologyId ? `?technology=${technologyId}` : ''
-    const { data } = await api.get(`/leaderboard/${params}`)
+  // Segmented leaderboard. `opts` = { technology, scope: 'all'|'weekly', pageSize }.
+  // The backend tolerates unknown/garbage params and never 500s.
+  async getLeaderboard(opts = {}) {
+    // Back-compat: a bare technology id/slug may be passed positionally.
+    const { technology, scope, pageSize } =
+      typeof opts === 'object' && opts !== null ? opts : { technology: opts }
+    const params = new URLSearchParams()
+    if (technology) params.set('technology', technology)
+    if (scope && scope !== 'all') params.set('scope', scope)
+    if (pageSize) params.set('page_size', pageSize)
+    const qs = params.toString()
+    const { data } = await api.get(`/leaderboard/${qs ? `?${qs}` : ''}`, { silentError: true })
     return data
   },
 

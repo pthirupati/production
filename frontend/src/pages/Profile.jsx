@@ -19,6 +19,7 @@ import { validators } from '../utils/validators'
 import { SkeletonCard } from '../components/Skeleton'
 import { PageHeader } from '../components/design'
 import { interviewsApi } from '../api/interviews'
+import { XpLevelCard, StreakWidget, BadgeWall } from '../components/engagement'
 
 export default function Profile() {
   const { user } = useAuthStore()
@@ -166,6 +167,13 @@ export default function Profile() {
         title="Profile Settings"
         subtitle="Account, billing, and preferences"
       />
+
+      {/* Engagement snapshot — level, streak, badges (each hides on error) */}
+      <div className="grid sm:grid-cols-2 gap-6">
+        <XpLevelCard />
+        <StreakWidget />
+      </div>
+      <BadgeWall />
 
       <div className="glass-card p-6">
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">

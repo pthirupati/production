@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { labApi } from '../api/labs'
 import { useAuthStore } from '../store/authStore'
 import { useDataStore } from '../store/dataStore'
-import { Trophy, Star, Clock, Crown, Medal, Server } from 'lucide-react'
+import { Trophy, Star, Clock, Crown, Medal, Server, CalendarDays, Infinity as InfinityIcon } from 'lucide-react'
 import Pagination from '../components/Pagination'
 import { PageHeader, FixitPanel } from '../components/design'
 import { SkeletonTable } from '../components/Skeleton'
@@ -147,6 +147,7 @@ export default function Leaderboard() {
   const [data, setData] = useState({ leaderboard: [], user_rank: null })
   const [technologies, setTechnologies] = useState([])
   const [selectedTech, setSelectedTech] = useState('')
+  const [scope, setScope] = useState('all') // 'all' (lifetime) | 'weekly'
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
 
@@ -157,11 +158,13 @@ export default function Leaderboard() {
   useEffect(() => {
     setLoading(true)
     setPage(1)
-    labApi.getLeaderboard(selectedTech || undefined)
+    // Backend supports scope=weekly|all and a technology filter; it tolerates
+    // unknown params and never 500s, so a failure just leaves the board empty.
+    labApi.getLeaderboard({ technology: selectedTech || undefined, scope })
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [selectedTech])
+  }, [selectedTech, scope])
 
   const leaderboard = data.leaderboard || []
   const top3 = leaderboard.slice(0, 3)
@@ -173,8 +176,28 @@ export default function Leaderboard() {
       <PageHeader
         eyebrow="Rankings"
         title="Leaderboard"
-        subtitle="Top fixers ranked by total score"
+        subtitle={scope === 'weekly' ? 'Top fixers this week' : 'Top fixers ranked by total score'}
       />
+
+      {/* Scope tabs: All-time | Weekly */}
+      <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-surface-800/60 border border-surface-700/60">
+        {[
+          { key: 'all', label: 'All-time', icon: InfinityIcon },
+          { key: 'weekly', label: 'This Week', icon: CalendarDays },
+        ].map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setScope(key)}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              scope === key
+                ? 'bg-accent-cyan/15 text-accent-cyan shadow-sm'
+                : 'text-surface-400 hover:text-white'
+            }`}
+          >
+            <Icon size={13} /> {label}
+          </button>
+        ))}
+      </div>
 
       {/* Tech filter chips */}
       <FixitPanel padding="p-4" className="flex gap-2 flex-wrap">
@@ -257,8 +280,14 @@ export default function Leaderboard() {
       ) : leaderboard.length === 0 ? (
         <div className="glass-card p-16 text-center animate-fade-in">
           <Trophy size={44} className="text-surface-700 mx-auto mb-4" />
-          <p className="text-white font-bold text-lg mb-1">No entries yet</p>
-          <p className="text-surface-500 text-sm">Be the first to claim the top spot!</p>
+          <p className="text-white font-bold text-lg mb-1">
+            {scope === 'weekly' ? 'No solves this week yet' : 'No entries yet'}
+          </p>
+          <p className="text-surface-500 text-sm">
+            {scope === 'weekly'
+              ? 'Solve a scenario in the last 7 days to appear on the weekly board!'
+              : 'Be the first to claim the top spot!'}
+          </p>
         </div>
       ) : (
         <div className="space-y-6 animate-fade-in">
@@ -304,9 +333,11 @@ export default function Leaderboard() {
                       <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold text-surface-500 uppercase tracking-wider text-right">
                         Solved
                       </th>
-                      <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold text-surface-500 uppercase tracking-wider text-right hidden sm:table-cell">
-                        Avg Time
-                      </th>
+                      {scope !== 'weekly' && (
+                        <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold text-surface-500 uppercase tracking-wider text-right hidden sm:table-cell">
+                          Avg Time
+                        </th>
+                      )}
                       <th className="px-4 sm:px-5 py-3 text-[11px] font-semibold text-surface-500 uppercase tracking-wider text-right">
                         Score
                       </th>
@@ -354,12 +385,14 @@ export default function Leaderboard() {
                               {entry.scenarios_completed ?? 0}
                             </span>
                           </td>
-                          <td className="px-4 sm:px-5 py-3 text-right hidden sm:table-cell">
-                            <span className="text-sm text-surface-500 flex items-center justify-end gap-1">
-                              <Clock size={11} className="shrink-0" />
-                              {formatTime(entry.avg_time)}
-                            </span>
-                          </td>
+                          {scope !== 'weekly' && (
+                            <td className="px-4 sm:px-5 py-3 text-right hidden sm:table-cell">
+                              <span className="text-sm text-surface-500 flex items-center justify-end gap-1">
+                                <Clock size={11} className="shrink-0" />
+                                {formatTime(entry.avg_time)}
+                              </span>
+                            </td>
+                          )}
                           <td className="px-4 sm:px-5 py-3 text-right">
                             <span className={`
                               font-mono font-black tabular-nums

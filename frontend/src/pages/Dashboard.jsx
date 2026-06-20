@@ -18,6 +18,7 @@ import { ACHIEVEMENT_META } from '../utils/constants'
 import ActivityHeatmap from '../components/ActivityHeatmap'
 import OnboardingTour from '../components/OnboardingTour'
 import { FixitPanel, FixitStatCard } from '../components/design'
+import { DailyChallengeCard, StreakWidget, XpLevelCard } from '../components/engagement'
 
 function OnboardingChecklist({ subscriptions, progress, jiraTickets, interviewEntitlement }) {
   const [dismissed, setDismissed] = useState(
@@ -339,6 +340,9 @@ export default function Dashboard() {
         </Link>
       )}
 
+      {/* Today's Challenge — deterministic daily pick (hides gracefully on error) */}
+      <DailyChallengeCard />
+
       {/* ═══ STAT CARDS ═══ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map(({ label, value, icon, color, bg }, idx) => (
@@ -618,6 +622,9 @@ export default function Dashboard() {
           </FixitPanel>
         </div>
         <div className="space-y-6">
+          {/* Engagement: XP/level + streak (both hide gracefully on error) */}
+          <XpLevelCard />
+          <StreakWidget />
           <FixitPanel className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-accent-amber/[0.04] via-transparent to-accent-pink/[0.03] pointer-events-none" />
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 relative">

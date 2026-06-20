@@ -261,6 +261,51 @@ All `FREE`. Each is small, self-contained, and improves perceived quality or eng
 
 ---
 
+## 6. Implementation status
+
+Status of every roadmap item (§4) and quick win (§5) as built in the codebase.
+Legend: ✅ **Implemented** · 🟡 **Partial** · ⬜ **Not implemented**. Evidence
+points at the files that back each claim. All work below is **FREE** (no paid
+API): engagement endpoints reuse existing models, the leaderboard segments an
+existing query, the IDE features are client-side, and CI scanning uses
+pip-audit / `npm audit`.
+
+### Roadmap (§4) — Next 10 highest-ROI
+
+| # | Improvement | Status | Evidence |
+|---|---|---|---|
+| 1 | Guided step→verify lab tracks | 🟡 Partial | `LearningPath` carries ordered steps `[{title, scenario_slug, description}]` (`backend/apps/question_bank/models.py`) and there are end-to-end guided **projects** driven by Jira tickets, but there is no in-lab per-step CHECK with a persistent instructions pane beside the terminal yet. |
+| 2 | Timed exam mode + blueprints + answer key | ⬜ Not implemented | No `exam_mode` / blueprint model or UI. (Per-scenario `solution_explanation` exists post-solve, but no curated timed exam set.) |
+| 3 | Daily challenge + streak calendar + XP/levels | ✅ Implemented | Endpoints `backend/apps/public_api/engagement.py` (`DailyChallengeView`, `StreakView`, `XpView`); XP/streak persisted on completion (`apps/progress/services.py` `compute_level`/`compute_current_streak`, `apps/jira_integration/completion.py`). Frontend: `DailyChallengeCard`, `StreakWidget`, `XpLevelCard` (`frontend/src/components/engagement/`) wired into Dashboard + Profile. |
+| 4 | Skill tree / role tracks UI | ⬜ Not implemented | `LearningPathProgress` data exists but no skill-tree/prereq UI is built. (Difficulty laddering on catalog pages is done — see quick win #4.) |
+| 5 | In-browser cloud console sim (AWS) | ⬜ Not implemented | No AWS/IAM/EC2/S3 console sim app. (VMware simulator exists as a separate sim.) |
+| 6 | Live coding + hands-on lab interview rounds | ✅ Implemented | `backend/apps/interviews/services/practical_lab.py` provisions real `LabSession`s for interview practical segments via `apps.labs.sessions.start_lab_session`; wired through interview views/serializers. |
+| 7 | CI/CD pipeline sim + Prometheus/Grafana observability sim | ⬜ Not implemented | No CI/CD or observability simulation modules under `apps/labs/provisioner/simulation/`. |
+| 8 | Code IDE depth: autosave/resume + bash & SQL grading + first-failing-test | 🟡 Partial | **Autosave/resume** ✅ and **first-failing-test panel** ✅ shipped this session (`frontend/src/components/ide/CodingIDE.jsx`). **Bash/SQL auto-grading** ⬜ still pending — bash stays in `NEEDS_REVIEW_LANGUAGES` (`backend/apps/labs/code_exec.py`); only Python + JavaScript auto-grade. |
+| 9 | Weekly contests + learning campaigns | ⬜ Not implemented | Ads `Campaigns` admin exists, but no learning-contest model reusing it. (Weekly **leaderboard** scope is done — see quick win #11.) |
+| 10 | Sandbox + WebSocket terminal security hardening | 🟡 Partial | Code-exec sandbox runs with resource caps and a fail-closed grader (`backend/apps/labs/code_exec.py`); `tests.test_api_security` runs in CI. Dedicated fail-closed escape/DoS regression suite for the terminal not yet exhaustive. |
+
+### Quick wins (§5)
+
+| # | Quick win | Status | Evidence |
+|---|---|---|---|
+| 1 | Streak calendar widget | ✅ Implemented | `StreakWidget` (heatmap + current/longest streak) on Dashboard + Profile, fed by `/api/streak/`. |
+| 2 | "Today's challenge" surface | ✅ Implemented | `DailyChallengeCard` on Dashboard, fed by `/api/daily-challenge/` (deterministic by date, fails closed). |
+| 3 | Badge wall on the profile | ✅ Implemented | `BadgeWall` (`frontend/src/components/engagement/BadgeWall.jsx`) renders `/api/achievements/` + `ACHIEVEMENT_META` as a badge grid on Profile. |
+| 4 | Difficulty ladder per page | ✅ Implemented | `Scenarios.jsx` groups results easy→medium→hard into sections; `TechnologyDetail.jsx` groups + difficulty-codes scenarios. |
+| 5 | First-failing-testcase panel in IDE | ✅ Implemented | `CodingIDE.jsx` surfaces the first **visible** failing test (name + grader message) prominently; hidden-test internals are never revealed (`firstFailingVisible`). |
+| 6 | Vim keymap + format-on-save toggle | ⬜ Not implemented | `CodeEditor.jsx` has no `@replit/codemirror-vim` / Prettier integration. |
+| 7 | Autosave code to localStorage | ✅ Implemented | `CodingIDE.jsx` debounces editable files to `localStorage` keyed by session, restores on mount, shows a "Saved" indicator, clears on solve. |
+| 8 | Filler-word / talk-time interview stats | ✅ Implemented | Computed from the STT transcript + timing (`backend/apps/interviews/services/stt_service.py`, `llm_engine.py`), no paid API. |
+| 9 | Per-scenario stats chip | ✅ Implemented | `ScenarioStatsChip` (`frontend/src/components/engagement/`) on scenario cards (from list-serializer fields, zero extra requests) and ScenarioDetail (self-fetches `/api/scenarios/<slug>/stats/`). Safe defaults; hides if no data. |
+| 10 | Promote bash to auto-gradable | ⬜ Not implemented | Bash/shell remain in `NEEDS_REVIEW_LANGUAGES` (`backend/apps/labs/code_exec.py`); no bash harness/tests yet. |
+| 11 | Segment the leaderboard (Weekly + Per-tech) | ✅ Implemented | `LeaderboardView` supports `scope=weekly|all` + `technology` (`backend/apps/public_api/views.py`); `Leaderboard.jsx` adds All-time/This-Week tabs over the existing tech chips. |
+| 12 | Post-solve editorial / answer key | 🟡 Partial | ScenarioDetail renders `solution_explanation` after a pass; no dedicated rich "editorial" field/curation pass yet. |
+| 13 | Status/SLO tile + Sentry release health | 🟡 Partial | `AdminMonitoring.jsx` includes status/uptime/Sentry signals; full Sentry release-health tile not fully built out. |
+| 14 | CI dependency scanning | ✅ Implemented | `.github/workflows/dependency-scan.yml` runs `pip-audit` (Python) + `npm audit` (frontend), advisory (`continue-on-error`) so it never blocks CI; triggers weekly + on manifest changes. |
+
+---
+
 ## Appendix — Sources
 
 Competitor research (WebSearch / vendor pages):

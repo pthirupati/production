@@ -13,6 +13,7 @@ import Pagination from '../components/Pagination'
 import StickyPageToolbar from '../components/StickyPageToolbar'
 import { useScrollHideToolbar } from '../hooks/useScrollHideToolbar'
 import { PageHeader } from '../components/design'
+import { ScenarioStatsChip } from '../components/engagement'
 
 const typeConfig = {
   fix:  { icon: Wrench,  label: 'Fix',  color: 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20',    border: 'border-l-accent-cyan',   glow: 'hover:shadow-[0_0_20px_rgba(6,182,212,0.06)]' },
@@ -63,6 +64,19 @@ function ScenarioCard({ scenario, index, isAuthenticated, onBookmark }) {
   const attempted = !solved && (scenario.user_progress?.attempts ?? 0) > 0
   const bestScore = scenario.user_progress?.best_score
 
+  // Per-scenario stats chip, synthesized from list-serializer fields already on
+  // the card (no extra request). Fail rate is derived from raw attempt/completion
+  // counts (both real model fields), falling back to the pass-rate complement.
+  // Hidden by the chip itself when there's no meaningful data.
+  const cardStats = scenario.attempts_count > 0 ? {
+    learners: scenario.attempts_count,
+    solved: scenario.completions_count,
+    avg_solve_seconds: null,
+    fail_rate_pct: scenario.completions_count != null
+      ? Math.max(0, Math.round((scenario.attempts_count - scenario.completions_count) / scenario.attempts_count * 100))
+      : (scenario.completion_rate != null ? Math.max(0, 100 - scenario.completion_rate) : 0),
+  } : null
+
   return (
     <Link
       to={`/scenarios/${scenario.slug}`}
@@ -111,6 +125,9 @@ function ScenarioCard({ scenario, index, isAuthenticated, onBookmark }) {
               </span>
             ))}
           </div>
+        )}
+        {cardStats && (
+          <ScenarioStatsChip stats={cardStats} className="mt-1.5 hidden sm:flex" />
         )}
       </div>
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Play, CheckCircle2, XCircle, FileCode, Loader2, Terminal as TerminalIcon,
   ListChecks, FileText, Lightbulb, Lock, EyeOff, AlertTriangle, Trophy,
-  Sparkles, Search, Sun, Moon, ZoomIn, ZoomOut, Bug, ScrollText,
+  Sparkles, Search, Sun, Moon, ZoomIn, ZoomOut, Bug, ScrollText, Save,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CodeEditor from './CodeEditor'
@@ -25,6 +25,45 @@ function fileName(path) {
 function tsLine(text) {
   const t = new Date().toLocaleTimeString()
   return `[${t}] ${text}`
+}
+
+// localStorage key for per-session autosaved drafts. Keyed by lab session so a
+// reload (or accidental navigation) restores the exact in-progress files.
+const draftKey = (sessionId) => `fixitlab:ide-draft:${sessionId}`
+
+function loadDraft(sessionId) {
+  try {
+    const raw = localStorage.getItem(draftKey(sessionId))
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed.files === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function saveDraft(sessionId, files) {
+  try {
+    localStorage.setItem(draftKey(sessionId), JSON.stringify({ files, ts: Date.now() }))
+    return true
+  } catch {
+    return false // quota / private mode — autosave silently degrades
+  }
+}
+
+function clearDraft(sessionId) {
+  try { localStorage.removeItem(draftKey(sessionId)) } catch { /* noop */ }
+}
+
+/**
+ * First FAILING VISIBLE test from a graded result. Hidden tests are never
+ * surfaced (no names/expected/actual) — only the message is shown for visible
+ * failures, reusing the grader output already returned. Returns null if the
+ * first failure is hidden or everything visible passed.
+ */
+function firstFailingVisible(tests) {
+  if (!Array.isArray(tests)) return null
+  return tests.find((t) => !t.passed && !t.hidden) || null
 }
 
 /** Small status pill for a single test row. */
@@ -96,6 +135,13 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const [checking, setChecking] = useState(false)
   const [pyLoading, setPyLoading] = useState(false)
   const [solved, setSolved] = useState(solvedProp)
+  const [savedAt, setSavedAt] = useState(null)   // last autosave timestamp (ms)
+  // Guards so we only persist AFTER the spec has loaded + any draft restored,
+  // never overwriting a saved draft with the initial server template. `dirtyRef`
+  // gates autosave on a genuine edit so the "Saved" badge isn't shown before the
+  // user has typed anything.
+  const hydratedRef = useRef(false)
+  const dirtyRef = useRef(false)
 
   // Right panel: 'instructions' | 'mentor'
   const [rightTab, setRightTab] = useState('instructions')
@@ -135,8 +181,28 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           fileMap[f.path] = f.content || ''
           if (f.readonly) ro.add(f.path)
         })
+        // Restore autosaved drafts: overlay saved content for editable files
+        // that still exist in the spec, so a reload doesn't lose work. Readonly
+        // (scaffold) files always come from the server.
+        const draft = loadDraft(sessionId)
+        if (draft?.files) {
+          let restored = false
+          Object.entries(draft.files).forEach(([path, content]) => {
+            if (path in fileMap && !ro.has(path) && typeof content === 'string' && content !== fileMap[path]) {
+              fileMap[path] = content
+              restored = true
+            }
+          })
+          if (restored) {
+            setSavedAt(draft.ts || Date.now())
+            appendTerminal('restored your autosaved work from this browser')
+          }
+        }
         setFiles(fileMap)
         setReadonlyPaths(ro)
+        // Mark hydrated on the next tick so the save-effect doesn't immediately
+        // re-persist the initial state (it only fires on genuine edits after).
+        hydratedRef.current = true
         const entry = s.entrypoint && fileMap[s.entrypoint] !== undefined
           ? s.entrypoint
           : Object.keys(fileMap)[0] || ''
@@ -150,6 +216,20 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [sessionId])
+
+  // ── Autosave editable files to localStorage (debounced) ──
+  useEffect(() => {
+    if (!hydratedRef.current || loading || !dirtyRef.current) return
+    const editable = {}
+    Object.keys(files).forEach((p) => {
+      if (!readonlyPaths.has(p)) editable[p] = files[p]
+    })
+    if (Object.keys(editable).length === 0) return
+    const id = setTimeout(() => {
+      if (saveDraft(sessionId, editable)) setSavedAt(Date.now())
+    }, 600)
+    return () => clearTimeout(id)
+  }, [files, readonlyPaths, sessionId, loading])
 
   const entrypoint = useMemo(() => {
     if (spec?.entrypoint && files[spec.entrypoint] !== undefined) return spec.entrypoint
@@ -166,7 +246,11 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
 
   const handleEditorChange = useCallback((text) => {
     if (!activePath) return
-    setFiles((prev) => (prev[activePath] === text ? prev : { ...prev, [activePath]: text }))
+    setFiles((prev) => {
+      if (prev[activePath] === text) return prev
+      dirtyRef.current = true   // genuine edit — enable autosave
+      return { ...prev, [activePath]: text }
+    })
   }, [activePath])
 
   const isJs = ['javascript', 'js', 'node', 'nodejs'].includes((language || '').toLowerCase())
@@ -289,6 +373,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       }
       if (result.passed) {
         setSolved(true)
+        clearDraft(sessionId)  // solved — discard the autosaved draft
         appendTerminal('server: ALL TESTS PASSED — solved')
         toast.success(result.message || 'All tests passed! Challenge solved.', { duration: 6000 })
         onSolved?.(result)
@@ -444,7 +529,15 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           <Sparkles size={13} /> <span className="hidden md:inline">Mentor</span>
         </button>
 
-        <span className="ml-auto text-[11px] text-surface-500 hidden lg:flex items-center gap-1">
+        {savedAt && !solved && (
+          <span
+            className="ml-auto flex items-center gap-1 text-[11px] text-accent-green/80"
+            title={`Your work is autosaved in this browser · ${new Date(savedAt).toLocaleTimeString()}`}
+          >
+            <Save size={11} /> <span className="hidden sm:inline">Saved</span>
+          </span>
+        )}
+        <span className={`text-[11px] text-surface-500 hidden lg:flex items-center gap-1 ${savedAt && !solved ? '' : 'ml-auto'}`}>
           <EyeOff size={11} /> {hiddenCount} hidden test{hiddenCount === 1 ? '' : 's'} run on the server
         </span>
       </div>
@@ -558,6 +651,41 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
                           </span>
                         )}
                       </div>
+
+                      {/* First failing VISIBLE test, surfaced prominently. Hidden
+                          test internals are never shown — only visible failures. */}
+                      {(() => {
+                        const fail = firstFailingVisible(testResults.tests)
+                        if (!fail) return null
+                        return (
+                          <div className="rounded-lg border border-accent-red/30 bg-accent-red/[0.07] p-2.5 mb-1.5">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <XCircle size={13} className="text-accent-red shrink-0" />
+                              <span className="text-[11px] font-semibold uppercase tracking-wider text-accent-red">
+                                First failing test
+                              </span>
+                            </div>
+                            <p className="text-xs font-mono font-medium text-surface-100 break-words">{fail.name}</p>
+                            {fail.message ? (
+                              <p className="mt-1.5 text-[11px] font-mono text-accent-red/90 break-words whitespace-pre-wrap">
+                                {fail.message}
+                              </p>
+                            ) : (
+                              <p className="mt-1.5 text-[11px] text-surface-400">
+                                This assertion didn't hold. Check your output against what this test expects.
+                              </p>
+                            )}
+                            <button
+                              onClick={() => askMentor('tests')}
+                              disabled={mentorLoading}
+                              className="mt-2 flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium border border-accent-purple/40 text-accent-purple hover:bg-accent-purple/10 disabled:opacity-50"
+                            >
+                              <Sparkles size={11} /> Why did this fail?
+                            </button>
+                          </div>
+                        )
+                      })()}
+
                       {(testResults.tests || []).map((t, i) => (
                         <TestRow key={i} {...t} />
                       ))}

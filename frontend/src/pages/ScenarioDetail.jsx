@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader } from '../components/design'
+import { ScenarioStatsChip } from '../components/engagement'
 
 const typeConfig = {
   fix: { icon: Wrench, label: 'Fix', desc: 'Find and fix the broken service' },
@@ -339,6 +340,9 @@ export default function ScenarioDetail() {
             <StatPill icon={Star}>{avgRating} avg rating</StatPill>
           )}
         </div>
+
+        {/* Community solve stats — avg time / learners / fail rate (hides if none) */}
+        <ScenarioStatsChip slug={scenario.slug} className="mt-3" />
 
         {scenario.tags?.length > 0 && (
           <div className="flex gap-2 mt-4 flex-wrap">
