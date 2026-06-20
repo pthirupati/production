@@ -1,0 +1,28 @@
+title: RHEL Excessive Swapping Under Load
+slug: rhel-sysctl-swappiness
+technology: RHEL Linux
+category: Tuning
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A DB host swaps excessively because vm.swappiness is too high.
+initial_state: A RHEL host with high swappiness hurting a DB.
+objectives:
+- 'Confirm the issue: Heavy swap under memory load'
+- Apply the documented fix in /etc/sysctl.d/99-vm.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Heavy swap under memory load
+- order: 2
+  cost: 15
+  content: Lower vm.swappiness appropriately.
+- order: 3
+  cost: 20
+  content: /etc/sysctl.d/99-vm.conf carries the corrected configuration.

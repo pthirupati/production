@@ -1,0 +1,29 @@
+title: NTP Not Failing Over to Backup
+slug: networking-ntp-server-down-failover
+technology: Networking
+category: Time / NTP
+difficulty: medium
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Time sync is lost because the primary NTP server is down and no backup source is configured.
+  Add a backup source and confirm synchronization.
+initial_state: A host with a single NTP source that has failed, leaving chrony unsynchronized.
+objectives:
+- 'Confirm the issue: chronyc tracking shows not synchronised.'
+- Apply the documented fix
+- Verify the network is healthy
+hints:
+- order: 1
+  cost: 10
+  content: chronyc tracking shows not synchronised.
+- order: 2
+  cost: 15
+  content: Fix the NTP source/reachability and resync.
+- order: 3
+  cost: 20
+  content: The session/sync/MTU is healthy.

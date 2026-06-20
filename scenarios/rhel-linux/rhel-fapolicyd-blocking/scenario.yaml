@@ -1,0 +1,28 @@
+title: RHEL fapolicyd Blocking Legit Binary
+slug: rhel-fapolicyd-blocking
+technology: RHEL Linux
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A legitimate application binary is blocked by fapolicyd allowlisting.
+initial_state: A RHEL host where fapolicyd blocks a valid binary.
+objectives:
+- 'Confirm the issue: App blocked by fapolicyd'
+- Apply the documented fix in /etc/fapolicyd/fapolicyd.rules
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: App blocked by fapolicyd
+- order: 2
+  cost: 15
+  content: Allowlist the binary in fapolicyd rules.
+- order: 3
+  cost: 20
+  content: /etc/fapolicyd/fapolicyd.rules carries the corrected configuration.

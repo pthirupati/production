@@ -1,0 +1,28 @@
+title: PostgreSQL Standby Not Allowing Reads
+slug: db-postgres-hot-standby-off
+technology: Database
+category: Replication
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Read queries on the standby are rejected because hot_standby is off.
+initial_state: A PostgreSQL standby with hot_standby disabled.
+objectives:
+- 'Confirm the issue: Standby refuses read queries'
+- Apply the documented fix in /var/lib/pgsql/data/postgresql.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Standby refuses read queries
+- order: 2
+  cost: 15
+  content: Enable hot_standby and restart.
+- order: 3
+  cost: 20
+  content: /var/lib/pgsql/data/postgresql.conf carries the corrected configuration.

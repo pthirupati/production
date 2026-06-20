@@ -1,0 +1,29 @@
+title: CI Pipeline Pushing Broken Image Tag
+slug: devops-ci-pipeline-bad-image-tag
+technology: DevOps
+category: CI/CD
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The pipeline deploys a 'broken' image tag because a variable was overwritten, so deploys
+  fail health checks. Fix the image tag variable and confirm the pipeline succeeds.
+initial_state: A CI/CD pipeline whose deploy stage references a bad image tag, failing the deployment.
+objectives:
+- Confirm the deploy stage uses a broken image tag
+- Restore the correct image tag variable
+- Verify the pipeline passes
+hints:
+- order: 1
+  cost: 10
+  content: Pipeline deploy fails referencing image 'broken'.
+- order: 2
+  cost: 15
+  content: Correct the image tag variable to a valid release; redeploy.
+- order: 3
+  cost: 20
+  content: Pipeline green.

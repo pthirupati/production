@@ -1,0 +1,29 @@
+title: CI/CD Pipeline Runner Out of Disk
+slug: devops-ci-pipeline-runner-disk
+technology: DevOps
+category: CI/CD
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The CI pipeline fails because the runner host filled its disk with build caches and Docker
+  layers, so the deploy stage errors. Clean up and fix the pipeline so it passes.
+initial_state: A CI/CD pipeline failing because the build/deploy runner is out of disk space.
+objectives:
+- Confirm the pipeline is failing from a full runner
+- Reclaim space and re-run the deploy
+- Verify the pipeline passes
+hints:
+- order: 1
+  cost: 10
+  content: Pipeline deploy stage errors; runner disk full.
+- order: 2
+  cost: 15
+  content: Prune caches/images and fix the deploy variables; redeploy.
+- order: 3
+  cost: 20
+  content: Pipeline passes.

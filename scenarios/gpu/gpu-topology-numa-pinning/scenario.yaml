@@ -1,0 +1,28 @@
+title: GPU Jobs Not NUMA-Pinned
+slug: gpu-topology-numa-pinning
+technology: GPU
+category: Performance
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: GPU throughput is low because processes aren't pinned to the NUMA node local to the GPU.
+initial_state: A GPU host without GPU-NUMA affinity pinning.
+objectives:
+- 'Confirm the issue: Cross-NUMA GPU access'
+- Apply the documented fix in /etc/gpu/numa-pinning.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Cross-NUMA GPU access
+- order: 2
+  cost: 15
+  content: Pin processes to the GPU-local NUMA node.
+- order: 3
+  cost: 20
+  content: /etc/gpu/numa-pinning.conf carries the corrected configuration.

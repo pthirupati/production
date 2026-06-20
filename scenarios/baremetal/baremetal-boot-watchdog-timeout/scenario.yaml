@@ -1,0 +1,29 @@
+title: Boot Watchdog Resetting Slow Boots
+slug: baremetal-boot-watchdog-timeout
+technology: Bare Metal
+category: Boot
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A server with slow storage keeps resetting during boot because the boot watchdog timeout
+  is too short.
+initial_state: A server whose boot watchdog fires before boot completes.
+objectives:
+- 'Confirm the issue: Reboot loop during long boots'
+- Apply the documented fix in /etc/bmc/boot-watchdog.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Reboot loop during long boots
+- order: 2
+  cost: 15
+  content: Lengthen the boot watchdog timeout.
+- order: 3
+  cost: 20
+  content: /etc/bmc/boot-watchdog.cfg carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Script Runs Under Wrong Interpreter
+slug: shell-no-shebang
+technology: Shell Scripting
+category: Portability
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A bash-specific script breaks because it has no shebang and runs under sh.
+initial_state: An ops script missing a shebang line.
+objectives:
+- 'Confirm the issue: Bashisms fail under sh'
+- Apply the documented fix in /opt/scripts/no-shebang.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Bashisms fail under sh
+- order: 2
+  cost: 15
+  content: 'Add #!/bin/bash shebang.'
+- order: 3
+  cost: 20
+  content: /opt/scripts/no-shebang.sh carries the corrected configuration.

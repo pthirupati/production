@@ -1,0 +1,29 @@
+title: ImagePullBackOff from Wrong Registry Tag
+slug: k8s-imagepull-wrong-tag
+technology: Kubernetes
+category: Workloads
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Deployment is in ImagePullBackOff because it references an image tag that doesn't exist
+  in the registry. Set a valid tag and confirm pods run.
+initial_state: A Kubernetes Deployment stuck in ImagePullBackOff due to a non-existent image tag.
+objectives:
+- Confirm pods are in ImagePullBackOff
+- Set the deployment image to a valid tag
+- Verify pods are Running
+hints:
+- order: 1
+  cost: 10
+  content: kubectl describe pod shows manifest unknown / not found.
+- order: 2
+  cost: 15
+  content: kubectl set image to a valid tag.
+- order: 3
+  cost: 20
+  content: Pods Running.

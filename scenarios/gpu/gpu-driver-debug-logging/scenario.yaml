@@ -1,0 +1,28 @@
+title: GPU Driver Verbose Logging Filling Disk
+slug: gpu-driver-debug-logging
+technology: GPU
+category: Logging
+difficulty: easy
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The disk fills because GPU driver debug logging was left on.
+initial_state: A GPU host with driver debug logging enabled.
+objectives:
+- 'Confirm the issue: Disk filling with driver logs'
+- Apply the documented fix in /etc/gpu/driver-logging.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Disk filling with driver logs
+- order: 2
+  cost: 15
+  content: Disable driver debug logging.
+- order: 3
+  cost: 20
+  content: /etc/gpu/driver-logging.conf carries the corrected configuration.

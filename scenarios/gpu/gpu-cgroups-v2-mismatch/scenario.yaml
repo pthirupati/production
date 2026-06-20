@@ -1,0 +1,28 @@
+title: GPU Containers Broken on cgroups v2
+slug: gpu-cgroups-v2-mismatch
+technology: GPU
+category: Containers
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: GPU containers break after the host moved to cgroups v2 with the wrong runtime config.
+initial_state: A GPU host whose container runtime config is wrong for cgroups v2.
+objectives:
+- 'Confirm the issue: GPU not visible under cgroups v2'
+- Apply the documented fix in /etc/nvidia-container-runtime/config.toml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: GPU not visible under cgroups v2
+- order: 2
+  cost: 15
+  content: Update the runtime config for cgroups v2.
+- order: 3
+  cost: 20
+  content: /etc/nvidia-container-runtime/config.toml carries the corrected configuration.

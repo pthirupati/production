@@ -1,0 +1,28 @@
+title: Redis Latency From Transparent Huge Pages
+slug: db-redis-thp-warning
+technology: Database
+category: Performance
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Redis logs warn about latency from transparent huge pages.
+initial_state: A Redis host with THP enabled, causing latency.
+objectives:
+- 'Confirm the issue: Redis warns about THP'
+- Apply the documented fix in /etc/redis/redis-tuning.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Redis warns about THP
+- order: 2
+  cost: 15
+  content: Disable THP and persist the setting.
+- order: 3
+  cost: 20
+  content: /etc/redis/redis-tuning.conf carries the corrected configuration.

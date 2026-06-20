@@ -1,0 +1,29 @@
+title: Metrics Script Divides by Zero
+slug: shell-arith-division-zero
+technology: Shell-script
+category: Arithmetic
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A metrics script crashes when a denominator is zero because it doesn't guard the division.
+  Add a guard and confirm the script is corrected.
+initial_state: An ops shell script that performs arithmetic without guarding a zero denominator.
+objectives:
+- Confirm a divide-by-zero crash
+- Guard the denominator before dividing
+- Verify the script is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Division by 0 error when count=0.
+- order: 2
+  cost: 15
+  content: Check the denominator is non-zero first.
+- order: 3
+  cost: 20
+  content: Script carries the corrected guard.

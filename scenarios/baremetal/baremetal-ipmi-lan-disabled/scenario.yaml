@@ -1,0 +1,28 @@
+title: BMC Remote Management Disabled
+slug: baremetal-ipmi-lan-disabled
+technology: Bare Metal
+category: BMC
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Out-of-band management is unreachable because the BMC LAN channel is disabled.
+initial_state: A server whose BMC LAN channel is turned off.
+objectives:
+- 'Confirm the issue: ipmitool over LAN fails'
+- Apply the documented fix in /etc/bmc/lan-channel.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: ipmitool over LAN fails
+- order: 2
+  cost: 15
+  content: Enable the BMC LAN channel.
+- order: 3
+  cost: 20
+  content: /etc/bmc/lan-channel.cfg carries the corrected configuration.

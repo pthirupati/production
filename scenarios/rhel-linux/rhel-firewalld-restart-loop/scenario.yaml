@@ -1,0 +1,28 @@
+title: RHEL firewalld Crash Looping
+slug: rhel-firewalld-restart-loop
+technology: RHEL Linux
+category: Firewall
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: firewalld keeps failing after a bad rule, leaving policy unmanaged.
+initial_state: A RHEL host where firewalld fails to stay running.
+objectives:
+- Confirm firewalld is down (firewalld restarts repeatedly)
+- Resolve the cause and start firewalld
+- Verify firewalld is active
+hints:
+- order: 1
+  cost: 10
+  content: firewalld restarts repeatedly
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start firewalld.'
+- order: 3
+  cost: 20
+  content: systemctl is-active firewalld returns active.

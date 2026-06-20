@@ -1,0 +1,74 @@
+title: 'Log Analysis: Fix the KeyError from the Traceback'
+slug: py-logfix-keyerror-config
+category: Python Development
+description: 'Production logged: `KeyError: ''timeout''` raised from get_setting() when a key is absent.
+  The function should return a provided default instead of crashing on a missing key. Read the traceback
+  in the comment and fix the lookup.'
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Read the traceback to identify the failing lookup
+- Use a safe dict lookup with a default
+- Return the default for missing keys without raising
+initial_state: 'Production logged: `KeyError: ''timeout''` raised from get_setting() when a key is absent.
+  The function should return a provided default instead of crashing on a missing key. Read the traceback
+  in the comment and fix the lookup.'
+solution_explanation: |
+  Subscript access raises KeyError for absent keys. dict.get(key, default) returns the fallback while still returning stored falsy values like 0.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: logfix
+  instructions: |
+    Fix get_setting(config, key, default) so it returns config[key] when present, otherwise `default`. The log shows it currently raises KeyError on missing keys.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      # Production traceback:
+      #   File "app.py", line 12, in handle_request
+      #     t = get_setting(cfg, 'timeout', 30)
+      #   File "settings.py", line 4, in get_setting
+      #     return config[key]
+      # KeyError: 'timeout'
+
+      def get_setting(config, key, default):
+          return config[key]   # raises KeyError when key is missing
+    readonly: false
+  visible_tests:
+  - name: present key
+    code: |
+      assert get_setting({'timeout': 5}, 'timeout', 30) == 5
+  - name: missing key uses default
+    code: |
+      assert get_setting({}, 'timeout', 30) == 30
+  hidden_tests:
+  - name: falsy stored value is returned
+    code: |
+      assert get_setting({'retries': 0}, 'retries', 3) == 0
+  - name: missing does not raise
+    code: |
+      r = get_setting({'a': 1}, 'b', 'fallback')
+      assert r == 'fallback'
+  - name: None default
+    code: |
+      assert get_setting({}, 'x', None) is None
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: The traceback points at `return config[key]` — bracket access raises on a missing key.
+- order: 2
+  cost: 20
+  content: dict.get(key, default) returns the default instead of raising.
+- order: 3
+  cost: 30
+  content: Return config.get(key, default).

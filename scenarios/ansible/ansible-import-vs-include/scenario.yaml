@@ -1,0 +1,28 @@
+title: Ansible Tasks Not Tagged Due to include
+slug: ansible-import-vs-include
+technology: Ansible
+category: Reuse
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Tags don't apply to included tasks because include vs import is used incorrectly.
+initial_state: An Ansible play using include where import is needed for tags.
+objectives:
+- 'Confirm the issue: Tags don''t reach included tasks'
+- Apply the documented fix in /home/ansible/include.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Tags don't reach included tasks
+- order: 2
+  cost: 15
+  content: Use import_tasks for static tagging.
+- order: 3
+  cost: 20
+  content: /home/ansible/include.yml carries the corrected configuration.

@@ -1,0 +1,70 @@
+title: Fix the chunk List Splitter
+slug: py-fix-chunk-list
+category: Python Development
+description: chunk(lst, size) splits a list into consecutive chunks of length size (last chunk may be
+  shorter), but the step is hard-coded to 1 instead of size, producing overlapping windows. Fix the step
+  so chunks are non-overlapping.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See overlapping windows instead of clean chunks
+- Step the range by `size`
+- Handle a final short chunk
+initial_state: chunk(lst, size) splits a list into consecutive chunks of length size (last chunk may be
+  shorter), but the step is hard-coded to 1 instead of size, producing overlapping windows. Fix the step
+  so chunks are non-overlapping.
+solution_explanation: |
+  Stepping by 1 creates a sliding window. Stepping by `size` yields disjoint chunks, with slicing handling the short final chunk.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix chunk(lst, size): return a list of consecutive sublists each of length size (the last may be shorter).
+      chunk([1,2,3,4,5], 2) -> [[1,2],[3,4],[5]]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def chunk(lst, size):
+          return [lst[i:i + size] for i in range(0, len(lst))]   # step should be size
+    readonly: false
+  visible_tests:
+  - name: even split
+    code: |
+      assert chunk([1,2,3,4], 2) == [[1,2],[3,4]]
+  - name: uneven split
+    code: |
+      assert chunk([1,2,3,4,5], 2) == [[1,2],[3,4],[5]]
+  hidden_tests:
+  - name: chunk size 3
+    code: |
+      assert chunk([1,2,3,4,5,6,7], 3) == [[1,2,3],[4,5,6],[7]]
+  - name: size larger than list
+    code: |
+      assert chunk([1,2], 5) == [[1,2]]
+  - name: empty list
+    code: |
+      assert chunk([], 3) == []
+  - name: size one
+    code: |
+      assert chunk([1,2,3], 1) == [[1],[2],[3]]
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: chunk([1,2,3,4], 2) currently returns [[1,2],[2,3],[3,4],[4]] — windows overlap.
+- order: 2
+  cost: 20
+  content: The range must advance by `size`, not 1.
+- order: 3
+  cost: 30
+  content: Use range(0, len(lst), size).

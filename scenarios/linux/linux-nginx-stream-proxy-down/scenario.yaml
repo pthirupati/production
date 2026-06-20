@@ -1,0 +1,29 @@
+title: Nginx Stream Proxy Service Down
+slug: linux-nginx-stream-proxy-down
+technology: Linux
+category: Proxy
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An nginx TCP stream proxy fronting a database is down, so clients can't reach the DB through
+  it. Restore nginx.
+initial_state: A Linux host where nginx (running as a stream proxy) is failed.
+objectives:
+- Confirm nginx is down
+- Fix the config and start nginx
+- Verify nginx is active
+hints:
+- order: 1
+  cost: 10
+  content: nginx -t flags an error; service down.
+- order: 2
+  cost: 15
+  content: Fix the stream block and start nginx.
+- order: 3
+  cost: 20
+  content: nginx active.

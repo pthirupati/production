@@ -1,0 +1,29 @@
+title: PgBouncer Pooler Stopped
+slug: db-pgbouncer-down
+technology: Database
+category: PostgreSQL
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The PgBouncer connection pooler stopped, so apps using the pooled port can no longer reach
+  Postgres. Restart the pooler.
+initial_state: A Linux host where the pgbouncer service is failed, breaking pooled DB connections.
+objectives:
+- Confirm pgbouncer is down
+- Fix and start the pooler
+- Verify pgbouncer is active
+hints:
+- order: 1
+  cost: 10
+  content: systemctl status pgbouncer shows failed.
+- order: 2
+  cost: 15
+  content: Correct the ini and start pgbouncer.
+- order: 3
+  cost: 20
+  content: pgbouncer active.

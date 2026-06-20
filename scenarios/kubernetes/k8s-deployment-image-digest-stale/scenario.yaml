@@ -1,0 +1,29 @@
+title: Deployment Pinned to Stale Image Digest
+slug: k8s-deployment-image-digest-stale
+technology: Kubernetes
+category: Workloads
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Deployment is pinned to an old image digest, so a critical fix never ships and pods misbehave.
+  Update the image reference and roll out so pods run the fixed build.
+initial_state: A Kubernetes Deployment pinned to a stale image digest.
+objectives:
+- Confirm the workload is unhealthy
+- Apply the documented fix and roll out
+- Verify all pods are Running
+hints:
+- order: 1
+  cost: 10
+  content: kubectl get pods shows the workload not Running.
+- order: 2
+  cost: 15
+  content: Apply the fix and kubectl rollout restart the deployment.
+- order: 3
+  cost: 20
+  content: All pods Running.

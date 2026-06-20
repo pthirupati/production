@@ -1,0 +1,28 @@
+title: BMC System Event Log Full
+slug: baremetal-sel-full
+technology: Bare Metal
+category: BMC
+difficulty: easy
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: New hardware events aren't recorded because the BMC SEL is full.
+initial_state: A server whose BMC SEL has filled up.
+objectives:
+- 'Confirm the issue: SEL rejects new events'
+- Apply the documented fix in /etc/bmc/sel-policy.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SEL rejects new events
+- order: 2
+  cost: 15
+  content: Clear and configure SEL rotation.
+- order: 3
+  cost: 20
+  content: /etc/bmc/sel-policy.cfg carries the corrected configuration.

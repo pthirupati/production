@@ -1,0 +1,28 @@
+title: Ansible Output Missing Timing Data
+slug: ansible-callback-plugin
+technology: Ansible
+category: Plugins
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Run profiling is missing because the timer callback plugin isn't enabled.
+initial_state: An Ansible config without the profiling callback enabled.
+objectives:
+- 'Confirm the issue: No task timing in output'
+- Apply the documented fix in /home/ansible/ansible.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No task timing in output
+- order: 2
+  cost: 15
+  content: Enable the profile_tasks callback.
+- order: 3
+  cost: 20
+  content: /home/ansible/ansible.cfg carries the corrected configuration.

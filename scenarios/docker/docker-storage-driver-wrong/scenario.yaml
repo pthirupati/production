@@ -1,0 +1,29 @@
+title: Wrong Storage Driver Degrading Docker
+slug: docker-storage-driver-wrong
+technology: Docker
+category: Storage
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Docker performance is poor and layers fail because the storage driver is misconfigured (e.g.
+  vfs on a host that should use overlay2). Set the right driver and confirm the config is corrected.
+initial_state: A host whose Docker storage driver is misconfigured, degrading image/layer operations.
+objectives:
+- Confirm the wrong storage driver
+- Set the appropriate driver (overlay2)
+- Verify the storage config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: docker info shows vfs / errors.
+- order: 2
+  cost: 15
+  content: Set storage-driver overlay2 and reset state.
+- order: 3
+  cost: 20
+  content: storage.conf carries the corrected driver.

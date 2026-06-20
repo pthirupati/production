@@ -1,0 +1,29 @@
+title: IIS Site Binding Conflict
+slug: win-iis-binding-conflict
+technology: Windows Server
+category: IIS
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Two IIS sites fight over the same host header/port binding, so one won't start. Fix the bindings
+  and confirm the site serves.
+initial_state: A Windows IIS server with conflicting site bindings.
+objectives:
+- Confirm the Windows issue
+- Apply the documented fix
+- Verify the issue is resolved
+hints:
+- order: 1
+  cost: 10
+  content: Investigate the affected Windows component.
+- order: 2
+  cost: 15
+  content: Apply the documented Windows fix.
+- order: 3
+  cost: 20
+  content: The component reports healthy.

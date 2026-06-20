@@ -1,0 +1,28 @@
+title: Invalid Nested Interactive Elements
+slug: html-nested-interactive
+technology: HTML
+category: Standards
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Markup is invalid because interactive elements are nested (a within button).
+initial_state: A page nesting interactive elements.
+objectives:
+- 'Confirm the issue: Nested interactive controls'
+- Apply the documented fix in /var/www/html/card.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Nested interactive controls
+- order: 2
+  cost: 15
+  content: Restructure to avoid nesting.
+- order: 3
+  cost: 20
+  content: /var/www/html/card.html carries the corrected markup/config.

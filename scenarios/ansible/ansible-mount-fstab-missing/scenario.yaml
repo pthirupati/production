@@ -1,0 +1,28 @@
+title: Ansible Mount Not Persisted
+slug: ansible-mount-fstab-missing
+technology: Ansible
+category: Modules
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A filesystem mounts but doesn't persist because the mount task state is wrong.
+initial_state: An Ansible mount task that doesn't write fstab.
+objectives:
+- 'Confirm the issue: Mount lost on reboot'
+- Apply the documented fix in /home/ansible/mount.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Mount lost on reboot
+- order: 2
+  cost: 15
+  content: 'Use state: mounted (writes fstab).'
+- order: 3
+  cost: 20
+  content: /home/ansible/mount.yml carries the corrected configuration.

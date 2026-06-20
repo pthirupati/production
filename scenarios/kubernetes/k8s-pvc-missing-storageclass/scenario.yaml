@@ -1,0 +1,30 @@
+title: PVC Pending from Missing StorageClass
+slug: k8s-pvc-missing-storageclass
+technology: Kubernetes
+category: Storage
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A PersistentVolumeClaim is Pending because it references a StorageClass that doesn't exist.
+  Point it at a valid StorageClass and confirm it binds.
+initial_state: A Kubernetes PVC stuck Pending due to a non-existent storageClassName, blocking the dependent
+  pod.
+objectives:
+- Confirm the PVC is Pending on a missing StorageClass
+- Reference a valid StorageClass and re-create
+- Verify the PVC binds and the pod runs
+hints:
+- order: 1
+  cost: 10
+  content: kubectl describe pvc shows storageclass not found.
+- order: 2
+  cost: 15
+  content: Set a valid storageClassName and re-apply.
+- order: 3
+  cost: 20
+  content: PVC Bound.

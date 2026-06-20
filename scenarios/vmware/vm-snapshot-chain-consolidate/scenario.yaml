@@ -1,0 +1,28 @@
+title: Long Snapshot Chain Eating Datastore
+slug: vm-snapshot-chain-consolidate
+category: VMware vSphere
+description: web-prod-01 has a long snapshot chain consuming datastore space and degrading I/O. Consolidate/delete
+  snapshots and confirm the chain is short.
+difficulty: medium
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Confirm web-prod-01 has too many snapshots
+- Consolidate or delete the snapshot chain
+- Verify the snapshot chain is reduced
+initial_state: vCenter shows web-prod-01 with a long snapshot chain.
+hints:
+- order: 1
+  cost: 10
+  content: 'In the vCenter simulator, locate the issue: confirm web-prod-01 has too many snapshots.'
+- order: 2
+  cost: 15
+  content: 'Apply the remediation in the GUI: consolidate or delete the snapshot chain.'
+- order: 3
+  cost: 20
+  content: 'Confirm resolution: verify the snapshot chain is reduced.'

@@ -1,0 +1,29 @@
+title: Wrong DNS Resolver Breaks Lookups
+slug: linux-resolv-conf-wrong
+technology: Linux
+category: DNS
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Name resolution fails because /etc/resolv.conf points at an unreachable DNS server. Set a
+  working resolver and confirm the file is corrected.
+initial_state: A Linux host whose resolv.conf nameserver is wrong/unreachable, breaking DNS.
+objectives:
+- Confirm DNS lookups fail
+- Set a working nameserver
+- Verify resolv.conf is corrected
+hints:
+- order: 1
+  cost: 10
+  content: getent hosts fails for known names.
+- order: 2
+  cost: 15
+  content: Point resolv.conf at a reachable resolver.
+- order: 3
+  cost: 20
+  content: resolv.conf carries the corrected nameserver.

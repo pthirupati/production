@@ -1,0 +1,29 @@
+title: RHEL Services Running Stale Libraries
+slug: rhel-needs-restarting
+technology: RHEL Linux
+category: Patching
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: After patching, services still run with old shared libraries (needs-restarting) creating
+  a security gap.
+initial_state: A RHEL host running stale libs after a patch.
+objectives:
+- 'Confirm the issue: needs-restarting lists stale services'
+- Apply the documented fix in /etc/rhel-patch-policy.conf
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: needs-restarting lists stale services
+- order: 2
+  cost: 15
+  content: Restart the affected services or set the dnf needs-restarting policy.
+- order: 3
+  cost: 20
+  content: /etc/rhel-patch-policy.conf carries the corrected markup/config.

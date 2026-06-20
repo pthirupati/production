@@ -1,0 +1,68 @@
+title: Fix the NaN Check in isInvalid
+slug: js-fix-nan-check
+category: JavaScript Development
+description: isInvalid(x) should return true when x is NaN, but it compares `x === NaN`, which is ALWAYS
+  false because NaN is not equal to itself. Use the correct NaN test.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Understand NaN !== NaN
+- Use Number.isNaN to detect NaN
+- Return false for all valid numbers
+initial_state: isInvalid(x) should return true when x is NaN, but it compares `x === NaN`, which is ALWAYS
+  false because NaN is not equal to itself. Use the correct NaN test.
+solution_explanation: |
+  NaN compares unequal to everything, including itself, so === NaN never works. Number.isNaN(x) reliably detects the NaN value without coercion.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix isInvalid(x): return true only when x is the NaN value.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function isInvalid(x) {
+        return x === NaN; // always false: NaN !== NaN
+      }
+    readonly: false
+  visible_tests:
+  - name: detects NaN
+    code: |
+      assert(isInvalid(NaN) === true, 'should detect NaN');
+  - name: number is valid
+    code: |
+      assert(isInvalid(5) === false);
+  hidden_tests:
+  - name: zero is valid
+    code: |
+      assert(isInvalid(0) === false);
+  - name: computed NaN
+    code: |
+      assert(isInvalid(0 / 0) === true);
+  - name: string is not NaN value
+    code: |
+      assert(isInvalid('abc') === false);
+  - name: Infinity is not NaN
+    code: |
+      assert(isInvalid(Infinity) === false);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: x === NaN is always false because NaN is the only value not equal to itself.
+- order: 2
+  cost: 20
+  content: Use the built-in Number.isNaN to test for NaN specifically.
+- order: 3
+  cost: 30
+  content: Return Number.isNaN(x).

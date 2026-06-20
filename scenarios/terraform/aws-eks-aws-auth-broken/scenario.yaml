@@ -1,0 +1,30 @@
+title: AWS EKS aws-auth ConfigMap Misconfigured
+slug: aws-eks-aws-auth-broken
+technology: Terraform
+category: EKS
+difficulty: hard
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Nodes are not joining the EKS cluster because the aws-auth ConfigMap is missing the node
+  instance role mapping. Fix aws-auth and confirm nodes register.
+initial_state: An AWS EKS cluster whose aws-auth ConfigMap lacks the worker node IAM role, so nodes never
+  reach Ready.
+objectives:
+- Confirm worker nodes are not joining the cluster
+- Add the node instance role to aws-auth and apply
+- Verify nodes register and go Ready
+hints:
+- order: 1
+  cost: 10
+  content: kubectl get nodes is empty; nodes can't authenticate.
+- order: 2
+  cost: 15
+  content: Add the node role ARN to mapRoles in aws-auth and apply.
+- order: 3
+  cost: 20
+  content: Nodes join and go Ready.

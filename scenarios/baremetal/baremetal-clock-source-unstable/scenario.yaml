@@ -1,0 +1,28 @@
+title: Unstable Clock Source Causing Drift
+slug: baremetal-clock-source-unstable
+technology: Bare Metal
+category: Time
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Timekeeping is unstable because the selected hardware clock source is unreliable.
+initial_state: A server using an unstable clocksource.
+objectives:
+- 'Confirm the issue: Time jumps/drifts'
+- Apply the documented fix in /etc/bios/clocksource.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Time jumps/drifts
+- order: 2
+  cost: 15
+  content: Select a stable clocksource (tsc/hpet).
+- order: 3
+  cost: 20
+  content: /etc/bios/clocksource.cfg carries the corrected configuration.

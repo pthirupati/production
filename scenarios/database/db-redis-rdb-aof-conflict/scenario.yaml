@@ -1,0 +1,28 @@
+title: Redis Persistence Misconfigured
+slug: db-redis-rdb-aof-conflict
+technology: Database
+category: Persistence
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Redis persistence is unreliable because RDB/AOF settings conflict.
+initial_state: A Redis host with conflicting persistence options.
+objectives:
+- 'Confirm the issue: Inconsistent persistence behavior'
+- Apply the documented fix in /etc/redis/redis.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Inconsistent persistence behavior
+- order: 2
+  cost: 15
+  content: Set a coherent AOF/RDB persistence policy.
+- order: 3
+  cost: 20
+  content: /etc/redis/redis.conf carries the corrected configuration.

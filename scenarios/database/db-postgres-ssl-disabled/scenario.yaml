@@ -1,0 +1,28 @@
+title: PostgreSQL Connections Not Encrypted
+slug: db-postgres-ssl-disabled
+technology: Database
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: App-to-DB traffic is plaintext because PostgreSQL SSL is disabled.
+initial_state: A PostgreSQL host with ssl off.
+objectives:
+- 'Confirm the issue: SHOW ssl returns off'
+- Apply the documented fix in /var/lib/pgsql/data/postgresql.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SHOW ssl returns off
+- order: 2
+  cost: 15
+  content: Enable ssl with proper certs and reload.
+- order: 3
+  cost: 20
+  content: /var/lib/pgsql/data/postgresql.conf carries the corrected configuration.

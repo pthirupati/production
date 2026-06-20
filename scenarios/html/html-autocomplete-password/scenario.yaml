@@ -1,0 +1,28 @@
+title: Sensitive Field Autocompletes
+slug: html-autocomplete-password
+technology: HTML
+category: Security
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: A sensitive field stores autocomplete data because autocomplete isn't disabled.
+initial_state: A page with autocomplete on a sensitive field.
+objectives:
+- 'Confirm the issue: Sensitive field autocompletes'
+- Apply the documented fix in /var/www/html/account.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Sensitive field autocompletes
+- order: 2
+  cost: 15
+  content: Set autocomplete=off appropriately.
+- order: 3
+  cost: 20
+  content: /var/www/html/account.html carries the corrected markup/config.

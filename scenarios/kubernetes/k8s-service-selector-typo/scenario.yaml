@@ -1,0 +1,30 @@
+title: Service Has No Endpoints from Selector Typo
+slug: k8s-service-selector-typo
+technology: Kubernetes
+category: Networking
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Service routes to nothing because its selector has a typo and matches no pods. Fix the
+  selector and confirm endpoints populate.
+initial_state: A Kubernetes Service whose label selector does not match its backing pods, so it has zero
+  endpoints.
+objectives:
+- Confirm the Service has no endpoints
+- Correct the selector to match the pod labels
+- Verify endpoints are populated
+hints:
+- order: 1
+  cost: 10
+  content: kubectl get endpoints shows none for the service.
+- order: 2
+  cost: 15
+  content: Fix the service selector to match pod labels.
+- order: 3
+  cost: 20
+  content: Endpoints populated.

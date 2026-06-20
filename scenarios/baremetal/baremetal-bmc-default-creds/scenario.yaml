@@ -1,0 +1,28 @@
+title: BMC Using Default Credentials
+slug: baremetal-bmc-default-creds
+technology: Bare Metal
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The BMC still uses vendor default credentials, a serious security risk.
+initial_state: A server whose BMC has default admin credentials.
+objectives:
+- 'Confirm the issue: Default BMC login works'
+- Apply the documented fix in /etc/bmc/credentials.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Default BMC login works
+- order: 2
+  cost: 15
+  content: Set strong BMC credentials.
+- order: 3
+  cost: 20
+  content: /etc/bmc/credentials.cfg carries the corrected configuration.

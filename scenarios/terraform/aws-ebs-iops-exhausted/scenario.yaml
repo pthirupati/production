@@ -1,0 +1,29 @@
+title: AWS EBS gp2 Volume Exhausted IOPS Credits
+slug: aws-ebs-iops-exhausted
+technology: Terraform
+category: EC2
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A gp2 EBS volume is burning through burst IOPS credits and the database is throttling. Migrate
+  it to gp3 with provisioned IOPS and confirm the volume type/IOPS is updated.
+initial_state: An AWS EC2 instance whose gp2 EBS volume has exhausted its burst balance, throttling I/O.
+objectives:
+- Confirm the gp2 volume burst balance is depleted
+- Migrate to gp3 with adequate provisioned IOPS and apply
+- Verify the volume reports the new type/IOPS
+hints:
+- order: 1
+  cost: 10
+  content: CloudWatch BurstBalance near 0 for the volume.
+- order: 2
+  cost: 15
+  content: Set volume_type gp3 with iops/throughput and apply.
+- order: 3
+  cost: 20
+  content: 'Re-check: gp3 with provisioned IOPS.'

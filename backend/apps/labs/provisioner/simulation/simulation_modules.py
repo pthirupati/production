@@ -61,11 +61,23 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
         )
 
     if "docker" in slug:
-        docker_active = "inactive" if "daemon-stopped" in slug or "stopped" in slug else "active"
-        state.services["docker"] = SimService(
-            "docker", active=docker_active, enabled="enabled", description="Docker Engine",
-        )
-        engine._container_running = "exited" not in slug and "daemon-stopped" not in slug
+        # A scenario preset may have already put the docker unit (or a related
+        # unit like docker-socket-proxy) into a failed state — do NOT clobber
+        # that, or the fail-closed check would auto-pass.
+        existing_docker = state.services.get("docker")
+        preset_broke_docker = bool(existing_docker and existing_docker.active != "active")
+        is_down_slug = "daemon-stopped" in slug or "stopped" in slug or "daemon-down" in slug
+        if preset_broke_docker or is_down_slug:
+            state.services["docker"] = SimService(
+                "docker", active="failed" if preset_broke_docker else "inactive",
+                enabled="enabled", description="Docker Engine",
+            )
+            engine._container_running = False
+        else:
+            state.services["docker"] = SimService(
+                "docker", active="active", enabled="enabled", description="Docker Engine",
+            )
+            engine._container_running = "exited" not in slug
 
     # Always ensure docker service exists for generic/docker scenarios
     if sim_type in ("generic", "rhel") or "docker" in slug:

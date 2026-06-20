@@ -1,0 +1,28 @@
+title: MPS Clients Starve Each Other
+slug: gpu-cuda-mps-memory-limit
+technology: GPU
+category: Performance
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Co-located MPS clients OOM because no per-client memory limit is set.
+initial_state: A GPU host running MPS without per-client limits.
+objectives:
+- 'Confirm the issue: One client OOMs the GPU'
+- Apply the documented fix in /etc/gpu/mps-memlimit.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: One client OOMs the GPU
+- order: 2
+  cost: 15
+  content: Set per-client MPS memory limits.
+- order: 3
+  cost: 20
+  content: /etc/gpu/mps-memlimit.conf carries the corrected configuration.

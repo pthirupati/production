@@ -1,0 +1,78 @@
+title: Implement a Simple Memoize
+slug: js-impl-debounce-logic
+category: JavaScript Development
+description: 'Implement memoize(fn): return a function that caches results by its single argument so fn
+  is only called once per distinct argument. A call counter is exposed by the tests via a wrapped fn.
+  The stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Cache results keyed by the argument
+- Return the cached value on repeat calls
+- Call the underlying fn only once per distinct argument
+initial_state: 'Implement memoize(fn): return a function that caches results by its single argument so
+  fn is only called once per distinct argument. A call counter is exposed by the tests via a wrapped fn.
+  The stub is empty so tests fail.'
+solution_explanation: |
+  A Map captured in the returned closure stores results per argument; a cache hit short-circuits the call, so fn runs once per distinct input.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement memoize(fn) -> memoized function of one argument. Repeated calls with the same argument return the cached result without re-calling fn.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function memoize(fn) {
+        // TODO: return a function that caches results by argument
+      }
+    readonly: false
+  visible_tests:
+  - name: returns correct result
+    code: |
+      const sq = memoize((n) => n * n);
+      assert(sq(4) === 16 && sq(5) === 25);
+  - name: caches repeated call
+    code: |
+      let calls = 0;
+      const f = memoize((n) => { calls++; return n + 1; });
+      f(2); f(2); f(2);
+      assert(calls === 1, 'fn called ' + calls + ' times');
+  hidden_tests:
+  - name: distinct args each computed once
+    code: |
+      let calls = 0;
+      const f = memoize((n) => { calls++; return n * 2; });
+      f(1); f(2); f(1); f(2);
+      assert(calls === 2, 'calls=' + calls);
+  - name: cached value is correct after repeat
+    code: |
+      const f = memoize((n) => n + 100);
+      assert(f(7) === 107 && f(7) === 107);
+  - name: string keys
+    code: |
+      let calls = 0;
+      const f = memoize((s) => { calls++; return s.length; });
+      f('ab'); f('ab');
+      assert(f('ab') === 2 && calls === 1);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Keep a cache (a Map works well) keyed by the argument.
+- order: 2
+  cost: 20
+  content: 'On call: if the cache has the arg, return it; otherwise compute, store, return.'
+- order: 3
+  cost: 30
+  content: Return a closure over the cache so it persists across calls.

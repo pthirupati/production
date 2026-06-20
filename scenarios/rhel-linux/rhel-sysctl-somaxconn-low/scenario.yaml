@@ -1,0 +1,28 @@
+title: RHEL Connection Backlog Too Small
+slug: rhel-sysctl-somaxconn-low
+technology: RHEL Linux
+category: Tuning
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A busy server drops connections because net.core.somaxconn is too small.
+initial_state: A RHEL host with a tiny somaxconn.
+objectives:
+- 'Confirm the issue: SYN backlog overflows'
+- Apply the documented fix in /etc/sysctl.d/99-net.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SYN backlog overflows
+- order: 2
+  cost: 15
+  content: Raise somaxconn in sysctl.d.
+- order: 3
+  cost: 20
+  content: /etc/sysctl.d/99-net.conf carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: ESXi Time Drift Breaking AD Auth
+slug: esxi-ntp-drift-kerberos
+category: VMware vSphere
+description: ESXi hosts drifted out of time sync, which breaks AD-based authentication and SSO. Restore
+  NTP synchronization across the hosts.
+difficulty: medium
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Confirm the hosts are not NTP-synced
+- Restore the NTP configuration/sync
+- Verify all hosts are NTP synchronized
+initial_state: vCenter shows ESXi hosts not synchronized to NTP.
+hints:
+- order: 1
+  cost: 10
+  content: 'In the vCenter simulator, locate the issue: confirm the hosts are not ntp-synced.'
+- order: 2
+  cost: 15
+  content: 'Apply the remediation in the GUI: restore the ntp configuration/sync.'
+- order: 3
+  cost: 20
+  content: 'Confirm resolution: verify all hosts are ntp synchronized.'

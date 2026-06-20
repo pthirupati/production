@@ -1,0 +1,28 @@
+title: MariaDB Galera Node Won't Join
+slug: db-mariadb-galera-config
+technology: Database
+category: Clustering
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Galera node won't join the cluster because the wsrep config is wrong.
+initial_state: A MariaDB Galera node with a bad wsrep configuration.
+objectives:
+- 'Confirm the issue: Node fails to join the cluster'
+- Apply the documented fix in /etc/my.cnf.d/galera.cnf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Node fails to join the cluster
+- order: 2
+  cost: 15
+  content: Fix wsrep_cluster_address/provider settings.
+- order: 3
+  cost: 20
+  content: /etc/my.cnf.d/galera.cnf carries the corrected configuration.

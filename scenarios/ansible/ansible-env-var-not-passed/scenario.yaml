@@ -1,0 +1,28 @@
+title: Ansible Command Missing Environment
+slug: ansible-env-var-not-passed
+technology: Ansible
+category: Environment
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A command fails because a required environment variable isn't passed via environment:.
+initial_state: An Ansible task missing the environment block.
+objectives:
+- 'Confirm the issue: Command errors on missing env'
+- Apply the documented fix in /home/ansible/env.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Command errors on missing env
+- order: 2
+  cost: 15
+  content: 'Add the environment: block.'
+- order: 3
+  cost: 20
+  content: /home/ansible/env.yml carries the corrected configuration.

@@ -1,0 +1,99 @@
+title: Implement a Tiny EventEmitter
+slug: js-impl-event-emitter
+category: JavaScript Development
+description: Implement an EventEmitter class with on(event, handler), off(event, handler), and emit(event,
+  ...args). emit calls every handler registered for the event, in registration order, with the provided
+  args. off removes a specific handler. The stub is empty so tests fail.
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Register handlers per event name
+- emit invokes all handlers in order with args
+- off removes the specific handler
+initial_state: Implement an EventEmitter class with on(event, handler), off(event, handler), and emit(event,
+  ...args). emit calls every handler registered for the event, in registration order, with the provided
+  args. off removes a specific handler. The stub is empty so tests fail.
+solution_explanation: |
+  A map of event -> handler array supports registration order on emit, and filtering by reference in off removes a specific handler.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement class EventEmitter with on(event, handler), off(event, handler), emit(event, ...args). Handlers fire in registration order.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      class EventEmitter {
+        // TODO: implement on, off, emit
+      }
+    readonly: false
+  visible_tests:
+  - name: on and emit
+    code: |
+      const e = new EventEmitter();
+      let got = 0;
+      e.on('tick', (n) => { got = n; });
+      e.emit('tick', 42);
+      assert(got === 42);
+  - name: multiple handlers in order
+    code: |
+      const e = new EventEmitter();
+      const seen = [];
+      e.on('x', () => seen.push(1));
+      e.on('x', () => seen.push(2));
+      e.emit('x');
+      assert(JSON.stringify(seen) === JSON.stringify([1, 2]));
+  hidden_tests:
+  - name: off removes a handler
+    code: |
+      const e = new EventEmitter();
+      let calls = 0;
+      const h = () => { calls++; };
+      e.on('a', h);
+      e.off('a', h);
+      e.emit('a');
+      assert(calls === 0, 'calls=' + calls);
+  - name: off keeps other handlers
+    code: |
+      const e = new EventEmitter();
+      const seen = [];
+      const h1 = () => seen.push(1);
+      const h2 = () => seen.push(2);
+      e.on('a', h1);
+      e.on('a', h2);
+      e.off('a', h1);
+      e.emit('a');
+      assert(JSON.stringify(seen) === JSON.stringify([2]));
+  - name: emit with multiple args
+    code: |
+      const e = new EventEmitter();
+      let sum = 0;
+      e.on('add', (a, b) => { sum = a + b; });
+      e.emit('add', 3, 4);
+      assert(sum === 7);
+  - name: emit unknown event is a no-op
+    code: |
+      const e = new EventEmitter();
+      e.emit('nope');
+      assert(true);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Store handlers in an object keyed by event name, each value an array.
+- order: 2
+  cost: 20
+  content: on pushes the handler; emit iterates the array calling each with ...args.
+- order: 3
+  cost: 30
+  content: off filters out the exact handler reference from that event's array.

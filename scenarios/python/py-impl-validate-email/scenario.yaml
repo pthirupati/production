@@ -1,0 +1,79 @@
+title: Implement a Basic Email Validator
+slug: py-impl-validate-email
+category: Python Development
+description: 'Implement is_valid_email(s): return True only when s looks like a basic email — exactly
+  one ''@'', a non-empty local part, and a domain that contains a dot with non-empty labels on both sides.
+  No spaces allowed. This is intentionally a simple ruleset defined by the tests.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Require exactly one @ with non-empty local part
+- Require a dotted domain with non-empty labels
+- Reject spaces and malformed addresses
+initial_state: 'Implement is_valid_email(s): return True only when s looks like a basic email — exactly
+  one ''@'', a non-empty local part, and a domain that contains a dot with non-empty labels on both sides.
+  No spaces allowed. This is intentionally a simple ruleset defined by the tests.'
+solution_explanation: |
+  The simple ruleset is: one @, non-empty local, dotted domain with no empty labels, and no whitespace. Splitting on @ and '.' checks each rule.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement is_valid_email(s) -> bool with these rules: exactly one '@'; local part non-empty; domain has at least one '.', with no empty label (no leading/trailing dot, no '..'); no whitespace anywhere.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def is_valid_email(s):
+          # TODO: validate per the rules in the brief/tests
+          pass
+    readonly: false
+  visible_tests:
+  - name: valid simple
+    code: |
+      assert is_valid_email('a@b.com') is True
+  - name: missing at
+    code: |
+      assert is_valid_email('ab.com') is False
+  hidden_tests:
+  - name: no dot in domain
+    code: |
+      assert is_valid_email('a@b') is False
+  - name: two ats
+    code: |
+      assert is_valid_email('a@@b.com') is False
+  - name: empty local
+    code: |
+      assert is_valid_email('@b.com') is False
+  - name: trailing dot domain
+    code: |
+      assert is_valid_email('a@b.') is False
+  - name: double dot
+    code: |
+      assert is_valid_email('a@b..com') is False
+  - name: has space
+    code: |
+      assert is_valid_email('a b@c.com') is False
+  - name: subdomain valid
+    code: |
+      assert is_valid_email('me@mail.example.com') is True
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Start by rejecting any whitespace and requiring exactly one '@'.
+- order: 2
+  cost: 20
+  content: Split into local and domain; both must be non-empty and the domain needs a dot.
+- order: 3
+  cost: 30
+  content: Split the domain on '.' and reject any empty label (catches leading/trailing/double dots).

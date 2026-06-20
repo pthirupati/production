@@ -1,0 +1,74 @@
+title: Fix the Mutable Default Argument Bug
+slug: py-fix-mutable-default-arg
+category: Python Development
+description: append_item(item, bucket=[]) uses a mutable default list, so the SAME list is shared across
+  calls and items leak between unrelated calls. Fix it using the standard None sentinel idiom so each
+  call starts fresh unless a bucket is explicitly passed.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Show that two separate calls share state
+- Replace the mutable default with a None sentinel
+- Confirm calls are independent but explicit buckets still work
+initial_state: append_item(item, bucket=[]) uses a mutable default list, so the SAME list is shared across
+  calls and items leak between unrelated calls. Fix it using the standard None sentinel idiom so each
+  call starts fresh unless a bucket is explicitly passed.
+solution_explanation: |
+  Default arguments are evaluated once when the function is defined, so a default list is shared across every call. The None-sentinel pattern allocates a new list per call while still honoring an explicit argument.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix append_item so a fresh list is used when no bucket is given. Calling it twice with no bucket must NOT accumulate across calls.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def append_item(item, bucket=[]):
+          bucket.append(item)
+          return bucket
+    readonly: false
+  visible_tests:
+  - name: appends to fresh list
+    code: |
+      assert append_item(1) == [1]
+  - name: explicit bucket used
+    code: |
+      b = [0]
+      assert append_item(5, b) == [0, 5]
+      assert b == [0, 5]
+  hidden_tests:
+  - name: calls are independent
+    code: |
+      assert append_item(1) == [1]
+      assert append_item(2) == [2]
+  - name: repeated default calls do not accumulate
+    code: |
+      for _ in range(3):
+          r = append_item('x')
+          assert r == ['x'], r
+  - name: distinct list objects
+    code: |
+      a = append_item('a')
+      b = append_item('b')
+      assert a is not b
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Call append_item(1) then append_item(2). The second returns [1, 2] — the default list persisted.
+- order: 2
+  cost: 20
+  content: Default argument values are created ONCE at definition time; a default list is shared.
+- order: 3
+  cost: 30
+  content: 'Use `bucket=None`, then inside: `if bucket is None: bucket = []`.'

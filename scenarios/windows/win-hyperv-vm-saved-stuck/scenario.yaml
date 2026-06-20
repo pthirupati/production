@@ -1,0 +1,29 @@
+title: Windows Hyper-V VM Stuck in Saved State
+slug: win-hyperv-vm-saved-stuck
+technology: Windows Server
+category: Virtualization
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Hyper-V VM is stuck in Saved state and will not start because the saved-state files are
+  incompatible after a host update. Clear the saved state and start the VM.
+initial_state: A Windows Hyper-V host where a guest is stuck in Saved state after a host integration update.
+objectives:
+- Confirm the VM is stuck in Saved state
+- Discard the saved state and start the VM
+- Verify the VM boots normally
+hints:
+- order: 1
+  cost: 10
+  content: Get-VM shows State Saved; start fails.
+- order: 2
+  cost: 15
+  content: Remove-VMSavedState then Start-VM.
+- order: 3
+  cost: 20
+  content: VM boots.

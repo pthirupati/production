@@ -1,0 +1,28 @@
+title: Ansible Misreads Looped Task Results
+slug: ansible-register-loop-results
+technology: Ansible
+category: Variables
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A later task misbehaves because it reads a registered loop variable incorrectly.
+initial_state: An Ansible play mishandling results from a looped register.
+objectives:
+- 'Confirm the issue: Wrong handling of loop results'
+- Apply the documented fix in /home/ansible/register.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Wrong handling of loop results
+- order: 2
+  cost: 15
+  content: Iterate results.results correctly.
+- order: 3
+  cost: 20
+  content: /home/ansible/register.yml carries the corrected configuration.

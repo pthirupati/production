@@ -1,0 +1,28 @@
+title: MySQL Temp Tables Spilling to Disk
+slug: db-mysql-tmp-table-disk
+technology: Database
+category: Tuning
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Query temp tables hit disk because tmp_table_size/max_heap_table_size are too low.
+initial_state: A MySQL host with tiny temp-table limits.
+objectives:
+- 'Confirm the issue: Created_tmp_disk_tables rising'
+- Apply the documented fix in /etc/my.cnf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Created_tmp_disk_tables rising
+- order: 2
+  cost: 15
+  content: Raise tmp_table_size and max_heap_table_size.
+- order: 3
+  cost: 20
+  content: /etc/my.cnf carries the corrected configuration.

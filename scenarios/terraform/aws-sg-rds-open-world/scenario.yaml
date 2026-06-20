@@ -1,0 +1,29 @@
+title: AWS Security Group Open to World on RDS Port
+slug: aws-sg-rds-open-world
+technology: Terraform
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The RDS security group allows 0.0.0.0/0 on port 5432, exposing the database to the internet.
+  Restrict ingress to the application security group only and confirm the open-world rule is gone.
+initial_state: An AWS RDS instance whose security group has a 5432 ingress open to the entire internet.
+objectives:
+- Find the 0.0.0.0/0 ingress on port 5432
+- Replace it with a source-sg restricted rule and apply
+- Verify no world-open rule remains
+hints:
+- order: 1
+  cost: 10
+  content: aws ec2 describe-security-groups shows 0.0.0.0/0 on 5432.
+- order: 2
+  cost: 15
+  content: Change the ingress source to the app SG id and apply.
+- order: 3
+  cost: 20
+  content: 'Re-check: world-open rule removed.'

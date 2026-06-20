@@ -1,0 +1,28 @@
+title: No Switch Topology Data (LLDP off)
+slug: baremetal-lldp-disabled
+technology: Bare Metal
+category: Networking
+difficulty: easy
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Cabling/topology can't be verified because LLDP is disabled on the host NICs.
+initial_state: A server with LLDP turned off.
+objectives:
+- 'Confirm the issue: No neighbor/switch data'
+- Apply the documented fix in /etc/network/lldp.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No neighbor/switch data
+- order: 2
+  cost: 15
+  content: Enable LLDP on the NICs.
+- order: 3
+  cost: 20
+  content: /etc/network/lldp.cfg carries the corrected configuration.

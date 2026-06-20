@@ -1,0 +1,28 @@
+title: Form Submits Nowhere
+slug: html-form-no-action
+technology: HTML
+category: Forms
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: A form does nothing on submit because action/method are missing or wrong.
+initial_state: A page with a misconfigured form action.
+objectives:
+- 'Confirm the issue: Submit goes nowhere'
+- Apply the documented fix in /var/www/html/signup.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Submit goes nowhere
+- order: 2
+  cost: 15
+  content: Set the correct action and method.
+- order: 3
+  cost: 20
+  content: /var/www/html/signup.html carries the corrected markup/config.

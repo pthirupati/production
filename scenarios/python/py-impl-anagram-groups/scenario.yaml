@@ -1,0 +1,71 @@
+title: Implement Group Anagrams
+slug: py-impl-anagram-groups
+category: Python Development
+description: 'Implement group_anagrams(words): group words that are anagrams of each other. Return a list
+  of groups; within each group preserve input order. The order of the groups themselves should follow
+  first appearance. The stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Compute an order-independent key per word (sorted letters)
+- Bucket words by that key
+- Preserve first-appearance order of groups and members
+initial_state: 'Implement group_anagrams(words): group words that are anagrams of each other. Return a
+  list of groups; within each group preserve input order. The order of the groups themselves should follow
+  first appearance. The stub is empty so tests fail.'
+solution_explanation: |
+  Sorting each word's letters gives a canonical anagram key. Bucketing by that key, while remembering first-seen order, groups them deterministically.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement group_anagrams(words) -> list of groups (lists). Words that are anagrams go together. Group order = first appearance; member order = input order.
+      group_anagrams(['eat','tea','tan','ate','nat','bat']) -> [['eat','tea','ate'], ['tan','nat'], ['bat']]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def group_anagrams(words):
+          # TODO: group anagrams together
+          pass
+    readonly: false
+  visible_tests:
+  - name: classic example
+    code: |
+      assert group_anagrams(['eat','tea','tan','ate','nat','bat']) == [['eat','tea','ate'], ['tan','nat'], ['bat']]
+  - name: no anagrams
+    code: |
+      assert group_anagrams(['abc','def']) == [['abc'], ['def']]
+  hidden_tests:
+  - name: all anagrams
+    code: |
+      assert group_anagrams(['abc','cab','bca']) == [['abc','cab','bca']]
+  - name: empty list
+    code: |
+      assert group_anagrams([]) == []
+  - name: single word
+    code: |
+      assert group_anagrams(['x']) == [['x']]
+  - name: member order preserved
+    code: |
+      assert group_anagrams(['ba','ab','ba']) == [['ba','ab','ba']]
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Two words are anagrams iff their sorted letters are equal.
+- order: 2
+  cost: 20
+  content: Use the sorted-letters string as a dict key to bucket words.
+- order: 3
+  cost: 30
+  content: Track first-seen key order separately so the output group order is stable.

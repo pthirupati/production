@@ -1,0 +1,28 @@
+title: Page Layout Built With Tables
+slug: html-table-layout
+technology: HTML
+category: Maintainability
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: The layout is brittle and inaccessible because it's built with layout tables.
+initial_state: A page using tables for layout.
+objectives:
+- 'Confirm the issue: Layout uses table markup'
+- Apply the documented fix in /var/www/html/layout.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Layout uses table markup
+- order: 2
+  cost: 15
+  content: Rebuild with CSS layout.
+- order: 3
+  cost: 20
+  content: /var/www/html/layout.html carries the corrected markup/config.

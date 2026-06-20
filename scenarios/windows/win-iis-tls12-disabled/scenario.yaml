@@ -1,0 +1,29 @@
+title: Windows IIS TLS 1.2 Disabled Breaks API
+slug: win-iis-tls12-disabled
+technology: Windows Server
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An API on IIS fails handshakes because TLS 1.2 was disabled during hardening while clients
+  require it. Re-enable TLS 1.2 (keep 1.0/1.1 off) and confirm handshakes succeed.
+initial_state: A Windows IIS host where over-aggressive hardening disabled TLS 1.2 in the SCHANNEL registry.
+objectives:
+- Confirm TLS 1.2 is disabled in SCHANNEL
+- Re-enable TLS 1.2 server protocol and reboot
+- Verify clients can complete the handshake
+hints:
+- order: 1
+  cost: 10
+  content: SCHANNEL TLS 1.2 Server Enabled is 0.
+- order: 2
+  cost: 15
+  content: Set TLS 1.2 Server Enabled=1, DisabledByDefault=0; reboot.
+- order: 3
+  cost: 20
+  content: Handshakes succeed.

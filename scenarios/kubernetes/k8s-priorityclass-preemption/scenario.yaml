@@ -1,0 +1,29 @@
+title: Low-Priority Pods Endlessly Preempted
+slug: k8s-priorityclass-preemption
+technology: Kubernetes
+category: Scheduling
+difficulty: hard
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Important batch pods are endlessly preempted because PriorityClass assignments are wrong.
+  Fix the priorities and confirm the cluster is healthy.
+initial_state: A Kubernetes cluster where misassigned PriorityClasses cause repeated preemption.
+objectives:
+- Confirm the workload is unhealthy
+- Apply the documented fix and roll out
+- Verify all pods are Running
+hints:
+- order: 1
+  cost: 10
+  content: kubectl get pods shows the workload not Running.
+- order: 2
+  cost: 15
+  content: Apply the fix and kubectl rollout restart the deployment.
+- order: 3
+  cost: 20
+  content: All pods Running.

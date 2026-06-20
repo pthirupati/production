@@ -1,0 +1,29 @@
+title: Mobile Layout Broken Without Viewport
+slug: html-meta-viewport-missing
+technology: Html
+category: Responsive
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The site doesn't scale on phones because the responsive viewport meta tag is missing. Add
+  it and confirm the file is corrected.
+initial_state: A static page missing the viewport meta, breaking mobile layout.
+objectives:
+- Confirm the page doesn't scale on mobile
+- Add the viewport meta tag
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No <meta name=viewport>.
+- order: 2
+  cost: 15
+  content: Add width=device-width, initial-scale=1.
+- order: 3
+  cost: 20
+  content: index.html carries the corrected viewport.

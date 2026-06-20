@@ -1,0 +1,28 @@
+title: Script Loses Args After shift
+slug: shell-positional-shift
+technology: Shell Scripting
+category: CLI
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Required arguments are lost because shift is used incorrectly.
+initial_state: An ops script mishandling positional params with shift.
+objectives:
+- 'Confirm the issue: Args consumed unexpectedly'
+- Apply the documented fix in /opt/scripts/shift-args.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Args consumed unexpectedly
+- order: 2
+  cost: 15
+  content: Fix the shift count/order.
+- order: 3
+  cost: 20
+  content: /opt/scripts/shift-args.sh carries the corrected configuration.

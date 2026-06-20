@@ -1,0 +1,74 @@
+title: Implement Valid Parentheses
+slug: py-impl-valid-parentheses
+category: Python Development
+description: 'Implement is_balanced(s): return True if every bracket in s — (), [], {} — is correctly
+  opened and closed in the right order, False otherwise. Other characters are ignored. The stub is empty
+  so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Use a stack to match opening brackets
+- Verify each closer matches the most recent opener
+- Ensure nothing is left unclosed
+initial_state: 'Implement is_balanced(s): return True if every bracket in s — (), [], {} — is correctly
+  opened and closed in the right order, False otherwise. Other characters are ignored. The stub is empty
+  so tests fail.'
+solution_explanation: |
+  A stack records open brackets; each closer must match the most recent opener (LIFO), and a non-empty stack at the end means something is unclosed.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement is_balanced(s) -> bool for the brackets (), [], {} (ignore other chars).
+      is_balanced('([]{})') -> True, is_balanced('(]') -> False
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def is_balanced(s):
+          # TODO: return True iff brackets are balanced
+          pass
+    readonly: false
+  visible_tests:
+  - name: balanced mixed
+    code: |
+      assert is_balanced('([]{})') is True
+  - name: mismatch
+    code: |
+      assert is_balanced('(]') is False
+  hidden_tests:
+  - name: empty is balanced
+    code: |
+      assert is_balanced('') is True
+  - name: unclosed
+    code: |
+      assert is_balanced('(((') is False
+  - name: extra close
+    code: |
+      assert is_balanced('())') is False
+  - name: ignores other chars
+    code: |
+      assert is_balanced('a(b)c[d]') is True
+  - name: wrong nesting
+    code: |
+      assert is_balanced('([)]') is False
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Push every opening bracket onto a stack.
+- order: 2
+  cost: 20
+  content: On a closing bracket, the top of the stack must be its matching opener.
+- order: 3
+  cost: 30
+  content: At the end the stack must be empty; an empty stack on a closer means invalid.

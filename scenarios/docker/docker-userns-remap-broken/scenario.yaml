@@ -1,0 +1,30 @@
+title: User Namespace Remap Misconfigured
+slug: docker-userns-remap-broken
+technology: Docker
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Containers fail to start after enabling userns-remap because the subuid/subgid mapping is
+  wrong. Fix the remap config and confirm it is corrected.
+initial_state: A host where Docker userns-remap is enabled but the subuid/subgid mapping is broken, blocking
+  container start.
+objectives:
+- Confirm containers fail under userns-remap
+- Fix the subuid/subgid mapping
+- Verify the config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: docker run errors on userns mapping.
+- order: 2
+  cost: 15
+  content: Correct userns-remap + /etc/subuid mapping.
+- order: 3
+  cost: 20
+  content: daemon.json carries the corrected remap.

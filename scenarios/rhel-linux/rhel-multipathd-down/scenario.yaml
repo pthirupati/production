@@ -1,0 +1,28 @@
+title: RHEL multipathd Down — SAN Paths Lost
+slug: rhel-multipathd-down
+technology: RHEL Linux
+category: Storage
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: SAN multipath failover is gone because multipathd is down.
+initial_state: A RHEL host where the multipathd service is failed.
+objectives:
+- Confirm multipathd is down (multipath -ll shows no daemon)
+- Resolve the cause and start multipathd
+- Verify multipathd is active
+hints:
+- order: 1
+  cost: 10
+  content: multipath -ll shows no daemon
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start multipathd.'
+- order: 3
+  cost: 20
+  content: systemctl is-active multipathd returns active.

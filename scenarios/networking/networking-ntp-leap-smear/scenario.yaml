@@ -1,0 +1,30 @@
+title: NTP Leap Smear Misconfiguration
+slug: networking-ntp-leap-smear
+technology: Networking
+category: Time / NTP
+difficulty: medium
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A mix of leap-smearing and non-smearing NTP sources is preventing clean synchronization.
+  Standardize on one source policy and confirm sync.
+initial_state: A host configured with conflicting leap-smear and standard NTP sources, so chrony will
+  not synchronize cleanly.
+objectives:
+- Confirm chrony is not synchronized due to source conflict
+- Standardize on a consistent NTP source set
+- Verify chronyc tracking shows synchronized
+hints:
+- order: 1
+  cost: 10
+  content: chronyc tracking shows not synchronised.
+- order: 2
+  cost: 15
+  content: Use a consistent (all-smear or all-standard) source set.
+- order: 3
+  cost: 20
+  content: Synchronized.

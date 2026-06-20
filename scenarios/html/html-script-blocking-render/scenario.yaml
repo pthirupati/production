@@ -1,0 +1,28 @@
+title: Render-Blocking Script in Head
+slug: html-script-blocking-render
+technology: HTML
+category: Performance
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: First paint is slow because a script in the head blocks rendering.
+initial_state: A page with a render-blocking script.
+objectives:
+- 'Confirm the issue: Slow first paint'
+- Apply the documented fix in /var/www/html/index.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Slow first paint
+- order: 2
+  cost: 15
+  content: Add defer/async or move the script.
+- order: 3
+  cost: 20
+  content: /var/www/html/index.html carries the corrected markup/config.

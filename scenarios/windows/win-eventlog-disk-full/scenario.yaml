@@ -1,0 +1,30 @@
+title: Windows Event Log Service Disk Full
+slug: win-eventlog-disk-full
+technology: Windows Server
+category: Logging
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The Windows Event Log service stopped because the system drive filled up with oversized logs.
+  Clear/relocate logs, cap log sizes, and restart the service.
+initial_state: A Windows Server where the Event Log service is stopped after the system volume filled
+  with verbose logs.
+objectives:
+- Confirm the Event Log service is stopped and the disk is full
+- Free space (clear/relocate logs) and cap maximum log sizes
+- Restart the service and verify it is Running
+hints:
+- order: 1
+  cost: 10
+  content: 'Get-Service EventLog shows Stopped; C: is near full.'
+- order: 2
+  cost: 15
+  content: wevtutil cl on bloated logs, set MaxSize, free space.
+- order: 3
+  cost: 20
+  content: Restart and confirm Running.

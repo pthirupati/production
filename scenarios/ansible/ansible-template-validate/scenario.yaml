@@ -1,0 +1,28 @@
+title: Ansible Ships Invalid sshd Config
+slug: ansible-template-validate
+technology: Ansible
+category: Modules
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A bad sshd_config is deployed because the template task has no validate step.
+initial_state: An Ansible template task that can ship an invalid sshd_config.
+objectives:
+- 'Confirm the issue: Invalid sshd_config deployed'
+- Apply the documented fix in /home/ansible/sshd-template.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Invalid sshd_config deployed
+- order: 2
+  cost: 15
+  content: 'Add a validate: sshd -t -f %s step.'
+- order: 3
+  cost: 20
+  content: /home/ansible/sshd-template.yml carries the corrected configuration.

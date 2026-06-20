@@ -1,0 +1,30 @@
+title: Bridge Subnet Conflicts With Corp Network
+slug: docker-default-bridge-subnet
+technology: Docker
+category: Networking
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Containers can't reach corporate services because Docker's default bridge subnet overlaps
+  the corp network. Move Docker's address pool and confirm the config is corrected.
+initial_state: A host whose Docker bridge subnet conflicts with the corporate network range, breaking
+  routing.
+objectives:
+- Confirm the subnet conflict
+- Reconfigure Docker's address pool
+- Verify the config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Routes to corp ranges go to docker0.
+- order: 2
+  cost: 15
+  content: Set default-address-pools in daemon.json.
+- order: 3
+  cost: 20
+  content: daemon.json carries the corrected pool.

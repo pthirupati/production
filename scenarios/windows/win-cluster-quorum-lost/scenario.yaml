@@ -1,0 +1,30 @@
+title: Windows Cluster Quorum Lost
+slug: win-cluster-quorum-lost
+technology: Windows Server
+category: Clustering
+difficulty: hard
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Failover Cluster went offline because it lost quorum after a node and the witness failed.
+  Reconfigure the quorum witness and bring the cluster back online.
+initial_state: A Windows Failover Cluster that lost quorum (node + witness down), taking clustered roles
+  offline.
+objectives:
+- Confirm the cluster is down due to quorum loss
+- Reconfigure the quorum witness (file share/cloud)
+- Verify the cluster and roles come online
+hints:
+- order: 1
+  cost: 10
+  content: Get-ClusterQuorum / cluster log shows quorum lost.
+- order: 2
+  cost: 15
+  content: Set a new file-share or cloud witness and force quorum if needed.
+- order: 3
+  cost: 20
+  content: Cluster online.

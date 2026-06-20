@@ -1,0 +1,28 @@
+title: Zoom Disabled Hurting Accessibility
+slug: html-viewport-user-scalable
+technology: HTML
+category: Accessibility
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Low-vision users can't zoom because the viewport disables scaling.
+initial_state: A page that disables pinch-zoom.
+objectives:
+- 'Confirm the issue: user-scalable=no set'
+- Apply the documented fix in /var/www/html/mobile.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: user-scalable=no set
+- order: 2
+  cost: 15
+  content: Allow user scaling in the viewport.
+- order: 3
+  cost: 20
+  content: /var/www/html/mobile.html carries the corrected markup/config.

@@ -1,0 +1,29 @@
+title: BMC Not Sending Hardware Alerts
+slug: baremetal-bmc-snmp-misconfig
+technology: Baremetal
+category: BMC
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Hardware alerts aren't reaching monitoring because the BMC SNMP trap destination is misconfigured.
+  Fix it and confirm the config is corrected.
+initial_state: A bare-metal server whose BMC SNMP trap configuration is wrong, so alerts are lost.
+objectives:
+- Confirm hardware alerts aren't received
+- Fix the BMC SNMP trap config
+- Verify the BMC config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No traps arrive at the NMS.
+- order: 2
+  cost: 15
+  content: Set the correct trap community/destination.
+- order: 3
+  cost: 20
+  content: snmp.cfg carries the corrected config.

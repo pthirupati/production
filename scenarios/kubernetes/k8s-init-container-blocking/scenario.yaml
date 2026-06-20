@@ -1,0 +1,30 @@
+title: Init Container Blocking Pod Start
+slug: k8s-init-container-blocking
+technology: Kubernetes
+category: Workloads
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A pod never starts because its init container waits on a dependency that never becomes ready.
+  Fix the init container and confirm the pod runs.
+initial_state: A Kubernetes pod stuck in Init because its init container loops waiting for an unavailable
+  dependency.
+objectives:
+- Confirm the pod is stuck in Init
+- Fix the init container's dependency/command and roll out
+- Verify the pod is Running
+hints:
+- order: 1
+  cost: 10
+  content: kubectl get pods shows Init:0/1 forever.
+- order: 2
+  cost: 15
+  content: Fix the init container's check/target and roll out.
+- order: 3
+  cost: 20
+  content: Pod Running.

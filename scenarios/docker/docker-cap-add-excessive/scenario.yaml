@@ -1,0 +1,28 @@
+title: Container Granted Excessive Capabilities
+slug: docker-cap-add-excessive
+technology: Docker
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A container runs with excessive Linux capabilities, widening the blast radius.
+initial_state: A compose service with unnecessary cap_add.
+objectives:
+- 'Confirm the issue: Container has SYS_ADMIN etc.'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Container has SYS_ADMIN etc.
+- order: 2
+  cost: 15
+  content: Drop caps and add only what's needed.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

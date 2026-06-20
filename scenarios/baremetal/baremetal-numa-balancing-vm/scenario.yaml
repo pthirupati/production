@@ -1,0 +1,28 @@
+title: NUMA Imbalance Hurting VM Hosts
+slug: baremetal-numa-balancing-vm
+technology: Bare Metal
+category: Performance
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: VM performance varies because automatic NUMA balancing fights the hypervisor pinning.
+initial_state: A server with NUMA balancing conflicting with VM pinning.
+objectives:
+- 'Confirm the issue: VM performance inconsistent'
+- Apply the documented fix in /etc/bios/numa-balancing.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: VM performance inconsistent
+- order: 2
+  cost: 15
+  content: Disable kernel NUMA balancing where pinned.
+- order: 3
+  cost: 20
+  content: /etc/bios/numa-balancing.cfg carries the corrected configuration.

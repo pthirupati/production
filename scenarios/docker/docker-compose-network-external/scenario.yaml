@@ -1,0 +1,28 @@
+title: Compose Can't Find External Network
+slug: docker-compose-network-external
+technology: Docker
+category: Networking
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A stack fails because it references an external network that isn't declared right.
+initial_state: A compose stack with a broken external network reference.
+objectives:
+- 'Confirm the issue: ''network not found'''
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''network not found'''
+- order: 2
+  cost: 15
+  content: Declare the external network correctly.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

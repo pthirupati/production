@@ -1,0 +1,28 @@
+title: Ansible Running Local Tasks Remotely
+slug: ansible-connection-local-wrong
+technology: Ansible
+category: Connection
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A task meant for the control node runs remotely because connection is wrong.
+initial_state: 'An Ansible task missing connection: local.'
+objectives:
+- 'Confirm the issue: Local-only task runs on remotes'
+- Apply the documented fix in /home/ansible/localconn.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Local-only task runs on remotes
+- order: 2
+  cost: 15
+  content: 'Set connection: local for that task.'
+- order: 3
+  cost: 20
+  content: /home/ansible/localconn.yml carries the corrected configuration.

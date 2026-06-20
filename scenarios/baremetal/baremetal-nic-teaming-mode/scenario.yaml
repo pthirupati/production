@@ -1,0 +1,28 @@
+title: NIC Team in Wrong Bonding Mode
+slug: baremetal-nic-teaming-mode
+technology: Bare Metal
+category: Networking
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Throughput/redundancy is wrong because the NIC team uses the wrong bonding mode.
+initial_state: A server whose NIC team mode is inappropriate.
+objectives:
+- 'Confirm the issue: No failover / no aggregation'
+- Apply the documented fix in /etc/network/teaming.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No failover / no aggregation
+- order: 2
+  cost: 15
+  content: Set the correct bonding/team mode.
+- order: 3
+  cost: 20
+  content: /etc/network/teaming.cfg carries the corrected configuration.

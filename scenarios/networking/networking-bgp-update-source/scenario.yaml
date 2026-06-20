@@ -1,0 +1,29 @@
+title: BGP Session Down From Wrong Update-Source
+slug: networking-bgp-update-source
+technology: Networking
+category: Routing / BGP
+difficulty: hard
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A multihop BGP session is down because the update-source interface is wrong, so the peer
+  rejects the connection. Fix update-source and confirm Established.
+initial_state: A router whose BGP update-source is misconfigured, breaking the session.
+objectives:
+- 'Confirm the issue: show ip bgp summary shows the neighbor not Established.'
+- Apply the documented fix
+- Verify the network is healthy
+hints:
+- order: 1
+  cost: 10
+  content: show ip bgp summary shows the neighbor not Established.
+- order: 2
+  cost: 15
+  content: Correct the BGP config and clear the session.
+- order: 3
+  cost: 20
+  content: The session/sync/MTU is healthy.

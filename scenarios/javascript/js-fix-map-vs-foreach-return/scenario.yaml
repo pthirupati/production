@@ -1,0 +1,68 @@
+title: Fix doubleAll Returning undefined
+slug: js-fix-map-vs-foreach-return
+category: JavaScript Development
+description: doubleAll(nums) should return a new array with each value doubled, but it uses forEach (which
+  returns undefined) instead of map, so the function returns undefined. Switch to map.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See the function return undefined
+- Use map to build and return the array
+- Double each element
+initial_state: doubleAll(nums) should return a new array with each value doubled, but it uses forEach
+  (which returns undefined) instead of map, so the function returns undefined. Switch to map.
+solution_explanation: |
+  forEach returns undefined and discards the callback results. map collects the transformed values into a new array, which we return.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix doubleAll(nums): return a new array of doubled values.
+      doubleAll([1,2,3]) -> [2,4,6]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function doubleAll(nums) {
+        nums.forEach((n) => n * 2); // forEach returns undefined
+      }
+    readonly: false
+  visible_tests:
+  - name: doubles
+    code: |
+      assert(JSON.stringify(doubleAll([1,2,3])) === JSON.stringify([2,4,6]), JSON.stringify(doubleAll([1,2,3])));
+  - name: empty
+    code: |
+      assert(JSON.stringify(doubleAll([])) === JSON.stringify([]), JSON.stringify(doubleAll([])));
+  hidden_tests:
+  - name: returns an array
+    code: |
+      assert(Array.isArray(doubleAll([1])), 'should return an array');
+  - name: negatives
+    code: |
+      assert(JSON.stringify(doubleAll([-1, 0, 2])) === JSON.stringify([-2, 0, 4]), JSON.stringify(doubleAll([-1, 0, 2])));
+  - name: does not mutate input
+    code: |
+      const src = [1,2];
+      doubleAll(src);
+      assert(JSON.stringify(src) === JSON.stringify([1,2]));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: doubleAll([1,2,3]) returns undefined — forEach doesn't build a result.
+- order: 2
+  cost: 20
+  content: map transforms each element into a new array; forEach just iterates.
+- order: 3
+  cost: 30
+  content: Return nums.map((n) => n * 2).

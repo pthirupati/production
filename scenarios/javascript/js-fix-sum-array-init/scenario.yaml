@@ -1,0 +1,70 @@
+title: Fix sumArray Accumulator Start
+slug: js-fix-sum-array-init
+category: JavaScript Development
+description: sumArray(nums) should add up all the numbers, but reduce is called without an initial value,
+  so on an EMPTY array it throws 'Reduce of empty array with no initial value'. Provide the initial accumulator
+  so empty returns 0 and totals stay correct.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Reproduce the empty-array reduce error
+- Pass 0 as the reduce initial value
+- Return correct sums including the empty case
+initial_state: sumArray(nums) should add up all the numbers, but reduce is called without an initial value,
+  so on an EMPTY array it throws 'Reduce of empty array with no initial value'. Provide the initial accumulator
+  so empty returns 0 and totals stay correct.
+solution_explanation: |
+  Without an initial value, reduce on an empty array throws. Seeding the accumulator with 0 makes empty return 0 and keeps sums correct.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix sumArray(nums) to return the sum of the array, and 0 for an empty array.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function sumArray(nums) {
+        return nums.reduce((acc, n) => acc + n); // no initial value
+      }
+    readonly: false
+  visible_tests:
+  - name: basic sum
+    code: |
+      assert(sumArray([1, 2, 3]) === 6);
+  - name: empty is zero
+    code: |
+      assert(sumArray([]) === 0, 'empty should be 0');
+  hidden_tests:
+  - name: single element
+    code: |
+      assert(sumArray([7]) === 7);
+  - name: negatives
+    code: |
+      assert(sumArray([-1, -2, 3]) === 0);
+  - name: empty does not throw
+    code: |
+      assert(sumArray([]) === 0);
+  - name: floats
+    code: |
+      assert(Math.abs(sumArray([0.1, 0.2]) - 0.3) < 1e-9);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: sumArray([]) throws because reduce has no seed value to return.
+- order: 2
+  cost: 20
+  content: reduce(fn, initialValue) — supply the initial accumulator.
+- order: 3
+  cost: 30
+  content: Pass 0 as the second argument to reduce.

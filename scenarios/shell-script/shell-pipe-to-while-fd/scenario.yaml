@@ -1,0 +1,28 @@
+title: Script SSH-in-Loop Eats stdin
+slug: shell-pipe-to-while-fd
+technology: Shell Scripting
+category: IO
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A loop running ssh consumes stdin and processes only the first host.
+initial_state: An ops script where ssh swallows the loop's stdin.
+objectives:
+- 'Confirm the issue: Only the first host is processed'
+- Apply the documented fix in /opt/scripts/fanout.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Only the first host is processed
+- order: 2
+  cost: 15
+  content: Use ssh -n or redirect stdin.
+- order: 3
+  cost: 20
+  content: /opt/scripts/fanout.sh carries the corrected configuration.

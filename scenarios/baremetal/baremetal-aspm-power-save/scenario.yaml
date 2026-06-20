@@ -1,0 +1,28 @@
+title: PCIe ASPM Causing Device Errors
+slug: baremetal-aspm-power-save
+technology: Bare Metal
+category: Power
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: PCIe devices throw errors because aggressive ASPM power saving destabilizes links.
+initial_state: A server with aggressive PCIe ASPM.
+objectives:
+- 'Confirm the issue: PCIe AER errors logged'
+- Apply the documented fix in /etc/bios/aspm.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: PCIe AER errors logged
+- order: 2
+  cost: 15
+  content: Disable/limit ASPM for stability.
+- order: 3
+  cost: 20
+  content: /etc/bios/aspm.cfg carries the corrected configuration.

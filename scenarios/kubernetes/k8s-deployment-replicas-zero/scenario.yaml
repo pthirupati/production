@@ -1,0 +1,29 @@
+title: Deployment Scaled to Zero by Accident
+slug: k8s-deployment-replicas-zero
+technology: Kubernetes
+category: Workloads
+difficulty: easy
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An app is down because its Deployment was accidentally scaled to zero replicas. Scale it
+  back up and confirm pods are Running.
+initial_state: A Kubernetes Deployment accidentally scaled to zero replicas.
+objectives:
+- Confirm the workload is unhealthy
+- Apply the documented fix and roll out
+- Verify all pods are Running
+hints:
+- order: 1
+  cost: 10
+  content: kubectl get pods shows the workload not Running.
+- order: 2
+  cost: 15
+  content: Apply the fix and kubectl rollout restart the deployment.
+- order: 3
+  cost: 20
+  content: All pods Running.

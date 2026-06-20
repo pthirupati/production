@@ -1,0 +1,30 @@
+title: Ansible Galaxy Role Not Installed
+slug: ansible-galaxy-role-missing
+technology: Ansible
+category: Roles
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A playbook fails because a required Galaxy role isn't pinned/installed via requirements.yml.
+  Fix requirements and confirm it is corrected.
+initial_state: An Ansible project whose requirements.yml omits a required role, so the play errors on
+  a missing role.
+objectives:
+- Confirm the play fails on a missing role
+- Add/pin the role in requirements.yml
+- Verify requirements is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''the role ... was not found''.'
+- order: 2
+  cost: 15
+  content: Add the role + version to requirements.yml.
+- order: 3
+  cost: 20
+  content: requirements.yml carries the corrected entry.

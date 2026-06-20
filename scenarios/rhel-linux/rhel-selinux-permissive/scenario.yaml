@@ -1,0 +1,28 @@
+title: RHEL SELinux Left Permissive
+slug: rhel-selinux-permissive
+technology: RHEL Linux
+category: Security
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An audit found SELinux running permissive instead of enforcing.
+initial_state: A RHEL host with SELinux set to permissive.
+objectives:
+- 'Confirm the issue: getenforce returns Permissive'
+- Apply the documented fix in /etc/selinux/config
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: getenforce returns Permissive
+- order: 2
+  cost: 15
+  content: Set SELINUX=enforcing in config.
+- order: 3
+  cost: 20
+  content: /etc/selinux/config carries the corrected configuration.

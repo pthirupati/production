@@ -1,0 +1,74 @@
+title: 'Log Analysis: Fix the AttributeError on int.strip'
+slug: py-logfix-attributeerror-strip
+category: Python Development
+description: 'The log shows `AttributeError: ''int'' object has no attribute ''strip''` from normalize()
+  because it calls .strip().lower() on every value, but some values are non-strings. Coerce to str first
+  (or skip non-strings) so it never crashes, returning a lowercased, stripped string for every input.'
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Read the AttributeError and find the unsafe .strip call
+- Coerce the value to a string before string operations
+- Return a normalized string for any input type
+initial_state: 'The log shows `AttributeError: ''int'' object has no attribute ''strip''` from normalize()
+  because it calls .strip().lower() on every value, but some values are non-strings. Coerce to str first
+  (or skip non-strings) so it never crashes, returning a lowercased, stripped string for every input.'
+solution_explanation: |
+  String methods only exist on strings. Wrapping the value in str() first makes the normalization total over any input type.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: logfix
+  instructions: |
+    Fix normalize(value): return str(value) lowercased and stripped of surrounding whitespace. It must work for strings AND non-strings (ints, etc). The log shows it crashes on an int.
+      normalize('  Hi ') -> 'hi', normalize(42) -> '42'
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      # Production log:
+      #   AttributeError: 'int' object has no attribute 'strip'
+      #     at normalize(value) -> return value.strip().lower()
+
+      def normalize(value):
+          return value.strip().lower()   # fails for non-strings
+    readonly: false
+  visible_tests:
+  - name: string normalized
+    code: |
+      assert normalize('  Hi ') == 'hi'
+  - name: int coerced
+    code: |
+      assert normalize(42) == '42'
+  hidden_tests:
+  - name: already clean
+    code: |
+      assert normalize('abc') == 'abc'
+  - name: uppercase
+    code: |
+      assert normalize('HELLO') == 'hello'
+  - name: float
+    code: |
+      assert normalize(3.5) == '3.5'
+  - name: whitespace only
+    code: |
+      assert normalize('   ') == ''
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: The log shows .strip() called on an int.
+- order: 2
+  cost: 20
+  content: Convert with str(value) before calling string methods.
+- order: 3
+  cost: 30
+  content: Return str(value).strip().lower().

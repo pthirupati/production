@@ -1,0 +1,28 @@
+title: GPU Peer-to-Peer Transfers Disabled
+slug: gpu-p2p-disabled
+technology: GPU
+category: Multi-GPU
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Multi-GPU transfers are slow because P2P over NVLink is disabled.
+initial_state: A multi-GPU host with P2P disabled.
+objectives:
+- 'Confirm the issue: Transfers go via host memory'
+- Apply the documented fix in /etc/gpu/p2p.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Transfers go via host memory
+- order: 2
+  cost: 15
+  content: Enable GPU P2P.
+- order: 3
+  cost: 20
+  content: /etc/gpu/p2p.conf carries the corrected configuration.

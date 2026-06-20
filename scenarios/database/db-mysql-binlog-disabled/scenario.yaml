@@ -1,0 +1,28 @@
+title: MySQL Binary Logging Disabled
+slug: db-mysql-binlog-disabled
+technology: Database
+category: Backup
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Point-in-time recovery and replication are impossible because binlog is off.
+initial_state: A MySQL host with binary logging disabled.
+objectives:
+- 'Confirm the issue: No binlog files present'
+- Apply the documented fix in /etc/my.cnf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No binlog files present
+- order: 2
+  cost: 15
+  content: Enable log_bin and set a format.
+- order: 3
+  cost: 20
+  content: /etc/my.cnf carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Nouveau Blocking NVIDIA Driver
+slug: gpu-driver-blacklist-nouveau
+technology: GPU
+category: Driver
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The proprietary driver can't load because the open nouveau driver isn't blacklisted.
+initial_state: A GPU host where nouveau conflicts with the NVIDIA driver.
+objectives:
+- 'Confirm the issue: NVIDIA driver fails to load'
+- Apply the documented fix in /etc/modprobe.d/blacklist-nouveau.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: NVIDIA driver fails to load
+- order: 2
+  cost: 15
+  content: Blacklist nouveau and rebuild initramfs.
+- order: 3
+  cost: 20
+  content: /etc/modprobe.d/blacklist-nouveau.conf carries the corrected configuration.

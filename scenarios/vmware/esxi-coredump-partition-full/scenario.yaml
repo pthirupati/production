@@ -1,0 +1,28 @@
+title: ESXi Core Dump Partition Full
+slug: esxi-coredump-partition-full
+category: VMware vSphere
+description: An ESXi host can't write core dumps because its coredump partition is full, risking lost
+  diagnostics on a PSOD. Clear/resize the coredump partition and confirm the alarm clears.
+difficulty: medium
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Confirm the core dump partition is full
+- Clear or resize the coredump partition
+- Verify the coredump alarm is cleared
+initial_state: vCenter shows the ESXi host's core dump partition full.
+hints:
+- order: 1
+  cost: 10
+  content: 'In the vCenter simulator, locate the issue: confirm the core dump partition is full.'
+- order: 2
+  cost: 15
+  content: 'Apply the remediation in the GUI: clear or resize the coredump partition.'
+- order: 3
+  cost: 20
+  content: 'Confirm resolution: verify the coredump alarm is cleared.'

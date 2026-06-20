@@ -1,0 +1,28 @@
+title: Script Leaks Password on Command Line
+slug: shell-echo-password
+technology: Shell Scripting
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A DB password is visible in the process list because it's passed on the CLI.
+initial_state: An ops script exposing a secret via argv.
+objectives:
+- 'Confirm the issue: Secret visible in ps'
+- Apply the documented fix in /opt/scripts/db-login.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Secret visible in ps
+- order: 2
+  cost: 15
+  content: Pass secrets via env/file, not argv.
+- order: 3
+  cost: 20
+  content: /opt/scripts/db-login.sh carries the corrected configuration.

@@ -1,0 +1,70 @@
+title: Fix the Number Parsing Crash
+slug: py-fix-parse-int-base-error
+category: Python Development
+description: safe_int(s, default) should parse a string to an int, returning `default` when the string
+  is not a valid integer, but it lets ValueError propagate and crash. Wrap the parse so invalid input
+  falls back to default.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Trigger the ValueError on bad input
+- Catch the conversion error
+- Return the provided default on failure
+initial_state: safe_int(s, default) should parse a string to an int, returning `default` when the string
+  is not a valid integer, but it lets ValueError propagate and crash. Wrap the parse so invalid input
+  falls back to default.
+solution_explanation: |
+  int() raises on non-numeric input. Catching ValueError/TypeError and returning the default makes parsing safe.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix safe_int(s, default): return int(s) when s parses, otherwise return default. Never raise.
+      safe_int('42', 0) -> 42, safe_int('abc', -1) -> -1
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def safe_int(s, default):
+          return int(s)        # raises ValueError on bad input
+    readonly: false
+  visible_tests:
+  - name: valid number
+    code: |
+      assert safe_int('42', 0) == 42
+  - name: invalid falls back
+    code: |
+      assert safe_int('abc', -1) == -1
+  hidden_tests:
+  - name: empty string
+    code: |
+      assert safe_int('', 99) == 99
+  - name: float string falls back
+    code: |
+      assert safe_int('3.14', 0) == 0
+  - name: negative number
+    code: |
+      assert safe_int('-7', 0) == -7
+  - name: None falls back
+    code: |
+      assert safe_int(None, 5) == 5
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: safe_int('abc', -1) raises ValueError instead of returning -1.
+- order: 2
+  cost: 20
+  content: Wrap int(s) in try/except.
+- order: 3
+  cost: 30
+  content: Catch ValueError (and TypeError for None) and return default.

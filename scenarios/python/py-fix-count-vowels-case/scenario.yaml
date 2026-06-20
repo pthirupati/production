@@ -1,0 +1,66 @@
+title: Fix Case-Insensitive Vowel Counting
+slug: py-fix-count-vowels-case
+category: Python Development
+description: count_vowels(s) is supposed to count vowels case-insensitively, but it only checks lowercase
+  vowels, so uppercase vowels are missed. Fix it so 'A' and 'a' both count.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Notice uppercase vowels are not counted
+- Normalize case before checking membership
+- Count a, e, i, o, u regardless of case
+initial_state: count_vowels(s) is supposed to count vowels case-insensitively, but it only checks lowercase
+  vowels, so uppercase vowels are missed. Fix it so 'A' and 'a' both count.
+solution_explanation: |
+  The vowel set only had lowercase letters. Lowercasing the input before checking membership makes the count case-insensitive.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix count_vowels(s) to count a, e, i, o, u case-insensitively.
+      count_vowels('Apple') -> 2
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def count_vowels(s):
+          vowels = 'aeiou'
+          return sum(1 for ch in s if ch in vowels)
+    readonly: false
+  visible_tests:
+  - name: lowercase word
+    code: |
+      assert count_vowels('education') == 5
+  - name: capitalized
+    code: |
+      assert count_vowels('Apple') == 2, count_vowels('Apple')
+  hidden_tests:
+  - name: all caps
+    code: |
+      assert count_vowels('AEIOU') == 5
+  - name: mixed case
+    code: |
+      assert count_vowels('HeLLo WoRLD') == 3
+  - name: no vowels
+    code: |
+      assert count_vowels('rhythm') == 0
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: count_vowels('Apple') returns 1 — the capital A is ignored.
+- order: 2
+  cost: 20
+  content: Lowercase the string first, or include uppercase vowels in the set.
+- order: 3
+  cost: 30
+  content: Iterate over s.lower() so 'A' and 'a' are both matched.

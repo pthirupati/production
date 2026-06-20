@@ -1,0 +1,29 @@
+title: CI Pipelines Deadlocked on Concurrency
+slug: devops-ci-pipeline-concurrency-deadlock
+technology: DevOps
+category: CI/CD
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Pipelines deadlock because a concurrency group is misconfigured, so the deploy never runs.
+  Fix the pipeline and confirm it passes.
+initial_state: A CI/CD or Helm environment with the documented ci-pipeline fault.
+objectives:
+- Confirm the pipeline is failing
+- Fix the pipeline configuration
+- Verify the pipeline passes
+hints:
+- order: 1
+  cost: 10
+  content: The pipeline deploy stage is failing.
+- order: 2
+  cost: 15
+  content: Fix the pipeline configuration and redeploy.
+- order: 3
+  cost: 20
+  content: The pipeline/release is healthy.

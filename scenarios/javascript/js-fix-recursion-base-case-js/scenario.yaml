@@ -1,0 +1,72 @@
+title: Fix the Recursive sumTo Base Case
+slug: js-fix-recursion-base-case-js
+category: JavaScript Development
+description: sumTo(n) recursively sums 1..n, but its base case is wrong — it stops at n === 1 returning
+  0, so the result is off by one (it drops the final 1). Also it overflows the stack for n === 0. Fix
+  the base case to handle n <= 0 (return 0) and include 1.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See sums come out one short
+- Stop recursion at n <= 0
+- Include 1 in the total
+initial_state: sumTo(n) recursively sums 1..n, but its base case is wrong — it stops at n === 1 returning
+  0, so the result is off by one (it drops the final 1). Also it overflows the stack for n === 0. Fix
+  the base case to handle n <= 0 (return 0) and include 1.
+solution_explanation: |
+  Returning 0 at n === 1 drops the final 1 and never terminates for n <= 0. Basing out at n <= 0 includes 1 and handles non-positive inputs.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix sumTo(n): return 1 + 2 + ... + n (0 for n <= 0).
+      sumTo(5) -> 15, sumTo(0) -> 0
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function sumTo(n) {
+        if (n === 1) return 0; // bug: drops 1 and recurses forever for n<=0
+        return n + sumTo(n - 1);
+      }
+    readonly: false
+  visible_tests:
+  - name: sum to 5
+    code: |
+      assert(sumTo(5) === 15, sumTo(5));
+  - name: sum to 1
+    code: |
+      assert(sumTo(1) === 1, sumTo(1));
+  hidden_tests:
+  - name: sum to 0
+    code: |
+      assert(sumTo(0) === 0);
+  - name: sum to 10
+    code: |
+      assert(sumTo(10) === 55);
+  - name: sum to 3
+    code: |
+      assert(sumTo(3) === 6);
+  - name: negative is 0
+    code: |
+      assert(sumTo(-3) === 0);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: sumTo(5) returns 14 — one short, because the base case returns 0 at n === 1.
+- order: 2
+  cost: 20
+  content: The base case should return when n <= 0 and must let n === 1 add its 1.
+- order: 3
+  cost: 30
+  content: Use `if (n <= 0) return 0;` and keep `return n + sumTo(n - 1);`.

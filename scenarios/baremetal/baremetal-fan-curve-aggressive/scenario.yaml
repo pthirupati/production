@@ -1,0 +1,29 @@
+title: Server Overheating From Bad Fan Curve
+slug: baremetal-fan-curve-aggressive
+technology: Baremetal
+category: Thermal
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A server runs hot because a custom fan curve is too passive for the workload. Set an appropriate
+  fan curve and confirm the config is corrected.
+initial_state: A bare-metal server whose fan curve is too passive, allowing thermal events under load.
+objectives:
+- Confirm thermal events from the fan curve
+- Set an appropriate fan curve
+- Verify the thermal config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: BMC logs show thermal warnings.
+- order: 2
+  cost: 15
+  content: Apply a more aggressive fan curve.
+- order: 3
+  cost: 20
+  content: fan_curve.cfg carries the corrected curve.

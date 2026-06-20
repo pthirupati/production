@@ -1,0 +1,28 @@
+title: Ansible Tags Skipping Critical Tasks
+slug: ansible-tags-misused
+technology: Ansible
+category: Tags
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A run with --tags skips critical setup because tags are applied wrong.
+initial_state: An Ansible play whose tags exclude required tasks.
+objectives:
+- 'Confirm the issue: Critical tasks are skipped'
+- Apply the documented fix in /home/ansible/tagged.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Critical tasks are skipped
+- order: 2
+  cost: 15
+  content: Apply tags correctly / add always.
+- order: 3
+  cost: 20
+  content: /home/ansible/tagged.yml carries the corrected configuration.

@@ -1,0 +1,31 @@
+title: Terraform count to for_each Migration Drift
+slug: terraform-count-foreach-drift
+technology: Terraform
+category: State / Plan
+difficulty: hard
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Switching a resource from count to for_each caused Terraform to want to destroy and recreate
+  every instance because addresses changed from [0],[1] to [key]. Use state mv to map indices to keys
+  so the migration is non-destructive.
+initial_state: A Terraform module migrated from count to for_each; plan wants to replace all instances
+  because state still uses numeric indices.
+objectives:
+- Confirm plan wants to recreate all instances after the migration
+- Map each indexed address to its keyed address with terraform state mv
+- Verify plan shows no recreation after the moves
+hints:
+- order: 1
+  cost: 10
+  content: terraform plan shows N destroys + N creates for the same resources.
+- order: 2
+  cost: 15
+  content: terraform state mv 'res[0]' 'res["a"]' for each (or moved blocks).
+- order: 3
+  cost: 20
+  content: Re-plan; instances unchanged.

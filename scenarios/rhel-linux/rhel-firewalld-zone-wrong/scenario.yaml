@@ -1,0 +1,28 @@
+title: RHEL Interface in Wrong Firewall Zone
+slug: rhel-firewalld-zone-wrong
+technology: RHEL Linux
+category: Firewall
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Traffic is wrongly allowed/blocked because a NIC is in the wrong firewalld zone.
+initial_state: A RHEL host with a NIC in the wrong firewall zone.
+objectives:
+- 'Confirm the issue: Unexpected firewall behavior'
+- Apply the documented fix in /etc/firewalld/zones/public.xml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Unexpected firewall behavior
+- order: 2
+  cost: 15
+  content: Assign the interface to the correct zone.
+- order: 3
+  cost: 20
+  content: /etc/firewalld/zones/public.xml carries the corrected configuration.

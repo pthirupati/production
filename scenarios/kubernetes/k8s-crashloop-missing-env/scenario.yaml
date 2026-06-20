@@ -1,0 +1,30 @@
+title: Deployment CrashLoop from Missing Env Var
+slug: k8s-crashloop-missing-env
+technology: Kubernetes
+category: Workloads
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Pods crash on startup because a required environment variable is missing, so the app exits
+  non-zero. Provide the env var and confirm pods become Running.
+initial_state: A Kubernetes Deployment whose container exits immediately due to a missing required environment
+  variable.
+objectives:
+- Confirm pods crash from a missing env var
+- Add the env var (or its source) and roll out
+- Verify pods are Running
+hints:
+- order: 1
+  cost: 10
+  content: kubectl logs shows the app erroring on a missing variable.
+- order: 2
+  cost: 15
+  content: Add the env/envFrom and roll out the deployment.
+- order: 3
+  cost: 20
+  content: Pods Running.

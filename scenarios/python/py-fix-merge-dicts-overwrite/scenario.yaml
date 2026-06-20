@@ -1,0 +1,78 @@
+title: Fix merge_dicts Precedence
+slug: py-fix-merge-dicts-overwrite
+category: Python Development
+description: 'merge_dicts(a, b) should return a new dict where keys from b OVERRIDE keys from a, but the
+  merge order is reversed so a wins instead. Also it mutates `a` in place. Fix both: b takes precedence
+  and inputs are not mutated.'
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Show b's values do not win and that a is mutated
+- Build a new dict without touching the inputs
+- Apply b after a so b overrides
+initial_state: 'merge_dicts(a, b) should return a new dict where keys from b OVERRIDE keys from a, but
+  the merge order is reversed so a wins instead. Also it mutates `a` in place. Fix both: b takes precedence
+  and inputs are not mutated.'
+solution_explanation: |
+  Copying a into a new dict and updating with b means b overrides on conflicts and neither input is mutated.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix merge_dicts(a, b): return a NEW dict with all keys from both, where b's value wins on conflicts. Do not mutate a or b.
+      merge_dicts({'x':1,'y':2}, {'y':9}) -> {'x':1, 'y':9}
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def merge_dicts(a, b):
+          a.update(b)        # mutates a
+          a.update(a)        # bug: re-applies a over b; and still mutates
+          return a
+    readonly: false
+  visible_tests:
+  - name: b overrides
+    code: |
+      assert merge_dicts({'x':1,'y':2}, {'y':9}) == {'x':1,'y':9}
+  - name: disjoint keys
+    code: |
+      assert merge_dicts({'a':1}, {'b':2}) == {'a':1,'b':2}
+  hidden_tests:
+  - name: does not mutate a
+    code: |
+      a = {'k': 1}
+      merge_dicts(a, {'k': 2})
+      assert a == {'k': 1}, a
+  - name: does not mutate b
+    code: |
+      b = {'k': 2}
+      merge_dicts({'k': 1}, b)
+      assert b == {'k': 2}
+  - name: b wins on multiple conflicts
+    code: |
+      assert merge_dicts({'a':1,'b':1}, {'a':2,'b':2}) == {'a':2,'b':2}
+  - name: empty b returns copy of a
+    code: |
+      a = {'a': 1}
+      r = merge_dicts(a, {})
+      assert r == {'a':1} and r is not a
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: merge_dicts({'y':2}, {'y':9}) returns y=2 — a wins, and the original a is changed.
+- order: 2
+  cost: 20
+  content: Make a copy of a first, then update it with b so b takes precedence.
+- order: 3
+  cost: 30
+  content: Return `out = dict(a); out.update(b); return out`.

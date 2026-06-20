@@ -1,0 +1,28 @@
+title: Script Date Parsing Breaks by Locale
+slug: shell-date-format-locale
+technology: Shell Scripting
+category: Portability
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Date parsing breaks on hosts with a different locale.
+initial_state: An ops script with locale-dependent date handling.
+objectives:
+- 'Confirm the issue: Date parse fails on some hosts'
+- Apply the documented fix in /opt/scripts/report-date.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Date parse fails on some hosts
+- order: 2
+  cost: 15
+  content: Set LC_ALL=C for date ops.
+- order: 3
+  cost: 20
+  content: /opt/scripts/report-date.sh carries the corrected configuration.

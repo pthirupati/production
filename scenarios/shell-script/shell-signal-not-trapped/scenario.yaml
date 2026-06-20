@@ -1,0 +1,30 @@
+title: Long Job Leaves Stale Lock on SIGTERM
+slug: shell-signal-not-trapped
+technology: Shell-script
+category: Signals
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A long-running job leaves a stale lock file when killed because it doesn't trap signals.
+  Add a trap to clean up and confirm the script is corrected.
+initial_state: An ops shell script that doesn't trap SIGTERM/EXIT, leaving a stale lock that blocks future
+  runs.
+objectives:
+- Confirm a stale lock remains after termination
+- Add a trap to remove the lock on exit/signal
+- Verify the script is corrected
+hints:
+- order: 1
+  cost: 10
+  content: The lock file persists after kill.
+- order: 2
+  cost: 15
+  content: trap 'rm -f $LOCK' EXIT INT TERM.
+- order: 3
+  cost: 20
+  content: Script carries the corrected trap.

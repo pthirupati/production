@@ -1,0 +1,74 @@
+title: 'Refactor: Fix find_first to Return the First Match'
+slug: py-review-early-return-find-first
+category: Python Development
+description: find_first(items, predicate) should return the FIRST item for which predicate is true (or
+  None), but it keeps looping and returns the LAST match instead. Refactor it to return early on the first
+  match.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See it returns the last match, not the first
+- Return as soon as the predicate is satisfied
+- Return None when nothing matches
+initial_state: find_first(items, predicate) should return the FIRST item for which predicate is true (or
+  None), but it keeps looping and returns the LAST match instead. Refactor it to return early on the first
+  match.
+solution_explanation: |
+  Returning on the first satisfying element (instead of recording and continuing) yields the first match and short-circuits the scan.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: review
+  instructions: |
+    Fix find_first(items, predicate): return the first item where predicate(item) is true, else None.
+      find_first([1,2,3,4], lambda x: x > 2) -> 3
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def find_first(items, predicate):
+          found = None
+          for it in items:
+              if predicate(it):
+                  found = it      # keeps overwriting -> returns LAST match
+          return found
+    readonly: false
+  visible_tests:
+  - name: first over two
+    code: |
+      assert find_first([1, 2, 3, 4], lambda x: x > 2) == 3
+  - name: no match
+    code: |
+      assert find_first([1, 2], lambda x: x > 9) is None
+  hidden_tests:
+  - name: returns first not last
+    code: |
+      assert find_first([5, 6, 7], lambda x: x > 4) == 5
+  - name: first element matches
+    code: |
+      assert find_first(['a', 'b'], lambda s: s == 'a') == 'a'
+  - name: empty
+    code: |
+      assert find_first([], lambda x: True) is None
+  - name: all match returns first
+    code: |
+      assert find_first([2, 4, 6], lambda x: x % 2 == 0) == 2
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: find_first([5,6,7], x>4) returns 7, but the first match is 5.
+- order: 2
+  cost: 20
+  content: Assigning to `found` and continuing keeps the last match.
+- order: 3
+  cost: 30
+  content: Return immediately inside the if; return None after the loop.

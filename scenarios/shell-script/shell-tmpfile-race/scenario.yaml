@@ -1,0 +1,28 @@
+title: Script Has Insecure Temp File
+slug: shell-tmpfile-race
+technology: Shell Scripting
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A script uses a predictable temp file name, risking a symlink race.
+initial_state: An ops script creating temp files insecurely.
+objectives:
+- 'Confirm the issue: Predictable /tmp file name'
+- Apply the documented fix in /opt/scripts/tmpwork.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Predictable /tmp file name
+- order: 2
+  cost: 15
+  content: Use mktemp for temp files.
+- order: 3
+  cost: 20
+  content: /opt/scripts/tmpwork.sh carries the corrected configuration.

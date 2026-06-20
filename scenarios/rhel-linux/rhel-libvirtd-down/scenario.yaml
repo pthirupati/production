@@ -1,0 +1,28 @@
+title: RHEL libvirtd Down — VMs Unmanaged
+slug: rhel-libvirtd-down
+technology: RHEL Linux
+category: Virtualization
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: KVM guests can't be managed because libvirtd is down.
+initial_state: A RHEL host where the libvirtd service is failed.
+objectives:
+- Confirm libvirtd is down (virsh list fails)
+- Resolve the cause and start libvirtd
+- Verify libvirtd is active
+hints:
+- order: 1
+  cost: 10
+  content: virsh list fails
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start libvirtd.'
+- order: 3
+  cost: 20
+  content: systemctl is-active libvirtd returns active.

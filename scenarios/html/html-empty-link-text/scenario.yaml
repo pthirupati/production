@@ -1,0 +1,28 @@
+title: Links With No Accessible Text
+slug: html-empty-link-text
+technology: HTML
+category: Accessibility
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Icon-only links have no accessible name for screen readers.
+initial_state: A page with empty/icon-only links.
+objectives:
+- 'Confirm the issue: Links have no text'
+- Apply the documented fix in /var/www/html/icons.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Links have no text
+- order: 2
+  cost: 15
+  content: Add aria-label/visually-hidden text.
+- order: 3
+  cost: 20
+  content: /var/www/html/icons.html carries the corrected markup/config.

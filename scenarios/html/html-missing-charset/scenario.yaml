@@ -1,0 +1,29 @@
+title: Garbled Characters From Missing Charset
+slug: html-missing-charset
+technology: Html
+category: Standards
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Special characters render as mojibake because the page has no charset meta tag. Add UTF-8
+  charset and confirm the file is corrected.
+initial_state: A static page missing <meta charset>, so non-ASCII text renders incorrectly.
+objectives:
+- Confirm garbled characters
+- Add <meta charset="utf-8">
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Accented characters show as ï¿½.
+- order: 2
+  cost: 15
+  content: Add the charset meta in <head>.
+- order: 3
+  cost: 20
+  content: index.html carries the corrected charset.

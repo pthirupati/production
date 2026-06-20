@@ -1,0 +1,93 @@
+title: Implement a Stack Class
+slug: py-impl-stack-class
+category: Python Development
+description: Implement a Stack class with push(x), pop(), peek(), is_empty(), and __len__. pop/peek on
+  an empty stack should raise IndexError. The stub is empty so the tests fail.
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Back the stack with a list
+- Implement LIFO push/pop/peek
+- Raise IndexError on empty pop/peek and support len()
+initial_state: Implement a Stack class with push(x), pop(), peek(), is_empty(), and __len__. pop/peek
+  on an empty stack should raise IndexError. The stub is empty so the tests fail.
+solution_explanation: |
+  A list models a stack: append/pop at the end give LIFO. Guarding the empty case raises IndexError, and __len__ exposes the size.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement class Stack with: push(x), pop() -> last item, peek() -> last item without removing, is_empty() -> bool, and len(stack). pop/peek on empty must raise IndexError.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      class Stack:
+          # TODO: implement push, pop, peek, is_empty, __len__
+          pass
+    readonly: false
+  visible_tests:
+  - name: push and pop
+    code: |
+      s = Stack()
+      s.push(1)
+      s.push(2)
+      assert s.pop() == 2 and s.pop() == 1
+  - name: starts empty
+    code: |
+      s = Stack()
+      assert s.is_empty() and len(s) == 0
+  hidden_tests:
+  - name: peek does not remove
+    code: |
+      s = Stack()
+      s.push(7)
+      assert s.peek() == 7 and len(s) == 1
+  - name: len tracks size
+    code: |
+      s = Stack()
+      for i in range(3):
+          s.push(i)
+      assert len(s) == 3
+  - name: pop empty raises
+    code: |
+      s = Stack()
+      try:
+          s.pop()
+          assert False, 'expected IndexError'
+      except IndexError:
+          pass
+  - name: peek empty raises
+    code: |
+      s = Stack()
+      try:
+          s.peek()
+          assert False
+      except IndexError:
+          pass
+  - name: LIFO order
+    code: |
+      s = Stack()
+      for x in [1,2,3]:
+          s.push(x)
+      assert [s.pop(), s.pop(), s.pop()] == [3,2,1]
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Use a Python list as the backing store; the end of the list is the top.
+- order: 2
+  cost: 20
+  content: push -> append, pop -> list.pop(), peek -> items[-1].
+- order: 3
+  cost: 30
+  content: Guard pop/peek when empty and raise IndexError; define __len__ to return the size.

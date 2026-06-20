@@ -1,0 +1,29 @@
+title: NVSwitch Fabric Manager Misconfigured
+slug: gpu-fabric-manager-down
+technology: Gpu
+category: Multi-GPU
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: On an NVSwitch system, GPUs can't form the fabric because Fabric Manager is misconfigured,
+  breaking multi-GPU NCCL. Fix the config and confirm it is corrected.
+initial_state: A multi-GPU NVSwitch host whose Fabric Manager configuration is wrong, blocking GPU peering.
+objectives:
+- Confirm the fabric won't form
+- Correct the Fabric Manager config
+- Verify the fabric config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: NCCL/peer init fails across GPUs.
+- order: 2
+  cost: 15
+  content: Fix fabricmanager.cfg and restart the service.
+- order: 3
+  cost: 20
+  content: fabricmanager.cfg carries the corrected config.

@@ -1,0 +1,30 @@
+title: Windows Page File Misconfigured Causing Low Memory
+slug: win-pagefile-misconfigured
+technology: Windows Server
+category: Performance
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The server throws low-memory errors because the page file was set to a fixed tiny size on
+  a busy SQL host. Right-size the page file and confirm the warnings stop.
+initial_state: A Windows Server with a too-small fixed page file, causing commit-limit / low virtual memory
+  errors.
+objectives:
+- Confirm low virtual memory events and the tiny fixed page file
+- Right-size the page file (or set system-managed)
+- Verify the low-memory warnings stop
+hints:
+- order: 1
+  cost: 10
+  content: System log shows 'low on virtual memory'.
+- order: 2
+  cost: 15
+  content: Set an adequate page file size on a fast volume.
+- order: 3
+  cost: 20
+  content: Warnings stop after recompute.

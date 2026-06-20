@@ -1,0 +1,28 @@
+title: Duplicate Content Without Canonical
+slug: html-canonical-missing
+technology: HTML
+category: SEO
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Search engines see duplicate content because no canonical link is set.
+initial_state: A page without a canonical link.
+objectives:
+- 'Confirm the issue: No canonical URL declared'
+- Apply the documented fix in /var/www/html/page.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No canonical URL declared
+- order: 2
+  cost: 15
+  content: Add a canonical link tag.
+- order: 3
+  cost: 20
+  content: /var/www/html/page.html carries the corrected markup/config.

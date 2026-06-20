@@ -1,0 +1,28 @@
+title: Ansible Deprecated Loop Syntax Breaks
+slug: ansible-with-items-deprecated
+technology: Ansible
+category: Loops
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A play errors on a newer Ansible because it uses removed with_ loop syntax incorrectly.
+initial_state: An Ansible play using outdated loop syntax that now fails.
+objectives:
+- 'Confirm the issue: Loop syntax errors on newer Ansible'
+- Apply the documented fix in /home/ansible/legacy-loop.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Loop syntax errors on newer Ansible
+- order: 2
+  cost: 15
+  content: 'Convert to the loop: keyword.'
+- order: 3
+  cost: 20
+  content: /home/ansible/legacy-loop.yml carries the corrected configuration.

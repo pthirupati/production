@@ -1,0 +1,28 @@
+title: CouchDB Service Down
+slug: db-couchdb-down
+technology: Database
+category: Document
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: CouchDB is down so document reads/writes fail.
+initial_state: A host where the couchdb service is failed.
+objectives:
+- Confirm couchdb is down (curl localhost:5984 fails)
+- Resolve the cause and start couchdb
+- Verify couchdb is active
+hints:
+- order: 1
+  cost: 10
+  content: curl localhost:5984 fails
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start couchdb.'
+- order: 3
+  cost: 20
+  content: systemctl is-active couchdb returns active.

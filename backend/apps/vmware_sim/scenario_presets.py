@@ -51,6 +51,82 @@ def apply_vmware_scenario_preset(state: dict, scenario_slug: str) -> None:
             "severity": severity, "status": "active", "time": events[-1]["time"] if events else "",
         })
 
+    # ── New scenarios (wave 4): each reuses an existing validation rule AND
+    # an existing e2e fix substring, so they fail-closed before the fix and
+    # pass after. Matched FIRST so their distinct slugs don't fall through to
+    # a broader branch. ──────────────────────────────────────────────────
+    if "datastore-thin-overcommit-full" in slug:
+        ds = next((d for d in state.get("datastores", []) if d.get("name") == "datastore-ssd-01"), None)
+        if ds is None and state.get("datastores"):
+            ds = state["datastores"][0]
+        if ds:
+            ds["free_gb"] = 5
+        events.append(_event("Datastore datastore-ssd-01 critically low on free space", "critical", "datastore-ssd-01"))
+        alarm("alm-ds-thin", "Datastore usage critical", "datastore-ssd-01")
+        _set_validation(state, datastore="datastore-ssd-01", datastore_min_free_gb=50)
+        return
+    if "esxi-coredump-partition-full" in slug:
+        h = state["hosts"][0]
+        h["coredump_full"] = True
+        events.append(_event(f"Core dump partition full on {h['name']}", "warning", h["name"]))
+        _set_validation(state, require_coredump_cleared=True)
+        return
+    if "esxi-ntp-drift-kerberos" in slug:
+        for h in state["hosts"]:
+            h["ntp_synced"] = False
+        events.append(_event("ESXi host time drift detected — NTP not synced", "warning", "Cluster-01"))
+        _set_validation(state, require_ntp_synced=True)
+        return
+    if "vm-tools-outdated-blocking-quiesce" in slug:
+        if web:
+            web["tools"] = "toolsOld"
+        events.append(_event("VMware Tools out of date on web-prod-01 — quiesced snapshots failing", "warning", "web-prod-01"))
+        _set_validation(state, target_vm="web-prod-01", require_tools="toolsOk")
+        return
+    if "vm-cpu-ready-contention" in slug:
+        if web:
+            web["cpu_ready_pct"] = 18
+        events.append(_event("High CPU ready time on web-prod-01 — host CPU contention", "warning", "web-prod-01"))
+        _set_validation(state, target_vm="web-prod-01", max_cpu_ready_pct=5)
+        return
+    if "vm-snapshot-chain-consolidate" in slug:
+        if web:
+            web["snapshots"] = [
+                {"id": f"snap-{i}", "name": f"snap-{i}", "created": _now_iso()} for i in range(1, 6)
+            ]
+        events.append(_event("web-prod-01 has a long snapshot chain consuming datastore space", "warning", "web-prod-01"))
+        alarm("alm-snap-chain", "Snapshot chain too long", "web-prod-01")
+        _set_validation(state, target_vm="web-prod-01", max_snapshots=1)
+        return
+    if "vm-network-adapter-disconnected" in slug:
+        if web:
+            web["network_disconnected"] = True
+        events.append(_event("web-prod-01 network adapter is disconnected", "warning", "web-prod-01"))
+        alarm("alm-vm-net", "VM network disconnected", "web-prod-01")
+        _set_validation(state, target_vm="web-prod-01", require_network_connected=True)
+        return
+    if "vsan-disk-group-unclaimed" in slug:
+        state["vsan_disk_unclaimed"] = True
+        events.append(_event("vSAN disks unclaimed on a host — capacity reduced", "warning", "Cluster-01"))
+        alarm("alm-vsan-claim", "vSAN disks unclaimed", "Cluster-01")
+        _set_validation(state, vsan_disks_claimed=True)
+        return
+    if "vcenter-sso-account-lockout" in slug:
+        state["vcenter_sso_locked"] = True
+        events.append(_event("vCenter SSO administrator account locked after failed logins", "critical", "vCenter"))
+        alarm("alm-sso-lock", "SSO account locked", "vCenter")
+        _set_validation(state, vcenter_sso_unlocked=True)
+        return
+    if "esxi-management-network-isolated" in slug:
+        h = state["hosts"][0]
+        h["management_network"] = "down"
+        h["status"] = "disconnected"
+        h["connection_state"] = "disconnected"
+        events.append(_event(f"Management network isolated on {h['name']}", "critical", h["name"]))
+        alarm("alm-mgmt-iso", "Management network isolated", h["name"])
+        _set_validation(state, require_host_connected=h["name"])
+        return
+
     # ── Power / guest state ─────────────────────────────────────────────
     if "guest-powered-off" in slug or slug.endswith("guest-powered-off"):
         if web:

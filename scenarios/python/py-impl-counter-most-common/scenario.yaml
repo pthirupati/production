@@ -1,0 +1,70 @@
+title: Implement most_common (top-k)
+slug: py-impl-counter-most-common
+category: Python Development
+description: 'Implement most_common(items, k): return the k most frequent items as a list of (item, count)
+  tuples, highest count first. Break ties by first appearance in `items`. The stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Count frequencies preserving first-seen order
+- Sort by count descending, ties by first appearance
+- Return the top k as (item, count) tuples
+initial_state: 'Implement most_common(items, k): return the k most frequent items as a list of (item,
+  count) tuples, highest count first. Break ties by first appearance in `items`. The stub is empty so
+  tests fail.'
+solution_explanation: |
+  Counting with a first-seen index lets you sort by descending count and ascending first-appearance, giving a deterministic top-k.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement most_common(items, k) -> list of (item, count) tuples for the k most frequent items, count descending, ties broken by first appearance.
+      most_common(['a','b','a','c','b','a'], 2) -> [('a', 3), ('b', 2)]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def most_common(items, k):
+          # TODO: return the top-k (item, count) tuples
+          pass
+    readonly: false
+  visible_tests:
+  - name: basic top 2
+    code: |
+      assert most_common(['a','b','a','c','b','a'], 2) == [('a', 3), ('b', 2)]
+  - name: k of 1
+    code: |
+      assert most_common(['x','x','y'], 1) == [('x', 2)]
+  hidden_tests:
+  - name: tie broken by first appearance
+    code: |
+      assert most_common(['b','a','a','b'], 2) == [('b', 2), ('a', 2)]
+  - name: k larger than distinct
+    code: |
+      assert most_common(['a','b'], 5) == [('a', 1), ('b', 1)]
+  - name: empty
+    code: |
+      assert most_common([], 3) == []
+  - name: all equal counts keep order
+    code: |
+      assert most_common(['z','y','x'], 3) == [('z',1),('y',1),('x',1)]
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Count occurrences and remember the first index where each item appeared.
+- order: 2
+  cost: 20
+  content: Sort items by (-count, first_index) so ties keep input order.
+- order: 3
+  cost: 30
+  content: Return the first k as (item, count) tuples.

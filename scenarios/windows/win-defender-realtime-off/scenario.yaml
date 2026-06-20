@@ -1,0 +1,29 @@
+title: Windows Defender Real-Time Protection Off
+slug: win-defender-realtime-off
+technology: Windows Server
+category: Security
+difficulty: easy
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Endpoint protection is degraded because Defender real-time protection was disabled. Re-enable
+  it and confirm protection is active.
+initial_state: A Windows Server with Defender real-time protection turned off.
+objectives:
+- Confirm the Windows issue
+- Apply the documented fix
+- Verify the issue is resolved
+hints:
+- order: 1
+  cost: 10
+  content: Investigate the affected Windows component.
+- order: 2
+  cost: 15
+  content: Apply the documented Windows fix.
+- order: 3
+  cost: 20
+  content: The component reports healthy.

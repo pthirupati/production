@@ -1,0 +1,29 @@
+title: Bad fstab Option Blocks Mount
+slug: linux-fstab-bad-option
+technology: Linux
+category: Storage
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A filesystem won't mount because an invalid mount option in /etc/fstab causes mount -a to
+  error. Fix the option and confirm the file is corrected.
+initial_state: A Linux host whose /etc/fstab has an invalid mount option, breaking mount -a.
+objectives:
+- Confirm mount -a fails on the bad option
+- Correct the fstab option
+- Verify the fstab is corrected
+hints:
+- order: 1
+  cost: 10
+  content: mount -a errors on the entry.
+- order: 2
+  cost: 15
+  content: Fix the invalid option in fstab.
+- order: 3
+  cost: 20
+  content: fstab carries the corrected entry.

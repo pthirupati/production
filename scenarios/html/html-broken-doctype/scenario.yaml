@@ -1,0 +1,29 @@
+title: Page Renders in Quirks Mode
+slug: html-broken-doctype
+technology: Html
+category: Standards
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A page renders inconsistently across browsers because it's missing a valid DOCTYPE and falls
+  into quirks mode. Add the HTML5 doctype and confirm the file is corrected.
+initial_state: A static site whose index.html lacks a DOCTYPE, triggering browser quirks mode.
+objectives:
+- Confirm the page is in quirks mode
+- Add the HTML5 <!DOCTYPE html>
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: document.compatMode is BackCompat.
+- order: 2
+  cost: 15
+  content: Add <!DOCTYPE html> at the very top.
+- order: 3
+  cost: 20
+  content: index.html carries the corrected doctype.

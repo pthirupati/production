@@ -1,0 +1,28 @@
+title: PostgreSQL shared_buffers Too Low
+slug: db-postgres-shared-buffers-low
+technology: Database
+category: Tuning
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: PostgreSQL performance is poor because shared_buffers is far too small for the host memory.
+initial_state: A PostgreSQL host whose shared_buffers is undersized.
+objectives:
+- 'Confirm the issue: High disk reads; shared_buffers tiny'
+- Apply the documented fix in /var/lib/pgsql/data/postgresql.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: High disk reads; shared_buffers tiny
+- order: 2
+  cost: 15
+  content: Raise shared_buffers appropriately and restart.
+- order: 3
+  cost: 20
+  content: /var/lib/pgsql/data/postgresql.conf carries the corrected configuration.

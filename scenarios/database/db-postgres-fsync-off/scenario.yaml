@@ -1,0 +1,29 @@
+title: PostgreSQL Running With fsync Off
+slug: db-postgres-fsync-off
+technology: Database
+category: PostgreSQL
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An audit found PostgreSQL running with fsync = off, risking data corruption on crash. Re-enable
+  fsync safely and confirm the configuration is corrected.
+initial_state: A PostgreSQL host whose postgresql.conf has fsync disabled, a durability risk.
+objectives:
+- Confirm fsync is disabled
+- Re-enable fsync and plan a restart
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SHOW fsync; returns off.
+- order: 2
+  cost: 15
+  content: Set fsync = on in postgresql.conf.
+- order: 3
+  cost: 20
+  content: postgresql.conf carries fsync on (corrected).

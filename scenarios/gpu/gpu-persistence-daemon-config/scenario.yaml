@@ -1,0 +1,28 @@
+title: GPU Persistence Daemon Misconfigured
+slug: gpu-persistence-daemon-config
+technology: GPU
+category: Performance
+difficulty: easy
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Persistence isn't applied at boot because the persistence daemon config is wrong.
+initial_state: A GPU host with a broken persistence daemon config.
+objectives:
+- 'Confirm the issue: Persistence off after reboot'
+- Apply the documented fix in /etc/gpu/persistenced.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Persistence off after reboot
+- order: 2
+  cost: 15
+  content: Fix the persistence daemon config.
+- order: 3
+  cost: 20
+  content: /etc/gpu/persistenced.conf carries the corrected configuration.

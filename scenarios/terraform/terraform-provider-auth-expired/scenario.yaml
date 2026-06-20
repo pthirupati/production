@@ -1,0 +1,31 @@
+title: Terraform Provider Authentication Expired
+slug: terraform-provider-auth-expired
+technology: Terraform
+category: Providers
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Terraform apply fails with an auth/credential error against AWS because the assumed-role
+  session expired. Refresh credentials (or fix assume_role), then validate terraform can authenticate
+  again.
+initial_state: A Terraform AWS provider whose temporary credentials/role session expired, so every plan/apply
+  returns an auth error.
+objectives:
+- Read the provider auth error from terraform plan
+- Refresh the AWS session/credentials or fix the assume_role block
+- Confirm terraform plan authenticates cleanly
+hints:
+- order: 1
+  cost: 10
+  content: terraform plan returns ExpiredToken/InvalidClientTokenId.
+- order: 2
+  cost: 15
+  content: Refresh creds (aws sso login) or fix assume_role ARN.
+- order: 3
+  cost: 20
+  content: Re-plan; provider authenticates.

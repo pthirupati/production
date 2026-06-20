@@ -1,0 +1,30 @@
+title: NetworkPolicy Blocking Required Egress
+slug: k8s-netpol-block-egress
+technology: Kubernetes
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A default-deny NetworkPolicy blocks a pod's egress to the database, breaking the app. Add
+  the required egress rule and confirm connectivity is restored.
+initial_state: A Kubernetes namespace with a default-deny policy missing an egress allow to the DB, breaking
+  the workload.
+objectives:
+- Confirm egress is blocked by the NetworkPolicy
+- Add the required egress allow rule
+- Verify connectivity and cluster health
+hints:
+- order: 1
+  cost: 10
+  content: App can't reach the DB; a deny-all NetworkPolicy is in place.
+- order: 2
+  cost: 15
+  content: Add an egress rule allowing the DB port/namespace.
+- order: 3
+  cost: 20
+  content: Connectivity restored.

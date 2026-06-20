@@ -1,0 +1,28 @@
+title: NVSwitch Driver/Fabric Version Skew
+slug: gpu-driver-fabric-mismatch
+technology: GPU
+category: Multi-GPU
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The fabric won't initialize because the driver and Fabric Manager versions are mismatched.
+initial_state: An NVSwitch host with driver/fabric version skew.
+objectives:
+- 'Confirm the issue: Fabric init fails on version skew'
+- Apply the documented fix in /etc/gpu/fabric-version.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Fabric init fails on version skew
+- order: 2
+  cost: 15
+  content: Align driver and Fabric Manager versions.
+- order: 3
+  cost: 20
+  content: /etc/gpu/fabric-version.conf carries the corrected configuration.

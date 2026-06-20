@@ -1,0 +1,29 @@
+title: Pod Evicted from Node Disk Pressure
+slug: k8s-pod-evicted-disk-pressure
+technology: Kubernetes
+category: Scheduling
+difficulty: hard
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Pods are being evicted because a node is under DiskPressure from log buildup. Reclaim node
+  disk and confirm pods reschedule and run.
+initial_state: A Kubernetes node tainted with DiskPressure, evicting pods until disk is reclaimed.
+objectives:
+- Confirm pods are evicted due to node DiskPressure
+- Reclaim disk on the node and clear the taint
+- Verify pods reschedule and the cluster is healthy
+hints:
+- order: 1
+  cost: 10
+  content: kubectl describe node shows DiskPressure taint.
+- order: 2
+  cost: 15
+  content: Free disk on the node; the taint clears and pods reschedule.
+- order: 3
+  cost: 20
+  content: Pods Running.

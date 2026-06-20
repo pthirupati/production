@@ -1,0 +1,28 @@
+title: Ansible SELinux Context Not Set
+slug: ansible-selinux-context
+technology: Ansible
+category: Modules
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An app is denied by SELinux because the Ansible sefcontext task is wrong.
+initial_state: An Ansible play that fails to set the right SELinux context.
+objectives:
+- 'Confirm the issue: SELinux denials on the path'
+- Apply the documented fix in /home/ansible/sefcontext.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SELinux denials on the path
+- order: 2
+  cost: 15
+  content: Fix the sefcontext + restorecon tasks.
+- order: 3
+  cost: 20
+  content: /home/ansible/sefcontext.yml carries the corrected configuration.

@@ -341,7 +341,7 @@ def _run_line_check(
             failures.append("postgresql is not running")
         return True
 
-    if "systemctl is-active docker" in stripped:
+    if "systemctl is-active docker" in stripped and "docker-" not in stripped.split("is-active", 1)[-1]:
         svc = state.services.get("docker")
         if not svc or svc.active != "active":
             failures.append("docker service is not running")
@@ -553,6 +553,15 @@ def _run_line_check(
             failures.append("BGP session not established")
         return True
 
+    # ── Interface MTU aligned to the path (ip link show … mtu 1500) ──
+    # Fail-closed: a jumbo-misconfigured interface (mtu 9000 on a 1500 path)
+    # must not pass until the MTU is corrected back to the path value.
+    if ("ip link show" in stripped or "ip -d link" in stripped) and "mtu 1500" in stripped:
+        net = getattr(engine, "networking", None) if engine else None
+        if net is not None and getattr(net, "interface_mtu", 1500) != 1500:
+            failures.append("interface MTU mismatch — align it to the path MTU (1500)")
+        return True
+
     if "chronyc tracking" in stripped or "ntpq" in stripped:
         net = getattr(engine, "networking", None) if engine else None
         if not net or not net.ntp_synced:
@@ -718,6 +727,29 @@ def _run_line_check(
         ]
         if backlog:
             failures.append("stale archived WAL still present — reclaim disk space before restart")
+        return True
+
+    # ── Generic service active check (any unit) — reads real service state.
+    # Placed AFTER the specific service branches above so nginx/mysqld/etc keep
+    # their tailored messages. Fail-closed: an inactive/missing unit fails.
+    if stripped.startswith("systemctl is-active ") or " systemctl is-active " in stripped:
+        parts = stripped.replace("systemctl is-active", "").split()
+        unit = next((p for p in parts if not p.startswith("-")), "")
+        unit = unit.replace(".service", "")
+        if unit:
+            svc = state.services.get(unit)
+            if not svc or svc.active != "active":
+                failures.append(f"{unit} is not active")
+            return True
+
+    # ── Generic config-repair marker (grep -q FIXED-OK <file>) — reads real
+    # file content. A scenario's preset writes a broken config; the fix rewrites
+    # it to contain the FIXED-OK sentinel, proving the file was genuinely edited.
+    if "grep" in stripped and "FIXED-OK" in stripped:
+        path = next((p for p in stripped.split() if p.startswith("/")), "")
+        content = state.read_file(path) if path else None
+        if content is None or "FIXED-OK" not in content:
+            failures.append(f"{path or 'target file'} not corrected — apply the documented fix")
         return True
 
     return False

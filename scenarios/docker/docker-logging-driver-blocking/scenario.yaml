@@ -1,0 +1,28 @@
+title: Blocking Log Driver Stalls Containers
+slug: docker-logging-driver-blocking
+technology: Docker
+category: Logging
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Containers stall when the remote log endpoint is slow because the log mode is blocking.
+initial_state: A host whose Docker log driver blocks on a slow endpoint.
+objectives:
+- 'Confirm the issue: Containers hang on logging'
+- Apply the documented fix in /etc/docker/daemon.json
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Containers hang on logging
+- order: 2
+  cost: 15
+  content: 'Set mode: non-blocking with a buffer.'
+- order: 3
+  cost: 20
+  content: /etc/docker/daemon.json carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: PXE Boot Fails on Tagged VLAN
+slug: baremetal-pxe-vlan-tag
+technology: Bare Metal
+category: Provisioning
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: PXE provisioning fails because the NIC isn't tagging the provisioning VLAN.
+initial_state: A server failing PXE due to a VLAN tagging issue.
+objectives:
+- 'Confirm the issue: No DHCP/PXE on the prov VLAN'
+- Apply the documented fix in /etc/pxe/vlan.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No DHCP/PXE on the prov VLAN
+- order: 2
+  cost: 15
+  content: Configure the PXE VLAN tag.
+- order: 3
+  cost: 20
+  content: /etc/pxe/vlan.cfg carries the corrected configuration.

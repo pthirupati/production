@@ -1,0 +1,28 @@
+title: Container Severely CPU-Throttled
+slug: docker-cpu-limit-throttle
+technology: Docker
+category: Resources
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A latency-sensitive container is throttled because its CPU quota is too tight.
+initial_state: A compose service with an overly tight CPU limit.
+objectives:
+- 'Confirm the issue: High CPU throttling on the container'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: High CPU throttling on the container
+- order: 2
+  cost: 15
+  content: Raise the CPU quota/shares.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

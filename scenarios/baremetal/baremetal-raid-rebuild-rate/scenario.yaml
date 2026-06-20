@@ -1,0 +1,28 @@
+title: RAID Rebuild Starving Production I/O
+slug: baremetal-raid-rebuild-rate
+technology: Bare Metal
+category: RAID
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Production I/O is starved because the RAID rebuild rate is set too high.
+initial_state: A server with an overly aggressive RAID rebuild rate.
+objectives:
+- 'Confirm the issue: App latency spikes during rebuild'
+- Apply the documented fix in /etc/raid/rebuild-rate.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: App latency spikes during rebuild
+- order: 2
+  cost: 15
+  content: Lower the rebuild rate to balance I/O.
+- order: 3
+  cost: 20
+  content: /etc/raid/rebuild-rate.cfg carries the corrected configuration.

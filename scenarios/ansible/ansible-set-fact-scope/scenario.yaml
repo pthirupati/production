@@ -1,0 +1,28 @@
+title: Ansible set_fact Not Visible to Other Hosts
+slug: ansible-set-fact-scope
+technology: Ansible
+category: Variables
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A fact set on one host isn't visible where expected because of host scoping.
+initial_state: An Ansible play with a host-scoping issue on set_fact.
+objectives:
+- 'Confirm the issue: Fact missing on other hosts'
+- Apply the documented fix in /home/ansible/setfact.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Fact missing on other hosts
+- order: 2
+  cost: 15
+  content: Use hostvars / delegate_facts correctly.
+- order: 3
+  cost: 20
+  content: /home/ansible/setfact.yml carries the corrected configuration.

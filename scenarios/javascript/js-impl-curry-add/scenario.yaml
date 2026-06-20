@@ -1,0 +1,71 @@
+title: Implement a Range Function
+slug: js-impl-curry-add
+category: JavaScript Development
+description: 'Implement range(start, end, step=1): return an array of numbers from start (inclusive) up
+  to but NOT including end, advancing by step. Assume step > 0 and end >= start. The stub is empty so
+  tests fail.'
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Generate values from start while < end
+- Advance by step (default 1)
+- Exclude the end value
+initial_state: 'Implement range(start, end, step=1): return an array of numbers from start (inclusive)
+  up to but NOT including end, advancing by step. Assume step > 0 and end >= start. The stub is empty
+  so tests fail.'
+solution_explanation: |
+  A loop from start while i < end, stepping by step, collects the half-open range [start, end).
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement range(start, end, step=1) -> array [start, start+step, ...] < end.
+      range(0, 5) -> [0,1,2,3,4]; range(0, 10, 2) -> [0,2,4,6,8]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function range(start, end, step = 1) {
+        // TODO: return [start .. end) advancing by step
+      }
+    readonly: false
+  visible_tests:
+  - name: default step
+    code: |
+      assert(JSON.stringify(range(0, 5)) === JSON.stringify([0,1,2,3,4]), JSON.stringify(range(0, 5)));
+  - name: step two
+    code: |
+      assert(JSON.stringify(range(0, 10, 2)) === JSON.stringify([0,2,4,6,8]), JSON.stringify(range(0, 10, 2)));
+  hidden_tests:
+  - name: non-zero start
+    code: |
+      assert(JSON.stringify(range(3, 7)) === JSON.stringify([3,4,5,6]), JSON.stringify(range(3, 7)));
+  - name: empty when start equals end
+    code: |
+      assert(JSON.stringify(range(4, 4)) === JSON.stringify([]), JSON.stringify(range(4, 4)));
+  - name: step three
+    code: |
+      assert(JSON.stringify(range(1, 10, 3)) === JSON.stringify([1,4,7]), JSON.stringify(range(1, 10, 3)));
+  - name: excludes end
+    code: |
+      assert(range(0, 5).indexOf(5) === -1);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Loop a counter from start while it is strictly less than end.
+- order: 2
+  cost: 20
+  content: Increment the counter by step each iteration (default step is 1).
+- order: 3
+  cost: 30
+  content: Push each value; the end value is never included.

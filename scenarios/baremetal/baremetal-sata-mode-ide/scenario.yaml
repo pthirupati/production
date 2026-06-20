@@ -1,0 +1,28 @@
+title: Storage Controller in Legacy IDE Mode
+slug: baremetal-sata-mode-ide
+technology: Bare Metal
+category: Storage
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Storage performance/features are degraded because the controller is in legacy IDE mode.
+initial_state: A server whose SATA controller is set to IDE instead of AHCI.
+objectives:
+- 'Confirm the issue: No AHCI features; slow I/O'
+- Apply the documented fix in /etc/bios/sata-mode.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No AHCI features; slow I/O
+- order: 2
+  cost: 15
+  content: Switch the controller to AHCI.
+- order: 3
+  cost: 20
+  content: /etc/bios/sata-mode.cfg carries the corrected configuration.

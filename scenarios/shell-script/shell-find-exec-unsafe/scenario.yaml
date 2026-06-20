@@ -1,0 +1,28 @@
+title: Script find -exec Mishandles Spaces
+slug: shell-find-exec-unsafe
+technology: Shell Scripting
+category: Robustness
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A find -exec breaks on filenames with spaces/newlines.
+initial_state: An ops script with an unsafe find -exec.
+objectives:
+- 'Confirm the issue: Spaced filenames break the command'
+- Apply the documented fix in /opt/scripts/purge.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Spaced filenames break the command
+- order: 2
+  cost: 15
+  content: Use -print0 | xargs -0 or -exec ... +.
+- order: 3
+  cost: 20
+  content: /opt/scripts/purge.sh carries the corrected configuration.

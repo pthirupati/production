@@ -1,0 +1,28 @@
+title: Inline SVG Missing Accessible Title
+slug: html-svg-no-title
+technology: HTML
+category: Accessibility
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: An informative inline SVG has no accessible title for screen readers.
+initial_state: A page with an inaccessible inline SVG.
+objectives:
+- 'Confirm the issue: SVG has no title/desc'
+- Apply the documented fix in /var/www/html/chart.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SVG has no title/desc
+- order: 2
+  cost: 15
+  content: Add title/desc and role to the SVG.
+- order: 3
+  cost: 20
+  content: /var/www/html/chart.html carries the corrected markup/config.

@@ -1,0 +1,28 @@
+title: GPU Fans Stuck in Passive Mode
+slug: gpu-fan-policy-passive
+technology: GPU
+category: Thermal
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: GPUs overheat because the fan policy never ramps under load.
+initial_state: A GPU host with a passive fan policy.
+objectives:
+- 'Confirm the issue: Fans don''t ramp under load'
+- Apply the documented fix in /etc/gpu/fan-policy.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Fans don't ramp under load
+- order: 2
+  cost: 15
+  content: Set an active fan curve.
+- order: 3
+  cost: 20
+  content: /etc/gpu/fan-policy.conf carries the corrected configuration.

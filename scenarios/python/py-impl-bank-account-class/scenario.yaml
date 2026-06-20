@@ -1,0 +1,95 @@
+title: Implement a BankAccount with Overdraft Protection
+slug: py-impl-bank-account-class
+category: Python Development
+description: 'Implement a BankAccount class: starts at an opening balance (default 0), supports deposit(amount)
+  and withdraw(amount). Negative or zero amounts raise ValueError. A withdrawal exceeding the balance
+  raises an exception with the message ''Insufficient funds'' and does NOT change the balance. balance
+  is exposed as an attribute. The stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Track a balance and update it on deposit/withdraw
+- Reject non-positive amounts with ValueError
+- Block overdrafts with a clear error and no state change
+initial_state: 'Implement a BankAccount class: starts at an opening balance (default 0), supports deposit(amount)
+  and withdraw(amount). Negative or zero amounts raise ValueError. A withdrawal exceeding the balance
+  raises an exception with the message ''Insufficient funds'' and does NOT change the balance. balance
+  is exposed as an attribute. The stub is empty so tests fail.'
+solution_explanation: |
+  Validation runs before any mutation, so a rejected operation leaves the balance untouched. The overdraft check raises with the required message.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement class BankAccount(opening=0) with .balance, deposit(amount), withdraw(amount). amount must be > 0 (else ValueError). Withdrawing more than the balance raises ValueError('Insufficient funds') and leaves balance unchanged.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      class BankAccount:
+          # TODO: balance, deposit, withdraw with validation + overdraft protection
+          pass
+    readonly: false
+  visible_tests:
+  - name: deposit then withdraw
+    code: |
+      a = BankAccount()
+      a.deposit(100)
+      a.withdraw(30)
+      assert a.balance == 70
+  - name: opening balance
+    code: |
+      a = BankAccount(50)
+      assert a.balance == 50
+  hidden_tests:
+  - name: overdraft blocked and balance unchanged
+    code: |
+      a = BankAccount(20)
+      try:
+          a.withdraw(50)
+          assert False, 'should raise'
+      except ValueError as e:
+          assert 'Insufficient funds' in str(e)
+      assert a.balance == 20
+  - name: negative deposit rejected
+    code: |
+      a = BankAccount()
+      try:
+          a.deposit(-5)
+          assert False
+      except ValueError:
+          pass
+      assert a.balance == 0
+  - name: zero withdraw rejected
+    code: |
+      a = BankAccount(10)
+      try:
+          a.withdraw(0)
+          assert False
+      except ValueError:
+          pass
+  - name: exact balance withdrawal allowed
+    code: |
+      a = BankAccount(40)
+      a.withdraw(40)
+      assert a.balance == 0
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Store balance in __init__ from the opening argument (default 0).
+- order: 2
+  cost: 20
+  content: Validate amount > 0 in both deposit and withdraw, raising ValueError otherwise.
+- order: 3
+  cost: 30
+  content: In withdraw, if amount > balance raise ValueError('Insufficient funds') before changing balance.

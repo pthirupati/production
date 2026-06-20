@@ -1,0 +1,30 @@
+title: AWS Secrets Manager Rotation Lambda Failing
+slug: aws-secrets-rotation-lambda-fail
+technology: Terraform
+category: Secrets
+difficulty: hard
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Secrets Manager rotation is failing because the rotation Lambda lacks VPC access to the
+  database. Fix the Lambda networking/permissions and confirm rotation succeeds.
+initial_state: An AWS Secrets Manager secret whose rotation Lambda cannot reach the DB (missing VPC config/SG),
+  so rotation errors.
+objectives:
+- Confirm rotation is failing
+- Give the rotation Lambda the right VPC/SG/permissions and apply
+- Verify a rotation completes successfully
+hints:
+- order: 1
+  cost: 10
+  content: aws secretsmanager describe-secret shows last rotation failed.
+- order: 2
+  cost: 15
+  content: Attach the Lambda to the DB subnets/SG and grant access; apply.
+- order: 3
+  cost: 20
+  content: Rotation succeeds.

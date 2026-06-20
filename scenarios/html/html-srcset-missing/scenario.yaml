@@ -1,0 +1,28 @@
+title: Mobile Downloads Oversized Images
+slug: html-srcset-missing
+technology: HTML
+category: Performance
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Phones download desktop-sized images because srcset isn't used.
+initial_state: A page without responsive image srcset.
+objectives:
+- 'Confirm the issue: Oversized images on mobile'
+- Apply the documented fix in /var/www/html/responsive.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Oversized images on mobile
+- order: 2
+  cost: 15
+  content: Add srcset/sizes for responsive images.
+- order: 3
+  cost: 20
+  content: /var/www/html/responsive.html carries the corrected markup/config.

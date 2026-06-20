@@ -1,0 +1,28 @@
+title: GPU Thermal Throttling Under Load
+slug: gpu-thermal-throttle-airflow
+technology: GPU
+category: Thermal
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: GPUs throttle under sustained load because the thermal policy is too lax.
+initial_state: A GPU host throttling on temperature.
+objectives:
+- 'Confirm the issue: nvidia-smi shows thermal throttle'
+- Apply the documented fix in /etc/gpu/thermal-policy.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: nvidia-smi shows thermal throttle
+- order: 2
+  cost: 15
+  content: Apply a stricter thermal/fan policy.
+- order: 3
+  cost: 20
+  content: /etc/gpu/thermal-policy.conf carries the corrected configuration.

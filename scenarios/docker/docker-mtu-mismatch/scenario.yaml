@@ -1,0 +1,28 @@
+title: Container Network MTU Mismatch
+slug: docker-mtu-mismatch
+technology: Docker
+category: Networking
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Large packets from containers are dropped because the docker0 MTU mismatches the host.
+initial_state: A host whose Docker network MTU is wrong for the underlay.
+objectives:
+- 'Confirm the issue: Large flows from containers hang'
+- Apply the documented fix in /etc/docker/daemon.json
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Large flows from containers hang
+- order: 2
+  cost: 15
+  content: Set the correct MTU in daemon.json.
+- order: 3
+  cost: 20
+  content: /etc/docker/daemon.json carries the corrected configuration.

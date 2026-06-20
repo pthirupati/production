@@ -1,0 +1,30 @@
+title: Pod CrashLoopBackOff from Bad Liveness Probe
+slug: k8s-crashloop-bad-liveness
+technology: Kubernetes
+category: Workloads
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Deployment is in CrashLoopBackOff because the liveness probe path is wrong and the kubelet
+  keeps killing healthy containers. Fix the probe and confirm pods stay Running.
+initial_state: A Kubernetes Deployment whose liveness probe targets a non-existent path, causing constant
+  restarts.
+objectives:
+- Confirm the pods are crash-looping from the liveness probe
+- Correct the probe path/port and roll out
+- Verify all pods are Running
+hints:
+- order: 1
+  cost: 10
+  content: kubectl describe pod shows liveness probe failures.
+- order: 2
+  cost: 15
+  content: Fix the probe path and kubectl rollout restart the deployment.
+- order: 3
+  cost: 20
+  content: Pods Running.

@@ -1,0 +1,28 @@
+title: Unclosed Tags Breaking Layout
+slug: html-unclosed-tags
+technology: HTML
+category: Standards
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Layout collapses because tags are left unclosed.
+initial_state: A page with unclosed/mismatched tags.
+objectives:
+- 'Confirm the issue: Unclosed tags break the DOM'
+- Apply the documented fix in /var/www/html/broken.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Unclosed tags break the DOM
+- order: 2
+  cost: 15
+  content: Close all tags correctly.
+- order: 3
+  cost: 20
+  content: /var/www/html/broken.html carries the corrected markup/config.

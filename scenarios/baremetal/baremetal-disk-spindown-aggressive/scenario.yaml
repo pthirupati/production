@@ -1,0 +1,28 @@
+title: Disks Spinning Down Under Load
+slug: baremetal-disk-spindown-aggressive
+technology: Bare Metal
+category: Storage
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Latency spikes occur because an aggressive power policy spins disks down under light load.
+initial_state: A server whose disk power policy is too aggressive.
+objectives:
+- 'Confirm the issue: Latency spikes from spin-up'
+- Apply the documented fix in /etc/storage/power-policy.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Latency spikes from spin-up
+- order: 2
+  cost: 15
+  content: Relax the disk power management policy.
+- order: 3
+  cost: 20
+  content: /etc/storage/power-policy.cfg carries the corrected configuration.

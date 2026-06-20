@@ -1,0 +1,28 @@
+title: Ansible delegate_to Targeting Wrong Host
+slug: ansible-delegate-to-wrong
+technology: Ansible
+category: Delegation
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A task runs on the wrong host because delegate_to points at the wrong target.
+initial_state: An Ansible task delegated to an incorrect host.
+objectives:
+- 'Confirm the issue: Task affects the wrong host'
+- Apply the documented fix in /home/ansible/delegate.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Task affects the wrong host
+- order: 2
+  cost: 15
+  content: Fix the delegate_to target.
+- order: 3
+  cost: 20
+  content: /home/ansible/delegate.yml carries the corrected configuration.

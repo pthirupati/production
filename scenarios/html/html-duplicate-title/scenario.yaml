@@ -1,0 +1,28 @@
+title: Page Has Multiple Title Tags
+slug: html-duplicate-title
+technology: HTML
+category: Standards
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Browsers/SEO are confused because there are multiple title tags.
+initial_state: A page with duplicate title elements.
+objectives:
+- 'Confirm the issue: More than one <title>'
+- Apply the documented fix in /var/www/html/dup.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: More than one <title>
+- order: 2
+  cost: 15
+  content: Keep a single title tag.
+- order: 3
+  cost: 20
+  content: /var/www/html/dup.html carries the corrected markup/config.

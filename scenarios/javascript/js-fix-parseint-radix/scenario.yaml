@@ -1,0 +1,75 @@
+title: Fix parseInt Radix in toBase10
+slug: js-fix-parseint-radix
+category: JavaScript Development
+description: 'toBase10(str) parses a decimal numeric string, but it calls parseInt(str) without a radix.
+  For inputs with leading zeros this is fragile, and the intent is explicit base-10 parsing. Also it returns
+  NaN silently for bad input where it should throw. Fix: always pass radix 10 and throw a RangeError on
+  non-numeric input.'
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Always specify radix 10 to parseInt
+- Parse leading-zero strings as decimal (not octal-ish)
+- Throw on input that does not parse
+initial_state: 'toBase10(str) parses a decimal numeric string, but it calls parseInt(str) without a radix.
+  For inputs with leading zeros this is fragile, and the intent is explicit base-10 parsing. Also it returns
+  NaN silently for bad input where it should throw. Fix: always pass radix 10 and throw a RangeError on
+  non-numeric input.'
+solution_explanation: |
+  Specifying radix 10 makes parsing unambiguous, and checking for NaN turns silent bad input into an explicit RangeError.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix toBase10(str): return the base-10 integer value. Use radix 10 explicitly. If the result is NaN, throw a RangeError('not a number').
+      toBase10('010') -> 10, toBase10('42') -> 42
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function toBase10(str) {
+        return parseInt(str); // no radix; returns NaN silently on bad input
+      }
+    readonly: false
+  visible_tests:
+  - name: plain number
+    code: |
+      assert(toBase10('42') === 42);
+  - name: leading zeros decimal
+    code: |
+      assert(toBase10('010') === 10, toBase10('010'));
+  hidden_tests:
+  - name: negative
+    code: |
+      assert(toBase10('-7') === -7);
+  - name: trailing text parses prefix
+    code: |
+      assert(toBase10('15px') === 15);
+  - name: throws on non-numeric
+    code: |
+      let threw = false;
+      try { toBase10('abc'); } catch (e) { threw = e instanceof RangeError; }
+      assert(threw, 'should throw RangeError');
+  - name: zero
+    code: |
+      assert(toBase10('0') === 0);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: parseInt without a radix is ambiguous and returns NaN quietly for 'abc'.
+- order: 2
+  cost: 20
+  content: 'Always pass 10 as the second argument: parseInt(str, 10).'
+- order: 3
+  cost: 30
+  content: After parsing, if Number.isNaN(n) throw new RangeError('not a number').

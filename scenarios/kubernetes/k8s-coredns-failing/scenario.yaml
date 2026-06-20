@@ -1,0 +1,29 @@
+title: CoreDNS Failing Cluster DNS
+slug: k8s-coredns-failing
+technology: Kubernetes
+category: Networking
+difficulty: hard
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Pods can't resolve service names because the CoreDNS Corefile is misconfigured. Fix CoreDNS
+  and confirm in-cluster DNS works (cluster healthy).
+initial_state: A Kubernetes cluster whose CoreDNS ConfigMap has a broken Corefile, breaking service discovery.
+objectives:
+- Confirm DNS resolution is failing in pods
+- Fix the CoreDNS Corefile and restart CoreDNS
+- Verify resolution works and the cluster is healthy
+hints:
+- order: 1
+  cost: 10
+  content: nslookup of a service fails inside pods.
+- order: 2
+  cost: 15
+  content: Correct the CoreDNS Corefile and roll out CoreDNS.
+- order: 3
+  cost: 20
+  content: DNS works.

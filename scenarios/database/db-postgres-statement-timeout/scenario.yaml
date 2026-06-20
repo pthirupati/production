@@ -1,0 +1,28 @@
+title: PostgreSQL Runaway Queries No Timeout
+slug: db-postgres-statement-timeout
+technology: Database
+category: Reliability
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Runaway queries pile up because no statement_timeout is set.
+initial_state: A PostgreSQL host with no statement_timeout.
+objectives:
+- 'Confirm the issue: Long queries never time out'
+- Apply the documented fix in /var/lib/pgsql/data/postgresql.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Long queries never time out
+- order: 2
+  cost: 15
+  content: Set a sane statement_timeout.
+- order: 3
+  cost: 20
+  content: /var/lib/pgsql/data/postgresql.conf carries the corrected configuration.

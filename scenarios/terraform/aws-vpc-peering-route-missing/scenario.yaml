@@ -1,0 +1,30 @@
+title: AWS VPC Peering Route Missing
+slug: aws-vpc-peering-route-missing
+technology: Terraform
+category: VPC
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Two VPCs are peered but traffic does not flow because the route tables lack routes to the
+  peer CIDR. Add the peering routes via Terraform and confirm cross-VPC connectivity.
+initial_state: An AWS VPC peering connection that is active but missing route table entries for the peer
+  CIDR on both sides.
+objectives:
+- Confirm the peering is active but routes are missing
+- Add routes to the peer CIDR via the peering connection and apply
+- Verify cross-VPC traffic flows
+hints:
+- order: 1
+  cost: 10
+  content: aws ec2 describe-route-tables lacks the peer CIDR route.
+- order: 2
+  cost: 15
+  content: Add aws_route entries pointing at the peering connection and apply.
+- order: 3
+  cost: 20
+  content: Cross-VPC connectivity works.

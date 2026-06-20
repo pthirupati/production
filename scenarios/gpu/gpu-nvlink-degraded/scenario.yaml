@@ -1,0 +1,28 @@
+title: NVLink Link Degraded to Lower Width
+slug: gpu-nvlink-degraded
+technology: GPU
+category: Multi-GPU
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Inter-GPU bandwidth dropped because an NVLink lane degraded without alerting.
+initial_state: A multi-GPU host with a degraded NVLink not monitored.
+objectives:
+- 'Confirm the issue: NVLink width reduced'
+- Apply the documented fix in /etc/gpu/nvlink-policy.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: NVLink width reduced
+- order: 2
+  cost: 15
+  content: Add NVLink health monitoring/alerts.
+- order: 3
+  cost: 20
+  content: /etc/gpu/nvlink-policy.conf carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Script Overwrites Its Own EXIT Trap
+slug: shell-exit-trap-overwrite
+technology: Shell Scripting
+category: Signals
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Cleanup is skipped because a second trap overwrites the first EXIT trap.
+initial_state: An ops script clobbering its EXIT trap.
+objectives:
+- 'Confirm the issue: First cleanup never runs'
+- Apply the documented fix in /opt/scripts/multi-trap.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: First cleanup never runs
+- order: 2
+  cost: 15
+  content: Combine cleanup into one trap.
+- order: 3
+  cost: 20
+  content: /opt/scripts/multi-trap.sh carries the corrected configuration.

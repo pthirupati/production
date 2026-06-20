@@ -1,0 +1,28 @@
+title: RHEL chrony Has No Time Servers
+slug: rhel-chrony-conf-no-servers
+technology: RHEL Linux
+category: Time
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Time won't sync because chrony.conf lists no usable servers.
+initial_state: A RHEL host whose chrony.conf has no valid sources.
+objectives:
+- 'Confirm the issue: chronyc sources empty'
+- Apply the documented fix in /etc/chrony.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: chronyc sources empty
+- order: 2
+  cost: 15
+  content: Add valid NTP servers to chrony.conf.
+- order: 3
+  cost: 20
+  content: /etc/chrony.conf carries the corrected configuration.

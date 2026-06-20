@@ -1,0 +1,28 @@
+title: ESXi Management Network Isolated
+slug: esxi-management-network-isolated
+category: VMware vSphere
+description: An ESXi host is unmanageable because its management network is isolated, showing it disconnected
+  in vCenter. Restore the management network and reconnect the host.
+difficulty: hard
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Confirm the host management network is isolated
+- Restore the management network and reconnect
+- Verify the host is connected
+initial_state: vCenter shows an ESXi host disconnected with its management network down.
+hints:
+- order: 1
+  cost: 10
+  content: 'In the vCenter simulator, locate the issue: confirm the host management network is isolated.'
+- order: 2
+  cost: 15
+  content: 'Apply the remediation in the GUI: restore the management network and reconnect.'
+- order: 3
+  cost: 20
+  content: 'Confirm resolution: verify the host is connected.'

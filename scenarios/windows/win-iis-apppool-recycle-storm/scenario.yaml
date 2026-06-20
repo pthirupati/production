@@ -1,0 +1,30 @@
+title: Windows IIS App Pool Recycling Too Often
+slug: win-iis-apppool-recycle-storm
+technology: Windows Server
+category: IIS
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An IIS application pool recycles every few minutes due to a low private-memory limit, dropping
+  sessions. Tune the recycling settings and confirm the pool stays up.
+initial_state: A Windows IIS app pool with an aggressive memory-based recycle limit, causing frequent
+  recycles and dropped sessions.
+objectives:
+- Confirm the app pool recycles frequently from the memory limit
+- Tune the recycling thresholds appropriately
+- Verify the pool stops thrashing
+hints:
+- order: 1
+  cost: 10
+  content: System log shows WAS recycle events every few minutes.
+- order: 2
+  cost: 15
+  content: Raise/disable the private memory recycle limit appropriately.
+- order: 3
+  cost: 20
+  content: Pool stays up.

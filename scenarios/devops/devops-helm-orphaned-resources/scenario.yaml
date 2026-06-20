@@ -1,0 +1,31 @@
+title: Helm Chart Upgrade Left Orphaned Resources
+slug: devops-helm-orphaned-resources
+technology: DevOps
+category: Helm
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: After a botched helm upgrade, orphaned resources from a renamed template block conflict with
+  new ones and the release is unhealthy. Reconcile by rolling back to a deployed revision and cleaning
+  up.
+initial_state: A Kubernetes helm release whose upgrade renamed templates, leaving orphaned objects and
+  a non-deployed status.
+objectives:
+- Confirm the release is not in a deployed state
+- Roll back to a clean deployed revision
+- Verify helm history shows deployed
+hints:
+- order: 1
+  cost: 10
+  content: helm history shows the release is not deployed.
+- order: 2
+  cost: 15
+  content: helm rollback to the last good revision.
+- order: 3
+  cost: 20
+  content: Release deployed.

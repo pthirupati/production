@@ -1,0 +1,28 @@
+title: Server Power-Capped Below Workload Need
+slug: baremetal-power-cap-enforced
+technology: Bare Metal
+category: Power
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Performance is throttled because a node power cap is set below the workload's need.
+initial_state: A server with an enforced power cap that's too low.
+objectives:
+- 'Confirm the issue: CPU/GPU throttled by power cap'
+- Apply the documented fix in /etc/bmc/power-cap.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: CPU/GPU throttled by power cap
+- order: 2
+  cost: 15
+  content: Raise or remove the power cap appropriately.
+- order: 3
+  cost: 20
+  content: /etc/bmc/power-cap.cfg carries the corrected configuration.

@@ -1,0 +1,29 @@
+title: RHEL SELinux Boolean Blocking Service
+slug: rhel-selinux-booleans
+technology: RHEL Linux
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A service is denied by SELinux because a required boolean (e.g. httpd_can_network_connect)
+  is off. Set the boolean persistently and confirm it is corrected.
+initial_state: A RHEL host where an SELinux boolean is disabled, blocking a legitimate service action.
+objectives:
+- Confirm an SELinux boolean blocks the service
+- Enable the boolean persistently
+- Verify the boolean config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: AVC denial tied to a boolean.
+- order: 2
+  cost: 15
+  content: setsebool -P the required boolean on.
+- order: 3
+  cost: 20
+  content: booleans.local carries the corrected setting.

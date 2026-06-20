@@ -1,0 +1,29 @@
+title: Push Fails to Internal Registry (TLS)
+slug: docker-insecure-registry
+technology: Docker
+category: Registry
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Pushes to an internal registry fail with a TLS error because the registry isn't listed as
+  allowed/insecure in Docker's config. Fix the registry config and confirm it is corrected.
+initial_state: A host whose Docker registry config rejects the internal registry over TLS, blocking pushes.
+objectives:
+- Confirm pushes fail with a TLS/registry error
+- Add the registry to the Docker config
+- Verify the registry config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: docker push errors with x509/registry.
+- order: 2
+  cost: 15
+  content: Add the registry to registries.conf appropriately.
+- order: 3
+  cost: 20
+  content: registries.conf carries the corrected entry.

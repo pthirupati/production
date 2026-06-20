@@ -1,0 +1,29 @@
+title: RHEL auditd Stopped — Compliance Gap
+slug: rhel-auditd-down
+technology: RHEL Linux
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The Linux audit daemon stopped on a RHEL host, creating a compliance gap with no audit trail.
+  Restore auditd.
+initial_state: A RHEL host where the auditd service is failed, stopping audit logging.
+objectives:
+- Confirm auditd is down
+- Resolve and start auditd
+- Verify auditd is active
+hints:
+- order: 1
+  cost: 10
+  content: auditctl -s / systemctl shows auditd down.
+- order: 2
+  cost: 15
+  content: Start auditd and confirm logging.
+- order: 3
+  cost: 20
+  content: auditd active.

@@ -1,0 +1,30 @@
+title: RBAC Forbidden on ServiceAccount
+slug: k8s-rbac-sa-forbidden
+technology: Kubernetes
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A controller pod gets 'forbidden' errors because its ServiceAccount lacks a RoleBinding.
+  Bind the needed role and confirm the cluster is healthy.
+initial_state: A Kubernetes workload whose ServiceAccount has no RBAC permissions for the API calls it
+  makes.
+objectives:
+- Confirm the SA is getting forbidden errors
+- Create the RoleBinding granting the needed permissions
+- Verify the cluster is healthy
+hints:
+- order: 1
+  cost: 10
+  content: Logs show 'forbidden' on API calls.
+- order: 2
+  cost: 15
+  content: kubectl create rolebinding for the SA with the right role.
+- order: 3
+  cost: 20
+  content: Calls succeed.

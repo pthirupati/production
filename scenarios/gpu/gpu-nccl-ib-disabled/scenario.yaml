@@ -1,0 +1,28 @@
+title: Multi-GPU Training Slow (NCCL not using IB)
+slug: gpu-nccl-ib-disabled
+technology: GPU
+category: Networking
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Distributed training is slow because NCCL falls back to TCP instead of InfiniBand.
+initial_state: A multi-node GPU host where NCCL isn't using IB.
+objectives:
+- 'Confirm the issue: NCCL uses slow TCP transport'
+- Apply the documented fix in /etc/nccl.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: NCCL uses slow TCP transport
+- order: 2
+  cost: 15
+  content: Configure NCCL to use IB/RDMA.
+- order: 3
+  cost: 20
+  content: /etc/nccl.conf carries the corrected configuration.

@@ -1,0 +1,30 @@
+title: ConfigMap Update Not Picked Up
+slug: k8s-configmap-stale-mount
+technology: Kubernetes
+category: Config
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Pods keep using stale config because a ConfigMap change wasn't rolled out to the Deployment.
+  Roll the Deployment and confirm pods pick up the new config (cluster healthy).
+initial_state: A Kubernetes Deployment running stale config because the mounted ConfigMap changed without
+  a rollout.
+objectives:
+- Confirm pods use stale ConfigMap data
+- Roll the Deployment to pick up the change
+- Verify the cluster is healthy
+hints:
+- order: 1
+  cost: 10
+  content: Pods show old config after a ConfigMap edit.
+- order: 2
+  cost: 15
+  content: kubectl rollout restart the deployment.
+- order: 3
+  cost: 20
+  content: New config in use.

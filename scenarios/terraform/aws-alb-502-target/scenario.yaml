@@ -1,0 +1,31 @@
+title: AWS ALB Returning 502 from Bad Target Health
+slug: aws-alb-502-target
+technology: Terraform
+category: ELB
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An Application Load Balancer returns 502s because target group health checks use the wrong
+  path/port and mark healthy targets unhealthy. Fix the target group health check and confirm targets
+  go healthy.
+initial_state: An AWS ALB whose target group health check path/port is wrong, so the LB has no healthy
+  targets and returns 502.
+objectives:
+- Confirm the target group has no healthy targets
+- Fix the health check path/port/matcher and apply
+- Verify targets report healthy and 502s stop
+hints:
+- order: 1
+  cost: 10
+  content: aws elbv2 describe-target-health shows all unhealthy.
+- order: 2
+  cost: 15
+  content: Correct the health check path/port/matcher and apply.
+- order: 3
+  cost: 20
+  content: Targets healthy; 502s stop.

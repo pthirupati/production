@@ -1,0 +1,28 @@
+title: .dockerignore Missing Bloats Context
+slug: docker-no-dockerignore
+technology: Docker
+category: Build
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Builds are slow and leak files because .dockerignore is missing.
+initial_state: A build context without a .dockerignore.
+objectives:
+- 'Confirm the issue: Huge build context uploaded'
+- Apply the documented fix in /opt/app/.dockerignore
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Huge build context uploaded
+- order: 2
+  cost: 15
+  content: Add a proper .dockerignore.
+- order: 3
+  cost: 20
+  content: /opt/app/.dockerignore carries the corrected configuration.

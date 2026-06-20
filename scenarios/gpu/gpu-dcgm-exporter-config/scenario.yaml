@@ -1,0 +1,28 @@
+title: GPU Metrics Missing in Monitoring
+slug: gpu-dcgm-exporter-config
+technology: GPU
+category: Observability
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: GPU metrics are missing because the DCGM exporter field config is wrong.
+initial_state: A GPU host with a broken DCGM exporter config.
+objectives:
+- 'Confirm the issue: No GPU metrics scraped'
+- Apply the documented fix in /etc/dcgm-exporter/config.csv
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No GPU metrics scraped
+- order: 2
+  cost: 15
+  content: Fix the DCGM exporter field set.
+- order: 3
+  cost: 20
+  content: /etc/dcgm-exporter/config.csv carries the corrected configuration.

@@ -1,0 +1,75 @@
+title: 'Log Analysis: Fix the JSON.parse Crash'
+slug: js-logfix-json-parse-throw
+category: JavaScript Development
+description: 'The log shows `SyntaxError: Unexpected token ... in JSON` from safeParse() because JSON.parse
+  throws on malformed input. Wrap it so invalid JSON returns a provided fallback instead of crashing.'
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Identify the throwing JSON.parse from the log
+- Catch the parse error
+- Return the fallback on failure
+initial_state: 'The log shows `SyntaxError: Unexpected token ... in JSON` from safeParse() because JSON.parse
+  throws on malformed input. Wrap it so invalid JSON returns a provided fallback instead of crashing.'
+solution_explanation: |
+  JSON.parse throws on malformed input. A try/catch returning the fallback makes parsing total and crash-free.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: logfix
+  instructions: |
+    Fix safeParse(str, fallback): return the parsed JSON, or `fallback` if str is not valid JSON. Never throw.
+      safeParse('{"a":1}', null) -> {a:1}; safeParse('oops', null) -> null
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      // Production log:
+      //   SyntaxError: Unexpected token o in JSON at position 0
+      //     at safeParse -> JSON.parse(str)
+
+      function safeParse(str, fallback) {
+        return JSON.parse(str); // throws on invalid JSON
+      }
+    readonly: false
+  visible_tests:
+  - name: valid json
+    code: |
+      assert(JSON.stringify(safeParse('{"a":1}', null)) === JSON.stringify({a:1}), JSON.stringify(safeParse('{"a":1}', null)));
+  - name: invalid returns fallback
+    code: |
+      assert(safeParse('oops', null) === null);
+  hidden_tests:
+  - name: array json
+    code: |
+      assert(JSON.stringify(safeParse('[1,2,3]', [])) === JSON.stringify([1,2,3]), JSON.stringify(safeParse('[1,2,3]', [])));
+  - name: invalid uses custom fallback
+    code: |
+      assert(JSON.stringify(safeParse('not json', {error: true})) === JSON.stringify({error: true}), JSON.stringify(safeParse('not json', {error: true})));
+  - name: does not throw
+    code: |
+      let threw = false;
+      try { safeParse('{bad', 0); } catch (e) { threw = true; }
+      assert(threw === false);
+  - name: number json
+    code: |
+      assert(safeParse('42', null) === 42);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: The log shows JSON.parse throwing a SyntaxError on bad input.
+- order: 2
+  cost: 20
+  content: Wrap JSON.parse in try/catch.
+- order: 3
+  cost: 30
+  content: Return fallback from the catch block.

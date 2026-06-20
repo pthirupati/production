@@ -1,0 +1,28 @@
+title: Script Loses Errors From Logs
+slug: shell-stderr-stdout-merge
+technology: Shell Scripting
+category: Logging
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Errors don't appear in logs because stderr isn't redirected with stdout.
+initial_state: An ops script not capturing stderr.
+objectives:
+- 'Confirm the issue: Errors missing from the log'
+- Apply the documented fix in /opt/scripts/logging.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Errors missing from the log
+- order: 2
+  cost: 15
+  content: Redirect 2>&1 appropriately.
+- order: 3
+  cost: 20
+  content: /opt/scripts/logging.sh carries the corrected configuration.

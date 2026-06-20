@@ -1,0 +1,28 @@
+title: PCIe Bifurcation Wrong for Riser
+slug: baremetal-pcie-bifurcation
+technology: Bare Metal
+category: Hardware
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Add-in cards aren't all detected because PCIe bifurcation is wrong for the riser.
+initial_state: A server with incorrect PCIe bifurcation.
+objectives:
+- 'Confirm the issue: Some PCIe devices missing'
+- Apply the documented fix in /etc/bios/pcie-bifurcation.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Some PCIe devices missing
+- order: 2
+  cost: 15
+  content: Set the correct PCIe bifurcation.
+- order: 3
+  cost: 20
+  content: /etc/bios/pcie-bifurcation.cfg carries the corrected configuration.

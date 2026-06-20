@@ -1,0 +1,29 @@
+title: CI Pipeline Failing on Missing KUBECONFIG
+slug: devops-ci-pipeline-kubeconfig-missing
+technology: DevOps
+category: CI/CD
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The GitLab deploy stage fails because KUBECONFIG is not exported in the runner, so kubectl
+  can't reach the cluster. Fix the pipeline variables and confirm the pipeline goes green.
+initial_state: A CI/CD pipeline whose deploy job errors with 'KUBECONFIG not set', failing every deploy.
+objectives:
+- Confirm the deploy stage fails on missing KUBECONFIG
+- Set the KUBECONFIG/cluster credentials in the pipeline
+- Verify the pipeline reaches a passed state
+hints:
+- order: 1
+  cost: 10
+  content: 'gitlab-runner status / pipeline shows deploy failed: KUBECONFIG not set.'
+- order: 2
+  cost: 15
+  content: Add the KUBECONFIG variable and valid cluster creds; redeploy.
+- order: 3
+  cost: 20
+  content: Pipeline passes.

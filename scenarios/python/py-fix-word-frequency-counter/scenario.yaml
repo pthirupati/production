@@ -1,0 +1,75 @@
+title: Fix the Word Frequency Counter
+slug: py-fix-word-frequency-counter
+category: Python Development
+description: word_count(text) should return a dict mapping each lowercased word to its frequency, but
+  it never lowercases and splits on the default which leaves trailing punctuation attached, AND it overwrites
+  counts to 1 instead of incrementing. Fix counting, case, and punctuation.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Notice counts cap at 1 and case/punctuation split words
+- Lowercase and strip punctuation from each token
+- Increment counts correctly
+initial_state: word_count(text) should return a dict mapping each lowercased word to its frequency, but
+  it never lowercases and splits on the default which leaves trailing punctuation attached, AND it overwrites
+  counts to 1 instead of incrementing. Fix counting, case, and punctuation.
+solution_explanation: |
+  Assigning 1 each time discards prior counts; counts.get(word,0)+1 accumulates. Stripping punctuation and lowercasing merges word variants.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix word_count(text): return {word: count}. Words are lowercased and stripped of surrounding punctuation; split on whitespace.
+      word_count('Cat cat, dog.') -> {'cat': 2, 'dog': 1}
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      import string
+
+      def word_count(text):
+          counts = {}
+          for word in text.split():
+              counts[word] = 1     # bug: overwrites; no normalization
+          return counts
+    readonly: false
+  visible_tests:
+  - name: counts and normalizes
+    code: |
+      assert word_count('Cat cat, dog.') == {'cat': 2, 'dog': 1}, word_count('Cat cat, dog.')
+  - name: single word
+    code: |
+      assert word_count('hello') == {'hello': 1}
+  hidden_tests:
+  - name: punctuation stripped
+    code: |
+      assert word_count('hi! hi? hi.') == {'hi': 3}, word_count('hi! hi? hi.')
+  - name: case folded
+    code: |
+      assert word_count('The THE the') == {'the': 3}
+  - name: empty text
+    code: |
+      assert word_count('') == {}
+  - name: mixed
+    code: |
+      assert word_count('a a b A') == {'a': 3, 'b': 1}
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: 'word_count(''cat cat'') returns {''cat'': 1} — it overwrites instead of adding.'
+- order: 2
+  cost: 20
+  content: Use counts.get(word, 0) + 1 to accumulate; also lowercase and strip punctuation.
+- order: 3
+  cost: 30
+  content: raw.strip(string.punctuation).lower() normalizes each token before counting.

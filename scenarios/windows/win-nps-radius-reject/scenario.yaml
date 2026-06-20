@@ -1,0 +1,30 @@
+title: Windows NPS RADIUS Rejecting VPN Users
+slug: win-nps-radius-reject
+technology: Windows Server
+category: Networking
+difficulty: hard
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: VPN authentications are rejected because the NPS connection request policy / shared secret
+  is misconfigured. Fix the policy and confirm RADIUS auth succeeds.
+initial_state: A Windows NPS (RADIUS) server rejecting VPN clients due to a wrong shared secret or connection
+  request policy order.
+objectives:
+- Confirm NPS is rejecting the VPN clients
+- Fix the shared secret / connection request policy
+- Verify a successful RADIUS authentication
+hints:
+- order: 1
+  cost: 10
+  content: NPS log shows reason code 'access denied'.
+- order: 2
+  cost: 15
+  content: Correct the shared secret and policy conditions/order.
+- order: 3
+  cost: 20
+  content: Auth succeeds.

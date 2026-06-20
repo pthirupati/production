@@ -1,0 +1,28 @@
+title: Container OOM-Killed by Low Memory Limit
+slug: docker-memory-limit-oom
+technology: Docker
+category: Resources
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A container is OOM-killed in a loop because its mem_limit is too low.
+initial_state: A compose service with an undersized memory limit.
+objectives:
+- 'Confirm the issue: docker inspect shows OOMKilled'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: docker inspect shows OOMKilled
+- order: 2
+  cost: 15
+  content: Raise the memory limit appropriately.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

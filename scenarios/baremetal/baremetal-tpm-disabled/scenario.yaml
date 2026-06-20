@@ -1,0 +1,28 @@
+title: TPM Disabled Blocking Secure Features
+slug: baremetal-tpm-disabled
+technology: Bare Metal
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Disk encryption/attestation can't initialize because the TPM is disabled.
+initial_state: A server with the TPM turned off.
+objectives:
+- 'Confirm the issue: No TPM device present'
+- Apply the documented fix in /etc/bios/tpm.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No TPM device present
+- order: 2
+  cost: 15
+  content: Enable the TPM in BIOS.
+- order: 3
+  cost: 20
+  content: /etc/bios/tpm.cfg carries the corrected configuration.

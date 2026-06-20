@@ -1,0 +1,73 @@
+title: 'Refactor: Make double_all Pure (No Mutation)'
+slug: py-review-pure-no-mutate
+category: Python Development
+description: 'double_all(nums) returns a list with every value doubled, but it mutates the caller''s list
+  in place — a side effect that breaks callers who reuse the original. Refactor it to be pure: return
+  a NEW list and leave the input unchanged. The hidden test pins the no-mutation contract.'
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Recognize the in-place mutation side effect
+- Build and return a new list
+- Leave the caller's list unchanged
+initial_state: 'double_all(nums) returns a list with every value doubled, but it mutates the caller''s
+  list in place — a side effect that breaks callers who reuse the original. Refactor it to be pure: return
+  a NEW list and leave the input unchanged. The hidden test pins the no-mutation contract.'
+solution_explanation: |
+  Mutating nums in place leaks a side effect to callers. A list comprehension returns a new list and leaves the argument untouched.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: review
+  instructions: |
+    Refactor double_all(nums) so it returns a new list of doubled values and does NOT modify the input list.
+      double_all([1,2,3]) -> [2,4,6]; the original stays [1,2,3]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def double_all(nums):
+          for i in range(len(nums)):
+              nums[i] *= 2      # mutates the caller's list
+          return nums
+    readonly: false
+  visible_tests:
+  - name: doubles values
+    code: |
+      assert double_all([1, 2, 3]) == [2, 4, 6]
+  - name: empty
+    code: |
+      assert double_all([]) == []
+  hidden_tests:
+  - name: does not mutate input
+    code: |
+      src = [1, 2, 3]
+      double_all(src)
+      assert src == [1, 2, 3], src
+  - name: returns a new object
+    code: |
+      src = [4, 5]
+      out = double_all(src)
+      assert out is not src
+  - name: negatives and zero
+    code: |
+      assert double_all([-2, 0, 3]) == [-4, 0, 6]
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: After calling double_all(src), the caller's src is also doubled — that's the bug.
+- order: 2
+  cost: 20
+  content: Don't write back into nums; create a fresh list instead.
+- order: 3
+  cost: 30
+  content: Return [n * 2 for n in nums].

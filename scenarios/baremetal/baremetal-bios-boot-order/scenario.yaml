@@ -1,0 +1,29 @@
+title: Server Boots Wrong Device After BIOS Reset
+slug: baremetal-bios-boot-order
+technology: Baremetal
+category: BIOS
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: After a BIOS reset a server keeps PXE-booting instead of the local disk because the boot
+  order is wrong. Fix the boot order and confirm it is corrected.
+initial_state: A bare-metal server whose BIOS boot order points at PXE/wrong device after a reset.
+objectives:
+- Confirm the wrong boot device order
+- Set the correct boot order
+- Verify the boot config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Server PXEs every boot.
+- order: 2
+  cost: 15
+  content: Set local disk first in the BIOS boot order.
+- order: 3
+  cost: 20
+  content: boot_order.cfg carries the corrected order.

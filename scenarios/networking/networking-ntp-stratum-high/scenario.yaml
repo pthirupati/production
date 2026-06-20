@@ -1,0 +1,30 @@
+title: NTP Stratum Too High After Upstream Loss
+slug: networking-ntp-stratum-high
+technology: Networking
+category: Time / NTP
+difficulty: medium
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: After losing its upstream, the local NTP server fell back to a very high stratum and clients
+  reject it. Restore a low-stratum source and confirm sync.
+initial_state: A host whose NTP service lost its upstream and is no longer synchronized, so downstream
+  clients drift.
+objectives:
+- Confirm the server is not synchronized
+- Restore a reliable low-stratum upstream
+- Verify chronyc tracking shows synchronized
+hints:
+- order: 1
+  cost: 10
+  content: chronyc tracking shows not synchronised / high stratum.
+- order: 2
+  cost: 15
+  content: Point at a reliable upstream and resync.
+- order: 3
+  cost: 20
+  content: Synchronized.

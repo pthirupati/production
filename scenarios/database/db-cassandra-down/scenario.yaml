@@ -1,0 +1,29 @@
+title: Cassandra Node Service Down
+slug: db-cassandra-down
+technology: Database
+category: Cassandra
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Cassandra node service is down, reducing the cluster below quorum for some keyspaces. Restore
+  the node service.
+initial_state: A Linux host where the cassandra service is failed, dropping a node out of the ring.
+objectives:
+- Confirm cassandra is down
+- Resolve and start the service
+- Verify cassandra is active
+hints:
+- order: 1
+  cost: 10
+  content: nodetool status / systemctl shows the node down.
+- order: 2
+  cost: 15
+  content: Fix and systemctl start cassandra.
+- order: 3
+  cost: 20
+  content: cassandra active.

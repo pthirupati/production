@@ -1,0 +1,29 @@
+title: BIND named DNS Server Down
+slug: linux-named-down
+technology: Linux
+category: DNS
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The local BIND (named) DNS server is down, breaking name resolution for dependent services.
+  Restore named.
+initial_state: A Linux host where the named service is failed, stopping local DNS.
+objectives:
+- Confirm named is down
+- Fix the zone/config and start named
+- Verify named is active
+hints:
+- order: 1
+  cost: 10
+  content: named-checkconf flags errors; service down.
+- order: 2
+  cost: 15
+  content: Fix and systemctl start named.
+- order: 3
+  cost: 20
+  content: named active.

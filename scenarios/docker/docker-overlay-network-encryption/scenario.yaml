@@ -1,0 +1,28 @@
+title: Swarm Overlay Traffic Unencrypted
+slug: docker-overlay-network-encryption
+technology: Docker
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Overlay network traffic is unencrypted because encryption isn't enabled on the network.
+initial_state: A Swarm overlay network without encryption.
+objectives:
+- 'Confirm the issue: Overlay traffic in plaintext'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Overlay traffic in plaintext
+- order: 2
+  cost: 15
+  content: Enable overlay network encryption.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

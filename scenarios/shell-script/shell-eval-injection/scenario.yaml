@@ -1,0 +1,28 @@
+title: Script Uses Dangerous eval
+slug: shell-eval-injection
+technology: Shell Scripting
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A script passes untrusted input to eval, enabling command injection.
+initial_state: An ops script with an unsafe eval on input.
+objectives:
+- 'Confirm the issue: Untrusted input reaches eval'
+- Apply the documented fix in /opt/scripts/parse.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Untrusted input reaches eval
+- order: 2
+  cost: 15
+  content: Remove eval; parse safely.
+- order: 3
+  cost: 20
+  content: /opt/scripts/parse.sh carries the corrected configuration.

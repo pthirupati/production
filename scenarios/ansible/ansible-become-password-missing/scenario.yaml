@@ -1,0 +1,29 @@
+title: Ansible Privilege Escalation Failing
+slug: ansible-become-password-missing
+technology: Ansible
+category: Privilege Escalation
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An Ansible play fails on privileged tasks because become is enabled but no become method/password
+  is configured. Fix the play/escalation config and confirm it is corrected.
+initial_state: An Ansible control node whose playbook enables become but lacks a working escalation method.
+objectives:
+- Confirm privileged tasks fail on become
+- Configure become correctly
+- Verify the playbook is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''Missing sudo password'' on become tasks.'
+- order: 2
+  cost: 15
+  content: Set become_method/become_user and supply creds.
+- order: 3
+  cost: 20
+  content: playbook.yml carries the corrected become block.

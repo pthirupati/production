@@ -1,0 +1,30 @@
+title: Windows RDS Session Host Not Accepting Logons
+slug: win-rds-drain-stuck
+technology: Windows Server
+category: Remote Desktop
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Remote Desktop Session Host stays in drain mode after maintenance and refuses new logons.
+  Clear drain mode and confirm users can connect.
+initial_state: A Windows RDS session host left in 'drain, deny new logons' after patching, so users get
+  blocked.
+objectives:
+- Confirm the host is in drain mode denying logons
+- Re-enable new logons
+- Verify users can connect
+hints:
+- order: 1
+  cost: 10
+  content: Get-RDSessionHost / change logon /query shows draining.
+- order: 2
+  cost: 15
+  content: change logon /enable (clear drain).
+- order: 3
+  cost: 20
+  content: Logons accepted.

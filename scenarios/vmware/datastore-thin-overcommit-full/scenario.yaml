@@ -1,0 +1,29 @@
+title: Datastore Full From Thin-Provision Overcommit
+slug: datastore-thin-overcommit-full
+category: VMware vSphere
+description: Thin-provisioned VMs grew and filled datastore-ssd-01, so VMs risk stunning when it hits
+  100%. Reclaim or add capacity until the datastore has healthy free space again.
+difficulty: hard
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Open the simulator and confirm datastore-ssd-01 is nearly full
+- Reclaim space (or add capacity) on the datastore
+- Verify the datastore has at least 50 GB free
+initial_state: vCenter shows datastore-ssd-01 critically low on free space due to thin-provision growth.
+hints:
+- order: 1
+  cost: 10
+  content: 'In the vCenter simulator, locate the issue: open the simulator and confirm datastore-ssd-01
+    is nearly full.'
+- order: 2
+  cost: 15
+  content: 'Apply the remediation in the GUI: reclaim space (or add capacity) on the datastore.'
+- order: 3
+  cost: 20
+  content: 'Confirm resolution: verify the datastore has at least 50 gb free.'

@@ -1,0 +1,28 @@
+title: Script Compares Numbers as Strings
+slug: shell-test-string-vs-int
+technology: Shell Scripting
+category: Logic
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A threshold check is wrong because numbers are compared as strings.
+initial_state: An ops script using string comparison for numbers.
+objectives:
+- 'Confirm the issue: 10 < 9 evaluates true'
+- Apply the documented fix in /opt/scripts/threshold.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: 10 < 9 evaluates true
+- order: 2
+  cost: 15
+  content: Use -lt/-gt numeric comparisons.
+- order: 3
+  cost: 20
+  content: /opt/scripts/threshold.sh carries the corrected configuration.

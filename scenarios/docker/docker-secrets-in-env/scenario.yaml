@@ -1,0 +1,28 @@
+title: Secrets Baked Into Image Env
+slug: docker-secrets-in-env
+technology: Docker
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Secrets are exposed because they're set via ENV/build args baked into layers.
+initial_state: A Dockerfile baking secrets into image layers.
+objectives:
+- 'Confirm the issue: Secret visible in image history'
+- Apply the documented fix in /opt/app/Dockerfile
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Secret visible in image history
+- order: 2
+  cost: 15
+  content: Use runtime secrets, not ENV/build-args.
+- order: 3
+  cost: 20
+  content: /opt/app/Dockerfile carries the corrected configuration.

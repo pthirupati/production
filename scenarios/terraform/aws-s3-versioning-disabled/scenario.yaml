@@ -1,0 +1,29 @@
+title: AWS S3 Bucket Versioning Disabled on Compliance Bucket
+slug: aws-s3-versioning-disabled
+technology: Terraform
+category: S3
+difficulty: easy
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A compliance audit flagged that the audit-logs S3 bucket has versioning disabled, risking
+  data loss. Enable versioning via Terraform and confirm the bucket reports versioning Enabled.
+initial_state: An AWS environment where a compliance-critical S3 bucket has object versioning turned off.
+objectives:
+- Confirm the bucket has versioning disabled
+- Enable versioning (aws_s3_bucket_versioning) and apply
+- Verify the bucket reports versioning = Enabled
+hints:
+- order: 1
+  cost: 10
+  content: aws s3api get-bucket-versioning shows no Status.
+- order: 2
+  cost: 15
+  content: Add aws_s3_bucket_versioning Enabled and apply.
+- order: 3
+  cost: 20
+  content: 'Re-check: Status Enabled.'

@@ -1,0 +1,30 @@
+title: Windows DFS Replication Backlog
+slug: win-dfsr-backlog
+technology: Windows Server
+category: File Services
+difficulty: hard
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A DFS Replication group has a large backlog and branch offices see stale files. Identify
+  the staging quota bottleneck, raise it, and confirm the backlog drains.
+initial_state: A Windows DFSR replication group whose staging quota is too small, causing a persistent
+  replication backlog.
+objectives:
+- Confirm a large DFSR backlog and a small staging quota
+- Raise the staging quota and clear the bottleneck
+- Verify the backlog drains toward zero
+hints:
+- order: 1
+  cost: 10
+  content: dfsrdiag backlog shows thousands of files.
+- order: 2
+  cost: 15
+  content: Increase the staging quota above the largest files.
+- order: 3
+  cost: 20
+  content: Backlog drains.

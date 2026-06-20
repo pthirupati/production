@@ -1,0 +1,28 @@
+title: Hardware Watchdog Not Enabled
+slug: baremetal-watchdog-disabled
+technology: Bare Metal
+category: Reliability
+difficulty: easy
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A hung host won't auto-recover because the hardware watchdog is disabled.
+initial_state: A server with the BMC watchdog turned off.
+objectives:
+- 'Confirm the issue: No auto-recovery on hang'
+- Apply the documented fix in /etc/bmc/watchdog.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No auto-recovery on hang
+- order: 2
+  cost: 15
+  content: Enable and configure the watchdog.
+- order: 3
+  cost: 20
+  content: /etc/bmc/watchdog.cfg carries the corrected configuration.

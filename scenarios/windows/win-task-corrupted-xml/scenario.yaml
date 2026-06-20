@@ -1,0 +1,29 @@
+title: Scheduled Task Corrupted XML
+slug: win-task-corrupted-xml
+technology: Windows Server
+category: Automation
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A scheduled task won't run because its task definition XML is corrupted. Recreate/repair
+  the task and confirm it runs.
+initial_state: A Windows Server with a corrupted scheduled task definition.
+objectives:
+- Confirm the Windows issue
+- Apply the documented fix
+- Verify the issue is resolved
+hints:
+- order: 1
+  cost: 10
+  content: Investigate the affected Windows component.
+- order: 2
+  cost: 15
+  content: Apply the documented Windows fix.
+- order: 3
+  cost: 20
+  content: The component reports healthy.

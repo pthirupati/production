@@ -1,0 +1,29 @@
+title: Journald Logs Lost on Reboot
+slug: linux-journald-storage-volatile
+technology: Linux
+category: Logging
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: System journal logs vanish after reboot because journald storage is set to volatile. Make
+  storage persistent and confirm the config is corrected.
+initial_state: A Linux host whose journald.conf uses volatile storage, losing logs across reboots.
+objectives:
+- Confirm journals are not persistent
+- Set Storage=persistent
+- Verify journald.conf is corrected
+hints:
+- order: 1
+  cost: 10
+  content: journalctl --list-boots shows only current.
+- order: 2
+  cost: 15
+  content: Set Storage=persistent in journald.conf.
+- order: 3
+  cost: 20
+  content: journald.conf carries the corrected storage.

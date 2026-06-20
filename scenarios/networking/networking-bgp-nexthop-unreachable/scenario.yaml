@@ -1,0 +1,29 @@
+title: BGP Next-Hop Unreachable Drops Routes
+slug: networking-bgp-nexthop-unreachable
+technology: Networking
+category: Routing / BGP
+difficulty: hard
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: BGP routes are received but not installed because the advertised next-hop is unreachable
+  (no IGP route). Fix next-hop reachability/next-hop-self and confirm a healthy session.
+initial_state: A router that receives BGP prefixes but cannot use them because the next-hop is unreachable.
+objectives:
+- Confirm routes are not installed due to unreachable next-hop
+- Fix next-hop reachability or apply next-hop-self
+- Verify the session is healthy with usable prefixes
+hints:
+- order: 1
+  cost: 10
+  content: show ip bgp summary plus routes show inaccessible next-hop.
+- order: 2
+  cost: 15
+  content: Add the IGP route or set next-hop-self; clear the session.
+- order: 3
+  cost: 20
+  content: Routes usable, session healthy.

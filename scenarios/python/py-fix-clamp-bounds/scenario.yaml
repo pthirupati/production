@@ -1,0 +1,70 @@
+title: Fix the clamp Min/Max Swap
+slug: py-fix-clamp-bounds
+category: Python Development
+description: clamp(x, lo, hi) should constrain x to the [lo, hi] range, but the min and max are swapped,
+  so it returns the opposite of what you want. Fix the clamping so values below lo become lo and above
+  hi become hi.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See out-of-range values clamped to the wrong bound
+- Apply max(lo, ...) then min(hi, ...) correctly
+- Leave in-range values unchanged
+initial_state: clamp(x, lo, hi) should constrain x to the [lo, hi] range, but the min and max are swapped,
+  so it returns the opposite of what you want. Fix the clamping so values below lo become lo and above
+  hi become hi.
+solution_explanation: |
+  Swapping min/lo and max/hi inverts the clamp. The correct nesting is max(lo, min(hi, x)).
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix clamp(x, lo, hi): if x < lo return lo, if x > hi return hi, else x.
+      clamp(15, 0, 10) -> 10, clamp(-3, 0, 10) -> 0
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def clamp(x, lo, hi):
+          return min(lo, max(hi, x))   # bounds swapped
+    readonly: false
+  visible_tests:
+  - name: above range
+    code: |
+      assert clamp(15, 0, 10) == 10, clamp(15, 0, 10)
+  - name: below range
+    code: |
+      assert clamp(-3, 0, 10) == 0, clamp(-3, 0, 10)
+  hidden_tests:
+  - name: in range
+    code: |
+      assert clamp(5, 0, 10) == 5
+  - name: equals lower bound
+    code: |
+      assert clamp(0, 0, 10) == 0
+  - name: equals upper bound
+    code: |
+      assert clamp(10, 0, 10) == 10
+  - name: negative range
+    code: |
+      assert clamp(-5, -10, -1) == -5
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: clamp(15, 0, 10) returns 0 instead of 10 — the bounds are reversed.
+- order: 2
+  cost: 20
+  content: To cap at hi use min(hi, x); to floor at lo use max(lo, ...).
+- order: 3
+  cost: 30
+  content: Return max(lo, min(hi, x)).

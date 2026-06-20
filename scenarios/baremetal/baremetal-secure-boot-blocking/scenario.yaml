@@ -1,0 +1,29 @@
+title: Secure Boot Blocking Custom Driver
+slug: baremetal-secure-boot-blocking
+technology: Baremetal
+category: Boot
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A required out-of-tree driver won't load because Secure Boot rejects the unsigned module.
+  Enroll the key (or adjust policy) and confirm the config is corrected.
+initial_state: A bare-metal server where Secure Boot blocks a needed unsigned kernel module.
+objectives:
+- Confirm Secure Boot blocks the module
+- Enroll the signing key / adjust policy
+- Verify the boot config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: dmesg shows module signature rejected.
+- order: 2
+  cost: 15
+  content: Enroll the MOK key for the driver.
+- order: 3
+  cost: 20
+  content: secureboot.cfg carries the corrected policy.

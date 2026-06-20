@@ -1,0 +1,28 @@
+title: GPU XID Errors Not Surfaced
+slug: gpu-xid-errors-logging
+technology: GPU
+category: Reliability
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Hardware XID errors aren't surfaced to ops because monitoring config is wrong.
+initial_state: A GPU host not alerting on XID errors.
+objectives:
+- 'Confirm the issue: XID errors go unnoticed'
+- Apply the documented fix in /etc/nvidia/xid-monitor.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: XID errors go unnoticed
+- order: 2
+  cost: 15
+  content: Configure XID error monitoring.
+- order: 3
+  cost: 20
+  content: /etc/nvidia/xid-monitor.conf carries the corrected configuration.

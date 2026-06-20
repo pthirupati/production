@@ -1,0 +1,71 @@
+title: Implement sum_of_divisors
+slug: py-impl-fizz-sum-divisors
+category: Python Development
+description: 'Implement sum_of_divisors(n) for a positive integer n: the sum of all positive divisors
+  of n that are strictly less than n (its proper divisors). sum_of_divisors(6) == 1+2+3 == 6. The stub
+  is empty so tests fail.'
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Find all proper divisors of n
+- Exclude n itself
+- Return their sum (1 for primes, 0 for 1)
+initial_state: 'Implement sum_of_divisors(n) for a positive integer n: the sum of all positive divisors
+  of n that are strictly less than n (its proper divisors). sum_of_divisors(6) == 1+2+3 == 6. The stub
+  is empty so tests fail.'
+solution_explanation: |
+  Scanning to sqrt(n) and adding both members of each divisor pair (without double-counting a square root, and excluding n) gives the proper-divisor sum.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement sum_of_divisors(n) -> sum of proper divisors (divisors < n).
+      sum_of_divisors(6) -> 6 (1+2+3), sum_of_divisors(12) -> 16
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def sum_of_divisors(n):
+          # TODO: sum the proper divisors of n
+          pass
+    readonly: false
+  visible_tests:
+  - name: perfect number
+    code: |
+      assert sum_of_divisors(6) == 6, sum_of_divisors(6)
+  - name: twelve
+    code: |
+      assert sum_of_divisors(12) == 16, sum_of_divisors(12)
+  hidden_tests:
+  - name: prime
+    code: |
+      assert sum_of_divisors(7) == 1
+  - name: one
+    code: |
+      assert sum_of_divisors(1) == 0
+  - name: perfect square
+    code: |
+      assert sum_of_divisors(16) == 15, sum_of_divisors(16)
+  - name: 28 is perfect
+    code: |
+      assert sum_of_divisors(28) == 28
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: 1 is a proper divisor of every n > 1; n itself is excluded.
+- order: 2
+  cost: 20
+  content: Divisors come in pairs i and n//i — only scan i up to sqrt(n).
+- order: 3
+  cost: 30
+  content: Watch the perfect-square case (don't double-count i == n//i) and never add n.

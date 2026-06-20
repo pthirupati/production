@@ -1,0 +1,28 @@
+title: GPU Host Memory Accounting Off
+slug: gpu-cgroup-memory-accounting
+technology: GPU
+category: Resources
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Host memory pressure from GPU jobs is invisible because cgroup memory accounting is off.
+initial_state: A GPU host with memory accounting disabled.
+objectives:
+- 'Confirm the issue: No memory accounting for GPU jobs'
+- Apply the documented fix in /etc/gpu/cgroup-accounting.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No memory accounting for GPU jobs
+- order: 2
+  cost: 15
+  content: Enable cgroup memory accounting.
+- order: 3
+  cost: 20
+  content: /etc/gpu/cgroup-accounting.conf carries the corrected configuration.

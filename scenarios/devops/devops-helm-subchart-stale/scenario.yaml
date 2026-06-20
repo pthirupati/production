@@ -1,0 +1,30 @@
+title: Helm Subchart Dependency Not Updated
+slug: devops-helm-subchart-stale
+technology: DevOps
+category: Helm
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A helm release is unhealthy because a subchart dependency wasn't updated before upgrade,
+  leaving the release in a bad state. Roll back to the deployed revision and reconcile.
+initial_state: A Kubernetes helm release left non-deployed because subchart dependencies were stale at
+  upgrade time.
+objectives:
+- Confirm the release is not deployed
+- Roll back to the last good revision
+- Verify the release is deployed
+hints:
+- order: 1
+  cost: 10
+  content: helm history shows the release not deployed.
+- order: 2
+  cost: 15
+  content: helm rollback to the working revision (after dep update).
+- order: 3
+  cost: 20
+  content: Release deployed.

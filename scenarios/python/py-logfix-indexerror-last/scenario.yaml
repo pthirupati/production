@@ -1,0 +1,68 @@
+title: 'Log Analysis: Fix the IndexError on Empty Input'
+slug: py-logfix-indexerror-last
+category: Python Development
+description: 'The log shows `IndexError: list index out of range` from last_or_none() when the list is
+  empty. It should return None for an empty list instead of indexing [-1].'
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Spot the [-1] access that fails on empty lists
+- Guard the empty case
+- Return None when there is no last element
+initial_state: 'The log shows `IndexError: list index out of range` from last_or_none() when the list
+  is empty. It should return None for an empty list instead of indexing [-1].'
+solution_explanation: |
+  Indexing [-1] requires at least one element. An empty-check returning None avoids the IndexError.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: logfix
+  instructions: |
+    Fix last_or_none(items): return the last element, or None if the list is empty. The log shows an IndexError on empty input.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      # Production log:
+      #   IndexError: list index out of range
+      #     at last_or_none(items) -> return items[-1]
+
+      def last_or_none(items):
+          return items[-1]   # IndexError when items is empty
+    readonly: false
+  visible_tests:
+  - name: last element
+    code: |
+      assert last_or_none([1, 2, 3]) == 3
+  - name: empty is none
+    code: |
+      assert last_or_none([]) is None
+  hidden_tests:
+  - name: single element
+    code: |
+      assert last_or_none([42]) == 42
+  - name: strings
+    code: |
+      assert last_or_none(['a', 'b']) == 'b'
+  - name: empty does not raise
+    code: |
+      assert last_or_none([]) is None
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: items[-1] on an empty list raises IndexError (per the log).
+- order: 2
+  cost: 20
+  content: Check `if not items` first.
+- order: 3
+  cost: 30
+  content: Return None when empty, otherwise items[-1].

@@ -1,0 +1,28 @@
+title: Script Crashes on Unset Variable
+slug: shell-unset-var-default
+technology: Shell Scripting
+category: Robustness
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A script crashes when an expected variable is unset and undefaulted.
+initial_state: An ops script with no defaults for optional vars.
+objectives:
+- 'Confirm the issue: Unbound variable error'
+- Apply the documented fix in /opt/scripts/params.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Unbound variable error
+- order: 2
+  cost: 15
+  content: Use ${VAR:-default} defaults.
+- order: 3
+  cost: 20
+  content: /opt/scripts/params.sh carries the corrected configuration.

@@ -1,0 +1,30 @@
+title: AWS SNS to SQS Subscription Not Delivering
+slug: aws-sns-sqs-no-delivery
+technology: Terraform
+category: Messaging
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Messages published to SNS are not landing in the SQS queue because the queue policy does
+  not allow SNS to send. Fix the queue access policy/subscription and confirm delivery.
+initial_state: An AWS SNS topic subscribed to an SQS queue whose access policy denies sns.amazonaws.com,
+  so nothing is delivered.
+objectives:
+- Confirm SNS messages are not reaching SQS
+- Add the SQS queue policy allowing the SNS topic and apply
+- Verify messages are delivered to the queue
+hints:
+- order: 1
+  cost: 10
+  content: Queue depth stays 0 after publishing to SNS.
+- order: 2
+  cost: 15
+  content: Add an SQS policy allowing the SNS topic ARN to SendMessage and apply.
+- order: 3
+  cost: 20
+  content: Messages arrive in SQS.

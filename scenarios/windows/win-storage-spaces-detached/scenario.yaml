@@ -1,0 +1,30 @@
+title: Windows Storage Spaces Virtual Disk Detached
+slug: win-storage-spaces-detached
+technology: Windows Server
+category: Storage
+difficulty: hard
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Storage Spaces virtual disk is detached after a disk replacement and the volume is offline.
+  Reattach the virtual disk, repair the pool, and bring the volume online.
+initial_state: A Windows Storage Spaces pool whose virtual disk detached after a physical disk swap, taking
+  a volume offline.
+objectives:
+- Confirm the virtual disk is detached and volume offline
+- Reattach/repair the virtual disk in the pool
+- Verify the volume is online and healthy
+hints:
+- order: 1
+  cost: 10
+  content: Get-VirtualDisk shows Detached/Unhealthy.
+- order: 2
+  cost: 15
+  content: Connect-VirtualDisk and Repair-VirtualDisk, bring volume online.
+- order: 3
+  cost: 20
+  content: Volume healthy.

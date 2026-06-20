@@ -1,0 +1,28 @@
+title: RHEL PAM Locking Out Valid Users
+slug: rhel-pam-faillock-lockout
+technology: RHEL Linux
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Legitimate users are locked out because faillock thresholds are too aggressive.
+initial_state: A RHEL host with overly strict PAM faillock.
+objectives:
+- 'Confirm the issue: Valid users locked out'
+- Apply the documented fix in /etc/security/faillock.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Valid users locked out
+- order: 2
+  cost: 15
+  content: Tune faillock thresholds.
+- order: 3
+  cost: 20
+  content: /etc/security/faillock.conf carries the corrected configuration.

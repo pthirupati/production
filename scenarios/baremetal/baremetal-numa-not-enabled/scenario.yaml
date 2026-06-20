@@ -1,0 +1,29 @@
+title: NUMA Disabled Hurting Memory Bandwidth
+slug: baremetal-numa-not-enabled
+technology: Baremetal
+category: Performance
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A dual-socket server has Node Interleaving on (NUMA disabled), hurting memory bandwidth for
+  NUMA-aware apps. Disable interleaving and confirm the config is corrected.
+initial_state: A bare-metal dual-socket server with memory node interleaving on, masking NUMA topology.
+objectives:
+- Confirm NUMA is effectively disabled
+- Disable node interleaving
+- Verify the BIOS config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: numactl --hardware shows 1 node.
+- order: 2
+  cost: 15
+  content: Turn off Node Interleaving in BIOS.
+- order: 3
+  cost: 20
+  content: numa.cfg carries the corrected setting.

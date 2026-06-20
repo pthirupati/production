@@ -1,0 +1,29 @@
+title: CI Pipeline Failing Smoke Tests on Deploy
+slug: devops-ci-pipeline-smoke-fail
+technology: DevOps
+category: CI/CD
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Post-deploy smoke tests fail because the deploy stage shipped a misconfigured build, failing
+  the pipeline. Fix the pipeline config and confirm it passes.
+initial_state: A CI/CD pipeline whose deploy stage fails smoke tests due to a misconfigured build.
+objectives:
+- Confirm the pipeline fails at the deploy/smoke stage
+- Fix the deploy configuration
+- Verify the pipeline passes
+hints:
+- order: 1
+  cost: 10
+  content: Pipeline shows deploy failed.
+- order: 2
+  cost: 15
+  content: Correct the deploy variables/config; redeploy.
+- order: 3
+  cost: 20
+  content: Pipeline green.

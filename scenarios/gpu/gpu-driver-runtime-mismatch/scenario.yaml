@@ -1,0 +1,28 @@
+title: Container CUDA Newer Than Host Driver
+slug: gpu-driver-runtime-mismatch
+technology: GPU
+category: Containers
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: GPU containers fail because the image's CUDA runtime is newer than the host driver supports.
+initial_state: A GPU host with a driver older than the container CUDA.
+objectives:
+- 'Confirm the issue: ''CUDA driver version is insufficient'''
+- Apply the documented fix in /etc/gpu/runtime-compat.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''CUDA driver version is insufficient'''
+- order: 2
+  cost: 15
+  content: Update the host driver or pin the image CUDA.
+- order: 3
+  cost: 20
+  content: /etc/gpu/runtime-compat.conf carries the corrected configuration.

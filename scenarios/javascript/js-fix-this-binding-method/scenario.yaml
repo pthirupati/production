@@ -1,0 +1,74 @@
+title: Fix the Lost `this` in a Callback
+slug: js-fix-this-binding-method
+category: JavaScript Development
+description: makeAdder(base) returns an object whose addAll(nums) should add `base` to each number, but
+  it uses a normal function callback in map, so `this` is undefined inside it and base can't be read.
+  Fix the binding (arrow function) so addAll works.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See `this` lost inside the map callback
+- Use an arrow function to preserve `this`
+- Add base to each element correctly
+initial_state: makeAdder(base) returns an object whose addAll(nums) should add `base` to each number,
+  but it uses a normal function callback in map, so `this` is undefined inside it and base can't be read.
+  Fix the binding (arrow function) so addAll works.
+solution_explanation: |
+  A standalone function callback rebinds `this`, so this.base is undefined. An arrow function lexically captures the method's `this`, keeping base.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix makeAdder(base): the returned object's addAll(nums) must return a new array with base added to each number.
+      makeAdder(10).addAll([1, 2]) -> [11, 12]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function makeAdder(base) {
+        return {
+          base: base,
+          addAll(nums) {
+            return nums.map(function (n) { return n + this.base; }); // this is undefined
+          }
+        };
+      }
+    readonly: false
+  visible_tests:
+  - name: adds base
+    code: |
+      assert(JSON.stringify(makeAdder(10).addAll([1, 2])) === JSON.stringify([11, 12]), JSON.stringify(makeAdder(10).addAll([1, 2])));
+  - name: base zero
+    code: |
+      assert(JSON.stringify(makeAdder(0).addAll([5, 6])) === JSON.stringify([5, 6]), JSON.stringify(makeAdder(0).addAll([5, 6])));
+  hidden_tests:
+  - name: negative base
+    code: |
+      assert(JSON.stringify(makeAdder(-1).addAll([3, 4])) === JSON.stringify([2, 3]), JSON.stringify(makeAdder(-1).addAll([3, 4])));
+  - name: empty input
+    code: |
+      assert(JSON.stringify(makeAdder(5).addAll([])) === JSON.stringify([]), JSON.stringify(makeAdder(5).addAll([])));
+  - name: does not produce NaN
+    code: |
+      const r = makeAdder(7).addAll([1]);
+      assert(r[0] === 8, 'got ' + r[0]);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Inside the plain function callback, this.base is undefined, yielding NaN.
+- order: 2
+  cost: 20
+  content: A normal function gets its own `this`; an arrow function inherits the method's `this`.
+- order: 3
+  cost: 30
+  content: 'Change the map callback to an arrow function: (n) => n + this.base.'

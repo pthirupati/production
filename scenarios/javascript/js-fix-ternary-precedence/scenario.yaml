@@ -1,0 +1,72 @@
+title: Fix the Operator Precedence in describe
+slug: js-fix-ternary-precedence
+category: JavaScript Development
+description: 'describe(n) should return a string like ''positive: 5'' / ''non-positive: -2'', but the
+  string concatenation and ternary are mixed without parentheses, so ''+'' binds before ''?:'' and the
+  label is wrong. Fix the precedence with parentheses so the ternary chooses the label.'
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See the wrong label produced by precedence
+- Parenthesize the ternary so it evaluates first
+- Return the correctly labelled string
+initial_state: 'describe(n) should return a string like ''positive: 5'' / ''non-positive: -2'', but the
+  string concatenation and ternary are mixed without parentheses, so ''+'' binds before ''?:'' and the
+  label is wrong. Fix the precedence with parentheses so the ternary chooses the label.'
+solution_explanation: |
+  Because + binds tighter than ?:, the original concatenated first and fed a truthy string into the condition. Parenthesizing the ternary makes it select the label, which is then concatenated with n.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix describe(n): return 'positive: <n>' when n > 0, otherwise 'non-positive: <n>'.
+      describe(5) -> 'positive: 5'; describe(-2) -> 'non-positive: -2'
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function describe(n) {
+        // '+' binds tighter than '?:', so the ternary never picks the label
+        return 'label: ' + n > 0 ? 'positive: ' + n : 'non-positive: ' + n;
+      }
+    readonly: false
+  visible_tests:
+  - name: positive
+    code: |
+      assert(describe(5) === 'positive: 5', describe(5));
+  - name: negative
+    code: |
+      assert(describe(-2) === 'non-positive: -2', describe(-2));
+  hidden_tests:
+  - name: zero is non-positive
+    code: |
+      assert(describe(0) === 'non-positive: 0', describe(0));
+  - name: large positive
+    code: |
+      assert(describe(100) === 'positive: 100');
+  - name: no stray label text
+    code: |
+      assert(describe(3).indexOf('label') === -1, describe(3));
+  - name: one
+    code: |
+      assert(describe(1) === 'positive: 1');
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: 'describe(5) returns the wrong string because ''label: '' + n is evaluated before the ?: .'
+- order: 2
+  cost: 20
+  content: In JS, + has higher precedence than the conditional operator ?:.
+- order: 3
+  cost: 30
+  content: 'Wrap the ternary in parentheses: (n > 0 ? ''positive: '' : ''non-positive: '') + n.'

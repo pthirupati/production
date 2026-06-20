@@ -1,0 +1,29 @@
+title: CI Deploy Failing on Expired OIDC Token
+slug: devops-ci-pipeline-oidc-token
+technology: DevOps
+category: CI/CD
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The deploy stage fails because the cloud OIDC federation token is misconfigured/expired.
+  Fix the pipeline credentials and confirm it passes.
+initial_state: A CI/CD or Helm environment with the documented ci-pipeline fault.
+objectives:
+- Confirm the pipeline is failing
+- Fix the pipeline configuration
+- Verify the pipeline passes
+hints:
+- order: 1
+  cost: 10
+  content: The pipeline deploy stage is failing.
+- order: 2
+  cost: 15
+  content: Fix the pipeline configuration and redeploy.
+- order: 3
+  cost: 20
+  content: The pipeline/release is healthy.

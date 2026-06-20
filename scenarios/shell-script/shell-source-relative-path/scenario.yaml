@@ -1,0 +1,28 @@
+title: Script Source Fails From Other CWD
+slug: shell-source-relative-path
+technology: Shell Scripting
+category: Portability
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Sourcing a sibling lib fails when run from another directory.
+initial_state: An ops script sourcing a lib by relative path.
+objectives:
+- 'Confirm the issue: ''No such file'' when run elsewhere'
+- Apply the documented fix in /opt/scripts/main-with-lib.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''No such file'' when run elsewhere'
+- order: 2
+  cost: 15
+  content: Resolve the script dir and source absolutely.
+- order: 3
+  cost: 20
+  content: /opt/scripts/main-with-lib.sh carries the corrected configuration.

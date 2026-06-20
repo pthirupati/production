@@ -1,0 +1,28 @@
+title: Ansible Authorized Key Not Installed
+slug: ansible-user-ssh-key
+technology: Ansible
+category: Modules
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Key-based login fails because the authorized_key task targets the wrong user/path.
+initial_state: An Ansible authorized_key task with the wrong target.
+objectives:
+- 'Confirm the issue: SSH key auth fails'
+- Apply the documented fix in /home/ansible/sshkey.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SSH key auth fails
+- order: 2
+  cost: 15
+  content: Fix the authorized_key user/key.
+- order: 3
+  cost: 20
+  content: /home/ansible/sshkey.yml carries the corrected configuration.

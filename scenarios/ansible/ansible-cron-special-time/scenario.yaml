@@ -1,0 +1,28 @@
+title: Ansible Cron Job Wrong Schedule
+slug: ansible-cron-special-time
+technology: Ansible
+category: Modules
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A cron job runs at the wrong time because the cron task fields are wrong.
+initial_state: An Ansible cron task with an incorrect schedule.
+objectives:
+- 'Confirm the issue: Job runs at the wrong time'
+- Apply the documented fix in /home/ansible/cron.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Job runs at the wrong time
+- order: 2
+  cost: 15
+  content: Fix the cron schedule fields.
+- order: 3
+  cost: 20
+  content: /home/ansible/cron.yml carries the corrected configuration.

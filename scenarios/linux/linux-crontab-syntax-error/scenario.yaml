@@ -1,0 +1,30 @@
+title: Cron Entry Never Fires (Bad Schedule)
+slug: linux-crontab-syntax-error
+technology: Linux
+category: Cron
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A scheduled job never runs because its cron schedule field is malformed. Fix the schedule
+  and confirm the file is corrected.
+initial_state: A Linux host whose /etc/cron.d entry has an invalid time specification, so the job never
+  fires.
+objectives:
+- Confirm the job never runs
+- Fix the cron schedule syntax
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: cron logs show no run for the job.
+- order: 2
+  cost: 15
+  content: Correct the 5-field schedule.
+- order: 3
+  cost: 20
+  content: cron.d entry carries the corrected schedule.

@@ -1,0 +1,75 @@
+title: Fix the Fibonacci Base Case
+slug: py-fix-fibonacci-base-case
+category: Python Development
+description: 'fib(n) returns the n-th Fibonacci number (0-indexed: 0,1,1,2,3,5,...), but the base cases
+  are wrong so the whole sequence is shifted/incorrect. Fix the base cases so fib(0)=0 and fib(1)=1.'
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Check fib(0) and fib(1) against the definition
+- Correct the base-case return values
+- Verify the recursive/iterative sequence is right
+initial_state: 'fib(n) returns the n-th Fibonacci number (0-indexed: 0,1,1,2,3,5,...), but the base cases
+  are wrong so the whole sequence is shifted/incorrect. Fix the base cases so fib(0)=0 and fib(1)=1.'
+solution_explanation: |
+  fib(0) must be 0. The base case returned 1, shifting the indexing. Correcting it to return 0 fixes the whole sequence.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix fib(n) so the 0-indexed sequence is 0, 1, 1, 2, 3, 5, 8, ...
+      fib(0)=0, fib(1)=1, fib(6)=8
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def fib(n):
+          if n == 0:
+              return 1
+          if n == 1:
+              return 1
+          a, b = 0, 1
+          for _ in range(n - 1):
+              a, b = b, a + b
+          return b
+    readonly: false
+  visible_tests:
+  - name: fib(0)
+    code: |
+      assert fib(0) == 0, fib(0)
+  - name: fib(1)
+    code: |
+      assert fib(1) == 1, fib(1)
+  hidden_tests:
+  - name: fib(2)
+    code: |
+      assert fib(2) == 1, fib(2)
+  - name: fib(6)
+    code: |
+      assert fib(6) == 8, fib(6)
+  - name: fib(10)
+    code: |
+      assert fib(10) == 55, fib(10)
+  - name: sequence prefix
+    code: |
+      assert [fib(i) for i in range(7)] == [0, 1, 1, 2, 3, 5, 8]
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: fib(0) returns 1, but by definition it should be 0.
+- order: 2
+  cost: 20
+  content: Only the base case for n == 0 is wrong.
+- order: 3
+  cost: 30
+  content: 'Make `if n == 0: return 0`. The iterative part is already correct.'

@@ -1,0 +1,29 @@
+title: Ansible Loop Iterating Wrong Variable
+slug: ansible-loop-wrong-var
+technology: Ansible
+category: Loops
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A play loops over the wrong variable and creates nothing useful. Fix the loop to iterate
+  the intended list and confirm the play is corrected.
+initial_state: An Ansible play whose loop references the wrong variable, so the task produces no effect.
+objectives:
+- Confirm the loop iterates the wrong data
+- Fix the loop variable
+- Verify the play is corrected
+hints:
+- order: 1
+  cost: 10
+  content: The loop runs 0 / wrong iterations.
+- order: 2
+  cost: 15
+  content: Point the loop at the correct list var.
+- order: 3
+  cost: 20
+  content: loop.yml carries the corrected loop.

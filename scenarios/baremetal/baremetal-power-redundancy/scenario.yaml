@@ -1,0 +1,28 @@
+title: Power Supply Redundancy Lost
+slug: baremetal-power-redundancy
+technology: Bare Metal
+category: Power
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Redundancy is lost because the power policy/PSU config is wrong after maintenance.
+initial_state: A server running without PSU redundancy.
+objectives:
+- 'Confirm the issue: Single PSU feeding the server'
+- Apply the documented fix in /etc/bmc/power-policy.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Single PSU feeding the server
+- order: 2
+  cost: 15
+  content: Restore the redundant power policy.
+- order: 3
+  cost: 20
+  content: /etc/bmc/power-policy.cfg carries the corrected configuration.

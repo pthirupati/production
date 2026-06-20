@@ -1,0 +1,28 @@
+title: Slow Pulls Without Registry Mirror
+slug: docker-registry-mirror-missing
+technology: Docker
+category: Performance
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Image pulls are slow because no registry mirror is configured.
+initial_state: A host without a Docker registry mirror.
+objectives:
+- 'Confirm the issue: Slow upstream pulls'
+- Apply the documented fix in /etc/docker/daemon.json
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Slow upstream pulls
+- order: 2
+  cost: 15
+  content: Add a registry-mirrors entry.
+- order: 3
+  cost: 20
+  content: /etc/docker/daemon.json carries the corrected configuration.

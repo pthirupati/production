@@ -1,0 +1,28 @@
+title: Resource Preload Hints Wrong
+slug: html-preload-misconfigured
+technology: HTML
+category: Performance
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Preload hints hurt instead of help because they target the wrong resources/as.
+initial_state: A page with misconfigured preload hints.
+objectives:
+- 'Confirm the issue: Preload warnings / waste'
+- Apply the documented fix in /var/www/html/fast.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Preload warnings / waste
+- order: 2
+  cost: 15
+  content: Fix the preload as/href hints.
+- order: 3
+  cost: 20
+  content: /var/www/html/fast.html carries the corrected markup/config.

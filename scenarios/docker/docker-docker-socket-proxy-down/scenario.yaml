@@ -1,0 +1,28 @@
+title: Docker Socket Proxy Down
+slug: docker-docker-socket-proxy-down
+technology: Docker
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A hardened socket proxy in front of dockerd is down, breaking tooling.
+initial_state: A host where the docker-socket-proxy service is failed.
+objectives:
+- Confirm docker-socket-proxy is down (Tools can't reach the proxied socket)
+- Resolve the cause and start docker-socket-proxy
+- Verify docker-socket-proxy is active
+hints:
+- order: 1
+  cost: 10
+  content: Tools can't reach the proxied socket
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start docker-socket-proxy.'
+- order: 3
+  cost: 20
+  content: systemctl is-active docker-socket-proxy returns active.

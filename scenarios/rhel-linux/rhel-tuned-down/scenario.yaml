@@ -1,0 +1,28 @@
+title: RHEL tuned Daemon Down
+slug: rhel-tuned-down
+technology: RHEL Linux
+category: Performance
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Performance tuning isn't applied because the tuned daemon is down.
+initial_state: A RHEL host where the tuned service is failed.
+objectives:
+- Confirm tuned is down (tuned-adm active fails)
+- Resolve the cause and start tuned
+- Verify tuned is active
+hints:
+- order: 1
+  cost: 10
+  content: tuned-adm active fails
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start tuned.'
+- order: 3
+  cost: 20
+  content: systemctl is-active tuned returns active.

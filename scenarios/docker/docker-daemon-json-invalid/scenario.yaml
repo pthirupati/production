@@ -1,0 +1,29 @@
+title: Invalid daemon.json Stops Docker
+slug: docker-daemon-json-invalid
+technology: Docker
+category: Configuration
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The Docker daemon won't start because /etc/docker/daemon.json has a JSON syntax error. Fix
+  the JSON and confirm the config is corrected.
+initial_state: A host whose Docker daemon.json is malformed, preventing dockerd from starting.
+objectives:
+- Confirm dockerd fails on bad daemon.json
+- Fix the JSON syntax
+- Verify the config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: journalctl -u docker shows JSON parse error.
+- order: 2
+  cost: 15
+  content: Correct daemon.json to valid JSON.
+- order: 3
+  cost: 20
+  content: daemon.json carries the corrected JSON.

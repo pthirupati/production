@@ -1,0 +1,28 @@
+title: Script Heredoc Expands Unexpectedly
+slug: shell-here-string-quoting
+technology: Shell Scripting
+category: Quoting
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A generated config is wrong because heredoc expansion isn't quoted.
+initial_state: An ops script whose heredoc expands variables it shouldn't.
+objectives:
+- 'Confirm the issue: Literal text gets expanded'
+- Apply the documented fix in /opt/scripts/gen-config.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Literal text gets expanded
+- order: 2
+  cost: 15
+  content: Quote the heredoc delimiter ('EOF').
+- order: 3
+  cost: 20
+  content: /opt/scripts/gen-config.sh carries the corrected configuration.

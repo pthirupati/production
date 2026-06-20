@@ -1,0 +1,28 @@
+title: Docker Networking Broken (iptables off)
+slug: docker-iptables-disabled
+technology: Docker
+category: Networking
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Container networking is broken because Docker was told not to manage iptables.
+initial_state: A host with iptables management disabled in Docker.
+objectives:
+- 'Confirm the issue: Containers have no outbound network'
+- Apply the documented fix in /etc/docker/daemon.json
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Containers have no outbound network
+- order: 2
+  cost: 15
+  content: Re-enable Docker iptables management.
+- order: 3
+  cost: 20
+  content: /etc/docker/daemon.json carries the corrected configuration.

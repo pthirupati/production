@@ -1,0 +1,28 @@
+title: GPU vBIOS Mismatch in Fleet
+slug: gpu-vbios-mismatch
+technology: GPU
+category: Firmware
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: One node behaves differently because its GPU vBIOS doesn't match the fleet baseline.
+initial_state: A GPU host with an off-baseline vBIOS.
+objectives:
+- 'Confirm the issue: One node misbehaves'
+- Apply the documented fix in /etc/gpu/vbios-baseline.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: One node misbehaves
+- order: 2
+  cost: 15
+  content: Align the vBIOS to the fleet baseline.
+- order: 3
+  cost: 20
+  content: /etc/gpu/vbios-baseline.conf carries the corrected configuration.

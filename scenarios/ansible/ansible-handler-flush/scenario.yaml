@@ -1,0 +1,28 @@
+title: Ansible Handlers Run Too Late
+slug: ansible-handler-flush
+technology: Ansible
+category: Handlers
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Dependent tasks fail because handlers don't flush before they're needed.
+initial_state: An Ansible play needing an explicit handler flush.
+objectives:
+- 'Confirm the issue: Handlers run after dependent tasks'
+- Apply the documented fix in /home/ansible/flush.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Handlers run after dependent tasks
+- order: 2
+  cost: 15
+  content: 'Add meta: flush_handlers at the right point.'
+- order: 3
+  cost: 20
+  content: /home/ansible/flush.yml carries the corrected configuration.

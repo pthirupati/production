@@ -1,0 +1,29 @@
+title: GPU ECC Disabled on Critical Node
+slug: gpu-ecc-disabled
+technology: Gpu
+category: Reliability
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A training node has ECC memory disabled, risking silent corruption on long runs. Re-enable
+  ECC and confirm the config is corrected.
+initial_state: A GPU host where ECC memory protection has been turned off.
+objectives:
+- Confirm ECC is disabled
+- Re-enable ECC (and plan the reset)
+- Verify the ECC config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: nvidia-smi -q shows ECC Disabled.
+- order: 2
+  cost: 15
+  content: nvidia-smi -e 1 and reset; persist the setting.
+- order: 3
+  cost: 20
+  content: ECC config carries the corrected value.

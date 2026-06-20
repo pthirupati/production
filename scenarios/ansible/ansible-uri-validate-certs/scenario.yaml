@@ -1,0 +1,28 @@
+title: Ansible URI Task Failing on Certs
+slug: ansible-uri-validate-certs
+technology: Ansible
+category: Modules
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A uri task fails because validate_certs handling is wrong for the internal CA.
+initial_state: An Ansible uri task with incorrect cert validation config.
+objectives:
+- 'Confirm the issue: uri task TLS errors'
+- Apply the documented fix in /home/ansible/uri.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: uri task TLS errors
+- order: 2
+  cost: 15
+  content: Trust the CA / set validate_certs correctly.
+- order: 3
+  cost: 20
+  content: /home/ansible/uri.yml carries the corrected configuration.

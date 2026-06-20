@@ -1,0 +1,28 @@
+title: VMware Tools Outdated Blocking Backups
+slug: vm-tools-outdated-blocking-quiesce
+category: VMware vSphere
+description: Quiesced (application-consistent) snapshots fail for web-prod-01 because VMware Tools is
+  out of date. Upgrade Tools and confirm it reports current.
+difficulty: medium
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Confirm web-prod-01 Tools are outdated
+- Upgrade VMware Tools
+- Verify Tools status is current
+initial_state: vCenter shows web-prod-01 with outdated VMware Tools.
+hints:
+- order: 1
+  cost: 10
+  content: 'In the vCenter simulator, locate the issue: confirm web-prod-01 tools are outdated.'
+- order: 2
+  cost: 15
+  content: 'Apply the remediation in the GUI: upgrade vmware tools.'
+- order: 3
+  cost: 20
+  content: 'Confirm resolution: verify tools status is current.'

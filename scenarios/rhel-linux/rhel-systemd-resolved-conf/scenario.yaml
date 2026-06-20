@@ -1,0 +1,28 @@
+title: RHEL DNS Caching Misconfigured
+slug: rhel-systemd-resolved-conf
+technology: RHEL Linux
+category: DNS
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: DNS behavior is wrong because systemd-resolved settings are misconfigured.
+initial_state: A RHEL host with a broken resolved.conf.
+objectives:
+- 'Confirm the issue: Wrong DNS caching behavior'
+- Apply the documented fix in /etc/systemd/resolved.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Wrong DNS caching behavior
+- order: 2
+  cost: 15
+  content: Fix resolved.conf settings.
+- order: 3
+  cost: 20
+  content: /etc/systemd/resolved.conf carries the corrected configuration.

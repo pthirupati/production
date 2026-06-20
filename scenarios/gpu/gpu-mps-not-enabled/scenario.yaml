@@ -1,0 +1,30 @@
+title: GPU MPS Not Enabled for Multi-Tenant
+slug: gpu-mps-not-enabled
+technology: Gpu
+category: Performance
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Multiple inference processes are serializing on one GPU because the Multi-Process Service
+  (MPS) isn't enabled. Enable MPS and confirm the config is corrected.
+initial_state: A GPU host where NVIDIA MPS is not enabled, so concurrent processes can't share the GPU
+  efficiently.
+objectives:
+- Confirm processes serialize without MPS
+- Enable the MPS control daemon
+- Verify the MPS config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: nvidia-smi shows one process at a time.
+- order: 2
+  cost: 15
+  content: Start nvidia-cuda-mps-control and configure it.
+- order: 3
+  cost: 20
+  content: MPS config carries the corrected setting.

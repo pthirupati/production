@@ -1,0 +1,28 @@
+title: Scheduler Allocates GPUs It Can't Isolate
+slug: gpu-batch-scheduler-binding
+technology: GPU
+category: Scheduling
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Jobs interfere because the batch scheduler doesn't bind GPUs via cgroups/CUDA_VISIBLE_DEVICES.
+initial_state: A GPU host where the scheduler doesn't isolate GPUs.
+objectives:
+- 'Confirm the issue: Jobs see each other''s GPUs'
+- Apply the documented fix in /etc/gpu/scheduler-binding.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Jobs see each other's GPUs
+- order: 2
+  cost: 15
+  content: Bind GPUs per job (cgroups/visible devices).
+- order: 3
+  cost: 20
+  content: /etc/gpu/scheduler-binding.conf carries the corrected configuration.

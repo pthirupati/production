@@ -1,0 +1,98 @@
+title: Implement an LRU Cache
+slug: py-impl-lru-cache-class
+category: Python Development
+description: Implement an LRUCache(capacity) with get(key) and put(key, value). get returns the value
+  or -1 if absent and marks the key most-recently-used. put inserts/updates and evicts the least-recently-used
+  key when capacity is exceeded. The stub is empty so the tests fail.
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Track recency of access for keys
+- Evict the least-recently-used entry on overflow
+- Make get/put update recency correctly
+initial_state: Implement an LRUCache(capacity) with get(key) and put(key, value). get returns the value
+  or -1 if absent and marks the key most-recently-used. put inserts/updates and evicts the least-recently-used
+  key when capacity is exceeded. The stub is empty so the tests fail.
+solution_explanation: |
+  An OrderedDict maintains insertion/use order. Moving a key to the end on access marks it most-recent; popitem(last=False) evicts the LRU entry.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement class LRUCache(capacity) with get(key)->value or -1, and put(key, value). On overflow evict the least-recently-used key. Both get and put count as 'use'.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      class LRUCache:
+          def __init__(self, capacity):
+              # TODO
+              pass
+          def get(self, key):
+              # TODO
+              pass
+          def put(self, key, value):
+              # TODO
+              pass
+    readonly: false
+  visible_tests:
+  - name: basic get/put
+    code: |
+      c = LRUCache(2)
+      c.put(1, 1)
+      c.put(2, 2)
+      assert c.get(1) == 1
+  - name: miss returns -1
+    code: |
+      c = LRUCache(2)
+      assert c.get(99) == -1
+  hidden_tests:
+  - name: evicts least recently used
+    code: |
+      c = LRUCache(2)
+      c.put(1, 1)
+      c.put(2, 2)
+      c.put(3, 3)
+      assert c.get(1) == -1 and c.get(2) == 2 and c.get(3) == 3
+  - name: get refreshes recency
+    code: |
+      c = LRUCache(2)
+      c.put(1, 1)
+      c.put(2, 2)
+      c.get(1)
+      c.put(3, 3)
+      assert c.get(2) == -1 and c.get(1) == 1 and c.get(3) == 3
+  - name: update existing keeps it fresh
+    code: |
+      c = LRUCache(2)
+      c.put(1, 1)
+      c.put(2, 2)
+      c.put(1, 10)
+      c.put(3, 3)
+      assert c.get(2) == -1 and c.get(1) == 10
+  - name: capacity one
+    code: |
+      c = LRUCache(1)
+      c.put(1, 1)
+      c.put(2, 2)
+      assert c.get(1) == -1 and c.get(2) == 2
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: You need to know which key was used least recently — order matters.
+- order: 2
+  cost: 20
+  content: collections.OrderedDict supports move_to_end and popitem(last=False).
+- order: 3
+  cost: 30
+  content: On get/put, move the key to the end; after put, if over capacity pop the first item.

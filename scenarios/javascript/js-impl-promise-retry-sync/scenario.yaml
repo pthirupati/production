@@ -1,0 +1,73 @@
+title: Implement pick (Object Subset)
+slug: js-impl-promise-retry-sync
+category: JavaScript Development
+description: 'Implement pick(obj, keys): return a NEW object containing only the entries of obj whose
+  key is in the keys array. Keys not present in obj are skipped. The original object is not mutated. The
+  stub is empty so tests fail.'
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Copy only the requested keys
+- Skip keys absent from the source
+- Return a new object without mutating the input
+initial_state: 'Implement pick(obj, keys): return a NEW object containing only the entries of obj whose
+  key is in the keys array. Keys not present in obj are skipped. The original object is not mutated. The
+  stub is empty so tests fail.'
+solution_explanation: |
+  Iterating the requested keys and copying only those present (via hasOwnProperty, so falsy values are retained) yields the subset without mutating the source.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement pick(obj, keys) -> new object with only those keys that exist in obj.
+      pick({a:1,b:2,c:3}, ['a','c']) -> {a:1, c:3}
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function pick(obj, keys) {
+        // TODO: return a new object with only the selected keys
+      }
+    readonly: false
+  visible_tests:
+  - name: subset
+    code: |
+      assert(JSON.stringify(pick({a:1,b:2,c:3}, ['a','c'])) === JSON.stringify({a:1,c:3}), JSON.stringify(pick({a:1,b:2,c:3}, ['a','c'])));
+  - name: empty keys
+    code: |
+      assert(JSON.stringify(pick({a:1}, [])) === JSON.stringify({}), JSON.stringify(pick({a:1}, [])));
+  hidden_tests:
+  - name: missing key skipped
+    code: |
+      assert(JSON.stringify(pick({a:1}, ['a','z'])) === JSON.stringify({a:1}), JSON.stringify(pick({a:1}, ['a','z'])));
+  - name: all keys
+    code: |
+      assert(JSON.stringify(pick({x:1,y:2}, ['x','y'])) === JSON.stringify({x:1,y:2}), JSON.stringify(pick({x:1,y:2}, ['x','y'])));
+  - name: does not mutate source
+    code: |
+      const src = {a:1,b:2};
+      pick(src, ['a']);
+      assert(JSON.stringify(src) === JSON.stringify({a:1,b:2}));
+  - name: falsy values kept
+    code: |
+      assert(JSON.stringify(pick({a:0, b:false, c:1}, ['a','b'])) === JSON.stringify({a:0, b:false}), JSON.stringify(pick({a:0, b:false, c:1}, ['a','b'])));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Iterate over the keys array, not the object.
+- order: 2
+  cost: 20
+  content: Use hasOwnProperty to copy only keys that actually exist on obj.
+- order: 3
+  cost: 30
+  content: Build into a fresh object so the source isn't mutated; keep falsy values like 0/false.

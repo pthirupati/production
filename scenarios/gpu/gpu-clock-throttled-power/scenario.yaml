@@ -1,0 +1,29 @@
+title: GPU Clocks Throttled by Power Cap
+slug: gpu-clock-throttled-power
+technology: Gpu
+category: Performance
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Training throughput is low because the GPU power limit was set far below the board's capability,
+  throttling clocks. Raise the power limit appropriately and confirm the config is corrected.
+initial_state: A GPU host whose power limit is set too low, throttling clock speeds under load.
+objectives:
+- Confirm clocks are throttled by the power cap
+- Raise the power limit appropriately
+- Verify the power config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: nvidia-smi shows SW Power Cap throttle.
+- order: 2
+  cost: 15
+  content: nvidia-smi -pl to a sane value; persist it.
+- order: 3
+  cost: 20
+  content: Power config carries the corrected limit.

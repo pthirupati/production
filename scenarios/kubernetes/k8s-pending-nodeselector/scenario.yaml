@@ -1,0 +1,29 @@
+title: Pod Pending from Node Selector No Match
+slug: k8s-pending-nodeselector
+technology: Kubernetes
+category: Scheduling
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A pod is Pending because its nodeSelector requires a label no node has. Fix the selector
+  (or label a node) and confirm scheduling.
+initial_state: A Kubernetes pod Pending because its nodeSelector/affinity matches no available node.
+objectives:
+- Confirm the pod is Pending on an unschedulable selector
+- Fix the nodeSelector or label a suitable node
+- Verify the pod schedules and runs
+hints:
+- order: 1
+  cost: 10
+  content: kubectl describe pod shows 'didn't match node selector'.
+- order: 2
+  cost: 15
+  content: Correct the nodeSelector or label a node; re-apply.
+- order: 3
+  cost: 20
+  content: Pod Running.

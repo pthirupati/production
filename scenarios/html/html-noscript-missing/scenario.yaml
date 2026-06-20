@@ -1,0 +1,28 @@
+title: No Fallback for Disabled JS
+slug: html-noscript-missing
+technology: HTML
+category: UX
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Users without JS see a blank page because there's no noscript fallback.
+initial_state: A page with no noscript fallback.
+objectives:
+- 'Confirm the issue: Blank page without JS'
+- Apply the documented fix in /var/www/html/spa.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Blank page without JS
+- order: 2
+  cost: 15
+  content: Add a noscript fallback message.
+- order: 3
+  cost: 20
+  content: /var/www/html/spa.html carries the corrected markup/config.

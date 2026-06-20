@@ -1,0 +1,65 @@
+title: Fix the Celsius-to-Fahrenheit Formula
+slug: py-fix-temperature-conversion
+category: Python Development
+description: c_to_f(c) converts Celsius to Fahrenheit but uses the wrong formula (forgets the *9/5 factor),
+  so every conversion is off. Fix it to the correct F = C * 9/5 + 32.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Compare known conversions (0C, 100C) to the output
+- Apply the correct multiplier and offset
+- Return a correct float
+initial_state: c_to_f(c) converts Celsius to Fahrenheit but uses the wrong formula (forgets the *9/5 factor),
+  so every conversion is off. Fix it to the correct F = C * 9/5 + 32.
+solution_explanation: |
+  The conversion needs the 9/5 scaling factor before adding 32; omitting it only offsets the value.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix c_to_f(c): Fahrenheit = c * 9/5 + 32.
+      c_to_f(0) -> 32.0, c_to_f(100) -> 212.0
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def c_to_f(c):
+          return c + 32      # bug: missing * 9/5
+    readonly: false
+  visible_tests:
+  - name: freezing
+    code: |
+      assert c_to_f(0) == 32.0
+  - name: boiling
+    code: |
+      assert c_to_f(100) == 212.0, c_to_f(100)
+  hidden_tests:
+  - name: body temp
+    code: |
+      assert abs(c_to_f(37) - 98.6) < 1e-9, c_to_f(37)
+  - name: negative
+    code: |
+      assert c_to_f(-40) == -40.0, c_to_f(-40)
+  - name: twenty c
+    code: |
+      assert c_to_f(20) == 68.0
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: c_to_f(100) returns 132, but boiling water is 212F.
+- order: 2
+  cost: 20
+  content: You scaled by nothing — Celsius degrees are larger than Fahrenheit degrees.
+- order: 3
+  cost: 30
+  content: Use c * 9 / 5 + 32.

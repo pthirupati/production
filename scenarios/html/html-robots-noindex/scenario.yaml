@@ -1,0 +1,28 @@
+title: Page Accidentally Set to noindex
+slug: html-robots-noindex
+technology: HTML
+category: SEO
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: An important page is deindexed because a robots noindex meta is present.
+initial_state: A page with an accidental noindex meta.
+objectives:
+- 'Confirm the issue: Page excluded from search'
+- Apply the documented fix in /var/www/html/landing.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Page excluded from search
+- order: 2
+  cost: 15
+  content: Remove the noindex meta.
+- order: 3
+  cost: 20
+  content: /var/www/html/landing.html carries the corrected markup/config.

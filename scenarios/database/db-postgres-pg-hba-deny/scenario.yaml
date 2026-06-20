@@ -1,0 +1,30 @@
+title: PostgreSQL pg_hba Rejecting App
+slug: db-postgres-pg-hba-deny
+technology: Database
+category: PostgreSQL
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Application logins to PostgreSQL are rejected with 'no pg_hba.conf entry' because the host-based
+  auth rules don't allow the app subnet. Add the correct rule and reload so the app can connect.
+initial_state: A PostgreSQL host whose pg_hba.conf lacks an entry for the application network, rejecting
+  its logins.
+objectives:
+- Confirm logins fail on pg_hba rules
+- Add the correct host auth entry
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Logs show 'no pg_hba.conf entry for host'.
+- order: 2
+  cost: 15
+  content: Add a host line for the app CIDR/method and reload.
+- order: 3
+  cost: 20
+  content: pg_hba.conf carries the corrected rule.

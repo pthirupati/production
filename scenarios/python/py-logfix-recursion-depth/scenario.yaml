@@ -1,0 +1,70 @@
+title: 'Log Analysis: Fix the RecursionError in factorial'
+slug: py-logfix-recursion-depth
+category: Python Development
+description: 'The log shows `RecursionError: maximum recursion depth exceeded` from factorial() because
+  its base case is wrong (it never stops at 0), so it recurses forever into negatives. Fix the base case
+  so factorial(0) == 1 and recursion terminates.'
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Read the RecursionError and find the missing/wrong base case
+- Stop recursion at n == 0 (or n <= 1)
+- Return the correct factorial
+initial_state: 'The log shows `RecursionError: maximum recursion depth exceeded` from factorial() because
+  its base case is wrong (it never stops at 0), so it recurses forever into negatives. Fix the base case
+  so factorial(0) == 1 and recursion terminates.'
+solution_explanation: |
+  Without a base case the recursion descends past 0 forever. Returning 1 for n <= 1 terminates it with the correct value.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: logfix
+  instructions: |
+    Fix factorial(n) for n >= 0 so recursion terminates: factorial(0) == 1. The log shows infinite recursion.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      # Production log:
+      #   RecursionError: maximum recursion depth exceeded
+      #     factorial(n) keeps calling factorial(n - 1) past 0
+
+      def factorial(n):
+          return n * factorial(n - 1)   # no base case -> infinite recursion
+    readonly: false
+  visible_tests:
+  - name: factorial 0
+    code: |
+      assert factorial(0) == 1
+  - name: factorial 5
+    code: |
+      assert factorial(5) == 120
+  hidden_tests:
+  - name: factorial 1
+    code: |
+      assert factorial(1) == 1
+  - name: factorial 10
+    code: |
+      assert factorial(10) == 3628800
+  - name: factorial 3
+    code: |
+      assert factorial(3) == 6
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: The log says recursion never stops — there is no base case.
+- order: 2
+  cost: 20
+  content: factorial(0) and factorial(1) are both 1.
+- order: 3
+  cost: 30
+  content: 'Add `if n <= 1: return 1` before recursing.'

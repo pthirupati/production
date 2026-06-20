@@ -1,0 +1,28 @@
+title: Container Doesn't Restart After Crash
+slug: docker-restart-policy-missing
+technology: Docker
+category: Reliability
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A crashed container stays down because no restart policy is set.
+initial_state: A compose service without a restart policy.
+objectives:
+- 'Confirm the issue: Crashed container stays exited'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Crashed container stays exited
+- order: 2
+  cost: 15
+  content: 'Set restart: unless-stopped.'
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

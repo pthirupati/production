@@ -1,0 +1,29 @@
+title: Pod Pending from Resource Quota Exhausted
+slug: k8s-pending-quota-exhausted
+technology: Kubernetes
+category: Scheduling
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: New pods are Pending because the namespace ResourceQuota is exhausted. Right-size requests
+  or raise the quota and confirm pods schedule.
+initial_state: A Kubernetes namespace whose ResourceQuota is fully consumed, leaving new pods Pending.
+objectives:
+- Confirm pods are Pending due to quota
+- Lower requests or raise the quota
+- Verify pods schedule and the cluster is healthy
+hints:
+- order: 1
+  cost: 10
+  content: kubectl describe pod shows 'exceeded quota'.
+- order: 2
+  cost: 15
+  content: Adjust requests or increase the ResourceQuota.
+- order: 3
+  cost: 20
+  content: Pods schedule.

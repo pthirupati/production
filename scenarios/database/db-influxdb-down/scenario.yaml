@@ -1,0 +1,28 @@
+title: InfluxDB Time-Series DB Down
+slug: db-influxdb-down
+technology: Database
+category: Time-Series
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: InfluxDB is down so metrics ingestion has stopped.
+initial_state: A host where the influxdb service is failed.
+objectives:
+- Confirm influxdb is down (influx ping fails)
+- Resolve the cause and start influxdb
+- Verify influxdb is active
+hints:
+- order: 1
+  cost: 10
+  content: influx ping fails
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start influxdb.'
+- order: 3
+  cost: 20
+  content: systemctl is-active influxdb returns active.

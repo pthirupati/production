@@ -1,0 +1,28 @@
+title: Signals Not Reaching Container Process
+slug: docker-entrypoint-shell-form
+technology: Docker
+category: Runtime
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The app doesn't receive SIGTERM because ENTRYPOINT uses shell form (PID 1 is sh).
+initial_state: A Dockerfile using shell-form ENTRYPOINT.
+objectives:
+- 'Confirm the issue: Container ignores stop signals'
+- Apply the documented fix in /opt/app/Dockerfile
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Container ignores stop signals
+- order: 2
+  cost: 15
+  content: Use exec-form ENTRYPOINT (JSON array).
+- order: 3
+  cost: 20
+  content: /opt/app/Dockerfile carries the corrected configuration.

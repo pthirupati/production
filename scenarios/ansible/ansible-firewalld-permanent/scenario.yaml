@@ -1,0 +1,28 @@
+title: Ansible Firewall Rule Not Permanent
+slug: ansible-firewalld-permanent
+technology: Ansible
+category: Modules
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A firewall rule disappears on reload because the firewalld task isn't permanent.
+initial_state: 'An Ansible firewalld task missing permanent: yes.'
+objectives:
+- 'Confirm the issue: Rule lost on reload'
+- Apply the documented fix in /home/ansible/firewalld.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Rule lost on reload
+- order: 2
+  cost: 15
+  content: 'Add permanent: yes and reload.'
+- order: 3
+  cost: 20
+  content: /home/ansible/firewalld.yml carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: SR-IOV Disabled Blocking VF NICs
+slug: baremetal-sr-iov-disabled
+technology: Bare Metal
+category: Networking
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: VMs can't get virtual NIC functions because SR-IOV is disabled in BIOS/NIC.
+initial_state: A server with SR-IOV turned off.
+objectives:
+- 'Confirm the issue: No VFs available'
+- Apply the documented fix in /etc/bios/sriov.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No VFs available
+- order: 2
+  cost: 15
+  content: Enable SR-IOV in BIOS and the NIC.
+- order: 3
+  cost: 20
+  content: /etc/bios/sriov.cfg carries the corrected configuration.

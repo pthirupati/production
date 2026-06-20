@@ -1,0 +1,28 @@
+title: Script Array Expansion Splits Wrong
+slug: shell-array-quoting
+technology: Shell Scripting
+category: Arrays
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Array elements with spaces split because expansion isn't quoted.
+initial_state: An ops script mis-expanding a bash array.
+objectives:
+- 'Confirm the issue: Array args split incorrectly'
+- Apply the documented fix in /opt/scripts/args-array.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Array args split incorrectly
+- order: 2
+  cost: 15
+  content: Use "${arr[@]}" quoting.
+- order: 3
+  cost: 20
+  content: /opt/scripts/args-array.sh carries the corrected configuration.

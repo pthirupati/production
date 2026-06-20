@@ -1,0 +1,29 @@
+title: Ingress 404 from Wrong Path Type
+slug: k8s-ingress-pathtype-404
+technology: Kubernetes
+category: Networking
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An Ingress returns 404 because the pathType/path is misconfigured for the backend. Fix the
+  Ingress rule and confirm the route resolves.
+initial_state: A Kubernetes Ingress whose path/pathType does not match the intended route, returning 404.
+objectives:
+- Confirm the Ingress route returns 404
+- Fix the path/pathType and backend service
+- Verify the route resolves and the cluster is healthy
+hints:
+- order: 1
+  cost: 10
+  content: Ingress rule path/pathType is wrong for the backend.
+- order: 2
+  cost: 15
+  content: Correct the path/pathType and apply; roll out.
+- order: 3
+  cost: 20
+  content: Route resolves.

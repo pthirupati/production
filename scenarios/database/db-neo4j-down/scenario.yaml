@@ -1,0 +1,28 @@
+title: Neo4j Graph DB Down
+slug: db-neo4j-down
+technology: Database
+category: Graph
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Neo4j is down so graph queries fail.
+initial_state: A host where the neo4j service is failed.
+objectives:
+- Confirm neo4j is down (cypher-shell connection fails)
+- Resolve the cause and start neo4j
+- Verify neo4j is active
+hints:
+- order: 1
+  cost: 10
+  content: cypher-shell connection fails
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start neo4j.'
+- order: 3
+  cost: 20
+  content: systemctl is-active neo4j returns active.

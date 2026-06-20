@@ -1,0 +1,28 @@
+title: RHEL Core Dumps Not Generated
+slug: rhel-coredump-disabled
+technology: RHEL Linux
+category: Debugging
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Crashing services produce no core dumps because coredump is disabled/limited.
+initial_state: A RHEL host not generating core dumps.
+objectives:
+- 'Confirm the issue: No cores for crashed services'
+- Apply the documented fix in /etc/systemd/coredump.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No cores for crashed services
+- order: 2
+  cost: 15
+  content: Enable coredumps with sane limits.
+- order: 3
+  cost: 20
+  content: /etc/systemd/coredump.conf carries the corrected configuration.

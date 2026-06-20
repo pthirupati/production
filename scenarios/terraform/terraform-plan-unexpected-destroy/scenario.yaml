@@ -1,0 +1,31 @@
+title: Terraform Plan Shows Unexpected Resource Destruction
+slug: terraform-plan-unexpected-destroy
+technology: Terraform
+category: State / Plan
+difficulty: hard
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A terraform plan unexpectedly proposes destroying a production RDS instance because a resource
+  was renamed in code without a state move. Investigate the plan, use terraform state mv (or moved blocks)
+  to align state with the new addresses, and confirm the plan no longer destroys data.
+initial_state: A Terraform config where a resource block was renamed; terraform plan now wants to destroy
+  and recreate a stateful resource.
+objectives:
+- Read the plan and identify which addressed resource is being destroyed/recreated
+- Use terraform state mv or a moved block to realign state without recreation
+- Re-run terraform plan and confirm no destroy of the stateful resource
+hints:
+- order: 1
+  cost: 10
+  content: terraform plan shows '-/+ destroy then create' on the RDS resource.
+- order: 2
+  cost: 15
+  content: terraform state mv <old.addr> <new.addr> (or add a moved block).
+- order: 3
+  cost: 20
+  content: Re-plan; the stateful resource shows no changes.

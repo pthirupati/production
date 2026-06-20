@@ -1,0 +1,29 @@
+title: Binary Built for Wrong GPU Arch
+slug: gpu-cuda-arch-mismatch
+technology: GPU
+category: Toolkit
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A CUDA binary fails because it was built for a different compute capability than the installed
+  GPU.
+initial_state: A GPU host running a binary built for the wrong arch.
+objectives:
+- 'Confirm the issue: ''no kernel image available'''
+- Apply the documented fix in /etc/gpu/cuda-arch.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''no kernel image available'''
+- order: 2
+  cost: 15
+  content: Rebuild for the correct compute capability.
+- order: 3
+  cost: 20
+  content: /etc/gpu/cuda-arch.conf carries the corrected configuration.

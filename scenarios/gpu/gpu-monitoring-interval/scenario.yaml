@@ -1,0 +1,28 @@
+title: GPU Telemetry Sampling Too Coarse
+slug: gpu-monitoring-interval
+technology: GPU
+category: Observability
+difficulty: easy
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Transient GPU issues are missed because telemetry sampling is too coarse.
+initial_state: A GPU host sampling telemetry too infrequently.
+objectives:
+- 'Confirm the issue: Spikes missed by monitoring'
+- Apply the documented fix in /etc/gpu/telemetry.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Spikes missed by monitoring
+- order: 2
+  cost: 15
+  content: Tighten the telemetry sampling interval.
+- order: 3
+  cost: 20
+  content: /etc/gpu/telemetry.conf carries the corrected configuration.

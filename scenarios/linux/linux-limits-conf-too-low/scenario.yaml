@@ -1,0 +1,29 @@
+title: Open Files Limit Too Low Crashes App
+slug: linux-limits-conf-too-low
+technology: Linux
+category: Limits
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A high-connection service crashes with 'too many open files' because the nofile limit is
+  far too low. Raise it and confirm the file is corrected.
+initial_state: A Linux host whose limits.conf sets nofile too low for a connection-heavy service.
+objectives:
+- Confirm the app hits the open-files limit
+- Raise the nofile limit appropriately
+- Verify limits.conf is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Logs show 'too many open files'.
+- order: 2
+  cost: 15
+  content: Raise soft/hard nofile in limits.conf.
+- order: 3
+  cost: 20
+  content: limits.conf carries the corrected limit.

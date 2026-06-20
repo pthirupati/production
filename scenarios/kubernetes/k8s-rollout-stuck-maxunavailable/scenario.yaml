@@ -1,0 +1,30 @@
+title: Deployment Rollout Stuck on maxUnavailable
+slug: k8s-rollout-stuck-maxunavailable
+technology: Kubernetes
+category: Workloads
+difficulty: hard
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A rolling update is wedged because new pods fail and maxUnavailable=0 blocks progress. Fix
+  the new pods' config and confirm the rollout completes.
+initial_state: A Kubernetes Deployment whose rollout stalls because the new ReplicaSet pods fail and the
+  strategy blocks progress.
+objectives:
+- Confirm the rollout is stuck with failing new pods
+- Fix the new pods' configuration and roll out
+- Verify all pods are Running
+hints:
+- order: 1
+  cost: 10
+  content: kubectl rollout status hangs; new pods CrashLoop/ImagePull.
+- order: 2
+  cost: 15
+  content: Fix the image/config and kubectl rollout restart.
+- order: 3
+  cost: 20
+  content: Rollout completes.

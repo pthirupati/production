@@ -1,0 +1,29 @@
+title: RabbitMQ Broker Service Down
+slug: linux-rabbitmq-down
+technology: Linux
+category: Messaging
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The RabbitMQ broker is down, so message producers/consumers can't connect. Restore the broker
+  service.
+initial_state: A Linux host where the rabbitmq-server service is failed, halting messaging.
+objectives:
+- Confirm rabbitmq-server is down
+- Resolve and start the broker
+- Verify it is active
+hints:
+- order: 1
+  cost: 10
+  content: rabbitmqctl status fails; service down.
+- order: 2
+  cost: 15
+  content: Fix and systemctl start rabbitmq-server.
+- order: 3
+  cost: 20
+  content: rabbitmq-server active.

@@ -1,0 +1,28 @@
+title: MongoDB Running Without Authentication
+slug: db-mongodb-no-auth
+technology: Database
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: MongoDB accepts unauthenticated connections because authorization is disabled.
+initial_state: A MongoDB host with security.authorization off.
+objectives:
+- 'Confirm the issue: mongo connects with no creds'
+- Apply the documented fix in /etc/mongod.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: mongo connects with no creds
+- order: 2
+  cost: 15
+  content: Enable authorization and create an admin user.
+- order: 3
+  cost: 20
+  content: /etc/mongod.conf carries the corrected configuration.

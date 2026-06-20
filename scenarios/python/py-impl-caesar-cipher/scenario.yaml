@@ -1,0 +1,74 @@
+title: Implement a Caesar Cipher
+slug: py-impl-caesar-cipher
+category: Python Development
+description: 'Implement caesar(text, shift): shift each ASCII letter by `shift` positions, wrapping within
+  its case, leaving non-letters unchanged. shift can be any integer (including negative or > 26). The
+  stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Shift letters within their case with wraparound
+- Leave non-letters unchanged
+- Handle large/negative shifts via modulo
+initial_state: 'Implement caesar(text, shift): shift each ASCII letter by `shift` positions, wrapping
+  within its case, leaving non-letters unchanged. shift can be any integer (including negative or > 26).
+  The stub is empty so tests fail.'
+solution_explanation: |
+  Normalizing each letter to 0..25 within its case, adding the shift, and taking mod 26 handles wraparound for any integer shift; non-letters pass through unchanged.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement caesar(text, shift) -> str. Letters shift within A-Z / a-z with wraparound; other characters pass through. Any integer shift is allowed.
+      caesar('abc', 1) -> 'bcd', caesar('XYZ', 3) -> 'ABC'
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def caesar(text, shift):
+          # TODO: shift letters, wrap within case, leave others alone
+          pass
+    readonly: false
+  visible_tests:
+  - name: shift by one
+    code: |
+      assert caesar('abc', 1) == 'bcd'
+  - name: wrap uppercase
+    code: |
+      assert caesar('XYZ', 3) == 'ABC', caesar('XYZ', 3)
+  hidden_tests:
+  - name: non-letters unchanged
+    code: |
+      assert caesar('a-b!', 1) == 'b-c!'
+  - name: negative shift
+    code: |
+      assert caesar('bcd', -1) == 'abc'
+  - name: shift over 26
+    code: |
+      assert caesar('abc', 27) == 'bcd'
+  - name: mixed case
+    code: |
+      assert caesar('Hello, World!', 5) == 'Mjqqt, Btwqi!'
+  - name: zero shift
+    code: |
+      assert caesar('Zz', 0) == 'Zz'
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Work on letters only; copy other characters as-is.
+- order: 2
+  cost: 20
+  content: Map a letter to 0..25, add the shift, then mod 26 to wrap.
+- order: 3
+  cost: 30
+  content: Use ord/chr with the case base ('a' or 'A') and (... + shift) % 26.

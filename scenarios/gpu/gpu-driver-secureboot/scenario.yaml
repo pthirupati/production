@@ -1,0 +1,28 @@
+title: GPU Driver Unsigned Under Secure Boot
+slug: gpu-driver-secureboot
+technology: GPU
+category: Driver
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The GPU driver won't load under Secure Boot because the module isn't signed/enrolled.
+initial_state: A GPU host where Secure Boot blocks the unsigned driver.
+objectives:
+- 'Confirm the issue: Driver signature rejected'
+- Apply the documented fix in /etc/gpu/secureboot-signing.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Driver signature rejected
+- order: 2
+  cost: 15
+  content: Sign/enroll the driver module (MOK).
+- order: 3
+  cost: 20
+  content: /etc/gpu/secureboot-signing.conf carries the corrected configuration.

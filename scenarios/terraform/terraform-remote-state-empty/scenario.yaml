@@ -1,0 +1,30 @@
+title: Terraform Remote State Data Source Empty
+slug: terraform-remote-state-empty
+technology: Terraform
+category: Backends
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A terraform_remote_state data source returns empty outputs, so dependent resources get null
+  values and apply fails. Fix the backend config/key path and verify outputs resolve.
+initial_state: A downstream Terraform config whose terraform_remote_state data source points at the wrong
+  S3 key/workspace.
+objectives:
+- Identify why the remote_state data source returns empty outputs
+- Correct the bucket/key/workspace in the data source
+- Confirm the upstream outputs are populated
+hints:
+- order: 1
+  cost: 10
+  content: Plan errors referencing null from data.terraform_remote_state.*.outputs.
+- order: 2
+  cost: 15
+  content: Fix backend bucket/key/workspace to match the producer.
+- order: 3
+  cost: 20
+  content: Re-plan; values resolve.

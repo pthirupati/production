@@ -1,0 +1,28 @@
+title: vCenter SSO Administrator Locked Out
+slug: vcenter-sso-account-lockout
+category: VMware vSphere
+description: The vCenter SSO administrator account is locked after repeated failed logins, blocking admin
+  access. Unlock the account and confirm access is restored.
+difficulty: hard
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Confirm the SSO admin account is locked
+- Unlock the SSO administrator account
+- Verify the account is unlocked
+initial_state: vCenter shows the SSO administrator account locked.
+hints:
+- order: 1
+  cost: 10
+  content: 'In the vCenter simulator, locate the issue: confirm the sso admin account is locked.'
+- order: 2
+  cost: 15
+  content: 'Apply the remediation in the GUI: unlock the sso administrator account.'
+- order: 3
+  cost: 20
+  content: 'Confirm resolution: verify the account is unlocked.'

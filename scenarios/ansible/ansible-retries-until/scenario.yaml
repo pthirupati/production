@@ -1,0 +1,28 @@
+title: Ansible Flaky Task Not Retried
+slug: ansible-retries-until
+technology: Ansible
+category: Reliability
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A flaky network task fails because retries/until aren't configured.
+initial_state: An Ansible task lacking retries/until.
+objectives:
+- 'Confirm the issue: Transient failure aborts the run'
+- Apply the documented fix in /home/ansible/retry.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Transient failure aborts the run
+- order: 2
+  cost: 15
+  content: Add retries + until + delay.
+- order: 3
+  cost: 20
+  content: /home/ansible/retry.yml carries the corrected configuration.

@@ -1,0 +1,72 @@
+title: Fix the Loose-Equality Bug in isZero
+slug: js-fix-equality-loose-vs-strict
+category: JavaScript Development
+description: isZero(x) should return true ONLY for the number 0, but it uses loose equality (==), so '',
+  false, '0', and [] all coerce to 0 and wrongly return true. Switch to strict equality and a type check.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See coercion make non-numbers look like zero
+- Use strict equality (===)
+- Return true only for the actual number 0
+initial_state: isZero(x) should return true ONLY for the number 0, but it uses loose equality (==), so
+  '', false, '0', and [] all coerce to 0 and wrongly return true. Switch to strict equality and a type
+  check.
+solution_explanation: |
+  Loose == coerces operands, so many falsy values equal 0. Strict === compares type and value, matching only the number 0.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix isZero(x) to return true only when x is the number 0 (not '', not false, not '0').
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function isZero(x) {
+        return x == 0; // loose equality coerces '', false, [], '0'
+      }
+    readonly: false
+  visible_tests:
+  - name: number zero
+    code: |
+      assert(isZero(0) === true);
+  - name: empty string is not zero
+    code: |
+      assert(isZero('') === false, "'' should not be zero");
+  hidden_tests:
+  - name: false is not zero
+    code: |
+      assert(isZero(false) === false);
+  - name: string zero is not number zero
+    code: |
+      assert(isZero('0') === false);
+  - name: empty array is not zero
+    code: |
+      assert(isZero([]) === false);
+  - name: nonzero number
+    code: |
+      assert(isZero(5) === false);
+  - name: still true for 0
+    code: |
+      assert(isZero(0) === true);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: isZero('') returns true because '' == 0 is true in JS.
+- order: 2
+  cost: 20
+  content: == performs type coercion; === does not.
+- order: 3
+  cost: 30
+  content: Use x === 0.

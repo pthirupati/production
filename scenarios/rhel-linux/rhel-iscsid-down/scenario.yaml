@@ -1,0 +1,28 @@
+title: RHEL iSCSI Initiator Down
+slug: rhel-iscsid-down
+technology: RHEL Linux
+category: Storage
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: iSCSI LUNs are unavailable because the iscsid service is down.
+initial_state: A RHEL host where the iscsid service is failed.
+objectives:
+- Confirm iscsid is down (iscsiadm session lost)
+- Resolve the cause and start iscsid
+- Verify iscsid is active
+hints:
+- order: 1
+  cost: 10
+  content: iscsiadm session lost
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start iscsid.'
+- order: 3
+  cost: 20
+  content: systemctl is-active iscsid returns active.

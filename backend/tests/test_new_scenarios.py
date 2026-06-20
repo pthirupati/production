@@ -153,3 +153,178 @@ class NewScenarioIntegrityTests(SimpleTestCase):
         shell.run("systemctl start mysqld")
         ok, _ = validate_simulation_state(shell.state, script)
         self.assertFalse(ok, "mysql passed with a restart but the table still crashed")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Wave 1–4 expansion: representative integrity sample across every family.
+# Each entry proves fail-closed BEFORE the fix and PASS after applying the
+# real remediation the e2e fix performs.
+# ──────────────────────────────────────────────────────────────────────
+
+from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
+
+
+def _engine(slug, sim_type="generic"):
+    return UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
+
+
+# Service-down scenarios: preset registers a failed unit; fix = systemctl start.
+SERVICE_SAMPLE = [
+    ("database", "db-redis-down", "redis"),
+    ("database", "db-etcd-down", "etcd"),
+    ("database", "db-elasticsearch-down", "elasticsearch"),
+    ("docker", "docker-daemon-down", "docker"),
+    ("docker", "docker-containerd-down", "containerd"),
+    ("docker", "docker-docker-socket-proxy-down", "docker-socket-proxy"),
+    ("rhel-linux", "rhel-sssd-down", "sssd"),
+    ("rhel-linux", "rhel-multipathd-down", "multipathd"),
+    ("linux", "linux-haproxy-down", "haproxy"),
+    ("linux", "linux-named-down", "named"),
+]
+
+# Marker scenarios: preset writes a broken config; fix rewrites with FIXED-OK.
+MARKER_SAMPLE = [
+    ("database", "db-postgres-fsync-off", "/var/lib/pgsql/data/postgresql.conf"),
+    ("ansible", "ansible-jinja-template-error", "/home/ansible/templates/app.conf.j2"),
+    ("ansible", "ansible-handler-missing", "/home/ansible/site.yml"),
+    ("shell-script", "shell-pipefail-missing", "/opt/scripts/deploy-pipeline.sh"),
+    ("shell-script", "shell-rm-rf-variable", "/opt/scripts/wipe.sh"),
+    ("html", "html-broken-doctype", "/var/www/html/index.html"),
+    ("html", "html-mixed-content", "/var/www/html/secure.html"),
+    ("gpu", "gpu-ecc-disabled", "/etc/nvidia/ecc.conf"),
+    ("gpu", "gpu-driver-blacklist-nouveau", "/etc/modprobe.d/blacklist-nouveau.conf"),
+    ("baremetal", "baremetal-bmc-default-creds", "/etc/bmc/credentials.cfg"),
+    ("baremetal", "baremetal-iommu-not-enabled", "/etc/bios/iommu.cfg"),
+    ("rhel-linux", "rhel-selinux-permissive", "/etc/selinux/config"),
+    ("linux", "linux-sudoers-syntax-error", "/etc/sudoers.d/ops"),
+]
+
+# Flag-family scenarios: terraform_fixed / windows_fixed gate validation.
+TERRAFORM_SAMPLE = [
+    "terraform-plan-unexpected-destroy", "aws-iam-wildcard-policy",
+    "aws-eks-aws-auth-broken", "aws-dynamodb-hot-partition",
+]
+WINDOWS_SAMPLE = [
+    "win-cluster-quorum-lost", "win-sqlserver-tempdb-contention",
+    "win-adcs-crl-expired", "win-iis-binding-conflict",
+]
+
+
+class ExpansionServiceScenarioTests(SimpleTestCase):
+    def test_service_down_fails_then_passes(self):
+        for tech, slug, unit in SERVICE_SAMPLE:
+            with self.subTest(slug=slug):
+                script = _load_check(f"{tech}/{slug}")
+                self.assertFalse(is_trivial_validation_script(script), f"{slug}: trivial check")
+                eng = _engine(slug)
+                before, msg = validate_simulation_state(eng.shell.state, script, eng)
+                self.assertFalse(before, f"{slug}: passed BEFORE fix ({msg})")
+                eng.shell.run(f"systemctl start {unit}")
+                svc = eng.shell.state.services.get(unit)
+                if svc:
+                    svc.active = "active"
+                after, msg = validate_simulation_state(eng.shell.state, script, eng)
+                self.assertTrue(after, f"{slug}: still FAILS after fix ({msg})")
+
+
+class ExpansionMarkerScenarioTests(SimpleTestCase):
+    def test_config_marker_fails_then_passes(self):
+        for tech, slug, path in MARKER_SAMPLE:
+            with self.subTest(slug=slug):
+                script = _load_check(f"{tech}/{slug}")
+                self.assertFalse(is_trivial_validation_script(script), f"{slug}: trivial check")
+                sim_type = "gpu" if tech == "gpu" else ("baremetal" if tech == "baremetal" else "generic")
+                eng = _engine(slug, sim_type)
+                before, msg = validate_simulation_state(eng.shell.state, script, eng)
+                self.assertFalse(before, f"{slug}: passed BEFORE fix ({msg})")
+                existing = eng.shell.state.read_file(path) or ""
+                eng.shell.state.write_file(path, existing + "\n# FIXED-OK\n")
+                after, msg = validate_simulation_state(eng.shell.state, script, eng)
+                self.assertTrue(after, f"{slug}: still FAILS after fix ({msg})")
+
+    def test_unfixed_marker_stays_failed(self):
+        """A marker scenario must NOT pass until the file carries FIXED-OK."""
+        tech, slug, path = MARKER_SAMPLE[0]
+        script = _load_check(f"{tech}/{slug}")
+        eng = _engine(slug)
+        # Touch the file without the sentinel — still failing.
+        eng.shell.state.write_file(path, "still broken\n")
+        ok, _ = validate_simulation_state(eng.shell.state, script, eng)
+        self.assertFalse(ok, f"{slug}: passed without the FIXED-OK sentinel")
+
+
+class ExpansionFlagFamilyTests(SimpleTestCase):
+    def test_terraform_fails_then_passes(self):
+        for slug in TERRAFORM_SAMPLE:
+            with self.subTest(slug=slug):
+                script = _load_check(f"terraform/{slug}")
+                eng = _engine(slug, "terraform")
+                before, msg = validate_simulation_state(eng.shell.state, script, eng)
+                self.assertFalse(before, f"{slug}: passed BEFORE fix ({msg})")
+                eng.shell.state.terraform_fixed = True
+                after, msg = validate_simulation_state(eng.shell.state, script, eng)
+                self.assertTrue(after, f"{slug}: still FAILS after fix ({msg})")
+
+    def test_windows_fails_then_passes(self):
+        for slug in WINDOWS_SAMPLE:
+            with self.subTest(slug=slug):
+                script = _load_check(f"windows/{slug}")
+                eng = _engine(slug, "windows")
+                before, msg = validate_simulation_state(eng.shell.state, script, eng)
+                self.assertFalse(before, f"{slug}: passed BEFORE fix ({msg})")
+                eng.shell.state.windows_fixed = True
+                after, msg = validate_simulation_state(eng.shell.state, script, eng)
+                self.assertTrue(after, f"{slug}: still FAILS after fix ({msg})")
+
+
+class ExpansionEngineFamilyTests(SimpleTestCase):
+    def test_devops_helm_and_ci_fail_then_pass(self):
+        # Helm stuck → rollback heals.
+        eng = _engine("devops-helm-pending-upgrade-stuck", "generic")
+        script = _load_check("devops/devops-helm-pending-upgrade-stuck")
+        before, msg = validate_simulation_state(eng.shell.state, script, eng)
+        self.assertFalse(before, f"helm: passed before fix ({msg})")
+        eng.devops.helm_rollback("webapp", 3)
+        after, msg = validate_simulation_state(eng.shell.state, script, eng)
+        self.assertTrue(after, f"helm: still fails after rollback ({msg})")
+
+        # CI pipeline broken → fix_pipeline heals.
+        eng = _engine("devops-ci-pipeline-kubeconfig-missing", "generic")
+        script = _load_check("devops/devops-ci-pipeline-kubeconfig-missing")
+        before, msg = validate_simulation_state(eng.shell.state, script, eng)
+        self.assertFalse(before, f"ci: passed before fix ({msg})")
+        eng.devops.fix_pipeline()
+        after, msg = validate_simulation_state(eng.shell.state, script, eng)
+        self.assertTrue(after, f"ci: still fails after fix ({msg})")
+
+    def test_networking_bgp_ntp_mtu_fail_then_pass(self):
+        cases = [
+            ("networking-bgp-as-mismatch", lambda n: n.fix_bgp()),
+            ("networking-ntp-source-unreachable", lambda n: n.sync_ntp()),
+            ("networking-mtu-jumbo-blackhole", lambda n: setattr(n, "interface_mtu", 1500)),
+        ]
+        for slug, fix in cases:
+            with self.subTest(slug=slug):
+                eng = _engine(slug, "networking")
+                script = _load_check(f"networking/{slug}")
+                before, msg = validate_simulation_state(eng.shell.state, script, eng)
+                self.assertFalse(before, f"{slug}: passed before fix ({msg})")
+                fix(eng.networking)
+                after, msg = validate_simulation_state(eng.shell.state, script, eng)
+                self.assertTrue(after, f"{slug}: still fails after fix ({msg})")
+
+    def test_kubernetes_crashloop_fails_then_passes(self):
+        eng = _engine("k8s-crashloop-bad-liveness", "kubernetes")
+        script = _load_check("kubernetes/k8s-crashloop-bad-liveness")
+        before, msg = validate_simulation_state(eng.shell.state, script, eng)
+        self.assertFalse(before, f"k8s: passed before fix ({msg})")
+        # Heal the cluster the way a rollout would.
+        c = eng.cluster
+        for p in c.pods:
+            p.status = "Running"
+            p.ready = "1/1"
+        for s in c.services:
+            if s.name != "kubernetes" and not s.endpoints:
+                s.endpoints = ["10.244.1.5:8080"]
+        after, msg = validate_simulation_state(eng.shell.state, script, eng)
+        self.assertTrue(after, f"k8s: still fails after heal ({msg})")

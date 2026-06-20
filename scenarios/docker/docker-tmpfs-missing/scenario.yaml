@@ -1,0 +1,28 @@
+title: Sensitive Scratch Data Hits Disk
+slug: docker-tmpfs-missing
+technology: Docker
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Sensitive scratch data is written to disk because no tmpfs mount is used.
+initial_state: A compose service that should use tmpfs for scratch.
+objectives:
+- 'Confirm the issue: Secrets written to disk layer'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Secrets written to disk layer
+- order: 2
+  cost: 15
+  content: Mount a tmpfs for scratch paths.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

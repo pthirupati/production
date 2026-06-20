@@ -1,0 +1,28 @@
+title: Ansible Play Has No Error Handling
+slug: ansible-block-rescue-missing
+technology: Ansible
+category: Error Handling
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A failing task aborts the whole play because there's no block/rescue handling.
+initial_state: An Ansible play lacking block/rescue for a risky task.
+objectives:
+- 'Confirm the issue: One failure aborts everything'
+- Apply the documented fix in /home/ansible/block.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: One failure aborts everything
+- order: 2
+  cost: 15
+  content: Wrap risky tasks in block/rescue.
+- order: 3
+  cost: 20
+  content: /home/ansible/block.yml carries the corrected configuration.

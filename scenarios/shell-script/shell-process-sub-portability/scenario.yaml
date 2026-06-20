@@ -1,0 +1,28 @@
+title: Script Uses Process Substitution Under sh
+slug: shell-process-sub-portability
+technology: Shell Scripting
+category: Portability
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A diff using <(...) fails because the script runs under sh, not bash.
+initial_state: An ops script using process substitution without bash.
+objectives:
+- 'Confirm the issue: <(...) syntax error under sh'
+- Apply the documented fix in /opt/scripts/diff-check.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: <(...) syntax error under sh
+- order: 2
+  cost: 15
+  content: Run under bash or restructure.
+- order: 3
+  cost: 20
+  content: /opt/scripts/diff-check.sh carries the corrected configuration.

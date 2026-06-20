@@ -1,0 +1,28 @@
+title: Serial Console Redirection Broken
+slug: baremetal-console-redirect
+technology: Bare Metal
+category: Console
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Headless troubleshooting is impossible because serial console redirection is misconfigured.
+initial_state: A server with broken serial console redirection.
+objectives:
+- 'Confirm the issue: No serial console output'
+- Apply the documented fix in /etc/bios/serial-console.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No serial console output
+- order: 2
+  cost: 15
+  content: Fix serial console redirection settings.
+- order: 3
+  cost: 20
+  content: /etc/bios/serial-console.cfg carries the corrected configuration.

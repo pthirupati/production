@@ -1,0 +1,28 @@
+title: Charset Declared Too Late
+slug: html-charset-late
+technology: HTML
+category: Standards
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Early bytes render wrong because the charset meta appears after content.
+initial_state: A page declaring charset too late in head.
+objectives:
+- 'Confirm the issue: Charset not in the first bytes'
+- Apply the documented fix in /var/www/html/late.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Charset not in the first bytes
+- order: 2
+  cost: 15
+  content: Move charset to the top of head.
+- order: 3
+  cost: 20
+  content: /var/www/html/late.html carries the corrected markup/config.

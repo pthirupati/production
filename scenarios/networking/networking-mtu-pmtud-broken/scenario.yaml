@@ -1,0 +1,30 @@
+title: MTU Path Discovery Broken by ICMP Filtering
+slug: networking-mtu-pmtud-broken
+technology: Networking
+category: L2 / MTU
+difficulty: hard
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Path MTU Discovery is broken because a firewall drops ICMP 'fragmentation needed', so jumbo-configured
+  flows hang. Restore ICMP/align MTU and confirm connectivity.
+initial_state: A network where PMTUD fails (ICMP filtered) on an interface set to jumbo MTU, hanging large
+  transfers.
+objectives:
+- Confirm PMTUD is broken on the jumbo interface
+- Allow the needed ICMP / align the MTU
+- Verify large flows complete and the network is healthy
+hints:
+- order: 1
+  cost: 10
+  content: Interface MTU 9000; large flows stall, ICMP type 3/4 dropped.
+- order: 2
+  cost: 15
+  content: Permit ICMP frag-needed or set MTU to the path value.
+- order: 3
+  cost: 20
+  content: Connectivity restored.

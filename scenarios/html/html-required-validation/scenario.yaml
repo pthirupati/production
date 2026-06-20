@@ -1,0 +1,28 @@
+title: Form Missing Required Validation
+slug: html-required-validation
+technology: HTML
+category: Forms
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Empty required fields submit because no validation attributes are set.
+initial_state: A page lacking required/pattern validation.
+objectives:
+- 'Confirm the issue: Empty required fields submit'
+- Apply the documented fix in /var/www/html/order.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Empty required fields submit
+- order: 2
+  cost: 15
+  content: Add required/pattern attributes.
+- order: 3
+  cost: 20
+  content: /var/www/html/order.html carries the corrected markup/config.

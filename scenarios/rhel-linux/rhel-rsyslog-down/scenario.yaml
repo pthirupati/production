@@ -1,0 +1,29 @@
+title: RHEL rsyslog Stopped — No System Logs
+slug: rhel-rsyslog-down
+technology: RHEL Linux
+category: Logging
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: System logging stopped on a RHEL host because rsyslog failed, so /var/log/messages isn't
+  updating. Restore logging.
+initial_state: A RHEL host where the rsyslog service is failed, halting system logging.
+objectives:
+- Confirm rsyslog is down
+- Resolve and start rsyslog
+- Verify rsyslog is active
+hints:
+- order: 1
+  cost: 10
+  content: systemctl status rsyslog shows failed.
+- order: 2
+  cost: 15
+  content: Fix and systemctl start rsyslog.
+- order: 3
+  cost: 20
+  content: rsyslog active.

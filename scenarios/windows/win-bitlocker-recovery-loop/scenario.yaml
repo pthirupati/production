@@ -1,0 +1,30 @@
+title: Windows BitLocker Recovery Loop After TPM Update
+slug: win-bitlocker-recovery-loop
+technology: Windows Server
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A firmware/TPM update invalidated the BitLocker PCR seal and the server boots into recovery
+  each time. Suspend protection, reseal to TPM, and confirm clean boots.
+initial_state: A Windows Server prompting for BitLocker recovery on every boot after a TPM/firmware change
+  altered the PCRs.
+objectives:
+- Confirm the recovery prompt stems from a PCR/TPM change
+- Suspend protection, then reseal BitLocker to the TPM
+- Verify the system boots without prompting
+hints:
+- order: 1
+  cost: 10
+  content: manage-bde -status shows protection on; boot hits recovery.
+- order: 2
+  cost: 15
+  content: Suspend-BitLocker then re-enable to reseal to the new TPM state.
+- order: 3
+  cost: 20
+  content: Boots cleanly.

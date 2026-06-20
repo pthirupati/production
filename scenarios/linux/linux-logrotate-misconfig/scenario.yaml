@@ -1,0 +1,29 @@
+title: Logrotate Not Rotating — Disk Filling
+slug: linux-logrotate-misconfig
+technology: Linux
+category: Logging
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An application's logs aren't rotating because its logrotate config is misconfigured, filling
+  the disk. Fix the config and confirm it is corrected.
+initial_state: A Linux host whose logrotate drop-in is misconfigured, so app logs never rotate.
+objectives:
+- Confirm logs aren't rotating
+- Fix the logrotate config
+- Verify the config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: logrotate -d shows it skips the log.
+- order: 2
+  cost: 15
+  content: Correct the path/rotate/size directives.
+- order: 3
+  cost: 20
+  content: logrotate drop-in carries the corrected config.

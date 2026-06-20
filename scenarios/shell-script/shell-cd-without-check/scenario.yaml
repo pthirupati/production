@@ -1,0 +1,28 @@
+title: Script cd Failure Causes Wrong-Dir Ops
+slug: shell-cd-without-check
+technology: Shell Scripting
+category: Safety
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A cleanup script runs in the wrong directory because a failed cd isn't checked.
+initial_state: An ops script that doesn't verify cd succeeded.
+objectives:
+- 'Confirm the issue: rm runs in the wrong directory'
+- Apply the documented fix in /opt/scripts/clean.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: rm runs in the wrong directory
+- order: 2
+  cost: 15
+  content: cd ... || exit before destructive ops.
+- order: 3
+  cost: 20
+  content: /opt/scripts/clean.sh carries the corrected configuration.

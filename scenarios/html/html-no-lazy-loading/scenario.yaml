@@ -1,0 +1,28 @@
+title: Below-Fold Images Not Lazy-Loaded
+slug: html-no-lazy-loading
+technology: HTML
+category: Performance
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Page load is heavy because off-screen images aren't lazy-loaded.
+initial_state: A page not using image lazy loading.
+objectives:
+- 'Confirm the issue: All images load eagerly'
+- Apply the documented fix in /var/www/html/feed.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: All images load eagerly
+- order: 2
+  cost: 15
+  content: Add loading=lazy to off-screen images.
+- order: 3
+  cost: 20
+  content: /var/www/html/feed.html carries the corrected markup/config.

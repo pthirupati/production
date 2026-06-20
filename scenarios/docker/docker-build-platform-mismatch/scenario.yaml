@@ -1,0 +1,28 @@
+title: Image Built for Wrong Architecture
+slug: docker-build-platform-mismatch
+technology: Docker
+category: Build
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The image won't run on the target because it was built for the wrong platform.
+initial_state: A build producing an image for the wrong CPU architecture.
+objectives:
+- 'Confirm the issue: ''exec format error'''
+- Apply the documented fix in /opt/app/Dockerfile
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''exec format error'''
+- order: 2
+  cost: 15
+  content: Build for the correct --platform.
+- order: 3
+  cost: 20
+  content: /opt/app/Dockerfile carries the corrected configuration.

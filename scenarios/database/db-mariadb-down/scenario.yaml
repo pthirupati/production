@@ -1,0 +1,29 @@
+title: MariaDB Service Crashed
+slug: db-mariadb-down
+technology: Database
+category: MariaDB
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The MariaDB database service crashed and the application can't connect. Restore the service
+  so connections succeed.
+initial_state: A Linux host where the mariadb service is in a failed state.
+objectives:
+- Confirm mariadb is failed
+- Resolve the cause and start the service
+- Verify mariadb is active
+hints:
+- order: 1
+  cost: 10
+  content: systemctl status mariadb shows failed.
+- order: 2
+  cost: 15
+  content: Fix and systemctl start mariadb.
+- order: 3
+  cost: 20
+  content: mariadb active.

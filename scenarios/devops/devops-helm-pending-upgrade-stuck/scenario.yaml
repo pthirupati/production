@@ -1,0 +1,30 @@
+title: Helm Release Stuck in Pending-Upgrade After Failed Deploy
+slug: devops-helm-pending-upgrade-stuck
+technology: DevOps
+category: Helm
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A helm upgrade failed mid-apply and the release is wedged in pending-upgrade, blocking all
+  further deploys. Roll back to the last deployed revision and confirm the release is healthy.
+initial_state: A Kubernetes cluster where a helm release is stuck in pending-upgrade after an interrupted
+  upgrade.
+objectives:
+- Confirm the release is stuck in pending-upgrade
+- Roll back to the last deployed revision
+- Verify helm history shows a deployed status
+hints:
+- order: 1
+  cost: 10
+  content: helm history webapp shows pending-upgrade on top.
+- order: 2
+  cost: 15
+  content: helm rollback webapp <last-deployed-rev>.
+- order: 3
+  cost: 20
+  content: Status returns to deployed.

@@ -1,0 +1,28 @@
+title: IOMMU Disabled Blocking Passthrough
+slug: baremetal-iommu-not-enabled
+technology: Bare Metal
+category: Virtualization
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Device passthrough fails because IOMMU/VT-d is disabled in BIOS.
+initial_state: A server with IOMMU turned off.
+objectives:
+- 'Confirm the issue: VFIO/passthrough fails'
+- Apply the documented fix in /etc/bios/iommu.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: VFIO/passthrough fails
+- order: 2
+  cost: 15
+  content: Enable IOMMU/VT-d in BIOS.
+- order: 3
+  cost: 20
+  content: /etc/bios/iommu.cfg carries the corrected configuration.

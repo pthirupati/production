@@ -1,0 +1,28 @@
+title: RHEL kdump Not Capturing Crashes
+slug: rhel-kdump-not-configured
+technology: RHEL Linux
+category: Reliability
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Kernel crashes produce no dump because kdump isn't configured/reserved.
+initial_state: A RHEL host with kdump misconfigured.
+objectives:
+- 'Confirm the issue: No vmcore on crash'
+- Apply the documented fix in /etc/kdump.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No vmcore on crash
+- order: 2
+  cost: 15
+  content: Configure kdump and crashkernel reservation.
+- order: 3
+  cost: 20
+  content: /etc/kdump.conf carries the corrected configuration.

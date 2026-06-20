@@ -1,0 +1,28 @@
+title: vSAN Disk Group Unclaimed
+slug: vsan-disk-group-unclaimed
+category: VMware vSphere
+description: vSAN capacity is reduced because a host's disks are unclaimed and not contributing to the
+  datastore. Claim the disks and confirm vSAN is healthy.
+difficulty: hard
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Confirm vSAN disks are unclaimed
+- Claim the disks into the disk group
+- Verify all vSAN disks are claimed
+initial_state: vCenter shows unclaimed vSAN disks on a host.
+hints:
+- order: 1
+  cost: 10
+  content: 'In the vCenter simulator, locate the issue: confirm vsan disks are unclaimed.'
+- order: 2
+  cost: 15
+  content: 'Apply the remediation in the GUI: claim the disks into the disk group.'
+- order: 3
+  cost: 20
+  content: 'Confirm resolution: verify all vsan disks are claimed.'

@@ -1,0 +1,28 @@
+title: Script Treats HTTP Errors as Success
+slug: shell-curl-no-fail
+technology: Shell Scripting
+category: HTTP
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A health check passes even on HTTP 500 because curl doesn't fail on errors.
+initial_state: An ops script using curl without --fail.
+objectives:
+- 'Confirm the issue: 500 treated as success'
+- Apply the documented fix in /opt/scripts/healthcheck.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: 500 treated as success
+- order: 2
+  cost: 15
+  content: Use curl --fail (and check status).
+- order: 3
+  cost: 20
+  content: /opt/scripts/healthcheck.sh carries the corrected configuration.

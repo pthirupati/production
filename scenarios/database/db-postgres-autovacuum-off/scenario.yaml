@@ -1,0 +1,28 @@
+title: PostgreSQL Autovacuum Disabled — Bloat
+slug: db-postgres-autovacuum-off
+technology: Database
+category: Maintenance
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Tables are bloating and transaction IDs are aging because autovacuum is off.
+initial_state: A PostgreSQL host with autovacuum disabled.
+objectives:
+- 'Confirm the issue: Bloat grows; XID age rising'
+- Apply the documented fix in /var/lib/pgsql/data/postgresql.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Bloat grows; XID age rising
+- order: 2
+  cost: 15
+  content: Re-enable autovacuum and tune thresholds.
+- order: 3
+  cost: 20
+  content: /var/lib/pgsql/data/postgresql.conf carries the corrected configuration.

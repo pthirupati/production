@@ -1,0 +1,29 @@
+title: NTP Sync Blocked by Egress Firewall
+slug: networking-ntp-iburst-firewall
+technology: Networking
+category: Time / NTP
+difficulty: medium
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Chrony never synchronizes because an egress firewall blocks UDP 123 to the time servers.
+  Open NTP egress and confirm synchronization.
+initial_state: A host whose NTP egress is firewalled, so chrony stays unsynchronized.
+objectives:
+- 'Confirm the issue: chronyc tracking shows not synchronised.'
+- Apply the documented fix
+- Verify the network is healthy
+hints:
+- order: 1
+  cost: 10
+  content: chronyc tracking shows not synchronised.
+- order: 2
+  cost: 15
+  content: Fix the NTP source/reachability and resync.
+- order: 3
+  cost: 20
+  content: The session/sync/MTU is healthy.

@@ -1,0 +1,28 @@
+title: RHEL dnf Failing Behind Proxy
+slug: rhel-yum-proxy-wrong
+technology: RHEL Linux
+category: Patching
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: dnf can't reach repos because the proxy setting is wrong.
+initial_state: A RHEL host with a bad dnf proxy config.
+objectives:
+- 'Confirm the issue: dnf times out via proxy'
+- Apply the documented fix in /etc/dnf/dnf.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: dnf times out via proxy
+- order: 2
+  cost: 15
+  content: Fix the proxy in dnf.conf.
+- order: 3
+  cost: 20
+  content: /etc/dnf/dnf.conf carries the corrected configuration.

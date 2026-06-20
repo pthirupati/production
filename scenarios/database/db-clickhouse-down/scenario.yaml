@@ -1,0 +1,28 @@
+title: ClickHouse Server Down
+slug: db-clickhouse-down
+technology: Database
+category: Analytics
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: ClickHouse is down so analytical queries fail.
+initial_state: A host where the clickhouse-server service is failed.
+objectives:
+- Confirm clickhouse-server is down (clickhouse-client connection fails)
+- Resolve the cause and start clickhouse-server
+- Verify clickhouse-server is active
+hints:
+- order: 1
+  cost: 10
+  content: clickhouse-client connection fails
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start clickhouse-server.'
+- order: 3
+  cost: 20
+  content: systemctl is-active clickhouse-server returns active.

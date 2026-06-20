@@ -1,0 +1,29 @@
+title: Strict CSP Blocking Site Assets
+slug: html-csp-blocking-assets
+technology: Html
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A new Content-Security-Policy is so strict it blocks the site's own scripts/styles. Adjust
+  the policy to allow legitimate assets and confirm the file is corrected.
+initial_state: A static page whose embedded CSP blocks its own resources, breaking the UI.
+objectives:
+- Confirm legitimate assets are CSP-blocked
+- Adjust the CSP to allow them
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Console shows CSP violations on own assets.
+- order: 2
+  cost: 15
+  content: Add the right sources to the CSP.
+- order: 3
+  cost: 20
+  content: index.html carries the corrected CSP.

@@ -1,0 +1,72 @@
+title: Implement Temperature Statistics
+slug: py-impl-temperature-stats
+category: Python Development
+description: Implement stats(nums) returning a dict {'min','max','mean'} for a non-empty list of numbers.
+  mean is a float. The stub is empty so tests fail. (You decide behavior for empty -> the tests only use
+  non-empty lists, but raising ValueError on empty is acceptable.)
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Compute min, max, and mean
+- Return them in a dict with the exact keys
+- Keep mean as a float
+initial_state: Implement stats(nums) returning a dict {'min','max','mean'} for a non-empty list of numbers.
+  mean is a float. The stub is empty so tests fail. (You decide behavior for empty -> the tests only use
+  non-empty lists, but raising ValueError on empty is acceptable.)
+solution_explanation: |
+  min/max are built-ins; the mean is the sum over the count. Returning them in a dict with the required keys satisfies the contract.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement stats(nums) -> {'min': .., 'max': .., 'mean': ..} for a non-empty numeric list. mean must be a float.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def stats(nums):
+          # TODO: return {'min':..,'max':..,'mean':..}
+          pass
+    readonly: false
+  visible_tests:
+  - name: basic
+    code: |
+      r = stats([1, 2, 3, 4])
+      assert r['min'] == 1 and r['max'] == 4 and r['mean'] == 2.5
+  - name: single value
+    code: |
+      r = stats([5])
+      assert r == {'min': 5, 'max': 5, 'mean': 5.0}
+  hidden_tests:
+  - name: negatives
+    code: |
+      r = stats([-3, 0, 3])
+      assert r['min'] == -3 and r['max'] == 3 and r['mean'] == 0.0
+  - name: floats mean
+    code: |
+      r = stats([1, 2])
+      assert isinstance(r['mean'], float) and r['mean'] == 1.5
+  - name: has exactly the keys
+    code: |
+      r = stats([7, 8])
+      assert set(r.keys()) == {'min', 'max', 'mean'}
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Python has built-in min() and max().
+- order: 2
+  cost: 20
+  content: mean is sum(nums) / len(nums) — true division gives a float.
+- order: 3
+  cost: 30
+  content: Return a dict with keys 'min', 'max', and 'mean'.

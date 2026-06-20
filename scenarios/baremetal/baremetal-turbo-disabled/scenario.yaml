@@ -1,0 +1,28 @@
+title: CPU Turbo Disabled Hurting Throughput
+slug: baremetal-turbo-disabled
+technology: Bare Metal
+category: Performance
+difficulty: easy
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Throughput is below expectation because CPU turbo boost is disabled in BIOS.
+initial_state: A server with turbo boost turned off.
+objectives:
+- 'Confirm the issue: CPU never boosts'
+- Apply the documented fix in /etc/bios/turbo.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: CPU never boosts
+- order: 2
+  cost: 15
+  content: Enable turbo boost in BIOS.
+- order: 3
+  cost: 20
+  content: /etc/bios/turbo.cfg carries the corrected configuration.

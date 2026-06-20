@@ -1,0 +1,28 @@
+title: Script Drops Trailing Output
+slug: shell-command-substitution-newline
+technology: Shell Scripting
+category: IO
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Captured command output is mangled because of unquoted substitution.
+initial_state: An ops script with unquoted command substitution.
+objectives:
+- 'Confirm the issue: Trailing whitespace/newlines lost'
+- Apply the documented fix in /opt/scripts/capture.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Trailing whitespace/newlines lost
+- order: 2
+  cost: 15
+  content: Quote "$(...)" and handle output.
+- order: 3
+  cost: 20
+  content: /opt/scripts/capture.sh carries the corrected configuration.

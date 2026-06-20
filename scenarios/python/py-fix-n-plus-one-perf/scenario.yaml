@@ -1,0 +1,73 @@
+title: Fix the Quadratic Membership Check
+slug: py-fix-n-plus-one-perf
+category: Python Development
+description: common_elements(a, b) returns items present in both lists, but it checks `x in b` for every
+  x in a where b is a list — an O(n*m) scan that times out on large inputs. Convert b to a set for O(1)
+  lookups so it scales.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Recognize the O(n*m) list membership pattern
+- Use a set for constant-time lookups
+- Pass the large-input performance test within the timeout
+initial_state: common_elements(a, b) returns items present in both lists, but it checks `x in b` for every
+  x in a where b is a list — an O(n*m) scan that times out on large inputs. Convert b to a set for O(1)
+  lookups so it scales.
+solution_explanation: |
+  List membership is linear, so the nested scan is quadratic and times out on big inputs. Pre-building a set of b (and a `seen` set) makes each lookup O(1), so the whole pass is linear.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix common_elements(a, b): return the list of elements of a that also appear in b, in a's order, without duplicates. Make it efficient enough for large inputs.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def common_elements(a, b):
+          out = []
+          for x in a:
+              if x in b and x not in out:   # x in b is O(len(b)); x not in out is O(len(out))
+                  out.append(x)
+          return out
+    readonly: false
+  visible_tests:
+  - name: basic intersection
+    code: |
+      assert common_elements([1,2,3,4], [2,4,6]) == [2,4]
+  - name: no overlap
+    code: |
+      assert common_elements([1,2], [3,4]) == []
+  hidden_tests:
+  - name: preserves a's order and dedupes
+    code: |
+      assert common_elements([3,1,3,2,1], [1,3]) == [3,1]
+  - name: large input performance
+    code: |
+      a = list(range(200000))
+      b = list(range(100000, 300000))
+      r = common_elements(a, b)
+      assert r[0] == 100000 and r[-1] == 199999 and len(r) == 100000
+  - name: empty inputs
+    code: |
+      assert common_elements([], [1,2]) == [] and common_elements([1], []) == []
+  timeout: 6
+hints:
+- order: 1
+  cost: 10
+  content: With b as a list, `x in b` scans b every time — that's O(len(a) * len(b)).
+- order: 2
+  cost: 20
+  content: Convert b to a set once; membership becomes O(1).
+- order: 3
+  cost: 30
+  content: Also track a `seen` set instead of `x not in out` (which is also linear).

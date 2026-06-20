@@ -1,0 +1,28 @@
+title: RHEL Postfix MTA Down
+slug: rhel-postfix-down
+technology: RHEL Linux
+category: Mail
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Outbound mail/alerts stopped because Postfix is down.
+initial_state: A RHEL host where the postfix service is failed.
+objectives:
+- Confirm postfix is down (mailq / sendmail fails)
+- Resolve the cause and start postfix
+- Verify postfix is active
+hints:
+- order: 1
+  cost: 10
+  content: mailq / sendmail fails
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start postfix.'
+- order: 3
+  cost: 20
+  content: systemctl is-active postfix returns active.

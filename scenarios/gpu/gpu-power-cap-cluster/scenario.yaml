@@ -1,0 +1,28 @@
+title: GPU Power Cap Set Too Low Cluster-Wide
+slug: gpu-power-cap-cluster
+technology: GPU
+category: Performance
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Cluster GPU throughput is capped because a global power limit is too conservative.
+initial_state: A GPU fleet with an overly low global power cap.
+objectives:
+- 'Confirm the issue: All GPUs power-capped'
+- Apply the documented fix in /etc/gpu/cluster-power.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: All GPUs power-capped
+- order: 2
+  cost: 15
+  content: Raise the cluster power cap appropriately.
+- order: 3
+  cost: 20
+  content: /etc/gpu/cluster-power.conf carries the corrected configuration.

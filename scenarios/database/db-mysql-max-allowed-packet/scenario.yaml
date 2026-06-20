@@ -1,0 +1,28 @@
+title: MySQL Rejecting Large Queries
+slug: db-mysql-max-allowed-packet
+technology: Database
+category: Limits
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Large queries/blobs fail because max_allowed_packet is too small.
+initial_state: A MySQL host with a tiny max_allowed_packet.
+objectives:
+- 'Confirm the issue: ''Packet too large'' errors'
+- Apply the documented fix in /etc/my.cnf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''Packet too large'' errors'
+- order: 2
+  cost: 15
+  content: Raise max_allowed_packet and restart.
+- order: 3
+  cost: 20
+  content: /etc/my.cnf carries the corrected configuration.

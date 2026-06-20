@@ -1,0 +1,28 @@
+title: Script Float Math Loses Precision
+slug: shell-numeric-bc-scale
+technology: Shell Scripting
+category: Arithmetic
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Ratios are truncated because bash integer math is used for floats.
+initial_state: An ops script doing float math with integer arithmetic.
+objectives:
+- 'Confirm the issue: Fractions truncated to 0'
+- Apply the documented fix in /opt/scripts/ratio.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Fractions truncated to 0
+- order: 2
+  cost: 15
+  content: Use bc/awk with scale for floats.
+- order: 3
+  cost: 20
+  content: /opt/scripts/ratio.sh carries the corrected configuration.

@@ -1,0 +1,29 @@
+title: Broken sudoers Locks Out Admins
+slug: linux-sudoers-syntax-error
+technology: Linux
+category: Access
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A syntax error in a sudoers drop-in breaks sudo for the ops team. Fix the file (safely) and
+  confirm it is corrected.
+initial_state: A Linux host whose /etc/sudoers.d drop-in has a syntax error, breaking privilege escalation.
+objectives:
+- Confirm sudo is broken by the syntax error
+- Fix the sudoers drop-in safely
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: visudo -c flags the file.
+- order: 2
+  cost: 15
+  content: Correct the syntax (validate with visudo -c).
+- order: 3
+  cost: 20
+  content: sudoers drop-in carries the corrected syntax.

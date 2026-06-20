@@ -1,0 +1,28 @@
+title: Ansible free Strategy Causing Ordering Bugs
+slug: ansible-strategy-free-unsafe
+technology: Ansible
+category: Strategy
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Hosts get inconsistent results because the free strategy breaks an ordering assumption.
+initial_state: An Ansible play using the free strategy where linear is required.
+objectives:
+- 'Confirm the issue: Inconsistent cross-host ordering'
+- Apply the documented fix in /home/ansible/strategy.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Inconsistent cross-host ordering
+- order: 2
+  cost: 15
+  content: Use the linear strategy where ordering matters.
+- order: 3
+  cost: 20
+  content: /home/ansible/strategy.yml carries the corrected configuration.

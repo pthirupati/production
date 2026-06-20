@@ -1,0 +1,28 @@
+title: Ansible Vault ID Mismatch
+slug: ansible-vault-id-wrong
+technology: Ansible
+category: Vault
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Encrypted vars can't be decrypted because the vault id label is wrong.
+initial_state: An Ansible project with a mismatched vault id.
+objectives:
+- 'Confirm the issue: Vault decryption fails'
+- Apply the documented fix in /home/ansible/vault-vars.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Vault decryption fails
+- order: 2
+  cost: 15
+  content: Use the correct vault id/label.
+- order: 3
+  cost: 20
+  content: /home/ansible/vault-vars.yml carries the corrected configuration.

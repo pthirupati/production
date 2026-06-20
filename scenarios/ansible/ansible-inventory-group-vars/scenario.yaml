@@ -1,0 +1,28 @@
+title: Ansible Group Vars Not Applied
+slug: ansible-inventory-group-vars
+technology: Ansible
+category: Inventory
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Group vars aren't applied because the inventory group name doesn't match group_vars.
+initial_state: An Ansible inventory whose group naming breaks group_vars matching.
+objectives:
+- 'Confirm the issue: Group vars ignored'
+- Apply the documented fix in /home/ansible/inventory/hosts.ini
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Group vars ignored
+- order: 2
+  cost: 15
+  content: Align inventory group names with group_vars.
+- order: 3
+  cost: 20
+  content: /home/ansible/inventory/hosts.ini carries the corrected configuration.

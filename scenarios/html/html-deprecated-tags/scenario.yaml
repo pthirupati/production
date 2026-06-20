@@ -1,0 +1,28 @@
+title: Page Uses Deprecated Presentational Tags
+slug: html-deprecated-tags
+technology: HTML
+category: Standards
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Markup uses deprecated font/center tags that don't render reliably.
+initial_state: A page using deprecated presentational tags.
+objectives:
+- 'Confirm the issue: Deprecated tags in markup'
+- Apply the documented fix in /var/www/html/old.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Deprecated tags in markup
+- order: 2
+  cost: 15
+  content: Replace with CSS-based markup.
+- order: 3
+  cost: 20
+  content: /var/www/html/old.html carries the corrected markup/config.

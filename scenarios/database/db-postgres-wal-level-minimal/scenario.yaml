@@ -1,0 +1,28 @@
+title: PostgreSQL wal_level Too Low for Replication
+slug: db-postgres-wal-level-minimal
+technology: Database
+category: Replication
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Replication/PITR can't work because wal_level is minimal.
+initial_state: A PostgreSQL host with wal_level=minimal.
+objectives:
+- 'Confirm the issue: Replication slots can''t be used'
+- Apply the documented fix in /var/lib/pgsql/data/postgresql.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Replication slots can't be used
+- order: 2
+  cost: 15
+  content: Set wal_level=replica (or logical) and restart.
+- order: 3
+  cost: 20
+  content: /var/lib/pgsql/data/postgresql.conf carries the corrected configuration.

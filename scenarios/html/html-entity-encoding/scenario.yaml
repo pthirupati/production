@@ -1,0 +1,28 @@
+title: Special Characters Not Escaped
+slug: html-entity-encoding
+technology: HTML
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: User content breaks markup / risks XSS because characters aren't entity-escaped.
+initial_state: A page rendering unescaped characters.
+objectives:
+- 'Confirm the issue: Raw < > & in content'
+- Apply the documented fix in /var/www/html/comments.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Raw < > & in content
+- order: 2
+  cost: 15
+  content: Entity-encode special characters.
+- order: 3
+  cost: 20
+  content: /var/www/html/comments.html carries the corrected markup/config.

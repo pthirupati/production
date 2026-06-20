@@ -1,0 +1,28 @@
+title: CUDA Toolkit Not on PATH/LD_LIBRARY_PATH
+slug: gpu-cuda-toolkit-path
+technology: GPU
+category: Toolkit
+difficulty: easy
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: nvcc and CUDA libs aren't found because the toolkit paths aren't exported.
+initial_state: A GPU host missing CUDA path exports.
+objectives:
+- 'Confirm the issue: nvcc not found; libs missing'
+- Apply the documented fix in /etc/profile.d/cuda.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: nvcc not found; libs missing
+- order: 2
+  cost: 15
+  content: Export CUDA bin/lib paths persistently.
+- order: 3
+  cost: 20
+  content: /etc/profile.d/cuda.sh carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Compose File Version Unsupported
+slug: docker-compose-version-deprecated
+technology: Docker
+category: Compose
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The compose file fails to parse because of an unsupported/legacy schema field.
+initial_state: A compose file with an unsupported schema element.
+objectives:
+- 'Confirm the issue: compose config errors'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: compose config errors
+- order: 2
+  cost: 15
+  content: Update the compose file schema.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

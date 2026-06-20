@@ -1,0 +1,28 @@
+title: PostgreSQL Checkpoint I/O Spikes
+slug: db-postgres-checkpoint-spikes
+technology: Database
+category: Tuning
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Periodic I/O spikes hurt latency because checkpoints are too aggressive.
+initial_state: A PostgreSQL host with poor checkpoint tuning.
+objectives:
+- 'Confirm the issue: Latency spikes at checkpoints'
+- Apply the documented fix in /var/lib/pgsql/data/postgresql.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Latency spikes at checkpoints
+- order: 2
+  cost: 15
+  content: Tune checkpoint settings to spread I/O.
+- order: 3
+  cost: 20
+  content: /var/lib/pgsql/data/postgresql.conf carries the corrected configuration.

@@ -1,0 +1,29 @@
+title: Ansible Variable Precedence Override
+slug: ansible-vars-precedence-bug
+technology: Ansible
+category: Variables
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A deployment uses the wrong value because variable precedence puts a stale group_var above
+  the intended one. Fix the variable definition and confirm it is corrected.
+initial_state: An Ansible project where variable precedence yields a wrong value for a key setting.
+objectives:
+- Confirm the wrong value is applied
+- Resolve the precedence/definition
+- Verify the vars file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: debug shows the unexpected value.
+- order: 2
+  cost: 15
+  content: Set the value at the right precedence level.
+- order: 3
+  cost: 20
+  content: group_vars carries the corrected value.

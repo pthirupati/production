@@ -1,0 +1,28 @@
+title: Layout Shift From Unsized Images
+slug: html-missing-width-height
+technology: HTML
+category: Performance
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Cumulative layout shift is high because images lack width/height.
+initial_state: A page whose images have no dimensions.
+objectives:
+- 'Confirm the issue: High CLS from images'
+- Apply the documented fix in /var/www/html/news.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: High CLS from images
+- order: 2
+  cost: 15
+  content: Set width/height on images.
+- order: 3
+  cost: 20
+  content: /var/www/html/news.html carries the corrected markup/config.

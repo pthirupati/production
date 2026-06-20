@@ -1,0 +1,73 @@
+title: Implement a Password Strength Validator
+slug: py-impl-password-strength
+category: Python Development
+description: 'Implement is_strong_password(p): True only if p is at least 8 characters AND contains at
+  least one lowercase letter, one uppercase letter, one digit, and one of the symbols !@#$%^&*. Otherwise
+  False. The stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Enforce the minimum length
+- Require lowercase, uppercase, digit, and symbol
+- Return False if any rule is unmet
+initial_state: 'Implement is_strong_password(p): True only if p is at least 8 characters AND contains
+  at least one lowercase letter, one uppercase letter, one digit, and one of the symbols !@#$%^&*. Otherwise
+  False. The stub is empty so tests fail.'
+solution_explanation: |
+  Each rule is an independent any() check over the characters; the password is strong only when the length and all four character-class checks pass.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement is_strong_password(p) -> bool. Rules: len >= 8; >=1 lowercase; >=1 uppercase; >=1 digit; >=1 symbol from !@#$%^&*.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def is_strong_password(p):
+          # TODO: validate per the rules in the brief/tests
+          pass
+    readonly: false
+  visible_tests:
+  - name: strong
+    code: |
+      assert is_strong_password('Abcdef1!') is True
+  - name: too short
+    code: |
+      assert is_strong_password('Ab1!') is False
+  hidden_tests:
+  - name: no uppercase
+    code: |
+      assert is_strong_password('abcdef1!') is False
+  - name: no lowercase
+    code: |
+      assert is_strong_password('ABCDEF1!') is False
+  - name: no digit
+    code: |
+      assert is_strong_password('Abcdefg!') is False
+  - name: no symbol
+    code: |
+      assert is_strong_password('Abcdefg1') is False
+  - name: long and complete
+    code: |
+      assert is_strong_password('Sup3r$ecretPass') is True
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Check the length first; short passwords fail immediately.
+- order: 2
+  cost: 20
+  content: Use any(c.islower() ...), any(c.isupper() ...), any(c.isdigit() ...).
+- order: 3
+  cost: 30
+  content: Check membership against the set of allowed symbols and require all four classes.

@@ -1,0 +1,77 @@
+title: 'Log Analysis: Fix the Crash Parsing CSV Numbers'
+slug: py-logfix-valueerror-int-parse
+category: Python Development
+description: 'A batch job crashed with `ValueError: invalid literal for int() with base 10: ''''` in sum_csv_row().
+  The row may contain empty fields and surrounding spaces. Parse only the integer fields, skipping blanks,
+  and return their sum. Read the log and fix the parsing.'
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Read the ValueError and identify the bad int() call
+- Skip empty/whitespace fields
+- Sum the remaining integers robustly
+initial_state: 'A batch job crashed with `ValueError: invalid literal for int() with base 10: ''''` in
+  sum_csv_row(). The row may contain empty fields and surrounding spaces. Parse only the integer fields,
+  skipping blanks, and return their sum. Read the log and fix the parsing.'
+solution_explanation: |
+  Empty/whitespace fields can't be parsed. Stripping and skipping blanks before int() makes the sum robust to messy CSV rows.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: logfix
+  instructions: |
+    Fix sum_csv_row(row) where row is a list of strings. Strip each field; skip empty fields; sum the integer values of the rest. The log shows it crashes on an empty field.
+      sum_csv_row(['1', ' 2 ', '', '3']) -> 6
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      # Production log:
+      #   ValueError: invalid literal for int() with base 10: ''
+      #     at sum_csv_row -> total += int(field)
+
+      def sum_csv_row(row):
+          total = 0
+          for field in row:
+              total += int(field)   # blank fields raise ValueError
+          return total
+    readonly: false
+  visible_tests:
+  - name: with blanks and spaces
+    code: |
+      assert sum_csv_row(['1', ' 2 ', '', '3']) == 6, sum_csv_row(['1', ' 2 ', '', '3'])
+  - name: all numbers
+    code: |
+      assert sum_csv_row(['10', '20']) == 30
+  hidden_tests:
+  - name: only blanks
+    code: |
+      assert sum_csv_row(['', '   ', '']) == 0
+  - name: negative values
+    code: |
+      assert sum_csv_row(['-5', '5']) == 0
+  - name: single
+    code: |
+      assert sum_csv_row([' 7 ']) == 7
+  - name: empty row
+    code: |
+      assert sum_csv_row([]) == 0
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: The log shows int('') failing — empty fields aren't numbers.
+- order: 2
+  cost: 20
+  content: Strip whitespace and skip fields that become empty.
+- order: 3
+  cost: 30
+  content: Continue past blank fields, then int(field) the rest.

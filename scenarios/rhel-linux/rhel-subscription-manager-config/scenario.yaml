@@ -1,0 +1,29 @@
+title: RHEL Subscription Repo Misconfigured
+slug: rhel-subscription-manager-config
+technology: RHEL Linux
+category: Patching
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: dnf updates fail on a RHEL host because the subscription/repo configuration is broken, so
+  no packages resolve. Correct the repo config and confirm it is corrected.
+initial_state: A RHEL host whose repository configuration is broken, so dnf cannot fetch updates.
+objectives:
+- Confirm dnf can't resolve packages
+- Correct the repo/subscription config
+- Verify the repo config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: dnf repolist shows 0 repos / errors.
+- order: 2
+  cost: 15
+  content: Fix the .repo enabled/baseurl entries.
+- order: 3
+  cost: 20
+  content: redhat.repo carries the corrected config.

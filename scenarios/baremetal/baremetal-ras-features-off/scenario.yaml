@@ -1,0 +1,28 @@
+title: Memory RAS Features Disabled
+slug: baremetal-ras-features-off
+technology: Bare Metal
+category: Reliability
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Correctable memory errors aren't mitigated because RAS features are off.
+initial_state: A server with memory RAS features disabled.
+objectives:
+- 'Confirm the issue: No memory error mitigation'
+- Apply the documented fix in /etc/bios/ras.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No memory error mitigation
+- order: 2
+  cost: 15
+  content: Enable the appropriate RAS features.
+- order: 3
+  cost: 20
+  content: /etc/bios/ras.cfg carries the corrected configuration.

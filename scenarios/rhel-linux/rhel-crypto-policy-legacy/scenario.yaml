@@ -1,0 +1,28 @@
+title: RHEL Crypto Policy Set to LEGACY
+slug: rhel-crypto-policy-legacy
+technology: RHEL Linux
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Weak ciphers are allowed because the system crypto policy is LEGACY.
+initial_state: A RHEL host with a LEGACY crypto policy.
+objectives:
+- 'Confirm the issue: Weak TLS/SSH ciphers allowed'
+- Apply the documented fix in /etc/crypto-policies/config
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Weak TLS/SSH ciphers allowed
+- order: 2
+  cost: 15
+  content: Set the crypto policy to DEFAULT/FUTURE.
+- order: 3
+  cost: 20
+  content: /etc/crypto-policies/config carries the corrected configuration.

@@ -1,0 +1,29 @@
+title: AD FSMO Role Holder Unreachable
+slug: win-ad-fsmo-unreachable
+technology: Windows Server
+category: Active Directory
+difficulty: hard
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Domain operations stall because an FSMO role holder is unreachable; seize/transfer roles
+  and confirm AD health.
+initial_state: A Windows AD environment with an unreachable FSMO role holder.
+objectives:
+- Confirm the Windows issue
+- Apply the documented fix
+- Verify the issue is resolved
+hints:
+- order: 1
+  cost: 10
+  content: Investigate the affected Windows component.
+- order: 2
+  cost: 15
+  content: Apply the documented Windows fix.
+- order: 3
+  cost: 20
+  content: The component reports healthy.

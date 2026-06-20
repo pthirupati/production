@@ -1,0 +1,28 @@
+title: Memory Running at Reduced Speed
+slug: baremetal-memory-mismatch-rank
+technology: Bare Metal
+category: Memory
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: RAM runs below rated speed because of a DIMM population/rank mismatch.
+initial_state: A server whose DIMM population forces a lower memory clock.
+objectives:
+- 'Confirm the issue: Memory clocked below rated'
+- Apply the documented fix in /etc/bios/memory.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Memory clocked below rated
+- order: 2
+  cost: 15
+  content: Fix DIMM population per the guide.
+- order: 3
+  cost: 20
+  content: /etc/bios/memory.cfg carries the corrected configuration.

@@ -1,0 +1,71 @@
+title: Implement the Luhn Checksum
+slug: js-impl-validate-credit-card
+category: JavaScript Development
+description: 'Implement luhnValid(digits): given a string of digits, return true if it passes the Luhn
+  checksum (used for credit-card numbers). The stub is empty so tests fail. Non-digit characters should
+  make it false.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Double every second digit from the right
+- Subtract 9 from doubled values over 9
+- Return true only when the total is a multiple of 10
+initial_state: 'Implement luhnValid(digits): given a string of digits, return true if it passes the Luhn
+  checksum (used for credit-card numbers). The stub is empty so tests fail. Non-digit characters should
+  make it false.'
+solution_explanation: |
+  The Luhn algorithm doubles alternate digits from the right (subtracting 9 when over 9) and checks the total modulo 10; non-digit input is rejected.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement luhnValid(digits) -> boolean (Luhn algorithm). Reject strings with any non-digit.
+      luhnValid('4539148803436467') -> true
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function luhnValid(digits) {
+        // TODO: return true iff digits passes the Luhn checksum
+      }
+    readonly: false
+  visible_tests:
+  - name: valid number
+    code: |
+      assert(luhnValid('4539148803436467') === true);
+  - name: invalid number
+    code: |
+      assert(luhnValid('1234567812345678') === false);
+  hidden_tests:
+  - name: simple valid
+    code: |
+      assert(luhnValid('79927398713') === true);
+  - name: off by one invalid
+    code: |
+      assert(luhnValid('79927398710') === false);
+  - name: non-digit rejected
+    code: |
+      assert(luhnValid('1234a') === false);
+  - name: empty rejected
+    code: |
+      assert(luhnValid('') === false);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Walk the digits from right to left, doubling every second one.
+- order: 2
+  cost: 20
+  content: If a doubled digit exceeds 9, subtract 9.
+- order: 3
+  cost: 30
+  content: The number is valid iff the summed total is divisible by 10. Reject non-digits first.

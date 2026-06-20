@@ -1,0 +1,28 @@
+title: MySQL Loose sql_mode Hiding Data Bugs
+slug: db-mysql-sql-mode-loose
+technology: Database
+category: Integrity
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Silent data truncation occurs because sql_mode is too permissive.
+initial_state: A MySQL host with a loose sql_mode missing STRICT.
+objectives:
+- 'Confirm the issue: Truncated values accepted silently'
+- Apply the documented fix in /etc/my.cnf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Truncated values accepted silently
+- order: 2
+  cost: 15
+  content: Set a strict sql_mode and restart.
+- order: 3
+  cost: 20
+  content: /etc/my.cnf carries the corrected configuration.

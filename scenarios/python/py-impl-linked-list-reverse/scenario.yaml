@@ -1,0 +1,92 @@
+title: Implement Reverse a Linked List
+slug: py-impl-linked-list-reverse
+category: Python Development
+description: 'A singly linked Node class (with .val and .next) is provided as a read-only helper. Implement
+  reverse_list(head): reverse the list in-place and return the new head. The stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Walk the list re-pointing each .next backward
+- Return the new head (old tail)
+- Handle empty and single-node lists
+initial_state: 'A singly linked Node class (with .val and .next) is provided as a read-only helper. Implement
+  reverse_list(head): reverse the list in-place and return the new head. The stub is empty so tests fail.'
+solution_explanation: |
+  Iteratively reversing the .next pointers with a prev/cur/next trio reverses the list in O(n) and returns the old tail as the new head.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement reverse_list(head) for the provided Node class; return the new head. The list helpers to_list(head) and from_list(values) are available for testing.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: linked.py
+    content: |
+      class Node:
+          def __init__(self, val, next=None):
+              self.val = val
+              self.next = next
+
+      def from_list(values):
+          head = None
+          for v in reversed(values):
+              head = Node(v, head)
+          return head
+
+      def to_list(head):
+          out = []
+          while head is not None:
+              out.append(head.val)
+              head = head.next
+          return out
+    readonly: true
+  - path: solution.py
+    content: |
+      def reverse_list(head):
+          # TODO: reverse the singly linked list and return the new head
+          pass
+    readonly: false
+  visible_tests:
+  - name: reverses a list
+    code: |
+      head = from_list([1, 2, 3, 4])
+      assert to_list(reverse_list(head)) == [4, 3, 2, 1]
+  - name: single node
+    code: |
+      head = from_list([7])
+      assert to_list(reverse_list(head)) == [7]
+  hidden_tests:
+  - name: empty list
+    code: |
+      assert reverse_list(None) is None
+  - name: two nodes
+    code: |
+      assert to_list(reverse_list(from_list([1, 2]))) == [2, 1]
+  - name: longer list
+    code: |
+      assert to_list(reverse_list(from_list([5,4,3,2,1]))) == [1,2,3,4,5]
+  - name: new head is old tail
+    code: |
+      head = from_list([1, 2, 3])
+      new_head = reverse_list(head)
+      assert new_head.val == 3
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: 'Keep three pointers: prev, cur, and the saved next.'
+- order: 2
+  cost: 20
+  content: For each node, point cur.next at prev, then advance prev and cur.
+- order: 3
+  cost: 30
+  content: Return prev at the end — it's the old tail / new head.

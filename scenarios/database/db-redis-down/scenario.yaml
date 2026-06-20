@@ -1,0 +1,31 @@
+title: Redis Server Failed to Start
+slug: db-redis-down
+technology: Database
+category: Redis
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The Redis cache server is down and the application is throwing connection errors. The redis
+  service failed to start after a config change. Investigate the service status, fix the cause, and bring
+  redis back online.
+initial_state: A Linux host where the redis service is in a failed state, so cache reads/writes error
+  out.
+objectives:
+- Confirm the redis service is failed/inactive
+- Resolve the cause and start the service
+- Verify redis is active
+hints:
+- order: 1
+  cost: 10
+  content: systemctl status redis shows failed.
+- order: 2
+  cost: 15
+  content: Fix the config and systemctl start redis.
+- order: 3
+  cost: 20
+  content: systemctl is-active redis returns active.

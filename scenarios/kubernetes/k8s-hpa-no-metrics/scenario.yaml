@@ -1,0 +1,30 @@
+title: HPA Not Scaling Without Metrics
+slug: k8s-hpa-no-metrics
+technology: Kubernetes
+category: Autoscaling
+difficulty: hard
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A HorizontalPodAutoscaler shows unknown targets and never scales because resource requests
+  are missing. Add requests so metrics resolve and confirm the HPA works.
+initial_state: A Kubernetes HPA stuck at <unknown> because the target Deployment has no CPU requests for
+  the metrics server.
+objectives:
+- Confirm the HPA targets show unknown
+- Add CPU requests so the metrics resolve
+- Verify the cluster/HPA is healthy
+hints:
+- order: 1
+  cost: 10
+  content: kubectl get hpa shows TARGETS <unknown>/50%.
+- order: 2
+  cost: 15
+  content: Add resources.requests.cpu and roll out.
+- order: 3
+  cost: 20
+  content: HPA reports real targets.

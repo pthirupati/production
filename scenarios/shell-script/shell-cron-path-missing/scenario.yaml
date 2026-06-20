@@ -1,0 +1,29 @@
+title: Cron Script Fails on Missing PATH
+slug: shell-cron-path-missing
+technology: Shell-script
+category: Cron
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A script works interactively but fails under cron because it relies on a PATH that cron doesn't
+  set. Make it robust and confirm it is corrected.
+initial_state: An ops shell script that breaks under cron because it assumes an interactive PATH.
+objectives:
+- Confirm the script fails under cron's minimal env
+- Set an explicit PATH / use absolute paths
+- Verify the script is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Binaries 'not found' only under cron.
+- order: 2
+  cost: 15
+  content: Export a full PATH or use absolute binary paths.
+- order: 3
+  cost: 20
+  content: cronjob.sh carries the corrected PATH handling.

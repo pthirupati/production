@@ -1,0 +1,73 @@
+title: Fix the Numeric Sort (Lexicographic Bug)
+slug: js-fix-array-sort-numeric
+category: JavaScript Development
+description: sortNumbers(nums) should return the array sorted in ascending NUMERIC order, but it calls
+  .sort() with no comparator, so JS sorts by string, putting 10 before 2. Provide a numeric comparator.
+  Also, return a new array (don't mutate the input).
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See the lexicographic ordering bug (10 before 2)
+- Provide an (a, b) => a - b comparator
+- Return a sorted copy without mutating input
+initial_state: sortNumbers(nums) should return the array sorted in ascending NUMERIC order, but it calls
+  .sort() with no comparator, so JS sorts by string, putting 10 before 2. Provide a numeric comparator.
+  Also, return a new array (don't mutate the input).
+solution_explanation: |
+  Default sort compares string representations. A numeric comparator orders by value, and spreading into a new array avoids mutating the input.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix sortNumbers(nums) to sort ascending numerically and return a NEW array (do not mutate the input).
+      sortNumbers([10, 2, 1]) -> [1, 2, 10]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function sortNumbers(nums) {
+        return nums.sort(); // lexicographic AND mutates input
+      }
+    readonly: false
+  visible_tests:
+  - name: numeric order
+    code: |
+      assert(JSON.stringify(sortNumbers([10, 2, 1])) === JSON.stringify([1, 2, 10]), JSON.stringify(sortNumbers([10, 2, 1])));
+  - name: already sorted
+    code: |
+      assert(JSON.stringify(sortNumbers([1, 2, 3])) === JSON.stringify([1, 2, 3]), JSON.stringify(sortNumbers([1, 2, 3])));
+  hidden_tests:
+  - name: multi-digit
+    code: |
+      assert(JSON.stringify(sortNumbers([100, 25, 9, 1000])) === JSON.stringify([9, 25, 100, 1000]), JSON.stringify(sortNumbers([100, 25, 9, 1000])));
+  - name: negatives
+    code: |
+      assert(JSON.stringify(sortNumbers([3, -1, -10, 2])) === JSON.stringify([-10, -1, 2, 3]), JSON.stringify(sortNumbers([3, -1, -10, 2])));
+  - name: does not mutate input
+    code: |
+      const src = [3, 1, 2];
+      sortNumbers(src);
+      assert(JSON.stringify(src) === JSON.stringify([3, 1, 2]), 'input mutated');
+  - name: empty
+    code: |
+      assert(JSON.stringify(sortNumbers([])) === JSON.stringify([]), JSON.stringify(sortNumbers([])));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: sortNumbers([10, 2, 1]) gives [1, 10, 2] — string comparison, not numeric.
+- order: 2
+  cost: 20
+  content: Pass a comparator (a, b) => a - b to sort.
+- order: 3
+  cost: 30
+  content: Also copy first with [...nums] so the caller's array isn't sorted in place.

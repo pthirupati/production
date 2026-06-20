@@ -1,0 +1,28 @@
+title: Bind Mount Points at Wrong Path
+slug: docker-bind-mount-wrong
+technology: Docker
+category: Storage
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: App data isn't persisted because a bind mount points at the wrong host path.
+initial_state: A compose service with an incorrect bind mount.
+objectives:
+- 'Confirm the issue: Data not where expected'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Data not where expected
+- order: 2
+  cost: 15
+  content: Fix the volume host path.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

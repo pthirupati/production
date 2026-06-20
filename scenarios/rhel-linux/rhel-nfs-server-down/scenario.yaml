@@ -1,0 +1,29 @@
+title: RHEL NFS Server Export Offline
+slug: rhel-nfs-server-down
+technology: RHEL Linux
+category: Storage
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: NFS clients can't mount exports because the nfs-server service is down on a RHEL host. Restore
+  the NFS server.
+initial_state: A RHEL host where the nfs-server service is failed, so exports are unavailable.
+objectives:
+- Confirm nfs-server is down
+- Resolve and start nfs-server
+- Verify nfs-server is active
+hints:
+- order: 1
+  cost: 10
+  content: showmount fails; nfs-server down.
+- order: 2
+  cost: 15
+  content: Fix exports and start nfs-server.
+- order: 3
+  cost: 20
+  content: nfs-server active.

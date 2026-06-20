@@ -1,0 +1,74 @@
+title: 'Log Analysis: Fix ''Cannot read properties of undefined'''
+slug: js-logfix-cannot-read-undefined
+category: JavaScript Development
+description: 'Production logged: `TypeError: Cannot read properties of undefined (reading ''city'')` in
+  getCity(). The user object may lack an `address`. Use optional chaining (or guards) to return the city
+  or a fallback ''unknown'' without crashing.'
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Read the TypeError and find the unsafe nested access
+- Use optional chaining / guards for the missing address
+- Return 'unknown' when the path is absent
+initial_state: 'Production logged: `TypeError: Cannot read properties of undefined (reading ''city'')`
+  in getCity(). The user object may lack an `address`. Use optional chaining (or guards) to return the
+  city or a fallback ''unknown'' without crashing.'
+solution_explanation: |
+  Optional chaining stops at the first nullish link and yields undefined, and ?? supplies the 'unknown' fallback — no TypeError.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: logfix
+  instructions: |
+    Fix getCity(user): return user.address.city, or 'unknown' if address (or city) is missing. The log shows it crashes when address is undefined.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      // Production log:
+      //   TypeError: Cannot read properties of undefined (reading 'city')
+      //     at getCity (user.js:2)
+
+      function getCity(user) {
+        return user.address.city; // crashes when address is undefined
+      }
+    readonly: false
+  visible_tests:
+  - name: has address
+    code: |
+      assert(getCity({ address: { city: 'NYC' } }) === 'NYC');
+  - name: missing address
+    code: |
+      assert(getCity({}) === 'unknown', getCity({}));
+  hidden_tests:
+  - name: missing city
+    code: |
+      assert(getCity({ address: {} }) === 'unknown');
+  - name: null user
+    code: |
+      assert(getCity(null) === 'unknown');
+  - name: does not throw on undefined
+    code: |
+      assert(getCity(undefined) === 'unknown');
+  - name: real city returned
+    code: |
+      assert(getCity({ address: { city: 'Paris' } }) === 'Paris');
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: The log shows reading .city on an undefined address.
+- order: 2
+  cost: 20
+  content: Optional chaining (?.) short-circuits to undefined instead of throwing.
+- order: 3
+  cost: 30
+  content: Return user?.address?.city ?? 'unknown'.

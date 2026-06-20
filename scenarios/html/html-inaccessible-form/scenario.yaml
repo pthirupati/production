@@ -1,0 +1,29 @@
+title: Form Inputs Missing Labels (a11y)
+slug: html-inaccessible-form
+technology: Html
+category: Accessibility
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A contact form fails accessibility checks because inputs have no associated labels. Add proper
+  labels and confirm the file is corrected.
+initial_state: A static contact form whose inputs lack <label> associations, failing a11y.
+objectives:
+- Confirm inputs lack labels
+- Associate labels with inputs
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Inputs have no for/id label link.
+- order: 2
+  cost: 15
+  content: Add <label for> or wrap inputs.
+- order: 3
+  cost: 20
+  content: contact.html carries the corrected labels.

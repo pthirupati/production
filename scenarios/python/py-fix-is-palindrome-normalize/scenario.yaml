@@ -1,0 +1,70 @@
+title: Fix is_palindrome Normalization
+slug: py-fix-is-palindrome-normalize
+category: Python Development
+description: 'is_palindrome(s) should ignore case, spaces, and punctuation (so ''A man, a plan, a canal:
+  Panama'' is a palindrome), but it compares the raw string, so anything with spaces or capitals fails.
+  Fix the normalization.'
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See that the raw comparison rejects valid palindromes
+- Strip non-alphanumerics and lowercase before comparing
+- Compare the cleaned string to its reverse
+initial_state: 'is_palindrome(s) should ignore case, spaces, and punctuation (so ''A man, a plan, a canal:
+  Panama'' is a palindrome), but it compares the raw string, so anything with spaces or capitals fails.
+  Fix the normalization.'
+solution_explanation: |
+  Comparing the raw string is sensitive to case and punctuation. Filtering to lowercase alphanumerics first yields the canonical comparison.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix is_palindrome(s) to ignore case and any non-alphanumeric characters.
+      is_palindrome('A man, a plan, a canal: Panama') -> True
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def is_palindrome(s):
+          return s == s[::-1]
+    readonly: false
+  visible_tests:
+  - name: simple palindrome
+    code: |
+      assert is_palindrome('racecar') is True
+  - name: with punctuation
+    code: |
+      assert is_palindrome('A man, a plan, a canal: Panama') is True
+  hidden_tests:
+  - name: not a palindrome
+    code: |
+      assert is_palindrome('hello') is False
+  - name: case insensitive
+    code: |
+      assert is_palindrome('Noon') is True
+  - name: alphanumeric mix
+    code: |
+      assert is_palindrome('Was it a car or a cat I saw?') is True
+  - name: empty string is palindrome
+    code: |
+      assert is_palindrome('') is True
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: is_palindrome('Noon') returns False because 'N' != 'n' in the raw compare.
+- order: 2
+  cost: 20
+  content: Keep only alphanumeric characters and lowercase them before comparing.
+- order: 3
+  cost: 30
+  content: cleaned = ''.join(c.lower() for c in s if c.isalnum()); return cleaned == cleaned[::-1].

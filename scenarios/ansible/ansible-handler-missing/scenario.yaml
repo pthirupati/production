@@ -1,0 +1,29 @@
+title: Ansible Handler Never Runs
+slug: ansible-handler-missing
+technology: Ansible
+category: Handlers
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A service never restarts after a config change because the notify references a handler that
+  doesn't exist.
+initial_state: An Ansible play whose notify name doesn't match any handler.
+objectives:
+- 'Confirm the issue: Service isn''t restarted on change'
+- Apply the documented fix in /home/ansible/site.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Service isn't restarted on change
+- order: 2
+  cost: 15
+  content: Match the notify name to the handler.
+- order: 3
+  cost: 20
+  content: /home/ansible/site.yml carries the corrected configuration.

@@ -1,0 +1,72 @@
+title: Fix rotate_left for Large k
+slug: py-fix-rotate-list-modulo
+category: Python Development
+description: rotate_left(lst, k) rotates a list left by k positions, but it slices with a raw k, so when
+  k is larger than len(lst) (or the list is empty) the result is wrong or crashes. Fix it by reducing
+  k modulo the length and handling the empty list.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Try k larger than the list length
+- Reduce k modulo len(lst)
+- Handle empty list without ZeroDivisionError
+initial_state: rotate_left(lst, k) rotates a list left by k positions, but it slices with a raw k, so
+  when k is larger than len(lst) (or the list is empty) the result is wrong or crashes. Fix it by reducing
+  k modulo the length and handling the empty list.
+solution_explanation: |
+  A raw slice index beyond the list length produces wrong results; k % len(lst) normalizes it, and the empty-list guard avoids modulo by zero.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix rotate_left(lst, k): return a new list rotated left by k. k may exceed len(lst); an empty list returns []. Do not mutate the input.
+      rotate_left([1,2,3,4,5], 2) -> [3,4,5,1,2]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def rotate_left(lst, k):
+          return lst[k:] + lst[:k]
+    readonly: false
+  visible_tests:
+  - name: rotate by 2
+    code: |
+      assert rotate_left([1,2,3,4,5], 2) == [3,4,5,1,2]
+  - name: rotate by 0
+    code: |
+      assert rotate_left([1,2,3], 0) == [1,2,3]
+  hidden_tests:
+  - name: k equals length
+    code: |
+      assert rotate_left([1,2,3], 3) == [1,2,3], rotate_left([1,2,3], 3)
+  - name: k greater than length
+    code: |
+      assert rotate_left([1,2,3], 4) == [2,3,1], rotate_left([1,2,3], 4)
+  - name: empty list
+    code: |
+      assert rotate_left([], 5) == []
+  - name: does not mutate
+    code: |
+      a = [1,2,3]
+      rotate_left(a, 1)
+      assert a == [1,2,3]
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: rotate_left([1,2,3], 4) gives [] + [1,2,3] = [1,2,3], but should be [2,3,1].
+- order: 2
+  cost: 20
+  content: Rotating by len(lst) is the identity; reduce k modulo the length.
+- order: 3
+  cost: 30
+  content: Guard the empty list, then `k %= len(lst)` before slicing.

@@ -1,0 +1,30 @@
+title: Terraform Module Version Not Pinned Broke Apply
+slug: terraform-module-unpinned-broke
+technology: Terraform
+category: Modules
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An upstream module published a breaking change and, because the version was unpinned, the
+  next apply failed. Pin the module to a known-good version and confirm validate/plan succeeds.
+initial_state: A Terraform root module referencing a child module without a version constraint; the latest
+  release broke the interface.
+objectives:
+- Identify the module call without a version constraint
+- Pin it to the last known-good version
+- Confirm terraform init/validate succeed
+hints:
+- order: 1
+  cost: 10
+  content: module block has no version = argument.
+- order: 2
+  cost: 15
+  content: Pin version = "x.y.z" to the working release and re-init.
+- order: 3
+  cost: 20
+  content: terraform validate passes.

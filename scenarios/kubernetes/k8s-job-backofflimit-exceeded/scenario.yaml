@@ -1,0 +1,29 @@
+title: Job Backoff Limit Exceeded
+slug: k8s-job-backofflimit-exceeded
+technology: Kubernetes
+category: Batch
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Job repeatedly fails and hits its backoffLimit because a missing input file makes it exit
+  non-zero. Fix the input and confirm the Job completes (cluster healthy).
+initial_state: A Kubernetes Job failing on every attempt due to a missing input, exhausting its backoffLimit.
+objectives:
+- Confirm the Job exceeded its backoffLimit
+- Fix the missing input and re-run
+- Verify the cluster is healthy
+hints:
+- order: 1
+  cost: 10
+  content: kubectl describe job shows BackoffLimitExceeded.
+- order: 2
+  cost: 15
+  content: Provide the input (configmap/volume) and re-create the Job.
+- order: 3
+  cost: 20
+  content: Job completes.

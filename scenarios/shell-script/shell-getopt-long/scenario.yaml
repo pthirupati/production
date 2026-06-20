@@ -1,0 +1,28 @@
+title: Script Doesn't Support Long Options
+slug: shell-getopt-long
+technology: Shell Scripting
+category: CLI
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Operators can't use --long flags because only short getopts is implemented.
+initial_state: An ops script lacking long-option support.
+objectives:
+- 'Confirm the issue: --long flags unrecognized'
+- Apply the documented fix in /opt/scripts/longopts.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: --long flags unrecognized
+- order: 2
+  cost: 15
+  content: Parse long options explicitly.
+- order: 3
+  cost: 20
+  content: /opt/scripts/longopts.sh carries the corrected configuration.

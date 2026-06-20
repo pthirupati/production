@@ -1,0 +1,28 @@
+title: MySQL Slow Query Log Disabled
+slug: db-mysql-slow-query-log-off
+technology: Database
+category: Observability
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Nobody can diagnose slow queries because the slow query log is disabled.
+initial_state: A MySQL host with the slow query log turned off.
+objectives:
+- 'Confirm the issue: No slow_query.log entries'
+- Apply the documented fix in /etc/my.cnf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No slow_query.log entries
+- order: 2
+  cost: 15
+  content: Enable slow_query_log with a threshold.
+- order: 3
+  cost: 20
+  content: /etc/my.cnf carries the corrected configuration.

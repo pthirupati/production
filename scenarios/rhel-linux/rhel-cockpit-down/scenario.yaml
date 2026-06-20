@@ -1,0 +1,28 @@
+title: RHEL Cockpit Web Console Down
+slug: rhel-cockpit-down
+technology: RHEL Linux
+category: Management
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The Cockpit web console is unreachable because the service is down.
+initial_state: A RHEL host where the cockpit service is failed.
+objectives:
+- Confirm cockpit is down (Web console on 9090 unreachable)
+- Resolve the cause and start cockpit
+- Verify cockpit is active
+hints:
+- order: 1
+  cost: 10
+  content: Web console on 9090 unreachable
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start cockpit.'
+- order: 3
+  cost: 20
+  content: systemctl is-active cockpit returns active.

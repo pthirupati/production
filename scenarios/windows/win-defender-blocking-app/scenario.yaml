@@ -1,0 +1,30 @@
+title: Windows Defender Blocking Line-of-Business App
+slug: win-defender-blocking-app
+technology: Windows Server
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Microsoft Defender quarantines a legitimate internal application binary. Add a controlled
+  exclusion/restore the file and confirm the app launches.
+initial_state: A Windows Server where Defender flagged an internal LOB executable as malware and quarantined
+  it.
+objectives:
+- Confirm Defender quarantined the LOB binary
+- Add a path/hash exclusion and restore the file
+- Verify the application launches
+hints:
+- order: 1
+  cost: 10
+  content: Get-MpThreatDetection shows the quarantined binary.
+- order: 2
+  cost: 15
+  content: Add-MpPreference exclusion and restore from quarantine.
+- order: 3
+  cost: 20
+  content: App runs.

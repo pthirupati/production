@@ -1,0 +1,28 @@
+title: MySQL Replica Replication Stopped
+slug: db-mysql-replica-stopped
+technology: Database
+category: Replication
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: MySQL replica replication stopped after an error and the replica is falling behind.
+initial_state: A MySQL replica whose replication threads stopped on an error.
+objectives:
+- Confirm mysqld is down (SHOW REPLICA STATUS shows IO/SQL not running)
+- Resolve the cause and start mysqld
+- Verify mysqld is active
+hints:
+- order: 1
+  cost: 10
+  content: SHOW REPLICA STATUS shows IO/SQL not running
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start mysqld.'
+- order: 3
+  cost: 20
+  content: systemctl is-active mysqld returns active.

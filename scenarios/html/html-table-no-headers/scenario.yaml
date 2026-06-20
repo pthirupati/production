@@ -1,0 +1,28 @@
+title: Data Table Missing Header Scope
+slug: html-table-no-headers
+technology: HTML
+category: Accessibility
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: A data table is inaccessible because header cells lack scope/th markup.
+initial_state: A page with a non-semantic data table.
+objectives:
+- 'Confirm the issue: Table headers not marked up'
+- Apply the documented fix in /var/www/html/data.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Table headers not marked up
+- order: 2
+  cost: 15
+  content: Use th with scope on header cells.
+- order: 3
+  cost: 20
+  content: /var/www/html/data.html carries the corrected markup/config.

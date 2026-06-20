@@ -1,0 +1,28 @@
+title: MongoDB Oplog Too Small for Replication
+slug: db-mongodb-oplog-too-small
+technology: Database
+category: Replication
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Secondaries fall off replication because the oplog window is too short.
+initial_state: A MongoDB replica set with an undersized oplog.
+objectives:
+- 'Confirm the issue: Secondaries go stale quickly'
+- Apply the documented fix in /etc/mongod.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Secondaries go stale quickly
+- order: 2
+  cost: 15
+  content: Increase the oplog size.
+- order: 3
+  cost: 20
+  content: /etc/mongod.conf carries the corrected configuration.

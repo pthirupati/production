@@ -1,0 +1,28 @@
+title: Image Bloated by Build Tooling
+slug: docker-multistage-bloat
+technology: Docker
+category: Build
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The final image is huge because build tooling isn't dropped via multi-stage.
+initial_state: A Dockerfile shipping build dependencies in the final image.
+objectives:
+- 'Confirm the issue: Image is hundreds of MB too big'
+- Apply the documented fix in /opt/app/Dockerfile
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Image is hundreds of MB too big
+- order: 2
+  cost: 15
+  content: Use a multi-stage build.
+- order: 3
+  cost: 20
+  content: /opt/app/Dockerfile carries the corrected configuration.

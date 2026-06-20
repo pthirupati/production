@@ -1,0 +1,28 @@
+title: VM Network Adapter Disconnected
+slug: vm-network-adapter-disconnected
+category: VMware vSphere
+description: web-prod-01 is offline on the network because its virtual NIC is disconnected. Reconnect
+  the adapter and confirm connectivity.
+difficulty: easy
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Confirm the VM's NIC is disconnected
+- Reconnect the virtual network adapter
+- Verify the adapter is connected
+initial_state: vCenter shows web-prod-01 with a disconnected network adapter.
+hints:
+- order: 1
+  cost: 10
+  content: 'In the vCenter simulator, locate the issue: confirm the vm''s nic is disconnected.'
+- order: 2
+  cost: 15
+  content: 'Apply the remediation in the GUI: reconnect the virtual network adapter.'
+- order: 3
+  cost: 20
+  content: 'Confirm resolution: verify the adapter is connected.'

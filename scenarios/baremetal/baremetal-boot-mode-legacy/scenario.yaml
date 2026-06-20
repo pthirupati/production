@@ -1,0 +1,28 @@
+title: Server in Legacy BIOS Instead of UEFI
+slug: baremetal-boot-mode-legacy
+technology: Bare Metal
+category: Boot
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A UEFI-only OS install fails because the server is in legacy BIOS boot mode.
+initial_state: A server booting in legacy mode where UEFI is required.
+objectives:
+- 'Confirm the issue: UEFI media won''t boot'
+- Apply the documented fix in /etc/bios/bootmode.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: UEFI media won't boot
+- order: 2
+  cost: 15
+  content: Switch to UEFI boot mode.
+- order: 3
+  cost: 20
+  content: /etc/bios/bootmode.cfg carries the corrected configuration.

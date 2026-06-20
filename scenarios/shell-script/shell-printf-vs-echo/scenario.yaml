@@ -1,0 +1,28 @@
+title: Script echo Mangles Backslashes
+slug: shell-printf-vs-echo
+technology: Shell Scripting
+category: Portability
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Output is wrong because echo handles backslashes inconsistently across shells.
+initial_state: An ops script relying on non-portable echo.
+objectives:
+- 'Confirm the issue: Backslash sequences mishandled'
+- Apply the documented fix in /opt/scripts/emit.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Backslash sequences mishandled
+- order: 2
+  cost: 15
+  content: Use printf for reliable output.
+- order: 3
+  cost: 20
+  content: /opt/scripts/emit.sh carries the corrected configuration.

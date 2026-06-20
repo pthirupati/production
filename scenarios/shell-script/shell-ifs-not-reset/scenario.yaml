@@ -1,0 +1,28 @@
+title: Script Corrupts Parsing via Global IFS
+slug: shell-ifs-not-reset
+technology: Shell Scripting
+category: Robustness
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Later parsing breaks because the script changes IFS globally and never restores it.
+initial_state: An ops script that mutates IFS without restoring it.
+objectives:
+- 'Confirm the issue: Subsequent parsing is wrong'
+- Apply the documented fix in /opt/scripts/csv.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Subsequent parsing is wrong
+- order: 2
+  cost: 15
+  content: Localize and restore IFS.
+- order: 3
+  cost: 20
+  content: /opt/scripts/csv.sh carries the corrected configuration.

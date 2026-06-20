@@ -1,0 +1,28 @@
+title: Containers Die During Daemon Restart
+slug: docker-live-restore-off
+technology: Docker
+category: Availability
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Containers stop whenever dockerd restarts because live-restore is disabled.
+initial_state: A host with Docker live-restore turned off.
+objectives:
+- 'Confirm the issue: Daemon restart kills containers'
+- Apply the documented fix in /etc/docker/daemon.json
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Daemon restart kills containers
+- order: 2
+  cost: 15
+  content: Enable live-restore in daemon.json.
+- order: 3
+  cost: 20
+  content: /etc/docker/daemon.json carries the corrected configuration.

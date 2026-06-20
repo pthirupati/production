@@ -1,0 +1,28 @@
+title: Service Discovery Fails Without Alias
+slug: docker-network-alias-missing
+technology: Docker
+category: Networking
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Inter-service DNS fails because the expected network alias isn't defined.
+initial_state: A compose stack missing a required network alias.
+objectives:
+- 'Confirm the issue: Service name doesn''t resolve'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Service name doesn't resolve
+- order: 2
+  cost: 15
+  content: Add the network alias.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

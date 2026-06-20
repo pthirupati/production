@@ -1,0 +1,28 @@
+title: Images Missing Alt Text (a11y)
+slug: html-img-missing-alt
+technology: HTML
+category: Accessibility
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Screen readers can't describe images because alt attributes are missing.
+initial_state: A page whose images lack alt text.
+objectives:
+- 'Confirm the issue: Images have no alt attributes'
+- Apply the documented fix in /var/www/html/gallery.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Images have no alt attributes
+- order: 2
+  cost: 15
+  content: Add descriptive alt attributes.
+- order: 3
+  cost: 20
+  content: /var/www/html/gallery.html carries the corrected markup/config.

@@ -1,0 +1,28 @@
+title: Script Leaves Temp Files Behind
+slug: shell-mktemp-cleanup
+technology: Shell Scripting
+category: Hygiene
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Temp files accumulate because there's no cleanup trap.
+initial_state: An ops script not cleaning up its temp dir.
+objectives:
+- 'Confirm the issue: Temp files pile up'
+- Apply the documented fix in /opt/scripts/build-temp.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Temp files pile up
+- order: 2
+  cost: 15
+  content: trap 'rm -rf $TMP' EXIT.
+- order: 3
+  cost: 20
+  content: /opt/scripts/build-temp.sh carries the corrected configuration.

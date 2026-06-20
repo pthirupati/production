@@ -1,0 +1,28 @@
+title: Invisible Text During Font Load
+slug: html-font-no-display-swap
+technology: HTML
+category: Performance
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Text is invisible while a web font loads because font-display swap isn't set.
+initial_state: A page with a FOIT web-font issue.
+objectives:
+- 'Confirm the issue: Flash of invisible text'
+- Apply the documented fix in /var/www/html/typography.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Flash of invisible text
+- order: 2
+  cost: 15
+  content: 'Use font-display: swap.'
+- order: 3
+  cost: 20
+  content: /var/www/html/typography.html carries the corrected markup/config.

@@ -1,0 +1,80 @@
+title: 'Refactor: Fix the Discount Edge Cases'
+slug: py-review-extract-guard-clause
+category: Python Development
+description: 'apply_discount(price, percent) applies a percentage discount, but the logic accepts invalid
+  percentages (negative or > 100) and can return negative prices. Refactor with guard clauses: percent
+  must be in [0, 100] (else ValueError), and the returned price is never negative. The tests pin these
+  contracts.'
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Validate the percent range with a guard clause
+- Raise ValueError for out-of-range percentages
+- Never return a negative price
+initial_state: 'apply_discount(price, percent) applies a percentage discount, but the logic accepts invalid
+  percentages (negative or > 100) and can return negative prices. Refactor with guard clauses: percent
+  must be in [0, 100] (else ValueError), and the returned price is never negative. The tests pin these
+  contracts.'
+solution_explanation: |
+  A guard clause rejecting out-of-range percentages up front prevents nonsensical negative prices and makes the contract explicit.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: review
+  instructions: |
+    Refactor apply_discount(price, percent): percent must be between 0 and 100 inclusive (else raise ValueError). Return price reduced by that percent, as a float.
+      apply_discount(100, 25) -> 75.0
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def apply_discount(price, percent):
+          return price - price * percent / 100   # no validation; allows bad percent
+    readonly: false
+  visible_tests:
+  - name: quarter off
+    code: |
+      assert apply_discount(100, 25) == 75.0
+  - name: no discount
+    code: |
+      assert apply_discount(50, 0) == 50.0
+  hidden_tests:
+  - name: full discount
+    code: |
+      assert apply_discount(80, 100) == 0.0
+  - name: negative percent rejected
+    code: |
+      try:
+          apply_discount(100, -10)
+          assert False, 'should raise'
+      except ValueError:
+          pass
+  - name: over 100 percent rejected
+    code: |
+      try:
+          apply_discount(100, 150)
+          assert False
+      except ValueError:
+          pass
+  - name: returns float
+    code: |
+      assert isinstance(apply_discount(10, 10), float)
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: apply_discount(100, 150) currently returns -50 — an invalid percentage isn't rejected.
+- order: 2
+  cost: 20
+  content: 'Add a guard clause: raise ValueError when percent is outside [0, 100].'
+- order: 3
+  cost: 30
+  content: Then return price * (1 - percent/100).

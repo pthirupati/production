@@ -1,0 +1,28 @@
+title: RHEL SSH Refusing Connections Under Load
+slug: rhel-sshd-maxstartups
+technology: RHEL Linux
+category: Access
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: SSH refuses new connections under bursts because MaxStartups is too low.
+initial_state: A RHEL host with a too-low sshd MaxStartups.
+objectives:
+- 'Confirm the issue: SSH drops bursts of connections'
+- Apply the documented fix in /etc/ssh/sshd_config.d/limits.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SSH drops bursts of connections
+- order: 2
+  cost: 15
+  content: Raise MaxStartups appropriately.
+- order: 3
+  cost: 20
+  content: /etc/ssh/sshd_config.d/limits.conf carries the corrected configuration.

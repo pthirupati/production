@@ -1,0 +1,28 @@
+title: HTTPS Page Loading HTTP Assets
+slug: html-mixed-content
+technology: HTML
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Browsers block assets because an HTTPS page references HTTP resources.
+initial_state: A page with mixed (http) content.
+objectives:
+- 'Confirm the issue: Mixed-content warnings'
+- Apply the documented fix in /var/www/html/secure.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Mixed-content warnings
+- order: 2
+  cost: 15
+  content: Use https/protocol-relative URLs.
+- order: 3
+  cost: 20
+  content: /var/www/html/secure.html carries the corrected markup/config.

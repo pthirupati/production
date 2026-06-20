@@ -1,0 +1,68 @@
+title: Fix the Exponential Recursive Fibonacci
+slug: py-fix-recursion-memoize-perf
+category: Python Development
+description: fib(n) is implemented with naive double recursion, which is exponential and times out for
+  moderate n (e.g. n=40). Add memoization (or convert to iteration) so it computes large n quickly while
+  staying correct.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Recognize the exponential branching of naive recursion
+- Cache subresults or iterate
+- Compute fib(40)+ within the timeout
+initial_state: fib(n) is implemented with naive double recursion, which is exponential and times out for
+  moderate n (e.g. n=40). Add memoization (or convert to iteration) so it computes large n quickly while
+  staying correct.
+solution_explanation: |
+  Naive recursion recomputes overlapping subproblems, giving O(2^n). Memoizing with lru_cache (or iterating) makes it linear.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Make fib(n) efficient (0-indexed: 0,1,1,2,3,5,...). It must compute fib(40) and beyond quickly. You may memoize or rewrite iteratively.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def fib(n):
+          if n < 2:
+              return n
+          return fib(n - 1) + fib(n - 2)   # exponential, times out for large n
+    readonly: false
+  visible_tests:
+  - name: small values
+    code: |
+      assert fib(0) == 0 and fib(1) == 1 and fib(10) == 55
+  - name: fib(20)
+    code: |
+      assert fib(20) == 6765
+  hidden_tests:
+  - name: fib(40) fast
+    code: |
+      assert fib(40) == 102334155
+  - name: fib(60)
+    code: |
+      assert fib(60) == 1548008755920
+  - name: sequence prefix
+    code: |
+      assert [fib(i) for i in range(8)] == [0,1,1,2,3,5,8,13]
+  timeout: 6
+hints:
+- order: 1
+  cost: 10
+  content: fib(40) recomputes the same subproblems billions of times — it hangs.
+- order: 2
+  cost: 20
+  content: Cache results by n so each value is computed once.
+- order: 3
+  cost: 30
+  content: Add @lru_cache(maxsize=None) above fib, or build it iteratively with a loop.

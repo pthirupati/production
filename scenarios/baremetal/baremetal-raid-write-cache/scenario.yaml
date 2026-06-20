@@ -1,0 +1,28 @@
+title: RAID Write Cache Disabled (BBU Failed)
+slug: baremetal-raid-write-cache
+technology: Bare Metal
+category: RAID
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Write performance collapsed because the controller disabled write cache after a BBU failure.
+initial_state: A server whose RAID write cache is off due to BBU state.
+objectives:
+- 'Confirm the issue: Write IOPS dropped sharply'
+- Apply the documented fix in /etc/raid/cache-policy.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Write IOPS dropped sharply
+- order: 2
+  cost: 15
+  content: Restore BBU/cache policy safely.
+- order: 3
+  cost: 20
+  content: /etc/raid/cache-policy.cfg carries the corrected configuration.

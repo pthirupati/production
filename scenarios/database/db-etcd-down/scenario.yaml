@@ -1,0 +1,28 @@
+title: etcd Key-Value Store Down
+slug: db-etcd-down
+technology: Database
+category: Distributed
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The etcd service is down, breaking everything that depends on it for coordination.
+initial_state: A host where the etcd service is failed.
+objectives:
+- Confirm etcd is down (etcdctl endpoint health fails)
+- Resolve the cause and start etcd
+- Verify etcd is active
+hints:
+- order: 1
+  cost: 10
+  content: etcdctl endpoint health fails
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start etcd.'
+- order: 3
+  cost: 20
+  content: systemctl is-active etcd returns active.

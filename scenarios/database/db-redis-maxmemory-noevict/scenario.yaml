@@ -1,0 +1,30 @@
+title: Redis OOM From No Eviction Policy
+slug: db-redis-maxmemory-noevict
+technology: Database
+category: Redis
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Redis is returning OOM errors on writes because maxmemory is set with a 'noeviction' policy
+  and the dataset filled memory. Set an appropriate eviction policy and confirm the config is corrected.
+initial_state: A Redis host whose redis.conf uses maxmemory-policy noeviction, so it rejects writes once
+  full.
+objectives:
+- Confirm writes fail with OOM under noeviction
+- Set an appropriate maxmemory-policy
+- Verify the config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Redis returns 'OOM command not allowed'.
+- order: 2
+  cost: 15
+  content: Set maxmemory-policy (e.g. allkeys-lru) in redis.conf.
+- order: 3
+  cost: 20
+  content: redis.conf carries the corrected policy.

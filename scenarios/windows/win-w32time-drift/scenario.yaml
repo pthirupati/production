@@ -1,0 +1,30 @@
+title: Windows Time Service Drift Breaks Kerberos
+slug: win-w32time-drift
+technology: Windows Server
+category: Active Directory
+difficulty: hard
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Domain logons fail intermittently because the server clock drifted more than 5 minutes from
+  the DC, breaking Kerberos. Resync W32Time to the domain hierarchy and confirm time is correct.
+initial_state: A domain-joined Windows Server whose clock drifted past the Kerberos tolerance, causing
+  KRB_AP_ERR_SKEW.
+objectives:
+- Confirm clock skew vs the domain controller
+- Reconfigure/resync W32Time to the domain hierarchy
+- Verify time is within tolerance and logons work
+hints:
+- order: 1
+  cost: 10
+  content: w32tm /query /status shows large offset.
+- order: 2
+  cost: 15
+  content: w32tm /config /syncfromflags:domhier then resync.
+- order: 3
+  cost: 20
+  content: Offset within tolerance.

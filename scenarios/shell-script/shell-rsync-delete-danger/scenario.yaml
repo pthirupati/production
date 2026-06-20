@@ -1,0 +1,30 @@
+title: Backup Script rsync --delete Wipes Target
+slug: shell-rsync-delete-danger
+technology: Shell-script
+category: Backup
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A backup script uses rsync --delete with a variable source that can be empty, risking wiping
+  the destination. Make the script safe (guard empty vars) and confirm it is corrected.
+initial_state: An ops shell script whose rsync --delete can run with an empty source path, endangering
+  the backup target.
+objectives:
+- Confirm the unsafe rsync --delete pattern
+- Guard against empty/unset source paths
+- Verify the script is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SRC may be empty before rsync --delete.
+- order: 2
+  cost: 15
+  content: Add set -u and a non-empty guard before rsync.
+- order: 3
+  cost: 20
+  content: backup.sh carries the corrected guard.

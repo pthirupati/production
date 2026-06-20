@@ -1,0 +1,28 @@
+title: GPU Not Partitioned for Multi-Tenant
+slug: gpu-mig-not-enabled
+technology: GPU
+category: MIG
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A large GPU is monopolized by one job because MIG partitioning isn't enabled.
+initial_state: A GPU host that should use MIG but doesn't.
+objectives:
+- 'Confirm the issue: One job owns the whole GPU'
+- Apply the documented fix in /etc/gpu/mig-enable.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: One job owns the whole GPU
+- order: 2
+  cost: 15
+  content: Enable MIG and define instances.
+- order: 3
+  cost: 20
+  content: /etc/gpu/mig-enable.conf carries the corrected configuration.

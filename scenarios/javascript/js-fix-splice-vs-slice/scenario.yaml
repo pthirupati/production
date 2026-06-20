@@ -1,0 +1,68 @@
+title: Fix takeFirst Mutating the Input
+slug: js-fix-splice-vs-slice
+category: JavaScript Development
+description: takeFirst(arr, k) should return the first k elements WITHOUT modifying the input, but it
+  uses splice, which removes elements from the original array. Use slice instead so the input is untouched.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See the input array get shortened
+- Use slice (non-mutating) instead of splice
+- Return the first k elements as a copy
+initial_state: takeFirst(arr, k) should return the first k elements WITHOUT modifying the input, but it
+  uses splice, which removes elements from the original array. Use slice instead so the input is untouched.
+solution_explanation: |
+  splice mutates by removing elements. slice returns a shallow copy of the requested range and leaves the source array intact.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix takeFirst(arr, k): return the first k elements as a NEW array, leaving arr unchanged.
+      takeFirst([1,2,3,4], 2) -> [1,2]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function takeFirst(arr, k) {
+        return arr.splice(0, k); // splice mutates arr
+      }
+    readonly: false
+  visible_tests:
+  - name: first two
+    code: |
+      assert(JSON.stringify(takeFirst([1,2,3,4], 2)) === JSON.stringify([1,2]), JSON.stringify(takeFirst([1,2,3,4], 2)));
+  - name: k zero
+    code: |
+      assert(JSON.stringify(takeFirst([1,2], 0)) === JSON.stringify([]), JSON.stringify(takeFirst([1,2], 0)));
+  hidden_tests:
+  - name: does not mutate input
+    code: |
+      const src = [1,2,3,4];
+      takeFirst(src, 2);
+      assert(JSON.stringify(src) === JSON.stringify([1,2,3,4]), 'input mutated');
+  - name: k larger than length
+    code: |
+      assert(JSON.stringify(takeFirst([1,2], 5)) === JSON.stringify([1,2]), JSON.stringify(takeFirst([1,2], 5)));
+  - name: empty array
+    code: |
+      assert(JSON.stringify(takeFirst([], 3)) === JSON.stringify([]), JSON.stringify(takeFirst([], 3)));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: After takeFirst(src, 2), src lost its first two elements.
+- order: 2
+  cost: 20
+  content: splice removes from the array; slice returns a copy.
+- order: 3
+  cost: 30
+  content: Return arr.slice(0, k).

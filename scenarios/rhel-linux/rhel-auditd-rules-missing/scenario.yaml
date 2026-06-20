@@ -1,0 +1,28 @@
+title: RHEL Audit Rules Not Loaded
+slug: rhel-auditd-rules-missing
+technology: RHEL Linux
+category: Security
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Required audit events aren't captured because audit rules are missing.
+initial_state: A RHEL host missing required audit rules.
+objectives:
+- 'Confirm the issue: auditctl -l shows no rules'
+- Apply the documented fix in /etc/audit/rules.d/audit.rules
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: auditctl -l shows no rules
+- order: 2
+  cost: 15
+  content: Add the required audit rules.
+- order: 3
+  cost: 20
+  content: /etc/audit/rules.d/audit.rules carries the corrected configuration.

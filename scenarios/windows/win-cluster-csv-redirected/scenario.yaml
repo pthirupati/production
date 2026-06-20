@@ -1,0 +1,30 @@
+title: Windows Failover Cluster CSV Redirected Mode
+slug: win-cluster-csv-redirected
+technology: Windows Server
+category: Clustering
+difficulty: hard
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Cluster Shared Volume is stuck in redirected I/O mode, slowing all VMs on it. Find the
+  cause (backup/filter), clear redirected mode, and confirm direct I/O.
+initial_state: A Windows Failover Cluster whose CSV is in redirected access mode, funneling all I/O through
+  the coordinator node.
+objectives:
+- Confirm the CSV is in redirected mode
+- Clear the cause and return the CSV to direct I/O
+- Verify direct access is restored
+hints:
+- order: 1
+  cost: 10
+  content: Get-ClusterSharedVolumeState shows Redirected.
+- order: 2
+  cost: 15
+  content: Resolve the blocking filter/backup; set CSV back to direct.
+- order: 3
+  cost: 20
+  content: Direct I/O restored.

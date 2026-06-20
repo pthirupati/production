@@ -1,0 +1,28 @@
+title: Redis Exposed Without Password
+slug: db-redis-no-password
+technology: Database
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Redis is reachable with no requirepass, a security risk.
+initial_state: A Redis host with no auth password set.
+objectives:
+- 'Confirm the issue: redis-cli connects without AUTH'
+- Apply the documented fix in /etc/redis/redis.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: redis-cli connects without AUTH
+- order: 2
+  cost: 15
+  content: Set requirepass in redis.conf.
+- order: 3
+  cost: 20
+  content: /etc/redis/redis.conf carries the corrected configuration.

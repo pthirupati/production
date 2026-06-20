@@ -1,0 +1,29 @@
+title: RHEL firewalld Service Not Running
+slug: rhel-firewalld-down
+technology: RHEL Linux
+category: Firewall
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The firewalld service is down on a RHEL host, leaving firewall policy unmanaged. Start firewalld
+  and confirm it's active.
+initial_state: A RHEL host where the firewalld service is failed/inactive.
+objectives:
+- Confirm firewalld is down
+- Start firewalld
+- Verify firewalld is active
+hints:
+- order: 1
+  cost: 10
+  content: systemctl status firewalld shows not running.
+- order: 2
+  cost: 15
+  content: systemctl start firewalld.
+- order: 3
+  cost: 20
+  content: firewalld active.

@@ -1,0 +1,29 @@
+title: Sidecar Container Crashlooping the Pod
+slug: k8s-sidecar-crashloop
+technology: Kubernetes
+category: Workloads
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A logging sidecar crash-loops and takes the whole pod down with it. Fix the sidecar config
+  and confirm pods are Running.
+initial_state: A Kubernetes pod whose sidecar container crash-loops.
+objectives:
+- Confirm the workload is unhealthy
+- Apply the documented fix and roll out
+- Verify all pods are Running
+hints:
+- order: 1
+  cost: 10
+  content: kubectl get pods shows the workload not Running.
+- order: 2
+  cost: 15
+  content: Apply the fix and kubectl rollout restart the deployment.
+- order: 3
+  cost: 20
+  content: All pods Running.

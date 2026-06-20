@@ -1,0 +1,29 @@
+title: Jumbo MTU Mismatch Black-Holing Traffic
+slug: networking-mtu-jumbo-blackhole
+technology: Networking
+category: L2 / MTU
+difficulty: hard
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An interface was set to jumbo MTU 9000 while the path only supports 1500, black-holing large
+  packets. Align the MTU end-to-end and confirm connectivity.
+initial_state: A host/switch interface set to MTU 9000 on a 1500-MTU path, causing large flows to be dropped.
+objectives:
+- Confirm the MTU mismatch is black-holing traffic
+- Align the interface MTU with the path
+- Verify large packets pass and the network is healthy
+hints:
+- order: 1
+  cost: 10
+  content: Interface MTU is 9000 on a 1500 path; large pings fail (DF).
+- order: 2
+  cost: 15
+  content: Set the interface MTU back to 1500 (or fix the path end-to-end).
+- order: 3
+  cost: 20
+  content: Connectivity restored.

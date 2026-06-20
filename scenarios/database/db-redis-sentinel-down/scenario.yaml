@@ -1,0 +1,28 @@
+title: Redis Sentinel Quorum Lost
+slug: db-redis-sentinel-down
+technology: Database
+category: HA
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Redis Sentinel is down, so automatic failover can no longer occur.
+initial_state: A host where the redis-sentinel service is failed.
+objectives:
+- Confirm redis-sentinel is down (redis-cli -p 26379 ping fails)
+- Resolve the cause and start redis-sentinel
+- Verify redis-sentinel is active
+hints:
+- order: 1
+  cost: 10
+  content: redis-cli -p 26379 ping fails
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start redis-sentinel.'
+- order: 3
+  cost: 20
+  content: systemctl is-active redis-sentinel returns active.

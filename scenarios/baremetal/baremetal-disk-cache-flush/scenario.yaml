@@ -1,0 +1,28 @@
+title: Disk Write Cache Without Flush Risk
+slug: baremetal-disk-cache-flush
+technology: Bare Metal
+category: Storage
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Crash-consistency is at risk because disk write cache is on without proper flush handling.
+initial_state: A server with unsafe disk write-cache flush config.
+objectives:
+- 'Confirm the issue: Data loss risk on power cut'
+- Apply the documented fix in /etc/storage/cache-flush.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Data loss risk on power cut
+- order: 2
+  cost: 15
+  content: Configure safe write-cache/flush behavior.
+- order: 3
+  cost: 20
+  content: /etc/storage/cache-flush.cfg carries the corrected configuration.

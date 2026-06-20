@@ -1,0 +1,28 @@
+title: Hugepages Not Reserved for Workload
+slug: baremetal-hugepages-not-reserved
+technology: Bare Metal
+category: Memory
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A DB/VM workload can't get hugepages because none are reserved at boot.
+initial_state: A server with no hugepages reserved.
+objectives:
+- 'Confirm the issue: Workload can''t allocate hugepages'
+- Apply the documented fix in /etc/bios/hugepages.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Workload can't allocate hugepages
+- order: 2
+  cost: 15
+  content: Reserve hugepages at boot.
+- order: 3
+  cost: 20
+  content: /etc/bios/hugepages.cfg carries the corrected configuration.

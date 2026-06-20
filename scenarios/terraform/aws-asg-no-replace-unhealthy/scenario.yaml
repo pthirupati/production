@@ -1,0 +1,31 @@
+title: AWS Auto Scaling Group Not Replacing Unhealthy Instances
+slug: aws-asg-no-replace-unhealthy
+technology: Terraform
+category: EC2
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An Auto Scaling Group is not replacing instances that fail ELB health checks because the
+  ASG health check type is set to EC2 only. Switch to ELB health checks and confirm unhealthy instances
+  get replaced.
+initial_state: An AWS ASG using EC2-only health checks, so application-level failures (ELB) never trigger
+  replacement.
+objectives:
+- Confirm unhealthy instances are not being replaced
+- Set the ASG health_check_type to ELB and apply
+- Verify failing instances are terminated and replaced
+hints:
+- order: 1
+  cost: 10
+  content: ASG health check type is EC2; app-down instances stay InService.
+- order: 2
+  cost: 15
+  content: Set health_check_type = ELB (and grace period) and apply.
+- order: 3
+  cost: 20
+  content: Unhealthy instances are replaced.

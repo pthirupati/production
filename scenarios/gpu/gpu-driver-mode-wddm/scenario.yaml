@@ -1,0 +1,28 @@
+title: GPU in Display Mode Instead of Compute
+slug: gpu-driver-mode-wddm
+technology: GPU
+category: Driver
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Compute performance is poor because the GPU is in a display-oriented mode.
+initial_state: A GPU host with the wrong driver/compute mode.
+objectives:
+- 'Confirm the issue: GPU in display mode'
+- Apply the documented fix in /etc/gpu/driver-mode.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: GPU in display mode
+- order: 2
+  cost: 15
+  content: Switch to TCC/compute mode.
+- order: 3
+  cost: 20
+  content: /etc/gpu/driver-mode.conf carries the corrected configuration.

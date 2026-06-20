@@ -1,0 +1,28 @@
+title: PostgreSQL work_mem Causing Disk Sorts
+slug: db-postgres-work-mem-low
+technology: Database
+category: Tuning
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Queries spill sorts to disk because work_mem is too low.
+initial_state: A PostgreSQL host with an undersized work_mem.
+objectives:
+- 'Confirm the issue: EXPLAIN shows external merge sorts'
+- Apply the documented fix in /var/lib/pgsql/data/postgresql.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: EXPLAIN shows external merge sorts
+- order: 2
+  cost: 15
+  content: Raise work_mem to a sane value.
+- order: 3
+  cost: 20
+  content: /var/lib/pgsql/data/postgresql.conf carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: VM High CPU Ready From Host Contention
+slug: vm-cpu-ready-contention
+category: VMware vSphere
+description: web-prod-01 is slow because CPU ready time is high due to host CPU contention/oversubscription.
+  Reduce contention (migrate/right-size) and confirm CPU ready drops.
+difficulty: hard
+lab_mode: simulation
+simulation_type: vmware
+jira_priority: High
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Confirm web-prod-01 CPU ready time is high
+- Reduce host CPU contention (migrate/right-size)
+- Verify CPU ready time is within target
+initial_state: vCenter shows web-prod-01 with high CPU ready time.
+hints:
+- order: 1
+  cost: 10
+  content: 'In the vCenter simulator, locate the issue: confirm web-prod-01 cpu ready time is high.'
+- order: 2
+  cost: 15
+  content: 'Apply the remediation in the GUI: reduce host cpu contention (migrate/right-size).'
+- order: 3
+  cost: 20
+  content: 'Confirm resolution: verify cpu ready time is within target.'

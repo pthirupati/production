@@ -1,0 +1,29 @@
+title: SSH Hardening Broke Automation Login
+slug: linux-sshd-permitroot-hardening
+technology: Linux
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An automation account can no longer log in over SSH because a hardening change set an overly
+  broad restriction. Fix the sshd drop-in correctly and confirm it is corrected.
+initial_state: A Linux host whose sshd hardening drop-in blocks a required automation login.
+objectives:
+- Confirm the automation SSH login is blocked
+- Adjust the sshd drop-in correctly
+- Verify the config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: sshd denies the automation user.
+- order: 2
+  cost: 15
+  content: Scope the restriction (Match) correctly.
+- order: 3
+  cost: 20
+  content: sshd drop-in carries the corrected directive.

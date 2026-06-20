@@ -1,0 +1,29 @@
+title: NTP Refusing Large Step Correction
+slug: networking-ntp-makestep-needed
+technology: Networking
+category: Time / NTP
+difficulty: medium
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The clock is off by minutes and chrony won't slew it fast enough, so it stays unsynchronized.
+  Apply a step correction and confirm sync.
+initial_state: A host whose large time offset prevents chrony from synchronizing.
+objectives:
+- 'Confirm the issue: chronyc tracking shows not synchronised.'
+- Apply the documented fix
+- Verify the network is healthy
+hints:
+- order: 1
+  cost: 10
+  content: chronyc tracking shows not synchronised.
+- order: 2
+  cost: 15
+  content: Fix the NTP source/reachability and resync.
+- order: 3
+  cost: 20
+  content: The session/sync/MTU is healthy.

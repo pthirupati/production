@@ -1,0 +1,29 @@
+title: MySQL Bound to Localhost Only
+slug: db-mysql-bind-address
+technology: Database
+category: MySQL
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Remote applications can't reach MySQL because bind-address is 127.0.0.1, so it only listens
+  locally. Bind it appropriately and confirm the config is corrected.
+initial_state: A MySQL host whose my.cnf bind-address restricts it to localhost, blocking remote app connections.
+objectives:
+- Confirm MySQL only listens on localhost
+- Set an appropriate bind-address
+- Verify the config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: ss -ltnp shows 3306 only on 127.0.0.1.
+- order: 2
+  cost: 15
+  content: Set bind-address to the right interface in my.cnf.
+- order: 3
+  cost: 20
+  content: my.cnf carries the corrected bind-address.

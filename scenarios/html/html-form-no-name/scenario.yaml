@@ -1,0 +1,28 @@
+title: Form Fields Not Submitted
+slug: html-form-no-name
+technology: HTML
+category: Forms
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Submitted data is empty because inputs lack name attributes.
+initial_state: A page whose inputs have no name attributes.
+objectives:
+- 'Confirm the issue: Server receives no fields'
+- Apply the documented fix in /var/www/html/login.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Server receives no fields
+- order: 2
+  cost: 15
+  content: Add name attributes to inputs.
+- order: 3
+  cost: 20
+  content: /var/www/html/login.html carries the corrected markup/config.

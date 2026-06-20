@@ -1,0 +1,29 @@
+title: Container Denied GPU by cgroup Rule
+slug: gpu-cgroup-device-denied
+technology: Gpu
+category: Containers
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Containers can't see the GPU because the NVIDIA container runtime/cgroup device rules are
+  misconfigured. Fix the runtime config and confirm it is corrected.
+initial_state: A GPU host whose container runtime config blocks GPU device access for containers.
+objectives:
+- Confirm containers can't access the GPU
+- Fix the container runtime/cgroup config
+- Verify the runtime config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: 'CUDA error: no device in containers.'
+- order: 2
+  cost: 15
+  content: Correct config.toml device/cgroup settings.
+- order: 3
+  cost: 20
+  content: config.toml carries the corrected settings.

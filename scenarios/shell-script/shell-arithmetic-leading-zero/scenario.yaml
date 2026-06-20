@@ -1,0 +1,28 @@
+title: Script Octal Bug on Zero-Padded Numbers
+slug: shell-arithmetic-leading-zero
+technology: Shell Scripting
+category: Arithmetic
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Arithmetic on zero-padded numbers fails because they're treated as octal.
+initial_state: An ops script with an octal interpretation bug.
+objectives:
+- 'Confirm the issue: 08/09 cause ''invalid number'''
+- Apply the documented fix in /opt/scripts/dates.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: 08/09 cause 'invalid number'
+- order: 2
+  cost: 15
+  content: Force base-10 with 10# in arithmetic.
+- order: 3
+  cost: 20
+  content: /opt/scripts/dates.sh carries the corrected configuration.

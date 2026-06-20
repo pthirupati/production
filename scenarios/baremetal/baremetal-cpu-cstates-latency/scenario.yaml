@@ -1,0 +1,28 @@
+title: Deep C-States Causing Latency Jitter
+slug: baremetal-cpu-cstates-latency
+technology: Bare Metal
+category: Performance
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A latency-sensitive workload has jitter because deep CPU C-states are enabled.
+initial_state: A server whose CPU C-state config hurts latency.
+objectives:
+- 'Confirm the issue: Latency jitter under load'
+- Apply the documented fix in /etc/bios/cstates.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Latency jitter under load
+- order: 2
+  cost: 15
+  content: Restrict deep C-states for low latency.
+- order: 3
+  cost: 20
+  content: /etc/bios/cstates.cfg carries the corrected configuration.

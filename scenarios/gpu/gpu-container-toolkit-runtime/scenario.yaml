@@ -1,0 +1,28 @@
+title: NVIDIA Container Runtime Not Default
+slug: gpu-container-toolkit-runtime
+technology: GPU
+category: Containers
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: GPU containers need an explicit flag because the NVIDIA runtime isn't the default.
+initial_state: A host where the NVIDIA container runtime isn't registered as default.
+objectives:
+- 'Confirm the issue: --gpus required every time'
+- Apply the documented fix in /etc/docker/daemon.json
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: --gpus required every time
+- order: 2
+  cost: 15
+  content: Register and default the nvidia runtime.
+- order: 3
+  cost: 20
+  content: /etc/docker/daemon.json carries the corrected configuration.

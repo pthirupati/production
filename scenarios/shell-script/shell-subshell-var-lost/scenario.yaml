@@ -1,0 +1,28 @@
+title: Script Loses Variable Set in Pipe
+slug: shell-subshell-var-lost
+technology: Shell Scripting
+category: Scope
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A counter set inside a pipe is lost because the loop runs in a subshell.
+initial_state: An ops script losing variables set in a piped while-loop.
+objectives:
+- 'Confirm the issue: Counter resets to 0 after the loop'
+- Apply the documented fix in /opt/scripts/count.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Counter resets to 0 after the loop
+- order: 2
+  cost: 15
+  content: Avoid the subshell (process substitution).
+- order: 3
+  cost: 20
+  content: /opt/scripts/count.sh carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Script Fails Reassigning readonly Var
+slug: shell-readonly-reassign
+technology: Shell Scripting
+category: Logic
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A script aborts trying to reassign a readonly variable.
+initial_state: An ops script reassigning a readonly variable.
+objectives:
+- 'Confirm the issue: ''readonly variable'' error'
+- Apply the documented fix in /opt/scripts/const.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''readonly variable'' error'
+- order: 2
+  cost: 15
+  content: Avoid reassigning constants.
+- order: 3
+  cost: 20
+  content: /opt/scripts/const.sh carries the corrected configuration.

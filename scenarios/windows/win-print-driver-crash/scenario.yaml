@@ -1,0 +1,30 @@
+title: Windows Print Server Driver Crash Loop
+slug: win-print-driver-crash
+technology: Windows Server
+category: Printing
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The Print Spooler keeps crashing because a bad v3 print driver faults the spooler process.
+  Isolate/remove the driver and restore stable printing.
+initial_state: A Windows print server whose spooler crashes repeatedly due to a faulty kernel-mode print
+  driver.
+objectives:
+- Confirm the spooler crashes from a specific driver
+- Isolate or remove the bad driver (driver isolation)
+- Verify the spooler stays up and printing works
+hints:
+- order: 1
+  cost: 10
+  content: Spooler faults reference the driver DLL.
+- order: 2
+  cost: 15
+  content: Set the driver to Isolated or remove/replace it.
+- order: 3
+  cost: 20
+  content: Spooler stable.

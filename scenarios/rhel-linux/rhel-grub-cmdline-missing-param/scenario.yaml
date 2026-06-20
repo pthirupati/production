@@ -1,0 +1,28 @@
+title: RHEL Missing Kernel Boot Parameter
+slug: rhel-grub-cmdline-missing-param
+technology: RHEL Linux
+category: Boot
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A required kernel parameter is missing from the boot cmdline, affecting behavior.
+initial_state: A RHEL host missing a needed kernel boot parameter.
+objectives:
+- 'Confirm the issue: Feature inactive at boot'
+- Apply the documented fix in /etc/default/grub
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Feature inactive at boot
+- order: 2
+  cost: 15
+  content: Add the param to GRUB_CMDLINE_LINUX and regenerate.
+- order: 3
+  cost: 20
+  content: /etc/default/grub carries the corrected configuration.

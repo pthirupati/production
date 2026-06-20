@@ -1,0 +1,29 @@
+title: AWS CloudFront Serving Stale Assets After Deploy
+slug: aws-cloudfront-stale-cache
+technology: Terraform
+category: CloudFront
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: After deploys, users keep getting stale assets because no CloudFront invalidation is created
+  and cache TTLs are too long. Add an invalidation/fix the cache policy and confirm fresh content is served.
+initial_state: An AWS CloudFront distribution serving stale objects; no invalidation runs on deploy.
+objectives:
+- Confirm stale objects are served after a deploy
+- Create an invalidation and/or correct the cache policy TTLs
+- Verify fresh content is served
+hints:
+- order: 1
+  cost: 10
+  content: Origin object differs from CloudFront response.
+- order: 2
+  cost: 15
+  content: create-invalidation --paths '/*' and tune cache policy.
+- order: 3
+  cost: 20
+  content: Edge returns the new object.

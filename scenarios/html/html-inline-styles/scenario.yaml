@@ -1,0 +1,28 @@
+title: Excessive Inline Styles Block Caching
+slug: html-inline-styles
+technology: HTML
+category: Maintainability
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Styles can't be cached or reused because everything is inline.
+initial_state: A page riddled with inline styles.
+objectives:
+- 'Confirm the issue: Inline styles everywhere'
+- Apply the documented fix in /var/www/html/styled.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Inline styles everywhere
+- order: 2
+  cost: 15
+  content: Move styles to an external sheet.
+- order: 3
+  cost: 20
+  content: /var/www/html/styled.html carries the corrected markup/config.

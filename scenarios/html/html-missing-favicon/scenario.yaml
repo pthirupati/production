@@ -1,0 +1,28 @@
+title: Browser 404s on Favicon
+slug: html-missing-favicon
+technology: HTML
+category: Polish
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: The page logs a favicon 404 because no favicon link is declared.
+initial_state: A page with no favicon link.
+objectives:
+- 'Confirm the issue: 404 on /favicon.ico'
+- Apply the documented fix in /var/www/html/index.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: 404 on /favicon.ico
+- order: 2
+  cost: 15
+  content: Add a favicon link tag.
+- order: 3
+  cost: 20
+  content: /var/www/html/index.html carries the corrected markup/config.

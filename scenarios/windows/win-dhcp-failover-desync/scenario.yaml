@@ -1,0 +1,29 @@
+title: Windows DHCP Failover Out of Sync
+slug: win-dhcp-failover-desync
+technology: Windows Server
+category: Networking
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A DHCP failover relationship is out of sync and one server is handing out conflicting leases.
+  Re-sync the failover relationship and confirm consistent leasing.
+initial_state: A Windows DHCP failover pair that drifted out of sync, risking duplicate leases.
+objectives:
+- Confirm the DHCP failover relationship is out of sync
+- Force a replication/resync of the relationship
+- Verify both servers agree on the scope state
+hints:
+- order: 1
+  cost: 10
+  content: Get-DhcpServerv4Failover shows state mismatch.
+- order: 2
+  cost: 15
+  content: Invoke-DhcpServerv4FailoverReplication to resync.
+- order: 3
+  cost: 20
+  content: Relationship Normal.

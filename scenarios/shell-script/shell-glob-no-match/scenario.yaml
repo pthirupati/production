@@ -1,0 +1,28 @@
+title: Script Breaks on Empty Glob
+slug: shell-glob-no-match
+technology: Shell Scripting
+category: Robustness
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A loop over *.log breaks when there are no matches because nullglob isn't set.
+initial_state: An ops script mishandling an empty glob.
+objectives:
+- 'Confirm the issue: Loop processes the literal ''*.log'''
+- Apply the documented fix in /opt/scripts/archive.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Loop processes the literal '*.log'
+- order: 2
+  cost: 15
+  content: Set shopt -s nullglob.
+- order: 3
+  cost: 20
+  content: /opt/scripts/archive.sh carries the corrected configuration.

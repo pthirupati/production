@@ -1,0 +1,28 @@
+title: RHEL Logs Not Forwarded to SIEM
+slug: rhel-rsyslog-remote-forward
+technology: RHEL Linux
+category: Logging
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Logs aren't reaching the SIEM because the rsyslog forwarding rule is wrong.
+initial_state: A RHEL host not forwarding logs remotely.
+objectives:
+- 'Confirm the issue: SIEM receives no logs'
+- Apply the documented fix in /etc/rsyslog.d/remote.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SIEM receives no logs
+- order: 2
+  cost: 15
+  content: Fix the rsyslog remote forwarding config.
+- order: 3
+  cost: 20
+  content: /etc/rsyslog.d/remote.conf carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Firmware Rollback Protection Misconfigured
+slug: baremetal-firmware-rollback-protection
+technology: Bare Metal
+category: Firmware
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A required firmware downgrade is blocked (or an unsafe one allowed) by rollback policy.
+initial_state: A server with wrong firmware rollback protection.
+objectives:
+- 'Confirm the issue: Firmware change blocked/allowed wrongly'
+- Apply the documented fix in /etc/firmware/rollback-policy.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Firmware change blocked/allowed wrongly
+- order: 2
+  cost: 15
+  content: Set the correct rollback protection policy.
+- order: 3
+  cost: 20
+  content: /etc/firmware/rollback-policy.cfg carries the corrected configuration.

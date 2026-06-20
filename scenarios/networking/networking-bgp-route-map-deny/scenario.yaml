@@ -1,0 +1,29 @@
+title: BGP Prefixes Filtered by Route-Map
+slug: networking-bgp-route-map-deny
+technology: Networking
+category: Routing / BGP
+difficulty: hard
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Expected prefixes aren't learned because an inbound route-map denies them. Fix the route-map
+  and confirm a healthy session with prefixes.
+initial_state: A router dropping BGP prefixes due to a route-map deny.
+objectives:
+- 'Confirm the issue: show ip bgp summary shows the neighbor not Established.'
+- Apply the documented fix
+- Verify the network is healthy
+hints:
+- order: 1
+  cost: 10
+  content: show ip bgp summary shows the neighbor not Established.
+- order: 2
+  cost: 15
+  content: Correct the BGP config and clear the session.
+- order: 3
+  cost: 20
+  content: The session/sync/MTU is healthy.

@@ -1,0 +1,28 @@
+title: PostgreSQL Not Logging Slow Queries
+slug: db-postgres-log-min-duration
+technology: Database
+category: Observability
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Slow queries aren't logged because log_min_duration_statement is disabled.
+initial_state: A PostgreSQL host not logging slow statements.
+objectives:
+- 'Confirm the issue: No slow statements in logs'
+- Apply the documented fix in /var/lib/pgsql/data/postgresql.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No slow statements in logs
+- order: 2
+  cost: 15
+  content: Set log_min_duration_statement to a threshold.
+- order: 3
+  cost: 20
+  content: /var/lib/pgsql/data/postgresql.conf carries the corrected configuration.

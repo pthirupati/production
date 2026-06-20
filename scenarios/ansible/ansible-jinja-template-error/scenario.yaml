@@ -1,0 +1,30 @@
+title: Ansible Jinja2 Template Undefined
+slug: ansible-jinja-template-error
+technology: Ansible
+category: Templating
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A template task fails with an 'undefined variable' error because a Jinja2 reference is wrong.
+  Fix the template and confirm it is corrected.
+initial_state: An Ansible role whose Jinja2 template references an undefined variable, failing the template
+  task.
+objectives:
+- Confirm the template task errors on an undefined var
+- Fix the variable reference / add a default
+- Verify the template is corrected
+hints:
+- order: 1
+  cost: 10
+  content: AnsibleUndefinedVariable on the template task.
+- order: 2
+  cost: 15
+  content: Reference the right var or add a default filter.
+- order: 3
+  cost: 20
+  content: Template carries the corrected reference.

@@ -1,0 +1,28 @@
+title: Legacy XHTML Doctype Causing Issues
+slug: html-doctype-xhtml
+technology: HTML
+category: Standards
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: A legacy XHTML doctype causes parsing quirks on modern browsers.
+initial_state: A page with an outdated XHTML doctype.
+objectives:
+- 'Confirm the issue: XHTML doctype quirks'
+- Apply the documented fix in /var/www/html/legacy-xhtml.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: XHTML doctype quirks
+- order: 2
+  cost: 15
+  content: Switch to the HTML5 doctype.
+- order: 3
+  cost: 20
+  content: /var/www/html/legacy-xhtml.html carries the corrected markup/config.

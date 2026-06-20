@@ -1,0 +1,30 @@
+title: Windows SMB Multichannel Disabled Slow Transfers
+slug: win-smb-multichannel-off
+technology: Windows Server
+category: File Services
+difficulty: easy
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: File copies to a multi-NIC file server are slow because SMB Multichannel is disabled. Enable
+  it and confirm throughput improves.
+initial_state: A Windows file server with multiple NICs where SMB Multichannel is turned off, capping
+  transfer speed.
+objectives:
+- Confirm SMB Multichannel is disabled
+- Enable SMB Multichannel on server and client
+- Verify multi-NIC throughput
+hints:
+- order: 1
+  cost: 10
+  content: Get-SmbServerConfiguration shows EnableMultiChannel False.
+- order: 2
+  cost: 15
+  content: Set-SmbServerConfiguration -EnableMultiChannel $true.
+- order: 3
+  cost: 20
+  content: Throughput uses multiple NICs.

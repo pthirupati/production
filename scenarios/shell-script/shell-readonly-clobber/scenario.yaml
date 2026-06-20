@@ -1,0 +1,29 @@
+title: Script Clobbers Readonly Output File
+slug: shell-readonly-clobber
+technology: Shell-script
+category: Safety
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A reporting script overwrites an important file with > instead of appending or guarding it.
+  Make output handling safe and confirm the script is corrected.
+initial_state: An ops shell script that clobbers an existing output file with a careless redirect.
+objectives:
+- Confirm the script clobbers the output
+- Use safe redirection / noclobber / append
+- Verify the script is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '> overwrites the prior report.'
+- order: 2
+  cost: 15
+  content: Use >> or set -o noclobber with a guard.
+- order: 3
+  cost: 20
+  content: Script carries the corrected redirect.

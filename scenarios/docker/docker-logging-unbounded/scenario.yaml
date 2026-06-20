@@ -1,0 +1,29 @@
+title: Container Logs Filling Disk
+slug: docker-logging-unbounded
+technology: Docker
+category: Logging
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The host disk is filling because Docker uses unbounded json-file logging with no rotation.
+  Configure log limits and confirm the config is corrected.
+initial_state: A host where Docker logging has no size/rotation limits, filling the disk over time.
+objectives:
+- Confirm logs grow unbounded
+- Set log-driver options with rotation
+- Verify the config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: du shows huge *-json.log files.
+- order: 2
+  cost: 15
+  content: Set max-size/max-file in daemon.json log-opts.
+- order: 3
+  cost: 20
+  content: daemon.json carries the corrected log limits.

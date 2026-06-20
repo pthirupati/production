@@ -1,0 +1,29 @@
+title: RHEL Boots Into Wrong systemd Target
+slug: rhel-grub-default-target
+technology: RHEL Linux
+category: Boot
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A server reboots into graphical.target instead of multi-user, wasting resources and exposing
+  a GUI. Set the correct default target and confirm it is corrected.
+initial_state: A RHEL host whose default systemd target is wrong for a headless server.
+objectives:
+- Confirm the wrong default target
+- Set the correct default target
+- Verify the target config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: systemctl get-default shows graphical.
+- order: 2
+  cost: 15
+  content: systemctl set-default multi-user.target.
+- order: 3
+  cost: 20
+  content: default target config corrected.

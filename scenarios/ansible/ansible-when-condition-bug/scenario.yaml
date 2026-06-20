@@ -1,0 +1,29 @@
+title: Ansible when Condition Always False
+slug: ansible-when-condition-bug
+technology: Ansible
+category: Conditionals
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A critical task is always skipped because its when condition compares the wrong fact. Fix
+  the conditional and confirm the play is corrected.
+initial_state: An Ansible play whose when condition never evaluates true, skipping a required task.
+objectives:
+- Confirm the task is always skipped
+- Fix the when condition
+- Verify the play is corrected
+hints:
+- order: 1
+  cost: 10
+  content: The task shows 'skipping' every run.
+- order: 2
+  cost: 15
+  content: Compare the correct fact/var in when.
+- order: 3
+  cost: 20
+  content: conditional.yml carries the corrected condition.

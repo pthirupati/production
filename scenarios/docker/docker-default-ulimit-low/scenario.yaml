@@ -1,0 +1,28 @@
+title: Containers Hit Low File Descriptor Limit
+slug: docker-default-ulimit-low
+technology: Docker
+category: Limits
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: High-connection containers hit 'too many open files' because default ulimits are low.
+initial_state: A host with low default container ulimits.
+objectives:
+- 'Confirm the issue: Containers hit nofile limit'
+- Apply the documented fix in /etc/docker/daemon.json
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Containers hit nofile limit
+- order: 2
+  cost: 15
+  content: Raise default-ulimits in daemon.json.
+- order: 3
+  cost: 20
+  content: /etc/docker/daemon.json carries the corrected configuration.

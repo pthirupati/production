@@ -1,0 +1,29 @@
+title: RHEL chronyd Time Sync Service Down
+slug: rhel-chronyd-down
+technology: RHEL Linux
+category: Time
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: On a RHEL host the chronyd time service is down, so the clock will drift and Kerberos/TLS
+  may fail. Restart chronyd and confirm it's active.
+initial_state: A RHEL host where the chronyd service is failed, stopping time synchronization.
+objectives:
+- Confirm chronyd is down
+- Resolve and start chronyd
+- Verify chronyd is active
+hints:
+- order: 1
+  cost: 10
+  content: systemctl status chronyd shows failed.
+- order: 2
+  cost: 15
+  content: Fix and systemctl start chronyd.
+- order: 3
+  cost: 20
+  content: chronyd active.

@@ -1,0 +1,28 @@
+title: Ansible Copy Used Where Template Needed
+slug: ansible-copy-vs-template
+technology: Ansible
+category: Modules
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A config with variables ships literally because copy is used instead of template.
+initial_state: An Ansible task using copy on a file that needs templating.
+objectives:
+- 'Confirm the issue: Variables appear literally'
+- Apply the documented fix in /home/ansible/copy.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Variables appear literally
+- order: 2
+  cost: 15
+  content: Switch to the template module.
+- order: 3
+  cost: 20
+  content: /home/ansible/copy.yml carries the corrected configuration.

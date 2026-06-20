@@ -1,0 +1,28 @@
+title: No Print Stylesheet — Broken Printing
+slug: html-print-stylesheet
+technology: HTML
+category: UX
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Printed pages look broken because there's no print stylesheet.
+initial_state: A page lacking a print stylesheet.
+objectives:
+- 'Confirm the issue: Printout looks broken'
+- Apply the documented fix in /var/www/html/invoice.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Printout looks broken
+- order: 2
+  cost: 15
+  content: Add a print media stylesheet.
+- order: 3
+  cost: 20
+  content: /var/www/html/invoice.html carries the corrected markup/config.

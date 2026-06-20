@@ -1,0 +1,28 @@
+title: Thermal Shutdown Threshold Too Low
+slug: baremetal-thermal-shutdown-threshold
+technology: Bare Metal
+category: Thermal
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A server shuts down under normal load because the thermal shutdown threshold is misconfigured.
+initial_state: A server with a too-low thermal shutdown threshold.
+objectives:
+- 'Confirm the issue: Unexpected thermal shutdowns'
+- Apply the documented fix in /etc/bmc/thermal-shutdown.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Unexpected thermal shutdowns
+- order: 2
+  cost: 15
+  content: Set a correct thermal shutdown threshold.
+- order: 3
+  cost: 20
+  content: /etc/bmc/thermal-shutdown.cfg carries the corrected configuration.

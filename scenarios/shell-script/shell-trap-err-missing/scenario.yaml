@@ -1,0 +1,28 @@
+title: Script Has No Error Trap for Debugging
+slug: shell-trap-err-missing
+technology: Shell Scripting
+category: Observability
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Failures are hard to debug because there's no ERR trap reporting the failing line.
+initial_state: An ops script lacking an ERR trap.
+objectives:
+- 'Confirm the issue: No context on failures'
+- Apply the documented fix in /opt/scripts/pipeline.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No context on failures
+- order: 2
+  cost: 15
+  content: Add trap with LINENO reporting.
+- order: 3
+  cost: 20
+  content: /opt/scripts/pipeline.sh carries the corrected configuration.

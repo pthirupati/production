@@ -1,0 +1,28 @@
+title: Ansible Long Task Times Out
+slug: ansible-async-poll-wrong
+technology: Ansible
+category: Async
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A long task times out because async/poll values are wrong.
+initial_state: An Ansible task with bad async/poll settings.
+objectives:
+- 'Confirm the issue: Long task killed early'
+- Apply the documented fix in /home/ansible/async.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Long task killed early
+- order: 2
+  cost: 15
+  content: Set appropriate async and poll values.
+- order: 3
+  cost: 20
+  content: /home/ansible/async.yml carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Script Masks Exit Code via local
+slug: shell-exit-code-masked
+technology: Shell Scripting
+category: Reliability
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A function's failure is hidden because local masks the command exit code.
+initial_state: An ops script where local masks a command's status.
+objectives:
+- 'Confirm the issue: Failure is swallowed by local'
+- Apply the documented fix in /opt/scripts/check-status.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Failure is swallowed by local
+- order: 2
+  cost: 15
+  content: Separate declaration from assignment.
+- order: 3
+  cost: 20
+  content: /opt/scripts/check-status.sh carries the corrected configuration.

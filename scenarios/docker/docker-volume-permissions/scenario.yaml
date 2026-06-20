@@ -1,0 +1,28 @@
+title: Container Can't Write to Volume
+slug: docker-volume-permissions
+technology: Docker
+category: Storage
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A non-root container can't write to its volume because of ownership/permissions.
+initial_state: A compose service whose volume permissions block writes.
+objectives:
+- 'Confirm the issue: ''Permission denied'' on the volume'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''Permission denied'' on the volume'
+- order: 2
+  cost: 15
+  content: Fix volume ownership / run-as user.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

@@ -1,0 +1,29 @@
+title: Broken Relative Asset Paths
+slug: html-broken-relative-links
+technology: Html
+category: Assets
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Images and stylesheets 404 because relative asset paths are wrong after a directory move.
+  Fix the paths and confirm the file is corrected.
+initial_state: A static page whose relative asset paths are broken, so CSS/images fail to load.
+objectives:
+- Confirm assets 404 from bad paths
+- Fix the relative paths
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Network tab shows 404 on assets.
+- order: 2
+  cost: 15
+  content: Correct the relative href/src paths.
+- order: 3
+  cost: 20
+  content: index.html carries the corrected paths.

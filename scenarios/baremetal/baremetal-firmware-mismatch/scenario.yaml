@@ -1,0 +1,29 @@
+title: NIC Firmware Mismatch Causing Drops
+slug: baremetal-firmware-mismatch
+technology: Baremetal
+category: Firmware
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A NIC is dropping packets under load because its firmware is mismatched with the driver.
+  Pin/upgrade to the matched firmware and confirm the config is corrected.
+initial_state: A bare-metal server whose NIC firmware/driver versions are mismatched, causing packet drops.
+objectives:
+- Confirm drops tied to firmware mismatch
+- Align NIC firmware with the driver
+- Verify the firmware config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: ethtool stats show rising drops.
+- order: 2
+  cost: 15
+  content: Flash the matched firmware version.
+- order: 3
+  cost: 20
+  content: nic_version.cfg carries the corrected version.

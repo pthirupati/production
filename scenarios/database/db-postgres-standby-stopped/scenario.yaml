@@ -1,0 +1,28 @@
+title: PostgreSQL Standby Not Streaming
+slug: db-postgres-standby-stopped
+technology: Database
+category: Replication
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A PostgreSQL streaming standby stopped replaying WAL and is diverging from the primary.
+initial_state: A PostgreSQL standby whose replication has halted.
+objectives:
+- Confirm postgresql is down (pg_stat_replication shows the standby disconnected)
+- Resolve the cause and start postgresql
+- Verify postgresql is active
+hints:
+- order: 1
+  cost: 10
+  content: pg_stat_replication shows the standby disconnected
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start postgresql.'
+- order: 3
+  cost: 20
+  content: systemctl is-active postgresql returns active.

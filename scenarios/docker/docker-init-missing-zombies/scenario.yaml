@@ -1,0 +1,28 @@
+title: Container Accumulating Zombie Processes
+slug: docker-init-missing-zombies
+technology: Docker
+category: Runtime
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Zombie processes accumulate because no init process reaps children.
+initial_state: A compose service without an init reaper.
+objectives:
+- 'Confirm the issue: Zombie processes pile up'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Zombie processes pile up
+- order: 2
+  cost: 15
+  content: 'Enable init: true (tini).'
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

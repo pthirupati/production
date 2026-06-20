@@ -1,0 +1,28 @@
+title: Compose Service in Restart Loop
+slug: docker-compose-restart-loop
+technology: Docker
+category: Reliability
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A service restart-loops because its command/config is wrong but restart is always.
+initial_state: A compose service stuck restarting on a bad command.
+objectives:
+- 'Confirm the issue: Container restarts endlessly'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Container restarts endlessly
+- order: 2
+  cost: 15
+  content: Fix the command and restart policy.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

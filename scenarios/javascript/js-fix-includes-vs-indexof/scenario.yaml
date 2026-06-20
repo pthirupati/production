@@ -1,0 +1,71 @@
+title: Fix the Truthiness Bug with indexOf
+slug: js-fix-includes-vs-indexof
+category: JavaScript Development
+description: hasValue(arr, x) should return whether x is in the array, but it returns `arr.indexOf(x)`
+  (a number) and treats it as a boolean — and index 0 is falsy, so a match at position 0 wrongly reports
+  false. Fix it to return a real boolean.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See a match at index 0 report false
+- Compare indexOf against -1, or use includes
+- Return a strict boolean
+initial_state: hasValue(arr, x) should return whether x is in the array, but it returns `arr.indexOf(x)`
+  (a number) and treats it as a boolean — and index 0 is falsy, so a match at position 0 wrongly reports
+  false. Fix it to return a real boolean.
+solution_explanation: |
+  Coercing the index to boolean misreads a valid index of 0 as false. Comparing against -1 (or using includes) returns correct membership.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix hasValue(arr, x) to return true/false for membership.
+      hasValue([5, 6], 5) -> true (even though it's at index 0)
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function hasValue(arr, x) {
+        return Boolean(arr.indexOf(x)); // index 0 is falsy -> wrong
+      }
+    readonly: false
+  visible_tests:
+  - name: present at index 0
+    code: |
+      assert(hasValue([5, 6], 5) === true, 'index 0 match');
+  - name: absent
+    code: |
+      assert(hasValue([1, 2], 9) === false);
+  hidden_tests:
+  - name: present later
+    code: |
+      assert(hasValue([1, 2, 3], 3) === true);
+  - name: empty array
+    code: |
+      assert(hasValue([], 1) === false);
+  - name: returns boolean
+    code: |
+      assert(hasValue([1], 1) === true && hasValue([1], 2) === false);
+  - name: strings
+    code: |
+      assert(hasValue(['a', 'b'], 'a') === true);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: hasValue([5,6], 5) returns false because indexOf is 0, which is falsy.
+- order: 2
+  cost: 20
+  content: indexOf returns -1 when absent, and a real index (possibly 0) when present.
+- order: 3
+  cost: 30
+  content: Return arr.indexOf(x) !== -1 (or arr.includes(x)).

@@ -1,0 +1,30 @@
+title: AWS CloudTrail Not Logging to S3
+slug: aws-cloudtrail-not-logging
+technology: Terraform
+category: Compliance
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: CloudTrail is enabled but not delivering logs because the S3 bucket policy denies the CloudTrail
+  service principal. Fix the bucket policy and confirm log delivery resumes.
+initial_state: An AWS CloudTrail trail whose target S3 bucket policy blocks cloudtrail.amazonaws.com,
+  so no logs are written.
+objectives:
+- Confirm CloudTrail log delivery is failing
+- Fix the S3 bucket policy for the CloudTrail principal and apply
+- Verify logs are delivered to the bucket
+hints:
+- order: 1
+  cost: 10
+  content: aws cloudtrail get-trail-status shows delivery errors.
+- order: 2
+  cost: 15
+  content: Add the standard CloudTrail bucket policy statements and apply.
+- order: 3
+  cost: 20
+  content: Logs are delivered.

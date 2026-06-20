@@ -1,0 +1,28 @@
+title: RHEL SSSD Down — AD Logins Fail
+slug: rhel-sssd-down
+technology: RHEL Linux
+category: Identity
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Domain users can't log in because SSSD is down on a RHEL host.
+initial_state: A RHEL host where the sssd service is failed.
+objectives:
+- Confirm sssd is down (getent passwd domainuser fails)
+- Resolve the cause and start sssd
+- Verify sssd is active
+hints:
+- order: 1
+  cost: 10
+  content: getent passwd domainuser fails
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start sssd.'
+- order: 3
+  cost: 20
+  content: systemctl is-active sssd returns active.

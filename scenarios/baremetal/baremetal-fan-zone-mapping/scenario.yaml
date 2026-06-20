@@ -1,0 +1,28 @@
+title: Fan Zones Mapped to Wrong Sensors
+slug: baremetal-fan-zone-mapping
+technology: Bare Metal
+category: Thermal
+difficulty: hard
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Hotspots aren't cooled because fan zones are mapped to the wrong temperature sensors.
+initial_state: A server with incorrect fan-zone-to-sensor mapping.
+objectives:
+- 'Confirm the issue: Hotspots not cooled'
+- Apply the documented fix in /etc/bmc/fan-zones.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Hotspots not cooled
+- order: 2
+  cost: 15
+  content: Fix fan zone sensor mapping.
+- order: 3
+  cost: 20
+  content: /etc/bmc/fan-zones.cfg carries the corrected configuration.

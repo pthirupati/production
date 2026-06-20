@@ -1,0 +1,71 @@
+title: Implement chunk
+slug: js-impl-chunk
+category: JavaScript Development
+description: 'Implement chunk(arr, size): split arr into consecutive sub-arrays of length size (last may
+  be shorter). Do not mutate the input. The stub is empty so tests fail.'
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Walk the array in steps of size
+- Slice each window into a sub-array
+- Handle a short final chunk and empty input
+initial_state: 'Implement chunk(arr, size): split arr into consecutive sub-arrays of length size (last
+  may be shorter). Do not mutate the input. The stub is empty so tests fail.'
+solution_explanation: |
+  Iterating in steps of size and slicing [i, i+size) builds non-overlapping chunks; slice handles the short final chunk and never mutates the input.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement chunk(arr, size) -> array of sub-arrays.
+      chunk([1,2,3,4,5], 2) -> [[1,2],[3,4],[5]]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function chunk(arr, size) {
+        // TODO: return arr split into chunks of length size
+      }
+    readonly: false
+  visible_tests:
+  - name: uneven
+    code: |
+      assert(JSON.stringify(chunk([1,2,3,4,5], 2)) === JSON.stringify([[1,2],[3,4],[5]]), JSON.stringify(chunk([1,2,3,4,5], 2)));
+  - name: even
+    code: |
+      assert(JSON.stringify(chunk([1,2,3,4], 2)) === JSON.stringify([[1,2],[3,4]]), JSON.stringify(chunk([1,2,3,4], 2)));
+  hidden_tests:
+  - name: size three
+    code: |
+      assert(JSON.stringify(chunk([1,2,3,4,5,6,7], 3)) === JSON.stringify([[1,2,3],[4,5,6],[7]]), JSON.stringify(chunk([1,2,3,4,5,6,7], 3)));
+  - name: size larger than array
+    code: |
+      assert(JSON.stringify(chunk([1,2], 5)) === JSON.stringify([[1,2]]), JSON.stringify(chunk([1,2], 5)));
+  - name: empty
+    code: |
+      assert(JSON.stringify(chunk([], 3)) === JSON.stringify([]), JSON.stringify(chunk([], 3)));
+  - name: does not mutate
+    code: |
+      const src = [1,2,3,4];
+      chunk(src, 2);
+      assert(JSON.stringify(src) === JSON.stringify([1,2,3,4]));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Step an index i from 0 by `size` each iteration.
+- order: 2
+  cost: 20
+  content: slice(i, i + size) copies one chunk without mutating the source.
+- order: 3
+  cost: 30
+  content: Push each slice into the output array.

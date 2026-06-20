@@ -1,0 +1,71 @@
+title: Implement is_prime
+slug: py-impl-is-prime
+category: Python Development
+description: 'Implement is_prime(n): True if n is a prime number, False otherwise. Handle n < 2 (not prime)
+  and be efficient enough to test moderately large primes (trial division up to sqrt(n) is fine).'
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Treat n < 2 as not prime
+- Test divisibility up to sqrt(n)
+- Return correct booleans including edge cases
+initial_state: 'Implement is_prime(n): True if n is a prime number, False otherwise. Handle n < 2 (not
+  prime) and be efficient enough to test moderately large primes (trial division up to sqrt(n) is fine).'
+solution_explanation: |
+  After handling n<2 and even numbers, testing odd divisors up to sqrt(n) is sufficient and fast.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement is_prime(n) -> bool. 0 and 1 are not prime. 2 is prime.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def is_prime(n):
+          # TODO: return True iff n is prime
+          pass
+    readonly: false
+  visible_tests:
+  - name: small primes
+    code: |
+      assert is_prime(2) and is_prime(3) and is_prime(5)
+  - name: small composites
+    code: |
+      assert not is_prime(4) and not is_prime(9)
+  hidden_tests:
+  - name: zero and one
+    code: |
+      assert not is_prime(0) and not is_prime(1)
+  - name: larger prime
+    code: |
+      assert is_prime(97)
+  - name: larger composite
+    code: |
+      assert not is_prime(100)
+  - name: big prime fast
+    code: |
+      assert is_prime(104729)
+  - name: returns bool
+    code: |
+      assert is_prime(7) is True and is_prime(8) is False
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Numbers below 2 are not prime; return False early.
+- order: 2
+  cost: 20
+  content: You only need to test divisors up to the square root of n.
+- order: 3
+  cost: 30
+  content: Loop i from 3 while i*i <= n stepping by 2 (after handling even numbers).

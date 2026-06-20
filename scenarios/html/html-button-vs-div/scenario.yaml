@@ -1,0 +1,28 @@
+title: Clickable Div Not Keyboard-Accessible
+slug: html-button-vs-div
+technology: HTML
+category: Accessibility
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: A clickable div can't be used by keyboard because it's not a real button.
+initial_state: A page using a div instead of a button for actions.
+objectives:
+- 'Confirm the issue: Action element not focusable'
+- Apply the documented fix in /var/www/html/menu.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Action element not focusable
+- order: 2
+  cost: 15
+  content: Use a real <button> element.
+- order: 3
+  cost: 20
+  content: /var/www/html/menu.html carries the corrected markup/config.

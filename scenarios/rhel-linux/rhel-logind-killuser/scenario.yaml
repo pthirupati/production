@@ -1,0 +1,28 @@
+title: RHEL tmux Sessions Killed on Logout
+slug: rhel-logind-killuser
+technology: RHEL Linux
+category: Sessions
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Detached sessions die on logout because KillUserProcesses is enabled.
+initial_state: A RHEL host killing user processes on logout.
+objectives:
+- 'Confirm the issue: tmux/screen dies after logout'
+- Apply the documented fix in /etc/systemd/logind.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: tmux/screen dies after logout
+- order: 2
+  cost: 15
+  content: Set KillUserProcesses=no (or use linger).
+- order: 3
+  cost: 20
+  content: /etc/systemd/logind.conf carries the corrected configuration.

@@ -1,0 +1,29 @@
+title: Script Mishandles CLI Flags
+slug: shell-getopts-parsing
+technology: Shell-script
+category: CLI
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An ops CLI script mishandles options because it parses arguments manually and breaks on combined/edge
+  flags. Use getopts properly and confirm the script is corrected.
+initial_state: An ops shell script with brittle manual argument parsing that mishandles standard flags.
+objectives:
+- Confirm flags are mishandled
+- Reimplement parsing with getopts
+- Verify the script is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Combined/edge flags break parsing.
+- order: 2
+  cost: 15
+  content: Use a getopts while-loop.
+- order: 3
+  cost: 20
+  content: Script carries the corrected getopts.

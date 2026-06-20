@@ -1,0 +1,28 @@
+title: MySQL Slow Connects From DNS Lookups
+slug: db-mysql-skip-name-resolve
+technology: Database
+category: Performance
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: New connections are slow because MySQL does reverse DNS on every connect.
+initial_state: A MySQL host without skip-name-resolve.
+objectives:
+- 'Confirm the issue: Connects stall on DNS'
+- Apply the documented fix in /etc/my.cnf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Connects stall on DNS
+- order: 2
+  cost: 15
+  content: Set skip-name-resolve and use IP grants.
+- order: 3
+  cost: 20
+  content: /etc/my.cnf carries the corrected configuration.

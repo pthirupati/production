@@ -1,0 +1,28 @@
+title: Ansible Package Task Wrong Name
+slug: ansible-package-name-wrong
+technology: Ansible
+category: Modules
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A package install fails because the package name differs on this distro.
+initial_state: An Ansible package task using the wrong distro package name.
+objectives:
+- 'Confirm the issue: ''No package available'''
+- Apply the documented fix in /home/ansible/pkg.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''No package available'''
+- order: 2
+  cost: 15
+  content: Use the correct package name / when by distro.
+- order: 3
+  cost: 20
+  content: /home/ansible/pkg.yml carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Ansible lineinfile Regex Duplicates Lines
+slug: ansible-lineinfile-regex
+technology: Ansible
+category: Modules
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A config gets duplicate lines because the lineinfile regexp doesn't match the existing line.
+initial_state: An Ansible lineinfile task with a non-matching regexp.
+objectives:
+- 'Confirm the issue: Duplicate config lines appear'
+- Apply the documented fix in /home/ansible/lineinfile.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Duplicate config lines appear
+- order: 2
+  cost: 15
+  content: Fix the regexp to match the existing line.
+- order: 3
+  cost: 20
+  content: /home/ansible/lineinfile.yml carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: MIG Partitioned With Wrong Profile
+slug: gpu-mig-profile-wrong
+technology: GPU
+category: MIG
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Workloads get the wrong slice size because the MIG profile layout is incorrect.
+initial_state: A GPU host with an inappropriate MIG profile.
+objectives:
+- 'Confirm the issue: Jobs get wrong GPU slice'
+- Apply the documented fix in /etc/nvidia/mig-layout.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Jobs get wrong GPU slice
+- order: 2
+  cost: 15
+  content: Reconfigure the MIG profile layout.
+- order: 3
+  cost: 20
+  content: /etc/nvidia/mig-layout.conf carries the corrected configuration.

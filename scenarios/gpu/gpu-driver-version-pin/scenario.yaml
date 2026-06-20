@@ -1,0 +1,29 @@
+title: GPU Driver Auto-Updated and Broke CUDA
+slug: gpu-driver-version-pin
+technology: GPU
+category: Driver
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An unattended upgrade bumped the NVIDIA driver to a version incompatible with the deployed
+  CUDA, breaking jobs.
+initial_state: A GPU host where the driver was auto-updated past the supported CUDA range.
+objectives:
+- 'Confirm the issue: CUDA jobs fail after driver bump'
+- Apply the documented fix in /etc/nvidia/driver-pin.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: CUDA jobs fail after driver bump
+- order: 2
+  cost: 15
+  content: Pin the driver to the supported version.
+- order: 3
+  cost: 20
+  content: /etc/nvidia/driver-pin.conf carries the corrected configuration.

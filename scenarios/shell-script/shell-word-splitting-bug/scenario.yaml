@@ -1,0 +1,29 @@
+title: Unquoted Variable Word-Splitting Bug
+slug: shell-word-splitting-bug
+technology: Shell-script
+category: Quoting
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A file-processing script mishandles paths with spaces because variables are unquoted, causing
+  word splitting. Quote correctly and confirm the script is corrected.
+initial_state: An ops shell script that breaks on filenames with spaces due to unquoted variable expansion.
+objectives:
+- Confirm word-splitting on spaced paths
+- Quote the variables / use arrays
+- Verify the script is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Paths with spaces split into args.
+- order: 2
+  cost: 15
+  content: Quote "$var" and iterate safely.
+- order: 3
+  cost: 20
+  content: Script carries the corrected quoting.

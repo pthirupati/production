@@ -1,0 +1,30 @@
+title: DaemonSet Not Scheduling on Tainted Nodes
+slug: k8s-daemonset-taint-toleration
+technology: Kubernetes
+category: Scheduling
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A DaemonSet is missing pods on tainted nodes because it lacks the matching toleration. Add
+  the toleration and confirm full coverage (cluster healthy).
+initial_state: A Kubernetes DaemonSet that skips tainted nodes due to missing tolerations, leaving gaps
+  in coverage.
+objectives:
+- Confirm the DaemonSet skips tainted nodes
+- Add the matching toleration and apply
+- Verify full coverage and cluster health
+hints:
+- order: 1
+  cost: 10
+  content: DaemonSet desired<scheduled on tainted nodes.
+- order: 2
+  cost: 15
+  content: Add the toleration matching the node taint and apply.
+- order: 3
+  cost: 20
+  content: Full coverage.

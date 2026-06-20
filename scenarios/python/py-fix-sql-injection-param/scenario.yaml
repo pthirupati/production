@@ -1,0 +1,76 @@
+title: Fix the SQL Injection in build_user_query
+slug: py-fix-sql-injection-param
+category: Python Development
+description: build_user_query(username) builds a SQL string by f-string interpolation, which is a SQL-injection
+  vulnerability. Refactor it to return a (query, params) tuple that uses a parameter placeholder (?) so
+  the username is bound, never concatenated.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Recognize the injection via string interpolation
+- Return a parameterized query with a ? placeholder
+- Pass the username as a bound parameter, not inline text
+initial_state: build_user_query(username) builds a SQL string by f-string interpolation, which is a SQL-injection
+  vulnerability. Refactor it to return a (query, params) tuple that uses a parameter placeholder (?) so
+  the username is bound, never concatenated.
+solution_explanation: |
+  String interpolation lets crafted input change the query. A parameterized query with a ? placeholder binds the value at execution time, so it is treated strictly as data.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Refactor build_user_query(username) to return a tuple (sql, params) where sql uses a single ? placeholder and params is a tuple/list containing username. The raw username must NOT appear in the SQL string.
+    Expected sql: "SELECT * FROM users WHERE username = ?"
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def build_user_query(username):
+          sql = "SELECT * FROM users WHERE username = '" + username + "'"
+          return sql
+    readonly: false
+  visible_tests:
+  - name: returns sql and params tuple
+    code: |
+      sql, params = build_user_query('alice')
+      assert sql == 'SELECT * FROM users WHERE username = ?', sql
+      assert list(params) == ['alice'], params
+  - name: uses a placeholder
+    code: |
+      sql, params = build_user_query('bob')
+      assert '?' in sql
+  hidden_tests:
+  - name: malicious input is not interpolated
+    code: |
+      evil = "x' OR '1'='1"
+      sql, params = build_user_query(evil)
+      assert evil not in sql, 'username must not be concatenated into SQL'
+      assert list(params) == [evil]
+  - name: no inline quotes around a value
+    code: |
+      sql, params = build_user_query('alice')
+      assert "'alice'" not in sql
+  - name: params carries the value
+    code: |
+      sql, params = build_user_query('zoe')
+      assert tuple(params) == ('zoe',)
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Concatenating username into the SQL string lets an attacker inject `' OR '1'='1`.
+- order: 2
+  cost: 20
+  content: Use a ? placeholder in the SQL and return the value separately as params.
+- order: 3
+  cost: 30
+  content: return "SELECT * FROM users WHERE username = ?", (username,)

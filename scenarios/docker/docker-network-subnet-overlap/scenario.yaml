@@ -1,0 +1,28 @@
+title: Two Compose Stacks Overlap Subnets
+slug: docker-network-subnet-overlap
+technology: Docker
+category: Networking
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Cross-stack routing breaks because two compose networks use the same subnet.
+initial_state: Two compose stacks with overlapping network subnets.
+objectives:
+- 'Confirm the issue: Routing between stacks broken'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Routing between stacks broken
+- order: 2
+  cost: 15
+  content: Assign distinct subnets per network.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

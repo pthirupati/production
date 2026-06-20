@@ -1,0 +1,29 @@
+title: containerd Runtime Down — Docker Broken
+slug: docker-containerd-down
+technology: Docker
+category: Runtime
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Docker commands fail because the containerd runtime service is down underneath dockerd. Restore
+  containerd so the container runtime works.
+initial_state: A host where the containerd service is failed, so Docker can't manage containers.
+objectives:
+- Confirm containerd is down
+- Resolve and start containerd
+- Verify containerd is active
+hints:
+- order: 1
+  cost: 10
+  content: docker ps errors; containerd down.
+- order: 2
+  cost: 15
+  content: Fix and systemctl start containerd.
+- order: 3
+  cost: 20
+  content: containerd active.

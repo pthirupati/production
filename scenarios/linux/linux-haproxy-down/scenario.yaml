@@ -1,0 +1,29 @@
+title: HAProxy Load Balancer Down
+slug: linux-haproxy-down
+technology: Linux
+category: Load Balancing
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The HAProxy load balancer is down, so all backend traffic is dropped. Restore the service
+  and confirm it's active.
+initial_state: A Linux host where the haproxy service is failed, taking the load balancer offline.
+objectives:
+- Confirm haproxy is down
+- Fix the config and start haproxy
+- Verify haproxy is active
+hints:
+- order: 1
+  cost: 10
+  content: systemctl status haproxy shows failed.
+- order: 2
+  cost: 15
+  content: haproxy -c -f then systemctl start haproxy.
+- order: 3
+  cost: 20
+  content: haproxy active.

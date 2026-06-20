@@ -1,0 +1,30 @@
+title: Windows WSUS Database Bloated
+slug: win-wsus-db-bloated
+technology: Windows Server
+category: Patching
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: WSUS is slow and clients time out because the SUSDB is full of superseded/declined updates.
+  Run cleanup and reindex, then confirm sync/clients work.
+initial_state: A Windows WSUS server whose database is bloated with obsolete updates, slowing the console
+  and client check-ins.
+objectives:
+- Confirm WSUS is slow due to DB bloat
+- Decline superseded updates and run server cleanup + reindex
+- Verify the console and client check-ins are healthy
+hints:
+- order: 1
+  cost: 10
+  content: WSUS console is sluggish; many superseded updates.
+- order: 2
+  cost: 15
+  content: Run the cleanup wizard, decline superseded, reindex SUSDB.
+- order: 3
+  cost: 20
+  content: WSUS responsive.

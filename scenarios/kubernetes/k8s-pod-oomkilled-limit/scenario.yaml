@@ -1,0 +1,30 @@
+title: Pod OOMKilled from Low Memory Limit
+slug: k8s-pod-oomkilled-limit
+technology: Kubernetes
+category: Workloads
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A pod is OOMKilled in a loop because its memory limit is far below the app's working set.
+  Raise the limit appropriately and confirm pods stay Running.
+initial_state: A Kubernetes workload OOMKilled repeatedly due to a memory limit set well below its real
+  usage.
+objectives:
+- Confirm pods are OOMKilled from the memory limit
+- Raise the memory limit/request appropriately and roll out
+- Verify pods are Running
+hints:
+- order: 1
+  cost: 10
+  content: kubectl describe pod shows OOMKilled.
+- order: 2
+  cost: 15
+  content: Increase resources.limits.memory and roll out.
+- order: 3
+  cost: 20
+  content: Pods Running.

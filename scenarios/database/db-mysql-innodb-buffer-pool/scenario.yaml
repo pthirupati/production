@@ -1,0 +1,28 @@
+title: MySQL InnoDB Buffer Pool Too Small
+slug: db-mysql-innodb-buffer-pool
+technology: Database
+category: Tuning
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: MySQL has a poor cache hit ratio because the InnoDB buffer pool is too small.
+initial_state: A MySQL host with an undersized innodb_buffer_pool_size.
+objectives:
+- 'Confirm the issue: Low buffer pool hit rate'
+- Apply the documented fix in /etc/my.cnf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Low buffer pool hit rate
+- order: 2
+  cost: 15
+  content: Increase innodb_buffer_pool_size and restart.
+- order: 3
+  cost: 20
+  content: /etc/my.cnf carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Dockerfile Always Rebuilds Everything
+slug: docker-dockerfile-cache-bust
+technology: Docker
+category: Build
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Builds are slow because COPY ordering busts the layer cache every time.
+initial_state: A Dockerfile with poor layer ordering.
+objectives:
+- 'Confirm the issue: Every build reinstalls deps'
+- Apply the documented fix in /opt/app/Dockerfile
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Every build reinstalls deps
+- order: 2
+  cost: 15
+  content: Order COPY/RUN to maximize cache reuse.
+- order: 3
+  cost: 20
+  content: /opt/app/Dockerfile carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Container Runs as Root Unnecessarily
+slug: docker-dockerfile-root-user
+technology: Docker
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A container runs as root, violating security policy.
+initial_state: A Dockerfile that never drops to a non-root user.
+objectives:
+- 'Confirm the issue: Process runs as UID 0'
+- Apply the documented fix in /opt/app/Dockerfile
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Process runs as UID 0
+- order: 2
+  cost: 15
+  content: Add a USER directive for a non-root user.
+- order: 3
+  cost: 20
+  content: /opt/app/Dockerfile carries the corrected configuration.

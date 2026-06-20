@@ -1,0 +1,28 @@
+title: GPU DMA-BUF Access Denied to Service
+slug: gpu-dmabuf-permissions
+technology: GPU
+category: Driver
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: A rendering service is denied GPU buffer sharing because DMA-BUF device permissions are wrong.
+initial_state: A GPU host with wrong DMA-BUF/device permissions.
+objectives:
+- 'Confirm the issue: DMA-BUF access denied'
+- Apply the documented fix in /etc/gpu/dmabuf-access.conf
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: DMA-BUF access denied
+- order: 2
+  cost: 15
+  content: Fix the device group/permissions.
+- order: 3
+  cost: 20
+  content: /etc/gpu/dmabuf-access.conf carries the corrected markup/config.

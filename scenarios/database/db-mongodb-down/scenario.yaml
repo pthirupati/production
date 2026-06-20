@@ -1,0 +1,29 @@
+title: MongoDB Down After Config Edit
+slug: db-mongodb-down
+technology: Database
+category: MongoDB
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: MongoDB (mongod) won't start after a configuration edit, breaking the document store. Bring
+  it back online.
+initial_state: A Linux host where the mongod service is failed after a bad config change.
+objectives:
+- Confirm mongod is failed
+- Fix the config and start the service
+- Verify mongod is active
+hints:
+- order: 1
+  cost: 10
+  content: systemctl status mongod shows failed.
+- order: 2
+  cost: 15
+  content: Correct mongod.conf and start it.
+- order: 3
+  cost: 20
+  content: mongod active.

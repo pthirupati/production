@@ -1,0 +1,28 @@
+title: PostgreSQL Planner Misestimating Cache
+slug: db-postgres-effective-cache-size
+technology: Database
+category: Tuning
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: The query planner picks bad plans because effective_cache_size doesn't reflect real RAM.
+initial_state: A PostgreSQL host with a wrong effective_cache_size.
+objectives:
+- 'Confirm the issue: Planner avoids index scans'
+- Apply the documented fix in /var/lib/pgsql/data/postgresql.conf
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Planner avoids index scans
+- order: 2
+  cost: 15
+  content: Set effective_cache_size to roughly 50-75% of RAM.
+- order: 3
+  cost: 20
+  content: /var/lib/pgsql/data/postgresql.conf carries the corrected markup/config.

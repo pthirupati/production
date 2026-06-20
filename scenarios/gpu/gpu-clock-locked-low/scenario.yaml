@@ -1,0 +1,28 @@
+title: GPU Clocks Locked at Low Frequency
+slug: gpu-clock-locked-low
+technology: GPU
+category: Performance
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Throughput is low because application clocks are locked too low.
+initial_state: A GPU host with clocks locked below capability.
+objectives:
+- 'Confirm the issue: Clocks pinned low'
+- Apply the documented fix in /etc/gpu/clock-policy.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Clocks pinned low
+- order: 2
+  cost: 15
+  content: Set appropriate application clocks.
+- order: 3
+  cost: 20
+  content: /etc/gpu/clock-policy.conf carries the corrected configuration.

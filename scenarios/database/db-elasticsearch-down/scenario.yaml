@@ -1,0 +1,28 @@
+title: Elasticsearch Node Down
+slug: db-elasticsearch-down
+technology: Database
+category: Search
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An Elasticsearch node is down, turning the cluster yellow/red.
+initial_state: A host where the elasticsearch service is failed.
+objectives:
+- Confirm elasticsearch is down (curl localhost:9200 fails)
+- Resolve the cause and start elasticsearch
+- Verify elasticsearch is active
+hints:
+- order: 1
+  cost: 10
+  content: curl localhost:9200 fails
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start elasticsearch.'
+- order: 3
+  cost: 20
+  content: systemctl is-active elasticsearch returns active.

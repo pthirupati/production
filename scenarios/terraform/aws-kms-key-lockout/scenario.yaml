@@ -1,0 +1,30 @@
+title: AWS KMS Key Policy Locked Out Admins
+slug: aws-kms-key-lockout
+technology: Terraform
+category: KMS
+difficulty: hard
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A KMS key policy was edited and accidentally removed the account root principal, risking
+  lockout. Restore a safe key policy granting root and the admin role, and confirm access.
+initial_state: An AWS KMS customer-managed key whose policy no longer grants the account root, so it cannot
+  be administered normally.
+objectives:
+- Confirm the key policy is missing the root/admin principal
+- Restore a safe key policy and apply
+- Verify the key can be administered again
+hints:
+- order: 1
+  cost: 10
+  content: aws kms get-key-policy shows no root principal.
+- order: 2
+  cost: 15
+  content: Restore the default key policy granting root + admins and apply.
+- order: 3
+  cost: 20
+  content: Key administration works again.

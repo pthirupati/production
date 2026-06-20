@@ -1,0 +1,30 @@
+title: AWS Lambda Hitting Concurrency Limit
+slug: aws-lambda-concurrency-throttle
+technology: Terraform
+category: Lambda
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Lambda function is being throttled because reserved concurrency is set too low for the
+  traffic. Raise reserved/ provisioned concurrency appropriately and confirm throttles stop.
+initial_state: An AWS Lambda function whose reserved concurrency is far below demand, causing Throttles
+  and 429s.
+objectives:
+- Confirm the function is throttling on concurrency
+- Adjust reserved/provisioned concurrency and apply
+- Verify throttle metrics drop to zero
+hints:
+- order: 1
+  cost: 10
+  content: CloudWatch Throttles > 0 for the function.
+- order: 2
+  cost: 15
+  content: Raise reserved_concurrent_executions and apply.
+- order: 3
+  cost: 20
+  content: Throttles return to 0.

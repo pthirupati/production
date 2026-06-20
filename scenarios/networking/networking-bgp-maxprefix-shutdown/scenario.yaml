@@ -1,0 +1,29 @@
+title: BGP Max-Prefix Limit Tripped Shutdown
+slug: networking-bgp-maxprefix-shutdown
+technology: Networking
+category: Routing / BGP
+difficulty: hard
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A peer announced more prefixes than the configured maximum-prefix limit, shutting the session
+  down. Raise the limit appropriately and re-establish the session.
+initial_state: A router whose BGP neighbor was shut down after exceeding the maximum-prefix limit.
+objectives:
+- Confirm the neighbor is down from max-prefix
+- Raise the maximum-prefix limit appropriately and clear
+- Verify the session is Established with full prefixes
+hints:
+- order: 1
+  cost: 10
+  content: show ip bgp summary shows the neighbor down/Idle.
+- order: 2
+  cost: 15
+  content: Raise maximum-prefix and clear the neighbor.
+- order: 3
+  cost: 20
+  content: Established with prefixes.

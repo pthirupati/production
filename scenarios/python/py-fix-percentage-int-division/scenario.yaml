@@ -1,0 +1,72 @@
+title: Fix Integer Division in percentage
+slug: py-fix-percentage-int-division
+category: Python Development
+description: percentage(part, whole) should return what percent `part` is of `whole` as a float, but it
+  uses floor division (//) so it truncates to whole numbers (e.g. 1/3 -> 0.0). Fix it to return a true
+  float percentage and guard whole == 0 (return 0.0).
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See the truncated 0.0 result
+- Use true division
+- Guard division by zero
+initial_state: percentage(part, whole) should return what percent `part` is of `whole` as a float, but
+  it uses floor division (//) so it truncates to whole numbers (e.g. 1/3 -> 0.0). Fix it to return a true
+  float percentage and guard whole == 0 (return 0.0).
+solution_explanation: |
+  Floor division throws away the fractional part before multiplying, so small ratios collapse to 0. True division keeps the fraction.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix percentage(part, whole): return part/whole * 100 as a float. If whole is 0, return 0.0.
+      percentage(1, 4) -> 25.0
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def percentage(part, whole):
+          if whole == 0:
+              return 0.0
+          return part // whole * 100
+    readonly: false
+  visible_tests:
+  - name: quarter
+    code: |
+      assert percentage(1, 4) == 25.0, percentage(1, 4)
+  - name: zero whole
+    code: |
+      assert percentage(5, 0) == 0.0
+  hidden_tests:
+  - name: one third
+    code: |
+      assert abs(percentage(1, 3) - 33.3333333) < 1e-3, percentage(1, 3)
+  - name: full
+    code: |
+      assert percentage(3, 3) == 100.0
+  - name: returns float
+    code: |
+      assert isinstance(percentage(1, 2), float)
+  - name: half
+    code: |
+      assert percentage(1, 2) == 50.0
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: percentage(1, 4) returns 0.0 because 1 // 4 == 0.
+- order: 2
+  cost: 20
+  content: // is floor division; use / for a real fraction.
+- order: 3
+  cost: 30
+  content: Return part / whole * 100.

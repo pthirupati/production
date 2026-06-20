@@ -1,0 +1,28 @@
+title: GPU Telemetry Export Insecure
+slug: gpu-telemetry-export-tls
+technology: GPU
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: GPU telemetry is exported without TLS, exposing it on the network.
+initial_state: A GPU host exporting telemetry in plaintext.
+objectives:
+- 'Confirm the issue: Telemetry sent unencrypted'
+- Apply the documented fix in /etc/gpu/telemetry-tls.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Telemetry sent unencrypted
+- order: 2
+  cost: 15
+  content: Enable TLS on the telemetry exporter.
+- order: 3
+  cost: 20
+  content: /etc/gpu/telemetry-tls.conf carries the corrected configuration.

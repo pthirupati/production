@@ -1,0 +1,28 @@
+title: External Links Vulnerable to Tabnabbing
+slug: html-target-blank-noopener
+technology: HTML
+category: Security
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: External target=_blank links lack rel=noopener, a security/perf issue.
+initial_state: A page with unsafe target=_blank links.
+objectives:
+- 'Confirm the issue: No rel=noopener on _blank'
+- Apply the documented fix in /var/www/html/links.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: No rel=noopener on _blank
+- order: 2
+  cost: 15
+  content: Add rel=noopener noreferrer.
+- order: 3
+  cost: 20
+  content: /var/www/html/links.html carries the corrected markup/config.

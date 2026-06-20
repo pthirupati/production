@@ -1,0 +1,28 @@
+title: Ansible Running Tasks as Wrong User
+slug: ansible-become-user-wrong
+technology: Ansible
+category: Privilege
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Files get the wrong ownership because become_user is incorrect.
+initial_state: An Ansible play escalating to the wrong user.
+objectives:
+- 'Confirm the issue: Files owned by the wrong user'
+- Apply the documented fix in /home/ansible/become.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Files owned by the wrong user
+- order: 2
+  cost: 15
+  content: Fix become_user on the tasks.
+- order: 3
+  cost: 20
+  content: /home/ansible/become.yml carries the corrected configuration.

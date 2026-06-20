@@ -1,0 +1,28 @@
+title: Docker Daemon Not Running
+slug: docker-daemon-down
+technology: Docker
+category: Daemon
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The Docker daemon is down so no containers can run.
+initial_state: A host where the docker service is failed.
+objectives:
+- Confirm docker is down (docker ps errors with daemon socket)
+- Resolve the cause and start docker
+- Verify docker is active
+hints:
+- order: 1
+  cost: 10
+  content: docker ps errors with daemon socket
+- order: 2
+  cost: 15
+  content: 'Fix the cause and run: systemctl start docker.'
+- order: 3
+  cost: 20
+  content: systemctl is-active docker returns active.

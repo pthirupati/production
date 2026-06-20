@@ -1,0 +1,28 @@
+title: RHEL Unattended Updates Misconfigured
+slug: rhel-dnf-automatic-misconfig
+technology: RHEL Linux
+category: Patching
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Security updates aren't applied (or reboot unexpectedly) because dnf-automatic is misconfigured.
+initial_state: A RHEL host with a broken dnf-automatic config.
+objectives:
+- 'Confirm the issue: Updates not applied as intended'
+- Apply the documented fix in /etc/dnf/automatic.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Updates not applied as intended
+- order: 2
+  cost: 15
+  content: Fix the dnf-automatic policy.
+- order: 3
+  cost: 20
+  content: /etc/dnf/automatic.conf carries the corrected configuration.

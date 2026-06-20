@@ -1,0 +1,28 @@
+title: Memcached Cache Service Down
+slug: linux-memcached-down
+technology: Linux
+category: Caching
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The memcached service is down, increasing DB load as cache misses spike. Restore memcached.
+initial_state: A Linux host where the memcached service is failed.
+objectives:
+- Confirm memcached is down
+- Start memcached
+- Verify memcached is active
+hints:
+- order: 1
+  cost: 10
+  content: systemctl status memcached shows failed.
+- order: 2
+  cost: 15
+  content: systemctl start memcached.
+- order: 3
+  cost: 20
+  content: memcached active.

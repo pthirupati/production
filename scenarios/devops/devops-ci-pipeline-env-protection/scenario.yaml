@@ -1,0 +1,29 @@
+title: CI Deploy Blocked by Environment Protection
+slug: devops-ci-pipeline-env-protection
+technology: DevOps
+category: CI/CD
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Deploys fail because a protected-environment rule isn't satisfied by the pipeline. Fix the
+  pipeline config and confirm it passes.
+initial_state: A CI/CD or Helm environment with the documented ci-pipeline fault.
+objectives:
+- Confirm the pipeline is failing
+- Fix the pipeline configuration
+- Verify the pipeline passes
+hints:
+- order: 1
+  cost: 10
+  content: The pipeline deploy stage is failing.
+- order: 2
+  cost: 15
+  content: Fix the pipeline configuration and redeploy.
+- order: 3
+  cost: 20
+  content: The pipeline/release is healthy.

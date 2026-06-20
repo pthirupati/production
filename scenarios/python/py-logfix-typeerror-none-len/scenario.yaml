@@ -1,0 +1,71 @@
+title: 'Log Analysis: Fix the TypeError on len(None)'
+slug: py-logfix-typeerror-none-len
+category: Python Development
+description: 'The log shows `TypeError: object of type ''NoneType'' has no len()` from count_items() because
+  the argument can be None. Treat None as an empty collection (count 0) without crashing.'
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Identify the None-length crash from the log
+- Guard the None case
+- Return 0 for None, the length otherwise
+initial_state: 'The log shows `TypeError: object of type ''NoneType'' has no len()` from count_items()
+  because the argument can be None. Treat None as an empty collection (count 0) without crashing.'
+solution_explanation: |
+  len() requires a sized object. Guarding None and returning 0 prevents the TypeError while preserving normal length behavior.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: logfix
+  instructions: |
+    Fix count_items(items) so it returns len(items), but returns 0 when items is None. The log shows it crashes on None.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      # Production log:
+      #   TypeError: object of type 'NoneType' has no len()
+      #     at count_items(items) -> return len(items)
+
+      def count_items(items):
+          return len(items)   # crashes when items is None
+    readonly: false
+  visible_tests:
+  - name: list length
+    code: |
+      assert count_items([1, 2, 3]) == 3
+  - name: none is zero
+    code: |
+      assert count_items(None) == 0
+  hidden_tests:
+  - name: empty list
+    code: |
+      assert count_items([]) == 0
+  - name: string length
+    code: |
+      assert count_items('abc') == 3
+  - name: dict length
+    code: |
+      assert count_items({'a': 1}) == 1
+  - name: none does not raise
+    code: |
+      assert count_items(None) == 0
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: The log says len(None) is the problem.
+- order: 2
+  cost: 20
+  content: Check `if items is None` before calling len.
+- order: 3
+  cost: 30
+  content: Return 0 for None, otherwise len(items).

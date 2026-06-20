@@ -1,0 +1,28 @@
+title: RHEL Slow Initial Time Sync
+slug: rhel-ntp-iburst-missing
+technology: RHEL Linux
+category: Time
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Initial time sync after boot is slow because iburst isn't set on the servers.
+initial_state: A RHEL host whose chrony sources lack iburst.
+objectives:
+- 'Confirm the issue: Slow first sync after boot'
+- Apply the documented fix in /etc/chrony.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Slow first sync after boot
+- order: 2
+  cost: 15
+  content: Add iburst to the server lines.
+- order: 3
+  cost: 20
+  content: /etc/chrony.conf carries the corrected configuration.

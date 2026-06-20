@@ -1,0 +1,28 @@
+title: BMC Clock Drift Misleads Logs
+slug: baremetal-ntp-bmc-drift
+technology: Bare Metal
+category: BMC
+difficulty: easy
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Hardware event timestamps are wrong because the BMC clock isn't synced.
+initial_state: A server whose BMC clock drifts (no NTP).
+objectives:
+- 'Confirm the issue: SEL timestamps wrong'
+- Apply the documented fix in /etc/bmc/ntp.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SEL timestamps wrong
+- order: 2
+  cost: 15
+  content: Configure BMC NTP.
+- order: 3
+  cost: 20
+  content: /etc/bmc/ntp.cfg carries the corrected configuration.

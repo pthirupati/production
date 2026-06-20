@@ -1,0 +1,28 @@
+title: GPU Passthrough Broken Without IOMMU
+slug: gpu-driver-iommu-passthrough
+technology: GPU
+category: Virtualization
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: GPU passthrough to a VM fails because IOMMU isn't enabled/configured.
+initial_state: A GPU host with IOMMU not configured for passthrough.
+objectives:
+- 'Confirm the issue: VFIO passthrough fails'
+- Apply the documented fix in /etc/gpu/iommu.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: VFIO passthrough fails
+- order: 2
+  cost: 15
+  content: Enable IOMMU and bind to vfio-pci.
+- order: 3
+  cost: 20
+  content: /etc/gpu/iommu.conf carries the corrected configuration.

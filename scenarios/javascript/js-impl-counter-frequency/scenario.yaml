@@ -1,0 +1,69 @@
+title: Implement wordFrequency
+slug: js-impl-counter-frequency
+category: JavaScript Development
+description: 'Implement wordFrequency(text): return an object mapping each lowercased word to its count.
+  Words are separated by whitespace; trim surrounding punctuation (.,!?). The stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Split on whitespace and lowercase
+- Strip surrounding punctuation from words
+- Count occurrences into an object
+initial_state: 'Implement wordFrequency(text): return an object mapping each lowercased word to its count.
+  Words are separated by whitespace; trim surrounding punctuation (.,!?). The stub is empty so tests fail.'
+solution_explanation: |
+  Splitting on whitespace, stripping edge punctuation, lowercasing, and accumulating into an object yields a normalized frequency map.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement wordFrequency(text) -> { word: count }. Lowercase words; strip leading/trailing .,!? ; split on whitespace; ignore empty tokens.
+      wordFrequency('Cat cat, dog.') -> {cat:2, dog:1}
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function wordFrequency(text) {
+        // TODO: return a map of normalized word -> count
+      }
+    readonly: false
+  visible_tests:
+  - name: counts and normalizes
+    code: |
+      assert(JSON.stringify(wordFrequency('Cat cat, dog.')) === JSON.stringify({cat:2, dog:1}), JSON.stringify(wordFrequency('Cat cat, dog.')));
+  - name: single
+    code: |
+      assert(JSON.stringify(wordFrequency('hello')) === JSON.stringify({hello:1}), JSON.stringify(wordFrequency('hello')));
+  hidden_tests:
+  - name: punctuation stripped
+    code: |
+      assert(JSON.stringify(wordFrequency('hi! hi? hi.')) === JSON.stringify({hi:3}), JSON.stringify(wordFrequency('hi! hi? hi.')));
+  - name: case folded
+    code: |
+      assert(JSON.stringify(wordFrequency('The THE the')) === JSON.stringify({the:3}), JSON.stringify(wordFrequency('The THE the')));
+  - name: extra spaces
+    code: |
+      assert(JSON.stringify(wordFrequency('a   a  b')) === JSON.stringify({a:2, b:1}), JSON.stringify(wordFrequency('a   a  b')));
+  - name: empty text
+    code: |
+      assert(JSON.stringify(wordFrequency('')) === JSON.stringify({}), JSON.stringify(wordFrequency('')));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Split on /\s+/ to tolerate multiple spaces.
+- order: 2
+  cost: 20
+  content: Strip leading/trailing punctuation with a regex and lowercase the word.
+- order: 3
+  cost: 30
+  content: Accumulate counts with out[word] = (out[word] || 0) + 1; skip empty tokens.

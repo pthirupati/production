@@ -1,0 +1,28 @@
+title: Ansible Task Always Reports Changed
+slug: ansible-changed-when-wrong
+technology: Ansible
+category: Idempotency
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A command task always reports changed, breaking idempotency and handlers.
+initial_state: An Ansible command task missing changed_when.
+objectives:
+- 'Confirm the issue: Task always shows changed'
+- Apply the documented fix in /home/ansible/idempotent.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Task always shows changed
+- order: 2
+  cost: 15
+  content: Add a correct changed_when condition.
+- order: 3
+  cost: 20
+  content: /home/ansible/idempotent.yml carries the corrected configuration.

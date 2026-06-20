@@ -1,0 +1,69 @@
+title: Implement Roman to Integer
+slug: py-impl-roman-to-int
+category: Python Development
+description: 'Implement from_roman(s): convert a valid Roman numeral string to its integer value, honoring
+  subtractive notation (IV=4, IX=9, etc). The stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Map Roman symbols to values
+- Subtract when a smaller symbol precedes a larger one
+- Sum to the correct integer
+initial_state: 'Implement from_roman(s): convert a valid Roman numeral string to its integer value, honoring
+  subtractive notation (IV=4, IX=9, etc). The stub is empty so tests fail.'
+solution_explanation: |
+  Scanning right to left and subtracting any symbol smaller than the running maximum cleanly handles subtractive notation.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement from_roman(s) -> int for a valid Roman numeral.
+      from_roman('IV') -> 4, from_roman('MCMXCIV') -> 1994
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def from_roman(s):
+          # TODO: convert a Roman numeral to an integer
+          pass
+    readonly: false
+  visible_tests:
+  - name: three
+    code: |
+      assert from_roman('III') == 3
+  - name: four
+    code: |
+      assert from_roman('IV') == 4, from_roman('IV')
+  hidden_tests:
+  - name: nine
+    code: |
+      assert from_roman('IX') == 9
+  - name: '58'
+    code: |
+      assert from_roman('LVIII') == 58
+  - name: '1994'
+    code: |
+      assert from_roman('MCMXCIV') == 1994, from_roman('MCMXCIV')
+  - name: '3888'
+    code: |
+      assert from_roman('MMMDCCCLXXXVIII') == 3888
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: 'Map each symbol to a value: I=1, V=5, X=10, L=50, C=100, D=500, M=1000.'
+- order: 2
+  cost: 20
+  content: A smaller value before a larger one (like IV) means subtract.
+- order: 3
+  cost: 30
+  content: 'Scan right-to-left: subtract when the current value is less than the last larger one.'

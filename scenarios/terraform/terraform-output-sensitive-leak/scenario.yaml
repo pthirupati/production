@@ -1,0 +1,31 @@
+title: Terraform Output Sensitive Value Leaked in CI Logs
+slug: terraform-output-sensitive-leak
+technology: Terraform
+category: Outputs
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A database password is showing up in plaintext in CI logs because the Terraform output is
+  not marked sensitive. Mark the output sensitive, scrub the exposed value, and verify terraform output
+  no longer prints the secret.
+initial_state: A Terraform output for a generated credential missing sensitive = true, leaking it in plan/apply
+  logs.
+objectives:
+- Find the output printing the secret in CI logs
+- Add sensitive = true and confirm it is redacted
+- Verify terraform output shows (sensitive value)
+hints:
+- order: 1
+  cost: 10
+  content: outputs.tf has a credential output without sensitive = true.
+- order: 2
+  cost: 15
+  content: Add sensitive = true to that block.
+- order: 3
+  cost: 20
+  content: terraform output shows <sensitive>.

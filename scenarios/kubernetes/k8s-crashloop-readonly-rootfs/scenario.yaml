@@ -1,0 +1,29 @@
+title: Pods CrashLoop on Read-Only Root Filesystem
+slug: k8s-crashloop-readonly-rootfs
+technology: Kubernetes
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Containers crash because a securityContext set readOnlyRootFilesystem but the app writes
+  to /tmp without a volume. Add a writable volume and confirm pods run.
+initial_state: A Kubernetes workload with readOnlyRootFilesystem but no emptyDir for scratch writes, crash-looping.
+objectives:
+- Confirm the crash stems from a read-only filesystem
+- Mount a writable emptyDir for scratch paths and roll out
+- Verify pods are Running
+hints:
+- order: 1
+  cost: 10
+  content: Logs show 'read-only file system' on /tmp.
+- order: 2
+  cost: 15
+  content: Add an emptyDir volume mounted at the scratch path and roll out.
+- order: 3
+  cost: 20
+  content: Pods Running.

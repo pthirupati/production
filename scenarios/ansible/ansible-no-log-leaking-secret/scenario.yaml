@@ -1,0 +1,29 @@
+title: Ansible Task Leaking Secret in Output
+slug: ansible-no-log-leaking-secret
+technology: Ansible
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A task prints a secret in the run output because no_log isn't set. Add no_log and confirm
+  the task is corrected.
+initial_state: An Ansible task handling a secret without no_log, leaking it into logs.
+objectives:
+- Confirm the secret is printed in output
+- 'Add no_log: true to the task'
+- Verify the task is corrected
+hints:
+- order: 1
+  cost: 10
+  content: The secret appears in stdout.
+- order: 2
+  cost: 15
+  content: 'Set no_log: true on the sensitive task.'
+- order: 3
+  cost: 20
+  content: Task carries the corrected no_log.

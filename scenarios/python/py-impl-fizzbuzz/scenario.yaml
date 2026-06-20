@@ -1,0 +1,69 @@
+title: Implement FizzBuzz
+slug: py-impl-fizzbuzz
+category: Python Development
+description: 'Implement fizzbuzz(n) returning a list for 1..n: ''Fizz'' for multiples of 3, ''Buzz'' for
+  multiples of 5, ''FizzBuzz'' for multiples of both, otherwise the number as a string. The stub returns
+  nothing, so the tests fail.'
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Read the FizzBuzz contract from the tests
+- Check the combined 3-and-5 case first
+- Return the correct list of strings for 1..n
+initial_state: 'Implement fizzbuzz(n) returning a list for 1..n: ''Fizz'' for multiples of 3, ''Buzz''
+  for multiples of 5, ''FizzBuzz'' for multiples of both, otherwise the number as a string. The stub returns
+  nothing, so the tests fail.'
+solution_explanation: |
+  Iterating 1..n and checking the combined %15 case first yields canonical FizzBuzz output.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement fizzbuzz(n) -> list for 1..n. multiples of 3 -> 'Fizz', of 5 -> 'Buzz', of both -> 'FizzBuzz', else str(number).
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def fizzbuzz(n):
+          # TODO: return the FizzBuzz list for 1..n
+          pass
+    readonly: false
+  visible_tests:
+  - name: length n
+    code: |
+      out = fizzbuzz(5)
+      assert len(out) == 5
+  - name: plain numbers
+    code: |
+      assert fizzbuzz(2) == ['1', '2']
+  hidden_tests:
+  - name: fizz and buzz
+    code: |
+      out = fizzbuzz(5)
+      assert out[2] == 'Fizz' and out[4] == 'Buzz'
+  - name: fizzbuzz at 15
+    code: |
+      assert fizzbuzz(15)[14] == 'FizzBuzz'
+  - name: full prefix
+    code: |
+      assert fizzbuzz(16) == ['1','2','Fizz','4','Buzz','Fizz','7','8','Fizz','Buzz','11','Fizz','13','14','FizzBuzz','16']
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: The tests want a list of strings, with numbers stringified.
+- order: 2
+  cost: 20
+  content: Check the multiple-of-15 case before the 3 and 5 cases.
+- order: 3
+  cost: 30
+  content: if i%15==0:'FizzBuzz' elif i%3==0:'Fizz' elif i%5==0:'Buzz' else str(i).

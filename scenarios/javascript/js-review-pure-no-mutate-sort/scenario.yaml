@@ -1,0 +1,72 @@
+title: 'Refactor: Make sortedCopy Pure'
+slug: js-review-pure-no-mutate-sort
+category: JavaScript Development
+description: sortedCopy(arr) is supposed to return a sorted COPY, leaving the input untouched, but it
+  sorts arr in place and returns it, so callers see their array reordered. Refactor it to sort a copy.
+  The hidden test pins the no-mutation contract.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Recognize the in-place sort side effect
+- Sort a copy instead of the original
+- Return ascending-sorted values without mutating input
+initial_state: sortedCopy(arr) is supposed to return a sorted COPY, leaving the input untouched, but it
+  sorts arr in place and returns it, so callers see their array reordered. Refactor it to sort a copy.
+  The hidden test pins the no-mutation contract.
+solution_explanation: |
+  Array.sort mutates its receiver. Spreading into a new array first sorts a copy and leaves the caller's array intact.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: review
+  instructions: |
+    Refactor sortedCopy(arr): return a new ascending-sorted array; do NOT mutate the input.
+      sortedCopy([3,1,2]) -> [1,2,3], original stays [3,1,2]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function sortedCopy(arr) {
+        return arr.sort((a, b) => a - b); // sorts in place, mutates input
+      }
+    readonly: false
+  visible_tests:
+  - name: sorts ascending
+    code: |
+      assert(JSON.stringify(sortedCopy([3,1,2])) === JSON.stringify([1,2,3]), JSON.stringify(sortedCopy([3,1,2])));
+  - name: already sorted
+    code: |
+      assert(JSON.stringify(sortedCopy([1,2,3])) === JSON.stringify([1,2,3]), JSON.stringify(sortedCopy([1,2,3])));
+  hidden_tests:
+  - name: does not mutate input
+    code: |
+      const src = [3, 1, 2];
+      sortedCopy(src);
+      assert(JSON.stringify(src) === JSON.stringify([3, 1, 2]), 'input mutated');
+  - name: returns a new array
+    code: |
+      const src = [2, 1];
+      const out = sortedCopy(src);
+      assert(out !== src);
+  - name: negatives
+    code: |
+      assert(JSON.stringify(sortedCopy([0, -5, 3, -1])) === JSON.stringify([-5, -1, 0, 3]), JSON.stringify(sortedCopy([0, -5, 3, -1])));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: After sortedCopy(src), src is itself sorted — Array.sort mutates in place.
+- order: 2
+  cost: 20
+  content: Copy the array first, then sort the copy.
+- order: 3
+  cost: 30
+  content: Return [...arr].sort((a, b) => a - b).

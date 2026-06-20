@@ -1,0 +1,30 @@
+title: BGP Neighbor Stuck in Idle After AS Mismatch
+slug: networking-bgp-as-mismatch
+technology: Networking
+category: Routing / BGP
+difficulty: hard
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A BGP session is stuck Idle because the configured remote-AS does not match the peer. Correct
+  the neighbor remote-as and confirm the session reaches Established.
+initial_state: A router whose BGP neighbor is misconfigured with the wrong remote-AS, leaving the session
+  Idle and no prefixes learned.
+objectives:
+- Confirm the BGP session is Idle with an AS mismatch
+- Correct the neighbor remote-as configuration
+- Verify the session reaches Established and learns prefixes
+hints:
+- order: 1
+  cost: 10
+  content: show ip bgp summary shows the neighbor Idle.
+- order: 2
+  cost: 15
+  content: Set the correct neighbor remote-as and clear the session.
+- order: 3
+  cost: 20
+  content: Neighbor Established with prefixes.

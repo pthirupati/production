@@ -1,0 +1,77 @@
+title: Implement deepEqual
+slug: js-impl-deep-equal
+category: JavaScript Development
+description: 'Implement deepEqual(a, b): structural equality for JSON-like values — primitives, arrays,
+  and plain objects (nested). Order of object keys doesn''t matter; array order does. The stub is empty
+  so tests fail.'
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Compare primitives strictly
+- Recurse into arrays (order-sensitive) and objects (order-insensitive)
+- Return false on any structural difference
+initial_state: 'Implement deepEqual(a, b): structural equality for JSON-like values — primitives, arrays,
+  and plain objects (nested). Order of object keys doesn''t matter; array order does. The stub is empty
+  so tests fail.'
+solution_explanation: |
+  After a strict-equality fast path, the function distinguishes arrays from objects, checks matching shape (length / key set), and recurses element- and value-wise.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement deepEqual(a, b) -> boolean for nested arrays/objects/primitives.
+      deepEqual({x:[1,2]}, {x:[1,2]}) -> true
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function deepEqual(a, b) {
+        // TODO: structural equality for primitives, arrays, plain objects
+      }
+    readonly: false
+  visible_tests:
+  - name: nested equal
+    code: |
+      assert(deepEqual({x:[1,2]}, {x:[1,2]}) === true);
+  - name: different value
+    code: |
+      assert(deepEqual({x:1}, {x:2}) === false);
+  hidden_tests:
+  - name: key order irrelevant
+    code: |
+      assert(deepEqual({a:1,b:2}, {b:2,a:1}) === true);
+  - name: array order matters
+    code: |
+      assert(deepEqual([1,2], [2,1]) === false);
+  - name: primitives
+    code: |
+      assert(deepEqual(3, 3) === true && deepEqual('a', 'b') === false);
+  - name: nested deep
+    code: |
+      assert(deepEqual({a:{b:{c:[1]}}}, {a:{b:{c:[1]}}}) === true);
+  - name: missing key
+    code: |
+      assert(deepEqual({a:1}, {a:1,b:2}) === false);
+  - name: array vs object
+    code: |
+      assert(deepEqual([], {}) === false);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Strict-equal primitives short-circuit; otherwise both must be objects.
+- order: 2
+  cost: 20
+  content: Arrays compare length + each index in order; objects compare key sets + each value.
+- order: 3
+  cost: 30
+  content: Recurse on each element/value with deepEqual.

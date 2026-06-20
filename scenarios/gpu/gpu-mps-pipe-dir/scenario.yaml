@@ -1,0 +1,28 @@
+title: GPU MPS Pipe Directory Misconfigured
+slug: gpu-mps-pipe-dir
+technology: GPU
+category: Performance
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: MPS clients can't connect because the MPS pipe/log directory config is wrong.
+initial_state: A GPU host with a broken MPS pipe directory.
+objectives:
+- 'Confirm the issue: MPS clients can''t attach'
+- Apply the documented fix in /etc/gpu/mps-pipe.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: MPS clients can't attach
+- order: 2
+  cost: 15
+  content: Fix the MPS pipe/log directory.
+- order: 3
+  cost: 20
+  content: /etc/gpu/mps-pipe.conf carries the corrected configuration.

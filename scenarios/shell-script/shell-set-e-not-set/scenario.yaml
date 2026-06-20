@@ -1,0 +1,28 @@
+title: Script Continues After Errors
+slug: shell-set-e-not-set
+technology: Shell Scripting
+category: Reliability
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A deploy script keeps going after a command fails because set -e is missing.
+initial_state: An ops script without set -e.
+objectives:
+- 'Confirm the issue: Script ignores failed commands'
+- Apply the documented fix in /opt/scripts/run.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Script ignores failed commands
+- order: 2
+  cost: 15
+  content: Add set -e (and set -u).
+- order: 3
+  cost: 20
+  content: /opt/scripts/run.sh carries the corrected configuration.

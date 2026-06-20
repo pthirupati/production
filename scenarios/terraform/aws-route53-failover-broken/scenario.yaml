@@ -1,0 +1,30 @@
+title: AWS Route53 Health Check Failing Failover
+slug: aws-route53-failover-broken
+technology: Terraform
+category: Route53
+difficulty: medium
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Route53 failover routing policy is not failing over because the health check endpoint path
+  is wrong. Fix the health check and confirm DNS fails over to the secondary when primary is unhealthy.
+initial_state: An AWS Route53 failover record whose health check targets a path that always 404s, so failover
+  never triggers.
+objectives:
+- Identify why the Route53 health check stays unhealthy/healthy incorrectly
+- Correct the health check resource path/port and apply
+- Verify failover behaves correctly
+hints:
+- order: 1
+  cost: 10
+  content: aws route53 get-health-check-status shows the wrong result.
+- order: 2
+  cost: 15
+  content: Fix the health check ResourcePath/Port and apply.
+- order: 3
+  cost: 20
+  content: Failover now triggers on primary failure.

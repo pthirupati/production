@@ -1,0 +1,71 @@
+title: Implement Matrix Transpose
+slug: py-impl-matrix-transpose
+category: Python Development
+description: 'Implement transpose(matrix): return the transpose of a rectangular matrix (list of equal-length
+  rows). Rows become columns. The stub is empty so tests fail.'
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Swap rows and columns
+- Handle non-square matrices
+- Return a new matrix without mutating the input
+initial_state: 'Implement transpose(matrix): return the transpose of a rectangular matrix (list of equal-length
+  rows). Rows become columns. The stub is empty so tests fail.'
+solution_explanation: |
+  zip(*matrix) yields one tuple per column, which is exactly the transposed rows; converting each to a list returns a fresh matrix.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement transpose(matrix) -> transposed matrix.
+      transpose([[1,2,3],[4,5,6]]) -> [[1,4],[2,5],[3,6]]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def transpose(matrix):
+          # TODO: return the transpose
+          pass
+    readonly: false
+  visible_tests:
+  - name: rectangular
+    code: |
+      assert transpose([[1,2,3],[4,5,6]]) == [[1,4],[2,5],[3,6]]
+  - name: square
+    code: |
+      assert transpose([[1,2],[3,4]]) == [[1,3],[2,4]]
+  hidden_tests:
+  - name: single row
+    code: |
+      assert transpose([[1,2,3]]) == [[1],[2],[3]]
+  - name: single column
+    code: |
+      assert transpose([[1],[2],[3]]) == [[1,2,3]]
+  - name: empty matrix
+    code: |
+      assert transpose([]) == []
+  - name: does not mutate
+    code: |
+      m = [[1,2],[3,4]]
+      transpose(m)
+      assert m == [[1,2],[3,4]]
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Element [i][j] of the input becomes [j][i] of the output.
+- order: 2
+  cost: 20
+  content: zip(*matrix) pairs up the i-th element of each row — that's the columns.
+- order: 3
+  cost: 30
+  content: 'Wrap each zipped tuple in list(): [list(col) for col in zip(*matrix)].'

@@ -1,0 +1,28 @@
+title: Script Lockfile Never Released on Crash
+slug: shell-lockfile-stale
+technology: Shell Scripting
+category: Concurrency
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A second run is blocked forever because a crash left a stale lockfile.
+initial_state: An ops script with a lockfile not tied to the process.
+objectives:
+- 'Confirm the issue: Stale lock blocks new runs'
+- Apply the documented fix in /opt/scripts/singleton.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Stale lock blocks new runs
+- order: 2
+  cost: 15
+  content: Use flock on a descriptor.
+- order: 3
+  cost: 20
+  content: /opt/scripts/singleton.sh carries the corrected configuration.

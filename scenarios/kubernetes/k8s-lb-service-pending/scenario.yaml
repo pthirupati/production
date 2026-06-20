@@ -1,0 +1,30 @@
+title: LoadBalancer Service Stuck Pending
+slug: k8s-lb-service-pending
+technology: Kubernetes
+category: Networking
+difficulty: medium
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A LoadBalancer Service is stuck with EXTERNAL-IP <pending> because no LB controller/annotation
+  is configured. Fix the configuration and confirm the cluster is healthy.
+initial_state: A Kubernetes LoadBalancer Service stuck pending an external IP due to missing controller
+  config.
+objectives:
+- Confirm the Service external IP is pending
+- Configure the LB controller/annotations
+- Verify the cluster is healthy
+hints:
+- order: 1
+  cost: 10
+  content: kubectl get svc shows EXTERNAL-IP <pending>.
+- order: 2
+  cost: 15
+  content: Add the LB class/annotation (or MetalLB pool) and apply.
+- order: 3
+  cost: 20
+  content: External IP assigned.

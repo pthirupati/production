@@ -1,0 +1,28 @@
+title: Ansible Service Not Enabled at Boot
+slug: ansible-service-enabled-missing
+technology: Ansible
+category: Modules
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A managed service starts but isn't enabled at boot because enabled is missing.
+initial_state: 'An Ansible service task missing enabled: yes.'
+objectives:
+- 'Confirm the issue: Service not enabled at boot'
+- Apply the documented fix in /home/ansible/svc.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Service not enabled at boot
+- order: 2
+  cost: 15
+  content: 'Add enabled: yes to the service task.'
+- order: 3
+  cost: 20
+  content: /home/ansible/svc.yml carries the corrected configuration.

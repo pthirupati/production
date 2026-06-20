@@ -1,0 +1,29 @@
+title: Helm Release Revision History Limit Hit
+slug: devops-helm-history-limit
+technology: DevOps
+category: Helm
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A helm release cannot roll back cleanly because an upgrade left it in a non-deployed state.
+  Roll back to a known deployed revision and confirm the release is healthy.
+initial_state: A Kubernetes helm release in a non-deployed state needing a rollback to a good revision.
+objectives:
+- Confirm the release is not deployed
+- Roll back to a deployed revision
+- Verify helm history shows deployed
+hints:
+- order: 1
+  cost: 10
+  content: helm history shows a non-deployed top revision.
+- order: 2
+  cost: 15
+  content: helm rollback to the deployed revision.
+- order: 3
+  cost: 20
+  content: Release deployed.

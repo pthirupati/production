@@ -1,0 +1,28 @@
+title: Script Doesn't Wait for Background Jobs
+slug: shell-background-wait
+technology: Shell Scripting
+category: Concurrency
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Results are incomplete because the script exits before background jobs finish.
+initial_state: An ops script not waiting on background jobs.
+objectives:
+- 'Confirm the issue: Script exits before jobs finish'
+- Apply the documented fix in /opt/scripts/parallel.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Script exits before jobs finish
+- order: 2
+  cost: 15
+  content: Add wait and check statuses.
+- order: 3
+  cost: 20
+  content: /opt/scripts/parallel.sh carries the corrected configuration.

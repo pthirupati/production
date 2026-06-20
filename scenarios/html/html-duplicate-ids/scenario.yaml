@@ -1,0 +1,29 @@
+title: Duplicate IDs Breaking JS/Anchors
+slug: html-duplicate-ids
+technology: Html
+category: Standards
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: JavaScript and in-page anchors misbehave because several elements share the same id. Make
+  IDs unique and confirm the file is corrected.
+initial_state: A static page with duplicate element ids, breaking getElementById and anchor links.
+objectives:
+- Confirm duplicate ids exist
+- Make all ids unique
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Multiple elements share an id.
+- order: 2
+  cost: 15
+  content: Rename to unique ids and update references.
+- order: 3
+  cost: 20
+  content: index.html carries the corrected unique ids.

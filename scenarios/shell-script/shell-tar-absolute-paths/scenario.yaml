@@ -1,0 +1,28 @@
+title: Backup tar Stores Absolute Paths
+slug: shell-tar-absolute-paths
+technology: Shell Scripting
+category: Backup
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Restores clobber the wrong locations because tar stored absolute paths.
+initial_state: An ops backup script using absolute paths in tar.
+objectives:
+- 'Confirm the issue: Restore writes to absolute paths'
+- Apply the documented fix in /opt/scripts/make-backup.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Restore writes to absolute paths
+- order: 2
+  cost: 15
+  content: Use -C and relative paths.
+- order: 3
+  cost: 20
+  content: /opt/scripts/make-backup.sh carries the corrected configuration.

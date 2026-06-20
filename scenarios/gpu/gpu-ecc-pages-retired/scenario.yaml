@@ -1,0 +1,28 @@
+title: GPU Approaching Retired Page Limit
+slug: gpu-ecc-pages-retired
+technology: GPU
+category: Reliability
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A GPU is silently degrading as retired ECC pages climb without alerting.
+initial_state: A GPU host not monitoring retired pages.
+objectives:
+- 'Confirm the issue: Retired pages rising, no alert'
+- Apply the documented fix in /etc/gpu/health-policy.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Retired pages rising, no alert
+- order: 2
+  cost: 15
+  content: Add retired-page health monitoring.
+- order: 3
+  cost: 20
+  content: /etc/gpu/health-policy.conf carries the corrected configuration.

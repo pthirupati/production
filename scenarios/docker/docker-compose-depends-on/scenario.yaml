@@ -1,0 +1,28 @@
+title: Compose Service Starts Before Dependency
+slug: docker-compose-depends-on
+technology: Docker
+category: Compose
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A service starts before its dependency is ready because depends_on/healthcheck is wrong.
+initial_state: A compose stack with broken startup ordering.
+objectives:
+- 'Confirm the issue: App connects before DB is ready'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: App connects before DB is ready
+- order: 2
+  cost: 15
+  content: 'Add depends_on with condition: service_healthy.'
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

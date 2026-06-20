@@ -1,0 +1,29 @@
+title: CI Pipeline Cache Poisoned Build
+slug: devops-ci-pipeline-cache-poisoned
+technology: DevOps
+category: CI/CD
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A poisoned dependency cache makes the CI deploy stage fail consistently. Invalidate the cache
+  and fix the pipeline variables so deploys succeed.
+initial_state: A CI/CD pipeline whose corrupted cache causes the deploy job to fail every run.
+objectives:
+- Confirm the deploy stage fails from a bad cache
+- Invalidate the cache and fix the deploy config
+- Verify the pipeline passes
+hints:
+- order: 1
+  cost: 10
+  content: Pipeline deploy fails repeatedly; cache suspect.
+- order: 2
+  cost: 15
+  content: Clear the cache key and correct the deploy variables; redeploy.
+- order: 3
+  cost: 20
+  content: Pipeline green.

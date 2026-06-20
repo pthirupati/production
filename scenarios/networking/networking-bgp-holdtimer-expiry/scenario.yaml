@@ -1,0 +1,30 @@
+title: BGP Session Reset by Hold-Timer Expiry
+slug: networking-bgp-holdtimer-expiry
+technology: Networking
+category: Routing / BGP
+difficulty: medium
+lab_mode: simulation
+simulation_type: networking
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A BGP session keeps resetting because mismatched/too-aggressive hold timers expire under
+  load. Align the timers and confirm a stable Established session.
+initial_state: A router whose BGP session resets on hold-timer expiry due to mismatched keepalive/hold
+  settings.
+objectives:
+- Confirm the session is not stably Established
+- Align BGP keepalive/hold timers with the peer
+- Verify the session is Established and stable
+hints:
+- order: 1
+  cost: 10
+  content: show ip bgp summary shows the neighbor not Established.
+- order: 2
+  cost: 15
+  content: Match the timers and clear the session.
+- order: 3
+  cost: 20
+  content: Stable Established.

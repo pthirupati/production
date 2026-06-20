@@ -1,0 +1,28 @@
+title: Compose Stack Missing Env File
+slug: docker-compose-env-missing
+technology: Docker
+category: Compose
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A compose stack fails because the referenced env_file is missing/misconfigured.
+initial_state: A host whose compose stack references a missing env file.
+objectives:
+- 'Confirm the issue: compose up errors on env_file'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: compose up errors on env_file
+- order: 2
+  cost: 15
+  content: Point env_file at the correct path.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Container Marked Unhealthy by Bad Healthcheck
+slug: docker-healthcheck-wrong
+technology: Docker
+category: Reliability
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A healthy container is marked unhealthy because the HEALTHCHECK command is wrong.
+initial_state: A container image with a broken HEALTHCHECK.
+objectives:
+- 'Confirm the issue: docker ps shows (unhealthy)'
+- Apply the documented fix in /opt/app/Dockerfile
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: docker ps shows (unhealthy)
+- order: 2
+  cost: 15
+  content: Fix the HEALTHCHECK command/interval.
+- order: 3
+  cost: 20
+  content: /opt/app/Dockerfile carries the corrected configuration.

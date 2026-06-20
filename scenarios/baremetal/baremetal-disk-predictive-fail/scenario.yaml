@@ -1,0 +1,28 @@
+title: Disk Predictive Failure Ignored
+slug: baremetal-disk-predictive-fail
+technology: Bare Metal
+category: Storage
+difficulty: medium
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A disk with predictive-failure SMART status isn't being replaced because alerting is off.
+initial_state: A server ignoring SMART predictive failures.
+objectives:
+- 'Confirm the issue: SMART predictive failure unhandled'
+- Apply the documented fix in /etc/smart/policy.cfg
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: SMART predictive failure unhandled
+- order: 2
+  cost: 15
+  content: Enable SMART alerting and plan replacement.
+- order: 3
+  cost: 20
+  content: /etc/smart/policy.cfg carries the corrected configuration.

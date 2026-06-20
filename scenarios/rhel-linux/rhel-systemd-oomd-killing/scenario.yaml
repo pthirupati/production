@@ -1,0 +1,28 @@
+title: RHEL systemd-oomd Killing Wrong Service
+slug: rhel-systemd-oomd-killing
+technology: RHEL Linux
+category: Reliability
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An important service is killed under pressure because oomd policy is misconfigured.
+initial_state: A RHEL host where systemd-oomd targets the wrong workload.
+objectives:
+- 'Confirm the issue: Critical service OOM-killed'
+- Apply the documented fix in /etc/systemd/oomd.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Critical service OOM-killed
+- order: 2
+  cost: 15
+  content: Tune oomd policy/limits.
+- order: 3
+  cost: 20
+  content: /etc/systemd/oomd.conf carries the corrected configuration.

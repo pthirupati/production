@@ -1,0 +1,30 @@
+title: Windows Group Policy Loopback Breaking Sessions
+slug: win-gpo-loopback-broken
+technology: Windows Server
+category: Active Directory
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A Group Policy loopback misconfiguration applies the wrong user settings on a kiosk OU. Fix
+  the loopback processing mode and confirm correct policy application.
+initial_state: A Windows AD environment where GPO loopback processing is set incorrectly, applying wrong
+  settings to session users.
+objectives:
+- Confirm the wrong policy is applied via loopback
+- Correct the loopback processing mode/merge
+- Verify gpresult shows the intended settings
+hints:
+- order: 1
+  cost: 10
+  content: gpresult shows unexpected user policy on the OU.
+- order: 2
+  cost: 15
+  content: Fix loopback mode (Merge/Replace) on the right GPO.
+- order: 3
+  cost: 20
+  content: Correct policy applies.

@@ -1,0 +1,28 @@
+title: Heading Levels Skipped
+slug: html-heading-skip
+technology: HTML
+category: Accessibility
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: Document outline is broken because heading levels jump (h1 to h4).
+initial_state: A page that skips heading levels.
+objectives:
+- 'Confirm the issue: Heading hierarchy skips levels'
+- Apply the documented fix in /var/www/html/article.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Heading hierarchy skips levels
+- order: 2
+  cost: 15
+  content: Use sequential heading levels.
+- order: 3
+  cost: 20
+  content: /var/www/html/article.html carries the corrected markup/config.

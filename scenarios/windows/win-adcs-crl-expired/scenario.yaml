@@ -1,0 +1,30 @@
+title: Windows Certificate Authority CRL Expired
+slug: win-adcs-crl-expired
+technology: Windows Server
+category: PKI
+difficulty: hard
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Applications reject certificates because the AD CS CRL expired and clients can't verify revocation.
+  Republish the CRL and confirm validation succeeds.
+initial_state: A Windows AD CS issuing CA whose CRL expired, breaking revocation checks for all issued
+  certificates.
+objectives:
+- Confirm the CRL has expired
+- Republish the CRL and verify CDP availability
+- Verify certificate validation succeeds
+hints:
+- order: 1
+  cost: 10
+  content: certutil -getreg shows expired CRL; clients fail chain build.
+- order: 2
+  cost: 15
+  content: certutil -CRL to republish and confirm CDP reachability.
+- order: 3
+  cost: 20
+  content: Validation works.

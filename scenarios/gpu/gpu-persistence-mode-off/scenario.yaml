@@ -1,0 +1,29 @@
+title: GPU Persistence Mode Off Causing Latency
+slug: gpu-persistence-mode-off
+technology: Gpu
+category: Performance
+difficulty: easy
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: GPU jobs have high startup latency because persistence mode is off, so the driver unloads
+  between jobs. Enable persistence and confirm the config is corrected.
+initial_state: A GPU host with persistence mode disabled, adding driver init latency to every job.
+objectives:
+- Confirm persistence mode is off
+- Enable persistence mode persistently
+- Verify the persistence config is corrected
+hints:
+- order: 1
+  cost: 10
+  content: nvidia-smi shows Persistence-M Off.
+- order: 2
+  cost: 15
+  content: Enable nvidia-persistenced and persist it.
+- order: 3
+  cost: 20
+  content: Persistence config carries the corrected setting.

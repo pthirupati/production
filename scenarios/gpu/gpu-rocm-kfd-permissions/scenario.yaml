@@ -1,0 +1,28 @@
+title: ROCm GPU Access Denied to Users
+slug: gpu-rocm-kfd-permissions
+technology: GPU
+category: Driver
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Non-root users can't use the AMD GPU because KFD device permissions are wrong.
+initial_state: A ROCm host with wrong /dev/kfd permissions.
+objectives:
+- 'Confirm the issue: ROCm denied for users'
+- Apply the documented fix in /etc/gpu/rocm-access.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: ROCm denied for users
+- order: 2
+  cost: 15
+  content: Fix the render/video group access.
+- order: 3
+  cost: 20
+  content: /etc/gpu/rocm-access.conf carries the corrected configuration.

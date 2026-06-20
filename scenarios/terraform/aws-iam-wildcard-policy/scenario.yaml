@@ -1,0 +1,29 @@
+title: AWS IAM Wildcard Policy Violates Least Privilege
+slug: aws-iam-wildcard-policy
+technology: Terraform
+category: IAM
+difficulty: hard
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A deploy role uses a wildcard Action:* / Resource:* policy. Tighten it to specific actions/resources
+  and confirm the wildcard policy is no longer attached.
+initial_state: An AWS IAM role attached to an over-broad inline policy granting all actions on all resources.
+objectives:
+- Identify the wildcard IAM policy on the deploy role
+- Replace it with a scoped least-privilege policy and apply
+- Verify the wildcard statement is removed
+hints:
+- order: 1
+  cost: 10
+  content: aws iam get-role-policy shows Action:* Resource:*.
+- order: 2
+  cost: 15
+  content: Scope the policy to the needed actions/ARNs and apply.
+- order: 3
+  cost: 20
+  content: 'Re-check: no wildcard statement.'

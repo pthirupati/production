@@ -1,0 +1,28 @@
+title: PostgreSQL Connection Pool Exhausted by Leak
+slug: db-postgres-connection-leak
+technology: Database
+category: Reliability
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: The connection pool exhausts because idle-in-transaction sessions aren't reaped.
+initial_state: A PostgreSQL host where idle sessions exhaust connections.
+objectives:
+- 'Confirm the issue: Too many idle-in-transaction sessions'
+- Apply the documented fix in /var/lib/pgsql/data/postgresql.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Too many idle-in-transaction sessions
+- order: 2
+  cost: 15
+  content: Set idle_in_transaction_session_timeout.
+- order: 3
+  cost: 20
+  content: /var/lib/pgsql/data/postgresql.conf carries the corrected configuration.

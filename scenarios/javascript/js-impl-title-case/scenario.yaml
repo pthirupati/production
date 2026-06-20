@@ -1,0 +1,69 @@
+title: Implement titleCase
+slug: js-impl-title-case
+category: JavaScript Development
+description: 'Implement titleCase(s): capitalize the first letter of each space-separated word and lowercase
+  the rest. Single spaces between words. The stub is empty so tests fail.'
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Split on spaces into words
+- Capitalize the first letter, lowercase the rest of each word
+- Rejoin with single spaces
+initial_state: 'Implement titleCase(s): capitalize the first letter of each space-separated word and lowercase
+  the rest. Single spaces between words. The stub is empty so tests fail.'
+solution_explanation: |
+  Splitting on spaces, transforming each word's first letter up and the remainder down, then rejoining produces clean title case.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement titleCase(s).
+      titleCase('hello WORLD') -> 'Hello World'
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function titleCase(s) {
+        // TODO: capitalize each word, lowercasing the rest
+      }
+    readonly: false
+  visible_tests:
+  - name: mixed case
+    code: |
+      assert(titleCase('hello WORLD') === 'Hello World');
+  - name: single word
+    code: |
+      assert(titleCase('javaSCRIPT') === 'Javascript');
+  hidden_tests:
+  - name: three words
+    code: |
+      assert(titleCase('the quick brown') === 'The Quick Brown');
+  - name: already title
+    code: |
+      assert(titleCase('Foo Bar') === 'Foo Bar');
+  - name: empty
+    code: |
+      assert(titleCase('') === '');
+  - name: single letters
+    code: |
+      assert(titleCase('a b c') === 'A B C');
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Split on ' ' to get words.
+- order: 2
+  cost: 20
+  content: 'For each word: uppercase the first char, lowercase the rest.'
+- order: 3
+  cost: 30
+  content: w[0].toUpperCase() + w.slice(1).toLowerCase(), then join(' '). Guard empty words.

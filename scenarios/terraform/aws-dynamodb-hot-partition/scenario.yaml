@@ -1,0 +1,30 @@
+title: AWS DynamoDB Throttling on Hot Partition
+slug: aws-dynamodb-hot-partition
+technology: Terraform
+category: DynamoDB
+difficulty: hard
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A DynamoDB table is throttling reads because of a hot partition and provisioned capacity
+  that is too low. Switch to on-demand (or raise capacity / improve key design) and confirm throttling
+  clears.
+initial_state: An AWS DynamoDB table experiencing ProvisionedThroughputExceeded on a hot partition key.
+objectives:
+- Confirm the table is throttling on a hot partition
+- Switch to on-demand billing or raise capacity and apply
+- Verify throttle events stop
+hints:
+- order: 1
+  cost: 10
+  content: CloudWatch ThrottledRequests is rising.
+- order: 2
+  cost: 15
+  content: Set billing_mode PAY_PER_REQUEST (or raise RCU/WCU) and apply.
+- order: 3
+  cost: 20
+  content: Throttling clears.

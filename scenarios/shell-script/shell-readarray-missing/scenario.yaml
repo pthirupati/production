@@ -1,0 +1,28 @@
+title: Script Reads File Line-by-Line Wrong
+slug: shell-readarray-missing
+technology: Shell Scripting
+category: IO
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Lines with backslashes/whitespace are mangled because read isn't used safely.
+initial_state: An ops script reading a file unsafely.
+objectives:
+- 'Confirm the issue: Lines get mangled'
+- Apply the documented fix in /opt/scripts/lines.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Lines get mangled
+- order: 2
+  cost: 15
+  content: Use IFS= read -r in a while-loop.
+- order: 3
+  cost: 20
+  content: /opt/scripts/lines.sh carries the corrected configuration.

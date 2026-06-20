@@ -1,0 +1,28 @@
+title: Compose Port Already in Use
+slug: docker-ports-conflict
+technology: Docker
+category: Networking
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A container won't start because its published port collides with another service.
+initial_state: A compose service with a conflicting host port.
+objectives:
+- 'Confirm the issue: ''port is already allocated'''
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''port is already allocated'''
+- order: 2
+  cost: 15
+  content: Change the published host port.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

@@ -1,0 +1,28 @@
+title: Ansible Playbook YAML Indentation Bug
+slug: ansible-yaml-indentation
+technology: Ansible
+category: Syntax
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A playbook fails to parse because of inconsistent YAML indentation.
+initial_state: An Ansible playbook with broken YAML indentation.
+objectives:
+- 'Confirm the issue: ansible-playbook --syntax-check fails'
+- Apply the documented fix in /home/ansible/badindent.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: ansible-playbook --syntax-check fails
+- order: 2
+  cost: 15
+  content: Fix the YAML indentation.
+- order: 3
+  cost: 20
+  content: /home/ansible/badindent.yml carries the corrected configuration.

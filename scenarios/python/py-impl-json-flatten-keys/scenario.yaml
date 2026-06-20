@@ -1,0 +1,71 @@
+title: Implement Nested Dict Flattening
+slug: py-impl-json-flatten-keys
+category: Python Development
+description: 'Implement flatten_dict(d): flatten a nested dict into a single-level dict whose keys join
+  the path with dots. Values that are dicts recurse; all other values (including lists) are leaves. The
+  stub is empty so tests fail.'
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Recurse into nested dictionaries
+- Join key paths with '.'
+- Treat non-dict values as leaves
+initial_state: 'Implement flatten_dict(d): flatten a nested dict into a single-level dict whose keys join
+  the path with dots. Values that are dicts recurse; all other values (including lists) are leaves. The
+  stub is empty so tests fail.'
+solution_explanation: |
+  Recursing only on dict values and threading a dotted prefix builds the joined key paths; non-dict values (including lists) terminate as leaves.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement flatten_dict(d) -> flat dict with dotted keys.
+      flatten_dict({'a': {'b': 1, 'c': {'d': 2}}, 'e': 3}) -> {'a.b': 1, 'a.c.d': 2, 'e': 3}
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def flatten_dict(d):
+          # TODO: flatten nested dicts into dotted keys
+          pass
+    readonly: false
+  visible_tests:
+  - name: nested example
+    code: |
+      assert flatten_dict({'a': {'b': 1, 'c': {'d': 2}}, 'e': 3}) == {'a.b': 1, 'a.c.d': 2, 'e': 3}
+  - name: flat already
+    code: |
+      assert flatten_dict({'x': 1, 'y': 2}) == {'x': 1, 'y': 2}
+  hidden_tests:
+  - name: deep nesting
+    code: |
+      assert flatten_dict({'a': {'b': {'c': {'d': 9}}}}) == {'a.b.c.d': 9}
+  - name: list is a leaf
+    code: |
+      assert flatten_dict({'a': {'b': [1, 2]}}) == {'a.b': [1, 2]}
+  - name: empty dict
+    code: |
+      assert flatten_dict({}) == {}
+  - name: mixed leaves and nests
+    code: |
+      assert flatten_dict({'k': 1, 'n': {'a': 2, 'b': {'c': 3}}}) == {'k': 1, 'n.a': 2, 'n.b.c': 3}
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Carry a prefix string as you descend into nested dicts.
+- order: 2
+  cost: 20
+  content: Only recurse when the value is a dict; everything else is a leaf.
+- order: 3
+  cost: 30
+  content: Join the prefix and key with '.', and merge recursive results with dict.update.

@@ -1,0 +1,28 @@
+title: GPU Container Shared Memory Too Small
+slug: gpu-shared-memory-limit
+technology: GPU
+category: Containers
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: PyTorch DataLoader crashes because the container's /dev/shm is too small.
+initial_state: A GPU container with an undersized shared memory segment.
+objectives:
+- 'Confirm the issue: ''bus error'' / shm errors'
+- Apply the documented fix in /etc/gpu/shm-policy.conf
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: '''bus error'' / shm errors'
+- order: 2
+  cost: 15
+  content: Increase the container shm size.
+- order: 3
+  cost: 20
+  content: /etc/gpu/shm-policy.conf carries the corrected configuration.

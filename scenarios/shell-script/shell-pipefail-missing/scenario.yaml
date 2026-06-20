@@ -1,0 +1,29 @@
+title: Pipeline Hides Failures Without pipefail
+slug: shell-pipefail-missing
+technology: Shell-script
+category: Reliability
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A deploy script reports success even when a piped command fails because pipefail isn't set.
+  Harden the script and confirm it is corrected.
+initial_state: An ops shell script whose pipelines mask failures because set -o pipefail is missing.
+objectives:
+- Confirm failures in pipes are swallowed
+- Add set -euo pipefail
+- Verify the script is corrected
+hints:
+- order: 1
+  cost: 10
+  content: A failing stage still exits 0.
+- order: 2
+  cost: 15
+  content: Add set -euo pipefail at the top.
+- order: 3
+  cost: 20
+  content: Script carries the corrected pipefail.

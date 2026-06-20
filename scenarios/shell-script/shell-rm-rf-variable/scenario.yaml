@@ -1,0 +1,28 @@
+title: Script rm -rf on Unvalidated Path
+slug: shell-rm-rf-variable
+technology: Shell Scripting
+category: Safety
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A script can rm -rf a dangerous path because the variable isn't validated.
+initial_state: An ops script doing rm -rf on an unguarded variable.
+objectives:
+- 'Confirm the issue: rm -rf "$DIR" with DIR possibly /'
+- Apply the documented fix in /opt/scripts/wipe.sh
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: rm -rf "$DIR" with DIR possibly /
+- order: 2
+  cost: 15
+  content: Validate the path and refuse unsafe targets.
+- order: 3
+  cost: 20
+  content: /opt/scripts/wipe.sh carries the corrected configuration.

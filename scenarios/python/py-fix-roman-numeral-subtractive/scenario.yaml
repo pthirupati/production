@@ -1,0 +1,82 @@
+title: Fix Roman Numeral Subtractive Notation
+slug: py-fix-roman-numeral-subtractive
+category: Python Development
+description: to_roman(n) converts 1..3999 to Roman numerals, but its value table omits the subtractive
+  pairs (4=IV, 9=IX, 40=XL, ...), so it emits IIII instead of IV. Add the subtractive entries in the right
+  order so output is canonical.
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See non-canonical output like IIII or VIIII
+- Add subtractive pairs (IV, IX, XL, XC, CD, CM) in descending order
+- Produce canonical Roman numerals
+initial_state: to_roman(n) converts 1..3999 to Roman numerals, but its value table omits the subtractive
+  pairs (4=IV, 9=IX, 40=XL, ...), so it emits IIII instead of IV. Add the subtractive entries in the right
+  order so output is canonical.
+solution_explanation: |
+  Greedy conversion only produces canonical numerals when the subtractive pairs are present as table entries in descending order.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix to_roman(n) for 1 <= n <= 3999 to produce canonical Roman numerals with subtractive notation.
+      to_roman(4) -> 'IV', to_roman(1994) -> 'MCMXCIV'
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def to_roman(n):
+          table = [
+              (1000, 'M'), (500, 'D'), (100, 'C'),
+              (50, 'L'), (10, 'X'), (5, 'V'), (1, 'I'),
+          ]
+          out = []
+          for value, sym in table:
+              while n >= value:
+                  out.append(sym)
+                  n -= value
+          return ''.join(out)
+    readonly: false
+  visible_tests:
+  - name: four
+    code: |
+      assert to_roman(4) == 'IV', to_roman(4)
+  - name: nine
+    code: |
+      assert to_roman(9) == 'IX', to_roman(9)
+  hidden_tests:
+  - name: forty
+    code: |
+      assert to_roman(40) == 'XL', to_roman(40)
+  - name: ninety-nine
+    code: |
+      assert to_roman(99) == 'XCIX', to_roman(99)
+  - name: '1994'
+    code: |
+      assert to_roman(1994) == 'MCMXCIV', to_roman(1994)
+  - name: 3888 (long)
+    code: |
+      assert to_roman(3888) == 'MMMDCCCLXXXVIII'
+  - name: plain values still work
+    code: |
+      assert to_roman(3) == 'III' and to_roman(2000) == 'MM'
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: to_roman(4) returns 'IIII' instead of 'IV' — subtractive pairs are missing.
+- order: 2
+  cost: 20
+  content: Insert 900/CM, 400/CD, 90/XC, 40/XL, 9/IX, 4/IV into the value table.
+- order: 3
+  cost: 30
+  content: Keep the table in strictly descending value order so the greedy loop stays canonical.

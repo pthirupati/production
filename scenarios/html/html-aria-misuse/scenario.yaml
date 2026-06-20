@@ -1,0 +1,28 @@
+title: Incorrect ARIA Breaking Accessibility
+slug: html-aria-misuse
+technology: HTML
+category: Accessibility
+difficulty: hard
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: ARIA is misused (wrong roles), making the widget less accessible than no ARIA.
+initial_state: A page misusing ARIA roles/attributes.
+objectives:
+- 'Confirm the issue: Incorrect ARIA roles'
+- Apply the documented fix in /var/www/html/widget.html
+- Verify the file is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Incorrect ARIA roles
+- order: 2
+  cost: 15
+  content: Fix or remove the incorrect ARIA.
+- order: 3
+  cost: 20
+  content: /var/www/html/widget.html carries the corrected markup/config.

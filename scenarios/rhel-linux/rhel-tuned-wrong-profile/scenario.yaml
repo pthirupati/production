@@ -1,0 +1,29 @@
+title: RHEL tuned Wrong Performance Profile
+slug: rhel-tuned-wrong-profile
+technology: RHEL Linux
+category: Performance
+difficulty: easy
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A latency-sensitive RHEL host is on a power-saving tuned profile, hurting performance. Switch
+  to the right profile and confirm it is corrected.
+initial_state: A RHEL host running an inappropriate tuned profile for its workload.
+objectives:
+- Confirm the wrong tuned profile is active
+- Switch to the appropriate profile
+- Verify the profile is corrected
+hints:
+- order: 1
+  cost: 10
+  content: tuned-adm active shows powersave.
+- order: 2
+  cost: 15
+  content: tuned-adm profile to the right one.
+- order: 3
+  cost: 20
+  content: active_profile carries the corrected profile.

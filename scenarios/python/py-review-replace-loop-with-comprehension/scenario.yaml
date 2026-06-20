@@ -1,0 +1,73 @@
+title: 'Refactor: Correct and Simplify squares_of_evens'
+slug: py-review-replace-loop-with-comprehension
+category: Python Development
+description: 'squares_of_evens(nums) is meant to return the squares of only the EVEN numbers, but the
+  verbose loop has a bug: it squares every number and filters nothing. Refactor it (a comprehension is
+  cleanest) so it returns the squares of the even values only, in order.'
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Notice odd numbers are wrongly included
+- Filter to even numbers before squaring
+- Return the squares in input order
+initial_state: 'squares_of_evens(nums) is meant to return the squares of only the EVEN numbers, but the
+  verbose loop has a bug: it squares every number and filters nothing. Refactor it (a comprehension is
+  cleanest) so it returns the squares of the even values only, in order.'
+solution_explanation: |
+  The loop squared everything with no filter. A guarded comprehension keeps only even numbers and is also clearer.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: review
+  instructions: |
+    Fix squares_of_evens(nums): return [n*n for the even n], preserving order.
+      squares_of_evens([1,2,3,4]) -> [4, 16]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def squares_of_evens(nums):
+          out = []
+          for n in nums:
+              out.append(n * n)   # bug: never filters to evens
+          return out
+    readonly: false
+  visible_tests:
+  - name: basic
+    code: |
+      assert squares_of_evens([1, 2, 3, 4]) == [4, 16]
+  - name: no evens
+    code: |
+      assert squares_of_evens([1, 3, 5]) == []
+  hidden_tests:
+  - name: all evens
+    code: |
+      assert squares_of_evens([2, 4, 6]) == [4, 16, 36]
+  - name: includes zero
+    code: |
+      assert squares_of_evens([0, 1, 2]) == [0, 4]
+  - name: negatives
+    code: |
+      assert squares_of_evens([-2, -3, -4]) == [4, 16]
+  - name: empty
+    code: |
+      assert squares_of_evens([]) == []
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: squares_of_evens([1,2,3]) returns [1,4,9] — odds shouldn't be there.
+- order: 2
+  cost: 20
+  content: Square a number only when it's even (n % 2 == 0).
+- order: 3
+  cost: 30
+  content: 'Use a comprehension: [n*n for n in nums if n % 2 == 0].'

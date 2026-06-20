@@ -1,0 +1,30 @@
+title: Terraform Resource Targeting Left Partial State
+slug: terraform-partial-apply-target
+technology: Terraform
+category: State / Plan
+difficulty: hard
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Someone ran terraform apply -target on one resource during an incident and now state is partially
+  applied and inconsistent with code. Reconcile the drift with a full plan/apply and confirm convergence.
+initial_state: A Terraform workspace where a -target apply left the state inconsistent; a normal plan
+  now shows surprising changes.
+objectives:
+- Confirm state is partial after the -target apply
+- Run a full terraform plan and reconcile the drift
+- Apply and confirm terraform plan reports no changes
+hints:
+- order: 1
+  cost: 10
+  content: A previous -target run skipped dependent resources.
+- order: 2
+  cost: 15
+  content: Run a full plan (no -target) and review the diff.
+- order: 3
+  cost: 20
+  content: Apply; final plan shows no changes.

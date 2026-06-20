@@ -1,0 +1,29 @@
+title: Pod Stuck Terminating on Finalizer
+slug: k8s-pod-stuck-terminating
+technology: Kubernetes
+category: Workloads
+difficulty: hard
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A pod is stuck Terminating because a finalizer never completes, blocking the rollout. Resolve/remove
+  the finalizer and confirm the cluster is healthy.
+initial_state: A Kubernetes pod stuck in Terminating due to a finalizer that never clears, wedging a rollout.
+objectives:
+- Confirm the pod is stuck Terminating on a finalizer
+- Resolve or remove the finalizer
+- Verify the cluster is healthy
+hints:
+- order: 1
+  cost: 10
+  content: kubectl get pods shows Terminating for a long time.
+- order: 2
+  cost: 15
+  content: Clear the finalizer (after resolving its controller) and roll out.
+- order: 3
+  cost: 20
+  content: Pod removed, cluster healthy.

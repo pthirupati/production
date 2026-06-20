@@ -1,0 +1,30 @@
+title: Windows DNS Scavenging Stale Records
+slug: win-dns-stale-records
+technology: Windows Server
+category: Networking
+difficulty: easy
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: Clients reach wrong hosts because DNS is full of stale dynamic records and scavenging is
+  disabled. Enable aging/scavenging and confirm stale records are removed.
+initial_state: A Windows DNS server with scavenging disabled, accumulating stale A records that misdirect
+  clients.
+objectives:
+- Confirm stale dynamic records and disabled scavenging
+- Enable aging/scavenging at server and zone level
+- Verify stale records are removed
+hints:
+- order: 1
+  cost: 10
+  content: Get-DnsServerScavenging shows scavenging off.
+- order: 2
+  cost: 15
+  content: Enable aging/scavenging on the server and zones.
+- order: 3
+  cost: 20
+  content: Stale records purged.

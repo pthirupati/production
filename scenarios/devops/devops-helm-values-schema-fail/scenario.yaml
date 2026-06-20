@@ -1,0 +1,29 @@
+title: Helm Upgrade Failing values.schema.json
+slug: devops-helm-values-schema-fail
+technology: DevOps
+category: Helm
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A helm upgrade fails schema validation and leaves the release non-deployed. Roll back to
+  a deployed revision and confirm health.
+initial_state: A CI/CD or Helm environment with the documented helm fault.
+objectives:
+- Confirm the release is not deployed
+- Roll back to the deployed revision
+- Verify helm history shows deployed
+hints:
+- order: 1
+  cost: 10
+  content: helm history shows the release not deployed.
+- order: 2
+  cost: 15
+  content: helm rollback to the last deployed revision.
+- order: 3
+  cost: 20
+  content: The pipeline/release is healthy.

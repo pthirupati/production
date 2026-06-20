@@ -1,0 +1,28 @@
+title: Container Root FS Writable
+slug: docker-readonly-rootfs-missing
+technology: Docker
+category: Security
+difficulty: medium
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: A container's root filesystem is writable, against hardening policy.
+initial_state: A compose service without a read-only root FS.
+objectives:
+- 'Confirm the issue: Root FS is writable'
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+hints:
+- order: 1
+  cost: 10
+  content: Root FS is writable
+- order: 2
+  cost: 15
+  content: Set read_only with explicit writable volumes.
+- order: 3
+  cost: 20
+  content: /opt/app/docker-compose.yml carries the corrected configuration.

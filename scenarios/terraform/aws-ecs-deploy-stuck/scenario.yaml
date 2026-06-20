@@ -1,0 +1,31 @@
+title: AWS ECS Service Stuck Deploying
+slug: aws-ecs-deploy-stuck
+technology: Terraform
+category: ECS
+difficulty: hard
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1500
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: An ECS service deployment is stuck because the task definition references an image tag that
+  fails its container health check. Fix the task def/health check and confirm the service reaches a steady
+  state.
+initial_state: An AWS ECS service whose new task definition fails container health checks, so the deployment
+  never stabilizes.
+objectives:
+- Confirm the ECS deployment is stuck (PRIMARY not steady)
+- Fix the task definition image/health check and apply
+- Verify the service reaches steady state
+hints:
+- order: 1
+  cost: 10
+  content: aws ecs describe-services shows rolloutState IN_PROGRESS forever.
+- order: 2
+  cost: 15
+  content: Fix the container health check / image tag and apply.
+- order: 3
+  cost: 20
+  content: Service reaches steadyState.
