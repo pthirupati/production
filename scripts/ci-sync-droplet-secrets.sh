@@ -57,6 +57,24 @@ if [ "${CLUSTER_MODE:-0}" = "1" ]; then
     gh_secret PRODUCTION_ENV_B64 "$CLUSTER_ENV_B64"
   fi
 
+  # Point fixitlab.in DNS at the edge (D1) public IP — automatic when GoDaddy keys
+  # are present (rotated env or GODADDY_* env); otherwise update the A record manually.
+  if [ -n "${EDGE_PUBLIC_IP:-}" ] && [ -x "$ROOT/scripts/update-godaddy-dns.sh" ]; then
+    if [ -z "${GODADDY_API_KEY:-}" ] && [ -n "${CLUSTER_ENV_B64:-}" ]; then
+      _cenv="$(echo "$CLUSTER_ENV_B64" | base64 -d 2>/dev/null || true)"
+      export GODADDY_API_KEY="$(printf '%s' "$_cenv" | grep '^GODADDY_API_KEY=' | cut -d= -f2- | tr -d '\r')"
+      export GODADDY_API_SECRET="$(printf '%s' "$_cenv" | grep '^GODADDY_API_SECRET=' | cut -d= -f2- | tr -d '\r')"
+    fi
+    if [ "${DRY_RUN:-0}" = "1" ]; then
+      echo "DRY_RUN update-godaddy-dns.sh $EDGE_PUBLIC_IP  (point fixitlab.in A record at edge)"
+    elif [ -n "${GODADDY_API_KEY:-}" ]; then
+      "$ROOT/scripts/update-godaddy-dns.sh" "$EDGE_PUBLIC_IP" \
+        || echo "WARN: GoDaddy DNS update failed — set the fixitlab.in A record to $EDGE_PUBLIC_IP manually"
+    else
+      echo "NOTE: GoDaddy API keys not present — set the fixitlab.in A record to $EDGE_PUBLIC_IP manually"
+    fi
+  fi
+
   # Update committed metadata (no secrets).
   META="$ROOT/infra/digitalocean/cluster.json"
   mkdir -p "$(dirname "$META")"

@@ -45,14 +45,18 @@ if [ ! -f "$ENV_FILE" ]; then
   fail_or_warn "env file not found: $ENV_FILE"
 fi
 
-# ── Build a redacted copy of the env (strip DO_API_TOKEN entirely) ──
+# ── Build a redacted copy of the env ──
+# Per policy, email ALL rotated infra passwords (Django/Postgres/Redis/RabbitMQ/
+# admin/Vault/JWT/webhooks) but NEVER the DO API token, the SSH private key, or the
+# GitHub / Google credentials (those stay in GitHub secrets only).
 REDACTED_ENV="$(mktemp)"
 trap 'rm -f "$REDACTED_ENV" "${BODY_FILE:-}" "${PAYLOAD_FILE:-}"' EXIT
-# Remove the DO token line and any DO_SSH_KEY_PEM material; replace with a notice.
-grep -v -E '^(DO_API_TOKEN|DO_SSH_KEY_PEM|PROD_SSH_KEY)=' "$ENV_FILE" > "$REDACTED_ENV" || true
+REDACT_KEYS='DO_API_TOKEN|DO_SSH_KEY_PEM|PROD_SSH_KEY|GH_ADMIN_TOKEN|GITHUB_TOKEN|GITHUB_CLIENT_SECRET|GOOGLE_CLIENT_SECRET|GMAIL_OAUTH_CLIENT_SECRET|GMAIL_OAUTH_REFRESH_TOKEN'
+grep -v -E "^(${REDACT_KEYS})=" "$ENV_FILE" > "$REDACTED_ENV" || true
 {
   echo ""
-  echo "# NOTE: DO_API_TOKEN and SSH private keys are intentionally redacted from this file."
+  echo "# NOTE: DO_API_TOKEN, SSH private keys, and GitHub/Google secrets are"
+  echo "# intentionally redacted here — they live in GitHub secrets only."
 } >> "$REDACTED_ENV"
 
 # Tolerant: a missing key returns empty (grep's non-zero must not abort the script).
@@ -123,6 +127,13 @@ PY
 }
 
 echo "=== FixitLab email credentials (dry_run=$DRY_RUN) ==="
+
+# Safety guard (runs for BOTH dry-run and real send): none of the redacted keys
+# may appear in the attachment.
+if grep -qE "^(${REDACT_KEYS})=" "$REDACTED_ENV"; then
+  echo "FATAL: a redacted secret (DO/SSH/GitHub/Google) leaked into the attachment" >&2
+  exit 1
+fi
 
 if _is_true "$DRY_RUN"; then
   echo "DRY_RUN — would POST to SendGrid (Authorization: Bearer ****) :"
