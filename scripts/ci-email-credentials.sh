@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Email the FixitLab cluster credential bundle to the operator via SendGrid.
+# Email the FixitLab cluster credential bundle to the operator.
+# Transport priority (no SendGrid required): Gmail API (GMAIL_OAUTH_*) →
+# Gmail SMTP (EMAIL_HOST_USER/PASSWORD app password) → SendGrid (only if set).
+# Sending creds come from the deployed node's env; the attachment stays redacted.
 #
 # Body includes:
 #   - D1 Edge public IP, D2/D3/D4 private IPs, site URL
@@ -103,29 +106,6 @@ The full .env.production is attached (DO_API_TOKEN and SSH private keys redacted
 Store this email securely and delete after transferring to your password manager.
 EOF
 
-# ── Build SendGrid v3 JSON payload (base64 attachment) ──
-build_payload() {
-  python3 - "$BODY_FILE" "$REDACTED_ENV" "$CRED_TO" "$CRED_FROM" <<'PY'
-import base64, json, sys
-body_path, att_path, to, frm = sys.argv[1:5]
-body = open(body_path, encoding="utf-8").read()
-att = base64.b64encode(open(att_path, "rb").read()).decode("ascii")
-payload = {
-    "personalizations": [{"to": [{"email": to}]}],
-    "from": {"email": frm},
-    "subject": "FixitLab cluster — deployment credentials",
-    "content": [{"type": "text/plain", "value": body}],
-    "attachments": [{
-        "content": att,
-        "type": "text/plain",
-        "filename": "env.production.redacted.txt",
-        "disposition": "attachment",
-    }],
-}
-print(json.dumps(payload))
-PY
-}
-
 echo "=== FixitLab email credentials (dry_run=$DRY_RUN) ==="
 
 # Safety guard (runs for BOTH dry-run and real send): none of the redacted keys
@@ -135,42 +115,124 @@ if grep -qE "^(${REDACT_KEYS})=" "$REDACTED_ENV"; then
   exit 1
 fi
 
-if _is_true "$DRY_RUN"; then
-  echo "DRY_RUN — would POST to SendGrid (Authorization: Bearer ****) :"
-  echo "  curl -s -X POST https://api.sendgrid.com/v3/mail/send -H 'Authorization: Bearer ****' -H 'Content-Type: application/json' --data @payload.json"
-  echo "----- redacted body preview -----"
-  cat "$BODY_FILE"
-  echo "----- attachment: env.production.redacted.txt (DO_API_TOKEN stripped) -----"
-  echo "  $(wc -l < "$REDACTED_ENV") lines; first line: $(head -n1 "$REDACTED_ENV")"
-  # Safety assertion: the token ASSIGNMENT must not be present (the redaction
-  # NOTE comment mentions the name DO_API_TOKEN, which is fine).
-  if grep -qE '^DO_API_TOKEN=' "$REDACTED_ENV"; then echo "FATAL: token leaked into attachment"; exit 1; fi
-  echo "=== email (dry-run) done — nothing sent ==="
-  exit 0
+# Send via the first available transport, preferring the platform's own Gmail
+# (no SendGrid required): Gmail API (GMAIL_OAUTH_*) → Gmail SMTP
+# (EMAIL_HOST_USER/PASSWORD app password) → SendGrid (only if SENDGRID_API_KEY set).
+# Sending credentials are read from the FULL env ($ENV_FILE); the attachment stays
+# redacted. Stdlib only — no extra runner packages.
+SEND_RC=0
+python3 - "$BODY_FILE" "$REDACTED_ENV" "$CRED_TO" "$CRED_FROM" "$ENV_FILE" "$DRY_RUN" <<'PY' || SEND_RC=$?
+import base64, json, re, smtplib, ssl, sys, urllib.request, urllib.parse
+from email.message import EmailMessage
+
+body_path, att_path, to, frm, env_path, dry = sys.argv[1:7]
+dry = dry in ("1", "true", "TRUE", "yes", "on")
+body = open(body_path, encoding="utf-8").read()
+att_bytes = open(att_path, "rb").read()
+SUBJECT = "FixitLab cluster — deployment credentials"
+
+env = {}
+for line in open(env_path, encoding="utf-8", errors="replace"):
+    line = line.strip()
+    if line and not line.startswith("#") and "=" in line:
+        k, v = line.split("=", 1)
+        env[k.strip()] = v.strip().strip('"').strip("'")
+
+def g(*names):
+    for n in names:
+        if env.get(n):
+            return env[n]
+    return ""
+
+gmail_cid = g("GMAIL_OAUTH_CLIENT_ID", "GOOGLE_CLIENT_ID")
+gmail_csec = g("GMAIL_OAUTH_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET")
+gmail_rt = g("GMAIL_OAUTH_REFRESH_TOKEN")
+smtp_user = g("EMAIL_HOST_USER")
+smtp_pass = g("EMAIL_HOST_PASSWORD")
+sendgrid = g("SENDGRID_API_KEY")
+from_addr = frm or g("DEFAULT_FROM_EMAIL") or smtp_user or "no-reply@fixitlab.in"
+m = re.search(r"<([^>]+)>", from_addr)
+from_email = m.group(1) if m else from_addr
+
+def mime():
+    msg = EmailMessage()
+    msg["Subject"], msg["From"], msg["To"] = SUBJECT, from_addr, to
+    msg.set_content(body)
+    msg.add_attachment(att_bytes, maintype="text", subtype="plain",
+                       filename="env.production.redacted.txt")
+    return msg
+
+def via_gmail_api():
+    data = urllib.parse.urlencode({
+        "client_id": gmail_cid, "client_secret": gmail_csec,
+        "refresh_token": gmail_rt, "grant_type": "refresh_token"}).encode()
+    with urllib.request.urlopen(
+            urllib.request.Request("https://oauth2.googleapis.com/token", data=data),
+            timeout=30) as r:
+        tok = json.loads(r.read())["access_token"]
+    raw = base64.urlsafe_b64encode(mime().as_bytes()).decode()
+    req = urllib.request.Request(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        data=json.dumps({"raw": raw}).encode(),
+        headers={"Authorization": "Bearer " + tok, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        r.read()
+    return "Gmail API"
+
+def via_gmail_smtp():
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=ssl.create_default_context(), timeout=30) as s:
+        s.login(smtp_user, smtp_pass)
+        s.send_message(mime(), from_addr=from_email, to_addrs=[to])
+    return "Gmail SMTP"
+
+def via_sendgrid():
+    payload = {"personalizations": [{"to": [{"email": to}]}],
+               "from": {"email": from_email}, "subject": SUBJECT,
+               "content": [{"type": "text/plain", "value": body}],
+               "attachments": [{"content": base64.b64encode(att_bytes).decode(),
+                                "type": "text/plain",
+                                "filename": "env.production.redacted.txt",
+                                "disposition": "attachment"}]}
+    req = urllib.request.Request("https://api.sendgrid.com/v3/mail/send",
+        data=json.dumps(payload).encode(),
+        headers={"Authorization": "Bearer " + sendgrid, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        r.read()
+    return "SendGrid"
+
+transports = []
+if gmail_cid and gmail_csec and gmail_rt: transports.append(("Gmail API", via_gmail_api))
+if smtp_user and smtp_pass: transports.append(("Gmail SMTP", via_gmail_smtp))
+if sendgrid: transports.append(("SendGrid", via_sendgrid))
+
+if dry:
+    print("DRY_RUN — available transports: " + (", ".join(t[0] for t in transports) or "NONE"))
+    print("  To: %s   From: %s   Subject: %s" % (to, from_addr, SUBJECT))
+    print("----- body preview -----\n" + body)
+    print("----- attachment: env.production.redacted.txt (%d bytes) -----" % len(att_bytes))
+    sys.exit(0 if transports else 3)
+
+if not transports:
+    sys.stderr.write("no email transport available (need GMAIL_OAUTH_*, EMAIL_HOST_USER/PASSWORD, or SENDGRID_API_KEY)\n")
+    sys.exit(3)
+
+last = ""
+for name, fn in transports:
+    try:
+        print("Credentials email sent to %s via %s" % (to, fn()))
+        sys.exit(0)
+    except Exception as e:
+        last = "%s failed: %s" % (name, e)
+        sys.stderr.write(last + "\n")
+sys.stderr.write("all transports failed: %s\n" % last)
+sys.exit(4)
+PY
+
+if [ "$SEND_RC" -ne 0 ]; then
+  if [ "$SEND_RC" -eq 3 ]; then
+    fail_or_warn "no email transport configured (set Gmail OAuth or Gmail SMTP in PRODUCTION_ENV_B64, or SENDGRID_API_KEY)"
+  else
+    fail_or_warn "credentials email failed (rc=$SEND_RC)"
+  fi
 fi
-
-if [ -z "${SENDGRID_API_KEY:-}" ]; then
-  fail_or_warn "SENDGRID_API_KEY not set"
-fi
-
-# Final safety assertion before sending.
-if grep -q '^DO_API_TOKEN=' "$REDACTED_ENV"; then
-  echo "FATAL: DO_API_TOKEN present in attachment — refusing to send"; exit 1
-fi
-
-PAYLOAD_FILE="$(mktemp)"
-build_payload > "$PAYLOAD_FILE"
-
-HTTP_CODE="$(curl -s -o /dev/null -w '%{http_code}' -X POST \
-  https://api.sendgrid.com/v3/mail/send \
-  -H "Authorization: Bearer ${SENDGRID_API_KEY}" \
-  -H "Content-Type: application/json" \
-  --data @"$PAYLOAD_FILE" || echo "000")"
-
-if [ "$HTTP_CODE" = "202" ]; then
-  echo "Credentials email sent to ${CRED_TO} (HTTP 202)"
-else
-  fail_or_warn "SendGrid returned HTTP ${HTTP_CODE}"
-fi
-
 echo "=== email credentials done ==="

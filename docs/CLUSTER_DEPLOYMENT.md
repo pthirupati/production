@@ -56,7 +56,7 @@ Environment **production** secrets:
 | `PROD_SSH_KEY` | ed25519/RSA private key for `root` on all droplets |
 | `PRODUCTION_ENV_B64` | base64 of the full `.env` template (OAuth/payment/Jira/business config preserved) |
 | `PROD_USER` | usually `root` |
-| `SENDGRID_API_KEY` | sending the credentials email |
+| `SENDGRID_API_KEY` | **OPTIONAL** — only a last-resort fallback. The credentials email is sent via the platform's own **Gmail** (`GMAIL_OAUTH_*`, or `EMAIL_HOST_USER`/`EMAIL_HOST_PASSWORD` app password) carried in `PRODUCTION_ENV_B64`. Not needed if Gmail is configured. |
 | `GH_ADMIN_TOKEN` | **REQUIRED for four-droplet.** PAT with Environment `secrets: write` on this repo. The default `github.token` CANNOT write Environment secrets (HTTP 403), and the cluster persists `PROD_HOST` / `PROD_APP_HOST` / `PROD_DB_HOST` / `PROD_LABS_HOST` / `VAULT_*` as Environment secrets the bootstrap/deploy jobs read. A preflight step now aborts **before** creating any droplet if this token can't write secrets. (Single-droplet does not need it.) |
 | `DO_PROTECTED_DROPLET_IDS` | (optional) droplet IDs the automation must never modify |
 
