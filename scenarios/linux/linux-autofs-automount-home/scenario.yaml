@@ -1,0 +1,44 @@
+title: 'Fix autofs so On-Demand /data Automounts Work'
+slug: linux-autofs-automount-home
+difficulty: medium
+category: 'Storage / autofs'
+technology: linux
+description: |
+  The team uses autofs to mount project shares on demand under /data/projects, but
+  accessing a project directory fails with 'No such file or directory'. The autofs master
+  map points at the wrong map file (or the map entry is malformed), so the automounter
+  never mounts anything. Correct the autofs master map and the project map so that
+  /data/projects/<name> automounts on access, then reload autofs. Record the fix.
+initial_state: |
+  Simulated RHEL 9 server with the autofs package installed. /etc/auto.master has a broken
+  entry for /data/projects and the referenced map file is wrong, so ls /data/projects/app
+  fails. The autofs service is running but mounts nothing.
+objectives:
+  - Reproduce the failure: ls /data/projects/app returns no such file
+  - Inspect /etc/auto.master and the referenced map file for the wrong path/syntax
+  - Correct the master map to reference the right indirect map (e.g. /data/projects /etc/auto.projects)
+  - Fix the map entry syntax and reload autofs (systemctl reload autofs)
+  - Record the remediation
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+topics_covered:
+  - autofs
+  - automount
+  - auto.master
+  - systemd
+hints:
+  - content: 'ls /data/projects/app fails because autofs never triggers a mount. Read /etc/auto.master — the mount point or the map file it points to is wrong.'
+    cost: 10
+    order: 1
+  - content: 'The master map line should bind the autofs mountpoint to an indirect map, e.g. ''/data/projects /etc/auto.projects''. Check that /etc/auto.projects exists and its entries are well formed (key -options server:/export/key).'
+    cost: 15
+    order: 2
+  - content: 'After correcting /etc/auto.master and the map, reload the automounter: systemctl reload autofs (or restart). Then ls /data/projects/app should trigger the mount.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

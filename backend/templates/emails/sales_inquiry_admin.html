@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>FixitLab Sales</title></head>
+<body style="margin:0;padding:0;background-color:#0a0e1a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0e1a;padding:32px 16px;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+  <tr><td style="text-align:center;padding:24px 0 20px;">
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr>
+      <td style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#06b6d4,#8b5cf6);text-align:center;line-height:44px;"><span style="color:#fff;font-weight:800;font-size:20px;">F</span></td>
+      <td style="padding-left:12px;"><span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">FixitLab</span></td>
+    </tr></table>
+  </td></tr>
+  <tr><td>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#141b2d 0%,#1a2235 100%);border-radius:16px;border:1px solid #1e293b;overflow:hidden;">
+      <tr><td style="height:6px;background:linear-gradient(90deg,#06b6d4,#8b5cf6,#ec4899);"></td></tr>
+      <tr><td style="padding:32px 40px 8px;">
+        <h1 style="color:#ffffff;font-size:24px;font-weight:700;margin:0;">New Teams / Org inquiry</h1>
+        <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:8px 0 0;">A new "Contact Sales" inquiry was submitted. Reply directly to the work email to start the conversation.</p>
+      </td></tr>
+      <tr><td style="padding:20px 40px 8px;">
+        <table width="100%" style="background:#0f172a;border-radius:12px;border:1px solid #1e293b;overflow:hidden;">
+          <tr><td style="padding:14px 20px;border-bottom:1px solid #1e293b;"><table width="100%"><tr>
+            <td style="color:#94a3b8;font-size:13px;">Contact</td>
+            <td style="color:#e2e8f0;font-size:14px;font-weight:700;text-align:right;">{{ full_name }}</td>
+          </tr></table></td></tr>
+          <tr><td style="padding:14px 20px;border-bottom:1px solid #1e293b;"><table width="100%"><tr>
+            <td style="color:#94a3b8;font-size:13px;">Organization</td>
+            <td style="color:#06b6d4;font-size:14px;font-weight:700;text-align:right;">{{ organization }}</td>
+          </tr></table></td></tr>
+          <tr><td style="padding:14px 20px;border-bottom:1px solid #1e293b;"><table width="100%"><tr>
+            <td style="color:#94a3b8;font-size:13px;">Work email</td>
+            <td style="color:#8b5cf6;font-size:14px;font-weight:700;text-align:right;"><a href="mailto:{{ work_email }}" style="color:#8b5cf6;text-decoration:none;">{{ work_email }}</a></td>
+          </tr></table></td></tr>
+          {% if company %}<tr><td style="padding:14px 20px;border-bottom:1px solid #1e293b;"><table width="100%"><tr>
+            <td style="color:#94a3b8;font-size:13px;">Company</td>
+            <td style="color:#e2e8f0;font-size:14px;font-weight:600;text-align:right;">{{ company }}</td>
+          </tr></table></td></tr>{% endif %}
+          {% if phone %}<tr><td style="padding:14px 20px;border-bottom:1px solid #1e293b;"><table width="100%"><tr>
+            <td style="color:#94a3b8;font-size:13px;">Phone</td>
+            <td style="color:#e2e8f0;font-size:14px;font-weight:600;text-align:right;">{{ phone }}</td>
+          </tr></table></td></tr>{% endif %}
+          {% if team_size %}<tr><td style="padding:14px 20px;"><table width="100%"><tr>
+            <td style="color:#94a3b8;font-size:13px;">Team size</td>
+            <td style="color:#10b981;font-size:14px;font-weight:700;text-align:right;">{{ team_size }}</td>
+          </tr></table></td></tr>{% endif %}
+        </table>
+      </td></tr>
+      {% if message %}<tr><td style="padding:8px 40px 8px;">
+        <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;">Message</p>
+        <div style="background:#0f172a;border-radius:12px;border:1px solid #1e293b;padding:18px;">
+          <p style="color:#e2e8f0;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">{{ message }}</p>
+        </div>
+      </td></tr>{% endif %}
+      <tr><td style="text-align:center;padding:24px 40px 36px;">
+        <a href="{{ admin_url }}" style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#8b5cf6);color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:12px 28px;border-radius:10px;">Open in Admin → Sales</a>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="text-align:center;padding:20px 0;">
+    <p style="color:#475569;font-size:12px;margin:0;">&copy; 2026 FixitLab — Teams &amp; Org sales</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body>
+</html>

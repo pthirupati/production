@@ -105,6 +105,70 @@ class TechnologySubscription(models.Model):
         super().save(*args, **kwargs)
 
 
+class SalesInquiry(models.Model):
+    """Teams / Org "Contact Sales" inquiry.
+
+    Captured from the public /contact-sales page. Admins triage these and can
+    attach a custom quote (amount + currency + notes + validity) that the org
+    negotiates to.
+    """
+
+    STATUS_CHOICES = [
+        ("new", "New"),
+        ("contacted", "Contacted"),
+        ("quoted", "Quoted"),
+        ("won", "Won"),
+        ("lost", "Lost"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Submitter details
+    full_name = models.CharField(max_length=150)
+    organization = models.CharField(max_length=200)
+    work_email = models.EmailField()
+    company = models.CharField(max_length=200, blank=True, default="")
+    phone = models.CharField(max_length=50, blank=True, default="")
+    team_size = models.CharField(max_length=50, blank=True, default="")
+    message = models.TextField(blank=True, default="")
+
+    # Triage
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="new")
+    handled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="handled_sales_inquiries",
+    )
+
+    # Custom quote the org negotiates to (nullable until an admin sets it)
+    custom_quote_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    custom_quote_currency = models.CharField(max_length=3, blank=True, default="USD")
+    custom_quote_notes = models.TextField(blank=True, default="")
+    custom_quote_valid_until = models.DateField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Sales inquiry"
+        verbose_name_plural = "Sales inquiries"
+        indexes = [
+            models.Index(fields=["status", "-created_at"], name="sales_status_created_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.organization} ({self.work_email}) — {self.status}"
+
+    @property
+    def has_quote(self):
+        return self.custom_quote_amount is not None
+
+
 class PaymentTransaction(models.Model):
     """Track all payment transactions with idempotency and audit trail."""
 

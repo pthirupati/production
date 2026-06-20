@@ -58,6 +58,10 @@ from .views import (
     AdminInterviewMaintenanceView,
     AdminEnvSecretsView,
 )
+from apps.billing.sales_views import (
+    AdminSalesInquiriesView,
+    AdminSalesInquiryDetailView,
+)
 from apps.interviews.admin_views import (
     AdminInterviewOverviewView,
     AdminInterviewCampaignsView,
@@ -180,6 +184,11 @@ urlpatterns = [
     path("interviews/entitlements/", AdminInterviewEntitlementsView.as_view()),
     path("interviews/maintenance/", AdminInterviewMaintenanceView.as_view()),
     path("certificates/", AdminCertificatesView.as_view()),
+
+    # Teams/Org sales inquiries + custom quotes
+    path("sales/", AdminSalesInquiriesView.as_view()),
+    path("sales/<uuid:pk>/", AdminSalesInquiryDetailView.as_view()),
+
     path("env-secrets/", AdminEnvSecretsView.as_view()),
     path("env-secrets/sync/", AdminEnvSecretsView.as_view()),
 ]

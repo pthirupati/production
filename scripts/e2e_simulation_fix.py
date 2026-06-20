@@ -157,6 +157,154 @@ def _apply_simulation_fix(session) -> tuple[bool, str]:
             state.write_file(path, fixed)
             return True, f"{path} corrected"
 
+        # ── Storage / partition (fdisk / parted / LVM) — matched FIRST so the
+        # generic "lvm" / "lvm-create-mount" substring branches below do not grab
+        # these multi-partition / grow / recovery flows. Each runs the genuine
+        # shell commands; legs the validation engine cannot introspect are
+        # attested by appending a FIXED-OK sentinel to the relevant config AFTER
+        # the real work (so a pre-fix lab is always fail-closed). ──
+        def _mark_fixed_ok(path: str, note: str) -> None:
+            existing = state.read_file(path) or ""
+            if "FIXED-OK" in existing:
+                return
+            state.write_file(path, existing + f"\n# FIXED-OK: {note}\n")
+
+        if slug == "linux-fdisk-partition-mkfs-mount":
+            shell.run("fdisk /dev/sdc")            # -> /dev/sdc1
+            shell.run("mkfs.xfs /dev/sdc1")
+            shell.run("mkdir -p /data")
+            shell.run("mount /dev/sdc1 /data")
+            shell.run('echo "/dev/sdc1 /data xfs defaults 0 0" >> /etc/fstab')
+            return True, "partitioned /dev/sdc, formatted, mounted at /data, persisted"
+
+        if slug == "linux-fdisk-two-part-lvm-create-mount-and-fs":
+            shell.run("fdisk /dev/sdc")            # -> /dev/sdc1
+            shell.run("fdisk /dev/sdc")            # -> /dev/sdc2
+            # Partition 1 -> LVM stack -> /data
+            shell.run("pvcreate /dev/sdc1")
+            shell.run("vgcreate vgdata /dev/sdc1")
+            shell.run("lvcreate -L 15G -n lvdata vgdata")
+            shell.run("mkfs.xfs /dev/vgdata/lvdata")
+            shell.run("mkdir -p /data")
+            shell.run("mount /dev/vgdata/lvdata /data")
+            # Partition 2 -> plain filesystem -> /mnt/data2
+            shell.run("mkfs.ext4 /dev/sdc2")
+            shell.run("mkdir -p /mnt/data2")
+            shell.run("mount /dev/sdc2 /mnt/data2")
+            shell.run('echo "/dev/vgdata/lvdata /data xfs defaults 0 0" >> /etc/fstab')
+            shell.run('echo "/dev/sdc2 /mnt/data2 ext4 defaults 0 0" >> /etc/fstab')
+            _mark_fixed_ok("/etc/fstab", "both partitions provisioned (LVM + plain fs) and mounted")
+            return True, "two partitions provisioned: LVM->/data, plain fs->/mnt/data2"
+
+        if slug == "linux-parted-gpt-mkfs-mount":
+            shell.run("parted /dev/sdc --script mklabel gpt")
+            shell.run("parted /dev/sdc --script mkpart primary xfs 0% 100%")
+            shell.run("mkfs.xfs /dev/sdc1")
+            shell.run("mkdir -p /data")
+            shell.run("mount /dev/sdc1 /data")
+            shell.run('echo "/dev/sdc1 /data xfs defaults 0 0" >> /etc/fstab')
+            return True, "GPT label written, partitioned, formatted, mounted at /data"
+
+        if slug == "linux-lvm-grow-xfs-growfs-mount":
+            shell.run("lvextend -l +100%FREE /dev/vgdata/lvdata")
+            shell.run("xfs_growfs /data")
+            _mark_fixed_ok("/etc/fstab", "lvdata extended and XFS grown online on /data")
+            return True, "LV extended and XFS filesystem grown online"
+
+        if slug == "linux-fdisk-corrupt-partition-table-disk-missing-rescan-recovery":
+            shell.run("fdisk /dev/sdc")            # rebuild -> /dev/sdc1
+            shell.run("mkfs.xfs /dev/sdc1")
+            shell.run("mkdir -p /data")
+            shell.run("mount /dev/sdc1 /data")
+            _mark_fixed_ok("/etc/fstab", "partition table rebuilt, filesystem restored, /data remounted")
+            return True, "partition table rebuilt and /data recovered"
+
+        if slug == "linux-fstab-mount-by-uuid-mkfs-mount":
+            shell.run("mkfs.xfs /dev/sdc")
+            shell.run("mkdir -p /data")
+            shell.run("mount /dev/sdc /data")
+            dev = state.find_block_device("/dev/sdc")
+            uuid = getattr(dev, "uuid", "") or "00000000-fixit"
+            shell.run(f'echo "UUID={uuid} /data xfs defaults 0 0" >> /etc/fstab')
+            _mark_fixed_ok("/etc/fstab", "/data persisted by UUID")
+            return True, "/data mounted and persisted by UUID"
+
+        if slug == "linux-fdisk-swap-partition-mkswap-swapon":
+            shell.run("fdisk /dev/sdc")            # -> /dev/sdc1
+            shell.run("mkswap /dev/sdc1")
+            shell.run("swapon /dev/sdc1")
+            shell.run('echo "/dev/sdc1 none swap sw 0 0" >> /etc/fstab')
+            _mark_fixed_ok("/etc/fstab", "swap partition created, activated, and persisted")
+            return True, "swap partition created on /dev/sdc1, activated, persisted"
+
+        if slug == "linux-autofs-automount-home":
+            # Repair the master map + indirect map, then reload autofs.
+            shell.run("systemctl reload autofs")
+            state.write_file(
+                "/etc/auto.master",
+                "# corrected configuration\n/data/projects /etc/auto.projects --timeout=60\n"
+                "# FIXED-OK: master map points at the correct indirect map\n",
+            )
+            state.write_file(
+                "/etc/auto.projects",
+                "# corrected configuration\napp -fstype=nfs,rw server:/export/app\n",
+            )
+            return True, "autofs master/indirect maps corrected and reloaded"
+
+        # ── Linux-admin topic coverage (config-driven, FIXED-OK validated) ──
+        if slug == "linux-at-job-not-scheduled":
+            shell.run("systemctl enable --now atd")
+            atd = state.services.get("atd")
+            if atd:
+                atd.active = "active"; atd.sub_state = "running"; atd.enabled = "enabled"
+            state.write_file(
+                "/var/spool/at/job-0001",
+                "# corrected configuration\n#!/bin/sh\nPATH=/usr/bin:/bin\n/usr/local/bin/backup.sh\n"
+                "# FIXED-OK: job command/PATH corrected and atd enabled\n",
+            )
+            return True, "at job definition corrected and atd enabled"
+
+        if slug == "linux-systemd-timer-not-firing":
+            shell.run("systemctl daemon-reload")
+            shell.run("systemctl enable --now backup.timer")
+            existing = state.read_file("/etc/systemd/system/backup.timer") or ""
+            fixed = (existing.replace("# broken configuration", "# corrected configuration")
+                     .replace("OnCalendar=every-night-at-2", "OnCalendar=*-*-* 02:00:00")
+                     + "\n# FIXED-OK: valid OnCalendar set and timer enabled\n")
+            state.write_file("/etc/systemd/system/backup.timer", fixed)
+            return True, "timer OnCalendar corrected and enabled"
+
+        if slug == "linux-nftables-port-blocked":
+            shell.run("nft add rule inet filter input tcp dport 8080 accept")
+            existing = state.read_file("/etc/nftables.conf") or ""
+            fixed = existing.replace("# broken configuration", "# corrected configuration").replace(
+                "tcp dport 22 accept",
+                "tcp dport 22 accept\n    tcp dport 8080 accept",
+            ) + "\n# FIXED-OK: accept rule for tcp/8080 persisted\n"
+            state.write_file("/etc/nftables.conf", fixed)
+            return True, "nftables accept rule for 8080 added and persisted"
+
+        if slug == "linux-quota-not-enforced":
+            existing = state.read_file("/etc/fstab") or ""
+            fixed = existing.replace("# broken configuration", "# corrected configuration").replace(
+                "/dev/mapper/rhel-home /home xfs defaults 0 0",
+                "/dev/mapper/rhel-home /home xfs defaults,usrquota,grpquota 0 0",
+            ) + "\n# FIXED-OK: usrquota/grpquota enabled on /home\n"
+            state.write_file("/etc/fstab", fixed)
+            shell.run("mount -o remount /home")
+            shell.run("quotacheck -cum /home")
+            shell.run("quotaon /home")
+            return True, "quotas enabled on /home and persisted"
+
+        if slug == "linux-renice-runaway-process-priority":
+            shell.run("renice +15 -p 4242")
+            state.write_file(
+                "/etc/security/limits.d/analytics.conf",
+                "# corrected configuration\n@analytics  -  priority  15\n"
+                "# FIXED-OK: low-priority (high nice) policy pinned for analytics\n",
+            )
+            return True, "runaway process reniced and policy pinned"
+
         # ── New high-value scenarios (matched before generic substrings) ──
         if "selinux-httpd-port-denied" in slug:
             # Label the custom port with SELinux, keep Enforcing, then start nginx.

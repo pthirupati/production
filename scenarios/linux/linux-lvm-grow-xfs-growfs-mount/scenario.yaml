@@ -1,0 +1,44 @@
+title: 'Grow a Full LVM Volume Online with lvextend + xfs_growfs'
+slug: linux-lvm-grow-xfs-growfs-mount
+difficulty: medium
+category: 'Storage / LVM'
+technology: linux
+description: |
+  The logical volume vgdata/lvdata is mounted at /data and is 100% full, causing writes
+  to fail. The volume group vgdata still has free extents available (a spare PV was added
+  earlier). You must grow the logical volume into that free space and then grow the XFS
+  filesystem ONLINE so /data gains capacity without unmounting. After growing, record the
+  change. Growing the LV alone is not enough — the XFS filesystem must also be expanded.
+initial_state: |
+  Simulated RHEL 9 server. df -h shows /data at 100% on /dev/mapper/vgdata-lvdata. vgs
+  shows vgdata has free space. The XFS filesystem on /data has not yet been grown to use
+  any new extents.
+objectives:
+  - Confirm the shortage with df -h /data and the free space with vgs
+  - Extend the LV into the free extents: lvextend -l +100%FREE /dev/vgdata/lvdata
+  - Grow the XFS filesystem online: xfs_growfs /data
+  - Confirm /data is larger with df -h and record the remediation
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+topics_covered:
+  - lvm
+  - lvextend
+  - xfs_growfs
+  - resize2fs
+  - grow-filesystem
+hints:
+  - content: 'df -h /data shows 100% used. vgs shows vgdata still has free extents — the LV simply has not claimed them yet.'
+    cost: 10
+    order: 1
+  - content: 'Extend the logical volume into all free space: lvextend -l +100%FREE /dev/vgdata/lvdata (or lvextend -L +10G ...). This grows the block device but NOT the filesystem yet.'
+    cost: 15
+    order: 2
+  - content: 'XFS can only grow, never shrink, and is grown by mountpoint while mounted: xfs_growfs /data. Re-check with df -h /data. (For ext4 you would use resize2fs instead.)'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

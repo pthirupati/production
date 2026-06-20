@@ -1,0 +1,44 @@
+title: 'Mount a Data Filesystem by UUID in /etc/fstab'
+slug: linux-fstab-mount-by-uuid-mkfs-mount
+difficulty: medium
+category: 'Storage / fstab'
+technology: linux
+description: |
+  The spare disk /dev/sdc must back /data, but device names like /dev/sdc are not stable
+  across reboots and re-cabling — the team standard is to mount filesystems by UUID. Make
+  a filesystem on /dev/sdc, look up its UUID with blkid, mount it at /data, and add an
+  fstab entry that references the filesystem by UUID= (not by /dev/sdc). Persisting it by
+  device name is not acceptable for this task.
+initial_state: |
+  Simulated RHEL 9 server. /dev/sdc (20G) is present but unformatted. /data is not
+  mounted and /etc/fstab has no UUID-based entry for it.
+objectives:
+  - Create a filesystem: mkfs.xfs /dev/sdc
+  - Find the UUID with blkid /dev/sdc
+  - Mount it at /data
+  - Add a UUID-based line to /etc/fstab (UUID=... /data xfs defaults 0 0)
+  - Verify the by-UUID mount resolves with mount -a and findmnt
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+topics_covered:
+  - fstab
+  - uuid
+  - blkid
+  - mkfs
+  - mount
+hints:
+  - content: 'Format the disk first so it has a UUID: mkfs.xfs /dev/sdc. Then read the UUID with blkid /dev/sdc.'
+    cost: 10
+    order: 1
+  - content: 'Mount it now and confirm: mkdir -p /data; mount /dev/sdc /data; mount | grep /data.'
+    cost: 15
+    order: 2
+  - content: 'For stability, the fstab entry must use the UUID, not /dev/sdc: add ''UUID=<the-uuid> /data xfs defaults 0 0'' to /etc/fstab and test with mount -a.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

@@ -1,0 +1,44 @@
+title: 'Tame a Runaway Process with renice and a Limit'
+slug: linux-renice-runaway-process-priority
+difficulty: easy
+category: 'Linux Administration'
+technology: linux
+description: |
+  A batch analytics process is hogging CPU and starving interactive work because it runs at
+  the default priority. Operations policy is to keep this workload at a low CPU priority
+  (high nice value) and to capture that policy so future launches inherit it. Renice the
+  running process to a low priority and record the policy (e.g. a wrapper/limits drop-in)
+  so it is reproducible. Record the remediation.
+initial_state: |
+  Simulated RHEL 9 server. top shows the analytics process at nice 0 consuming most CPU.
+  There is no policy file pinning it to a lower priority, so every restart reverts to nice
+  0 and re-starves the box.
+objectives:
+  - Identify the offending PID with top / ps -eo pid,ni,comm
+  - Renice it to a low priority: renice +15 -p <pid> (higher nice = lower priority)
+  - Confirm the new nice value with ps -o ni
+  - Capture the policy so future runs start at the lower priority and record it
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+topics_covered:
+  - nice
+  - renice
+  - priority
+  - cpu
+  - limits
+hints:
+  - content: 'ps -eo pid,ni,comm shows the analytics process at nice 0. Higher nice value = lower CPU priority; you want to raise its nice.'
+    cost: 10
+    order: 1
+  - content: 'Renice the running process: renice +15 -p <pid> (only root can lower the nice number; raising it is always allowed). Verify with ps -o ni -p <pid>.'
+    cost: 15
+    order: 2
+  - content: 'So it sticks across restarts, pin the policy in a drop-in/wrapper (e.g. nice -n 15 in the launcher, or a /etc/security/limits.d entry) and save it.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

@@ -1,0 +1,41 @@
+title: 'One-Off at Job Never Runs — atd and Queue'
+slug: linux-at-job-not-scheduled
+difficulty: easy
+category: 'Linux Administration'
+technology: linux
+description: |
+  A one-off maintenance task was supposed to run tonight via the `at` command, but the job
+  never executes. The atd daemon is not enabled, and the queued job definition under
+  /var/spool/at is malformed. Fix the at job definition and ensure atd is running/enabled so
+  the job fires at its scheduled time. Record the remediation.
+initial_state: |
+  Simulated RHEL 9 server. `atq` shows a job but it never runs; `systemctl is-enabled atd`
+  reports disabled. The job script under /var/spool/at references a missing command path.
+objectives:
+  - List queued jobs with atq and inspect the job body with at -c <id>
+  - Correct the malformed job definition (fix the command/PATH)
+  - Enable and start atd so queued jobs actually run
+  - Record the remediation in the job definition file
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+topics_covered:
+  - at
+  - atd
+  - scheduling
+  - systemd
+hints:
+  - content: 'atq shows the job is queued, but `systemctl is-enabled atd` is disabled — nothing will execute it. Also inspect the job body with at -c <jobid>.'
+    cost: 10
+    order: 1
+  - content: 'Fix the job definition under /var/spool/at (correct the command path / add the needed PATH), then enable the daemon: systemctl enable --now atd.'
+    cost: 15
+    order: 2
+  - content: 'Re-queue if needed (echo ''cmd'' | at <time>) and confirm with atq. Make sure the corrected job file is saved.'
+    cost: 15
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

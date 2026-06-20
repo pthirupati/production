@@ -429,6 +429,8 @@ JWT_SESSION_ENFORCEMENT = env.bool("JWT_SESSION_ENFORCEMENT", default=True)
 PRIMARY_EMAIL = env("PRIMARY_EMAIL", default="fixitlab@gmail.com")
 PAYMENT_EMAIL = env("PAYMENT_EMAIL", default="kubelearn464@gmail.com")
 SUPPORT_EMAIL = env("SUPPORT_EMAIL", default="fixitlab.techsupport@gmail.com")
+# Inbox that receives Teams/Org "Contact Sales" inquiries.
+SALES_INBOX = env("SALES_INBOX", default="fixitlab.admin@gmail.com")
 
 # --------------------------------------------------
 # Maintenance Mode

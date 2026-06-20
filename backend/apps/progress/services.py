@@ -120,37 +120,57 @@ def check_achievements(user, scenario, score, time_seconds, hints_used):
     return awarded
 
 
-def _check_streaks(user):
-    """Check if user has earned streak achievements."""
-    from django.db.models import DateField
+def compute_current_streak(user) -> int:
+    """Return the user's current consecutive-day solving streak (today-anchored).
+
+    A streak is the number of consecutive days, counting back from today, on
+    which the user completed at least one scenario. If they haven't solved
+    today *or* yesterday, the streak is 0 (a gap broke it). Pure read — no
+    side effects — so it's safe to call from any endpoint.
+    """
     from django.db.models.functions import TruncDate
 
-    # Get distinct dates when user completed scenarios (last 31 days)
     recent_dates = (
         UserScenarioProgress.objects.filter(
             user=user,
             completed=True,
-            completed_at__gte=timezone.now() - timezone.timedelta(days=31),
+            completed_at__gte=timezone.now() - timezone.timedelta(days=400),
         )
         .annotate(date=TruncDate("completed_at"))
         .values_list("date", flat=True)
         .distinct()
-        .order_by("-date")
     )
-    dates = sorted(set(recent_dates), reverse=True)
-
+    dates = set(d for d in recent_dates if d is not None)
     if not dates:
-        return
+        return 0
 
-    # Count consecutive days from today
-    streak = 0
     today = timezone.now().date()
-    for i, d in enumerate(dates):
-        expected = today - timezone.timedelta(days=i)
-        if d == expected:
-            streak += 1
-        else:
-            break
+    # Anchor: today if solved today, else yesterday (so an evening visit before
+    # solving doesn't show the streak as already broken).
+    if today in dates:
+        anchor = today
+    elif (today - timezone.timedelta(days=1)) in dates:
+        anchor = today - timezone.timedelta(days=1)
+    else:
+        return 0
+
+    streak = 0
+    cursor = anchor
+    while cursor in dates:
+        streak += 1
+        cursor -= timezone.timedelta(days=1)
+    return streak
+
+
+def _check_streaks(user):
+    """Award streak achievements AND persist streak/XP onto the user's Profile.
+
+    The Profile already carries daily_streak / longest_streak /
+    last_activity_date / xp fields; this is the single place that keeps them in
+    sync so the dashboard streak calendar and XP/level widgets have real data.
+    All Profile writes are best-effort and never block achievement awarding.
+    """
+    streak = compute_current_streak(user)
 
     if streak >= 3:
         UserAchievement.objects.get_or_create(user=user, achievement="streak_3")
@@ -158,6 +178,84 @@ def _check_streaks(user):
         UserAchievement.objects.get_or_create(user=user, achievement="streak_7")
     if streak >= 30:
         UserAchievement.objects.get_or_create(user=user, achievement="streak_30")
+
+    # Mirror streak + XP onto the Profile (dormant until now). XP is derived
+    # from completions/score below in award_xp_for_completion, so here we only
+    # keep the streak counters and last-activity date authoritative.
+    try:
+        from apps.accounts.models import Profile
+
+        profile, _ = Profile.objects.get_or_create(user=user)
+        today = timezone.now().date()
+        updates = []
+        if profile.daily_streak != streak:
+            profile.daily_streak = streak
+            updates.append("daily_streak")
+        if streak > profile.longest_streak:
+            profile.longest_streak = streak
+            updates.append("longest_streak")
+        if profile.last_activity_date != today:
+            profile.last_activity_date = today
+            updates.append("last_activity_date")
+        if updates:
+            profile.save(update_fields=updates)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Profile streak sync failed for %s: %s", user, exc)
+
+
+def _level_threshold(level: int) -> int:
+    """Cumulative XP required to *reach* a given level: 100 * (level-1)^2.
+
+    lvl1=0, lvl2=100, lvl3=400, lvl4=900, lvl5=1600, ...
+    """
+    return 100 * ((max(1, level) - 1) ** 2)
+
+
+def compute_level(xp: int) -> dict:
+    """Map an XP total to a level + progress toward the next level.
+
+    Simple, deterministic quadratic curve (see _level_threshold). Cheap to
+    compute, no schema. Returns:
+    {level, xp, xp_into_level, xp_for_next_level, progress_pct, next_level}.
+    """
+    xp = max(0, int(xp or 0))
+    # Highest level whose threshold is <= xp.
+    level = 1
+    while _level_threshold(level + 1) <= xp:
+        level += 1
+    current_threshold = _level_threshold(level)
+    next_threshold = _level_threshold(level + 1)
+    span = max(1, next_threshold - current_threshold)
+    into = max(0, xp - current_threshold)
+    return {
+        "level": level,
+        "xp": xp,
+        "xp_into_level": into,
+        "xp_for_next_level": next_threshold - current_threshold,
+        "progress_pct": min(100, round(into / span * 100)),
+        "next_level": level + 1,
+    }
+
+
+def award_xp_for_completion(user, score: int, difficulty: str | None = None) -> int:
+    """Add XP to the user's Profile for a completed scenario and return new total.
+
+    Formula (FREE, deterministic): base 50 + score + difficulty bonus
+    (easy 0 / medium 25 / hard 50). Best-effort; never raises.
+    """
+    bonus = {"easy": 0, "medium": 25, "hard": 50}.get((difficulty or "").lower(), 0)
+    gained = 50 + max(0, int(score or 0)) + bonus
+    try:
+        from apps.accounts.models import Profile
+        from django.db.models import F as _F
+
+        Profile.objects.get_or_create(user=user)
+        Profile.objects.filter(user=user).update(xp=_F("xp") + gained)
+        profile = Profile.objects.filter(user=user).only("xp").first()
+        return profile.xp if profile else gained
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("XP award failed for %s: %s", user, exc)
+        return 0
 
 
 def _notify_achievements(user, achievement_types):

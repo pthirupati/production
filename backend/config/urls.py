@@ -14,6 +14,7 @@ from apps.accounts.views import (
     LabHistoryView, SearchView, ContactView,
     CookieTokenRefreshView,
 )
+from apps.billing.sales_views import SalesInquiryView
 
 urlpatterns = [
     # Django admin (accessible at /django-admin/ to avoid conflict with frontend /admin/*)
@@ -45,6 +46,9 @@ urlpatterns = [
 
     # Contact form
     path("api/contact/", ContactView.as_view(), name="contact"),
+
+    # Teams/Org "Contact Sales" inquiry (public, AllowAny)
+    path("api/sales/inquiry/", SalesInquiryView.as_view(), name="sales_inquiry"),
 
     # Lab history
     path("api/labs/history/", LabHistoryView.as_view(), name="lab_history"),

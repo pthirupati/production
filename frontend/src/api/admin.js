@@ -534,6 +534,17 @@ export const adminApi = {
     const { data } = await api.post('/admin/campaigns/social/', payload)
     return data
   },
+
+  // Teams/Org sales inquiries + custom quotes
+  async getSalesInquiries(status = '') {
+    const q = status ? `?status=${encodeURIComponent(status)}` : ''
+    const { data } = await api.get(`/admin/sales/${q}`)
+    return data
+  },
+  async updateSalesInquiry(id, payload) {
+    const { data } = await api.patch(`/admin/sales/${id}/`, payload)
+    return data
+  },
 }
 
 /** Trigger a browser download for a Blob */

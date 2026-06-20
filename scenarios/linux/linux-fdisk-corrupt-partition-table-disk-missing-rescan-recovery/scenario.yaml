@@ -1,0 +1,47 @@
+title: 'Recover a Corrupted Partition Table and Remount Data'
+slug: linux-fdisk-corrupt-partition-table-disk-missing-rescan-recovery
+difficulty: hard
+category: 'Storage / Recovery'
+technology: linux
+description: |
+  After a botched dd, the partition table on /dev/sdc was wiped. The disk still exists but
+  its single data partition /dev/sdc1 vanished, so the /data filesystem can no longer be
+  mounted and the application is down. You must recreate the partition with the SAME layout
+  (one primary partition spanning the disk), restore the filesystem onto it, remount it at
+  /data, repair /etc/fstab, and record the recovery. (In a real incident you might recover
+  the table with testdisk or a sgdisk backup; here you rebuild it cleanly.)
+initial_state: |
+  Simulated RHEL 9 server. fdisk -l /dev/sdc shows the disk but NO partitions — the table
+  is gone. /data is not mounted. /etc/fstab references the old partition. The application
+  that depends on /data is failing.
+objectives:
+  - Inspect the damage with fdisk -l /dev/sdc (no partition present)
+  - Recreate the primary partition with fdisk /dev/sdc
+  - Lay a filesystem back down: mkfs.xfs /dev/sdc1
+  - Remount at /data and correct the /etc/fstab entry
+  - Record the recovery so the change is auditable
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+topics_covered:
+  - fdisk
+  - partition-table
+  - recovery
+  - mkfs
+  - mount
+  - fstab
+hints:
+  - content: 'fdisk -l /dev/sdc shows the disk but its partition table is empty — the partition that backed /data is gone, which is why the mount fails.'
+    cost: 10
+    order: 1
+  - content: 'Rebuild the partition with the original single-primary layout: fdisk /dev/sdc (n, p, defaults, w). /dev/sdc1 returns.'
+    cost: 20
+    order: 2
+  - content: 'Recreate the filesystem and bring /data back: mkfs.xfs /dev/sdc1; mount /dev/sdc1 /data; fix the /etc/fstab line to match (/dev/sdc1 /data xfs defaults 0 0).'
+    cost: 25
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

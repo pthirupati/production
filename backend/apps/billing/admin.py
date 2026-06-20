@@ -14,6 +14,7 @@ from .models import (
     CouponCode,
     PaymentTransaction,
     Plan,
+    SalesInquiry,
     Subscription,
     SubscriptionInvoice,
     TechnologySubscription,
@@ -395,6 +396,56 @@ class UserCertificateAdmin(admin.ModelAdmin):
         if obj.is_expired:
             return format_html('<span style="color:red;font-weight:bold;">Expired</span>')
         return format_html('<span style="color:green;font-weight:bold;">Valid</span>')
+
+
+# ---------------------------------------------------------------------------
+# Sales inquiry admin (Teams/Org Contact Sales)
+# ---------------------------------------------------------------------------
+
+@admin.register(SalesInquiry)
+class SalesInquiryAdmin(admin.ModelAdmin):
+    list_display = (
+        "organization",
+        "full_name",
+        "work_email",
+        "team_size",
+        "status",
+        "quote_display",
+        "handled_by",
+        "created_at",
+    )
+    list_filter = (
+        "status",
+        "custom_quote_currency",
+        ("created_at", admin.DateFieldListFilter),
+    )
+    search_fields = ("organization", "full_name", "work_email", "company", "phone")
+    readonly_fields = ("id", "created_at", "updated_at")
+    list_select_related = ("handled_by",)
+    date_hierarchy = "created_at"
+    fieldsets = (
+        ("Submitter", {
+            "fields": ("full_name", "organization", "work_email", "company", "phone", "team_size", "message"),
+        }),
+        ("Triage", {
+            "fields": ("status", "handled_by"),
+        }),
+        ("Custom quote", {
+            "fields": (
+                "custom_quote_amount", "custom_quote_currency",
+                "custom_quote_notes", "custom_quote_valid_until",
+            ),
+        }),
+        ("Meta", {
+            "fields": ("id", "created_at", "updated_at"),
+        }),
+    )
+
+    @admin.display(description="Quote")
+    def quote_display(self, obj):
+        if obj.custom_quote_amount is None:
+            return "—"
+        return f"{obj.custom_quote_currency} {obj.custom_quote_amount}"
 
 
 # Fix missing import for ExpiredCouponFilter

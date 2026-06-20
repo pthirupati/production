@@ -463,6 +463,126 @@ PROJECTS = [
     },
     {
         "technology_slug": "linux",
+        "title": "Storage Lifecycle: From Bare Disk to Snapshot Backup",
+        "slug": "linux-storage-disk-to-snapshot",
+        "architecture_type": "custom",
+        "description": (
+            "A spare disk has been attached to a busy database host that is running out of room on /data. "
+            "Work the ticket queue end to end: bring the new disk online, partition it with fdisk, build the "
+            "LVM stack, lay down a filesystem and mount it persistently, grow it online when it fills again, "
+            "and finally protect the data with an LVM snapshot and a verified backup/restore. This is the "
+            "exact zero-to-hero arc an SRE follows to provision and safeguard production storage."
+        ),
+        "objectives": [
+            "Bring a hot-added disk online and partition it with fdisk",
+            "Assemble the partition into an LVM volume group and logical volume",
+            "Create, mount, and persist a filesystem via /etc/fstab (by UUID)",
+            "Grow the volume and filesystem online under pressure",
+            "Snapshot the volume and prove a backup/restore works",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 6,
+        "tasks": [
+            {
+                "jira_key": "STOR-1",
+                "title": "Bring the new disk online",
+                "description": (
+                    "Ops hot-added a virtual disk, but lsblk still does not show /dev/sdc. Rescan the SCSI bus "
+                    "so the kernel sees the new device, then confirm it is the expected size and unused."
+                ),
+                "acceptance_criteria": "`lsblk` lists /dev/sdc with no partitions or filesystem; `fdisk -l /dev/sdc` shows the raw disk.",
+                "hint": "Trigger a rescan: `echo \"- - -\" > /sys/class/scsi_host/host0/scan` (or `rescan-scsi-bus.sh`). Then verify with `lsblk` and `blkid` — a fresh disk has no FSTYPE.",
+                "order": 1,
+            },
+            {
+                "jira_key": "STOR-2",
+                "title": "Partition the disk with fdisk",
+                "description": (
+                    "Create a single primary partition spanning /dev/sdc using fdisk, and set its type so it is "
+                    "ready to become an LVM physical volume."
+                ),
+                "acceptance_criteria": "`lsblk` shows /dev/sdc1 as a partition under /dev/sdc; `fdisk -l /dev/sdc` lists one Linux partition.",
+                "hint": "Run `fdisk /dev/sdc`: press n (new), p (primary), accept default first/last sectors for the whole disk, optionally t and 8e (Linux LVM), then w to write. `partprobe /dev/sdc` if the kernel needs a nudge.",
+                "order": 2,
+                "depends_on": "STOR-1",
+            },
+            {
+                "jira_key": "STOR-3",
+                "title": "Build the LVM physical volume and volume group",
+                "description": (
+                    "Initialise the new partition as an LVM physical volume and create a volume group named "
+                    "vgdata on it so logical volumes can be carved out."
+                ),
+                "acceptance_criteria": "`pvs` shows /dev/sdc1 belonging to vgdata; `vgs` lists vgdata with the partition's capacity.",
+                "hint": "Use `pvcreate /dev/sdc1`, then `vgcreate vgdata /dev/sdc1`. Confirm with `pvs`, `vgs`, and `pvdisplay`.",
+                "order": 3,
+                "depends_on": "STOR-2",
+            },
+            {
+                "jira_key": "STOR-4",
+                "title": "Create a logical volume and filesystem",
+                "description": (
+                    "Carve a logical volume named lvdata from vgdata (leave some free space in the VG for later "
+                    "growth) and format it with XFS."
+                ),
+                "acceptance_criteria": "`lvs` shows lvdata; `blkid` reports an xfs filesystem on /dev/vgdata/lvdata.",
+                "hint": "Use `lvcreate -L 15G -n lvdata vgdata` (not 100%FREE — keep room to grow later), then `mkfs.xfs /dev/vgdata/lvdata`.",
+                "order": 4,
+                "depends_on": "STOR-3",
+            },
+            {
+                "jira_key": "STOR-5",
+                "title": "Mount at /data and persist by UUID in /etc/fstab",
+                "description": (
+                    "Mount lvdata at /data and make the mount survive reboots. Reference the filesystem by UUID "
+                    "(not the device path) so the mount is stable."
+                ),
+                "acceptance_criteria": "`mount | grep /data` shows it mounted; `/etc/fstab` has a UUID= entry for /data and `mount -a` succeeds.",
+                "hint": "Get the UUID with `blkid /dev/vgdata/lvdata`, add `UUID=... /data xfs defaults 0 0` to /etc/fstab, then `mkdir -p /data && mount -a`. Verify with `findmnt /data`.",
+                "order": 5,
+                "depends_on": "STOR-4",
+            },
+            {
+                "jira_key": "STOR-6",
+                "title": "Grow the volume and filesystem online",
+                "description": (
+                    "/data has filled up again. Extend lvdata into the remaining free space in vgdata and grow "
+                    "the XFS filesystem WITHOUT unmounting it."
+                ),
+                "acceptance_criteria": "`df -h /data` shows the larger size while still mounted; `vgs` shows reduced free space.",
+                "hint": "Use `lvextend -l +100%FREE /dev/vgdata/lvdata`, then `xfs_growfs /data`. XFS grows by mountpoint and can only grow, never shrink (for ext4 you would use `resize2fs`).",
+                "order": 6,
+                "depends_on": "STOR-5",
+            },
+            {
+                "jira_key": "STOR-7",
+                "title": "Add a swap volume for memory pressure",
+                "description": (
+                    "The host is OOM-killing processes. Carve a small logical volume for swap, activate it, and "
+                    "persist it so it returns after a reboot."
+                ),
+                "acceptance_criteria": "`swapon --show` lists the new swap device and it is referenced in /etc/fstab.",
+                "hint": "Use `lvcreate -L 1G -n lvswap vgdata` (only if the VG still has room — otherwise shrink your grow in STOR-6), `mkswap /dev/vgdata/lvswap`, `swapon /dev/vgdata/lvswap`, then add `/dev/vgdata/lvswap none swap sw 0 0` to /etc/fstab.",
+                "order": 7,
+                "depends_on": "STOR-3",
+            },
+            {
+                "jira_key": "STOR-8",
+                "title": "Snapshot the volume and verify a backup/restore",
+                "description": (
+                    "Before a risky migration, protect /data. Take an LVM snapshot of lvdata, simulate a bad "
+                    "change, then restore from the snapshot to prove point-in-time recovery works."
+                ),
+                "acceptance_criteria": "A snapshot LV exists in `lvs`; after a restore/merge the original /data contents are back.",
+                "hint": "Create the snapshot with `lvcreate -L 2G -s -n lvdata_snap /dev/vgdata/lvdata`. To restore, unmount /data, `lvconvert --merge /dev/vgdata/lvdata_snap`, then remount (the merge completes on next activation). Always pair snapshots with a real off-host backup.",
+                "order": 8,
+                "depends_on": "STOR-5",
+            },
+        ],
+    },
+    {
+        "technology_slug": "linux",
         "title": "Harden a Server to CIS Benchmark",
         "slug": "linux-cis-hardening",
         "architecture_type": "custom",

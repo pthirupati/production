@@ -1,0 +1,45 @@
+title: 'User Disk Quotas Not Enforced on /home'
+slug: linux-quota-not-enforced
+difficulty: medium
+category: 'Linux Administration'
+technology: linux
+description: |
+  A runaway user filled /home and there is no protection because disk quotas were never
+  enabled. The /home entry in /etc/fstab is missing the usrquota/grpquota mount options, so
+  quotacheck/quotaon cannot enforce limits. Enable quotas on /home: add the mount options,
+  remount, initialise the quota database, turn quotas on, and set a limit for the offending
+  user. Record the remediation in /etc/fstab.
+initial_state: |
+  Simulated RHEL 9 server. repquota -a reports quotas are not on for /home. The /home line
+  in /etc/fstab has 'defaults' only (no usrquota/grpquota). One user is consuming all
+  space with no cap.
+objectives:
+  - Confirm quotas are off (repquota -a / quotaon -p)
+  - Add usrquota (and grpquota) to the /home options in /etc/fstab and remount
+  - Initialise the quota files: quotacheck -cum /home
+  - Turn quotas on: quotaon /home
+  - Set a limit for the user with edquota / setquota and record the fstab change
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+topics_covered:
+  - quota
+  - usrquota
+  - fstab
+  - quotacheck
+  - quotaon
+hints:
+  - content: 'repquota -a shows nothing for /home because quotas are not enabled. Check the /home line in /etc/fstab — it has no usrquota/grpquota option.'
+    cost: 10
+    order: 1
+  - content: 'Add the options (e.g. defaults,usrquota,grpquota) to the /home fstab entry, then mount -o remount /home so the kernel honours them.'
+    cost: 15
+    order: 2
+  - content: 'Build the quota DB and enable: quotacheck -cum /home; quotaon /home. Then cap the user with setquota -u <user> <soft> <hard> 0 0 /home. Save the fstab change.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

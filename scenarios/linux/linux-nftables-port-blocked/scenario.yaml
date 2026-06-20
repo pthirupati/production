@@ -1,0 +1,42 @@
+title: 'nftables Drops Application Traffic on 8080'
+slug: linux-nftables-port-blocked
+difficulty: medium
+category: 'Linux Administration'
+technology: linux
+description: |
+  After migrating from iptables to nftables, the application on TCP 8080 is unreachable.
+  The inet filter table's input chain has a default policy of drop with no accept rule for
+  8080. Add an nftables rule to allow tcp dport 8080, make it persistent in
+  /etc/nftables.conf, and reload the ruleset. Record the remediation.
+initial_state: |
+  Simulated RHEL 9 server. nft list ruleset shows table inet filter with chain input
+  policy drop and no rule for 8080. Connections to port 8080 time out. /etc/nftables.conf
+  lacks the accept rule.
+objectives:
+  - Inspect the ruleset: nft list ruleset
+  - Add an accept rule for tcp dport 8080 to the inet filter input chain
+  - Persist it in /etc/nftables.conf
+  - Reload nftables and verify the rule is present
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+topics_covered:
+  - nftables
+  - firewall
+  - networking
+  - nft
+hints:
+  - content: 'nft list ruleset shows chain input { policy drop } with no rule for 8080 — that default-drop is why traffic dies.'
+    cost: 10
+    order: 1
+  - content: 'Add a rule: nft add rule inet filter input tcp dport 8080 accept. Test connectivity to confirm.'
+    cost: 15
+    order: 2
+  - content: 'Make it survive reboots by adding the same rule to /etc/nftables.conf and reloading: systemctl reload nftables (or nft -f /etc/nftables.conf).'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

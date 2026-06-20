@@ -1669,6 +1669,24 @@ class UserProgressView(APIView):
                         })
                         break  # one per tech
 
+            # Streak + XP/level — reflect the dormant Profile counters so the
+            # dashboard can render the streak + level widgets from one call.
+            from apps.progress.services import compute_current_streak, compute_level
+            current_streak = compute_current_streak(request.user)
+            xp_total = 0
+            longest_streak = current_streak
+            try:
+                from apps.accounts.models import Profile
+                profile = Profile.objects.filter(user=request.user).only(
+                    "xp", "longest_streak"
+                ).first()
+                if profile:
+                    xp_total = profile.xp
+                    longest_streak = max(profile.longest_streak, current_streak)
+            except Exception:
+                pass
+            level_info = compute_level(xp_total)
+
             result = {
                 "summary": {
                     "total_scenarios": total_scenarios,
@@ -1676,6 +1694,13 @@ class UserProgressView(APIView):
                     "completion_rate": round(completed / total_scenarios * 100, 1) if total_scenarios else 0,
                     "total_attempts": total_attempts,
                     "average_score": round(avg_score, 1),
+                    "current_streak": current_streak,
+                    "longest_streak": longest_streak,
+                    "xp": xp_total,
+                    "level": level_info["level"],
+                    "level_progress_pct": level_info["progress_pct"],
+                    "xp_into_level": level_info["xp_into_level"],
+                    "xp_for_next_level": level_info["xp_for_next_level"],
                 },
                 "technology_progress": tech_progress,
                 "difficulty_progress": diff_progress,
@@ -1730,34 +1755,18 @@ class LeaderboardView(APIView):
 
     def get(self, request):
         tech_id = request.query_params.get("technology")
-        cache_key = f"leaderboard_{tech_id or 'all'}"
+        # scope: "all" (lifetime best, default) | "weekly" (last 7 days of solves)
+        scope = (request.query_params.get("scope") or "all").lower()
+        if scope not in ("all", "weekly"):
+            scope = "all"
+        cache_key = f"leaderboard_{scope}_{tech_id or 'all'}"
 
         cached_data = cache.get(cache_key)
         if cached_data is None:
-            qs = UserScenarioProgress.objects.filter(completed=True)
-            if tech_id:
-                qs = qs.filter(scenario__technology_id=tech_id)
-
-            leaderboard = (
-                qs.values("user__id", "user__username")
-                .annotate(
-                    total_score=Sum("best_score"),
-                    scenarios_completed=Count("id"),
-                    avg_time=Avg("best_time"),
-                )
-                .order_by("-total_score")[:100]
-            )
-
-            cached_data = []
-            for i, entry in enumerate(leaderboard, 1):
-                cached_data.append({
-                    "rank": i,
-                    "user_id": entry["user__id"],
-                    "username": entry["user__username"],
-                    "total_score": entry["total_score"],
-                    "scenarios_completed": entry["scenarios_completed"],
-                    "avg_time": round(entry["avg_time"] or 0),
-                })
+            if scope == "weekly":
+                cached_data = self._build_weekly(tech_id)
+            else:
+                cached_data = self._build_all_time(tech_id)
             cache.set(cache_key, cached_data, 300)  # 5 min
 
         user_rank = None
@@ -1767,8 +1776,15 @@ class LeaderboardView(APIView):
                     user_rank = entry
                     break
 
-        page = max(1, int(request.query_params.get("page", 1)))
-        page_size = max(1, min(int(request.query_params.get("page_size", 20)), 100))
+        # Tolerate garbage page / page_size params without 500ing.
+        try:
+            page = max(1, int(request.query_params.get("page", 1)))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            page_size = max(1, min(int(request.query_params.get("page_size", 20)), 100))
+        except (TypeError, ValueError):
+            page_size = 20
         start = (page - 1) * page_size
         end = start + page_size
         paginated = cached_data[start:end]
@@ -1776,11 +1792,84 @@ class LeaderboardView(APIView):
         return Response({
             "leaderboard": paginated,
             "user_rank": user_rank,
+            "scope": scope,
             "count": len(cached_data),
             "page": page,
             "page_size": page_size,
             "total_pages": max(1, (len(cached_data) + page_size - 1) // page_size),
         })
+
+    @staticmethod
+    def _coerce_tech_id(tech_id):
+        """Accept an int PK or a slug; return a kwargs dict for filtering.
+
+        A garbage value must never 500 — it simply yields no tech filter.
+        """
+        if not tech_id:
+            return {}
+        s = str(tech_id).strip()
+        if s.isdigit():
+            return {"scenario__technology_id": int(s)}
+        # Treat any non-numeric value as a slug (mirrors ScenariosListView).
+        return {"scenario__technology__slug": s}
+
+    @staticmethod
+    def _build_all_time(tech_id):
+        """Lifetime leaderboard from best-ever scenario scores."""
+        qs = UserScenarioProgress.objects.filter(completed=True)
+        qs = qs.filter(**LeaderboardView._coerce_tech_id(tech_id))
+        rows = (
+            qs.values("user__id", "user__username")
+            .annotate(
+                total_score=Sum("best_score"),
+                scenarios_completed=Count("id"),
+                avg_time=Avg("best_time"),
+            )
+            .order_by("-total_score")[:100]
+        )
+        return [
+            {
+                "rank": i,
+                "user_id": r["user__id"],
+                "username": r["user__username"],
+                "total_score": r["total_score"] or 0,
+                "scenarios_completed": r["scenarios_completed"],
+                "avg_time": round(r["avg_time"] or 0),
+            }
+            for i, r in enumerate(rows, 1)
+        ]
+
+    @staticmethod
+    def _build_weekly(tech_id):
+        """Last-7-days leaderboard from validated lab sessions.
+
+        UserScenarioProgress only keeps lifetime bests, so the weekly board reads
+        from completed LabSessions (which carry a per-session score + ended_at).
+        """
+        since = timezone.now() - timezone.timedelta(days=7)
+        qs = LabSession.objects.filter(
+            validation_passed=True, ended_at__gte=since, scenario__isnull=False
+        )
+        qs = qs.filter(**LeaderboardView._coerce_tech_id(tech_id))
+        rows = (
+            qs.values("user__id", "user__username")
+            .annotate(
+                total_score=Sum("score"),
+                scenarios_completed=Count("scenario", distinct=True),
+            )
+            .order_by("-total_score")[:100]
+        )
+        return [
+            {
+                "rank": i,
+                "user_id": r["user__id"],
+                "username": r["user__username"],
+                "total_score": r["total_score"] or 0,
+                "scenarios_completed": r["scenarios_completed"],
+                "avg_time": 0,
+            }
+            for i, r in enumerate(rows, 1)
+        ]
 
 
 # ─── Platform Stats (public) ────────────────────────────────────────

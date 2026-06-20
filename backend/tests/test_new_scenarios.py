@@ -695,3 +695,203 @@ class CrossTechBridgeTests(SimpleTestCase):
         self.assertEqual(restored.shell.state.session_id, sid)
         # The revealed /dev/sdc must still be present after restore.
         self.assertIsNotNone(restored.shell.state.find_block_device("/dev/sdc"))
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Storage / partition (fdisk / parted / LVM) + linux-admin topic coverage.
+#
+# Each scenario ships a non-trivial check.sh. The preset (applied by
+# RHELShell(scenario_slug=...)) sets the broken/initial state. The test runs
+# the SAME real shell commands the e2e fix performs, then — only where the
+# validation engine cannot introspect the change — appends the FIXED-OK
+# sentinel exactly as scripts/e2e_simulation_fix.py's _mark_fixed_ok does.
+# This proves, through the real validation path, fail-closed BEFORE the fix
+# and PASS only after the genuine partition/mkfs/mount/swap work.
+# ──────────────────────────────────────────────────────────────────────
+
+# slug -> (relative dir, [real shell commands], marker_path|None)
+STORAGE_SCENARIOS: dict[str, tuple[str, list[str], str | None]] = {
+    "linux-fdisk-partition-mkfs-mount": (
+        "linux/linux-fdisk-partition-mkfs-mount",
+        [
+            "fdisk /dev/sdc",
+            "mkfs.xfs /dev/sdc1",
+            "mkdir -p /data",
+            "mount /dev/sdc1 /data",
+            'echo "/dev/sdc1 /data xfs defaults 0 0" >> /etc/fstab',
+        ],
+        None,
+    ),
+    "linux-fdisk-two-part-lvm-create-mount-and-fs": (
+        "linux/linux-fdisk-two-part-lvm-create-mount-and-fs",
+        [
+            "fdisk /dev/sdc",
+            "fdisk /dev/sdc",
+            "pvcreate /dev/sdc1",
+            "vgcreate vgdata /dev/sdc1",
+            "lvcreate -L 15G -n lvdata vgdata",
+            "mkfs.xfs /dev/vgdata/lvdata",
+            "mkdir -p /data",
+            "mount /dev/vgdata/lvdata /data",
+            "mkfs.ext4 /dev/sdc2",
+            "mkdir -p /mnt/data2",
+            "mount /dev/sdc2 /mnt/data2",
+            'echo "/dev/vgdata/lvdata /data xfs defaults 0 0" >> /etc/fstab',
+            'echo "/dev/sdc2 /mnt/data2 ext4 defaults 0 0" >> /etc/fstab',
+        ],
+        "/etc/fstab",
+    ),
+    "linux-parted-gpt-mkfs-mount": (
+        "linux/linux-parted-gpt-mkfs-mount",
+        [
+            "parted /dev/sdc --script mklabel gpt",
+            "parted /dev/sdc --script mkpart primary xfs 0% 100%",
+            "mkfs.xfs /dev/sdc1",
+            "mkdir -p /data",
+            "mount /dev/sdc1 /data",
+            'echo "/dev/sdc1 /data xfs defaults 0 0" >> /etc/fstab',
+        ],
+        None,
+    ),
+    "linux-lvm-grow-xfs-growfs-mount": (
+        "linux/linux-lvm-grow-xfs-growfs-mount",
+        ["lvextend -l +100%FREE /dev/vgdata/lvdata", "xfs_growfs /data"],
+        "/etc/fstab",
+    ),
+    "linux-fdisk-corrupt-partition-table-disk-missing-rescan-recovery": (
+        "linux/linux-fdisk-corrupt-partition-table-disk-missing-rescan-recovery",
+        [
+            "fdisk /dev/sdc",
+            "mkfs.xfs /dev/sdc1",
+            "mkdir -p /data",
+            "mount /dev/sdc1 /data",
+        ],
+        "/etc/fstab",
+    ),
+    "linux-fstab-mount-by-uuid-mkfs-mount": (
+        "linux/linux-fstab-mount-by-uuid-mkfs-mount",
+        [
+            "mkfs.xfs /dev/sdc",
+            "mkdir -p /data",
+            "mount /dev/sdc /data",
+            'echo "UUID=fixit /data xfs defaults 0 0" >> /etc/fstab',
+        ],
+        "/etc/fstab",
+    ),
+    "linux-fdisk-swap-partition-mkswap-swapon": (
+        "linux/linux-fdisk-swap-partition-mkswap-swapon",
+        [
+            "fdisk /dev/sdc",
+            "mkswap /dev/sdc1",
+            "swapon /dev/sdc1",
+            'echo "/dev/sdc1 none swap sw 0 0" >> /etc/fstab',
+        ],
+        "/etc/fstab",
+    ),
+    "linux-autofs-automount-home": (
+        "linux/linux-autofs-automount-home",
+        ["systemctl reload autofs"],
+        "/etc/auto.master",
+    ),
+    # Linux-admin topic coverage (config-driven, FIXED-OK validated)
+    "linux-at-job-not-scheduled": (
+        "linux/linux-at-job-not-scheduled",
+        ["systemctl enable --now atd"],
+        "/var/spool/at/job-0001",
+    ),
+    "linux-systemd-timer-not-firing": (
+        "linux/linux-systemd-timer-not-firing",
+        ["systemctl daemon-reload", "systemctl enable --now backup.timer"],
+        "/etc/systemd/system/backup.timer",
+    ),
+    "linux-nftables-port-blocked": (
+        "linux/linux-nftables-port-blocked",
+        ["nft add rule inet filter input tcp dport 8080 accept"],
+        "/etc/nftables.conf",
+    ),
+    "linux-quota-not-enforced": (
+        "linux/linux-quota-not-enforced",
+        ["mount -o remount /home", "quotacheck -cum /home", "quotaon /home"],
+        "/etc/fstab",
+    ),
+    "linux-renice-runaway-process-priority": (
+        "linux/linux-renice-runaway-process-priority",
+        ["renice +15 -p 4242"],
+        "/etc/security/limits.d/analytics.conf",
+    ),
+}
+
+
+class StoragePartitionScenarioTests(SimpleTestCase):
+    def test_check_scripts_are_non_trivial(self):
+        for slug, (rel_dir, _, _) in STORAGE_SCENARIOS.items():
+            script = _load_check(rel_dir)
+            self.assertFalse(
+                is_trivial_validation_script(script),
+                f"{slug}: check.sh is trivial and would auto-pass",
+            )
+
+    def test_each_scenario_fails_before_fix_and_passes_after(self):
+        for slug, (rel_dir, cmds, marker) in STORAGE_SCENARIOS.items():
+            with self.subTest(slug=slug):
+                script = _load_check(rel_dir)
+
+                # Built the real way: the preset applies the broken state.
+                shell = RHELShell(scenario_slug=slug)
+                before_ok, before_msg = validate_simulation_state(shell.state, script)
+                self.assertFalse(
+                    before_ok,
+                    f"{slug}: validation passed BEFORE any fix ({before_msg})",
+                )
+
+                # Run the genuine remediation commands.
+                for cmd in cmds:
+                    shell.run(cmd)
+                # Mirror the e2e fix: attest legs the engine can't see, AFTER work.
+                if marker:
+                    existing = shell.state.read_file(marker) or ""
+                    if "FIXED-OK" not in existing:
+                        shell.state.write_file(marker, existing + "\n# FIXED-OK\n")
+
+                after_ok, after_msg = validate_simulation_state(shell.state, script)
+                self.assertTrue(
+                    after_ok,
+                    f"{slug}: validation still FAILS after the fix ({after_msg})",
+                )
+
+    def test_fdisk_partition_requires_real_partition_and_mount(self):
+        """Integrity spot-checks: the fdisk/partition scenarios must NOT pass on
+        a half-done fix (partition created but not formatted/mounted, or marker
+        written without the real work)."""
+        # 1) Single-partition: creating the partition but never mounting fails.
+        slug = "linux-fdisk-partition-mkfs-mount"
+        script = _load_check(STORAGE_SCENARIOS[slug][0])
+        shell = RHELShell(scenario_slug=slug)
+        shell.run("fdisk /dev/sdc")        # partition exists
+        shell.run("mkfs.xfs /dev/sdc1")    # formatted
+        ok, _ = validate_simulation_state(shell.state, script)
+        self.assertFalse(ok, f"{slug}: passed with a partition+fs but no /data mount")
+
+        # 2) Two-partition LVM+fs: the FIXED-OK marker alone must not pass — the
+        # real LV must exist and /data must be mounted too.
+        slug = "linux-fdisk-two-part-lvm-create-mount-and-fs"
+        script = _load_check(STORAGE_SCENARIOS[slug][0])
+        shell = RHELShell(scenario_slug=slug)
+        existing = shell.state.read_file("/etc/fstab") or ""
+        shell.state.write_file("/etc/fstab", existing + "\n# FIXED-OK\n")
+        ok, _ = validate_simulation_state(shell.state, script)
+        self.assertFalse(ok, f"{slug}: passed on the marker alone without the real LVM+mount")
+
+    def test_partition_workflow_creates_expected_devices(self):
+        """The shell genuinely models fdisk partitions, mkfs, and mounts."""
+        shell = RHELShell(scenario_slug="linux-fdisk-two-part-lvm-create-mount-and-fs")
+        shell.run("fdisk /dev/sdc")
+        shell.run("fdisk /dev/sdc")
+        self.assertIsNotNone(shell.state.find_block_device("/dev/sdc1"))
+        self.assertIsNotNone(shell.state.find_block_device("/dev/sdc2"))
+        shell.run("pvcreate /dev/sdc1")
+        shell.run("vgcreate vgdata /dev/sdc1")
+        shell.run("lvcreate -L 15G -n lvdata vgdata")
+        self.assertIn("vgdata/lvdata", shell.state.lvm.lvs)
+        shell.run("mkfs.ext4 /dev/sdc2")
+        self.assertEqual(shell.state.find_block_device("/dev/sdc2").fstype, "ext4")

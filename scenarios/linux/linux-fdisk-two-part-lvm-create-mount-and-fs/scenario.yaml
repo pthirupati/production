@@ -1,0 +1,53 @@
+title: 'Two fdisk Partitions: One for LVM, One Plain Filesystem'
+slug: linux-fdisk-two-part-lvm-create-mount-and-fs
+difficulty: hard
+category: 'Storage / Partitioning'
+technology: linux
+description: |
+  A 30G disk /dev/sdc is attached and raw. You must split it into TWO primary partitions
+  with fdisk and provision them differently:
+    - /dev/sdc1 becomes part of LVM — initialise it as a physical volume, create the
+      volume group vgdata on it, carve a logical volume named lvdata, format it, and
+      mount it at /data.
+    - /dev/sdc2 becomes a plain standalone filesystem — format it directly (no LVM) and
+      mount it at /mnt/data2.
+  Both must end up mounted and recorded in /etc/fstab. The lab only passes when the LV
+  lvdata exists, /data is mounted from the LV, and the plain /dev/sdc2 filesystem is
+  mounted and persisted.
+initial_state: |
+  Simulated RHEL 9 server. lsblk shows /dev/sdc (30G) with no partitions. There is no
+  vgdata volume group, no lvdata LV, /data is empty, and /mnt/data2 is empty. /etc/fstab
+  has no entries for either device.
+objectives:
+  - Create two primary partitions on /dev/sdc with fdisk (/dev/sdc1 and /dev/sdc2)
+  - LVM leg: pvcreate /dev/sdc1; vgcreate vgdata /dev/sdc1; lvcreate -L 15G -n lvdata vgdata
+  - Format and mount the LV: mkfs.xfs /dev/vgdata/lvdata; mount it at /data
+  - Plain leg: mkfs.ext4 /dev/sdc2; mount it at /mnt/data2
+  - Add both mounts to /etc/fstab so they come back after a reboot
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+topics_covered:
+  - fdisk
+  - lvm
+  - pvcreate
+  - vgcreate
+  - lvcreate
+  - mkfs
+  - mount
+  - fstab
+hints:
+  - content: 'Start with two partitions: run fdisk /dev/sdc twice (n, p, sizes, w) to create /dev/sdc1 and /dev/sdc2. Confirm with lsblk.'
+    cost: 10
+    order: 1
+  - content: 'Build the LVM stack on the FIRST partition only: pvcreate /dev/sdc1; vgcreate vgdata /dev/sdc1; lvcreate -L 15G -n lvdata vgdata; mkfs.xfs /dev/vgdata/lvdata; mount /dev/vgdata/lvdata /data. Verify with pvs, vgs, lvs.'
+    cost: 20
+    order: 2
+  - content: 'The SECOND partition is a plain filesystem (no LVM): mkfs.ext4 /dev/sdc2; mkdir -p /mnt/data2; mount /dev/sdc2 /mnt/data2. Add both to /etc/fstab and verify with mount and lvs.'
+    cost: 25
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

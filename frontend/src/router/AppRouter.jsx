@@ -40,6 +40,7 @@ const PaymentPage = lazy(() => import('../pages/PaymentPage'))
 const Privacy = lazy(() => import('../pages/Privacy'))
 const Terms = lazy(() => import('../pages/Terms'))
 const Contact = lazy(() => import('../pages/Contact'))
+const ContactSales = lazy(() => import('../pages/ContactSales'))
 const FAQ = lazy(() => import('../pages/FAQ'))
 const NotFound = lazy(() => import('../pages/NotFound'))
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'))
@@ -60,6 +61,7 @@ const AdminMonitoring = lazy(() => import('../pages/admin/AdminMonitoring'))
 const Team = lazy(() => import('../pages/Team'))
 const AdminSettings = lazy(() => import('../pages/admin/AdminSettings'))
 const AdminCampaigns = lazy(() => import('../pages/admin/AdminCampaigns'))
+const AdminSales = lazy(() => import('../pages/admin/AdminSales'))
 const InterviewHub = lazy(() => import('../pages/interviews/InterviewHub'))
 const InterviewSetup = lazy(() => import('../pages/interviews/InterviewSetup'))
 const InterviewCampaign = lazy(() => import('../pages/interviews/InterviewCampaign'))
@@ -130,6 +132,7 @@ export default function AppRouter() {
         <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/changelog" element={<PublicLayout><Changelog /></PublicLayout>} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/contact-sales" element={<ContactSales />} />
         <Route path="/support" element={<Navigate to="/contact" replace />} />
         <Route path="/faq" element={<FAQ />} />
         <Route path="/mock-interviews" element={<InterviewLanding />} />
@@ -179,6 +182,7 @@ export default function AppRouter() {
           <Route path="/admin/threads" element={<AdminThreads />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/campaigns" element={<AdminCampaigns />} />
+          <Route path="/admin/sales" element={<AdminSales />} />
           <Route path="/admin/coupons" element={<AdminCoupons />} />
           <Route path="/admin/analytics" element={<AdminAnalytics />} />
           <Route path="/admin/teams" element={<AdminTeams />} />

@@ -1,0 +1,42 @@
+title: 'systemd Timer Not Firing — OnCalendar Misconfigured'
+slug: linux-systemd-timer-not-firing
+difficulty: medium
+category: 'Linux Administration'
+technology: linux
+description: |
+  A backup is meant to run nightly via a systemd timer (backup.timer driving
+  backup.service), but it never fires. The timer unit has a malformed OnCalendar
+  expression and is not enabled. Correct the OnCalendar value, enable and start the timer,
+  and verify it shows up in systemctl list-timers. Record the remediation in the unit.
+initial_state: |
+  Simulated RHEL 9 server. /etc/systemd/system/backup.timer has an invalid OnCalendar=
+  line and the timer is not enabled, so systemctl list-timers does not list backup.timer
+  and the backup never runs.
+objectives:
+  - Inspect the timer: systemctl cat backup.timer and systemctl list-timers
+  - Fix the OnCalendar= expression to a valid calendar event (e.g. *-*-* 02:00:00)
+  - Reload systemd and enable --now backup.timer
+  - Confirm it is listed in systemctl list-timers and record the fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+topics_covered:
+  - systemd
+  - timers
+  - OnCalendar
+  - scheduling
+hints:
+  - content: 'systemctl list-timers does not show backup.timer. systemctl status backup.timer / cat backup.timer reveals an invalid OnCalendar= expression.'
+    cost: 10
+    order: 1
+  - content: 'Set a valid calendar event, e.g. OnCalendar=*-*-* 02:00:00 (validate with systemd-analyze calendar ''...''). Then systemctl daemon-reload.'
+    cost: 15
+    order: 2
+  - content: 'Enable and start it: systemctl enable --now backup.timer, then confirm with systemctl list-timers. Save the corrected unit.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

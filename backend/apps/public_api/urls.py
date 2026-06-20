@@ -39,6 +39,12 @@ from .views import (
     ExtendLabView,
     LabAiReviewView,
 )
+from .engagement import (
+    DailyChallengeView,
+    StreakView,
+    XpView,
+    ScenarioStatsView,
+)
 
 urlpatterns = [
     # Platform configuration
@@ -49,6 +55,7 @@ urlpatterns = [
     path("technologies/", TechnologiesListView.as_view()),
     path("technologies/<slug:slug>/", TechnologyDetailView.as_view()),
     path("scenarios/", ScenariosListView.as_view()),
+    path("scenarios/<slug:slug>/stats/", ScenarioStatsView.as_view()),
     path("scenarios/<slug:slug>/", ScenarioDetailView.as_view()),
     path("categories/", CategoriesListView.as_view()),
     path("tags/", TagsListView.as_view()),
@@ -82,6 +89,11 @@ urlpatterns = [
     path("achievements/certificate/", AchievementsCertificateView.as_view()),
     path("achievements/certificate/verify/", CertificateVerifyView.as_view()),
     path("leaderboard/", LeaderboardView.as_view()),
+
+    # Engagement loop (daily challenge, streak calendar, XP/levels)
+    path("daily-challenge/", DailyChallengeView.as_view()),
+    path("streak/", StreakView.as_view()),
+    path("xp/", XpView.as_view()),
 
     # Plan
     path("plan/", UserPlanView.as_view()),

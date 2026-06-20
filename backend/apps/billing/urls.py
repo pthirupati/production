@@ -7,6 +7,7 @@ from .extended_views import (
     OrgSeatCheckoutView,
     SubscriptionsOverviewView,
 )
+from .sales_views import SalesInquiryView
 
 urlpatterns = [
     path("status/", payment_controller.PaymentStatusView.as_view(), name="payment_status"),

@@ -4,7 +4,7 @@ import {
   Check, ArrowRight, Zap, Crown, Loader2, Sun, Moon, Server, Globe,
   Monitor, Database, Cpu, Shield, Lock, Sparkles, ShoppingCart, X,
   IndianRupee, DollarSign, BadgeCheck, ChevronRight, ChevronDown,
-  RefreshCw, ShieldCheck, AlertTriangle, Mic2, Menu,
+  RefreshCw, ShieldCheck, AlertTriangle, Mic2, Menu, Building2, Users,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
@@ -571,8 +571,8 @@ export default function Pricing() {
           )}
         </div>
 
-        {/* Free vs Paid comparison */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-16">
+        {/* Free vs Paid vs Teams comparison */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
           {/* Free */}
           <FixitPanel padding="p-8" className="hover:border-surface-600/40 transition-all duration-500 group reveal reveal-delay-1">
             <div className="flex items-center gap-3 mb-2">
@@ -622,6 +622,42 @@ export default function Pricing() {
               <a href="#technology-pricing" className="btn-primary w-full text-center block py-2.5 text-sm">
                 Browse technologies <ArrowRight size={14} className="inline ml-1" />
               </a>
+            </div>
+          </FixitPanel>
+
+          {/* Teams / Org — Contact Sales (no fixed price) */}
+          <FixitPanel padding="p-8" className="border-accent-purple/20 bg-gradient-to-br from-accent-purple/5 to-transparent hover:border-accent-purple/40 transition-all duration-500 group reveal reveal-delay-3">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-purple to-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <Building2 size={20} className="text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Teams &amp; Organizations</h3>
+                <p className="text-sm text-accent-purple">Volume seats &amp; custom plans</p>
+              </div>
+            </div>
+            <p className="text-2xl font-extrabold text-white mb-1 mt-3">Custom</p>
+            <p className="text-sm text-surface-400 mb-5">Tailored to your team — talk to us</p>
+            <ul className="space-y-3">
+              {[
+                'Seat licensing for your whole org',
+                'Centralized billing & admin controls',
+                'All technologies + Interview Studio',
+                'Priority onboarding & support',
+                'Custom quote — no fixed price',
+              ].map(f => (
+                <li key={f} className="flex items-center gap-3 text-sm text-surface-300">
+                  <Check size={16} className="text-accent-purple shrink-0" /> {f}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6">
+              <Link
+                to="/contact-sales"
+                className="w-full text-center block py-2.5 text-sm font-semibold rounded-lg text-white bg-gradient-to-r from-accent-purple to-indigo-600 hover:opacity-90 transition-opacity inline-flex items-center justify-center gap-1.5"
+              >
+                <Users size={15} /> Contact Sales
+              </Link>
             </div>
           </FixitPanel>
         </div>

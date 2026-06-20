@@ -3,7 +3,7 @@ import { useThemeStore } from '../../store/themeStore'
 import { useState } from 'react'
 import {
   LayoutDashboard, Target, Cpu, Users, MonitorPlay, ArrowLeft, Shield, Menu, X, Ticket, Activity, ScrollText, FileText, Tag, ShieldAlert,
-  BarChart3, Building2, Mic2, Award, CreditCard, MessageSquare, Wrench, Megaphone,
+  BarChart3, Building2, Mic2, Award, CreditCard, MessageSquare, Wrench, Megaphone, Briefcase,
 } from 'lucide-react'
 import AdminTopbar from './AdminTopbar'
 
@@ -33,6 +33,7 @@ const NAV_GROUPS = [
       { path: '/admin/users', icon: Users, label: 'Users' },
       { path: '/admin/teams', icon: Building2, label: 'Teams' },
       { path: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+      { path: '/admin/sales', icon: Briefcase, label: 'Sales Inquiries' },
       { path: '/admin/invoices', icon: FileText, label: 'Invoices' },
       { path: '/admin/coupons', icon: Tag, label: 'Coupons' },
       { path: '/admin/certificates', icon: Award, label: 'Certificates' },

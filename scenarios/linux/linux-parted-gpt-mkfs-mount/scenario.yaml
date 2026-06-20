@@ -1,0 +1,46 @@
+title: 'Create a GPT Disk Label with parted, Format and Mount'
+slug: linux-parted-gpt-mkfs-mount
+difficulty: medium
+category: 'Storage / Partitioning'
+technology: linux
+description: |
+  A new 20G disk /dev/sdc must be brought online for a large data volume. Because the
+  volume may later exceed the 2 TiB MBR limit, the team standard is a GPT label rather
+  than the legacy MBR/msdos scheme. Using parted, write a fresh GPT label on /dev/sdc,
+  create a single primary partition spanning the disk, put a filesystem on it, mount it
+  at /data, and persist it in /etc/fstab.
+initial_state: |
+  Simulated RHEL 9 server. /dev/sdc (20G) has no disk label and no partitions. parted
+  print reports an unrecognised disk label. /data is not mounted and is absent from
+  /etc/fstab.
+objectives:
+  - Write a GPT label: parted /dev/sdc --script mklabel gpt
+  - Create a partition: parted /dev/sdc --script mkpart primary xfs 0% 100%
+  - Format /dev/sdc1 with mkfs.xfs
+  - Mount it at /data (mkdir -p /data && mount /dev/sdc1 /data)
+  - Add the mount to /etc/fstab
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+topics_covered:
+  - parted
+  - gpt
+  - partitioning
+  - mkfs
+  - mount
+  - fstab
+hints:
+  - content: 'parted print on /dev/sdc shows ''unrecognised disk label''. A GPT label is required before any partition can exist: parted /dev/sdc --script mklabel gpt.'
+    cost: 10
+    order: 1
+  - content: 'With a GPT label in place, create the partition non-interactively: parted /dev/sdc --script mkpart primary xfs 0% 100%. A /dev/sdc1 appears.'
+    cost: 15
+    order: 2
+  - content: 'Format and mount: mkfs.xfs /dev/sdc1; mkdir -p /data; mount /dev/sdc1 /data; then add ''/dev/sdc1 /data xfs defaults 0 0'' to /etc/fstab.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium

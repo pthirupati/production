@@ -44,7 +44,7 @@ def finalize_lab_completion_if_ready(session) -> bool:
 
     score = session.score or 100
 
-    from apps.progress.services import record_attempt
+    from apps.progress.services import record_attempt, award_xp_for_completion
 
     record_attempt(
         user=session.user,
@@ -53,6 +53,13 @@ def finalize_lab_completion_if_ready(session) -> bool:
         completed=True,
         time_seconds=elapsed,
         hints_used=session.hints_used,
+    )
+
+    # Grant XP exactly once per scenario completion. This runs only after the
+    # idempotent completion_finalized guard above, so it cannot double-count.
+    award_xp_for_completion(
+        session.user, score=score,
+        difficulty=getattr(session.scenario, "difficulty", None),
     )
 
     Scenario.objects.filter(pk=session.scenario.pk).update(

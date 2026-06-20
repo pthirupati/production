@@ -413,6 +413,174 @@ def _preset_postgres_disk_full_archive(state: RHELOSState) -> None:
         )
 
 
+# ── Storage / partition (fdisk / parted / LVM) scenarios ─────────────────
+# A raw spare disk /dev/sdc is presented. The learner must partition it with
+# fdisk/parted, lay down a filesystem (or LVM stack), mount it, and persist it.
+# Validation reuses the recognized /data mount + fstab branches (slug carries a
+# mkfs-mount / lvm-create-mount / disk-missing-rescan substring), the real
+# `lvs | grep lvdata` LV probe, and the FIXED-OK marker for legs the engine
+# cannot introspect. The e2e fix performs the genuine commands first, then writes
+# the marker — so a fresh lab is always fail-closed.
+
+
+def _preset_fdisk_partition_mkfs(state: RHELOSState) -> None:
+    """A raw 20G /dev/sdc with no partition table; partition→mkfs→mount /data."""
+    state.add_block_device("/dev/sdc", "20G", "disk", present=True)
+    state._mkdir("/data")
+    state._write_file("/etc/fstab", "# /etc/fstab\nUUID=root-uuid / xfs defaults 0 0\n")
+
+
+def _preset_fdisk_two_part_lvm_and_fs(state: RHELOSState) -> None:
+    """A raw 30G /dev/sdc; split into two partitions (LVM + plain fs)."""
+    state.add_block_device("/dev/sdc", "30G", "disk", present=True)
+    state._mkdir("/data")
+    state._mkdir("/mnt")
+    state._mkdir("/mnt/data2")
+    state._write_file("/etc/fstab", "# /etc/fstab\nUUID=root-uuid / xfs defaults 0 0\n")
+
+
+def _preset_parted_gpt_mkfs(state: RHELOSState) -> None:
+    """A raw 20G /dev/sdc with no disk label; write GPT, partition, mount /data."""
+    state.add_block_device("/dev/sdc", "20G", "disk", present=True)
+    state._mkdir("/data")
+    state._write_file("/etc/fstab", "# /etc/fstab\nUUID=root-uuid / xfs defaults 0 0\n")
+
+
+def _preset_lvm_grow_xfs(state: RHELOSState) -> None:
+    """vgdata/lvdata is mounted at /data and full; vgdata has free extents.
+
+    A spare PV (/dev/sdc) is already in vgdata so lvextend has room to grow into.
+    Fail-closed: /etc/fstab carries no FIXED-OK marker until the real lvextend +
+    xfs_growfs has run.
+    """
+    from .lvm_state import SimLV, SimPV, SimVG
+
+    state.lvm.pvs["/dev/sdc"] = SimPV("/dev/sdc", "vgdata", "20.00g", "20.00g")
+    state.lvm.vgs["vgdata"] = SimVG("vgdata", "40.00g", "20.00g", ["/dev/sdc"])
+    state.lvm.lvs["vgdata/lvdata"] = SimLV(
+        "lvdata", "vgdata", "20.00g", "/data", "/dev/mapper/vgdata-lvdata")
+    state.block_devices["/dev/mapper/vgdata-lvdata"] = SimBlockDevice(
+        "/dev/mapper/vgdata-lvdata", "20G", "lvm", parent="vgdata",
+        fstype="xfs", uuid="grow1111-data", mountpoint="/data")
+    state.block_devices["/dev/vgdata/lvdata"] = state.block_devices["/dev/mapper/vgdata-lvdata"]
+    state.mounts["/data"] = {
+        "device": "/dev/mapper/vgdata-lvdata", "fstype": "xfs",
+        "size_kb": 20 * 1024 * 1024,
+    }
+    state._mkdir("/data")
+    state._write_file("/etc/fstab", "# /etc/fstab\n/dev/mapper/vgdata-lvdata /data xfs defaults 0 0\n")
+
+
+def _preset_fdisk_corrupt_table_recovery(state: RHELOSState) -> None:
+    """The partition table on /dev/sdc was wiped; the /data partition is gone.
+
+    The whole disk is present but has NO partition, so /data cannot be mounted.
+    /etc/fstab still references the old partition. Recovery = rebuild partition,
+    mkfs, remount /data, repair fstab (FIXED-OK written by the fix afterwards).
+    """
+    state.add_block_device("/dev/sdc", "20G", "disk", present=True)
+    state._mkdir("/data")
+    # fstab references the now-missing partition so the mount is broken.
+    state._write_file(
+        "/etc/fstab",
+        "# /etc/fstab\nUUID=root-uuid / xfs defaults 0 0\n/dev/sdc1 /data xfs defaults 0 0\n",
+    )
+
+
+def _preset_fstab_mount_by_uuid(state: RHELOSState) -> None:
+    """A raw /dev/sdc; format, then mount at /data by UUID in fstab."""
+    state.add_block_device("/dev/sdc", "20G", "disk", present=True)
+    state._mkdir("/data")
+    state._write_file("/etc/fstab", "# /etc/fstab\nUUID=root-uuid / xfs defaults 0 0\n")
+
+
+def _preset_fdisk_swap_partition(state: RHELOSState) -> None:
+    """A raw 4G /dev/sdc; create a swap PARTITION (fdisk→mkswap→swapon→fstab)."""
+    state.add_block_device("/dev/sdc", "4G", "disk", present=True)
+    state._write_file("/etc/fstab", "# /etc/fstab\nUUID=root-uuid / xfs defaults 0 0\n")
+
+
+def _preset_autofs_automount(state: RHELOSState) -> None:
+    """autofs master map points at the wrong/broken indirect map for /data/projects."""
+    from .rhel_os import SimService
+
+    state.services["autofs"] = SimService(
+        "autofs", active="active", enabled="enabled", description="Automounts filesystems on demand")
+    state._mkdir("/etc")
+    state._mkdir("/data")
+    # broken: master map references a non-existent map file
+    state._write_file(
+        "/etc/auto.master",
+        "# broken configuration\n/data/projects /etc/auto.WRONG --timeout=60\n",
+    )
+    state._write_file(
+        "/etc/auto.projects",
+        "# broken configuration — malformed entry\napp -fstype=nfs,bad server:/export\n",
+    )
+
+
+# ── Linux-admin topic coverage (config-driven, FIXED-OK validated) ───────
+
+
+def _preset_at_job_not_scheduled(state: RHELOSState) -> None:
+    """A queued at job is malformed and atd is disabled."""
+    from .rhel_os import SimService
+
+    state.services["atd"] = SimService(
+        "atd", active="inactive", enabled="disabled", description="Deferred execution scheduler")
+    state._mkdir("/var/spool/at")
+    state._write_file(
+        "/var/spool/at/job-0001",
+        "# broken configuration\n#!/bin/sh\n/opt/missing/backup.sh\n",
+    )
+
+
+def _preset_systemd_timer_not_firing(state: RHELOSState) -> None:
+    """backup.timer has an invalid OnCalendar and is not enabled."""
+    state._mkdir("/etc/systemd")
+    state._mkdir("/etc/systemd/system")
+    state._write_file(
+        "/etc/systemd/system/backup.timer",
+        "# broken configuration\n[Unit]\nDescription=Nightly backup\n\n[Timer]\n"
+        "OnCalendar=every-night-at-2\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n",
+    )
+    state._write_file(
+        "/etc/systemd/system/backup.service",
+        "[Unit]\nDescription=Nightly backup\n\n[Service]\nType=oneshot\n"
+        "ExecStart=/usr/local/bin/backup.sh\n",
+    )
+
+
+def _preset_nftables_port_blocked(state: RHELOSState) -> None:
+    """inet filter input chain default-drops; no accept rule for 8080."""
+    state._mkdir("/etc")
+    state._write_file(
+        "/etc/nftables.conf",
+        "# broken configuration\ntable inet filter {\n"
+        "  chain input {\n    type filter hook input priority 0; policy drop;\n"
+        "    iif \"lo\" accept\n    ct state established,related accept\n"
+        "    tcp dport 22 accept\n  }\n}\n",
+    )
+
+
+def _preset_quota_not_enforced(state: RHELOSState) -> None:
+    """/home fstab entry lacks usrquota/grpquota so quotas cannot be enforced."""
+    state._mkdir("/home")
+    state._write_file(
+        "/etc/fstab",
+        "# broken configuration\nUUID=root-uuid / xfs defaults 0 0\n"
+        "/dev/mapper/rhel-home /home xfs defaults 0 0\n",
+    )
+
+
+def _preset_renice_runaway_priority(state: RHELOSState) -> None:
+    """A runaway analytics process runs at nice 0 with no policy pinning it lower."""
+    state._mkdir("/etc/security")
+    state._mkdir("/etc/security/limits.d")
+    state._write_file(
+        "/etc/security/limits.d/analytics.conf",
+        "# broken configuration — no priority policy yet\n",
+    )
 
 
 # ── Real-state generated scenarios (services + config markers) ──
@@ -3573,6 +3741,21 @@ _PRESETS: dict[str, callable] = {
     "db-postgres-max-connections": _preset_postgres_max_connections,
     "db-mysql-table-crashed": _preset_mysql_table_crashed,
     "db-postgres-disk-full-archive": _preset_postgres_disk_full_archive,
+    # Storage / partition (fdisk / parted / LVM)
+    "linux-fdisk-partition-mkfs-mount": _preset_fdisk_partition_mkfs,
+    "linux-fdisk-two-part-lvm-create-mount-and-fs": _preset_fdisk_two_part_lvm_and_fs,
+    "linux-parted-gpt-mkfs-mount": _preset_parted_gpt_mkfs,
+    "linux-lvm-grow-xfs-growfs-mount": _preset_lvm_grow_xfs,
+    "linux-fdisk-corrupt-partition-table-disk-missing-rescan-recovery": _preset_fdisk_corrupt_table_recovery,
+    "linux-fstab-mount-by-uuid-mkfs-mount": _preset_fstab_mount_by_uuid,
+    "linux-fdisk-swap-partition-mkswap-swapon": _preset_fdisk_swap_partition,
+    "linux-autofs-automount-home": _preset_autofs_automount,
+    # Linux-admin topic coverage
+    "linux-at-job-not-scheduled": _preset_at_job_not_scheduled,
+    "linux-systemd-timer-not-firing": _preset_systemd_timer_not_firing,
+    "linux-nftables-port-blocked": _preset_nftables_port_blocked,
+    "linux-quota-not-enforced": _preset_quota_not_enforced,
+    "linux-renice-runaway-process-priority": _preset_renice_runaway_priority,
 }
 
 

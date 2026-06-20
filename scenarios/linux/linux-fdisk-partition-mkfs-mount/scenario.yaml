@@ -1,0 +1,46 @@
+title: 'Partition, Format and Mount a Spare Disk with fdisk'
+slug: linux-fdisk-partition-mkfs-mount
+difficulty: medium
+category: 'Storage / Partitioning'
+technology: linux
+description: |
+  A spare 20G disk /dev/sdc has been attached to the server but it is completely raw —
+  no partition table, no filesystem, nothing mounted. The application team needs durable
+  storage at /data. You must carve a primary partition on /dev/sdc with fdisk, lay down
+  an XFS (or ext4) filesystem on that partition, mount it at /data, and add a line to
+  /etc/fstab so the mount survives a reboot. A bare disk with no partition or an
+  unmounted partition is NOT acceptable.
+initial_state: |
+  Simulated RHEL 9 server. lsblk shows /dev/sdc (20G) with no child partitions and no
+  filesystem. blkid does not list /dev/sdc. There is no /data mount and nothing about
+  /data in /etc/fstab. Applications that write to /data are failing.
+objectives:
+  - Inspect the disk with lsblk and fdisk -l /dev/sdc
+  - Create a primary partition /dev/sdc1 with fdisk /dev/sdc (n, p, defaults, w)
+  - Make a filesystem on the partition: mkfs.xfs /dev/sdc1 (or mkfs.ext4)
+  - Mount it: mkdir -p /data && mount /dev/sdc1 /data
+  - Persist the mount in /etc/fstab so it remounts on reboot
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+topics_covered:
+  - fdisk
+  - partitioning
+  - mkfs
+  - mount
+  - fstab
+hints:
+  - content: 'Storage lives on /dev/sdc but it is raw. Look at it with lsblk and fdisk -l /dev/sdc — there is no partition yet, so nothing can be formatted or mounted.'
+    cost: 10
+    order: 1
+  - content: 'The disk has no partition table entry. Create one partition with fdisk /dev/sdc (press n, p, accept the default first/last sectors, then w to write). A new /dev/sdc1 appears.'
+    cost: 15
+    order: 2
+  - content: 'Now format and mount it: mkfs.xfs /dev/sdc1; mkdir -p /data; mount /dev/sdc1 /data. Finally add ''/dev/sdc1 /data xfs defaults 0 0'' to /etc/fstab and verify with mount and blkid.'
+    cost: 20
+    order: 3
+requires_companion_hosts: false
+dual_terminal: false
+jira_priority: Medium
