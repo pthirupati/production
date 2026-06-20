@@ -114,6 +114,7 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
             "permanent": st.firewall.permanent,
         },
         "boot": asdict(boot) if boot else None,
+        "docker": engine.docker.to_dict() if getattr(engine, "docker", None) else None,
         "engine_flags": {
             "ssh_key_fixed": getattr(engine, "_ssh_key_fixed", False),
             "power_state": getattr(engine, "_power_state", "on"),
@@ -194,6 +195,11 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
         for key, val in boot_data.items():
             if hasattr(engine.boot, key):
                 setattr(engine.boot, key, val)
+
+    docker_data = data.get("docker")
+    if docker_data:
+        from .docker_state import DockerState
+        engine.docker = DockerState.from_dict(docker_data)
 
     flags = data.get("engine_flags", {})
     engine._ssh_key_fixed = flags.get("ssh_key_fixed", False)

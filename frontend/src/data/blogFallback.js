@@ -41,16 +41,43 @@ export const BLOG_FALLBACK_POSTS = [
   },
   {
     slug: 'dns-troubleshooting-guide',
-    title: 'DNS Troubleshooting: From dig to Docker Resolver Issues',
-    excerpt: 'Resolver chain, nsswitch, and the Docker DNS trap — patterns you will see in production incidents.',
+    title: 'DNS Resolution Failures: A Complete Troubleshooting Playbook',
+    excerpt: 'Resolver chain, nsswitch, systemd-resolved, and the Docker DNS trap — patterns you will see in production incidents.',
     category: 'Networking',
+    author: 'Content Team',
+    date: 'March 10, 2026',
+    readTime: '9 min read',
+  },
+  {
+    slug: 'docker-vs-cloud-labs',
+    title: 'Docker vs Cloud Labs: When to Use Each for Training',
+    excerpt: 'Startup time, cost, and realism compared across Docker, AWS EC2, and DigitalOcean — and how FixitLab picks a provider per scenario.',
+    category: 'Architecture',
     author: 'Platform Team',
-    date: 'March 15, 2026',
+    date: 'March 22, 2026',
     readTime: '6 min read',
+  },
+  {
+    slug: 'top-5-linux-troubleshooting-commands',
+    title: 'Top 5 Linux Commands Every SRE Should Master',
+    excerpt: 'The high-leverage commands experienced SREs reach for first when a box is on fire — with real usage patterns.',
+    category: 'Linux',
+    author: 'Content Team',
+    date: 'March 18, 2026',
+    readTime: '7 min read',
+  },
+  {
+    slug: 'building-fixitlab-architecture',
+    title: 'How We Built FixitLab: Architecture Deep Dive',
+    excerpt: 'Provisioner factory, WebSocket terminals, the validation engine, and how we run hundreds of isolated labs cheaply.',
+    category: 'Engineering',
+    author: 'Thirupathi P.',
+    date: 'March 15, 2026',
+    readTime: '12 min read',
   },
 ]
 
-export const BLOG_CATEGORIES = ['All', 'Product', 'Education', 'Linux', 'Kubernetes', 'Networking', 'Architecture']
+export const BLOG_CATEGORIES = ['All', 'Product', 'Education', 'Linux', 'Kubernetes', 'Networking', 'Architecture', 'Engineering']
 
 export const categoryBadgeClass = {
   Product: 'text-accent-green bg-accent-green/10 border-accent-green/20',

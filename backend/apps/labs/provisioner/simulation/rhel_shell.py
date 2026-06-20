@@ -41,6 +41,13 @@ class RHELShell:
         return f"[{u}@{h} {disp}]{sym} "
 
     def run(self, line: str) -> str:
+        # Heredoc support: `cat > file <<EOF\n...body...\nEOF` (and `<<-`,
+        # quoted delimiters). The terminal submits the whole block as one line
+        # with embedded newlines, so handle it before the usual strip/parse.
+        if "<<" in line and "\n" in line:
+            hd = self._handle_heredoc(line)
+            if hd is not None:
+                return hd
         line = line.strip()
         if not line:
             return ""
@@ -269,6 +276,57 @@ class RHELShell:
     def _is_quoted_pipe(line: str) -> bool:
         """True when every `|` in the line sits inside quotes (nothing to split)."""
         return len(RHELShell._split_pipes(line)) == 1
+
+    def _handle_heredoc(self, block: str) -> str | None:
+        """Resolve a single-shot heredoc block submitted with embedded newlines.
+
+        Supports ``cmd ... << DELIM`` / ``<<- DELIM`` / ``<< 'DELIM'``. The body
+        is the lines between the opening line and the terminating delimiter. For
+        ``cat > file`` / ``cat >> file`` / ``tee file`` the body is written to the
+        VFS; otherwise the body is fed to the command as stdin.
+        """
+        lines = block.split("\n")
+        header = lines[0]
+        m = re.search(r"<<-?\s*[\"']?([A-Za-z_][A-Za-z0-9_]*)[\"']?", header)
+        if not m:
+            return None
+        delim = m.group(1)
+        body_lines: list[str] = []
+        terminated = False
+        for ln in lines[1:]:
+            if ln.strip() == delim:
+                terminated = True
+                break
+            body_lines.append(ln)
+        if not terminated:
+            return None
+        body = "\n".join(body_lines)
+        if body and not body.endswith("\n"):
+            body += "\n"
+        # Command portion is the header with the `<< DELIM` operator removed.
+        cmd_part = header[: m.start()].strip()
+        cmd, redirect = self._extract_redirect(cmd_part)
+        try:
+            tokens = shlex.split(cmd)
+        except ValueError:
+            tokens = cmd.split()
+        base = tokens[0] if tokens else ""
+        # `cat`/`tee` with a redirect (or `tee file`) writes the body to a file.
+        target = redirect.get("stdout") if redirect else None
+        append = bool(redirect and redirect.get("append"))
+        if base == "tee" and len(tokens) > 1:
+            target = tokens[1]
+            append = "-a" in tokens
+        if base in ("cat", "tee") and target:
+            self.state.write_file(target, body, append=append)
+            self.state.last_exit_code = 0
+            return ""
+        if base in ("cat", "tee", ""):
+            # No file target: echo the body back (cat <<EOF without redirect).
+            self.state.last_exit_code = 0
+            return body.rstrip("\n")
+        # Otherwise run the command with the heredoc body as stdin.
+        return self.run_with_stdin(cmd_part, body)
 
     def run_with_stdin(self, line: str, stdin: str | None) -> str:
         """Run a single command stage with optional piped stdin."""

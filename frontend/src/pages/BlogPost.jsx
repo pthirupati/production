@@ -578,6 +578,147 @@ If DNS fails inside a container, check both Docker's DNS and the host's DNS.
 Our **DNS Resolution Broken** scenario gives you a server where DNS is broken in three different ways. Can you restore full name resolution in under 10 minutes?
     `,
   },
+  'kubernetes-crashloop-debugging': {
+    title: 'Kubernetes CrashLoopBackOff: A Practical Debug Checklist',
+    category: 'Kubernetes',
+    author: 'Platform Team',
+    date: 'March 20, 2026',
+    readTime: '7 min read',
+    color: 'accent-purple',
+    content: `
+## What CrashLoopBackOff Actually Means
+
+\`CrashLoopBackOff\` is not an error in itself — it's Kubernetes telling you that a container **started, exited, and is being restarted repeatedly**, with an increasing back-off delay (10s, 20s, 40s … capped at 5 minutes). The real failure happened *inside* the container. Your job is to find it.
+
+## Step 1: Describe the Pod
+
+\`\`\`bash
+kubectl describe pod <pod-name>
+\`\`\`
+
+Scroll to the **Events** section and the **Last State** of the container:
+
+- \`Exit Code 0\` — the process finished and didn't stay running (wrong command / one-shot script)
+- \`Exit Code 1\` — generic application error (check logs)
+- \`Exit Code 137\` — **OOMKilled** (out of memory) or SIGKILL
+- \`Exit Code 139\` — segfault (SIGSEGV)
+- \`Reason: Error\` with no logs — often a bad image entrypoint
+
+## Step 2: Read the Logs (Including the Previous Container)
+
+\`\`\`bash
+kubectl logs <pod-name>
+kubectl logs <pod-name> --previous   # the crashed instance, not the restarting one
+\`\`\`
+
+The \`--previous\` flag is the single most-missed trick. The *current* container may be too young to log anything useful; the *previous* one holds the stack trace.
+
+## Step 3: Work the Usual Suspects
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| Exit 137, terse logs | Memory limit too low | Raise \`resources.limits.memory\` |
+| "connection refused" to a dependency | DB / service not ready | Add readiness probe or init container |
+| "no such file or directory" | Wrong \`command\`/\`args\` or missing binary | Fix the entrypoint or image |
+| Config / secret key errors | Missing env var, ConfigMap, or Secret | Mount it; check \`envFrom\` |
+| Permission denied on a path | Wrong \`securityContext\` / read-only FS | Set \`runAsUser\` / fix volume perms |
+
+## Step 4: Probes That Kill Healthy Pods
+
+A liveness probe that is too aggressive will restart a perfectly fine container before it finishes booting:
+
+\`\`\`yaml
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 30   # give slow apps time to start
+  periodSeconds: 10
+  failureThreshold: 3
+\`\`\`
+
+If your app needs 25 seconds to warm up but \`initialDelaySeconds\` is 5, Kubernetes "helpfully" kills it forever. Use a **startupProbe** for slow starters.
+
+## Step 5: Inspect Inside the Container
+
+If logs are empty, override the entrypoint and look around:
+
+\`\`\`bash
+kubectl run debug --rm -it --image=<same-image> --command -- sh
+kubectl debug <pod-name> -it --image=busybox --target=<container>
+\`\`\`
+
+## The Fast Triage Loop
+
+1. \`kubectl get pods\` — confirm the state and restart count
+2. \`kubectl describe pod\` — read Events + Last State exit code
+3. \`kubectl logs --previous\` — get the real error
+4. Form a hypothesis (memory, config, dependency, probe)
+5. Patch the manifest, \`kubectl apply\`, watch \`kubectl get pods -w\`
+
+## Practice
+
+Our **CrashLoopBackOff** scenario drops you into a cluster with a pod that won't stay up. Use the checklist above and get it to \`Running\` before the timer expires.
+    `,
+  },
+  'teams-coupons-and-security': {
+    title: "Teams, Coupons, and Platform Security — What's New",
+    category: 'Product',
+    author: 'Platform Team',
+    date: 'June 5, 2026',
+    readTime: '4 min read',
+    color: 'accent-green',
+    content: `
+## A Bigger Release Than Usual
+
+This update rounds out FixitLab for **teams and organizations** while tightening platform security across the board. Here is everything that shipped.
+
+## Teams & Enterprise Seats
+
+Organizations can now manage learning at scale from the **Team dashboard**:
+
+- **Email invites** with pending-invite tracking and one-click member removal
+- **Per-member analytics** — scenarios attempted, completion rate, and time spent in labs
+- **Seat-based billing** so you only pay for active members
+- Org-level visibility into progress across Linux, Docker, Kubernetes, cloud, and more
+
+Hiring managers can assign scenarios for interview prep and review completion data without leaving the platform.
+
+## Coupon Codes at Checkout
+
+Both **technology subscriptions** and **AI Interview Studio** plans now accept promo codes:
+
+- Apply a coupon directly in the cart before paying
+- Live discount preview shows your savings before you confirm
+- Admins create and manage codes (percentage or fixed amount, with expiry and usage caps) from the admin panel
+
+## Admin Security Dashboards
+
+Operators get production-grade tooling:
+
+- **Audit logs** for sensitive actions (subscription grants, role changes, content edits)
+- **Rate limiting** on auth and API endpoints to blunt abuse and credential stuffing
+- A **security dashboard** summarizing recent events, failed logins, and gateway status
+
+## Community Threads with Screenshots
+
+The community got more useful for real troubleshooting:
+
+- **Attach screenshots** of error output and terminal state to any thread
+- Upvote solutions and react to helpful answers
+- Threads stay tied to the scenario and technology they belong to, so context travels with the discussion
+
+## Smaller Improvements
+
+- Clearer billing and Jira notifications in the in-app notification center
+- Safe fallbacks across public pages so marketing and docs always render, even during maintenance
+- Polish across light and dark themes
+
+## Try It
+
+Invite your team from the Team page, grab a coupon, and start assigning labs. As always — break things, fix them, get hired.
+    `,
+  },
 }
 
 export default function BlogPost() {
