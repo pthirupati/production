@@ -135,6 +135,28 @@ def _apply_simulation_fix(session) -> tuple[bool, str]:
                 shell.run("rescan-scsi-bus.sh")
                 shell.run("ip addr add 10.0.0.30/24 dev eth1")
                 return True, "cross-tech NIC added in VMware and configured"
+            # ── Cross-tech Kubernetes-on-VMware: the worker node is a VMware VM.
+            # Perform the VMware VM action (via apply_action so the bridge hook
+            # fires exactly as the UI would), then the matching terminal step.
+            if xcfg.get("tech") == "kubernetes":
+                from apps.vmware_sim.engine import _ensure_session as _vmw_ensure
+                from apps.vmware_sim.engine import apply_action as _vmw_action
+                vm = xcfg.get("vmware_vm")
+                node = xcfg.get("k8s_node")
+                _vmw_ensure(sid, slug)
+                if engine.cluster is not None:
+                    engine.cluster.session_id = sid
+                if action == "k8s_node_reset":
+                    _vmw_action(sid, "reboot", {"vm_name": vm})
+                else:  # k8s_node_add / drain — power on the worker VM
+                    _vmw_action(sid, "power_on", {"vm_name": vm})
+                # Fold the VMware action into the cluster, then run any terminal
+                # step the scenario needs (drain the old node for the drain flow).
+                if engine.cluster is not None:
+                    engine.cluster.sync_from_vmware_bridge()
+                if action == "k8s_node_add" and "drain" in slug:
+                    shell.run("kubectl drain worker-1 --ignore-daemonsets --delete-emptydir-data")
+                return True, f"cross-tech k8s node {node} brought online via VMware ({vm})"
 
         # ── Real-state generated scenarios (services + config markers) ──
         # Matched FIRST by exact slug so generic substring rules below don't

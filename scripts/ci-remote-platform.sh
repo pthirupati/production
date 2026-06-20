@@ -7,7 +7,16 @@ ACTION="${1:-deploy}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
+# CLUSTER_ROLE=edge|app|data|labs selects the per-role compose file (four-droplet
+# topology). When unset, COMPOSE_FILE defaults to the single-host prod compose so
+# existing behavior is unchanged. platform-start.sh resolves the same mapping.
+CLUSTER_ROLE="${CLUSTER_ROLE:-}"
+case "$CLUSTER_ROLE" in
+  edge) COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.edge.yml}" ;;
+  app)  COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.app.yml}" ;;
+  data) COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.data.yml}" ;;
+  *)    COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}" ;;
+esac
 ENV_FILE="${ENV_FILE:-.env.production}"
 
 chmod +x scripts/platform-start.sh scripts/platform-stop.sh scripts/build-scenario-images.sh \
@@ -17,8 +26,10 @@ chmod +x scripts/platform-start.sh scripts/platform-stop.sh scripts/build-scenar
 
 case "$ACTION" in
   deploy)
-    export COMPOSE_FILE ENV_FILE
+    export COMPOSE_FILE ENV_FILE CLUSTER_ROLE
     export BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
+    # Edge gateway needs APP_PRIVATE_IP to render the cluster nginx upstream.
+    [ -n "${APP_PRIVATE_IP:-}" ] && export APP_PRIVATE_IP
     bash scripts/sync-production-env.sh "$ROOT/.env.production"
     ./scripts/platform-start.sh
     ;;

@@ -1,0 +1,173 @@
+# FixitLab — D2 App droplet (four-droplet topology)
+# Private droplet: backend (Django/ASGI) + all Celery workers + beat.
+# VMware / IDE / devops simulations run INSIDE the backend process (no extra service).
+# Reuses service definitions from docker-compose.prod.yml.
+#
+# Usage on D2:
+#   COMPOSE_FILE=docker-compose.app.yml ./scripts/platform-start.sh
+#   docker compose -f docker-compose.app.yml --env-file .env.production up -d
+#
+# Connectivity (all via .env.production, wired by scripts/ci-wire-cluster-env.py):
+#   - Postgres/pgBouncer  → D3 private IP   (POSTGRES_HOST / PGBOUNCER_HOST)
+#   - Redis / RabbitMQ    → D1 private IP   (REDIS_HOST / CELERY_BROKER_URL)
+#   - Vault               → http://<D1>:8200 (VAULT_ADDR)
+#   - Lab Docker engine   → ssh://root@<D4> (DOCKER_SOCKET / DOCKER_HOST)
+#
+# Backend exposes 8000 on the VPC private interface so the D1 gateway upstream
+# (backend_pool → {{APP_PRIVATE_IP}}:8000) can reach it. The DO firewall
+# (scripts/ci-setup-firewalls.sh) restricts 8000 to the D1 private IP only.
+
+services:
+
+  backend:
+    build: ./backend
+    container_name: fixitlab-backend-1
+    env_file:
+      - .env.production
+    environment:
+      TERMINAL_MAX_WS_PER_USER: ${TERMINAL_MAX_WS_PER_USER:-20}
+      # Remote lab Docker engine on D4 (set by ci-wire-cluster-env.py)
+      DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
+    ports:
+      # Gateway on D1 proxies here over the VPC; firewall limits source to D1
+      - "8000:8000"
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      # SSH identity for remote Docker on D4 (created by ci-setup-labs-ssh.sh)
+      - ./deploy/labs_ssh:/root/.ssh:ro
+      - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
+    networks:
+      - fixitlab_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/'); assert r.status==200"]
+      interval: 30s
+      timeout: 10s
+      retries: 8
+      start_period: 180s
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+        reservations:
+          memory: 512M
+    restart: unless-stopped
+
+  celery_worker:
+    build: ./backend
+    command: celery -A config worker -l info --concurrency=8 -Q default,notifications -n default@%h
+    env_file:
+      - .env.production
+    environment:
+      DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./deploy/labs_ssh:/root/.ssh:ro
+      - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
+    networks:
+      - fixitlab_net
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping --timeout 10 2>/dev/null | grep -q 'pong'"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    restart: unless-stopped
+
+  celery_provisioning:
+    build: ./backend
+    command: celery -A config worker -l info --concurrency=10 -Q provisioning -n provisioning@%h
+    env_file:
+      - .env.production
+    environment:
+      DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./deploy/labs_ssh:/root/.ssh:ro
+      - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
+    networks:
+      - fixitlab_net
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping --timeout 10 2>/dev/null | grep -q 'pong'"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    restart: unless-stopped
+
+  celery_maintenance:
+    build: ./backend
+    command: celery -A config worker -l info --concurrency=2 -Q maintenance -n maintenance@%h
+    env_file:
+      - .env.production
+    environment:
+      DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./deploy/labs_ssh:/root/.ssh:ro
+      - ./scripts:/scripts
+      - ./scenarios:/scenarios:ro
+    networks:
+      - fixitlab_net
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping --timeout 10 2>/dev/null | grep -q 'pong'"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+
+  celery_beat:
+    build: ./backend
+    command: celery -A config beat -l info --pidfile=/tmp/celerybeat.pid
+    env_file:
+      - .env.production
+    volumes:
+      - static_volume:/app/staticfiles
+    networks:
+      - fixitlab_net
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/celerybeat.pid && kill -0 $(cat /tmp/celerybeat.pid) 2>/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  static_volume:
+    name: fixitlab_static
+  media_volume:
+    name: fixitlab_media
+
+networks:
+  fixitlab_net:
+    name: fixitlab_net
+    driver: bridge

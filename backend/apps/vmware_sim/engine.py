@@ -34,6 +34,48 @@ def _cross_tech_config(scenario_slug: str | None) -> dict | None:
         return None
 
 
+def _k8s_node_for_vm(cfg: dict | None, vm: dict) -> str | None:
+    """The k8s node name a VMware VM represents in a cross-tech k8s lab, or None.
+
+    A VM carries an explicit `k8s_node` (set by the preset / create payload); we
+    also fall back to the scenario's configured worker VM ↔ node mapping so that a
+    VM the learner creates with the expected name still binds to the node.
+    """
+    if not cfg or cfg.get("tech") != "kubernetes":
+        return None
+    node = vm.get("k8s_node")
+    if node:
+        return node
+    if vm.get("name") and vm.get("name") == cfg.get("vmware_vm"):
+        return cfg.get("k8s_node")
+    return None
+
+
+def _bridge_k8s_node(entry: dict, vm: dict, kind: str) -> None:
+    """Map a VMware VM power action onto k8s node state via the shared bridge.
+
+    kind: "online" (power on / create), "offline" (power off), "reset" (reset).
+    No-op unless this is a k8s cross-tech scenario and the VM is the worker node.
+    """
+    cfg = _cross_tech_config(entry.get("scenario_slug"))
+    node = _k8s_node_for_vm(cfg, vm)
+    if not node:
+        return
+    sid = str(entry.get("session_id") or "")
+    if not sid:
+        return
+    try:
+        from apps.labs.provisioner.simulation import vmware_bridge as br
+        if kind == "online":
+            br.record_k8s_node_online(sid, node)
+        elif kind == "offline":
+            br.record_k8s_node_offline(sid, node)
+        elif kind == "reset":
+            br.record_k8s_node_reset(sid, node)
+    except Exception:
+        pass
+
+
 def _load_session(session_id: str) -> dict | None:
     data = cache.get(_session_key(str(session_id)))
     if data is None:
@@ -922,6 +964,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["alarms"] = [a for a in state.get("alarms", []) if a.get("entity") != vm["name"]]
         events.append(_event(f"VM {vm['name']} powered on", "info", vm["name"]))
         tasks.insert(0, _task("Power On Virtual Machine", vm["name"]))
+        # Cross-tech k8s: powering on a worker-node VM makes its k8s node join Ready.
+        _bridge_k8s_node(entry, vm, "online")
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} powered on successfully"}
 
@@ -939,6 +983,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["disk_io_mbps"] = 0
         events.append(_event(f"VM {vm['name']} powered off", "info", vm["name"]))
         tasks.insert(0, _task("Power Off Virtual Machine", vm["name"]))
+        # Cross-tech k8s: powering off a worker-node VM removes that node.
+        _bridge_k8s_node(entry, vm, "offline")
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} powered off"}
 
@@ -982,6 +1028,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if cfg and cfg.get("action") == "reset":
             from apps.labs.provisioner.simulation.vmware_bridge import record_vm_reset
             record_vm_reset(str(session_id))
+        # Cross-tech k8s: resetting a hung worker-node VM recovers its NotReady node.
+        _bridge_k8s_node(entry, vm, "reset")
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} restarted"}
 
@@ -1635,6 +1683,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             "disk_io_mbps": 0,
             "net_mbps": 0,
         }
+        # Cross-tech k8s: if the learner creates the worker VM the scenario expects
+        # (by name), bind it to the k8s node so powering it on joins that node.
+        _xcfg = _cross_tech_config(entry.get("scenario_slug"))
+        if _xcfg and _xcfg.get("tech") == "kubernetes" and name == _xcfg.get("vmware_vm"):
+            vm["k8s_node"] = _xcfg.get("k8s_node")
         state["vms"].append(vm)
         _enrich_inventory(state)
         host = _find_host(state, host_id=host_id)

@@ -139,6 +139,71 @@ def record_pending_nic(session_id: str, ip: str = "10.0.0.30/24") -> None:
     _save(session_id, data)
 
 
+# ── Kubernetes-on-VMware: VMware VM actions ⇄ k8s node state ──────────────────
+# For a cross-tech k8s lab the cluster's worker nodes ARE VMware VMs (k8s-worker-*).
+# Powering on / creating that VM in VMware makes the node join and become Ready;
+# resetting a hung node VM recovers a NotReady node. The K8sCluster (rebuilt per
+# terminal request, a different worker) reconstructs node Ready/scheduling state by
+# reading these flags from the shared cache — so the terminal's `kubectl get nodes`
+# reflects the VMware action, and scheduling is fail-closed until the VM is online.
+#
+# Stored shape under the session key:
+#   k8s_nodes_online : {node_name: True}  → node is Ready & schedulable
+#   k8s_nodes_reset  : {node_name: True}  → a hung node VM was reset (recovered)
+# The VMware VM name maps to the k8s node name via the VM's `k8s_node` field.
+
+def record_k8s_node_online(session_id: str, node_name: str) -> None:
+    """VMware power-on / create of a worker-node VM → that node joins as Ready."""
+    if not node_name:
+        return
+    data = _load(session_id)
+    online = data.setdefault("k8s_nodes_online", {})
+    online[node_name] = True
+    _save(session_id, data)
+
+
+def record_k8s_node_offline(session_id: str, node_name: str) -> None:
+    """VMware power-off of a worker-node VM → that node leaves the cluster.
+
+    Clears any prior online/reset marker so a drained-then-powered-off node does
+    not still count as a schedulable target."""
+    if not node_name:
+        return
+    data = _load(session_id)
+    data.get("k8s_nodes_online", {}).pop(node_name, None)
+    data.get("k8s_nodes_reset", {}).pop(node_name, None)
+    _save(session_id, data)
+
+
+def record_k8s_node_reset(session_id: str, node_name: str) -> None:
+    """VMware reset/restart of a hung worker-node VM → the NotReady node recovers."""
+    if not node_name:
+        return
+    data = _load(session_id)
+    reset = data.setdefault("k8s_nodes_reset", {})
+    reset[node_name] = True
+    # A reset also implies the VM is powered on again.
+    data.setdefault("k8s_nodes_online", {})[node_name] = True
+    _save(session_id, data)
+
+
+def k8s_node_online(session_id: str, node_name: str) -> bool:
+    return bool(_load(session_id).get("k8s_nodes_online", {}).get(node_name))
+
+
+def k8s_node_reset(session_id: str, node_name: str) -> bool:
+    return bool(_load(session_id).get("k8s_nodes_reset", {}).get(node_name))
+
+
+def k8s_node_states(session_id: str) -> dict:
+    """Snapshot of all node online/reset markers for this session."""
+    data = _load(session_id)
+    return {
+        "online": dict(data.get("k8s_nodes_online", {})),
+        "reset": dict(data.get("k8s_nodes_reset", {})),
+    }
+
+
 def consume_pending_nic(session_id: str) -> dict | None:
     data = _load(session_id)
     nic = data.get("pending_nic")
@@ -188,6 +253,42 @@ CROSS_TECH_SCENARIOS: dict[str, dict] = {
         "requires_reboot": False,
         "vmware_vm": "web-prod-01",
     },
+    # ── Kubernetes-on-VMware (the worker node is a VMware VM) ──
+    # `tech: kubernetes` tells the engine/UI this is a k8s cross-tech lab; the
+    # VMware VM named `vmware_vm` carries `k8s_node` so power/reset actions on it
+    # map to the named node. `action` is the VMware op the lab expects:
+    #   k8s_node_add   : power on / create the worker VM → node joins Ready
+    #   k8s_node_reset : reset the hung worker VM → NotReady node recovers
+    "k8s-hpa-needs-new-node-vmware": {
+        "action": "k8s_node_add",
+        "tech": "kubernetes",
+        "vmware_vm": "k8s-worker-2",
+        "k8s_node": "worker-2",
+    },
+    "k8s-scale-out-add-vmware-node": {
+        "action": "k8s_node_add",
+        "tech": "kubernetes",
+        "vmware_vm": "k8s-worker-2",
+        "k8s_node": "worker-2",
+    },
+    "k8s-daemonset-needs-node-vmware": {
+        "action": "k8s_node_add",
+        "tech": "kubernetes",
+        "vmware_vm": "k8s-worker-2",
+        "k8s_node": "worker-2",
+    },
+    "k8s-node-notready-vmware-reset": {
+        "action": "k8s_node_reset",
+        "tech": "kubernetes",
+        "vmware_vm": "k8s-worker-1",
+        "k8s_node": "worker-1",
+    },
+    "k8s-drain-node-poweroff-vmware": {
+        "action": "k8s_node_add",
+        "tech": "kubernetes",
+        "vmware_vm": "k8s-worker-2",
+        "k8s_node": "worker-2",
+    },
 }
 
 
@@ -197,3 +298,8 @@ def is_cross_tech_scenario(slug: str) -> bool:
 
 def cross_tech_config(slug: str) -> dict | None:
     return CROSS_TECH_SCENARIOS.get((slug or "").lower())
+
+
+def is_k8s_cross_tech_scenario(slug: str) -> bool:
+    cfg = cross_tech_config(slug)
+    return bool(cfg and cfg.get("tech") == "kubernetes")

@@ -1,0 +1,45 @@
+title: Scale-Out Blocked — Add a Worker VM in VMware to Fit the Pods
+slug: k8s-scale-out-add-vmware-node
+category: Kubernetes
+difficulty: medium
+description: |
+  The `api` Deployment was scaled to 4 replicas to handle a traffic spike, but two
+  pods are stuck Pending with FailedScheduling — the only worker node (worker-1) has
+  no free CPU/memory. This Kubernetes cluster runs ON VMware: each node is a VMware
+  VM, so adding capacity means adding a node VM, not editing a manifest.
+
+  This is a CROSS-TECHNOLOGY task. Open the VMware simulator (toolbar -> Open VMware)
+  and power on the spare worker VM `k8s-worker-2`. Once it joins as node worker-2,
+  the Pending api pods schedule onto it. Confirm from the terminal that every api
+  pod is Running across the two worker nodes.
+initial_state: |
+  A Kubernetes cluster with one control-plane and one worker (worker-1). The `api`
+  Deployment is set to 4 replicas; 2 are Running on worker-1 and 2 are Pending
+  (Insufficient cpu/memory). The replacement worker VM `k8s-worker-2` exists in the
+  VMware inventory but is powered off, so node worker-2 has not joined.
+objectives:
+  - Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl describe pod)
+  - Confirm the cluster has only one worker node (kubectl get nodes)
+  - Open the VMware simulator and power on the worker-node VM k8s-worker-2
+  - Confirm worker-2 is Ready and the Pending pods schedule onto it
+  - Verify all api pods are Running (kubectl get pods -o wide)
+lab_mode: simulation
+simulation_type: kubernetes
+cross_technology: true
+vmware_link: true
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: '`kubectl get pods` shows 2 api pods Pending. `kubectl describe pod <pending>` reports FailedScheduling: Insufficient cpu/memory. `kubectl get nodes` shows only worker-1 — there is no node with room.'
+  - order: 2
+    cost: 15
+    content: 'The nodes are VMware VMs. Adding replicas cannot help when no node can host them. Open the VMware simulator (toolbar -> Open VMware); the spare node VM k8s-worker-2 is in the inventory, powered off.'
+  - order: 3
+    cost: 20
+    content: 'Power on k8s-worker-2 in the VMware simulator (VM Actions -> Power -> Power On). It joins as node worker-2. In the terminal, `kubectl get nodes` shows worker-2 Ready and `kubectl get pods -o wide` shows the formerly-Pending pods now Running on worker-2.'
+requires_companion_hosts: false

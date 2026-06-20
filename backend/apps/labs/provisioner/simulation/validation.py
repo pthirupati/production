@@ -300,6 +300,55 @@ def _run_line_check(
             )
         return True
 
+    # ── Cross-technology Kubernetes-on-VMware (worker node is a VMware VM) ──
+    # Fail-closed chain: a worker node only becomes Ready / pods only schedule
+    # once the matching VMware VM is powered on / created / reset. We re-fold the
+    # bridge state here (validation may run in a worker that never issued kubectl)
+    # so `kubectl get nodes|pods|hpa` reflects the genuine VMware action.
+    try:
+        from .vmware_bridge import is_k8s_cross_tech_scenario as _is_k8s_xtech
+    except Exception:
+        _is_k8s_xtech = lambda _s: False  # noqa: E731
+    if _is_k8s_xtech(_xslug0) and (
+        "kubectl get nodes" in stripped or "kubectl get pods" in stripped
+        or "kubectl get hpa" in stripped or "kubectl get ds" in stripped
+        or "kubectl get daemonset" in stripped
+    ):
+        cluster = engine.cluster if engine else None
+        if cluster is None:
+            failures.append("kubernetes cluster not available")
+            return True
+        if not getattr(cluster, "session_id", ""):
+            cluster.session_id = getattr(state, "session_id", "") or ""
+        cluster.sync_from_vmware_bridge()
+        node = (getattr(cluster, "_xtech", None) or {}).get("node", "the worker")
+        kind = (getattr(cluster, "_xtech", None) or {}).get("kind", "add")
+        if "kubectl get nodes" in stripped and "Ready" in stripped:
+            if any(n.status != "Ready" for n in cluster.nodes):
+                if kind == "reset":
+                    failures.append(f"{node} still NotReady — reset its VM in the VMware simulator")
+                else:
+                    failures.append(f"{node} not joined — power on its worker VM in the VMware simulator")
+            return True
+        if "kubectl get hpa" in stripped:
+            unsatisfied = [h for h in cluster.hpas if h.current_replicas < h.desired_replicas]
+            if unsatisfied:
+                failures.append("HPA not satisfied — add a worker node in VMware so the extra pods schedule")
+            elif not cluster.is_healthy():
+                failures.append("cluster not healthy — ensure all pods are Running across the nodes")
+            return True
+        if "kubectl get ds" in stripped or "kubectl get daemonset" in stripped:
+            if any(p.status != "Running" for p in cluster.pods if p.owner in
+                   {d.name for d in getattr(cluster, "daemonsets", [])}):
+                failures.append("DaemonSet pod Pending — power on the worker VM in VMware so it gets a node")
+            return True
+        # kubectl get pods | grep Running
+        if any(p.status != "Running" for p in cluster.pods):
+            failures.append("pods still Pending — add/recover the worker node VM in the VMware simulator")
+        elif not cluster.is_healthy():
+            failures.append("cluster not healthy yet — complete the node + scheduling fix")
+        return True
+
     if stripped.startswith("HTTP_CODE=") or stripped.startswith("HTTP_CODE=$(curl"):
         code = _curl_http_code(state)
         if code != "200":

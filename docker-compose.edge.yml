@@ -1,0 +1,141 @@
+# FixitLab — D1 Edge droplet (four-droplet topology)
+# Public droplet: gateway (nginx + SSL), certbot, frontend-prod, redis, rabbitmq, vault.
+# Reuses service definitions from docker-compose.prod.yml. The gateway proxies the
+# backend API to the App droplet (D2) via the rendered cluster nginx template
+# (gateway/nginx.cluster.conf.template → upstream backend_pool = {{APP_PRIVATE_IP}}:8000).
+#
+# Usage on D1:
+#   COMPOSE_FILE=docker-compose.edge.yml ./scripts/platform-start.sh
+#   docker compose -f docker-compose.edge.yml --env-file .env.production up -d
+#
+# Vault runs here (D1) so it is reachable at http://<D1-private-ip>:8200 from D2/D4.
+# Redis (6379) and RabbitMQ (5672) bind on the VPC interface; the DO firewall
+# (scripts/ci-setup-firewalls.sh) restricts those ports to the D2 private IP.
+
+# HashiCorp Vault — see docker-compose.vault.yml. On the edge node Vault must also
+# publish 8200 on the private interface so D2/D4 can reach it for AppRole login.
+include:
+  - path: docker-compose.vault.yml
+
+services:
+
+  vault:
+    # Publish 8200 so app/labs droplets can reach Vault over the VPC.
+    # Firewall restricts source to D2/D4 private IPs.
+    ports:
+      - "8200:8200"
+    networks:
+      fixitlab_net:
+        aliases:
+          - vault
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile.prod
+    environment:
+      - SSL_DOMAIN=${SSL_DOMAIN:-fixitlab.in}
+      # When set, entrypoint renders the cluster template pointing at the App droplet.
+      - APP_PRIVATE_IP=${APP_PRIVATE_IP:-}
+      - CLUSTER_ROLE=${CLUSTER_ROLE:-edge}
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      frontend-prod:
+        condition: service_started
+    volumes:
+      - static_volume:/static
+      - media_volume:/media:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    networks:
+      - fixitlab_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 43200 & wait $${!}; done'"
+    restart: unless-stopped
+
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    networks:
+      - fixitlab_net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: fixitlab_redis
+    env_file:
+      - .env.production
+    command: >
+      sh -c "redis-server
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --requirepass $${REDIS_PASSWORD:-fixitlab_redis_secret}
+      --tcp-backlog 511
+      --timeout 300"
+    ports:
+      # Reachable from D2 over the VPC; firewall limits source to D2 private IP
+      - "6379:6379"
+    networks:
+      - fixitlab_net
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "sh", "-c", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: fixitlab_rabbitmq
+    env_file:
+      - .env.production
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-fixitlab}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-fixitlab_rabbit_secret}
+    ports:
+      # AMQP for D2 celery over the VPC; firewall limits source to D2 private IP
+      - "5672:5672"
+    networks:
+      - fixitlab_net
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  static_volume:
+    name: fixitlab_static
+  media_volume:
+    name: fixitlab_media
+  certbot_www:
+  certbot_certs:
+  redis_data:
+    name: fixitlab_redis_data
+  rabbitmq_data:
+    name: fixitlab_rabbitmq_data
+
+networks:
+  fixitlab_net:
+    name: fixitlab_net
+    driver: bridge

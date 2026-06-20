@@ -39,6 +39,85 @@ def _set_validation(state: dict, **rules: Any) -> None:
     state["validation"] = rules
 
 
+def _cross_tech_config(slug: str) -> dict | None:
+    try:
+        from apps.labs.provisioner.simulation.vmware_bridge import cross_tech_config
+        return cross_tech_config(slug or "")
+    except Exception:
+        return None
+
+
+def _make_node_vm(name: str, host_id: str, node: str, *, power: str,
+                  hung: bool = False) -> dict:
+    """A worker-node VM for a k8s-on-VMware lab. `k8s_node` binds it to the node."""
+    return {
+        "id": f"vm-{name}",
+        "name": name,
+        "host_id": host_id,
+        "datastore_id": "ds-01",
+        "network_id": "net-02",
+        "resource_pool_id": "rp-prod",
+        "power": power,
+        "cpu": 4,
+        "memory_mb": 8192,
+        "disk_gb": 80,
+        "guest_os": "Ubuntu Linux (64-bit)",
+        "guest_os_version": "Ubuntu 22.04 LTS",
+        "ip": "10.20.30.5%s" % node[-1] if node and node[-1].isdigit() else "10.20.30.50",
+        "hostname": f"{name}.fixitlab.local",
+        "tools": "toolsNotRunning" if (hung or power != "poweredOn") else "ok",
+        "tools_version": "11333",
+        "hardware_version": "vmx-19",
+        "annotation": f"Kubernetes {node} (node is this VM)",
+        "snapshots": [],
+        "cpu_pct": 95 if hung else (random.randint(20, 45) if power == "poweredOn" else 0),
+        "mem_pct": random.randint(40, 70) if power == "poweredOn" else 0,
+        "disk_io_mbps": 0,
+        "net_mbps": random.randint(5, 30) if power == "poweredOn" else 0,
+        "k8s_node": node,
+        **({"guest_hung": True} if hung else {}),
+    }
+
+
+def _seed_k8s_on_vmware(state: dict, slug: str, cfg: dict, alarm) -> None:
+    """Populate the VMware inventory with the cluster's worker-node VMs.
+
+    Add scenarios: worker-1 is up; worker-2's VM is powered OFF (so node worker-2
+    is absent and pods are Pending) until the learner powers it on / creates it.
+    Reset scenario: worker-1's VM is powered on but HUNG (node NotReady) until the
+    learner resets it.
+    """
+    hosts = state.get("hosts", [])
+    h1 = hosts[0]["id"] if hosts else "host-01"
+    h2 = hosts[1]["id"] if len(hosts) > 1 else h1
+    action = cfg.get("action")
+
+    if action == "k8s_node_reset":
+        # worker-1 VM is hung → its node is NotReady; reset to recover.
+        wvm = _make_node_vm("k8s-worker-1", h1, "worker-1", power="poweredOn", hung=True)
+        state["vms"].append(wvm)
+        # A healthy worker-2 so only worker-1 is the problem.
+        state["vms"].append(_make_node_vm("k8s-worker-2", h2, "worker-2", power="poweredOn"))
+        state["events"].append(_event(
+            "Guest heartbeat lost on k8s-worker-1 — node NotReady, reset required",
+            "critical", "k8s-worker-1"))
+        alarm("alm-k8s-node-hung", "Worker node VM hung (NotReady)", "k8s-worker-1")
+        return
+
+    # add / drain scenarios: worker-2's VM exists but is powered OFF.
+    state["vms"].append(_make_node_vm("k8s-worker-1", h1, "worker-1", power="poweredOn"))
+    state["vms"].append(_make_node_vm("k8s-worker-2", h2, "worker-2", power="poweredOff"))
+    if action == "k8s_node_add":
+        state["events"].append(_event(
+            "Cluster capacity exhausted — power on worker node VM k8s-worker-2",
+            "warning", "k8s-worker-2"))
+        alarm("alm-k8s-capacity", "Insufficient cluster capacity", "Cluster-01", "warning")
+    else:  # drain
+        state["events"].append(_event(
+            "Maintenance: drain k8s-worker-1 and bring up replacement k8s-worker-2",
+            "info", "Cluster-01"))
+
+
 def apply_vmware_scenario_preset(state: dict, scenario_slug: str) -> None:
     slug = (scenario_slug or "").lower()
     events = state["events"]
@@ -73,6 +152,15 @@ def apply_vmware_scenario_preset(state: dict, scenario_slug: str) -> None:
         events.append(_event(
             "Guest heartbeat lost on web-prod-01 — VM is hung, reset required", "critical", "web-prod-01"))
         alarm("alm-cross-hung", "Guest heartbeat lost", "web-prod-01")
+        return
+
+    # ── Cross-technology Kubernetes-on-VMware: the cluster's worker nodes ARE
+    # VMware VMs. The k8s terminal's `kubectl get nodes` reflects power/reset
+    # actions taken on these VMs (via the bridge cache). ──────────────────────
+    _k8s_xcfg = _cross_tech_config(slug)
+    if _k8s_xcfg and _k8s_xcfg.get("tech") == "kubernetes":
+        _seed_k8s_on_vmware(state, slug, _k8s_xcfg, alarm)
+        events.append(_event("vCenter inventory loaded", "info", "vCenter"))
         return
 
     # ── New scenarios (wave 4): each reuses an existing validation rule AND

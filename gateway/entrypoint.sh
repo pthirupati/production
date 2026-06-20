@@ -12,9 +12,19 @@ if [ -w /var/www/certbot ] 2>/dev/null; then
   mkdir -p /var/www/certbot
 fi
 
+# Four-droplet topology: when APP_PRIVATE_IP is set, render the cluster template
+# so the backend upstream points at the App droplet (D2) over the private VPC.
+PROD_CONF_SRC="/etc/nginx/templates/nginx.prod.conf"
+if [ -n "${APP_PRIVATE_IP:-}" ] && [ -f /etc/nginx/templates/nginx.cluster.conf.template ]; then
+  echo "[gateway] Cluster mode — backend upstream -> ${APP_PRIVATE_IP}:8000"
+  sed "s/{{APP_PRIVATE_IP}}/${APP_PRIVATE_IP}/g" \
+    /etc/nginx/templates/nginx.cluster.conf.template > /etc/nginx/templates/nginx.cluster.conf
+  PROD_CONF_SRC="/etc/nginx/templates/nginx.cluster.conf"
+fi
+
 if [ -f "$CERT_FILE" ] && [ -f "$KEY_FILE" ]; then
   echo "[gateway] Let's Encrypt certificates found — enabling production HTTPS"
-  cp /etc/nginx/templates/nginx.prod.conf /etc/nginx/conf.d/default.conf
+  cp "$PROD_CONF_SRC" /etc/nginx/conf.d/default.conf
 else
   echo "[gateway] No Let's Encrypt certs — bootstrap mode (HTTP :80 + self-signed HTTPS :443)"
   mkdir -p "$BOOTSTRAP_DIR"

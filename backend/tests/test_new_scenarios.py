@@ -698,6 +698,176 @@ class CrossTechBridgeTests(SimpleTestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Cross-technology Kubernetes-on-VMware: the cluster's worker nodes ARE VMware
+# VMs. Powering on / creating / resetting a worker-node VM in the VMware
+# simulator must reflect in the terminal's `kubectl get nodes` (node Ready) and
+# let stranded pods schedule. Fail-closed: the lab cannot pass with kubectl
+# alone — the VMware VM action is mandatory.
+# ──────────────────────────────────────────────────────────────────────
+
+from apps.vmware_sim.engine import _ensure_session as _vmw_ensure_k8s  # noqa: E402
+from apps.vmware_sim.engine import apply_action as _vmw_action_k8s  # noqa: E402
+
+_K8S_CROSS_DIRS = {
+    "k8s-hpa-needs-new-node-vmware": "kubernetes/k8s-hpa-needs-new-node-vmware",
+    "k8s-scale-out-add-vmware-node": "kubernetes/k8s-scale-out-add-vmware-node",
+    "k8s-node-notready-vmware-reset": "kubernetes/k8s-node-notready-vmware-reset",
+    "k8s-daemonset-needs-node-vmware": "kubernetes/k8s-daemonset-needs-node-vmware",
+    "k8s-drain-node-poweroff-vmware": "kubernetes/k8s-drain-node-poweroff-vmware",
+}
+
+
+class CrossTechK8sOnVMwareBridgeTests(SimpleTestCase):
+    """VMware worker-VM actions drive k8s node state for the cross-tech labs."""
+
+    def setUp(self):
+        _dj_cache.clear()
+
+    def _engine(self, slug, sid):
+        eng = UnifiedSimulationEngine(scenario_slug=slug, simulation_type="kubernetes")
+        eng.shell.state.session_id = sid
+        if eng.cluster is not None:
+            eng.cluster.session_id = sid
+        _vmw_ensure_k8s(sid, slug)
+        return eng
+
+    def test_check_scripts_non_trivial(self):
+        for slug, rel in _K8S_CROSS_DIRS.items():
+            self.assertFalse(
+                is_trivial_validation_script(_load_check(rel)),
+                f"{slug}: check.sh is trivial",
+            )
+
+    def test_registry_marks_them_k8s_cross_tech(self):
+        for slug in _K8S_CROSS_DIRS:
+            self.assertTrue(_bridge.is_cross_tech_scenario(slug), f"{slug} not in registry")
+            self.assertTrue(
+                _bridge.is_k8s_cross_tech_scenario(slug),
+                f"{slug} not flagged as a k8s cross-tech scenario",
+            )
+
+    def test_hpa_needs_node_fails_then_passes_after_vmware_power_on(self):
+        slug = "k8s-hpa-needs-new-node-vmware"
+        sid = "k8s-xtech-hpa"
+        eng = self._engine(slug, sid)
+        st = eng.shell.state
+        script = _load_check(_K8S_CROSS_DIRS[slug])
+
+        # Fail-closed: pods Pending, HPA short of desired, only one worker.
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, f"HPA scenario passed before adding a node: {msg}")
+        self.assertIn("Pending", eng.shell.run("kubectl get pods"))
+        self.assertNotIn("worker-2", eng.shell.run("kubectl get nodes"))
+
+        # kubectl-only scaling cannot help — still no capacity.
+        eng.shell.run("kubectl scale deployment web --replicas=4")
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "HPA scenario passed via kubectl scale without a node")
+
+        # Power on the worker-node VM in VMware → node worker-2 joins Ready.
+        res = _vmw_action_k8s(sid, "power_on", {"vm_name": "k8s-worker-2"})
+        self.assertTrue(res.get("ok"), res.get("error"))
+        nodes = eng.shell.run("kubectl get nodes")
+        self.assertIn("worker-2", nodes)
+        self.assertNotIn("NotReady", nodes)
+        self.assertNotIn("Pending", eng.shell.run("kubectl get pods"))
+
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertTrue(ok, f"HPA scenario failed after adding the VMware node: {msg}")
+
+    def test_scale_out_needs_node(self):
+        slug = "k8s-scale-out-add-vmware-node"
+        sid = "k8s-xtech-scale"
+        eng = self._engine(slug, sid)
+        st = eng.shell.state
+        script = _load_check(_K8S_CROSS_DIRS[slug])
+
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "scale-out scenario passed before adding a node")
+
+        _vmw_action_k8s(sid, "power_on", {"vm_name": "k8s-worker-2"})
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertTrue(ok, f"scale-out scenario failed after adding the node: {msg}")
+
+    def test_node_notready_only_recovers_via_vmware_reset(self):
+        slug = "k8s-node-notready-vmware-reset"
+        sid = "k8s-xtech-reset"
+        eng = self._engine(slug, sid)
+        st = eng.shell.state
+        script = _load_check(_K8S_CROSS_DIRS[slug])
+
+        self.assertIn("NotReady", eng.shell.run("kubectl get nodes"))
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "NotReady-node scenario passed before reset")
+
+        # Cheese attempt: uncordon + delete cannot revive a hung node's kubelet.
+        eng.shell.run("kubectl uncordon worker-1")
+        eng.shell.run("kubectl delete pod payments-dddd2")
+        self.assertIn("NotReady", eng.shell.run("kubectl get nodes"))
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "NotReady node wrongly recovered via kubectl uncordon")
+
+        # VMware reset of the hung node VM → node returns Ready and pods schedule.
+        res = _vmw_action_k8s(sid, "reboot", {"vm_name": "k8s-worker-1"})
+        self.assertTrue(res.get("ok"), res.get("error"))
+        nodes = eng.shell.run("kubectl get nodes")
+        self.assertNotIn("NotReady", nodes)
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertTrue(ok, f"NotReady-node scenario failed after VMware reset: {msg}")
+
+    def test_daemonset_needs_node(self):
+        slug = "k8s-daemonset-needs-node-vmware"
+        sid = "k8s-xtech-ds"
+        eng = self._engine(slug, sid)
+        st = eng.shell.state
+        script = _load_check(_K8S_CROSS_DIRS[slug])
+
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "daemonset scenario passed before adding a node")
+        self.assertIn("Pending", eng.shell.run("kubectl get pods"))
+
+        _vmw_action_k8s(sid, "power_on", {"vm_name": "k8s-worker-2"})
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertTrue(ok, f"daemonset scenario failed after adding the node: {msg}")
+
+    def test_drain_requires_both_new_node_and_drain(self):
+        slug = "k8s-drain-node-poweroff-vmware"
+        sid = "k8s-xtech-drain"
+        eng = self._engine(slug, sid)
+        st = eng.shell.state
+        script = _load_check(_K8S_CROSS_DIRS[slug])
+
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "drain scenario passed before any action")
+
+        # Adding the node alone is not enough — worker-1 is still in service.
+        _vmw_action_k8s(sid, "power_on", {"vm_name": "k8s-worker-2"})
+        ok, _ = validate_simulation_state(st, script, eng)
+        self.assertFalse(ok, "drain scenario passed by adding a node without draining")
+
+        # Drain worker-1 → its pods evict onto worker-2; now it passes.
+        eng.shell.run("kubectl drain worker-1 --ignore-daemonsets --delete-emptydir-data")
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertTrue(ok, f"drain scenario failed after add-node + drain: {msg}")
+
+    def test_created_worker_vm_also_joins_on_power_on(self):
+        """The learner may CREATE the worker VM (not just power a seeded one)."""
+        slug = "k8s-scale-out-add-vmware-node"
+        sid = "k8s-xtech-create"
+        eng = self._engine(slug, sid)
+        st = eng.shell.state
+        script = _load_check(_K8S_CROSS_DIRS[slug])
+        # Remove the seeded worker-2 VM, then create+power-on a fresh one by name.
+        from apps.vmware_sim.engine import get_state as _vmw_get
+        _vmw_action_k8s(sid, "delete_vm", {"vm_name": "k8s-worker-2"})
+        res = _vmw_action_k8s(sid, "create_vm", {"name": "k8s-worker-2", "cpu": 4, "memory_mb": 8192})
+        self.assertTrue(res.get("ok"), res.get("error"))
+        _vmw_action_k8s(sid, "power_on", {"vm_name": "k8s-worker-2"})
+        ok, msg = validate_simulation_state(st, script, eng)
+        self.assertTrue(ok, f"created worker VM did not join the cluster: {msg}")
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Storage / partition (fdisk / parted / LVM) + linux-admin topic coverage.
 #
 # Each scenario ships a non-trivial check.sh. The preset (applied by

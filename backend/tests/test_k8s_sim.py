@@ -498,3 +498,84 @@ class NetworkingNmcliTests(SimpleTestCase):
         self.assertIn("Idle", sim.shell.run('vtysh -c "show ip bgp summary"'))
         sim.shell.run("router bgp 65001\n neighbor 10.0.0.2 remote-as 65001")
         self.assertIn("Established", sim.shell.run('vtysh -c "show ip bgp summary"'))
+
+
+# ---------------------------------------------------------------------------
+# Cross-technology Kubernetes-on-VMware: the cluster reads the VMware bridge
+# (shared cache) by session_id so a node powered on / reset in the VMware
+# simulator appears Ready in `kubectl get nodes` and lets pods schedule.
+# ---------------------------------------------------------------------------
+
+class K8sOnVMwareBridgeTests(SimpleTestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+
+    def test_get_hpa_and_autoscale_verb(self):
+        sim = UnifiedSimulationEngine(scenario_slug="k8s-hpa-needs-new-node-vmware", simulation_type="kubernetes")
+        out = sim.shell.run("kubectl get hpa")
+        self.assertIn("REFERENCE", out)
+        self.assertIn("Deployment/web", out)
+        # autoscale verb creates an HPA on a healthy deployment.
+        sim2 = _k8s_sim("sim-k8s-crashloop")
+        sim2.shell.run("kubectl set image deployment/nginx nginx=nginx:latest")
+        res = sim2.shell.run("kubectl autoscale deployment nginx --min=1 --max=5 --cpu-percent=70")
+        self.assertIn("autoscaled", res)
+        self.assertIn("Deployment/nginx", sim2.shell.run("kubectl get hpa"))
+
+    def test_power_on_worker_vm_makes_node_ready_and_schedules_pods(self):
+        from apps.labs.provisioner.simulation import vmware_bridge as br
+        slug, sid = "k8s-hpa-needs-new-node-vmware", "k8s-cluster-unit"
+        sim = UnifiedSimulationEngine(scenario_slug=slug, simulation_type="kubernetes")
+        sim.shell.state.session_id = sid
+        sim.cluster.session_id = sid
+
+        # Before the VMware action: one worker, pods Pending, cluster unhealthy.
+        self.assertNotIn("worker-2", sim.shell.run("kubectl get nodes"))
+        self.assertIn("Pending", sim.shell.run("kubectl get pods"))
+        self.assertFalse(sim.cluster.is_healthy())
+
+        # Simulate the VMware "power on k8s-worker-2" via the bridge directly.
+        br.record_k8s_node_online(sid, "worker-2")
+
+        nodes = sim.shell.run("kubectl get nodes")
+        self.assertIn("worker-2", nodes)
+        self.assertNotIn("NotReady", nodes)
+        self.assertNotIn("Pending", sim.shell.run("kubectl get pods"))
+        self.assertTrue(sim.cluster.is_healthy())
+
+    def test_reset_recovers_notready_node_but_kubectl_alone_does_not(self):
+        from apps.labs.provisioner.simulation import vmware_bridge as br
+        slug, sid = "k8s-node-notready-vmware-reset", "k8s-reset-unit"
+        sim = UnifiedSimulationEngine(scenario_slug=slug, simulation_type="kubernetes")
+        sim.shell.state.session_id = sid
+        sim.cluster.session_id = sid
+
+        self.assertIn("NotReady", sim.shell.run("kubectl get nodes"))
+        # kubectl uncordon must NOT revive a hung node's kubelet.
+        sim.shell.run("kubectl uncordon worker-1")
+        self.assertIn("NotReady", sim.shell.run("kubectl get nodes"))
+        self.assertFalse(sim.cluster.is_healthy())
+
+        # The VMware reset (bridge) clears vm_hung → node Ready, pods schedule.
+        br.record_k8s_node_reset(sid, "worker-1")
+        self.assertNotIn("NotReady", sim.shell.run("kubectl get nodes"))
+        self.assertTrue(sim.cluster.is_healthy())
+
+    def test_node_offline_removes_capacity_again(self):
+        """Powering the worker VM back off must revert to a fail-closed state."""
+        from apps.labs.provisioner.simulation import vmware_bridge as br
+        from apps.labs.provisioner.simulation.k8s_cluster import K8sCluster
+        slug, sid = "k8s-scale-out-add-vmware-node", "k8s-offline-unit"
+        sim = UnifiedSimulationEngine(scenario_slug=slug, simulation_type="kubernetes")
+        sim.shell.state.session_id = sid
+        sim.cluster.session_id = sid
+
+        br.record_k8s_node_online(sid, "worker-2")
+        sim.cluster.sync_from_vmware_bridge()  # a kubectl command would do this
+        self.assertTrue(sim.cluster.is_healthy())
+        # Rebuild the cluster from a fresh read after powering the VM off again.
+        br.record_k8s_node_offline(sid, "worker-2")
+        fresh = K8sCluster(slug, session_id=sid)
+        self.assertNotIn("worker-2", fresh.get_nodes())
+        self.assertFalse(fresh.is_healthy())

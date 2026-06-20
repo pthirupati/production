@@ -4,7 +4,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
+# CLUSTER_ROLE selects the per-role compose file for the four-droplet topology.
+# When unset/empty, behavior is the single-host default (docker-compose.prod.yml).
+CLUSTER_ROLE="${CLUSTER_ROLE:-}"
+case "$CLUSTER_ROLE" in
+  edge) COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.edge.yml}" ;;
+  app)  COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.app.yml}" ;;
+  data) COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.data.yml}" ;;
+  labs) COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}" ;;  # labs = remote docker engine only; no compose stack
+  *)    COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}" ;;
+esac
 ENV_FILE="${ENV_FILE:-.env.production}"
 
 _env_true() {
@@ -12,6 +21,13 @@ _env_true() {
     1|true|TRUE|True|yes|YES|on|ON) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+# Helper: in a cluster role, only run a post-start step on the node that owns it.
+# Returns 0 (run) when single-host (no CLUSTER_ROLE) OR when role matches.
+_role_runs() {
+  [ -z "$CLUSTER_ROLE" ] && return 0
+  case " $* " in *" $CLUSTER_ROLE "*) return 0 ;; *) return 1 ;; esac
 }
 
 # Sync production env from Vault, GitHub secrets, or local deploy/production.env
@@ -22,8 +38,10 @@ chmod +x "$ROOT/scripts/sync-production-env.sh" "$ROOT/scripts/ensure-ssl-certs.
 docker network inspect fixitlab_labs >/dev/null 2>&1 || docker network create fixitlab_labs
 docker network inspect fixitlab_net >/dev/null 2>&1 || docker network create fixitlab_net
 
-# Vault must be up before render-env (when enabled via env or local approle file)
-if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; then
+# Vault must be up before render-env (when enabled via env or local approle file).
+# In the cluster, Vault runs only on the edge node (D1); app/data nodes reach it
+# remotely via VAULT_ADDR=http://<edge>:8200 and do not start a local container.
+if _role_runs edge && { _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; }; then
   bash "$ROOT/scripts/vault/start.sh" 2>/dev/null || true
   VAULT_CFG_HASH="$(md5sum "$ROOT/infra/vault/config.hcl" 2>/dev/null | awk '{print $1}' || md5 -q "$ROOT/infra/vault/config.hcl" 2>/dev/null || true)"
   VAULT_CFG_MARKER="/tmp/fixitlab-vault-config-hash"
@@ -47,12 +65,13 @@ echo "Compose: $COMPOSE_FILE | Env: $ENV_FILE"
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
 
 # Ensure Vault is on the same network as backend (fixes legacy standalone vault compose)
-if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; then
+if _role_runs edge && { _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; }; then
   bash "$ROOT/scripts/vault/ensure-network.sh" 2>/dev/null || true
 fi
 
-# Pin all app services to fixitlab_net (migrate off legacy fixitlab_fixitlab_net)
-if docker network inspect fixitlab_fixitlab_net >/dev/null 2>&1; then
+# Pin all app services to fixitlab_net (migrate off legacy fixitlab_fixitlab_net).
+# Single-host only — in the cluster, vault and app services live on different nodes.
+if [ -z "$CLUSTER_ROLE" ] && docker network inspect fixitlab_fixitlab_net >/dev/null 2>&1; then
   BACKEND_ON_LEGACY="$(docker inspect fixitlab-backend-1 --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' 2>/dev/null \
     | grep -q fixitlab_fixitlab_net && echo yes || echo no)"
   if [ "$BACKEND_ON_LEGACY" = "yes" ]; then
@@ -64,60 +83,72 @@ if docker network inspect fixitlab_fixitlab_net >/dev/null 2>&1; then
   fi
 fi
 
-# Always unseal Vault after containers start (Vault always starts sealed after restart)
-if _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; then
+# Always unseal Vault after containers start (Vault always starts sealed after restart).
+# Edge node owns Vault in the cluster; other roles reach it remotely.
+if _role_runs edge && { _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; }; then
   echo "Auto-unsealing Vault..."
   for _i in $(seq 1 12); do
     bash "$ROOT/scripts/vault/unseal.sh" 2>/dev/null && break || sleep 5
   done
 fi
 
-# Recreate app workers when env file changes so containers pick up new secrets
-ENV_HASH="$(md5sum "$ENV_FILE" 2>/dev/null | awk '{print $1}' || md5 -q "$ENV_FILE" 2>/dev/null || true)"
-ENV_HASH_FILE="/tmp/fixitlab-env-hash"
-if [ -n "$ENV_HASH" ] && [ -f "$ENV_HASH_FILE" ] && [ "$(cat "$ENV_HASH_FILE")" != "$ENV_HASH" ]; then
-  echo "Env changed — recreating backend/celery containers"
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --force-recreate \
-    backend celery_worker celery_provisioning celery_maintenance celery_beat
-fi
-[ -n "$ENV_HASH" ] && echo "$ENV_HASH" > "$ENV_HASH_FILE"
-
-echo "Waiting for backend..."
-for i in $(seq 1 60); do
-  if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python -c \
-    "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/'); assert r.status==200" 2>/dev/null; then
-    break
+# Recreate app workers when env file changes so containers pick up new secrets.
+# Only on a node that runs the backend/celery stack (single-host or cluster app).
+if _role_runs app; then
+  ENV_HASH="$(md5sum "$ENV_FILE" 2>/dev/null | awk '{print $1}' || md5 -q "$ENV_FILE" 2>/dev/null || true)"
+  ENV_HASH_FILE="/tmp/fixitlab-env-hash"
+  if [ -n "$ENV_HASH" ] && [ -f "$ENV_HASH_FILE" ] && [ "$(cat "$ENV_HASH_FILE")" != "$ENV_HASH" ]; then
+    echo "Env changed — recreating backend/celery containers"
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --force-recreate \
+      backend celery_worker celery_provisioning celery_maintenance celery_beat
   fi
-  sleep 3
-done
+  [ -n "$ENV_HASH" ] && echo "$ENV_HASH" > "$ENV_HASH_FILE"
 
-echo "Ensuring SSL certificates (Let's Encrypt)..."
+  echo "Waiting for backend..."
+  for i in $(seq 1 60); do
+    if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python -c \
+      "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/'); assert r.status==200" 2>/dev/null; then
+      break
+    fi
+    sleep 3
+  done
+fi
+
+# SSL/Let's Encrypt is owned by the gateway, which runs on the edge node (or single-host).
 export COMPOSE_FILE ENV_FILE
-if bash "$ROOT/scripts/ensure-ssl-certs.sh"; then
+if _role_runs edge; then
+  echo "Ensuring SSL certificates (Let's Encrypt)..."
+fi
+if _role_runs edge && bash "$ROOT/scripts/ensure-ssl-certs.sh"; then
   echo "SSL ready"
+elif ! _role_runs edge; then
+  : # not the edge node — gateway/SSL handled on D1
 else
   echo "WARNING: SSL certificate not obtained — site available on HTTP only until DNS/port 80 is fixed"
 fi
 
-echo "Running migrations (safe — does not wipe data)..."
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py migrate --noinput
+# Database-touching steps run on the node with the backend (single-host or cluster app).
+if _role_runs app; then
+  echo "Running migrations (safe — does not wipe data)..."
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py migrate --noinput
 
-echo "Syncing superuser credentials from env..."
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python /scripts/create_superuser.py || true
+  echo "Syncing superuser credentials from env..."
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python /scripts/create_superuser.py || true
 
-echo "Seeding/updating scenarios..."
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-  python manage.py seed_scenarios --dir /scenarios --merge-only
+  echo "Seeding/updating scenarios..."
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    python manage.py seed_scenarios --dir /scenarios --merge-only
 
-echo "Admin demo certificate / sample interview..."
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-  python manage.py seed_admin_demo || true
+  echo "Admin demo certificate / sample interview..."
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    python manage.py seed_admin_demo || true
 
-echo "Seeding/updating projects..."
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_projects || true
+  echo "Seeding/updating projects..."
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_projects || true
 
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-  python /scripts/migrate_jira_to_simulation.py || true
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    python /scripts/migrate_jira_to_simulation.py || true
+fi
 
 should_build_scenarios() {
   case "${1:-true}" in
@@ -126,7 +157,11 @@ should_build_scenarios() {
   esac
 }
 
-if should_build_scenarios "${BUILD_SCENARIOS:-true}"; then
+# Scenario lab images: built single-host here, but in the cluster they are built
+# on the D4 Labs droplet's remote docker engine by scripts/ci-cluster-deploy.sh.
+if [ -n "$CLUSTER_ROLE" ]; then
+  echo "Cluster role '$CLUSTER_ROLE' — scenario image build/validation handled on D4 (skipping here)"
+elif should_build_scenarios "${BUILD_SCENARIOS:-true}"; then
   echo "Building scenario lab images (BUILD_SCENARIOS=${BUILD_SCENARIOS:-true})..."
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend bash /scripts/build-scenario-images.sh 2>/dev/null || \
     bash "$ROOT/scripts/build-scenario-images.sh"

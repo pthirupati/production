@@ -1,0 +1,343 @@
+# FixitLab — four-droplet edge gateway (D1) nginx config TEMPLATE.
+#
+# {{APP_PRIVATE_IP}} is substituted at container start by gateway/entrypoint.sh
+# (envsubst) with the App droplet (D2) private VPC IP. The backend, websockets,
+# /static and /media are proxied across the VPC to D2:8000.
+#
+# This mirrors nginx.prod.conf; the only difference is the upstream targets point
+# at the remote App droplet instead of the local `backend` service name.
+
+# ── Rate limiting zones ──
+limit_req_zone $binary_remote_addr zone=api_rate:20m rate=20r/s;
+limit_req_zone $binary_remote_addr zone=auth_rate:20m rate=30r/m;
+limit_req_zone $binary_remote_addr zone=login_rate:20m rate=5r/m;
+limit_req_zone $binary_remote_addr zone=ws_rate:20m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=ws_connect_rate:10m rate=5r/m;
+limit_req_zone $binary_remote_addr zone=billing_rate:10m rate=30r/m;
+
+# ── Connection limiting zones ──
+limit_conn_zone $binary_remote_addr zone=conn_per_ip:20m;
+limit_conn_zone $binary_remote_addr zone=ws_conn_per_ip:10m;
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# ── Upstream backends — App droplet (D2) over the private VPC ──
+upstream backend_pool {
+    least_conn;
+    server {{APP_PRIVATE_IP}}:8000;
+    keepalive 32;
+}
+
+# WebSocket terminal — no keepalive pool (reuse breaks Upgrade handshakes)
+upstream backend_ws {
+    server {{APP_PRIVATE_IP}}:8000;
+}
+
+# ── Gzip compression ──
+gzip on;
+gzip_vary on;
+gzip_proxied any;
+gzip_comp_level 6;
+gzip_min_length 256;
+gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml application/rss+xml image/svg+xml;
+
+# Redirect HTTP → HTTPS (except ACME challenge)
+server {
+    listen 80;
+    server_name www.fixitlab.in;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location /health {
+        access_log off;
+        return 200 'ok';
+        add_header Content-Type text/plain;
+    }
+
+    location / {
+        return 301 https://fixitlab.in$request_uri;
+    }
+}
+
+server {
+    listen 80 default_server;
+    server_name fixitlab.in _;
+
+    # Let's Encrypt ACME challenge
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location /health {
+        access_log off;
+        return 200 'ok';
+        add_header Content-Type text/plain;
+    }
+
+    location / {
+        return 301 https://fixitlab.in$request_uri;
+    }
+}
+
+# www → apex
+server {
+    listen 443 ssl http2;
+    server_name www.fixitlab.in;
+
+    ssl_certificate     /etc/letsencrypt/live/fixitlab.in/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fixitlab.in/privkey.pem;
+
+    return 301 https://fixitlab.in$request_uri;
+}
+
+# HTTPS server
+server {
+    listen 443 ssl http2;
+    server_name fixitlab.in;
+
+    ssl_certificate     /etc/letsencrypt/live/fixitlab.in/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fixitlab.in/privkey.pem;
+
+    # ── SSL Configuration (Mozilla Modern) ──
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # OCSP Stapling
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 8.8.8.8 8.8.4.4 valid=300s;
+    resolver_timeout 5s;
+
+    # ── Security Headers ──
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Content-Type-Options  "nosniff" always;
+    add_header X-Frame-Options         "DENY" always;
+    add_header X-XSS-Protection        "1; mode=block" always;
+    add_header Referrer-Policy         "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy      "camera=(self), microphone=(self), geolocation=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lh3.googleusercontent.com; connect-src 'self' wss://*.fixitlab.in https://api.github.com https://accounts.google.com https://oauth2.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com; font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none';" always;
+
+    client_max_body_size 10m;
+    server_tokens off;
+
+    # HTTP/1.1 keepalive for upstream pool
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_next_upstream error timeout invalid_header http_502 http_503;
+
+    # ── Slowloris / slow-read protection ──
+    client_body_timeout 10s;
+    client_header_timeout 10s;
+    keepalive_timeout 5s 5s;
+    send_timeout 10s;
+
+    location /health {
+        access_log off;
+        return 200 'ok';
+        add_header Content-Type text/plain;
+    }
+
+    # ── DJANGO STATIC FILES (synced from D2 to the shared volume) ──
+    location /static/ {
+        alias /static/;
+        access_log off;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # ── FRONTEND (production build served locally on the edge node) ──
+    location / {
+        proxy_pass http://frontend-prod:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ── OTP verification — very strict (3 attempts/minute) ──
+    location ~ ^/api/auth/(otp|verify-otp|verify_otp)/ {
+        limit_req zone=login_rate burst=3 nodelay;
+        limit_req_status 429;
+        limit_conn conn_per_ip 3;
+        proxy_pass http://backend_pool;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ── Password reset — strict (5/minute) ──
+    location ~ ^/api/auth/(password|password-reset|forgot-password)/ {
+        limit_req zone=login_rate burst=5 nodelay;
+        limit_req_status 429;
+        limit_conn conn_per_ip 3;
+        proxy_pass http://backend_pool;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ── LOGIN/REGISTER (stricter rate limit) ──
+    location ~ ^/api/auth/(login|register)/ {
+        limit_req zone=login_rate burst=5 nodelay;
+        limit_req_status 429;
+        limit_conn conn_per_ip 10;
+        proxy_pass http://backend_pool;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ── AUTH ENDPOINTS ──
+    location /api/auth/ {
+        limit_req zone=auth_rate burst=15 nodelay;
+        limit_req_status 429;
+        proxy_pass http://backend_pool/api/auth/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ── DJANGO ADMIN (restricted to admin IP + basic auth) ──
+    location /django-admin/ {
+        allow 127.0.0.1;
+        allow 10.0.0.0/8;      # Internal/VPC network
+        allow 172.16.0.0/12;   # Docker internal
+        allow 192.168.0.0/16;  # Private network
+        deny all;
+
+        auth_basic "Admin Access — Restricted";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        limit_req zone=auth_rate burst=3 nodelay;
+        proxy_pass http://backend_pool/django-admin/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ── STRIPE WEBHOOK ──
+    location /api/billing/webhook/ {
+        proxy_pass http://backend_pool/api/billing/webhook/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Stripe-Signature $http_stripe_signature;
+    }
+
+    # ── RAZORPAY WEBHOOK ──
+    location /api/billing/webhook/razorpay/ {
+        limit_req zone=billing_rate burst=20 nodelay;
+        limit_req_status 429;
+        proxy_pass http://backend_pool/api/billing/webhook/razorpay/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Razorpay-Signature $http_x_razorpay_signature;
+    }
+
+    # ── BILLING API ──
+    location /api/billing/ {
+        limit_req zone=billing_rate burst=10 nodelay;
+        limit_req_status 429;
+        limit_conn conn_per_ip 5;
+        proxy_pass http://backend_pool/api/billing/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ── INTERVIEWS API ──
+    location /api/interviews/ {
+        limit_req zone=api_rate burst=20 nodelay;
+        limit_req_status 429;
+        limit_conn conn_per_ip 5;
+        proxy_pass http://backend_pool/api/interviews/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ── UPLOADED MEDIA (synced from D2 to the shared volume) ──
+    location /media/ {
+        alias /media/;
+        access_log off;
+        expires 7d;
+        add_header Cache-Control "public";
+    }
+
+    # ── BACKEND API ──
+    location /api/ {
+        limit_req zone=api_rate burst=40 nodelay;
+        limit_req_status 429;
+        limit_conn conn_per_ip 30;
+        proxy_pass http://backend_pool/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 30s;
+        proxy_read_timeout    120s;
+        proxy_send_timeout    120s;
+    }
+
+    # ── WEBSOCKETS ──
+    location /ws/ {
+        limit_req zone=ws_connect_rate burst=10 nodelay;
+        limit_conn ws_conn_per_ip 10;
+        proxy_pass http://backend_ws/ws/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    # ── MailHog — DISABLED IN PRODUCTION ──
+    location /mailbox/ {
+        return 404;
+    }
+    location /api/v2/messages {
+        return 404;
+    }
+
+    # ── Block common exploit paths ──
+    location ~* /(\.\.env|\.env|\.git|wp-admin|phpMyAdmin|phpmyadmin|\.well-known/security\.txt) {
+        return 404;
+    }
+
+    # ── Block direct /api/health/ from external access ──
+    location = /api/health/ {
+        allow 127.0.0.1;
+        allow 10.0.0.0/8;
+        allow 172.16.0.0/12;
+        allow 192.168.0.0/16;
+        deny all;
+        proxy_pass http://backend_pool/api/health/;
+        proxy_set_header Host $host;
+    }
+}

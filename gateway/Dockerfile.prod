@@ -9,6 +9,8 @@ RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.prod.conf /etc/nginx/templates/nginx.prod.conf
 COPY nginx.http.conf /etc/nginx/templates/nginx.http.conf
 COPY nginx.bootstrap.conf /etc/nginx/templates/nginx.bootstrap.conf
+# Four-droplet edge template — rendered by entrypoint.sh when APP_PRIVATE_IP is set
+COPY nginx.cluster.conf.template /etc/nginx/templates/nginx.cluster.conf.template
 COPY .htpasswd /etc/nginx/.htpasswd
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh

@@ -1,0 +1,47 @@
+title: HPA Wants More Pods but the Cluster is Out of Nodes — Add a Worker VM in VMware
+slug: k8s-hpa-needs-new-node-vmware
+category: Kubernetes
+difficulty: hard
+description: |
+  The `web` Deployment is under sustained load. Its HorizontalPodAutoscaler has
+  decided it needs 4 replicas, but two of the pods are stuck Pending with
+  FailedScheduling "Insufficient cpu" — the single worker node (worker-1) is full.
+  This cluster runs ON VMware: each Kubernetes node is a VMware VM. You cannot fix
+  this from kubectl alone — there is genuinely no room to schedule the pods.
+
+  This is a CROSS-TECHNOLOGY task. Open the VMware simulator for this lab (toolbar
+  -> Open VMware), power on the spare worker-node VM `k8s-worker-2` (it is in the
+  inventory, powered off). It joins the cluster as node `worker-2` and the Pending
+  pods schedule onto it. Then confirm from the terminal that the HPA is satisfied
+  and all pods are Running across both nodes.
+initial_state: |
+  A Kubernetes cluster with one control-plane and one worker (worker-1). The `web`
+  Deployment's HPA targets 4 replicas under load but only 2 are Running; the other
+  2 are Pending (Insufficient cpu). A second worker VM, `k8s-worker-2`, exists in
+  the VMware inventory but is powered off, so node worker-2 has not joined.
+objectives:
+  - Inspect the Pending pods and the HPA (kubectl get pods, kubectl describe hpa web)
+  - Confirm the cluster is out of schedulable capacity (kubectl get nodes shows one worker)
+  - Open the VMware simulator and power on the worker-node VM k8s-worker-2
+  - Confirm worker-2 is Ready (kubectl get nodes) and the Pending pods schedule
+  - Verify the HPA is satisfied and all web pods are Running (kubectl get hpa, kubectl get pods)
+lab_mode: simulation
+simulation_type: kubernetes
+cross_technology: true
+vmware_link: true
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: '`kubectl get pods` shows web pods Pending. `kubectl describe pod <pending-pod>` says FailedScheduling: Insufficient cpu. `kubectl get nodes` shows only worker-1 — the cluster is out of capacity, so this is not a YAML fix.'
+  - order: 2
+    cost: 15
+    content: 'These Kubernetes nodes are VMware VMs. The HPA cannot place pods because there is no second worker. Open the VMware simulator (toolbar -> Open VMware) and look in the inventory for k8s-worker-2 — it is powered off.'
+  - order: 3
+    cost: 20
+    content: 'In the VMware simulator, select k8s-worker-2 and Power On (VM Actions -> Power -> Power On). It joins as node worker-2. Back in the terminal, `kubectl get nodes` shows worker-2 Ready and the Pending pods become Running. Verify with `kubectl get hpa` (REPLICAS reaches the desired count) and `kubectl get pods`.'
+requires_companion_hosts: false

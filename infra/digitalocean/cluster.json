@@ -1,0 +1,49 @@
+{
+  "topology": "four-droplet",
+  "region": "blr1",
+  "size": "s-2vcpu-8gb-160gb-intel",
+  "domain": "fixitlab.in",
+  "vpc_name": "fixitlab-vpc",
+  "vpc_id": "",
+  "ssh_user": "root",
+  "droplets": {
+    "edge": {
+      "name": "fixitlab-edge",
+      "tag": "fixitlab-edge",
+      "role": "edge",
+      "public": true,
+      "droplet_id": "",
+      "public_ipv4": "",
+      "private_ipv4": "",
+      "services": ["gateway", "certbot", "frontend-prod", "redis", "rabbitmq", "vault"]
+    },
+    "app": {
+      "name": "fixitlab-app",
+      "tag": "fixitlab-app",
+      "role": "app",
+      "public": false,
+      "droplet_id": "",
+      "private_ipv4": "",
+      "services": ["backend", "celery_worker", "celery_provisioning", "celery_maintenance", "celery_beat"]
+    },
+    "data": {
+      "name": "fixitlab-db",
+      "tag": "fixitlab-db",
+      "role": "data",
+      "public": false,
+      "droplet_id": "",
+      "private_ipv4": "",
+      "services": ["database", "pgbouncer"]
+    },
+    "labs": {
+      "name": "fixitlab-labs",
+      "tag": "fixitlab-labs",
+      "role": "labs",
+      "public": false,
+      "droplet_id": "",
+      "private_ipv4": "",
+      "services": ["docker-engine", "fixitlab_labs-network", "scenario-images"]
+    }
+  },
+  "updated_at": ""
+}

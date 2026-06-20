@@ -1,0 +1,45 @@
+title: DaemonSet Pod Pending — Bring Up the Missing Node VM in VMware
+slug: k8s-daemonset-needs-node-vmware
+category: Kubernetes
+difficulty: medium
+description: |
+  The `node-agent` DaemonSet should run exactly one pod on every node, but one of
+  its pods is stuck Pending: the node it is meant to run on does not exist yet. This
+  Kubernetes cluster runs ON VMware — each node is a VMware VM — and the second
+  worker's VM is powered off, so the DaemonSet has nowhere to place its pod.
+
+  This is a CROSS-TECHNOLOGY task. Open the VMware simulator (toolbar -> Open VMware)
+  and power on the worker-node VM `k8s-worker-2`. Once it joins as node worker-2 the
+  DaemonSet controller schedules its pod there. Confirm from the terminal that the
+  DaemonSet is fully scheduled and all pods are Running.
+initial_state: |
+  A Kubernetes cluster with one worker (worker-1) running a node-agent DaemonSet
+  pod, and a second DaemonSet pod Pending because node worker-2 does not exist —
+  its VMware VM (k8s-worker-2) is powered off. The DaemonSet only becomes fully
+  scheduled once that node joins.
+objectives:
+  - Confirm a node-agent DaemonSet pod is Pending (kubectl get pods, kubectl get ds)
+  - Confirm only one worker node exists (kubectl get nodes)
+  - Open the VMware simulator and power on the worker-node VM k8s-worker-2
+  - Confirm worker-2 is Ready and the DaemonSet schedules its pod there
+  - Verify the DaemonSet is fully scheduled and all pods Running (kubectl get ds, kubectl get pods)
+lab_mode: simulation
+simulation_type: kubernetes
+cross_technology: true
+vmware_link: true
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: Medium
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: '`kubectl get ds` shows DESIRED greater than CURRENT/READY, and `kubectl get pods` shows a node-agent pod Pending. A DaemonSet places one pod per node, so a Pending pod means a node is missing — `kubectl get nodes` confirms only worker-1.'
+  - order: 2
+    cost: 15
+    content: 'The nodes are VMware VMs. The DaemonSet pod has no node to land on because worker-2 does not exist. Open the VMware simulator (toolbar -> Open VMware); k8s-worker-2 is in the inventory but powered off.'
+  - order: 3
+    cost: 20
+    content: 'Power on k8s-worker-2 in the VMware simulator (VM Actions -> Power -> Power On). It joins as node worker-2 and the DaemonSet controller schedules its pod there. In the terminal, `kubectl get nodes` shows worker-2 Ready and `kubectl get ds` shows DESIRED == READY.'
+requires_companion_hosts: false

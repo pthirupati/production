@@ -44,6 +44,26 @@ on:
         description: "Create DigitalOcean droplet (only for launch — skip if server exists)"
         type: boolean
         default: false
+      topology:
+        description: "Deployment topology (single = existing 1-droplet; four-droplet = D1 edge / D2 app / D3 data / D4 labs)"
+        type: choice
+        required: true
+        default: single
+        options:
+          - single
+          - four-droplet
+      wire_existing:
+        description: "Four-droplet only: discover existing droplets by tag (fixitlab-edge/app/db/labs) and skip creation"
+        type: boolean
+        default: false
+      credentials_email:
+        description: "Four-droplet only: recipient for the deployment credentials email"
+        type: string
+        default: thirupathi.samu2018@gmail.com
+      rotate_secrets:
+        description: "Four-droplet only: rotate infra secrets (Django/DB/Redis/Rabbit/JWT/admin/webhooks). Never rotates DO token or SSH key."
+        type: boolean
+        default: false
       run_tests:
         description: "Run backend and frontend unit tests before deploy"
         type: boolean
@@ -117,7 +137,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   create-server:
     name: Create server
-    if: inputs.action == 'launch' && inputs.create_server
+    if: inputs.action == 'launch' && inputs.create_server && inputs.topology != 'four-droplet'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -182,6 +202,7 @@ jobs:
     name: Test frontend
     needs: [create-server]
     if: |
+      inputs.topology != 'four-droplet' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_tests &&
       always() &&
@@ -206,6 +227,7 @@ jobs:
     name: Test backend
     needs: [create-server]
     if: |
+      inputs.topology != 'four-droplet' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_tests &&
       always() &&
@@ -254,6 +276,7 @@ jobs:
     name: Deploy and start application
     needs: [create-server, test-backend, test-frontend]
     if: |
+      inputs.topology != 'four-droplet' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       always() &&
       (needs.create-server.result == 'skipped' || needs.create-server.result == 'success') &&
@@ -335,6 +358,7 @@ jobs:
     needs: [deploy]
     if: |
       always() &&
+      inputs.topology != 'four-droplet' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       needs.deploy.result == 'success'
     runs-on: ubuntu-latest
@@ -396,6 +420,7 @@ jobs:
     needs: [deploy]
     if: |
       always() &&
+      inputs.topology != 'four-droplet' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       needs.deploy.result == 'success'
     runs-on: ubuntu-latest
@@ -430,6 +455,7 @@ jobs:
     needs: [deploy]
     if: |
       always() &&
+      inputs.topology != 'four-droplet' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_e2e &&
       needs.deploy.result == 'success'
@@ -458,6 +484,7 @@ jobs:
     needs: [deploy, prepare-e2e]
     if: |
       always() &&
+      inputs.topology != 'four-droplet' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_e2e &&
       needs.deploy.result == 'success' &&
@@ -514,6 +541,7 @@ jobs:
     needs: [deploy, prepare-e2e]
     if: |
       always() &&
+      inputs.topology != 'four-droplet' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_e2e &&
       needs.deploy.result == 'success' &&
@@ -565,6 +593,7 @@ jobs:
     needs: [deploy, prepare-e2e]
     if: |
       always() &&
+      inputs.topology != 'four-droplet' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.run_e2e &&
       needs.deploy.result == 'success' &&
@@ -600,6 +629,7 @@ jobs:
     needs: [deploy]
     if: >
       always() &&
+      inputs.topology != 'four-droplet' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       needs.deploy.result == 'success'
     uses: ./.github/workflows/e2e-smoke.yml
@@ -611,7 +641,7 @@ jobs:
   cleanup:
     name: Cleanup E2E test data
     needs: [deploy, verify-health, test-units, prepare-e2e, e2e-labs, e2e-api, e2e-interviews, smoke]
-    if: always() && needs.deploy.result == 'success'
+    if: always() && inputs.topology != 'four-droplet' && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
@@ -647,7 +677,7 @@ jobs:
   summary:
     name: Pipeline summary
     needs: [deploy, verify-health, test-units, prepare-e2e, e2e-labs, e2e-api, e2e-interviews, smoke, cleanup]
-    if: always() && (inputs.action == 'launch' || inputs.action == 'deploy')
+    if: always() && inputs.topology != 'four-droplet' && (inputs.action == 'launch' || inputs.action == 'deploy')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -679,4 +709,503 @@ jobs:
             echo "| e2e-interviews | \`${{ needs.e2e-interviews.result }}\` |"
             echo "| smoke | \`${{ needs.smoke.result }}\` |"
             echo "| cleanup | \`${{ needs.cleanup.result }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ════════════════════════════════════════════════════════════════════════
+  # FOUR-DROPLET TOPOLOGY — all jobs below are gated on
+  # inputs.topology == 'four-droplet'. They never run for the single-droplet
+  # path above. Job graph:
+  #
+  #   create-cluster  (generate-secrets → create/​discover droplets → firewalls →
+  #                    wire-env → labs-ssh → sync GitHub secrets → commit cluster.json)
+  #        ↓
+  #   bootstrap-cluster (parallel SSH bootstrap per role)
+  #        ↓
+  #   vault-cluster     (init/unseal Vault on D1 + AppRole + seed KV)
+  #        ↓
+  #   deploy-cluster    (D3 data → D1 edge → D2 app → D4 scenario images)
+  #        ↓
+  #   email-credentials (SendGrid bundle; DO token redacted; best-effort)
+  #        ↓
+  #   ┌──────────────────────────────────────────────┐
+  #   │ parallel after deploy:                       │
+  #   │   verify-health-cluster  (docker ps per node)│
+  #   │   test-units-cluster     (Django tests on D2)│
+  #   │   prepare-e2e-cluster → e2e-* (on D2 backend)│
+  #   └──────────────────────────────────────────────┘
+  #        ↓
+  #   cleanup-cluster + pg-backup-cluster + summary-cluster (if: always())
+  # ════════════════════════════════════════════════════════════════════════
+
+  create-cluster:
+    name: "[4D] Create cluster"
+    if: (inputs.action == 'launch' || inputs.action == 'deploy') && inputs.topology == 'four-droplet'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: write
+    outputs:
+      edge_public_ip: ${{ steps.create.outputs.edge_public_ip }}
+      edge_private_ip: ${{ steps.create.outputs.edge_private_ip }}
+      app_private_ip: ${{ steps.create.outputs.app_private_ip }}
+      db_private_ip: ${{ steps.create.outputs.db_private_ip }}
+      labs_private_ip: ${{ steps.create.outputs.labs_private_ip }}
+      updated_secrets: ${{ steps.synced.outputs.updated_secrets }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve DO API token (masked)
+        id: do_token
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+        run: |
+          if [ -n "$DO_API_TOKEN" ]; then
+            TOK="$DO_API_TOKEN"
+          else
+            TOK="$(echo "$PRODUCTION_ENV_B64" | base64 -d | grep '^DO_API_TOKEN=' | cut -d= -f2- | tr -d '\r')"
+          fi
+          echo "::add-mask::$TOK"
+          echo "token=$TOK" >> "$GITHUB_OUTPUT"
+
+      - uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ steps.do_token.outputs.token }}
+
+      - name: Generate / rotate cluster secrets
+        id: secrets
+        env:
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+          ROTATE_SECRETS: ${{ inputs.rotate_secrets && '1' || '0' }}
+          OUT_FILE: .env.cluster
+        run: |
+          chmod +x scripts/ci-generate-secrets.py
+          python3 scripts/ci-generate-secrets.py --out .env.cluster
+
+      - name: Create or discover droplets (one VPC + 4 tagged)
+        id: create
+        env:
+          DO_API_TOKEN: ${{ steps.do_token.outputs.token }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          DO_REGION: ${{ vars.DO_REGION || 'blr1' }}
+          DO_SIZE: ${{ vars.DO_SIZE || 's-2vcpu-8gb-160gb-intel' }}
+          WIRE_EXISTING: ${{ inputs.wire_existing && '1' || '0' }}
+          DO_PROTECTED_DROPLET_IDS: ${{ secrets.DO_PROTECTED_DROPLET_IDS }}
+        run: |
+          chmod +x scripts/ci-create-cluster-droplets.sh
+          ./scripts/ci-create-cluster-droplets.sh
+
+      - name: Configure cloud firewalls
+        env:
+          DO_API_TOKEN: ${{ steps.do_token.outputs.token }}
+          EDGE_PRIVATE_IP: ${{ steps.create.outputs.edge_private_ip }}
+          APP_PRIVATE_IP: ${{ steps.create.outputs.app_private_ip }}
+          DATA_PRIVATE_IP: ${{ steps.create.outputs.db_private_ip }}
+          LABS_PRIVATE_IP: ${{ steps.create.outputs.labs_private_ip }}
+        run: |
+          chmod +x scripts/ci-setup-firewalls.sh
+          ./scripts/ci-setup-firewalls.sh
+
+      - name: Wire env for cluster topology
+        id: wire
+        env:
+          EDGE_PRIVATE_IP: ${{ steps.create.outputs.edge_private_ip }}
+          APP_PRIVATE_IP: ${{ steps.create.outputs.app_private_ip }}
+          DATA_PRIVATE_IP: ${{ steps.create.outputs.db_private_ip }}
+          LABS_PRIVATE_IP: ${{ steps.create.outputs.labs_private_ip }}
+          EDGE_PUBLIC_IP: ${{ steps.create.outputs.edge_public_ip }}
+          OUT_FILE: .env.cluster
+        run: |
+          chmod +x scripts/ci-wire-cluster-env.py
+          python3 scripts/ci-wire-cluster-env.py --file .env.cluster
+          # Stash the rotated+wired env for downstream jobs (masked artifact).
+          B64="$(base64 < .env.cluster | tr -d '\n')"
+          echo "::add-mask::$B64"
+          echo "env_b64=$B64" >> "$GITHUB_OUTPUT"
+
+      - name: Sync GitHub secrets + commit cluster metadata
+        id: synced
+        env:
+          CLUSTER_MODE: "1"
+          GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN || github.token }}
+          GITHUB_ENVIRONMENT: production
+          EDGE_PUBLIC_IP: ${{ steps.create.outputs.edge_public_ip }}
+          EDGE_PRIVATE_IP: ${{ steps.create.outputs.edge_private_ip }}
+          APP_PRIVATE_IP: ${{ steps.create.outputs.app_private_ip }}
+          DATA_PRIVATE_IP: ${{ steps.create.outputs.db_private_ip }}
+          LABS_PRIVATE_IP: ${{ steps.create.outputs.labs_private_ip }}
+          EDGE_ID: ${{ steps.create.outputs.edge_id }}
+          APP_ID: ${{ steps.create.outputs.app_id }}
+          DATA_ID: ${{ steps.create.outputs.db_id }}
+          LABS_ID: ${{ steps.create.outputs.labs_id }}
+          VPC_ID: ${{ steps.create.outputs.vpc_id }}
+          VAULT_ENABLED: "true"
+          CLUSTER_ENV_B64: ${{ steps.wire.outputs.env_b64 }}
+        run: |
+          chmod +x scripts/ci-sync-droplet-secrets.sh
+          ./scripts/ci-sync-droplet-secrets.sh
+          echo "updated_secrets=PROD_HOST,PROD_APP_HOST,PROD_DB_HOST,PROD_LABS_HOST,PRODUCTION_ENV_B64,VAULT_ROLE_ID,VAULT_SECRET_ID,VAULT_UNSEAL_KEY,VAULT_ENABLED" >> "$GITHUB_OUTPUT"
+
+      - name: Commit cluster.json metadata
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add infra/digitalocean/cluster.json 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "ci: four-droplet cluster metadata"
+          git push origin HEAD:main || true
+
+  bootstrap-cluster:
+    name: "[4D] Bootstrap cluster"
+    needs: [create-cluster]
+    if: (inputs.action == 'launch' || inputs.action == 'deploy') && inputs.topology == 'four-droplet'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parallel SSH bootstrap per role
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          EDGE_PRIVATE_IP: ${{ needs.create-cluster.outputs.edge_private_ip }}
+          APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
+          DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
+          LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
+          GIT_REF: ${{ inputs.git_ref }}
+        run: |
+          export GIT_REPO="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          chmod +x scripts/ci-bootstrap-cluster.sh scripts/ci-setup-labs-ssh.sh
+          ./scripts/ci-bootstrap-cluster.sh
+          echo "Provisioning D2->D4 labs SSH key"
+          ./scripts/ci-setup-labs-ssh.sh
+
+  vault-cluster:
+    name: "[4D] Vault bootstrap (D1)"
+    needs: [create-cluster, bootstrap-cluster]
+    if: (inputs.action == 'launch' || inputs.action == 'deploy') && inputs.topology == 'four-droplet'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Init/unseal Vault + AppRole + seed KV on edge
+        id: vault
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+        run: |
+          chmod +x scripts/ci-vault-cluster-bootstrap.sh
+          ./scripts/ci-vault-cluster-bootstrap.sh
+      - name: Store Vault AppRole as GitHub secrets
+        env:
+          CLUSTER_MODE: "1"
+          GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN || github.token }}
+          GITHUB_ENVIRONMENT: production
+          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
+          DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
+          LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
+          VAULT_ROLE_ID: ${{ steps.vault.outputs.vault_role_id }}
+          VAULT_SECRET_ID: ${{ steps.vault.outputs.vault_secret_id }}
+          VAULT_UNSEAL_KEY: ${{ steps.vault.outputs.vault_unseal_key }}
+        run: |
+          chmod +x scripts/ci-sync-droplet-secrets.sh
+          ./scripts/ci-sync-droplet-secrets.sh
+
+  deploy-cluster:
+    name: "[4D] Deploy cluster"
+    needs: [create-cluster, bootstrap-cluster, vault-cluster]
+    if: |
+      always() &&
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      inputs.topology == 'four-droplet' &&
+      needs.bootstrap-cluster.result == 'success' &&
+      needs.vault-cluster.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment: production
+    outputs:
+      edge_public_ip: ${{ needs.create-cluster.outputs.edge_public_ip }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ordered deploy (data → edge → app → labs images)
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          EDGE_PRIVATE_IP: ${{ needs.create-cluster.outputs.edge_private_ip }}
+          APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
+          DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
+          LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
+          BUILD_SCENARIOS: ${{ inputs.build_scenarios }}
+        run: |
+          chmod +x scripts/ci-cluster-deploy.sh
+          ./scripts/ci-cluster-deploy.sh
+      - name: Public health (through edge gateway)
+        run: |
+          HOST="${{ needs.create-cluster.outputs.edge_public_ip }}"
+          for i in $(seq 1 20); do
+            if curl -sf --max-time 10 -H "Host: fixitlab.in" "http://${HOST}/health" | grep -q ok; then
+              echo "Public health OK (attempt ${i})"; exit 0
+            fi
+            echo "attempt ${i}/20 — retrying in 5s..."; sleep 5
+          done
+          echo "ERROR: public health failed on edge ${HOST}"; exit 1
+
+  email-credentials:
+    name: "[4D] Email credentials"
+    needs: [create-cluster, deploy-cluster]
+    if: |
+      always() &&
+      inputs.topology == 'four-droplet' &&
+      needs.deploy-cluster.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render redacted env from edge and email bundle
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          CRED_TO: ${{ inputs.credentials_email }}
+          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
+          DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
+          LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
+          UPDATED_SECRETS: ${{ needs.create-cluster.outputs.updated_secrets }}
+          CREDENTIALS_EMAIL_REQUIRED: ${{ vars.CREDENTIALS_EMAIL_REQUIRED || '0' }}
+        run: |
+          # Pull the (DO-token-free) .env.production from the edge node so the
+          # attachment matches what is actually deployed; the script strips the
+          # DO_API_TOKEN line again as a defence-in-depth measure.
+          KEY_FILE="$(mktemp)"; printf '%s\n' "$PROD_SSH_KEY" | tr -d '\r' > "$KEY_FILE"; chmod 600 "$KEY_FILE"
+          scp -o StrictHostKeyChecking=no -i "$KEY_FILE" \
+            "root@${EDGE_PUBLIC_IP}:/opt/fixitlab/.env.production" ./.env.cluster.fetched || cp env.production.example ./.env.cluster.fetched
+          rm -f "$KEY_FILE"
+          chmod +x scripts/ci-email-credentials.sh
+          ENV_FILE=./.env.cluster.fetched ./scripts/ci-email-credentials.sh
+
+  verify-health-cluster:
+    name: "[4D] Verify health"
+    needs: [create-cluster, deploy-cluster]
+    if: |
+      always() &&
+      inputs.topology == 'four-droplet' &&
+      needs.deploy-cluster.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Container health per node (via edge)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -e
+            echo "=== Edge (D1) ==="
+            cd /opt/fixitlab
+            docker compose -f docker-compose.edge.yml --env-file .env.production ps
+            for NODE in "${{ needs.create-cluster.outputs.db_private_ip }}:data:docker-compose.data.yml" \
+                        "${{ needs.create-cluster.outputs.app_private_ip }}:app:docker-compose.app.yml"; do
+              IP="${NODE%%:*}"; REST="${NODE#*:}"; ROLE="${REST%%:*}"; CF="${REST#*:}"
+              echo "=== ${ROLE} (${IP}) ==="
+              ssh -o StrictHostKeyChecking=no "root@${IP}" \
+                "cd /opt/fixitlab && docker compose -f ${CF} --env-file .env.production ps" || echo "WARN: ${ROLE} ps failed"
+            done
+
+  test-units-cluster:
+    name: "[4D] Unit tests (D2)"
+    needs: [create-cluster, deploy-cluster]
+    if: |
+      always() &&
+      inputs.topology == 'four-droplet' &&
+      needs.deploy-cluster.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Django unit tests in backend container on D2 (via edge)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            set -e
+            ssh -o StrictHostKeyChecking=no "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
+              cd /opt/fixitlab
+              docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
+                env SKIP_EMAIL_TESTS="${{ inputs.skip_email && 'true' || 'false' }}" \
+                python manage.py test tests.test_jira_webhooks tests.test_api_security tests.test_billing_webhooks \
+                --settings=config.test_settings --verbosity=2
+            '
+
+  prepare-e2e-cluster:
+    name: "[4D] Prepare E2E"
+    needs: [create-cluster, deploy-cluster]
+    if: |
+      always() &&
+      inputs.topology == 'four-droplet' &&
+      inputs.run_e2e &&
+      needs.deploy-cluster.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Disable JWT session enforcement on D2 backend (via edge)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            ssh -o StrictHostKeyChecking=no "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
+              cd /opt/fixitlab
+              chmod +x scripts/ci-e2e-session-mode.sh
+              COMPOSE_FILE=docker-compose.app.yml ./scripts/ci-e2e-session-mode.sh disable
+            '
+
+  e2e-api-cluster:
+    name: "[4D] E2E — API"
+    needs: [create-cluster, deploy-cluster, prepare-e2e-cluster]
+    if: |
+      always() &&
+      inputs.topology == 'four-droplet' &&
+      inputs.run_e2e &&
+      needs.deploy-cluster.result == 'success' &&
+      needs.prepare-e2e-cluster.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - name: Internal API E2E on D2 (via edge)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 20m
+          script: |
+            set -e
+            ssh -o StrictHostKeyChecking=no "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
+              cd /opt/fixitlab
+              EMAIL="${{ secrets.PROD_SUPERUSER_EMAIL }}"; PASS="${{ secrets.PROD_SUPERUSER_PASSWORD }}"
+              docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
+                env SUPERUSER_EMAIL="$EMAIL" SUPERUSER_PASSWORD="$PASS" \
+                JWT_SESSION_ENFORCEMENT=0 E2E_SKIP_EMAIL=1 RUN_FULL_E2E=1 E2E_SKIP_LAB=0 \
+                E2E_SKIP_DUPLICATE_LABS=1 E2E_SKIP_CLEANUP=1 E2E_PRESERVE_LAB_USERS=1 \
+                python /scripts/e2e_production_test.py
+            '
+
+  e2e-labs-cluster:
+    name: "[4D] E2E — labs"
+    needs: [create-cluster, deploy-cluster, prepare-e2e-cluster]
+    if: |
+      always() &&
+      inputs.topology == 'four-droplet' &&
+      inputs.run_e2e &&
+      needs.deploy-cluster.result == 'success' &&
+      needs.prepare-e2e-cluster.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    steps:
+      - name: All-scenarios lab E2E on D2 (labs run on D4 via remote docker)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 40m
+          script: |
+            set -e
+            ssh -o StrictHostKeyChecking=no "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
+              cd /opt/fixitlab
+              docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
+                env E2E_SKIP_LAB=0 E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 E2E_PRESERVE_LAB_USERS=1 \
+                E2E_TECH_FILTER="${{ inputs.technologies }}" TERMINAL_MAX_WS_PER_USER=64 \
+                python /scripts/e2e_all_scenarios_labs.py
+            '
+
+  cleanup-cluster:
+    name: "[4D] Cleanup + pg backup"
+    needs: [create-cluster, deploy-cluster, verify-health-cluster, test-units-cluster, prepare-e2e-cluster, e2e-api-cluster, e2e-labs-cluster]
+    if: always() && inputs.topology == 'four-droplet' && needs.deploy-cluster.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove E2E data + restore JWT enforcement on D2 (via edge)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            ssh -o StrictHostKeyChecking=no "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
+              cd /opt/fixitlab
+              docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
+                python /scripts/cleanup-test-data.py || echo "WARN: cleanup warnings"
+              chmod +x scripts/ci-e2e-session-mode.sh
+              COMPOSE_FILE=docker-compose.app.yml ./scripts/ci-e2e-session-mode.sh restore || echo "WARN: could not restore JWT mode"
+            '
+      - name: Install daily pg_dump cron on D3
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
+        run: |
+          chmod +x scripts/ci-pg-backup-cron.sh
+          ./scripts/ci-pg-backup-cron.sh
+
+  summary-cluster:
+    name: "[4D] Cluster summary"
+    needs: [create-cluster, bootstrap-cluster, vault-cluster, deploy-cluster, email-credentials, verify-health-cluster, test-units-cluster, prepare-e2e-cluster, e2e-api-cluster, e2e-labs-cluster, cleanup-cluster]
+    if: always() && inputs.topology == 'four-droplet' && (inputs.action == 'launch' || inputs.action == 'deploy')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Write cluster summary
+        run: |
+          {
+            echo "## FixitLab Production — four-droplet"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Topology | \`four-droplet\` |"
+            echo "| Edge (D1) | \`${{ needs.create-cluster.outputs.edge_public_ip }}\` (public) |"
+            echo "| App (D2) | \`${{ needs.create-cluster.outputs.app_private_ip }}\` (private) |"
+            echo "| Data (D3) | \`${{ needs.create-cluster.outputs.db_private_ip }}\` (private) |"
+            echo "| Labs (D4) | \`${{ needs.create-cluster.outputs.labs_private_ip }}\` (private) |"
+            echo "| Wire existing | \`${{ inputs.wire_existing }}\` |"
+            echo "| Rotate secrets | \`${{ inputs.rotate_secrets }}\` |"
+            echo "| Site | https://fixitlab.in |"
+            echo ""
+            echo "## Job results"
+            echo ""
+            echo "| Job | Result |"
+            echo "|---|---|"
+            echo "| create-cluster | \`${{ needs.create-cluster.result }}\` |"
+            echo "| bootstrap-cluster | \`${{ needs.bootstrap-cluster.result }}\` |"
+            echo "| vault-cluster | \`${{ needs.vault-cluster.result }}\` |"
+            echo "| deploy-cluster | \`${{ needs.deploy-cluster.result }}\` |"
+            echo "| email-credentials | \`${{ needs.email-credentials.result }}\` |"
+            echo "| verify-health-cluster | \`${{ needs.verify-health-cluster.result }}\` |"
+            echo "| test-units-cluster | \`${{ needs.test-units-cluster.result }}\` |"
+            echo "| prepare-e2e-cluster | \`${{ needs.prepare-e2e-cluster.result }}\` |"
+            echo "| e2e-api-cluster | \`${{ needs.e2e-api-cluster.result }}\` |"
+            echo "| e2e-labs-cluster | \`${{ needs.e2e-labs-cluster.result }}\` |"
+            echo "| cleanup-cluster | \`${{ needs.cleanup-cluster.result }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"

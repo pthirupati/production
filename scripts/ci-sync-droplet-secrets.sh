@@ -7,6 +7,87 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# ──────────────────────────────────────────────────────────────────────────
+# CLUSTER_MODE=1 — four-droplet topology. Sets cluster GitHub secrets + commits
+# infra/digitalocean/cluster.json (no secrets). Single-droplet path below is
+# left completely unchanged and is used when CLUSTER_MODE is unset.
+# ──────────────────────────────────────────────────────────────────────────
+if [ "${CLUSTER_MODE:-0}" = "1" ]; then
+  REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY required}"
+  ENV_NAME="${GITHUB_ENVIRONMENT:-production}"
+  : "${EDGE_PUBLIC_IP:?EDGE_PUBLIC_IP required}"
+  : "${APP_PRIVATE_IP:?APP_PRIVATE_IP required}"
+  : "${DATA_PRIVATE_IP:?DATA_PRIVATE_IP required}"
+  : "${LABS_PRIVATE_IP:?LABS_PRIVATE_IP required}"
+  DRY_RUN="${DRY_RUN:-0}"
+
+  _is_true() { case "${1:-}" in 1|true|TRUE|yes|on) return 0;; *) return 1;; esac; }
+
+  gh_secret() {
+    # gh_secret NAME VALUE  (masked; printed-only in DRY_RUN)
+    local name="$1" val="$2"
+    [ -z "$val" ] && return 0
+    [ -n "${GITHUB_ACTIONS:-}" ] && echo "::add-mask::${val}"
+    if _is_true "$DRY_RUN"; then
+      echo "DRY_RUN gh secret set ${name} --env ${ENV_NAME} --repo ${REPO}  (value masked)"
+      return 0
+    fi
+    printf '%s' "$val" | gh secret set "$name" --env "$ENV_NAME" --repo "$REPO"
+    echo "  set ${name}"
+  }
+
+  echo "=== cluster secret sync (dry_run=${DRY_RUN}) ==="
+  # Edge public IP is the canonical PROD_HOST (gateway lives on D1).
+  gh_secret PROD_HOST "$EDGE_PUBLIC_IP"
+  gh_secret PROD_EDGE_HOST "$EDGE_PUBLIC_IP"
+  gh_secret PROD_APP_HOST "$APP_PRIVATE_IP"
+  gh_secret PROD_DB_HOST "$DATA_PRIVATE_IP"
+  gh_secret PROD_LABS_HOST "$LABS_PRIVATE_IP"
+  [ -n "${EDGE_PRIVATE_IP:-}" ] && gh_secret PROD_EDGE_PRIVATE_HOST "$EDGE_PRIVATE_IP"
+
+  # Vault AppRole secrets captured by ci-vault-cluster-bootstrap.sh
+  gh_secret VAULT_ROLE_ID "${VAULT_ROLE_ID:-}"
+  gh_secret VAULT_SECRET_ID "${VAULT_SECRET_ID:-}"
+  gh_secret VAULT_UNSEAL_KEY "${VAULT_UNSEAL_KEY:-}"
+  [ -n "${VAULT_ENABLED:-}" ] && gh_secret VAULT_ENABLED "${VAULT_ENABLED}"
+
+  # Rotated full env (base64) — only when provided by generate-secrets step.
+  if [ -n "${CLUSTER_ENV_B64:-}" ]; then
+    gh_secret PRODUCTION_ENV_B64 "$CLUSTER_ENV_B64"
+  fi
+
+  # Update committed metadata (no secrets).
+  META="$ROOT/infra/digitalocean/cluster.json"
+  mkdir -p "$(dirname "$META")"
+  python3 - "$META" <<PY
+import json, os, sys
+from datetime import datetime, timezone
+from pathlib import Path
+path = sys.argv[1]
+data = json.loads(Path(path).read_text()) if Path(path).exists() else {}
+data.setdefault("topology", "four-droplet")
+data["vpc_id"] = os.environ.get("VPC_ID", data.get("vpc_id", ""))
+d = data.setdefault("droplets", {})
+def upd(role, id_key, pub_key=None):
+    node = d.setdefault(role, {})
+    node["droplet_id"] = os.environ.get(id_key, node.get("droplet_id", ""))
+    node["private_ipv4"] = os.environ.get(role.upper() + "_PRIVATE_IP", node.get("private_ipv4", ""))
+    if pub_key:
+        node["public_ipv4"] = os.environ.get(pub_key, node.get("public_ipv4", ""))
+upd("edge", "EDGE_ID", "EDGE_PUBLIC_IP")
+upd("app", "APP_ID")
+upd("data", "DATA_ID")
+upd("labs", "LABS_ID")
+data["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+Path(path).write_text(json.dumps(data, indent=2) + "\n")
+print(f"[cluster] wrote {path}")
+PY
+
+  echo "=== cluster secret sync done ==="
+  exit 0
+fi
+
 PUBLIC_IP="${PUBLIC_IP:?PUBLIC_IP required}"
 DROPLET_ID="${DROPLET_ID:?DROPLET_ID required}"
 SSH_KEY_ID="${SSH_KEY_ID:-}"

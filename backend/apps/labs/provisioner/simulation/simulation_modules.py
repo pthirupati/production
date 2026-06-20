@@ -211,13 +211,24 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
 
 
 def _register_k8s(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
+    sid = getattr(getattr(shell, "state", None), "session_id", "") or ""
     if not engine.cluster:
-        engine.cluster = K8sCluster(engine.scenario_slug)
+        engine.cluster = K8sCluster(engine.scenario_slug, session_id=sid)
+    elif sid and not getattr(engine.cluster, "session_id", ""):
+        engine.cluster.session_id = sid
 
     def handler(parts, line):
         if not parts or parts[0] != "kubectl":
             return None
-        return _handle_kubectl(engine.cluster, parts, line, shell)
+        # Re-fold any VMware node action performed since the last command so the
+        # terminal reflects a node added/reset in the VMware simulator (the two
+        # run in different workers; the bridge cache is the shared source).
+        cluster = engine.cluster
+        if cluster is not None:
+            if not getattr(cluster, "session_id", ""):
+                cluster.session_id = getattr(getattr(shell, "state", None), "session_id", "") or ""
+            cluster.sync_from_vmware_bridge()
+        return _handle_kubectl(cluster, parts, line, shell)
 
     shell.register_handler(handler)
 
@@ -232,7 +243,8 @@ def _kube_flags(parts: list[str]) -> tuple[list[str], dict[str, str], dict[str, 
     i = 0
     value_flags = {"-n", "--namespace", "-o", "--output", "-f", "--filename",
                    "--replicas", "--image", "--type", "--port", "--target-port",
-                   "-l", "--selector", "--overwrite"}
+                   "-l", "--selector", "--overwrite",
+                   "--min", "--max", "--cpu-percent", "--requests", "--limits"}
     while i < len(parts):
         tok = parts[i]
         if tok.startswith("-"):
@@ -273,6 +285,8 @@ _K8S_KIND_ALIASES = {
     "ns": "ns", "namespace": "ns", "namespaces": "ns",
     "ep": "ep", "endpoints": "ep", "endpoint": "ep",
     "event": "events", "events": "events", "ev": "events",
+    "hpa": "hpa", "horizontalpodautoscaler": "hpa", "horizontalpodautoscalers": "hpa",
+    "ds": "ds", "daemonset": "ds", "daemonsets": "ds",
     "all": "all",
 }
 
@@ -342,6 +356,10 @@ def _handle_kubectl(c, parts: list[str], line: str, shell: RHELShell) -> str:
             return c.get_namespaces()
         if kind == "ep":
             return c.get_endpoints(name)
+        if kind == "hpa":
+            return c.get_hpa(ns)
+        if kind == "ds":
+            return c.get_daemonsets(ns)
         if kind == "events":
             return c.get_events(ns, all_ns)
         if kind == "all":
@@ -360,6 +378,8 @@ def _handle_kubectl(c, parts: list[str], line: str, shell: RHELShell) -> str:
             return c.describe_node(name)
         if kind == "svc":
             return c.describe_service(name)
+        if kind == "hpa":
+            return c.describe_hpa(name)
         return f"error: unknown resource type \"{pos[0] if pos else ''}\""
 
     # ---- logs ----
@@ -442,6 +462,23 @@ def _handle_kubectl(c, parts: list[str], line: str, shell: RHELShell) -> str:
             target = pos[1] if len(pos) > 1 else target.split("/")[-1]
         target = target.split("/")[-1]
         return c.scale(target, replicas)
+
+    # ---- autoscale (create an HPA) ----
+    if verb == "autoscale":
+        target = pos[1] if len(pos) > 1 and ("deploy" in pos[0] or "deployment" in pos[0]) else (pos[0] if pos else "")
+        dep = target.split("/")[-1]
+        def _intval(*keys, default):
+            for k in keys:
+                if k in vals:
+                    try:
+                        return int(vals[k])
+                    except ValueError:
+                        pass
+            return default
+        min_r = _intval("--min", default=1)
+        max_r = _intval("--max", default=max(min_r, 5))
+        cpu = _intval("--cpu-percent", default=50)
+        return c.autoscale(dep, min_r, max_r, cpu)
 
     # ---- set image ----
     if verb == "set" and pos and pos[0] == "image":

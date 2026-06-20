@@ -1,0 +1,49 @@
+title: Node Maintenance — Drain worker-1, Bring Up a Replacement Node VM in VMware
+slug: k8s-drain-node-poweroff-vmware
+category: Kubernetes
+difficulty: hard
+description: |
+  Worker node `worker-1` needs to come out of service for hardware maintenance, but
+  it is the only worker and is running all three `billing` pods. You must move the
+  workload off it WITHOUT downtime. This Kubernetes cluster runs ON VMware — each
+  node is a VMware VM — so the maintenance is a two-part, cross-technology job:
+  bring up a replacement node and drain the old one.
+
+  Steps: (1) In the VMware simulator (toolbar -> Open VMware) power on the spare
+  worker VM `k8s-worker-2` so node worker-2 joins. (2) In the terminal, cordon and
+  drain worker-1 (`kubectl drain worker-1 --ignore-daemonsets`) so its pods evict
+  and reschedule onto worker-2. The lab passes when worker-1 is drained
+  (unschedulable, no pods left on it), worker-2 is Ready, and all billing pods are
+  Running. (In production you would then power off k8s-worker-1 for the hardware
+  work.)
+initial_state: |
+  A Kubernetes cluster with one worker (worker-1) hosting all 3 billing pods. A
+  replacement worker VM k8s-worker-2 exists in the VMware inventory, powered off.
+  worker-1 must be drained onto a freshly-joined worker-2 before it can be taken
+  down for maintenance.
+objectives:
+  - Confirm worker-1 hosts all billing pods (kubectl get pods -o wide)
+  - Open the VMware simulator and power on the replacement worker VM k8s-worker-2
+  - Confirm worker-2 is Ready (kubectl get nodes)
+  - Cordon and drain worker-1 so its pods reschedule (kubectl drain worker-1 --ignore-daemonsets)
+  - Verify worker-1 is unschedulable with no pods and all billing pods Running on worker-2
+lab_mode: simulation
+simulation_type: kubernetes
+cross_technology: true
+vmware_link: true
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: 'You cannot drain the only worker — the evicted pods would have nowhere to go. First add capacity. The nodes are VMware VMs, so open the VMware simulator (toolbar -> Open VMware): the replacement VM k8s-worker-2 is powered off.'
+  - order: 2
+    cost: 15
+    content: 'Power on k8s-worker-2 in the VMware simulator (VM Actions -> Power -> Power On). Confirm it joined with `kubectl get nodes` (worker-2 Ready). Now there is somewhere for worker-1''s pods to land.'
+  - order: 3
+    cost: 20
+    content: 'Drain the old node: `kubectl drain worker-1 --ignore-daemonsets --delete-emptydir-data`. It is cordoned (SchedulingDisabled) and its billing pods evict and reschedule onto worker-2. Verify with `kubectl get pods -o wide` (no pods on worker-1, all Running) and `kubectl get nodes` (worker-1 SchedulingDisabled).'
+requires_companion_hosts: false

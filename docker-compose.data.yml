@@ -1,0 +1,74 @@
+# FixitLab — D3 Data droplet (four-droplet topology)
+# Private droplet: PostgreSQL + pgBouncer only.
+# Reuses the service definitions from docker-compose.prod.yml (database, pgbouncer).
+#
+# Usage on D3:
+#   COMPOSE_FILE=docker-compose.data.yml ./scripts/platform-start.sh
+#   docker compose -f docker-compose.data.yml --env-file .env.production up -d
+#
+# pgBouncer/Postgres listen on the VPC private interface so D2 (app) can reach
+# them on the private network. They are NOT exposed publicly (D3 firewall blocks
+# all public inbound except SSH). The published ports below bind 0.0.0.0 inside
+# the droplet but the DigitalOcean cloud firewall (scripts/ci-setup-firewalls.sh)
+# restricts 5432/6432 to the D2 private IP only.
+
+services:
+  database:
+    build: ./database
+    container_name: fixitlab_db
+    volumes:
+      - fixitlab_db_data:/var/lib/postgresql/data
+    env_file:
+      - .env.production
+    ports:
+      # Reachable from D2 over the VPC; firewall limits source to D2 private IP
+      - "5432:5432"
+    networks:
+      - fixitlab_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: fixitlab_pgbouncer
+    environment:
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-fixitlab}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB:-fixitlab}
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=1000
+      - DEFAULT_POOL_SIZE=25
+      - SERVER_IDLE_TIMEOUT=600
+      - CLIENT_IDLE_TIMEOUT=0
+      - IGNORE_STARTUP_PARAMETERS=extra_float_digits
+    ports:
+      # pgBouncer transaction pool — D2 backend/celery connect here over the VPC
+      - "6432:5432"
+    networks:
+      - fixitlab_net
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  fixitlab_db_data:
+    name: fixitlab_db_data
+
+networks:
+  fixitlab_net:
+    name: fixitlab_net
+    driver: bridge

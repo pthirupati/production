@@ -20,6 +20,9 @@ class K8sNode:
     roles: list[str] = field(default_factory=lambda: ["control-plane"])
     version: str = "v1.28.2"
     schedulable: bool = True
+    # Cross-tech: the node's VMware VM is hung. A hung node cannot be made Ready or
+    # scheduled onto from kubectl — only a VMware reset (via the bridge) clears it.
+    vm_hung: bool = False
 
 
 @dataclass
@@ -104,11 +107,35 @@ class K8sIngress:
     class_name: str = "nginx"
 
 
+@dataclass
+class K8sHPA:
+    name: str
+    namespace: str = "default"
+    target: str = "Deployment/web"
+    min_replicas: int = 1
+    max_replicas: int = 5
+    target_cpu: int = 50
+    current_cpu: int = 80  # sustained load above target → wants to scale out
+    current_replicas: int = 1
+    desired_replicas: int = 1
+
+
+@dataclass
+class K8sDaemonSet:
+    name: str
+    namespace: str = "default"
+    image: str = "fluentd:latest"
+    selector: dict[str, str] = field(default_factory=lambda: {"app": "node-agent"})
+
+
 class K8sCluster:
     """Mutable cluster state for kubectl simulation."""
 
-    def __init__(self, scenario_slug: str = "") -> None:
+    def __init__(self, scenario_slug: str = "", session_id: str = "") -> None:
         self.scenario_slug = scenario_slug
+        # Lab session id links this cluster to the VMware simulator's bridge cache
+        # (shared across workers) for cross-technology k8s-on-VMware scenarios.
+        self.session_id = session_id
         self.namespaces: list[str] = ["default", "kube-system"]
         self.nodes = [
             K8sNode("master-1", roles=["control-plane"]),
@@ -121,7 +148,12 @@ class K8sCluster:
         self.secrets: list[K8sSecret] = []
         self.pvcs: list[K8sPVC] = []
         self.ingresses: list[K8sIngress] = []
+        self.hpas: list[K8sHPA] = []
+        self.daemonsets: list[K8sDaemonSet] = []
         self._apply_scenario(scenario_slug)
+        # After seeding, fold in any cross-tech VMware node action so the very
+        # first `kubectl get nodes` already reflects a node added/reset in VMware.
+        self.sync_from_vmware_bridge()
 
     # ------------------------------------------------------------------
     # Scenario seeding
@@ -129,6 +161,12 @@ class K8sCluster:
 
     def _apply_scenario(self, slug: str) -> None:
         s = slug.lower()
+        # ── Cross-technology Kubernetes-on-VMware (matched FIRST) ──
+        # The cluster's worker nodes ARE VMware VMs. These start fail-closed
+        # (pods Pending / a node NotReady) and only recover once the matching
+        # VMware VM action is performed; sync_from_vmware_bridge() folds that in.
+        if self._apply_cross_tech_k8s(s):
+            return
         if "crashloop" in s:
             self.deployments = [K8sDeployment("nginx", image="nginx:broken")]
             self.pods = [
@@ -263,6 +301,212 @@ class K8sCluster:
                     self.namespaces.append(obj.namespace)
 
     # ------------------------------------------------------------------
+    # Cross-technology Kubernetes-on-VMware seeding
+    # ------------------------------------------------------------------
+
+    def _apply_cross_tech_k8s(self, s: str) -> bool:
+        """Seed the broken state for a k8s-on-VMware cross-tech scenario.
+
+        Returns True if `s` is one of these scenarios (so _apply_scenario stops).
+        Every variant is fail-closed: capacity is short / a node is down until
+        the learner performs the VMware VM action, which sync_from_vmware_bridge
+        folds back in. The worker node that the missing VMware VM represents is
+        recorded in self._xtech (node name + the broken condition).
+        """
+        self._xtech: dict | None = None
+
+        if s == "k8s-hpa-needs-new-node-vmware":
+            # A single worker is at capacity; the HPA wants 4 replicas but the
+            # extra pods cannot schedule (Insufficient cpu) until worker-2 joins.
+            self.nodes = [
+                K8sNode("master-1", roles=["control-plane"]),
+                K8sNode("worker-1", roles=[]),
+            ]
+            self.deployments = [K8sDeployment("web", replicas=4, ready=2)]
+            self.pods = [
+                K8sPod("web-aaaa1", labels={"app": "web"}, node="worker-1", owner="web"),
+                K8sPod("web-aaaa2", labels={"app": "web"}, node="worker-1", owner="web"),
+                K8sPod("web-aaaa3", status="Pending", ready="0/1", node="<none>",
+                       labels={"app": "web"}, owner="web",
+                       events=["Warning FailedScheduling: 0/2 nodes are available: "
+                               "1 Insufficient cpu, 1 node(s) had untolerated taint."]),
+                K8sPod("web-aaaa4", status="Pending", ready="0/1", node="<none>",
+                       labels={"app": "web"}, owner="web",
+                       events=["Warning FailedScheduling: 0/2 nodes are available: "
+                               "1 Insufficient cpu, 1 node(s) had untolerated taint."]),
+            ]
+            self.services = [K8sService("web", selector={"app": "web"}, endpoints=["10.244.1.5:8080"])]
+            self.hpas = [K8sHPA("web", target="Deployment/web", min_replicas=1,
+                                max_replicas=6, target_cpu=50, current_cpu=85,
+                                current_replicas=2, desired_replicas=4)]
+            self._xtech = {"node": "worker-2", "kind": "add", "deployment": "web"}
+            return True
+
+        if s == "k8s-scale-out-add-vmware-node":
+            # The learner scaled web to 4, but only worker-1 exists → 2 Pending.
+            self.nodes = [
+                K8sNode("master-1", roles=["control-plane"]),
+                K8sNode("worker-1", roles=[]),
+            ]
+            self.deployments = [K8sDeployment("api", replicas=4, ready=2)]
+            self.pods = [
+                K8sPod("api-bbbb1", labels={"app": "api"}, node="worker-1", owner="api"),
+                K8sPod("api-bbbb2", labels={"app": "api"}, node="worker-1", owner="api"),
+                K8sPod("api-bbbb3", status="Pending", ready="0/1", node="<none>",
+                       labels={"app": "api"}, owner="api",
+                       events=["Warning FailedScheduling: 0/2 nodes are available: "
+                               "1 Insufficient cpu, 1 Insufficient memory."]),
+                K8sPod("api-bbbb4", status="Pending", ready="0/1", node="<none>",
+                       labels={"app": "api"}, owner="api",
+                       events=["Warning FailedScheduling: 0/2 nodes are available: "
+                               "1 Insufficient cpu, 1 Insufficient memory."]),
+            ]
+            self.services = [K8sService("api", selector={"app": "api"}, endpoints=["10.244.1.5:8080"])]
+            self._xtech = {"node": "worker-2", "kind": "add", "deployment": "api"}
+            return True
+
+        if s == "k8s-daemonset-needs-node-vmware":
+            # A DaemonSet should run one pod per node. worker-2's VM is powered
+            # off, so its DaemonSet pod is Pending until the VM is powered on.
+            self.nodes = [
+                K8sNode("master-1", roles=["control-plane"]),
+                K8sNode("worker-1", roles=[]),
+            ]
+            self.daemonsets = [K8sDaemonSet("node-agent", selector={"app": "node-agent"})]
+            self.deployments = []
+            self.pods = [
+                K8sPod("node-agent-cccc1", labels={"app": "node-agent"}, node="worker-1", owner="node-agent"),
+                K8sPod("node-agent-cccc2", status="Pending", ready="0/1", node="<none>",
+                       labels={"app": "node-agent"}, owner="node-agent",
+                       events=["Warning FailedScheduling: 0/2 nodes are available: "
+                               "1 node(s) didn't match Pod's node affinity (worker-2 NotReady/absent)."]),
+            ]
+            self.services = []
+            self._xtech = {"node": "worker-2", "kind": "add", "daemonset": "node-agent"}
+            return True
+
+        if s == "k8s-node-notready-vmware-reset":
+            # worker-1's VM is hung → the node is NotReady and its pod stranded.
+            # vm_hung marks it un-recoverable from kubectl (only a VMware reset).
+            self.nodes = [
+                K8sNode("master-1", roles=["control-plane"]),
+                K8sNode("worker-1", status="NotReady", roles=[], schedulable=True, vm_hung=True),
+            ]
+            self.deployments = [K8sDeployment("payments", replicas=2, ready=1)]
+            self.pods = [
+                K8sPod("payments-dddd1", labels={"app": "payments"}, node="master-1", owner="payments"),
+                K8sPod("payments-dddd2", status="Pending", ready="0/1", node="<none>",
+                       labels={"app": "payments"}, owner="payments",
+                       events=["Warning FailedScheduling: 0/2 nodes are available: "
+                               "1 node(s) were unschedulable, 1 node(s) had taint "
+                               "{node.kubernetes.io/not-ready}."]),
+            ]
+            self.services = [K8sService("payments", selector={"app": "payments"}, endpoints=["10.244.1.5:8080"])]
+            self._xtech = {"node": "worker-1", "kind": "reset", "deployment": "payments"}
+            return True
+
+        if s == "k8s-drain-node-poweroff-vmware":
+            # Maintenance flow: worker-1 must be drained (cordoned + evicted) and
+            # its VM powered off, while a NEW worker-2 VM is powered on to host the
+            # rescheduled pods. Fail-closed until worker-1 is unschedulable AND
+            # worker-2 is online AND no pod is left Pending.
+            self.nodes = [
+                K8sNode("master-1", roles=["control-plane"]),
+                K8sNode("worker-1", roles=[]),
+            ]
+            self.deployments = [K8sDeployment("billing", replicas=3, ready=3)]
+            self.pods = [
+                K8sPod("billing-eeee1", labels={"app": "billing"}, node="worker-1", owner="billing"),
+                K8sPod("billing-eeee2", labels={"app": "billing"}, node="worker-1", owner="billing"),
+                K8sPod("billing-eeee3", labels={"app": "billing"}, node="worker-1", owner="billing"),
+            ]
+            self.services = [K8sService("billing", selector={"app": "billing"}, endpoints=["10.244.1.5:8080"])]
+            self._xtech = {"node": "worker-2", "kind": "drain", "deployment": "billing",
+                           "drain_node": "worker-1"}
+            return True
+
+        return False
+
+    def sync_from_vmware_bridge(self) -> None:
+        """Fold VMware VM node actions (from the shared bridge cache) into node state.
+
+        This is what makes a node powered-on/created/reset in the VMware simulator
+        appear Ready in this terminal's `kubectl get nodes`, and lets the stranded
+        pods schedule onto it. Safe no-op for non-cross-tech clusters or when no
+        VMware action has happened yet (fail-closed).
+        """
+        xt = getattr(self, "_xtech", None)
+        if not xt or not self.session_id:
+            return
+        try:
+            from .vmware_bridge import k8s_node_states
+        except Exception:
+            return
+        states = k8s_node_states(self.session_id)
+        node_name = xt["node"]
+        online = bool(states.get("online", {}).get(node_name))
+        was_reset = bool(states.get("reset", {}).get(node_name))
+
+        if xt["kind"] == "reset":
+            # The hung node's VM was reset → the existing node's kubelet recovers.
+            if was_reset or online:
+                node = self.find_node(node_name)
+                if node:
+                    node.vm_hung = False
+                    node.status = "Ready"
+                    node.schedulable = True
+                self._schedule_pending_pods()
+            return
+
+        # add / drain kinds: a fresh worker VM was powered on / created → join it.
+        if online:
+            if not self.find_node(node_name):
+                self.nodes.append(K8sNode(node_name, roles=[]))
+            else:
+                n = self.find_node(node_name)
+                n.status, n.schedulable = "Ready", True
+
+        if xt["kind"] == "drain":
+            # In the drain flow the original node is taken out of service. We only
+            # cordon it here if the learner already cordoned/drained it (we never
+            # auto-cordon); pods land on worker-2 once it is online.
+            self._schedule_pending_pods()
+            return
+
+        if online:
+            self._schedule_pending_pods()
+
+    def _schedule_pending_pods(self) -> None:
+        """Place any Pending pods onto the first Ready, schedulable worker node.
+
+        Mirrors the kube-scheduler: a Pending pod only runs once there is a node
+        with capacity. We model capacity as "a Ready, schedulable node other than
+        the control-plane that is not the drained node."
+        """
+        targets = self._worker_nodes()
+        if not targets:
+            return
+        changed = False
+        for p in self.pods:
+            if p.status != "Pending":
+                continue
+            node = self._pick_node_for(p.owner)
+            p.status = "Running"
+            p.ready = "1/1"
+            p.node = node
+            p.events = []
+            changed = True
+        # Reconcile deployment ready counts + HPA observed replicas.
+        for dep in self.deployments:
+            dep.ready = sum(1 for p in self.pods if p.owner == dep.name and p.status == "Running")
+        for hpa in self.hpas:
+            running = sum(1 for p in self.pods if p.owner == hpa.target.split("/")[-1]
+                          and p.status == "Running")
+            hpa.current_replicas = running or hpa.current_replicas
+        if changed:
+            self._sync_endpoints()
+
+    # ------------------------------------------------------------------
     # Lookups
     # ------------------------------------------------------------------
 
@@ -285,6 +529,10 @@ class K8sCluster:
 
     def find_node(self, name: str) -> K8sNode | None:
         return next((n for n in self.nodes if n.name == name), None)
+
+    def find_hpa(self, name: str) -> K8sHPA | None:
+        return next((h for h in self.hpas if h.name == name), None) or \
+            (self.hpas[0] if self.hpas else None)
 
     # ------------------------------------------------------------------
     # get
@@ -406,6 +654,57 @@ class K8sCluster:
         for ns in self.namespaces:
             lines.append(f"{ns:<17} Active   30d")
         return "\n".join(lines)
+
+    def get_hpa(self, namespace: str = "default") -> str:
+        if not self.hpas:
+            return f"No resources found in {namespace} namespace."
+        lines = ["NAME   REFERENCE             TARGETS         MINPODS   MAXPODS   REPLICAS   AGE"]
+        for h in self.hpas:
+            if h.namespace != namespace:
+                continue
+            targets = f"cpu: {h.current_cpu}%/{h.target_cpu}%"
+            lines.append(
+                f"{h.name:<6} {h.target:<21} {targets:<15} {h.min_replicas:<9} "
+                f"{h.max_replicas:<9} {h.current_replicas:<10} 1h"
+            )
+        return "\n".join(lines)
+
+    def get_daemonsets(self, namespace: str = "default") -> str:
+        if not self.daemonsets:
+            return f"No resources found in {namespace} namespace."
+        lines = ["NAME         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   AGE"]
+        ready_nodes = sum(1 for n in self.nodes if n.status == "Ready" and "control-plane" not in n.roles)
+        for ds in self.daemonsets:
+            if ds.namespace != namespace:
+                continue
+            running = sum(1 for p in self.pods if p.owner == ds.name and p.status == "Running")
+            lines.append(
+                f"{ds.name:<12} {ready_nodes:<9} {running:<9} {running:<7} "
+                f"{running:<12} {running:<11} 1h"
+            )
+        return "\n".join(lines)
+
+    def describe_hpa(self, name: str) -> str:
+        h = self.find_hpa(name)
+        if not h:
+            return f"Error from server (NotFound): horizontalpodautoscalers.autoscaling \"{name}\" not found"
+        able = h.current_replicas >= h.desired_replicas
+        cond = ("AbleToScale True" if able else "AbleToScale False  FailedGetScale / pods Pending")
+        return (
+            f"Name:                                                  {h.name}\n"
+            f"Namespace:                                             {h.namespace}\n"
+            f"Reference:                                             {h.target}\n"
+            f"Metrics:                                               "
+            f"( current / target )\n"
+            f"  resource cpu on pods  (as a percentage of request):  {h.current_cpu}% / {h.target_cpu}%\n"
+            f"Min replicas:                                          {h.min_replicas}\n"
+            f"Max replicas:                                          {h.max_replicas}\n"
+            f"Deployment pods:                                       "
+            f"{h.current_replicas} current / {h.desired_replicas} desired\n"
+            f"Conditions:\n  {cond}\n"
+            + ("" if able else
+               "Events:\n  Warning  FailedScheduling  insufficient cluster capacity — add a worker node\n")
+        )
 
     def get_events(self, namespace: str = "default", all_ns: bool = False) -> str:
         lines = ["LAST SEEN   TYPE      REASON      OBJECT                MESSAGE"]
@@ -677,21 +976,74 @@ class K8sCluster:
         dep.replicas = replicas
         existing = [p for p in self.pods if p.owner == dep.name]
         healthy = "broken" not in dep.image and "missing" not in dep.image
+        # Cross-tech k8s-on-VMware clusters model finite node capacity: a pod that
+        # exceeds it starts Pending (FailedScheduling) until a worker VM is added in
+        # VMware. Other scenarios keep the original always-schedulable behaviour.
+        capacity_bound = getattr(self, "_xtech", None) is not None
         if replicas > len(existing):
             for i in range(replicas - len(existing)):
+                schedulable = healthy and (not capacity_bound or self._has_free_capacity(dep.name))
+                node = self._pick_node_for(dep.name) if schedulable else "<none>"
+                status = ("Running" if schedulable else
+                          ("Pending" if capacity_bound else "CrashLoopBackOff"))
                 self.pods.append(K8sPod(
-                    f"{dep.name}-{abs(hash(dep.name + str(i))) % 100000:05d}",
+                    f"{dep.name}-{abs(hash(dep.name + str(i) + str(len(self.pods)))) % 100000:05d}",
                     namespace=dep.namespace,
-                    status="Running" if healthy else "CrashLoopBackOff",
-                    ready="1/1" if healthy else "0/1",
+                    status=status,
+                    ready="1/1" if status == "Running" else "0/1",
                     image=dep.image, labels=dict(dep.selector), owner=dep.name,
+                    node=node,
+                    events=([] if status != "Pending" else
+                            ["Warning FailedScheduling: 0/{} nodes are available: "
+                             "Insufficient cpu.".format(len(self.nodes))]),
                 ))
         elif replicas < len(existing):
-            remove = [p.name for p in existing[replicas:]]
+            # Evict surplus pods; drop the Pending ones first (closest to real kube).
+            existing.sort(key=lambda p: 0 if p.status == "Pending" else 1)
+            remove = [p.name for p in existing[: len(existing) - replicas]]
             self.pods = [p for p in self.pods if p.name not in remove]
         dep.ready = sum(1 for p in self.pods if p.owner == dep.name and p.status == "Running")
         self._sync_endpoints()
         return f"deployment.apps/{dep.name} scaled"
+
+    def _worker_nodes(self) -> list[K8sNode]:
+        return [n for n in self.nodes
+                if n.status == "Ready" and n.schedulable and not n.vm_hung
+                and "control-plane" not in n.roles]
+
+    def _has_free_capacity(self, owner: str, per_node: int = 2) -> bool:
+        """True if some Ready worker node hosts fewer than per_node pods of owner."""
+        for node in self._worker_nodes():
+            here = sum(1 for p in self.pods
+                       if p.node == node.name and p.status == "Running" and p.owner == owner)
+            if here < per_node:
+                return True
+        return False
+
+    def _pick_node_for(self, owner: str, per_node: int = 2) -> str:
+        for node in self._worker_nodes():
+            here = sum(1 for p in self.pods
+                       if p.node == node.name and p.status == "Running" and p.owner == owner)
+            if here < per_node:
+                return node.name
+        wn = self._worker_nodes()
+        return wn[0].name if wn else "worker-1"
+
+    def autoscale(self, dep_name: str, min_r: int, max_r: int, cpu: int) -> str:
+        dep = self.find_deployment(dep_name)
+        if not dep:
+            return f"Error from server (NotFound): deployments.apps \"{dep_name}\" not found"
+        existing = self.find_hpa(dep_name)
+        if existing and existing.name == dep_name:
+            return f"Error from server (AlreadyExists): horizontalpodautoscalers.autoscaling \"{dep_name}\" already exists"
+        running = sum(1 for p in self.pods if p.owner == dep.name and p.status == "Running")
+        self.hpas.append(K8sHPA(
+            dep.name, namespace=dep.namespace, target=f"Deployment/{dep.name}",
+            min_replicas=max(1, min_r), max_replicas=max(min_r, max_r),
+            target_cpu=cpu, current_cpu=85, current_replicas=running or 1,
+            desired_replicas=min(max_r, max(min_r, dep.replicas)),
+        ))
+        return f"horizontalpodautoscaler.autoscaling/{dep.name} autoscaled"
 
     def set_image(self, dep_name: str, image: str) -> str:
         dep = self.find_deployment(dep_name)
@@ -781,7 +1133,9 @@ class K8sCluster:
             if not node:
                 return f"Error from server (NotFound): nodes \"{node_name}\" not found"
         node.schedulable = True
-        if node.status == "NotReady":
+        # A node whose VM is hung cannot be brought back by uncordon — its kubelet
+        # is dead. Only a VMware reset (the bridge) clears vm_hung and revives it.
+        if node.status == "NotReady" and not node.vm_hung:
             node.status = "Ready"
         return f"node/{node.name} uncordoned"
 
@@ -1178,6 +1532,40 @@ class K8sCluster:
             return False
         if any(n.status != "Ready" for n in self.nodes):
             return False
+        if not self._xtech_healthy():
+            return False
         return all(p.status == "Running" for p in self.pods) and all(
             s.endpoints for s in self.services if s.name != "kubernetes"
         )
+
+    def _xtech_healthy(self) -> bool:
+        """Extra fail-closed gate for cross-tech k8s-on-VMware scenarios.
+
+        Beyond "all nodes Ready / all pods Running" this enforces the scenario's
+        real success condition so the VMware action genuinely matters:
+          add   : the missing worker node must now exist and be Ready
+          reset : the previously-NotReady node must be Ready again (covered above)
+          drain : worker-1 must be drained (unschedulable) AND a new worker added,
+                  with no pod left stranded on the drained node
+          hpa   : the HPA's observed replicas must meet its desired count
+        """
+        xt = getattr(self, "_xtech", None)
+        if not xt:
+            return True
+        node_name = xt.get("node")
+        kind = xt.get("kind")
+        if kind in ("add", "drain"):
+            n = self.find_node(node_name)
+            if not n or n.status != "Ready":
+                return False
+        if kind == "drain":
+            drained = self.find_node(xt.get("drain_node", "worker-1"))
+            # The drained node must be cordoned (unschedulable) and emptied.
+            if not drained or drained.schedulable:
+                return False
+            if any(p.node == drained.name for p in self.pods):
+                return False
+        for hpa in self.hpas:
+            if hpa.current_replicas < hpa.desired_replicas:
+                return False
+        return True
