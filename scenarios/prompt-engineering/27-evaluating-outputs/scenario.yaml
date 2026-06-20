@@ -1,0 +1,116 @@
+title: "Evaluating Outputs & LLM-as-Judge"
+slug: evaluating-outputs-llm-judge
+category: Prompt Engineering
+description: >-
+  You can't improve prompts you don't measure. Learn to build evals: a test set,
+  clear criteria, and graders — exact-match for structured tasks, rubric-based
+  scoring for open-ended ones, and an LLM-as-judge with a tight rubric. Then write
+  a judge prompt that scores outputs consistently.
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Describe how to build an eval (test set, criteria, grading method)
+  - Choose programmatic grading vs LLM-as-judge for a given task
+  - Write an LLM-as-judge prompt with an explicit rubric and output format
+initial_state: >-
+  The guided AI practice console opens. Practice writing a judge prompt that scores
+  another model's output against a clear rubric. Rule-based and free.
+solution_explanation: >-
+  Evaluating outputs turns prompt engineering from vibes into measurement. Build an
+  eval - (1) a TEST SET of representative inputs (and ideal outputs where you have
+  them); (2) clear CRITERIA - what does a good answer look like; (3) a GRADER.
+  Choose the grader by task - exact-match / regex / schema validation for structured
+  outputs (cheap, deterministic); RUBRIC-based scoring for open-ended quality. When
+  there's no programmatic check, use LLM-AS-JUDGE - a separate model call that
+  scores the output against an explicit rubric. A good judge prompt - states the
+  criteria, asks for a score on a fixed scale WITH a brief justification, returns a
+  structured verdict, and ideally evaluates one dimension at a time. Watch for judge
+  bias (position, verbosity); calibrate against some human-labeled examples.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: An impartial evaluator that scores outputs against an explicit rubric.
+    lesson:
+      - heading: What an eval is
+        body: >-
+          An eval is a repeatable measurement of output quality - a TEST SET of
+          representative inputs, explicit CRITERIA for "good," and a GRADER that
+          scores each output. Once you have it, you can compare two prompts
+          objectively instead of guessing whether a change helped. Start small - even
+          20 good test cases beat zero.
+      - heading: Pick the grader
+        body: >-
+          Match the grader to the task. STRUCTURED outputs (JSON, a label, a number)
+          -> programmatic checks - exact match, regex, schema validation - cheap and
+          deterministic. OPEN-ENDED quality (a summary, an explanation) -> a RUBRIC
+          you score against, often with LLM-as-judge. Prefer programmatic grading
+          whenever the task allows it; it's faster, free, and unbiased.
+      - heading: LLM-as-judge done right
+        body: >-
+          When you must judge open-ended quality, use a separate model call as the
+          judge. A good judge prompt - states the exact CRITERIA/rubric, asks for a
+          SCORE on a fixed scale (e.g. 1-5) WITH a one-line justification, returns a
+          STRUCTURED verdict (JSON), and evaluates one dimension at a time for
+          reliability. Beware biases - judges favor longer answers and the first
+          option shown; calibrate against a few human-labeled cases and keep the
+          rubric tight.
+    rubric: [task, format, specificity, constraints]
+    exercises:
+      - id: judge-prompt
+        title: Write an LLM-as-judge prompt
+        goal: >-
+          Write a prompt that asks a model to JUDGE another output against explicit
+          criteria — it should give a SCORE on a fixed scale (e.g. 1-5) AND a brief
+          justification, and return the verdict in a structured format.
+        starter: ""
+        success:
+          min_words: 16
+          any_of:
+            - ["score", "rate", "grade", "rating", "1-5", "1 to 5", "0-10", "scale"]
+          require:
+            - ["criteria", "rubric", "based on", "judge", "evaluate", "assess", "according to"]
+          requires_json_request: true
+        success_response: |
+          {"score": 4, "justification": "Accurate and concise, but omits one required field."}
+        partial_response: >-
+          A solid judge prompt names the CRITERIA/rubric, asks for a SCORE on a fixed
+          scale plus a short justification, AND returns it as structured JSON. Add the
+          missing piece so the verdict is consistent and parseable.
+      - id: choose-grader
+        title: Choose programmatic vs LLM-judge
+        goal: >-
+          Write a short note picking ONE task and deciding whether to grade it
+          programmatically (exact-match/regex/schema) or with an LLM-as-judge — tie
+          it to whether the output is structured/checkable or open-ended.
+        starter: ""
+        success:
+          min_words: 14
+          any_of:
+            - ["exact match", "exact-match", "regex", "schema", "deterministic", "programmatic", "llm-as-judge", "llm as judge", "judge", "structured", "open-ended", "open ended", "rubric"]
+        success_response: >-
+          Good reasoning. Structured, checkable outputs should be graded
+          programmatically (cheap, deterministic, unbiased); reserve LLM-as-judge for
+          open-ended quality where no exact check exists.
+        partial_response: >-
+          Tie the choice to the output - structured/checkable -> programmatic
+          (exact-match, regex, schema); open-ended quality -> LLM-as-judge with a
+          rubric. Name the task and justify the grader.
+hints:
+  - content: 'An eval = a test set + clear criteria + a grader. With it you can compare two prompts objectively instead of guessing.'
+    cost: 10
+    order: 1
+  - content: Prefer programmatic grading (exact-match, regex, schema validation) for structured outputs — it's cheap, deterministic, and unbiased. Use LLM-as-judge only for open-ended quality.
+    cost: 15
+    order: 2
+  - content: 'A good judge prompt: state the rubric, ask for a score on a fixed scale (1-5) + a one-line reason, return structured JSON, judge one dimension at a time. Watch for verbosity/position bias and calibrate against human labels.'
+    cost: 20
+    order: 3

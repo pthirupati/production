@@ -1,8 +1,8 @@
 ---
 slug: jwt-token-expired
-title: "JWT Validation Failing — ExpiredJwtException on Valid Tokens"
+title: "JWT Validation Failing — Clock Skew and Short Expiry"
 technology: Java
-category: Security
+category: "Spring Security"
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -12,38 +12,21 @@ infrastructure_type: simulation
 jira_priority: High
 is_free: false
 description: |
-  Users are being logged out within minutes of logging in. The Spring Security filter
-  is throwing io.jsonwebtoken.ExpiredJwtException on tokens that should be valid for
-  24 hours. Investigation reveals the JWT expiry is configured as 3600 (seconds)
-  but is being interpreted as milliseconds in the token generation code, making
-  tokens expire in ~1 hour. Additionally, the server clock is 5 minutes ahead of
-  the issuing service, triggering premature expiration.
+  Authenticated calls intermittently return 401 with 'JWT expired'. Two issues combine: the access-token TTL is far too short for normal session length, and there is no allowed clock skew between the issuer and the resource server whose clocks differ by a few seconds. Tune the token lifetime and add a small skew allowance.
 objectives:
-  - Reproduce the ExpiredJwtException by decoding a recently issued token at jwt.io
-  - Identify the unit mismatch in the token generation code
-  - Fix the expiry calculation to correctly use milliseconds or seconds as expected
-  - Sync the server clock or add a clockSkew allowance to the JWT validator
+  - "Reproduce the 401 and confirm the failure is token expiry/validation"
+  - "Increase the access-token TTL to a sane value"
+  - "Allow a small clock-skew window during validation"
+  - "Verify authenticated calls stop failing intermittently"
 initial_state: |
-  Simulated server. Spring Boot app at /opt/app/. JWT config in application.yml.
-  jwt.expiry-ms is set to 3600 but code treats it as milliseconds (expires in 3.6s).
-  JwtUtil.java is at /opt/app/src/main/java/com/app/security/JwtUtil.java.
+  Config at /app/src/main/resources/application.yml sets a 30s JWT TTL and zero allowed clock skew; valid tokens are rejected as expired.
 hints:
   - order: 1
     cost: 10
-    content: "Decode a token: curl http://localhost:8080/api/auth/login -d '{...}'
-      Copy the token and paste at https://jwt.io to see the 'exp' claim.
-      If exp-iat is only a few seconds, the unit is wrong."
+    content: "Decode the JWT exp claim and compare to server time — the window is tiny."
   - order: 2
     cost: 15
-    content: "In JwtUtil.java, find the token builder. Change:
-      .setExpiration(new Date(System.currentTimeMillis() + jwtExpiryMs))
-      Ensure jwtExpiryMs is actually in milliseconds — change application.yml
-      jwt.expiry-ms from 3600 to 86400000 (24 hours in ms)."
+    content: "Raise the access-token validity (e.g. 15m) and refresh via the refresh token."
   - order: 3
     cost: 20
-    content: "To handle clock skew, add an allowance in the JWT parser:
-      Jwts.parserBuilder()
-        .setAllowedClockSkewSeconds(300) // allow 5 min skew
-        .setSigningKey(secretKey)
-        .build()
-      Also run: timedatectl status to check if NTP sync is enabled on the server."
+    content: "Allow ~30s clock skew in the JWT decoder so minor NTP drift does not 401."

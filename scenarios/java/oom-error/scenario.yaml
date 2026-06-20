@@ -1,36 +1,32 @@
-title: Java OutOfMemoryError
+---
 slug: sim-java-oom
-category: Java Development
+title: "Container OOMKilled — JVM Heap Larger Than the cgroup Limit"
+technology: Java
+category: "JVM Performance"
 difficulty: medium
-description: 'A Java application crashes with java.lang.OutOfMemoryError: Java heap space. The heap is
-  too small for the workload and/or the app is leaking objects so the heap fills and GC can''t recover.
-  Give the JVM enough heap to run, and investigate the allocation pattern to confirm whether it''s a sizing
-  issue or a genuine leak.'
-initial_state: 'Simulated RHEL 9 server running a Java app that throws OutOfMemoryError: Java heap space
-  under load because the max heap is too low (and/or memory is being retained).'
+time_limit: 900
+max_score: 100
 lab_mode: simulation
 simulation_type: java
+infrastructure_type: simulation
+jira_priority: Critical
 is_free: false
-jira_priority: Medium
-max_score: 100
-time_limit: 900
-dual_terminal: false
-requires_companion_hosts: false
+description: |
+  The pod is OOMKilled (exit 137) even though the JVM never logs an OutOfMemoryError. The JVM is not container-aware and sizes the heap from host memory, so RSS exceeds the container memory limit and the kernel kills it. Make the JVM respect the cgroup limit and leave headroom for non-heap memory.
 objectives:
-- Confirm the OutOfMemoryError and the current max heap
-- Run the app with an adequate max heap (-Xmx)
-- Inspect allocations to determine whether it's a sizing issue or a leak
+  - "Confirm the kill is OOMKilled (137) by the kernel, not a JVM heap OOM"
+  - "Make the JVM honor the container memory limit"
+  - "Leave headroom for metaspace/threads/direct buffers (cap heap %)"
+  - "Verify RSS stays under the limit and the pod stops being killed"
+initial_state: |
+  JVM flags at /app/jvm.options pin a large fixed -Xmx ignoring the cgroup limit; the container is OOMKilled with exit 137.
 hints:
-- order: 1
-  cost: 10
-  content: 'Confirm it''s heap space (not metaspace) from the crash message, and check the current max
-    heap: `java -XX:+PrintFlagsFinal -version | grep MaxHeapSize` (or the launch args).'
-- order: 2
-  cost: 15
-  content: 'Give it more headroom: run with `java -Xmx512m -jar app.jar` (raise as needed). If it still
-    OOMs with ample heap, it''s a leak, not just sizing.'
-- order: 3
-  cost: 20
-  content: 'Capture evidence for a leak: add `-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp` and
-    analyze the dump (or use `jmap -histo:live <pid>`). Fix the unbounded retention if found; otherwise
-    keep the larger -Xmx.'
+  - order: 1
+    cost: 10
+    content: "Pod status OOMKilled / exit 137 with no Java OOM = RSS exceeded the cgroup limit."
+  - order: 2
+    cost: 15
+    content: "Drop the fixed -Xmx and use -XX:MaxRAMPercentage=70 so the heap tracks the limit."
+  - order: 3
+    cost: 20
+    content: "Leave ~25-30% for non-heap; re-test and confirm RSS stays under the limit."

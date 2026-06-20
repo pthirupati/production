@@ -1,10 +1,10 @@
 ---
 slug: gradle-build-cache-corrupt
-title: "Gradle Build Fails — Corrupt Build Cache Causing Task Errors"
+title: "Corrupt Gradle Build Cache Failing the Build"
 technology: Java
-category: Build Tools
-difficulty: easy
-time_limit: 600
+category: "Gradle Build"
+difficulty: medium
+time_limit: 900
 max_score: 100
 lab_mode: simulation
 simulation_type: java
@@ -12,34 +12,21 @@ infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
 description: |
-  A Gradle 8.x build has started failing with cryptic errors: "Could not resolve
-  com.example:library:1.2.3" and "error: zip file is empty" on the :compileJava task.
-  The project was building fine yesterday. The Gradle local build cache and dependency
-  cache have become corrupted, likely due to a disk-full event that interrupted a
-  previous build. Engineers must clean the corrupt cache and rebuild from scratch.
+  Gradle builds fail intermittently with cache/lock errors ('Could not unpack', 'Timeout waiting to lock', corrupt cache entries) after a build was killed mid-write. The shared build cache and daemon state are poisoned. Clear the corrupt cache safely and re-enable a healthy cache configuration.
 objectives:
-  - Reproduce the build failure and read the full error output
-  - Identify the corrupt cache entries causing the failure
-  - Clean the Gradle build cache and local dependency cache
-  - Run a clean build to verify all tasks pass
+  - "Reproduce the cache/lock failure and identify the poisoned cache dir"
+  - "Stop running daemons and clear the corrupt cache safely"
+  - "Restore a valid build cache configuration in gradle.properties"
+  - "Run a clean build that succeeds and re-populates the cache"
 initial_state: |
-  Simulated build server. Gradle project at /opt/project/.
-  Gradle wrapper at /opt/project/gradlew. Build cache in ~/.gradle/caches/.
-  Running ./gradlew build fails with zip/corrupt file errors.
+  Gradle config at /root/.gradle/gradle.properties enables the build cache but the cache is corrupt; builds fail with unpack/lock errors.
 hints:
   - order: 1
     cost: 10
-    content: "Run: cd /opt/project && ./gradlew build --stacktrace 2>&1 | head -50
-      to see the full error. Look for 'zip file is empty' or 'corrupt' in the output."
+    content: "Read the failure — 'Could not unpack' / 'Timeout waiting to lock' points at the cache."
   - order: 2
     cost: 15
-    content: "Clean the project build directory and Gradle caches:
-      ./gradlew clean
-      rm -rf ~/.gradle/caches/
-      rm -rf ~/.gradle/build-cache/
-      This removes all cached artifacts."
+    content: "Stop daemons (gradle --stop) and remove the poisoned ~/.gradle/caches entries."
   - order: 3
     cost: 20
-    content: "After clearing caches, run: ./gradlew build --refresh-dependencies
-      The --refresh-dependencies flag forces Gradle to re-download all dependencies
-      instead of using any cached versions. This ensures a clean resolution."
+    content: "Keep org.gradle.caching=true but on a clean cache; re-run ./gradlew build."

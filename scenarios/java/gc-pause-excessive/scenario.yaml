@@ -1,10 +1,10 @@
 ---
 slug: gc-pause-excessive
-title: "Excessive GC Pauses — P99 Latency Spikes Over 2 Seconds"
+title: "Excessive GC Pauses Causing Request Latency Spikes"
 technology: Java
-category: JVM Tuning
+category: "JVM Performance"
 difficulty: hard
-time_limit: 1800
+time_limit: 1200
 max_score: 100
 lab_mode: simulation
 simulation_type: java
@@ -12,32 +12,21 @@ infrastructure_type: simulation
 jira_priority: High
 is_free: false
 description: |
-  A low-latency order-processing service is experiencing P99 latency spikes every
-  few minutes. GC logs show stop-the-world Full GC pauses of 600ms-2s. The service
-  is running with the default GC (G1GC) but with settings tuned for throughput rather
-  than low latency. Engineers must analyze GC logs, switch to ZGC or tune G1GC
-  pause targets, and verify pause times drop below 200ms.
+  A service shows multi-second p99 latency spikes that correlate with full GC pauses. The JVM is running the throughput (Parallel) collector with an undersized heap, so stop-the-world full collections stall every request. Switch to a low-pause collector (G1/ZGC) and right-size the heap to flatten the pause profile.
 objectives:
-  - Analyze /opt/app/logs/gc.log and identify the pause time pattern
-  - Switch from G1GC default to ZGC or tune G1GC with -XX:MaxGCPauseMillis=200
-  - Add GC logging flags to capture pause duration metrics
-  - Verify P99 GC pause time is under 200ms after the change
+  - "Enable GC logging and confirm long stop-the-world full GC pauses"
+  - "Select a low-pause collector appropriate for the heap size"
+  - "Set a sane max heap and a pause-time goal in jvm.options"
+  - "Verify p99 latency no longer correlates with GC pauses"
 initial_state: |
-  Simulated server. Application running with: -XX:+UseG1GC -Xmx4g -Xms4g.
-  GC log at /opt/app/logs/gc.log shows frequent Full GC events.
-  JVM startup config is at /opt/app/start.sh.
+  JVM flags at /app/jvm.options select -XX:+UseParallelGC with -Xmx512m; GC logs show frequent multi-second Full GC pauses under load.
 hints:
   - order: 1
     cost: 10
-    content: "Run: grep 'Pause Full' /opt/app/logs/gc.log | tail -20 to see recent
-      Full GC pause durations. Look for values >500ms."
+    content: "Add -Xlog:gc*:file=gc.log and look for long 'Pause Full' events."
   - order: 2
     cost: 15
-    content: "For ZGC, change the startup flags to: -XX:+UseZGC -Xmx4g -Xms4g
-      -Xlog:gc*:file=/opt/app/logs/gc.log:time,uptime:filecount=5,filesize=20m
-      ZGC targets sub-millisecond pauses."
+    content: "Use -XX:+UseG1GC with -XX:MaxGCPauseMillis=200 for a low-pause profile."
   - order: 3
     cost: 20
-    content: "Alternatively tune G1GC: add -XX:MaxGCPauseMillis=200 and
-      -XX:G1HeapRegionSize=16m. Also check for large object allocations
-      causing humongous object regions with: grep 'Humongous' /opt/app/logs/gc.log"
+    content: "Right-size the heap (e.g. -Xms2g -Xmx2g) so the collector is not thrashing."

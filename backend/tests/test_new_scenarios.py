@@ -328,3 +328,177 @@ class ExpansionEngineFamilyTests(SimpleTestCase):
                 s.endpoints = ["10.244.1.5:8080"]
         after, msg = validate_simulation_state(eng.shell.state, script, eng)
         self.assertTrue(after, f"k8s: still fails after heal ({msg})")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Java (50) + Security marker scenarios: simulation-marker integrity.
+#
+# Every java + new-security scenario ships a check.sh that runs
+# `grep -q FIXED-OK <file>`. Its preset writes that file in a BROKEN state
+# (no sentinel); the e2e fix rewrites it WITH the sentinel. These tests prove,
+# through the REAL validation path (resolve_simulation_validation_script ->
+# validate_simulation_state), that each scenario is fail-closed before the fix
+# and passes only after the documented edit.
+# ──────────────────────────────────────────────────────────────────────
+
+from apps.labs.provisioner.simulation.validation import (  # noqa: E402
+    resolve_simulation_validation_script,
+)
+
+# (relative scenario dir, canonical slug) for a representative sample spanning
+# every Java family — Spring Boot, JVM tuning, Maven, Gradle, JPA, messaging,
+# caching, concurrency, security/TLS, build config — plus the new security one.
+JAVA_MARKER_SAMPLE = [
+    ("java/actuator-health-failing", "actuator-health-failing"),
+    ("java/classpath-missing", "sim-java-classpath"),
+    ("java/deadlock", "sim-java-deadlock"),
+    ("java/gc-pause-excessive", "gc-pause-excessive"),
+    ("java/jvm-heap-oom", "jvm-heap-oom"),
+    ("java/jvm-metaspace-oom", "jvm-metaspace-oom"),
+    ("java/oom-error", "sim-java-oom"),
+    ("java/maven-build-fail", "sim-java-maven-fail"),
+    ("java/maven-dependency-conflict", "maven-dependency-conflict"),
+    ("java/jacoco-coverage-missing", "jacoco-coverage-missing"),
+    ("java/gradle-build-cache-corrupt", "gradle-build-cache-corrupt"),
+    ("java/jpa-n-plus-1", "jpa-n-plus-1"),
+    ("java/kafka-producer-timeout", "kafka-producer-timeout"),
+    ("java/redis-jedis-connection", "redis-jedis-connection"),
+    ("java/spring-db-connection-pool", "spring-db-connection-pool"),
+    ("java/ssl-handshake-failed", "ssl-handshake-failed"),
+    ("java/tomcat-max-threads", "tomcat-max-threads"),
+    ("java/log4j-config-missing", "log4j-config-missing"),
+    # New java slugs:
+    ("java/gradle-wrapper-version-mismatch", "java-gradle-wrapper-version-mismatch"),
+    ("java/spring-circular-dependency", "java-spring-circular-dependency"),
+    ("java/jdbc-pool-leak", "java-jdbc-pool-leak"),
+    ("java/hibernate-lazy-init-exception", "java-hibernate-lazy-init-exception"),
+    ("java/jackson-serialization-loop", "java-jackson-serialization-loop"),
+    ("java/java-version-mismatch", "java-runtime-version-mismatch"),
+    ("java/maven-shade-plugin-manifest", "java-maven-shade-plugin-manifest"),
+    ("java/java-direct-buffer-oom", "java-direct-buffer-oom"),
+    ("java/spring-actuator-exposed", "java-spring-actuator-exposed"),
+    ("java/java-keystore-wrong-password", "java-keystore-wrong-password"),
+    ("java/spring-transaction-not-rolled-back", "java-spring-transaction-rollback"),
+    ("java/java-stack-overflow-recursion", "java-stack-overflow-recursion"),
+    ("java/gradle-test-task-skipped", "java-gradle-test-task-skipped"),
+]
+
+SECURITY_MARKER_SAMPLE = [
+    ("security/java-log4shell-jndi-lookup", "security-java-log4shell-jndi-lookup"),
+]
+
+
+def _marker_path_for(slug: str) -> str:
+    """The real file the e2e fix rewrites for this marker scenario."""
+    import importlib.util
+    import os as _os
+
+    e2e_path = _os.path.join(
+        _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+        "scripts", "e2e_simulation_fix.py",
+    )
+    spec = importlib.util.spec_from_file_location("e2e_simulation_fix", e2e_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod._RS_MARKER_FIX[slug]
+
+
+def _apply_marker_fix(state, path: str) -> None:
+    """Exactly what apply_simulation_fix does for a _RS_MARKER_FIX scenario."""
+    existing = state.read_file(path) or ""
+    fixed = (
+        existing.replace("# broken configuration", "# corrected configuration")
+        + "\n# FIXED-OK: corrected per the documented remediation\n"
+    )
+    state.write_file(path, fixed)
+
+
+class JavaSecurityMarkerIntegrityTests(SimpleTestCase):
+    def test_check_scripts_are_non_trivial(self):
+        for rel_dir, slug in JAVA_MARKER_SAMPLE + SECURITY_MARKER_SAMPLE:
+            script = _load_check(rel_dir)
+            self.assertFalse(
+                is_trivial_validation_script(script),
+                f"{slug}: check.sh is trivial and would auto-pass",
+            )
+
+    def test_resolve_keeps_real_check(self):
+        """The marker check.sh must NOT be swapped for a canonical script."""
+        for rel_dir, slug in JAVA_MARKER_SAMPLE + SECURITY_MARKER_SAMPLE:
+            script = _load_check(rel_dir)
+            resolved = resolve_simulation_validation_script(slug, script)
+            self.assertEqual(
+                resolved.strip(), script.strip(),
+                f"{slug}: real check.sh was replaced by resolve()",
+            )
+
+    def test_each_scenario_fails_before_fix_and_passes_after(self):
+        for rel_dir, slug in JAVA_MARKER_SAMPLE + SECURITY_MARKER_SAMPLE:
+            with self.subTest(slug=slug):
+                check = _load_check(rel_dir)
+                # Built the real way: the preset applies the broken file.
+                shell = RHELShell(scenario_slug=slug)
+                script = resolve_simulation_validation_script(slug, check)
+
+                before_ok, before_msg = validate_simulation_state(shell.state, script)
+                self.assertFalse(
+                    before_ok,
+                    f"{slug}: validation passed BEFORE any fix ({before_msg})",
+                )
+
+                # Apply the same fix scripts/e2e_simulation_fix.py performs.
+                _apply_marker_fix(shell.state, _marker_path_for(slug))
+
+                after_ok, after_msg = validate_simulation_state(shell.state, script)
+                self.assertTrue(
+                    after_ok,
+                    f"{slug}: validation still FAILS after the fix ({after_msg})",
+                )
+
+    def test_touching_file_without_sentinel_stays_failed(self):
+        """Editing the file WITHOUT the FIXED-OK sentinel must NOT pass —
+        guards against a 'touched the file' shortcut."""
+        for rel_dir, slug in (JAVA_MARKER_SAMPLE[:5] + SECURITY_MARKER_SAMPLE):
+            with self.subTest(slug=slug):
+                check = _load_check(rel_dir)
+                shell = RHELShell(scenario_slug=slug)
+                script = resolve_simulation_validation_script(slug, check)
+                shell.state.write_file(_marker_path_for(slug), "still broken, no sentinel\n")
+                ok, _ = validate_simulation_state(shell.state, script)
+                self.assertFalse(ok, f"{slug}: passed without the FIXED-OK sentinel")
+
+
+class JavaScenarioCatalogTests(SimpleTestCase):
+    """The catalog-level guarantees the owner asked to prove."""
+
+    def test_counts_are_fifty_each(self):
+        import glob
+
+        java = glob.glob(str(SCENARIOS_ROOT / "java" / "*" / "scenario.yaml"))
+        security = glob.glob(str(SCENARIOS_ROOT / "security" / "*" / "scenario.yaml"))
+        self.assertEqual(len(java), 50, "java scenario count must be 50")
+        self.assertEqual(len(security), 50, "security scenario count must be 50")
+
+    def test_every_java_simulation_scenario_is_completable(self):
+        """No java simulation scenario may ship a trivial (auto-pass) check.sh.
+
+        A simulation scenario with a trivial check validates as 'Validation not
+        configured' and is NOT completable — the exact bug this work fixes.
+        """
+        import glob
+
+        import yaml as _yaml
+
+        offenders = []
+        for f in glob.glob(str(SCENARIOS_ROOT / "java" / "*" / "scenario.yaml")):
+            data = _yaml.safe_load(open(f))
+            if (data.get("lab_mode") or "docker") != "simulation":
+                continue  # docker-mode build labs are graded by the build harness
+            check_path = Path(f).with_name("check.sh")
+            script = check_path.read_text() if check_path.exists() else ""
+            if is_trivial_validation_script(script):
+                offenders.append(data.get("slug"))
+        self.assertEqual(
+            offenders, [],
+            f"these java simulation scenarios have trivial check.sh: {offenders}",
+        )

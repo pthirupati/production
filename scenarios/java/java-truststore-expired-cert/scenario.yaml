@@ -1,0 +1,32 @@
+---
+slug: java-truststore-expired-cert
+title: "Expired CA in Truststore Breaks Outbound TLS"
+technology: Java
+category: "Java Security"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  Outbound HTTPS suddenly fails with 'java.security.cert.CertificateExpiredException' / 'NotAfter' during handshake validation. A CA certificate in the application truststore has expired (or the pinned leaf rotated), so the chain no longer validates. Refresh the truststore with the current CA so TLS works again.
+objectives:
+  - "Reproduce the handshake failure and confirm it is certificate expiry"
+  - "Identify the expired CA/cert in the truststore"
+  - "Import the renewed CA and remove the expired entry"
+  - "Verify the outbound TLS handshake succeeds"
+initial_state: |
+  Config at /app/src/main/resources/application.yml points at a truststore whose CA has expired; outbound TLS fails CertificateExpiredException.
+hints:
+  - order: 1
+    cost: 10
+    content: "keytool -list -v shows the 'Valid until' date — the CA is past NotAfter."
+  - order: 2
+    cost: 15
+    content: "Import the renewed CA: keytool -importcert -alias ca -file new-ca.pem -keystore truststore.jks."
+  - order: 3
+    cost: 20
+    content: "Delete the expired alias and confirm the chain validates end-to-end."

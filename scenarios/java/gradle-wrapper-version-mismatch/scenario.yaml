@@ -1,0 +1,32 @@
+---
+slug: java-gradle-wrapper-version-mismatch
+title: "Gradle Wrapper Version Mismatch Breaks the Build"
+technology: Java
+category: "Gradle Build"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  The build fails because the Gradle wrapper pins a distribution version incompatible with the project's plugins (e.g. an old Gradle with a newer Android/Spring plugin), producing 'Unsupported class file major version' or 'requires Gradle X'. Align the wrapper distributionUrl to a supported Gradle version so the build runs.
+objectives:
+  - "Read the build error naming the required vs configured Gradle version"
+  - "Update distributionUrl in gradle-wrapper.properties to a compatible version"
+  - "Re-run ./gradlew --version to confirm the new distribution"
+  - "Verify the build succeeds with the aligned wrapper"
+initial_state: |
+  gradle-wrapper.properties at /app/gradle/wrapper/ pins an old Gradle distribution that the configured plugins reject.
+hints:
+  - order: 1
+    cost: 10
+    content: "The error says 'plugin requires Gradle X' or 'unsupported class file major version'."
+  - order: 2
+    cost: 15
+    content: "Edit distributionUrl in gradle-wrapper.properties to the supported gradle-X-bin.zip."
+  - order: 3
+    cost: 20
+    content: "./gradlew --version then ./gradlew build to confirm compatibility."

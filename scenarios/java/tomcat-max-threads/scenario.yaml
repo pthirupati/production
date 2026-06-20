@@ -1,10 +1,10 @@
 ---
 slug: tomcat-max-threads
-title: "Tomcat Thread Pool Exhausted — Connections Rejected Under Load"
+title: "Tomcat Thread Pool Maxed Out — Requests Queue and Time Out"
 technology: Java
-category: Web Servers
+category: "Spring Boot"
 difficulty: medium
-time_limit: 1200
+time_limit: 900
 max_score: 100
 lab_mode: simulation
 simulation_type: java
@@ -12,32 +12,21 @@ infrastructure_type: simulation
 jira_priority: High
 is_free: false
 description: |
-  A Java web application deployed on Tomcat 10.1 is returning HTTP 503 Service
-  Unavailable during load spikes. Tomcat logs show: "All threads (200) are currently
-  busy, waiting." The default maxThreads=200 is insufficient for the current concurrency
-  of approximately 500 simultaneous users. Engineers must tune the Tomcat connector
-  configuration and verify the application handles higher concurrency.
+  Under moderate load requests queue and eventually time out. The embedded Tomcat max-threads is set very low while the accept queue is large, so connections are accepted but starved of worker threads. Size the connector threads and queue to the workload so requests are served instead of timing out.
 objectives:
-  - Identify the thread pool exhaustion in Tomcat access and catalina logs
-  - Locate the HTTP connector configuration in server.xml
-  - Increase maxThreads and set acceptCount to handle burst traffic
-  - Restart Tomcat and verify 503 errors are eliminated
+  - "Confirm requests are queuing/timing out, not failing fast"
+  - "Inspect the Tomcat max-threads and accept-count settings"
+  - "Right-size threads (and queue) for the concurrency"
+  - "Verify throughput recovers and timeouts stop"
 initial_state: |
-  Simulated server. Tomcat 10.1 installed at /opt/tomcat/.
-  Logs at /opt/tomcat/logs/catalina.out show thread saturation.
-  server.xml at /opt/tomcat/conf/server.xml.
+  Config at /app/src/main/resources/application.yml sets server.tomcat.threads.max very low with a large accept-count; requests queue and time out under load.
 hints:
   - order: 1
     cost: 10
-    content: "Run: grep -i 'all threads' /opt/tomcat/logs/catalina.out to see the
-      thread exhaustion messages with timestamps."
+    content: "Accepted-but-waiting connections + timeouts = too few worker threads."
   - order: 2
     cost: 15
-    content: "In /opt/tomcat/conf/server.xml, find the Connector element on port 8080
-      and add/update: maxThreads='500' minSpareThreads='50' acceptCount='200'
-      connectionTimeout='20000'"
+    content: "Raise server.tomcat.threads.max to match expected concurrency."
   - order: 3
     cost: 20
-    content: "Also consider enabling the NIO2 connector for better async performance:
-      protocol='org.apache.coyote.http11.Http11Nio2Protocol'
-      After editing, restart: /opt/tomcat/bin/shutdown.sh && /opt/tomcat/bin/startup.sh"
+    content: "Keep accept-count modest so excess load is rejected fast instead of queuing forever."

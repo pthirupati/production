@@ -1,0 +1,127 @@
+title: "Claude-Specific Best Practices"
+slug: claude-best-practices
+category: Prompt Engineering
+description: >-
+  Claude rewards a few specific habits: XML tags to structure prompts, being
+  explicit and direct about what you want, letting it think before answering,
+  forcing the output shape with structured outputs, and using the system parameter
+  for role. Learn the Claude-flavored techniques that consistently lift output
+  quality.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Name Claude-specific prompting habits (XML tags, explicitness, thinking, structured outputs)
+  - Structure a prompt with XML tags and a clear, direct instruction
+  - Use the system parameter for role and let Claude reason before answering
+initial_state: >-
+  The guided AI practice console opens. Practice Claude-flavored techniques — XML
+  structure, explicit instructions, and reasoning before answering. Rule-based and
+  free.
+solution_explanation: >-
+  Claude responds especially well to a handful of habits. (1) XML TAGS - structure
+  prompts with tags like <document>, <example>, <instructions>; Claude was trained
+  to respect them, so they separate sections cleanly and you can reference them
+  ("using the text in <document>"). (2) BE EXPLICIT AND DIRECT - say exactly what
+  you want, including format and what to avoid; Claude follows clear instructions
+  faithfully rather than guessing. (3) LET IT THINK - for hard tasks, ask Claude to
+  reason first, or turn on adaptive/extended thinking; quality improves when it works
+  through the problem. (4) FORCE A SHAPE - on current Claude models, use structured
+  outputs (output_config.format) or tool use to lock the output format (this
+  supersedes the older assistant-prefill trick). (5) USE THE SYSTEM PARAMETER for
+  role/persona. (6) GIVE EXAMPLES inside tags for tricky formats. These compound -
+  explicit + structured + reasoned is the Claude sweet spot.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: Claude, an assistant that rewards structured, explicit, well-reasoned prompts.
+    lesson:
+      - heading: Structure with XML tags
+        body: >-
+          Claude is trained to respect XML-style tags, so use them to separate the
+          parts of a prompt - <document>...</document> for reference text,
+          <example>...</example> for samples, <instructions>...</instructions> for
+          the task. You can then refer to a section by name ("summarize the text in
+          <document>"). Tags make complex prompts unambiguous and are more robust than
+          loose prose.
+      - heading: Be explicit and direct
+        body: >-
+          Claude follows clear instructions faithfully, so tell it exactly what you
+          want - the task, the format, the length, the tone, and what to avoid. If
+          you want only JSON, say "Return only JSON, no prose." If you want a
+          specific structure, describe it or show it. Vague asks get reasonable but
+          generic answers; explicit asks get precisely what you specified.
+      - heading: Let it think, then lock the format
+        body: >-
+          For hard problems, let Claude reason before it answers - ask it to think
+          step by step, or turn on adaptive/extended thinking for deep reasoning. To
+          control output, the modern path on current Claude models is structured
+          outputs (output_config.format) or a tool input_schema, which validate the
+          shape (this replaces the older trick of prefilling the assistant turn with
+          "{"). Set role/persona via the SYSTEM parameter, and put examples in
+          <example> tags for tricky formats. Explicit + structured + reasoned is where
+          Claude shines.
+    rubric: [format, task, specificity, constraints]
+    exercises:
+      - id: xml-structured-prompt
+        title: Structure a prompt with XML tags
+        goal: >-
+          Write a prompt that uses XML-style tags to separate sections (e.g. a
+          <document> block of reference text and an <instructions> block for the
+          task), and refers to the tagged section in the instruction.
+        starter: |
+          <document>
+          FixitLab sessions auto-terminate after 30 minutes idle.
+          </document>
+          <instructions>
+        success:
+          min_words: 12
+          has_delimiter: true
+          any_of:
+            - ["document", "instructions", "example", "context", "tag", "above", "section", "summarize", "using the"]
+        success_response: >-
+          Clean structure — tagged sections let me tell reference text from the task
+          instantly, and I can act on exactly the block you point to. This is the
+          Claude-friendly way to lay out a prompt.
+        partial_response: >-
+          Use XML-style tags to separate the parts (e.g. <document>...</document> and
+          <instructions>...</instructions>) and reference the tagged block in your
+          instruction. Claude respects these tags and they keep sections unambiguous.
+      - id: explicit-and-reason
+        title: Be explicit and let Claude reason
+        goal: >-
+          Write a prompt that is explicit about the task AND its output format/length,
+          and that asks Claude to reason/think step by step before giving the final
+          answer.
+        starter: ""
+        success:
+          min_words: 14
+          any_of:
+            - ["step by step", "step-by-step", "think", "reason", "reasoning", "work through", "think first", "before answering"]
+          mentions_limit: true
+        success_response: >-
+          Strong Claude prompt — explicit task and format plus a request to reason
+          first. Letting Claude think through it before committing reliably lifts
+          quality on hard problems.
+        partial_response: >-
+          Combine TWO things - be explicit about the task AND the output
+          format/length, and ask Claude to reason/think step by step before the final
+          answer. Explicit + reasoned is the Claude sweet spot.
+hints:
+  - content: 'Claude respects XML tags — structure prompts with <document>, <example>, <instructions> and reference sections by name ("summarize the text in <document>").'
+    cost: 10
+    order: 1
+  - content: Be explicit and direct — state the exact task, format, length, tone, and what to avoid. Claude follows clear instructions faithfully instead of guessing.
+    cost: 15
+    order: 2
+  - content: 'Let it think (ask for step-by-step reasoning or turn on adaptive/extended thinking), force the output shape with structured outputs (output_config.format) or a tool input_schema, and set role via the system parameter.'
+    cost: 20
+    order: 3

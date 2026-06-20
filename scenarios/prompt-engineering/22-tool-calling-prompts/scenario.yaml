@@ -1,0 +1,121 @@
+title: "Writing Function & Tool-Calling Prompts"
+slug: tool-calling-prompts
+category: Prompt Engineering
+description: >-
+  Tool (function) calling lets a model invoke your code with structured arguments.
+  Whether the model calls the right tool with the right arguments comes down to how
+  you describe it. Learn to write tool descriptions and input schemas that drive
+  correct, reliable calls.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Explain what makes a tool description drive correct tool selection
+  - Write a tool definition with a name, a WHEN-to-use description, and typed inputs
+  - Add guidance for argument extraction and when NOT to call the tool
+initial_state: >-
+  The guided AI practice console opens. Practice writing tool definitions and
+  schemas that make the model call the right function with the right arguments.
+  Rule-based and free.
+solution_explanation: >-
+  With tool/function calling you give the model a set of tools - each with a NAME,
+  a DESCRIPTION, and a typed INPUT SCHEMA (JSON Schema). The model decides which to
+  call and with what arguments; your code runs it and returns the result. The
+  description is the single biggest lever on correctness - it should say WHAT the
+  tool does and crucially WHEN to use it (and when not to). Make inputs typed and
+  required-vs-optional explicit, add enums for fixed choices, and describe each
+  parameter. Other levers - tell the model it may call multiple tools or none, and
+  what to do when no tool fits. With Claude, you pass tools in the API `tools`
+  array; vague descriptions are the top cause of wrong or missing calls.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: An assistant that calls the tools you define when their description fits.
+    lesson:
+      - heading: Anatomy of a tool
+        body: >-
+          A tool definition has three parts - NAME (a clear verb_noun like
+          create_ticket), DESCRIPTION (what it does and WHEN to use it), and an INPUT
+          SCHEMA (typed parameters, usually JSON Schema). The model reads these and
+          decides whether and how to call the tool. Treat the description as a tiny
+          spec the model must understand cold.
+      - heading: Descriptions decide everything
+        body: >-
+          The description is the #1 driver of correct tool use. Write it like an API
+          doc - "Use this to look up the current weather for a city. Call it
+          whenever the user asks about weather, temperature, or forecast. Do NOT use
+          it for historical climate questions." Stating the TRIGGER (when to call)
+          and the ANTI-trigger (when not to) prevents both missed calls and
+          inappropriate ones.
+      - heading: Schemas and arguments
+        body: >-
+          Make inputs precise - type every parameter (string, integer, boolean,
+          array, object), mark which are required, use enums for fixed choices
+          ("status: one of open|closed"), and add a one-line description per field so
+          the model extracts the right value from the user's text. Also tell the
+          model what to do when NO tool fits (answer directly, or ask a clarifying
+          question) so it doesn't force an irrelevant call.
+    rubric: [task, format, specificity, constraints]
+    exercises:
+      - id: tool-when-to-use
+        title: Write a tool with a WHEN-to-use description
+        goal: >-
+          Write a tool definition with a NAME, a DESCRIPTION that says both what it
+          does and WHEN the model should call it, and typed INPUT parameters. Bonus:
+          note when it should NOT be called.
+        starter: |
+          Tool: create_ticket
+          Description:
+        success:
+          min_words: 16
+          require:
+            - ["when", "use this", "call this", "call it", "use it when", "trigger", "should call"]
+          any_of:
+            - ["string", "integer", "boolean", "enum", "array", "object", "required", "param", "input", "type"]
+        success_response: >-
+          Strong definition - a clear name, a WHEN-to-call description, and typed
+          inputs give me everything I need to call create_ticket with the right
+          arguments at the right moment.
+        partial_response: >-
+          State WHEN to call it (the trigger condition), not just what it does, and
+          type the INPUT parameters (e.g. title: string, priority: enum). The
+          trigger plus typed inputs are what drive a correct call.
+      - id: argument-schema
+        title: Specify a typed argument schema
+        goal: >-
+          Write a JSON-style input schema for a tool — at least two parameters with
+          their TYPES (string/integer/boolean/array), marking which are required and
+          using an enum or fixed choices where it helps.
+        starter: ""
+        success:
+          min_words: 10
+          requires_json_request: true
+          require:
+            - ["string", "integer", "int", "number", "boolean", "bool", "array", "enum"]
+          any_of:
+            - ["required", "optional", "enum", "type", "properties", "schema"]
+        success_response: |
+          {"type":"object","properties":{"city":{"type":"string"},"units":{"type":"string","enum":["c","f"]}},"required":["city"]}
+        partial_response: >-
+          Give a real schema - name each parameter, set its TYPE
+          (string/integer/boolean/array), mark which are required, and use an enum
+          for fixed choices. Typed schemas are what make argument extraction
+          reliable.
+hints:
+  - content: A tool = NAME + DESCRIPTION + typed INPUT SCHEMA. The model uses these to decide whether and how to call it.
+    cost: 10
+    order: 1
+  - content: 'The description is the #1 lever: state WHEN to call it (and when not to), like an API doc. "Use this when the user asks about weather; do not use for historical climate."'
+    cost: 15
+    order: 2
+  - content: 'Type every parameter, mark required vs optional, use enums for fixed choices, and tell the model what to do when no tool fits (answer directly or ask). Vague descriptions cause wrong/missing calls.'
+    cost: 20
+    order: 3

@@ -1,0 +1,32 @@
+---
+slug: java-spring-cors-misconfigured
+title: "CORS Misconfiguration Blocks the Frontend"
+technology: Java
+category: "Spring Security"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  The browser blocks API calls with 'No 'Access-Control-Allow-Origin' header is present' (and preflight OPTIONS fail). The Spring CORS configuration omits the frontend origin and the required methods/headers, and credentials are mishandled. Configure CORS correctly so the SPA can call the API without weakening it to a wildcard-with-credentials.
+objectives:
+  - "Reproduce the CORS/preflight failure from the browser"
+  - "Add the frontend origin and allowed methods/headers"
+  - "Handle credentials correctly (no wildcard origin with credentials)"
+  - "Verify cross-origin requests succeed"
+initial_state: |
+  WebConfig at /app/src/main/java/com/example/config/WebConfig.java does not allow the frontend origin; preflight and CORS requests fail.
+hints:
+  - order: 1
+    cost: 10
+    content: "DevTools shows the blocked preflight and the missing Allow-Origin header."
+  - order: 2
+    cost: 15
+    content: "Add the exact frontend origin and the methods/headers the app uses."
+  - order: 3
+    cost: 20
+    content: "If allowCredentials=true you must list explicit origins, never '*'."

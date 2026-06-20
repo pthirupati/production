@@ -1,35 +1,32 @@
-title: Spring Boot Startup Failure
+---
 slug: sim-java-spring-fail
-category: Java Development
-difficulty: medium
-description: A Spring Boot application fails to start with UnsatisfiedDependencyException / BeanCreationException.
-  A bean can't be wired — a missing component, an ambiguous autowire, or a misconfigured property prevents
-  the context from initializing, so the app exits on startup. Read the failure analysis, fix the bean/configuration,
-  and start the app.
-initial_state: Simulated RHEL 9 server with a Spring Boot app that aborts at startup because a required
-  bean can't be created/wired (UnsatisfiedDependencyException).
+title: "Spring Boot Port Already in Use — Startup Aborts"
+technology: Java
+category: "Spring Boot"
+difficulty: easy
+time_limit: 600
+max_score: 100
 lab_mode: simulation
 simulation_type: java
-is_free: false
+infrastructure_type: simulation
 jira_priority: Medium
-max_score: 100
-time_limit: 900
-dual_terminal: false
-requires_companion_hosts: false
+is_free: false
+description: |
+  Spring Boot fails to start with 'Web server failed to start. Port 8080 was already in use.' Another process holds the configured port, so the embedded server cannot bind. Either free the port or move the app to a free port via configuration, then confirm a clean startup.
 objectives:
-- Read the startup failure and identify the bean that can't be satisfied
-- Fix the missing component, ambiguous wiring, or misconfigured property
-- Start the application successfully
+  - "Confirm the bind failure is a port-in-use conflict"
+  - "Identify what holds the port (or choose a free one)"
+  - "Free the port or set server.port to an available value"
+  - "Verify the app starts and serves on the chosen port"
+initial_state: |
+  Config at /app/src/main/resources/application.properties pins server.port=8080 which is already bound; startup aborts with 'Port 8080 was already in use'.
 hints:
-- order: 1
-  cost: 10
-  content: Run the jar and read the startup log — Spring prints a "Description"/"Action" block naming
-    the bean and why it couldn't be created or which dependency is missing.
-- order: 2
-  cost: 15
-  content: 'Trace it: the field/constructor needing the bean lacks a matching @Component/@Bean, or two
-    candidates exist (add @Qualifier/@Primary), or a required `@Value`/property is unset in application.properties.'
-- order: 3
-  cost: 20
-  content: Fix the root cause (define/annotate the bean, disambiguate the autowire, or set the property),
-    then `java -jar app.jar` — the context starts and the app reports it's running.
+  - order: 1
+    cost: 10
+    content: "The message names the port; ss -tlnp | grep 8080 shows who holds it."
+  - order: 2
+    cost: 15
+    content: "Stop the conflicting process, or set server.port to a free port in application.properties."
+  - order: 3
+    cost: 20
+    content: "Restart and confirm 'Tomcat started on port(s)' with no bind error."

@@ -1,0 +1,78 @@
+title: Implement parseQueryString
+slug: js-impl-parse-query-string
+category: JavaScript Development
+description: 'Implement parseQueryString(qs): parse a URL query string into an object. Accept an optional
+  leading ''?''. Split on ''&'', then on the first ''=''. URL-decode keys and values (decodeURIComponent).
+  A key with no ''='' maps to ''''. Ignore empty segments. The stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Strip an optional leading '?' and split on '&'
+- Split each pair on the FIRST '=' and decode both sides
+- Map a bare key to '' and skip empty segments
+initial_state: 'Implement parseQueryString(qs): parse a URL query string into an object. Accept an optional
+  leading ''?''. Split on ''&'', then on the first ''=''. URL-decode keys and values (decodeURIComponent).
+  A key with no ''='' maps to ''''. Ignore empty segments. The stub is empty so tests fail.'
+solution_explanation: |
+  After stripping an optional '?', the string is split on '&'; each non-empty pair is split at its first '=' and both halves are URL-decoded, with a bare key mapping to an empty string.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement parseQueryString(qs) -> { key: value }.
+      parseQueryString('?a=1&b=2') -> {a:'1', b:'2'}
+      parseQueryString('q=hello%20world') -> {q:'hello world'}
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function parseQueryString(qs) {
+        // TODO: parse a query string into an object (handle '?', '&', '=', decoding)
+      }
+    readonly: false
+  visible_tests:
+  - name: basic pairs
+    code: |
+      assert(JSON.stringify(parseQueryString('?a=1&b=2')) === JSON.stringify({a:'1', b:'2'}), JSON.stringify(parseQueryString('?a=1&b=2')));
+  - name: decodes percent-encoding
+    code: |
+      assert(JSON.stringify(parseQueryString('q=hello%20world')) === JSON.stringify({q:'hello world'}), JSON.stringify(parseQueryString('q=hello%20world')));
+  hidden_tests:
+  - name: no leading question mark
+    code: |
+      assert(JSON.stringify(parseQueryString('x=10&y=20')) === JSON.stringify({x:'10', y:'20'}), JSON.stringify(parseQueryString('x=10&y=20')));
+  - name: empty string
+    code: |
+      assert(JSON.stringify(parseQueryString('')) === JSON.stringify({}), JSON.stringify(parseQueryString('')));
+  - name: bare key maps to empty
+    code: |
+      assert(JSON.stringify(parseQueryString('flag')) === JSON.stringify({flag:''}), JSON.stringify(parseQueryString('flag')));
+  - name: value containing equals
+    code: |
+      assert(JSON.stringify(parseQueryString('eq=a=b')) === JSON.stringify({eq:'a=b'}), JSON.stringify(parseQueryString('eq=a=b')));
+  - name: decodes keys too
+    code: |
+      assert(JSON.stringify(parseQueryString('a%20b=c')) === JSON.stringify({'a b':'c'}), JSON.stringify(parseQueryString('a%20b=c')));
+  - name: skips empty segments
+    code: |
+      assert(JSON.stringify(parseQueryString('a=1&&b=2')) === JSON.stringify({a:'1', b:'2'}), JSON.stringify(parseQueryString('a=1&&b=2')));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: If the string starts with '?', drop it; an empty remainder means {}.
+- order: 2
+  cost: 20
+  content: Split on '&'; for each pair, find the FIRST '=' (indexOf) so values may contain '='.
+- order: 3
+  cost: 30
+  content: decodeURIComponent both the key and the value; a pair with no '=' has value ''.

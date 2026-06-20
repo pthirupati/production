@@ -1,0 +1,87 @@
+title: Implement retry with Backoff (Synchronous)
+slug: js-impl-retry-backoff
+category: JavaScript Development
+description: 'Implement retry(fn, maxAttempts, onWait): call the synchronous fn; if it throws, retry up
+  to maxAttempts total attempts. Before each RETRY (not the first attempt), call onWait(attemptNumber)
+  so a caller can observe the backoff schedule. Return fn''s value on success; if all attempts throw,
+  rethrow the last error. The stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Attempt fn and return its value on success
+- Retry on throw up to maxAttempts, signalling each wait via onWait
+- Rethrow the final error if every attempt fails
+initial_state: 'Implement retry(fn, maxAttempts, onWait): call the synchronous fn; if it throws, retry
+  up to maxAttempts total attempts. Before each RETRY (not the first attempt), call onWait(attemptNumber)
+  so a caller can observe the backoff schedule. Return fn''s value on success; if all attempts throw,
+  rethrow the last error. The stub is empty so tests fail.'
+solution_explanation: |
+  A loop tries fn each attempt, returning on success. On failure it records the error and, when attempts remain, signals onWait(attempt) for the backoff. If the loop ends without success, the last error is rethrown.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement retry(fn, maxAttempts, onWait) -> fn's result, retrying on throw. Call onWait(n) before the n-th retry (n starts at 1). Rethrow the last error if all attempts fail.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function retry(fn, maxAttempts, onWait) {
+        // TODO: call fn; on throw, retry up to maxAttempts, onWait(n) before each retry
+      }
+    readonly: false
+  visible_tests:
+  - name: succeeds after failures
+    code: |
+      let n = 0;
+      const r = retry(() => { n++; if (n < 3) throw new Error('no'); return 'ok'; }, 5, () => {});
+      assert(r === 'ok' && n === 3, 'r=' + r + ' n=' + n);
+  - name: first try success calls fn once
+    code: |
+      let n = 0;
+      const r = retry(() => { n++; return 42; }, 3, () => {});
+      assert(r === 42 && n === 1, 'n=' + n);
+  hidden_tests:
+  - name: rethrows after exhausting attempts
+    code: |
+      let threw = false; let n = 0;
+      try { retry(() => { n++; throw new Error('always'); }, 3, () => {}); }
+      catch (e) { threw = (e.message === 'always'); }
+      assert(threw && n === 3, 'threw=' + threw + ' n=' + n);
+  - name: onWait called once per retry, not before first
+    code: |
+      let waits = [];
+      let n = 0;
+      retry(() => { n++; if (n < 3) throw new Error('x'); return 1; }, 5, (a) => waits.push(a));
+      assert(JSON.stringify(waits) === JSON.stringify([1, 2]), 'waits=' + JSON.stringify(waits));
+  - name: no wait on immediate success
+    code: |
+      let waited = false;
+      retry(() => 'done', 3, () => { waited = true; });
+      assert(waited === false, 'should not wait on success');
+  - name: single attempt rethrows without waiting
+    code: |
+      let waited = false; let threw = false;
+      try { retry(() => { throw new Error('one'); }, 1, () => { waited = true; }); }
+      catch (e) { threw = true; }
+      assert(threw && waited === false, 'threw=' + threw + ' waited=' + waited);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Loop attempt from 1 to maxAttempts; return fn() inside a try.
+- order: 2
+  cost: 20
+  content: On catch, remember the error; if more attempts remain, call onWait(attempt).
+- order: 3
+  cost: 30
+  content: After the loop (all failed), throw the last error you saved.

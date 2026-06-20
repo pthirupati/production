@@ -1,0 +1,78 @@
+title: Fix the Stateful Global Regex in isHex
+slug: js-fix-regex-global-lastindex
+category: JavaScript Development
+description: isHex(s) should return whether s is a string of one or more hex digits, but it reuses a single
+  regex literal declared with the global (g) flag and calls .test() on it. A global regex keeps lastIndex
+  between calls, so repeated tests of the SAME string alternate true/false. Fix it so each call is independent
+  (drop the g flag, or reset/avoid shared state).
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Reproduce the alternating true/false on repeated calls
+- Understand that /g regexes carry lastIndex across .test()
+- Make every call independent and correct
+initial_state: isHex(s) should return whether s is a string of one or more hex digits, but it reuses a
+  single regex literal declared with the global (g) flag and calls .test() on it. A global regex keeps
+  lastIndex between calls, so repeated tests of the SAME string alternate true/false. Fix it so each call
+  is independent (drop the g flag, or reset/avoid shared state).
+solution_explanation: |
+  A global-flag regex remembers lastIndex between .test() calls, so it alternates results for the same input. Removing the g flag makes each match start from the beginning, so the test is stateless and correct.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix isHex(s): return true iff s is one or more hex digits (0-9a-fA-F). Repeated calls with the same input must give the same answer.
+      isHex('1a2f') -> true (every time)
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      const HEX = /^[0-9a-f]+$/gi; // global flag => stateful lastIndex
+
+      function isHex(s) {
+        return HEX.test(s); // alternates true/false on repeated same input
+      }
+    readonly: false
+  visible_tests:
+  - name: valid hex
+    code: |
+      assert(isHex('1a2f') === true, 'should be hex');
+  - name: stable on repeat
+    code: |
+      assert(isHex('1a2f') === true && isHex('1a2f') === true && isHex('1a2f') === true, 'must not alternate');
+  hidden_tests:
+  - name: uppercase hex
+    code: |
+      assert(isHex('FF') === true);
+  - name: non-hex
+    code: |
+      assert(isHex('xyz') === false);
+  - name: empty is false
+    code: |
+      assert(isHex('') === false);
+  - name: repeated non-hex stable
+    code: |
+      assert(isHex('zz') === false && isHex('zz') === false);
+  - name: mixed invalid
+    code: |
+      assert(isHex('1g') === false);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Call isHex('1a2f') twice — it returns true then false. The regex is stateful.
+- order: 2
+  cost: 20
+  content: A regex with the g flag advances lastIndex on each .test(), so it desyncs across calls.
+- order: 3
+  cost: 30
+  content: Drop the g flag (use /^[0-9a-f]+$/i) or build a fresh regex each call.

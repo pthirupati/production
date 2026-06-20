@@ -1,0 +1,120 @@
+title: "Meta-Prompting: Use the Model to Improve Prompts"
+slug: meta-prompting
+category: Prompt Engineering
+description: >-
+  One of the highest-leverage tricks in prompt engineering is to have the model
+  help write and critique your prompts. Learn to ask a model to draft a strong
+  prompt from a rough goal, and to critique an existing prompt against the
+  ingredients of good prompting — then fold its suggestions back in.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Ask the model to draft a strong prompt from a rough goal, specifying the criteria
+  - Ask the model to critique a prompt against role, context, task, constraints, and format
+  - Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: >-
+  The guided AI practice console opens with two graded meta-prompting exercises.
+  Write a prompt that asks the model to draft a prompt, then one that asks it to
+  critique a prompt. Rule-based and free — strong meta-prompts pass, vague ones
+  fail.
+solution_explanation: >-
+  Meta-prompting means prompting about prompts. Two patterns: (1) GENERATE — give
+  the model your goal and the criteria, and ask it to write the prompt: "Write a
+  prompt that would make an assistant extract invoice fields as JSON; it should
+  specify role, exact fields and types, and forbid extra text." (2) CRITIQUE —
+  paste a prompt and ask the model to evaluate it against the ingredients (role,
+  context, task, constraints, output format) and suggest concrete improvements.
+  The key is to tell the model what "good" looks like, so it has a rubric to aim
+  at. Iterate: generate, critique, revise. You can even ask for two or three
+  variants and pick the best. This turns the model into a tireless prompt-pairing
+  partner.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A prompt-engineering assistant that drafts and critiques prompts on request.
+    lesson:
+      - heading: Ask it to write the prompt
+        body: >-
+          Instead of laboring over wording yourself, describe the goal and the
+          must-haves, then ask the model to produce the prompt. "Write a system
+          prompt for a support bot. It must: assign a role, list the in-scope
+          topics, and instruct a polite refusal for everything else." Naming the
+          criteria gives the model a target — without them you get a generic
+          draft.
+      - heading: Ask it to critique and improve
+        body: >-
+          Paste an existing prompt and ask for a structured critique: "Evaluate
+          this prompt against role, context, task, constraints, and output format.
+          List what's missing and rewrite it to fix the gaps." A model is good at
+          spotting an absent length cap or a vague task — exactly the things that
+          make prompts underperform.
+      - heading: Generate, critique, iterate
+        body: >-
+          The loop is generate -> critique -> revise. Ask for two or three
+          variants and compare. Have the model explain WHY one is stronger. You
+          stay the editor with judgment and ground truth; the model does the
+          tireless drafting. This is the fastest way to go from a rough idea to a
+          tight, tested prompt.
+    rubric: [task, constraints, specificity]
+    exercises:
+      - id: ask-to-draft
+        title: "Graded: ask the model to draft a prompt"
+        goal: >-
+          Write a meta-prompt that asks the model to WRITE a prompt for a stated
+          goal, and that names the criteria the generated prompt must satisfy
+          (e.g. role, a length or output-format constraint, specific fields).
+        starter: Help me write a better prompt.
+        success:
+          min_words: 16
+          any_of:
+            - ["write a prompt", "draft a prompt", "generate a prompt", "create a prompt", "produce a prompt", "write me a prompt", "design a prompt"]
+          require:
+            - ["role", "constraint", "format", "length", "limit", "field", "should include", "must include", "criteria", "include"]
+        success_response: >-
+          Here's a prompt you can use: "You are a support agent. Answer only
+          billing questions in under 60 words, as 3 bullets; politely decline
+          anything off-topic and point the user to support@acme.com."
+        partial_response: >-
+          Tell the model to WRITE the prompt, and name what it must contain. "Draft
+          a prompt for X that specifies a role, a length limit, and the output
+          format." Without criteria you'll get a generic draft.
+      - id: ask-to-critique
+        title: "Graded: ask the model to critique a prompt"
+        goal: >-
+          Write a meta-prompt that asks the model to CRITIQUE an existing prompt
+          against the ingredients of good prompting (role, context, task,
+          constraints, format) and suggest specific improvements.
+        starter: ""
+        success:
+          min_words: 14
+          any_of:
+            - ["critique", "evaluate", "review", "assess", "improve", "what's missing", "whats missing", "rewrite", "feedback", "score"]
+          require:
+            - ["role", "context", "task", "constraint", "format", "length", "ingredient", "audience", "output"]
+        success_response: >-
+          Critique: the prompt names a task but has no role, no length limit, and
+          no output format. Add a role, cap it at 100 words, and request bullets.
+        partial_response: >-
+          Ask the model to critique against specific dimensions. "Evaluate this
+          prompt for role, context, task, constraints, and output format; list
+          what's missing and rewrite it." Naming the rubric makes the feedback
+          actionable.
+hints:
+  - content: Don't hand-wordsmith — describe the goal and the must-haves, then ask the model to write the prompt for you.
+    cost: 10
+    order: 1
+  - content: For critique, give the model a rubric. "Evaluate this prompt for role, context, task, constraints, and format; list gaps and rewrite."
+    cost: 15
+    order: 2
+  - content: Run the loop generate -> critique -> revise, and ask for two or three variants so you can compare and pick the strongest.
+    cost: 20
+    order: 3

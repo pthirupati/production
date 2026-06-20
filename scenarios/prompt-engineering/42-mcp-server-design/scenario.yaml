@@ -1,0 +1,120 @@
+title: "Designing an MCP Server"
+slug: mcp-server-design
+category: Prompt Engineering
+description: >-
+  The Model Context Protocol (MCP) is the open standard that lets AI assistants
+  plug into your tools, data, and prompts through one consistent interface.
+  Designing a good MCP server is mostly good tool design: clear tools, clean
+  resources, and tight schemas. Learn the principles and practice describing them.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Explain what an MCP server exposes (tools, resources, prompts) and why it standardizes integration
+  - Design a focused MCP tool with a clear purpose, a trigger, and a typed input schema
+  - Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: >-
+  The guided AI practice console opens with two graded exercises on MCP server
+  design. Describe what a server exposes, then design a focused tool with a typed
+  schema. Rule-based and free — strong designs pass, vague ones fail.
+solution_explanation: >-
+  An MCP server exposes three things over a standard protocol: TOOLS (actions the
+  model can invoke, each with a name, description, and JSON input schema),
+  RESOURCES (read-only data the model can pull in, like files or records), and
+  PROMPTS (reusable templates). The value is standardization — write the server
+  once and any MCP-aware client can use it. Good server design is good tool
+  design: small, non-overlapping tools; descriptions that say WHEN to call each
+  one; tight typed schemas; and least-privilege (read-only where possible,
+  confirmation for destructive actions). On the Claude side you declare a remote
+  server as {type, name, url}; credentials live separately (e.g. in a vault), not
+  in the server definition.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: An assistant that connects to MCP servers exposing tools, resources, and prompts.
+    lesson:
+      - heading: What a server exposes
+        body: >-
+          An MCP server offers a standard menu: TOOLS (callable actions with typed
+          inputs — e.g. create_ticket, search_docs), RESOURCES (read-only context
+          the model can load, like a file or a record by URI), and PROMPTS
+          (named, reusable templates). A client connects, lists what's available,
+          and uses it. Because the protocol is standard, one server works across
+          many clients.
+      - heading: Design tools, not a kitchen sink
+        body: >-
+          The same rules as any tool design apply, doubled. Keep each tool focused
+          and non-overlapping; give it a name that reads like an action; write a
+          description that states WHEN to call it; and define a precise input
+          schema (names, types, required fields). A server with 40 vague,
+          overlapping tools is harder for a model to use than five sharp ones.
+      - heading: Least privilege and clean wiring
+        body: >-
+          Expose read-only resources where you can; gate destructive or
+          irreversible actions behind explicit, confirmable tools. Keep secrets
+          OUT of the tool definitions — when Claude connects to a remote MCP
+          server you declare {type, name, url} and supply credentials separately
+          (e.g. via a vault), so the schema you publish never carries a token.
+    rubric: [task, constraints, format, specificity]
+    exercises:
+      - id: describe-server-surface
+        title: "Graded: describe an MCP server's surface"
+        goal: >-
+          In a few sentences, describe what an MCP server you'd build exposes —
+          name at least one tool, and mention resources and/or prompts — and say
+          why exposing it over MCP is useful (standard interface, reusable across
+          clients).
+        starter: ""
+        success:
+          min_words: 16
+          any_of:
+            - ["tool", "tools", "resource", "resources", "prompt", "prompts"]
+          require:
+            - ["standard", "standardize", "standardized", "any client", "reusable", "reuse", "interface", "protocol", "plug", "connect", "interoperable"]
+        success_response: >-
+          Connected to the docs MCP server. It exposes a search_docs tool, a
+          read-only resource for each doc by URI, and a "summarize_doc" prompt
+          template — usable from any MCP client.
+        partial_response: >-
+          Name what the server exposes — at least one tool, plus resources and/or
+          prompts — and say why MCP helps: it's a standard interface, so the same
+          server works across any MCP-aware client without custom glue.
+      - id: design-focused-tool
+        title: "Graded: design one focused MCP tool"
+        goal: >-
+          Design a single MCP tool: give it an action-style name, say WHEN the
+          model should call it, and specify a typed input schema (parameter names
+          and JSON types).
+        starter: ""
+        success:
+          min_words: 14
+          require:
+            - ["when", "call this", "use this", "use it when", "trigger", "should call", "call when"]
+          any_of:
+            - ["string", "integer", "boolean", "enum", "array", "object", "type", "required", "schema", "parameter", "input"]
+        success_response: >-
+          Tool: create_ticket — call this when the user asks to file a bug.
+          Input: title (string, required), severity (enum: low/medium/high),
+          description (string).
+        partial_response: >-
+          Good — now make it concrete. Give the tool an action name, a trigger
+          ("call this when..."), and a typed input schema (e.g. title: string,
+          severity: enum). When + types is what makes the tool usable.
+hints:
+  - content: An MCP server exposes tools (actions), resources (read-only data), and prompts (templates) over one standard protocol — write once, use from any client.
+    cost: 10
+    order: 1
+  - content: Good server design is good tool design — small, non-overlapping tools, each with a trigger ("call when...") and a typed input schema.
+    cost: 15
+    order: 2
+  - content: Keep secrets out of the schema. When Claude connects to a remote server you declare {type, name, url} and supply credentials separately, so published tools never carry a token. Favor read-only resources; gate destructive tools.
+    cost: 20
+    order: 3

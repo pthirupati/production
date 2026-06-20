@@ -1,0 +1,32 @@
+---
+slug: java-maven-surefire-no-tests
+title: "Maven Surefire Runs Zero Tests (Green But Untested)"
+technology: Java
+category: "Maven Build"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  CI reports BUILD SUCCESS but 'Tests run: 0' — the test suite never executes, so regressions ship unnoticed. The surefire plugin's include pattern does not match the JUnit 5 test class naming, and the JUnit platform engine is missing. Fix the surefire configuration so tests actually run.
+objectives:
+  - "Confirm surefire reports zero tests run despite tests existing"
+  - "Align surefire <includes> with the test class naming"
+  - "Ensure the JUnit platform/engine dependency is present"
+  - "Verify the real test count is now executed"
+initial_state: |
+  POM at /app/pom.xml has a surefire include pattern that misses the test classes and no junit-jupiter engine; mvn test runs 0 tests.
+hints:
+  - order: 1
+    cost: 10
+    content: "Surefire 'Tests run: 0' with tests in src/test = pattern or engine mismatch."
+  - order: 2
+    cost: 15
+    content: "Set surefire <includes> to **/*Test.java (or whatever the classes are named)."
+  - order: 3
+    cost: 20
+    content: "Add junit-jupiter-engine so the JUnit 5 platform actually discovers tests."

@@ -1,0 +1,32 @@
+---
+slug: java-runtime-version-mismatch
+title: "UnsupportedClassVersionError — Compiled for a Newer JDK"
+technology: Java
+category: "Java Development"
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  The app crashes at startup with 'UnsupportedClassVersionError: ... has been compiled by a more recent version of the Java Runtime (class file version 61.0), this version of the Java Runtime only recognizes class file versions up to 55.0'. The build targets a newer bytecode level than the runtime JRE. Align the compiler release with the runtime.
+objectives:
+  - "Decode the class file version error to source/target JDK levels"
+  - "Set the Maven compiler release to match the runtime JRE"
+  - "Rebuild so bytecode targets the supported version"
+  - "Verify the app starts without the version error"
+initial_state: |
+  POM at /app/pom.xml sets maven.compiler.release above the JRE used to run the app, producing UnsupportedClassVersionError at startup.
+hints:
+  - order: 1
+    cost: 10
+    content: "Class file version 61 = Java 17, 55 = Java 11 — the runtime is older than the build."
+  - order: 2
+    cost: 15
+    content: "Set <maven.compiler.release> to the runtime JDK (or upgrade the JRE)."
+  - order: 3
+    cost: 20
+    content: "Rebuild and confirm the bytecode major version is now accepted."

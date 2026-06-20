@@ -1,0 +1,32 @@
+---
+slug: java-stack-overflow-recursion
+title: "StackOverflowError From Unbounded Recursion"
+technology: Java
+category: "Java Development"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  A recursive method blows the stack with java.lang.StackOverflowError on deep/cyclic input because it has no base case for a cycle and recurses without bound. Fix the algorithm — add the missing termination/cycle guard (or convert to iteration) so deep structures are handled without overflowing the stack.
+objectives:
+  - "Reproduce the StackOverflowError and read the repeating frame"
+  - "Identify the missing base case / cycle guard"
+  - "Add termination (or convert recursion to an explicit stack)"
+  - "Verify deep/cyclic input is processed without overflow"
+initial_state: |
+  TreeWalker at /app/src/main/java/com/example/util/TreeWalker.java recurses without a cycle guard; cyclic input causes StackOverflowError.
+hints:
+  - order: 1
+    cost: 10
+    content: "The trace repeats the same method frame — that is the runaway recursion."
+  - order: 2
+    cost: 15
+    content: "Add the missing base case / visited-set so cycles terminate."
+  - order: 3
+    cost: 20
+    content: "For very deep inputs, rewrite with an explicit stack to avoid the JVM stack limit."

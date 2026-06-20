@@ -3500,3 +3500,462 @@ _PRESETS: dict[str, callable] = {
     "db-mysql-table-crashed": _preset_mysql_table_crashed,
     "db-postgres-disk-full-archive": _preset_postgres_disk_full_archive,
 }
+
+
+
+
+# === Java/Security simulation-marker scenarios (generated) ===
+
+def _preset_jsm_actuator_health_failing(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for actuator-health-failing\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_sim_java_classpath(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/run-app.sh')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/run-app.sh', '# broken configuration for sim-java-classpath\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_sim_java_compile_error(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/java/com/example/App.java')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/java/com/example/App.java', '# broken configuration for sim-java-compile-error\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_container_startup_probe(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/k8s/deployment.yaml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/k8s/deployment.yaml', '# broken configuration for container-startup-probe\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_sim_java_deadlock(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/java/com/example/TransferService.java')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/java/com/example/TransferService.java', '# broken configuration for sim-java-deadlock\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_gc_pause_excessive(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/jvm.options')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/jvm.options', '# broken configuration for gc-pause-excessive\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_gradle_build_cache_corrupt(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/root/.gradle/gradle.properties')
+    if d:
+        state._mkdir(d)
+    state._write_file('/root/.gradle/gradle.properties', '# broken configuration for gradle-build-cache-corrupt\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_jacoco_coverage_missing(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/pom.xml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/pom.xml', '# broken configuration for jacoco-coverage-missing\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_jpa_n_plus_1(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for jpa-n-plus-1\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_junit_flaky_test(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/test/java/com/example/OrderServiceTest.java')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/test/java/com/example/OrderServiceTest.java', '# broken configuration for junit-flaky-test\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_jvm_heap_oom(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/jvm.options')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/jvm.options', '# broken configuration for jvm-heap-oom\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_jvm_metaspace_oom(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/jvm.options')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/jvm.options', '# broken configuration for jvm-metaspace-oom\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_jwt_token_expired(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for jwt-token-expired\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_kafka_producer_timeout(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for kafka-producer-timeout\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_log4j_config_missing(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/log4j2.xml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/log4j2.xml', '# broken configuration for log4j-config-missing\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_sim_java_maven_fail(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/pom.xml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/pom.xml', '# broken configuration for sim-java-maven-fail\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_maven_dependency_conflict(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/pom.xml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/pom.xml', '# broken configuration for maven-dependency-conflict\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_sim_java_oom(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/jvm.options')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/jvm.options', '# broken configuration for sim-java-oom\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_rabbitmq_consumer_stuck(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for rabbitmq-consumer-stuck\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_redis_jedis_connection(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for redis-jedis-connection\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_spring_boot_startup_fail(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for spring-boot-startup-fail\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_spring_db_connection_pool(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for spring-db-connection-pool\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_sim_java_spring_fail(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.properties')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.properties', '# broken configuration for sim-java-spring-fail\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_ssl_handshake_failed(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for ssl-handshake-failed\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_thread_deadlock(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/java/com/example/CacheManager.java')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/java/com/example/CacheManager.java', '# broken configuration for thread-deadlock\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_tomcat_max_threads(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for tomcat-max-threads\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_gradle_wrapper_version_mismatch(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/gradle/wrapper/gradle-wrapper.properties')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/gradle/wrapper/gradle-wrapper.properties', '# broken configuration for java-gradle-wrapper-version-mismatch\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_spring_circular_dependency(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/java/com/example/config/BeanConfig.java')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/java/com/example/config/BeanConfig.java', '# broken configuration for java-spring-circular-dependency\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_logback_rolling_policy(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/logback-spring.xml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/logback-spring.xml', '# broken configuration for java-logback-rolling-policy\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_maven_surefire_no_tests(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/pom.xml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/pom.xml', '# broken configuration for java-maven-surefire-no-tests\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_jdbc_pool_leak(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/java/com/example/repo/ReportDao.java')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/java/com/example/repo/ReportDao.java', '# broken configuration for java-jdbc-pool-leak\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_hibernate_lazy_init_exception(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for java-hibernate-lazy-init-exception\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_spring_profile_not_active(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for java-spring-profile-not-active\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_jackson_serialization_loop(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/java/com/example/model/Order.java')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/java/com/example/model/Order.java', '# broken configuration for java-jackson-serialization-loop\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_runtime_version_mismatch(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/pom.xml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/pom.xml', '# broken configuration for java-runtime-version-mismatch\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_spring_cors_misconfigured(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/java/com/example/config/WebConfig.java')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/java/com/example/config/WebConfig.java', '# broken configuration for java-spring-cors-misconfigured\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_maven_shade_plugin_manifest(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/pom.xml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/pom.xml', '# broken configuration for java-maven-shade-plugin-manifest\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_spring_scheduler_not_running(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/java/com/example/jobs/CleanupJob.java')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/java/com/example/jobs/CleanupJob.java', '# broken configuration for java-spring-scheduler-not-running\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_direct_buffer_oom(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/jvm.options')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/jvm.options', '# broken configuration for java-direct-buffer-oom\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_spring_actuator_exposed(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for java-spring-actuator-exposed\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_keystore_wrong_password(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for java-keystore-wrong-password\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_gradle_dependency_conflict(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/build.gradle')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/build.gradle', '# broken configuration for java-gradle-dependency-conflict\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_spring_transaction_rollback(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/java/com/example/service/PaymentService.java')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/java/com/example/service/PaymentService.java', '# broken configuration for java-spring-transaction-rollback\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_ssl_protocol_disabled(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for java-ssl-protocol-disabled\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_spring_property_placeholder(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for java-spring-property-placeholder\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_stack_overflow_recursion(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/java/com/example/util/TreeWalker.java')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/java/com/example/util/TreeWalker.java', '# broken configuration for java-stack-overflow-recursion\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_spring_bean_override_conflict(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for java-spring-bean-override-conflict\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_truststore_expired_cert(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/application.yml')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/application.yml', '# broken configuration for java-truststore-expired-cert\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_java_gradle_test_task_skipped(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/build.gradle')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/build.gradle', '# broken configuration for java-gradle-test-task-skipped\n# this file needs the documented fix\n')
+
+
+def _preset_jsm_security_java_log4shell_jndi_lookup(state: RHELOSState) -> None:
+    import os
+    d = os.path.dirname('/app/src/main/resources/log4j2.component.properties')
+    if d:
+        state._mkdir(d)
+    state._write_file('/app/src/main/resources/log4j2.component.properties', '# broken configuration for security-java-log4shell-jndi-lookup\n# this file needs the documented fix\n')
+
+_JSM_PRESETS = {
+    'actuator-health-failing': _preset_jsm_actuator_health_failing,
+    'sim-java-classpath': _preset_jsm_sim_java_classpath,
+    'sim-java-compile-error': _preset_jsm_sim_java_compile_error,
+    'container-startup-probe': _preset_jsm_container_startup_probe,
+    'sim-java-deadlock': _preset_jsm_sim_java_deadlock,
+    'gc-pause-excessive': _preset_jsm_gc_pause_excessive,
+    'gradle-build-cache-corrupt': _preset_jsm_gradle_build_cache_corrupt,
+    'jacoco-coverage-missing': _preset_jsm_jacoco_coverage_missing,
+    'jpa-n-plus-1': _preset_jsm_jpa_n_plus_1,
+    'junit-flaky-test': _preset_jsm_junit_flaky_test,
+    'jvm-heap-oom': _preset_jsm_jvm_heap_oom,
+    'jvm-metaspace-oom': _preset_jsm_jvm_metaspace_oom,
+    'jwt-token-expired': _preset_jsm_jwt_token_expired,
+    'kafka-producer-timeout': _preset_jsm_kafka_producer_timeout,
+    'log4j-config-missing': _preset_jsm_log4j_config_missing,
+    'sim-java-maven-fail': _preset_jsm_sim_java_maven_fail,
+    'maven-dependency-conflict': _preset_jsm_maven_dependency_conflict,
+    'sim-java-oom': _preset_jsm_sim_java_oom,
+    'rabbitmq-consumer-stuck': _preset_jsm_rabbitmq_consumer_stuck,
+    'redis-jedis-connection': _preset_jsm_redis_jedis_connection,
+    'spring-boot-startup-fail': _preset_jsm_spring_boot_startup_fail,
+    'spring-db-connection-pool': _preset_jsm_spring_db_connection_pool,
+    'sim-java-spring-fail': _preset_jsm_sim_java_spring_fail,
+    'ssl-handshake-failed': _preset_jsm_ssl_handshake_failed,
+    'thread-deadlock': _preset_jsm_thread_deadlock,
+    'tomcat-max-threads': _preset_jsm_tomcat_max_threads,
+    'java-gradle-wrapper-version-mismatch': _preset_jsm_java_gradle_wrapper_version_mismatch,
+    'java-spring-circular-dependency': _preset_jsm_java_spring_circular_dependency,
+    'java-logback-rolling-policy': _preset_jsm_java_logback_rolling_policy,
+    'java-maven-surefire-no-tests': _preset_jsm_java_maven_surefire_no_tests,
+    'java-jdbc-pool-leak': _preset_jsm_java_jdbc_pool_leak,
+    'java-hibernate-lazy-init-exception': _preset_jsm_java_hibernate_lazy_init_exception,
+    'java-spring-profile-not-active': _preset_jsm_java_spring_profile_not_active,
+    'java-jackson-serialization-loop': _preset_jsm_java_jackson_serialization_loop,
+    'java-runtime-version-mismatch': _preset_jsm_java_runtime_version_mismatch,
+    'java-spring-cors-misconfigured': _preset_jsm_java_spring_cors_misconfigured,
+    'java-maven-shade-plugin-manifest': _preset_jsm_java_maven_shade_plugin_manifest,
+    'java-spring-scheduler-not-running': _preset_jsm_java_spring_scheduler_not_running,
+    'java-direct-buffer-oom': _preset_jsm_java_direct_buffer_oom,
+    'java-spring-actuator-exposed': _preset_jsm_java_spring_actuator_exposed,
+    'java-keystore-wrong-password': _preset_jsm_java_keystore_wrong_password,
+    'java-gradle-dependency-conflict': _preset_jsm_java_gradle_dependency_conflict,
+    'java-spring-transaction-rollback': _preset_jsm_java_spring_transaction_rollback,
+    'java-ssl-protocol-disabled': _preset_jsm_java_ssl_protocol_disabled,
+    'java-spring-property-placeholder': _preset_jsm_java_spring_property_placeholder,
+    'java-stack-overflow-recursion': _preset_jsm_java_stack_overflow_recursion,
+    'java-spring-bean-override-conflict': _preset_jsm_java_spring_bean_override_conflict,
+    'java-truststore-expired-cert': _preset_jsm_java_truststore_expired_cert,
+    'java-gradle-test-task-skipped': _preset_jsm_java_gradle_test_task_skipped,
+    'security-java-log4shell-jndi-lookup': _preset_jsm_security_java_log4shell_jndi_lookup,
+}
+
+_PRESETS.update(_JSM_PRESETS)

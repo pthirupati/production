@@ -1,35 +1,32 @@
-title: Maven Build Failure
+---
 slug: sim-java-maven-fail
-category: Java Development
-difficulty: medium
-description: '`mvn package` fails because a declared dependency can''t be resolved from any configured
-  repository ("Could not resolve dependencies ... Failure to find"). The pom.xml has a wrong groupId/artifactId/version
-  (or a missing repository), so Maven can''t download it. Correct the dependency coordinates so the build
-  resolves and packages.'
-initial_state: Simulated RHEL 9 server with a Maven project whose pom.xml declares a dependency that doesn't
-  exist in any repo, so `mvn package` fails at dependency resolution.
+title: "Maven Build Failing — Unresolved Dependency / Bad POM"
+technology: Java
+category: "Maven Build"
+difficulty: easy
+time_limit: 600
+max_score: 100
 lab_mode: simulation
 simulation_type: java
-is_free: false
+infrastructure_type: simulation
 jira_priority: Medium
-max_score: 100
-time_limit: 900
-dual_terminal: false
-requires_companion_hosts: false
+is_free: false
+description: |
+  mvn package fails: a dependency cannot be resolved or the POM has an invalid element, so the reactor never reaches the package phase. Read the Maven error, repair the POM (coordinates, version, or repository), and get a clean BUILD SUCCESS with an artifact under target/.
 objectives:
-- Run the build and read which dependency fails to resolve
-- Identify the wrong coordinates (groupId/artifactId/version) in pom.xml
-- Fix the dependency so mvn package builds successfully
+  - "Run mvn package and read the first BUILD FAILURE cause"
+  - "Fix the unresolved dependency or invalid POM element"
+  - "Re-run until BUILD SUCCESS"
+  - "Confirm the artifact exists under target/"
+initial_state: |
+  Maven POM at /app/pom.xml has an unresolvable dependency / invalid element; mvn package exits with BUILD FAILURE.
 hints:
-- order: 1
-  cost: 10
-  content: 'Build to see the failure: `mvn package` reports "Failure to find <group>:<artifact>:<version>".
-    Inspect the tree/effective pom: `mvn dependency:tree`.'
-- order: 2
-  cost: 15
-  content: Open pom.xml and compare the failing dependency's groupId/artifactId/version against the real
-    coordinates (check Maven Central). A typo or non-existent version is the cause.
-- order: 3
-  cost: 20
-  content: Correct the coordinates (and add the right `<repository>` if it's not on Central), then `mvn
-    package` — dependency resolution succeeds and the JAR is built under target/.
+  - order: 1
+    cost: 10
+    content: "mvn package -e shows whether it is a resolution error or a malformed POM element."
+  - order: 2
+    cost: 15
+    content: "Correct the dependency coordinates/version (or add the right repository)."
+  - order: 3
+    cost: 20
+    content: "Re-run mvn package; on BUILD SUCCESS confirm ls target/*.jar."

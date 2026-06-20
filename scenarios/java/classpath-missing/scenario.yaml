@@ -1,35 +1,32 @@
-title: ClassNotFoundException Fix
+---
 slug: sim-java-classpath
-category: Java Development
+title: "ClassNotFoundException — Missing JAR on the Runtime Classpath"
+technology: Java
+category: "Java Development"
 difficulty: easy
-description: A Java application fails at runtime with java.lang.ClassNotFoundException (or NoClassDefFoundError).
-  A required class lives in a JAR that isn't on the runtime classpath, so the JVM can't load it when that
-  code path executes. Identify the missing dependency JAR and run the app with the correct classpath so
-  the class resolves.
-initial_state: Simulated RHEL 9 server with a Java app whose dependency JARs are in lib/. At runtime it
-  throws ClassNotFoundException because that JAR isn't included on the classpath.
+time_limit: 600
+max_score: 100
 lab_mode: simulation
 simulation_type: java
-is_free: false
+infrastructure_type: simulation
 jira_priority: Medium
-max_score: 100
-time_limit: 900
-dual_terminal: false
-requires_companion_hosts: false
+is_free: false
+description: |
+  A Java application fails at runtime with java.lang.ClassNotFoundException (or NoClassDefFoundError). A required class lives in a JAR under lib/ that is not on the runtime classpath, so the JVM cannot load it when that code path runs. Identify the missing dependency JAR and launch the app with a correct -cp.
 objectives:
-- Read the exception to find the missing fully-qualified class name
-- Locate the JAR providing that class (in lib/)
-- Run the app with the correct classpath so it no longer throws ClassNotFoundException
+  - "Reproduce the ClassNotFoundException and read the missing class name"
+  - "Locate the JAR under lib/ that provides the missing class"
+  - "Add that JAR to the runtime classpath in the launch command"
+  - "Run the app so the class resolves and it starts cleanly"
+initial_state: |
+  RHEL 9 server with a Java app. Dependency JARs are in lib/. The launch script /app/run-app.sh omits a JAR, so runtime throws ClassNotFoundException.
 hints:
-- order: 1
-  cost: 10
-  content: 'Run the app and read the stack trace — `ClassNotFoundException: com.example.Foo` names the
-    exact class the JVM can''t find.'
-- order: 2
-  cost: 15
-  content: 'Find which JAR contains it: `for j in lib/*.jar; do unzip -l "$j" | grep -q Foo.class && echo
-    "$j"; done`. That JAR is missing from the classpath.'
-- order: 3
-  cost: 20
-  content: 'Include all dependency JARs on the classpath: `java -cp ''.:lib/*'' Main` (the `lib/*` wildcard
-    adds every JAR). The class now loads and the app runs.'
+  - order: 1
+    cost: 10
+    content: "java -cp app.jar Main throws ClassNotFoundException — note the fully-qualified class."
+  - order: 2
+    cost: 15
+    content: "Find the JAR: for j in lib/*.jar; do unzip -l \"$j\" | grep -q TheClass && echo \"$j\"; done."
+  - order: 3
+    cost: 20
+    content: "Launch with every JAR on the classpath: java -cp 'app.jar:lib/*' com.example.Main."

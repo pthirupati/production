@@ -1,10 +1,10 @@
 ---
 slug: jpa-n-plus-1
-title: "Hibernate N+1 Query Problem — API Response Time 10x Slower"
+title: "JPA N+1 Query Storm Hammering the Database"
 technology: Java
-category: Database
+category: "Spring Data JPA"
 difficulty: hard
-time_limit: 1500
+time_limit: 1200
 max_score: 100
 lab_mode: simulation
 simulation_type: java
@@ -12,37 +12,21 @@ infrastructure_type: simulation
 jira_priority: High
 is_free: false
 description: |
-  A REST endpoint GET /api/orders that returns a list of orders with their associated
-  items is taking 8-12 seconds with 200 orders. Enabling Hibernate SQL logging reveals
-  201 SELECT queries being fired: 1 for orders, then 1 additional query per order to
-  fetch items. This classic N+1 problem occurs because the Order.items collection is
-  LAZY-loaded. Engineers must fix this using JOIN FETCH or @BatchSize.
+  Listing orders triggers hundreds of SQL queries: one for the orders plus one per order for its line items (the classic N+1 problem from lazy associations). The database is saturated and the endpoint is slow. Fetch the association eagerly for this query path with a JOIN FETCH / entity graph and enable SQL logging to prove it.
 objectives:
-  - Enable Hibernate SQL logging and count the queries fired per request
-  - Identify the LAZY-loaded association causing N+1 queries
-  - Fix with either a JOIN FETCH JPQL query or @BatchSize(size=25) on the collection
-  - Verify the request now fires 1-2 queries instead of N+1
+  - "Enable SQL logging and confirm 1 + N queries per list call"
+  - "Identify the lazily-loaded association causing the per-row queries"
+  - "Use JOIN FETCH or an @EntityGraph to batch the load"
+  - "Verify the list endpoint now issues a small constant number of queries"
 initial_state: |
-  Simulated server. Spring Boot app with JPA/Hibernate. Postgres backend.
-  Source at /opt/app/src/main/java/com/app/.
-  OrderRepository.java has a findAll() call. Order.java has @OneToMany LAZY items.
+  Config at /app/src/main/resources/application.yml has SQL logging off; the order-list path lazily loads line items, producing an N+1 query storm.
 hints:
   - order: 1
     cost: 10
-    content: "Enable SQL logging in application.yml:
-      spring.jpa.show-sql: true
-      spring.jpa.properties.hibernate.format_sql: true
-      Then call the endpoint and count the SELECT statements in the log."
+    content: "Turn on spring.jpa.show-sql / hibernate SQL logging and count the queries per request."
   - order: 2
     cost: 15
-    content: "In OrderRepository.java, replace the findAll() call with a custom query:
-      @Query(\"SELECT o FROM Order o JOIN FETCH o.items\")
-      List<Order> findAllWithItems();
-      This loads everything in a single JOIN query."
+    content: "Add a query with 'JOIN FETCH o.lineItems' or annotate the repo method @EntityGraph."
   - order: 3
     cost: 20
-    content: "Alternatively, in Order.java annotate the collection:
-      @BatchSize(size = 25)
-      @OneToMany(mappedBy = \"order\", fetch = FetchType.LAZY)
-      private List<OrderItem> items;
-      Hibernate will batch the lazy loads into groups of 25, reducing N queries to N/25."
+    content: "Or set hibernate.default_batch_fetch_size to batch lazy loads; confirm queries drop."

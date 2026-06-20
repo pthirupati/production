@@ -1,0 +1,75 @@
+title: Fix compact Dropping Valid Falsy-ish Values
+slug: js-fix-filter-truthy-predicate
+category: JavaScript Development
+description: compact(arr) should remove only null and undefined, keeping every other value (including
+  0, '', false, NaN). It currently filters with the value itself as the predicate (`arr.filter(x => x)`),
+  which also drops 0, '', false, and NaN. Fix the predicate to reject only null/undefined.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See 0, '', false, NaN wrongly removed
+- Keep all defined values, including falsy ones
+- Remove only null and undefined
+initial_state: compact(arr) should remove only null and undefined, keeping every other value (including
+  0, '', false, NaN). It currently filters with the value itself as the predicate (`arr.filter(x => x)`),
+  which also drops 0, '', false, and NaN. Fix the predicate to reject only null/undefined.
+solution_explanation: |
+  Using the value as the predicate drops every falsy value. Explicitly comparing against null and undefined keeps legitimate falsy values like 0, '', false, and NaN.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix compact(arr): return a new array with only null and undefined removed; keep 0, '', false, and NaN.
+      compact([0, null, 1, undefined, '']) -> [0, 1, '']
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function compact(arr) {
+        return arr.filter((x) => x); // also drops 0, '', false, NaN
+      }
+    readonly: false
+  visible_tests:
+  - name: keeps falsy, drops nullish
+    code: |
+      assert(JSON.stringify(compact([0, null, 1, undefined, ''])) === JSON.stringify([0, 1, '']), JSON.stringify(compact([0, null, 1, undefined, ''])));
+  - name: keeps false
+    code: |
+      assert(JSON.stringify(compact([false, null])) === JSON.stringify([false]), JSON.stringify(compact([false, null])));
+  hidden_tests:
+  - name: keeps zero
+    code: |
+      assert(JSON.stringify(compact([0, 0, null])) === JSON.stringify([0, 0]), JSON.stringify(compact([0, 0, null])));
+  - name: drops only nullish
+    code: |
+      assert(JSON.stringify(compact([1, null, 2, undefined, 3])) === JSON.stringify([1, 2, 3]), JSON.stringify(compact([1, null, 2, undefined, 3])));
+  - name: keeps NaN
+    code: |
+      const r = compact([NaN, null, 1]);
+      assert(r.length === 2 && Number.isNaN(r[0]) && r[1] === 1, JSON.stringify(r));
+  - name: nothing to drop
+    code: |
+      assert(JSON.stringify(compact([1, 2, 3])) === JSON.stringify([1, 2, 3]), JSON.stringify(compact([1, 2, 3])));
+  - name: all nullish
+    code: |
+      assert(JSON.stringify(compact([null, undefined])) === JSON.stringify([]), JSON.stringify(compact([null, undefined])));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: compact([0, '']) returns [] because 0 and '' are falsy and the predicate is just `x`.
+- order: 2
+  cost: 20
+  content: You want to remove ONLY null and undefined, not all falsy values.
+- order: 3
+  cost: 30
+  content: Filter with (x) => x !== null && x !== undefined (or x != null).

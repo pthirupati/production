@@ -1,35 +1,32 @@
-title: Deadlock Detection
+---
 slug: sim-java-deadlock
-category: Java Development
+title: "JVM Thread Deadlock Between Two Locks"
+technology: Java
+category: "Concurrency"
 difficulty: hard
-description: A multi-threaded Java application hangs indefinitely and makes no progress. Two threads have
-  each locked a resource the other needs and are waiting on each other — a classic deadlock. Capture a
-  thread dump to confirm the deadlock and identify the lock-ordering problem, then fix the synchronization
-  so the application runs to completion.
-initial_state: Simulated RHEL 9 server running a Java app that hangs. Two threads acquire two locks in
-  opposite orders, producing a deadlock so the process never finishes.
+time_limit: 1200
+max_score: 100
 lab_mode: simulation
 simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
 is_free: false
-jira_priority: Medium
-max_score: 100
-time_limit: 900
-dual_terminal: false
-requires_companion_hosts: false
+description: |
+  Two worker threads each hold one lock and wait for the other, producing a classic lock-ordering deadlock — throughput drops to zero and a thread dump shows 'Found one Java-level deadlock'. Fix the lock-acquisition order so both threads always take the locks in the same global order.
 objectives:
-- Capture a thread dump and confirm a deadlock
-- Identify the two threads and the conflicting lock order
-- Fix the synchronization (consistent lock ordering) so the app completes
+  - "Capture a thread dump and confirm the deadlock and the two locks involved"
+  - "Identify the two code paths that acquire the locks in opposite order"
+  - "Impose a single consistent global lock ordering"
+  - "Verify a fresh thread dump shows no deadlock and work resumes"
+initial_state: |
+  Service code at /app/src/main/java/com/example/TransferService.java locks accountA then accountB on one path and accountB then accountA on another.
 hints:
-- order: 1
-  cost: 10
-  content: 'Take a thread dump of the hung process: `jstack $(pgrep -f app.jar)`. jstack explicitly reports
-    "Found one Java-level deadlock" and the involved threads.'
-- order: 2
-  cost: 15
-  content: Read which monitors each thread holds vs waits for — Thread-1 holds A wants B while Thread-2
-    holds B wants A. That inconsistent lock ordering is the bug.
-- order: 3
-  cost: 20
-  content: Fix it by always acquiring locks in the SAME global order in both threads (or use a single
-    lock / tryLock with timeout). Re-run and confirm a fresh `jstack` shows no deadlock and the app finishes.
+  - order: 1
+    cost: 10
+    content: "jstack <pid> prints 'Found one Java-level deadlock' and names both threads and locks."
+  - order: 2
+    cost: 15
+    content: "The two methods take the two locks in opposite order — that is the cycle."
+  - order: 3
+    cost: 20
+    content: "Always lock in a fixed order (e.g. by account id) so no cycle can form."

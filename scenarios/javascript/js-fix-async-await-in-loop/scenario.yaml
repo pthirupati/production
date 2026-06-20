@@ -1,0 +1,75 @@
+title: Fix the Sequential await Inside forEach
+slug: js-fix-async-await-in-loop
+category: JavaScript Development
+description: runAll(tasks) should run each thunk and return an array of their results in order, but it
+  uses `forEach(async ...)` — forEach ignores the returned promises, so the function returns undefined
+  and nothing is collected. Each task here is SYNCHRONOUS (returns a value), so the fix is to collect
+  results with map and return the array. The stub returns undefined.
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See forEach swallow the per-item results
+- Collect each task's result into an array
+- Return the results in input order
+initial_state: runAll(tasks) should run each thunk and return an array of their results in order, but
+  it uses `forEach(async ...)` — forEach ignores the returned promises, so the function returns undefined
+  and nothing is collected. Each task here is SYNCHRONOUS (returns a value), so the fix is to collect
+  results with map and return the array. The stub returns undefined.
+solution_explanation: |
+  forEach evaluates each task but discards the return values and yields undefined. map collects each result into a new array, returned in order.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix runAll(tasks): call each task (a zero-arg function) and return an array of the results, in order.
+      runAll([() => 1, () => 2]) -> [1, 2]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function runAll(tasks) {
+        const out = [];
+        tasks.forEach((task) => { task(); }); // results discarded; returns undefined
+      }
+    readonly: false
+  visible_tests:
+  - name: collects results
+    code: |
+      assert(JSON.stringify(runAll([() => 1, () => 2])) === JSON.stringify([1, 2]), JSON.stringify(runAll([() => 1, () => 2])));
+  - name: returns an array
+    code: |
+      assert(Array.isArray(runAll([() => 'x'])), 'should return an array');
+  hidden_tests:
+  - name: order preserved
+    code: |
+      assert(JSON.stringify(runAll([() => 'a', () => 'b', () => 'c'])) === JSON.stringify(['a','b','c']), JSON.stringify(runAll([() => 'a', () => 'b', () => 'c'])));
+  - name: empty
+    code: |
+      assert(JSON.stringify(runAll([])) === JSON.stringify([]), JSON.stringify(runAll([])));
+  - name: computes values
+    code: |
+      const r = runAll([() => 2 + 2, () => 3 * 3]);
+      assert(r[0] === 4 && r[1] === 9, JSON.stringify(r));
+  - name: not undefined
+    code: |
+      assert(runAll([() => 1]) !== undefined, 'forEach returns undefined');
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: runAll([() => 1]) returns undefined — forEach throws away each task() result.
+- order: 2
+  cost: 20
+  content: forEach is for side effects; it never builds or returns a value.
+- order: 3
+  cost: 30
+  content: Use tasks.map((task) => task()) and return it.

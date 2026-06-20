@@ -1,42 +1,32 @@
 ---
 slug: jvm-metaspace-oom
-title: "Metaspace OOM — ClassLoader Leak Exhausting Native Memory"
+title: "OutOfMemoryError: Metaspace From Classloader Leak"
 technology: Java
-category: JVM Tuning
+category: "JVM Performance"
 difficulty: hard
-time_limit: 1500
+time_limit: 1200
 max_score: 100
 lab_mode: simulation
 simulation_type: java
 infrastructure_type: simulation
-jira_priority: Critical
+jira_priority: High
 is_free: false
 description: |
-  A Java EE application running on OpenJDK 17 is crashing every 4-6 hours with:
-  java.lang.OutOfMemoryError: Metaspace. A memory analysis reveals a custom
-  ClassLoader is loading duplicate classes on each web request without being garbage
-  collected. The Metaspace limit is also unconfigured, allowing unbounded growth.
-  Engineers must diagnose the leak with jstat, cap Metaspace, and fix the ClassLoader.
+  After repeated hot redeploys the JVM throws java.lang.OutOfMemoryError: Metaspace. Old application classloaders are never collected (a classloader leak), so loaded class metadata accumulates in Metaspace. Cap Metaspace to surface the leak early and address the retained classloaders.
 objectives:
-  - Use jstat -gcmetacapacity <pid> to observe Metaspace growth over time
-  - Identify the leaking ClassLoader class in the heap dump
-  - Add -XX:MaxMetaspaceSize=256m to cap Metaspace and force earlier GC
-  - Patch the ClassLoader to reuse instances instead of creating per-request
+  - "Confirm the OOM is Metaspace (not heap) and that class count keeps rising"
+  - "Set a Metaspace size cap so the leak is bounded and visible"
+  - "Identify the retained classloaders / static references pinning old classes"
+  - "Verify Metaspace stabilizes across redeploys"
 initial_state: |
-  Simulated server. The application PID is available at /var/run/app.pid.
-  A heap dump is available at /opt/app/heapdump.hprof for offline analysis.
-  jstat and jmap are installed and on PATH.
+  JVM flags at /app/jvm.options leave Metaspace unbounded; repeated redeploys leak classloaders until 'OutOfMemoryError: Metaspace'.
 hints:
   - order: 1
     cost: 10
-    content: "Run: jstat -gcmetacapacity $(cat /var/run/app.pid) 1000 20 to watch
-      Metaspace consumption grow. Compare MCMX and MC columns."
+    content: "jcmd <pid> GC.class_stats / VM.metaspace shows class metadata climbing each redeploy."
   - order: 2
     cost: 15
-    content: "Use jmap -histo:live $(cat /var/run/app.pid) | head -30 to list object
-      counts. Look for many instances of your custom ClassLoader class."
+    content: "Add -XX:MaxMetaspaceSize=256m so the leak fails fast instead of swallowing all memory."
   - order: 3
     cost: 20
-    content: "Add -XX:MaxMetaspaceSize=256m to /opt/app/start.sh. This alone will
-      trigger GC sooner but the root cause is the ClassLoader leak in
-      /opt/app/src/RequestClassLoader.java — change it to a singleton."
+    content: "Find static refs / thread-locals pinning old classloaders and release them on shutdown."

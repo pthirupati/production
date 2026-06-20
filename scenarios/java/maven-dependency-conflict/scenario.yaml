@@ -1,49 +1,32 @@
 ---
 slug: maven-dependency-conflict
-title: "Maven Build Fails — Dependency Version Conflict in pom.xml"
+title: "Maven Dependency Convergence Conflict (Jar Hell)"
 technology: Java
-category: Build Tools
-difficulty: medium
-time_limit: 900
+category: "Maven Build"
+difficulty: hard
+time_limit: 1200
 max_score: 100
 lab_mode: simulation
 simulation_type: java
 infrastructure_type: simulation
-jira_priority: Medium
+jira_priority: High
 is_free: false
 description: |
-  A Maven build is failing with: NoSuchMethodError: 'void com.fasterxml.jackson.
-  databind.ObjectMapper.registerModule()'. Two transitive dependencies are pulling
-  in different incompatible versions of jackson-databind (2.12.x vs 2.15.x).
-  The version conflict causes a runtime classpath resolution problem. Engineers must
-  use mvn dependency:tree to diagnose the conflict and pin the correct version.
+  The app throws NoSuchMethodError/LinkageError at runtime because two transitive dependencies pull conflicting versions of the same library onto the classpath. Use the dependency tree to find the divergence and pin a single converged version (or exclude the bad transitive) so the classpath is consistent.
 objectives:
-  - Run mvn dependency:tree to visualize the conflicting dependency versions
-  - Identify which two transitive dependencies are pulling in different versions
-  - Add an explicit version declaration in the pom.xml dependencyManagement section
-  - Verify mvn clean install completes without errors
+  - "Reproduce the runtime LinkageError / NoSuchMethodError"
+  - "Use mvn dependency:tree to locate the conflicting versions"
+  - "Pin one version via dependencyManagement or exclude the bad transitive"
+  - "Confirm the conflict is resolved and the app runs"
 initial_state: |
-  Simulated build server. Maven project at /opt/project/.
-  pom.xml exists with multiple Spring and Jackson dependencies.
-  Running mvn clean install produces a NoSuchMethodError at runtime.
+  POM at /app/pom.xml lets two transitive paths bring different versions of one library; the app hits NoSuchMethodError at runtime.
 hints:
   - order: 1
     cost: 10
-    content: "Run: cd /opt/project && mvn dependency:tree | grep jackson to see all
-      jackson-databind version pulls. Look for lines with 'omitted for conflict'."
+    content: "mvn dependency:tree -Dverbose shows the 'omitted for conflict' duplicate versions."
   - order: 2
     cost: 15
-    content: "In pom.xml, add a dependencyManagement section (or update the existing
-      one) to pin jackson-databind to 2.15.2:
-      <dependencyManagement><dependencies>
-        <dependency>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-databind</artifactId>
-          <version>2.15.2</version>
-        </dependency>
-      </dependencies></dependencyManagement>"
+    content: "Pin the version in <dependencyManagement> so every path converges on it."
   - order: 3
     cost: 20
-    content: "After updating pom.xml, run: mvn dependency:tree | grep jackson again
-      to confirm all references now resolve to 2.15.2. Then run: mvn clean install
-      to verify the build passes."
+    content: "Or add an <exclusion> on the offending transitive dep; re-run the tree to verify."

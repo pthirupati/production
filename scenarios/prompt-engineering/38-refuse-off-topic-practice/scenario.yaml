@@ -1,0 +1,119 @@
+title: "Practice: A System Prompt That Refuses Off-Topic"
+slug: refuse-off-topic-practice
+category: Prompt Engineering
+description: >-
+  A hands-on, graded lab. Write a SYSTEM prompt for a narrow assistant (say, a
+  billing-support bot) that stays strictly in scope: it answers in-scope
+  questions and politely declines anything off-topic, ideally redirecting the
+  user. This is the backbone of safe, predictable production assistants.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Write a system prompt that assigns a narrow role and an explicit scope boundary
+  - Make the assistant politely refuse and redirect off-topic requests instead of answering
+  - Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: >-
+  The guided AI practice console opens with two graded exercises on scoping and
+  refusals. Write a system prompt that keeps a narrow bot on-topic and declines
+  the rest, kindly. Rule-based and free — a strong prompt passes, a vague one
+  fails.
+solution_explanation: >-
+  A good guardrail prompt has three parts: (1) a clear ROLE and SCOPE — "You are
+  a billing-support assistant. You ONLY help with invoices, charges, and refunds";
+  (2) an explicit refusal rule — "If a request is outside that scope, politely
+  decline in one sentence and point the user to the right channel"; (3) a TONE
+  rule so refusals don't lecture — "Be brief and friendly; never be preachy."
+  Putting this in the SYSTEM role (not the user turn) makes it persistent and
+  harder to override. The classic failure is being so strict the bot refuses
+  valid requests, or so loose it answers anything — name the in-scope topics
+  explicitly to avoid both.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A configurable assistant whose behavior is set by its system prompt.
+    lesson:
+      - heading: Scope is a positive list plus a rule
+        body: >-
+          Don't only say "refuse off-topic questions" — first state what IS in
+          scope: "You help with invoices, charges, and refunds for Acme Cloud."
+          Then add the boundary: "For anything outside that, politely decline."
+          A positive scope list is what lets the model tell in-scope from
+          out-of-scope reliably.
+      - heading: Refuse without lecturing, and redirect
+        body: >-
+          The best refusals are short, kind, and useful: "I can only help with
+          billing here — for account security, please contact support@acme.com."
+          Tell the model HOW to refuse: brief, non-judgmental, and always point
+          the user somewhere. A wall-of-text moral lecture is a bad user
+          experience and erodes trust.
+      - heading: Put it in the system role
+        body: >-
+          Scope and refusal rules belong in the SYSTEM prompt, not buried in a
+          user message. The system prompt sets durable behavior that persists
+          across the whole conversation and is harder for a stray user message to
+          override. (Defending against deliberate override attempts is its own
+          topic — see the prompt-injection lessons.)
+    rubric: [role, constraints, task, format, specificity]
+    exercises:
+      - id: scope-and-refuse
+        title: "Graded: scope a bot and refuse off-topic"
+        goal: >-
+          Write a SYSTEM prompt for a billing-support assistant. Give it a role,
+          state what it may help with, and instruct it to politely decline and
+          redirect anything outside that scope.
+        starter: You are a helpful assistant.
+        success:
+          min_words: 16
+          require_any_role: true
+          require:
+            - ["only", "out of scope", "off-topic", "off topic", "decline", "refuse", "politely", "not answer", "won't", "stay on", "outside"]
+          any_of:
+            - ["redirect", "instead", "point them", "direct them", "i can", "i can't", "i cannot", "say it's", "explain that", "contact", "billing", "invoice", "refund"]
+        success_response: >-
+          I can only help with billing questions — invoices, charges, and refunds.
+          That one's outside what I cover, so please reach out to support@acme.com
+          and they'll be glad to help.
+        partial_response: >-
+          Good start — now add a scope. Name what the bot DOES handle (e.g.
+          billing: invoices, charges, refunds), then tell it to politely decline
+          and redirect anything else. Without a positive scope it can't reliably
+          tell in-scope from off-topic.
+      - id: refusal-tone
+        title: "Graded: a kind, brief refusal style"
+        goal: >-
+          Write an instruction that controls HOW the assistant refuses: it should
+          decline off-topic or disallowed requests briefly and politely, without
+          lecturing or moralizing.
+        starter: ""
+        success:
+          min_words: 12
+          any_of:
+            - ["brief", "concise", "short", "polite", "politely", "without lecturing", "no lecture", "non-judgmental", "kind", "friendly", "one sentence", "don't moralize", "no moralizing"]
+          require:
+            - ["refuse", "decline", "say no", "can't", "cannot", "won't", "not able", "turn down", "not answer"]
+        success_response: >-
+          Sorry, I can't help with that one — but I'm happy to help with anything
+          billing-related.
+        partial_response: >-
+          You've described declining — now pin the TONE. Add that refusals must be
+          brief and polite, with no lecturing or moralizing. Short and kind keeps
+          users from feeling scolded.
+hints:
+  - content: Start the system prompt with a role and a positive scope ("You ONLY help with X, Y, Z"), then add the refusal rule for everything else.
+    cost: 10
+    order: 1
+  - content: Tell the model how to refuse, not just when. "Politely decline in one sentence and redirect" beats a vague "don't answer off-topic questions."
+    cost: 15
+    order: 2
+  - content: 'Try: "You are Acme Cloud''s billing assistant. You ONLY answer questions about invoices, charges, and refunds. If a request is outside that scope, politely decline in one sentence and point the user to support@acme.com. Never lecture."'
+    cost: 20
+    order: 3

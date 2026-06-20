@@ -1,0 +1,32 @@
+---
+slug: java-jdbc-pool-leak
+title: "JDBC Connection Leak Exhausts the Pool"
+technology: Java
+category: "Spring Boot"
+difficulty: hard
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  Over hours the connection pool drains to zero and the app hangs acquiring connections. A DAO opens a JDBC Connection/Statement/ResultSet but only closes them on the happy path, so any exception leaks a connection permanently. Make resource handling leak-proof with try-with-resources so connections always return to the pool.
+objectives:
+  - "Observe the pool's active count climb and never recover"
+  - "Find the DAO path that leaks connections on exceptions"
+  - "Convert to try-with-resources so resources always close"
+  - "Verify active connections return to baseline after load"
+initial_state: |
+  ReportDao at /app/src/main/java/com/example/repo/ReportDao.java closes JDBC resources only on success, leaking a connection on every error.
+hints:
+  - order: 1
+    cost: 10
+    content: "Hikari active count only rises — connections are borrowed and never returned."
+  - order: 2
+    cost: 15
+    content: "A close() in the happy path leaks on exceptions; wrap in try-with-resources."
+  - order: 3
+    cost: 20
+    content: "try (Connection c = ds.getConnection(); Statement s = ...) closes even on throw."

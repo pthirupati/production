@@ -1,0 +1,32 @@
+---
+slug: java-spring-actuator-exposed
+title: "Actuator Endpoints Exposed Without Auth"
+technology: Java
+category: "Spring Security"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Critical
+is_free: false
+description: |
+  All Spring Boot Actuator endpoints are exposed over HTTP without authentication, including /actuator/env and /actuator/heapdump, leaking secrets and enabling abuse. Lock the management surface down: expose only the safe endpoints, require auth on the rest, and stop dumping sensitive data.
+objectives:
+  - "Enumerate the exposed actuator endpoints and the sensitive ones"
+  - "Restrict management.endpoints.web.exposure to the minimum needed"
+  - "Require authentication for sensitive endpoints"
+  - "Verify env/heapdump are no longer anonymously reachable"
+initial_state: |
+  Config at /app/src/main/resources/application.yml sets exposure include='*' with no auth; /actuator/env and /actuator/heapdump are public.
+hints:
+  - order: 1
+    cost: 10
+    content: "curl /actuator/env returns properties (and secrets) to anyone — that is the leak."
+  - order: 2
+    cost: 15
+    content: "Set management.endpoints.web.exposure.include to just health,info (and what you need)."
+  - order: 3
+    cost: 20
+    content: "Secure the rest behind Spring Security and disable heapdump exposure."

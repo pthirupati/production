@@ -1,0 +1,32 @@
+---
+slug: java-gradle-test-task-skipped
+title: "Gradle 'test' Task Skipped — JUnit Platform Not Wired"
+technology: Java
+category: "Gradle Build"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  The Gradle build is green but the test task is NO-SOURCE / skipped, so no JUnit tests ever run and regressions ship. The build never calls useJUnitPlatform() and the junit-jupiter test dependencies are missing, so Gradle finds nothing to execute. Wire the test task to the JUnit 5 platform so the suite actually runs.
+objectives:
+  - "Confirm the test task is skipped / runs zero tests"
+  - "Add test { useJUnitPlatform() } to the build"
+  - "Add the junit-jupiter testImplementation/testRuntimeOnly dependencies"
+  - "Verify the real test count executes on ./gradlew test"
+initial_state: |
+  build.gradle at /app/ never calls useJUnitPlatform() and lacks junit-jupiter; ./gradlew test reports NO-SOURCE and runs nothing.
+hints:
+  - order: 1
+    cost: 10
+    content: "./gradlew test --info shows the test task as NO-SOURCE — it found no tests to run."
+  - order: 2
+    cost: 15
+    content: "Add a test { useJUnitPlatform() } block so Gradle uses the JUnit 5 engine."
+  - order: 3
+    cost: 20
+    content: "Add junit-jupiter (api + engine) test dependencies, then re-run ./gradlew test."

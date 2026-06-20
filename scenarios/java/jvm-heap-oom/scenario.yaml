@@ -1,40 +1,32 @@
 ---
 slug: jvm-heap-oom
-title: "JVM Heap OutOfMemoryError — Application Crash on Peak Load"
+title: "OutOfMemoryError: Java Heap Space Under Load"
 technology: Java
-category: JVM Tuning
-difficulty: easy
-time_limit: 900
+category: "JVM Performance"
+difficulty: hard
+time_limit: 1200
 max_score: 100
 lab_mode: simulation
 simulation_type: java
 infrastructure_type: simulation
-jira_priority: High
-is_free: true
+jira_priority: Critical
+is_free: false
 description: |
-  A Spring Boot microservice is crashing on the production servers during peak traffic
-  with the error: java.lang.OutOfMemoryError: Java heap space. The service restarts but
-  crashes again within minutes. The default JVM heap (-Xmx256m) is too small for the
-  current workload. Engineers need to identify the correct heap settings and redeploy.
+  The service dies with java.lang.OutOfMemoryError: Java heap space under load. A request handler accumulates objects in an unbounded collection (a leak) while the max heap is also too small for the working set. Capture a heap dump to find the dominator, fix the leak, and right-size -Xmx.
 objectives:
-  - Read the application crash logs and identify the OutOfMemoryError cause
-  - Determine the appropriate -Xmx and -Xms heap settings for the workload
-  - Update the JVM startup flags in the service configuration
-  - Verify the application runs without OOM errors under simulated load
+  - "Reproduce the OOM and capture a heap dump on OutOfMemoryError"
+  - "Identify the dominant retained object set (the leak)"
+  - "Bound the leaking collection / cache so it cannot grow without limit"
+  - "Set an appropriate -Xmx and confirm the service is stable under load"
 initial_state: |
-  Simulated RHEL 9 server running a Spring Boot 3.x service. The service is configured
-  with default heap settings (-Xmx256m). Application logs show repeated OOM crashes.
-  File: /opt/app/start.sh contains the java startup command.
+  JVM flags at /app/jvm.options set -Xmx256m with no heap-dump-on-OOM; the app retains request objects in an unbounded list and OOMs under load.
 hints:
   - order: 1
     cost: 10
-    content: "Check /opt/app/logs/app.log for the full OOM stack trace. Look for the
-      java.lang.OutOfMemoryError: Java heap space line."
+    content: "Add -XX:+HeapDumpOnOutOfMemoryError and analyze the dump (jhat/Eclipse MAT)."
   - order: 2
     cost: 15
-    content: "Edit /opt/app/start.sh and change -Xmx256m to -Xmx1g and add -Xms512m
-      to set the minimum heap as well."
+    content: "Bound the offending cache/list (size cap or eviction) so it cannot grow forever."
   - order: 3
     cost: 20
-    content: "After editing, run: systemctl restart app-service and monitor with:
-      tail -f /opt/app/logs/app.log to confirm clean startup."
+    content: "Set a realistic -Xmx (e.g. -Xmx1g) for the working set and re-test under load."

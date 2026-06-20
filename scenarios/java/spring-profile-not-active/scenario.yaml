@@ -1,0 +1,32 @@
+---
+slug: java-spring-profile-not-active
+title: "Wrong Spring Profile Active in Production"
+technology: Java
+category: "Spring Boot"
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  Production is accidentally running with development settings (H2 in-memory DB, debug logging, permissive CORS) because no production profile is activated, so Spring falls back to defaults. Make the prod profile active and ensure prod-specific properties (datasource, logging) take effect.
+objectives:
+  - "Confirm the app booted with dev/default settings in prod"
+  - "Set the active profile to prod (config or env)"
+  - "Ensure application-prod.yml properties override the defaults"
+  - "Verify the prod datasource and logging are in effect"
+initial_state: |
+  application.yml at /app/src/main/resources/ does not set spring.profiles.active, so the app uses dev defaults in production.
+hints:
+  - order: 1
+    cost: 10
+    content: "Startup logs 'No active profile set, falling back to default'."
+  - order: 2
+    cost: 15
+    content: "Set spring.profiles.active=prod (in config or SPRING_PROFILES_ACTIVE)."
+  - order: 3
+    cost: 20
+    content: "Confirm application-prod.yml is loaded and its datasource/logging win."

@@ -1,0 +1,32 @@
+---
+slug: java-gradle-dependency-conflict
+title: "Gradle Transitive Version Conflict (Runtime LinkageError)"
+technology: Java
+category: "Gradle Build"
+difficulty: hard
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  The app compiles but throws NoSuchMethodError at runtime: two dependencies pull conflicting versions of the same library and Gradle's default resolution picked an incompatible one. Use the dependency report to find the divergence and force a single consistent version (or a platform/BOM constraint).
+objectives:
+  - "Reproduce the runtime LinkageError / NoSuchMethodError"
+  - "Run the Gradle dependencies report to find the conflict"
+  - "Force/constrain a single version (resolutionStrategy or platform)"
+  - "Confirm the conflict resolves and the app runs"
+initial_state: |
+  build.gradle at /app/ lets two transitive paths bring different versions of one library; the app hits NoSuchMethodError at runtime.
+hints:
+  - order: 1
+    cost: 10
+    content: "./gradlew dependencies shows the conflicting versions and which one won."
+  - order: 2
+    cost: 15
+    content: "Pin it: implementation platform('group:bom:ver') or a resolutionStrategy.force."
+  - order: 3
+    cost: 20
+    content: "Re-run the report to confirm a single converged version on the runtime classpath."

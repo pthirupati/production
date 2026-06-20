@@ -1,0 +1,115 @@
+title: "Practice: Reliably Extract JSON"
+slug: extract-json-practice
+category: Prompt Engineering
+description: >-
+  A hands-on, graded lab. You are given a messy line of text and must write a
+  prompt that makes the simulator return clean, parseable JSON every time — the
+  exact keys, the right types, and NO surrounding prose or markdown fences. This
+  is the skill that lets an AI safely feed another program.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Write a prompt that returns ONLY valid JSON for a given record — no prose, no fences
+  - Pin the exact field names AND their types so the output is predictable
+  - Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: >-
+  The guided AI practice console opens with two graded JSON-extraction exercises.
+  Write prompts that make the rule-based simulator emit clean JSON and nothing
+  else. No API key, no cost — a strong prompt passes, a vague one fails.
+solution_explanation: >-
+  Reliable JSON comes from four habits: (1) name the EXACT keys and their types
+  (string, integer, boolean, array); (2) show ONE example of the desired object;
+  (3) add a hard rule — "Return ONLY the JSON, no prose, no markdown fences"; (4)
+  with the Claude API you can go further: structured outputs (output_config.format
+  with a json_schema) or strict tool use (strict: true) validate against a real
+  schema so the model literally cannot return the wrong shape. In this rule-based
+  lab, habits 1-3 are what the checker looks for.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A data-extraction assistant that returns structured data on request.
+    lesson:
+      - heading: Name the keys and the types
+        body: >-
+          "Return JSON" is too vague — the model guesses the shape. Say exactly
+          which fields and types: "Return a JSON object with keys name (string),
+          age (integer), and active (boolean)." Naming the types stops the model
+          from returning "30" when you wanted 30, or "true" when you wanted true.
+      - heading: Forbid everything that isn't JSON
+        body: >-
+          Stray prose ("Sure, here you go:") and ```json fences are the #1 cause
+          of parse failures in production. Add a hard constraint: "Return ONLY the
+          JSON object. No explanations, no comments, no markdown code fences."
+          Showing one example object makes the model copy the exact shape.
+      - heading: When prompting isn't enough
+        body: >-
+          For a real guarantee, don't rely on prose alone. The Claude API offers
+          structured outputs (set output_config.format to a json_schema, or call
+          messages.parse() with a schema) and strict tool use (strict: true on a
+          tool's input_schema). Both validate the model's output against a real
+          schema. Prompting is the free, portable version of the same idea.
+    rubric: [format, task, constraints, examples, specificity]
+    exercises:
+      - id: extract-clean-json
+        title: "Graded: extract a record into JSON only"
+        goal: >-
+          You are given this text - "Grace Hopper, age 79, rank Rear Admiral,
+          retired true." Write a prompt that extracts it into a JSON object with
+          keys name, age, rank, and retired — and returns ONLY the JSON, with no
+          other text or markdown fences.
+        starter: >-
+          Extract this into JSON: "Grace Hopper, age 79, rank Rear Admiral,
+          retired true."
+        success:
+          min_words: 14
+          requires_json_request: true
+          any_of:
+            - ["only", "no other text", "no prose", "no explanation", "no markdown", "no code fence", "no fences", "nothing else", "just the json"]
+          require:
+            - ["name", "age", "rank", "retired", "key", "field", "schema"]
+        success_response: |
+          {"name": "Grace Hopper", "age": 79, "rank": "Rear Admiral", "retired": true}
+        partial_response: >-
+          You're asking for JSON — good. Now lock it down: name the exact keys
+          (name, age, rank, retired) and add "Return ONLY the JSON, no prose or
+          markdown fences." Otherwise I might wrap it in text or ```json fences.
+      - id: typed-json-with-example
+        title: "Graded: typed schema with an example"
+        goal: >-
+          Write a prompt that asks for JSON, specifies at least two field TYPES
+          (string, integer, boolean, or array), shows one example object, and
+          forbids any extra text around the JSON.
+        starter: ""
+        success:
+          min_words: 14
+          requires_json_request: true
+          require:
+            - ["string", "integer", "int", "number", "boolean", "bool", "array", "list", "object"]
+          mentions_example: true
+          any_of:
+            - ["only", "no prose", "no other text", "no markdown", "no code fence", "no fences", "nothing else", "just the json"]
+        success_response: |
+          {"title": "Reset password", "priority": 2, "open": true, "tags": ["auth", "ux"]}
+        partial_response: >-
+          Name the field TYPES (string, integer, boolean, array), include one
+          example object, and forbid extra text. A typed schema + an example +
+          "JSON only" is what makes the output reliably parseable.
+hints:
+  - content: Say exactly which keys and types you want, then add the magic rule "Return ONLY the JSON — no prose, no markdown code fences."
+    cost: 10
+    order: 1
+  - content: Include one example of the exact JSON you want. The model copies the shape, which is the single most effective trick for clean output.
+    cost: 15
+    order: 2
+  - content: 'Try: ''Extract name (string), age (integer), rank (string), retired (boolean) from the text. Return ONLY a JSON object, e.g. {"name":"...","age":0,"rank":"...","retired":false}. No prose, no code fences.'''
+    cost: 20
+    order: 3

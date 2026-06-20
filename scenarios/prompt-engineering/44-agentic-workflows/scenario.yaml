@@ -1,0 +1,120 @@
+title: "Agentic Workflows: Plan, Act, Verify"
+slug: agentic-workflows
+category: Prompt Engineering
+description: >-
+  An agent is a model that runs a loop — plan, take an action with a tool,
+  observe the result, and repeat until a goal is met. Learn when an agentic loop
+  is the right tool (and when a single call or a fixed workflow is better), and
+  how to prompt one so it stays on task and knows when to stop.
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Decide between a single call, a fixed workflow, and an open-ended agent loop
+  - Prompt an agent with a clear goal, a stopping condition, and a verification step
+  - Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: >-
+  The guided AI practice console opens with two graded exercises on agentic
+  workflows. Write an agent instruction with a goal and a stop condition, then
+  justify when an agent beats a simpler approach. Rule-based and free — strong
+  answers pass, vague ones fail.
+solution_explanation: >-
+  Start simple and escalate. A SINGLE CALL handles classification, extraction, or
+  Q&A. A FIXED WORKFLOW (you orchestrate the steps in code) handles multi-step
+  pipelines where the path is known. Reach for an AGENT — a model-driven loop —
+  only when the task is open-ended and hard to fully specify up front, the
+  outcome justifies the extra cost and latency, and errors are recoverable
+  (tests, review, rollback). A good agent prompt states the GOAL clearly up front
+  (give the full task in one well-specified instruction), grants the tools it
+  needs, defines a STOPPING CONDITION ("stop when the tests pass and you've
+  summarized the change"), and builds in VERIFICATION (have it check its own work
+  before declaring done). Without an explicit stop and a verify step, agents loop
+  forever or quit early.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: An autonomous assistant that plans, calls tools, observes results, and iterates toward a goal.
+    lesson:
+      - heading: Should this even be an agent?
+        body: >-
+          Most tasks aren't agents. Use a single call for one-shot work
+          (summarize, classify, extract). Use a fixed, code-orchestrated workflow
+          when the steps are known in advance — it's cheaper and more predictable.
+          Reserve an open-ended agent loop for tasks that are genuinely
+          multi-step, hard to specify fully, worth the cost, and recoverable when
+          they go wrong.
+      - heading: Goal up front, then let it run
+        body: >-
+          Agents do best when you state the full goal and constraints in one clear
+          instruction at the start, rather than dribbling context across many
+          turns. "Migrate this module to the new API; keep tests green; don't
+          change public behavior." A well-specified goal up front yields more
+          efficient, more coherent runs than vague step-by-step nudging.
+      - heading: Stopping conditions and self-verification
+        body: >-
+          Two things keep a loop healthy. A STOPPING CONDITION tells the agent
+          when it's done — "stop when all tests pass and you've written a one-line
+          summary." A VERIFICATION step makes it check its own work before
+          claiming success — re-run the tests, diff the output against the
+          requirement. Without these, agents either spin endlessly or declare
+          victory too soon.
+    rubric: [task, reasoning, constraints, specificity]
+    exercises:
+      - id: agent-goal-and-stop
+        title: "Graded: an agent instruction with a stop condition"
+        goal: >-
+          Write an instruction for an agent that states a clear goal, lets it use
+          tools/act in a loop, and defines an explicit stopping condition or a
+          step where it verifies its own work before finishing.
+        starter: "Fix the failing build."
+        success:
+          min_words: 14
+          must_contain_all:
+            - ["stop", "until", "done", "finish", "complete", "verify", "check"]
+          any_of:
+            - ["goal", "task", "tool", "act", "action", "step", "loop", "iterate", "then", "tests pass", "re-run", "confirm"]
+        success_response: >-
+          Goal: make the build pass. Run the tests, fix what fails, and repeat.
+          Stop when all tests pass; before finishing, re-run the full suite to
+          verify, then give a one-line summary.
+        partial_response: >-
+          You set a goal — now add a stopping condition and a verification step.
+          Tell the agent when it's done ("stop when tests pass") and to confirm by
+          re-running before declaring success. Otherwise it loops or quits early.
+      - id: when-agent-vs-workflow
+        title: "Graded: agent vs simpler approach"
+        goal: >-
+          Explain when an open-ended agent loop is the right choice versus a
+          single call or a fixed workflow — touch on at least one tradeoff
+          (open-ended vs known steps, cost/latency, or recoverability of errors).
+        starter: ""
+        success:
+          min_words: 16
+          any_of:
+            - ["open-ended", "open ended", "multi-step", "multistep", "hard to specify", "single call", "fixed workflow", "workflow", "known steps", "cost", "latency", "recoverable", "rollback", "overkill", "tradeoff", "trade-off"]
+        success_response: >-
+          Use an agent only when the task is open-ended and hard to script, the
+          payoff justifies extra cost and latency, and mistakes are recoverable.
+          For known steps, a fixed workflow is cheaper and more predictable.
+        partial_response: >-
+          Name a real tradeoff. Agents fit open-ended, hard-to-specify tasks where
+          errors are recoverable and the cost is worth it; a single call or a
+          fixed code workflow is cheaper and more predictable for known steps.
+hints:
+  - content: Start simple. Single call for one-shot tasks, a fixed code workflow for known steps, an agent loop only for open-ended, recoverable, worth-it tasks.
+    cost: 10
+    order: 1
+  - content: Give the agent the full goal and constraints up front, then let it run — that beats dribbling context over many turns.
+    cost: 15
+    order: 2
+  - content: 'Always include a stop condition and a verify step: "Repeat until all tests pass; before finishing, re-run the suite to confirm, then summarize." Without them, agents loop forever or quit too soon.'
+    cost: 20
+    order: 3

@@ -1,34 +1,32 @@
-title: Java Compilation Error
+---
 slug: sim-java-compile-error
-category: Java Development
+title: "javac Compilation Error Blocking the Build"
+technology: Java
+category: "Java Development"
 difficulty: easy
-description: App.java fails to compile — javac reports a syntax error (a missing semicolon, an unbalanced
-  brace, or a mismatched type), so no .class file is produced. Read the compiler's file/line diagnostic,
-  correct the source, and compile cleanly.
-initial_state: Simulated RHEL 9 server with App.java containing a compile-time syntax error; `javac App.java`
-  aborts with an error and produces no class file.
+time_limit: 600
+max_score: 100
 lab_mode: simulation
 simulation_type: java
-is_free: false
+infrastructure_type: simulation
 jira_priority: Medium
-max_score: 100
-time_limit: 900
-dual_terminal: false
-requires_companion_hosts: false
+is_free: false
+description: |
+  The project will not compile: javac reports an error (a missing semicolon, an unresolved symbol, or an incompatible type). Until the source compiles, nothing downstream — tests, packaging, deploy — can run. Read the compiler error, fix the offending source, and get a clean compile.
 objectives:
-- Run javac and read the exact file, line, and error
-- Correct the offending Java syntax
-- Compile successfully so App.class is produced
+  - "Run the compile and read the first javac error with its file and line"
+  - "Open the offending source file and correct the syntax/type error"
+  - "Recompile until javac reports no errors"
+  - "Confirm the .class output is produced"
+initial_state: |
+  Java source at /app/src/main/java/com/example/App.java does not compile; javac prints an error and exits non-zero.
 hints:
-- order: 1
-  cost: 10
-  content: 'Compile to see the diagnostic: `javac App.java`. The error includes the line number and a
-    `^` pointing at the problem.'
-- order: 2
-  cost: 15
-  content: Inspect that line and the one before it — common causes are a missing `;`, an unbalanced `{`/`}`,
-    or a type mismatch the message describes.
-- order: 3
-  cost: 20
-  content: Fix the syntax and re-run `javac App.java` until it's clean; confirm `App.class` exists (`ls
-    App.class`) and the program runs with `java App`.
+  - order: 1
+    cost: 10
+    content: "javac points at the exact file:line — start at the FIRST error, later ones often cascade."
+  - order: 2
+    cost: 15
+    content: "Fix the reported issue (missing ;, wrong type, undefined symbol) and save."
+  - order: 3
+    cost: 20
+    content: "Recompile: javac -d target/classes $(find src -name '*.java'); expect zero errors."

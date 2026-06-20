@@ -1,0 +1,124 @@
+title: "Structuring Prompts with XML Tags"
+slug: xml-tags-claude
+category: Prompt Engineering
+description: >-
+  Claude is trained to respect XML-style tags, which makes them a powerful way to
+  organize a prompt — separate the document, the examples, and the instructions,
+  and even ask Claude to put its output inside named tags. Learn to tag inputs and
+  outputs for clean, unambiguous prompts.
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Explain why XML tags help Claude separate the parts of a prompt
+  - Tag the inputs of a prompt (document, examples, instructions)
+  - Ask the model to wrap its OUTPUT in named tags for easy extraction
+initial_state: >-
+  The guided AI practice console opens. Practice wrapping prompt sections in
+  XML-style tags and asking for tagged output. Rule-based and free.
+solution_explanation: >-
+  XML-style tags like <document>, <example>, <instructions> are a Claude-friendly
+  way to structure prompts because the model was trained to attend to them. Use
+  them two ways - (1) tag INPUTS so the model can tell reference material from the
+  task and you can reference a section by name ("summarize the text in
+  <document>"); (2) tag OUTPUTS - ask Claude to put its answer inside
+  <answer>...</answer> or its reasoning inside <scratchpad>...</scratchpad>, which
+  makes the parts trivial to extract programmatically (and lets you discard the
+  scratchpad). Tags can be named and nested (<email>, <code>, <user_input>). They
+  out-perform loose prose for any multi-part prompt. This is a convention, not a
+  strict schema - for guaranteed structure use tool use / structured outputs.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: Claude, an assistant that follows XML-tagged structure precisely.
+    lesson:
+      - heading: Why tags work with Claude
+        body: >-
+          Claude is trained to recognize and respect XML-style tags, so they're a
+          reliable signal for "this block is a document," "this is an example,"
+          "this is the instruction." Compared to loose prose, tags remove ambiguity
+          about which part of the prompt is which - and you can refer to a section by
+          name later in the same prompt.
+      - heading: Tagging the inputs
+        body: >-
+          Wrap each part of the prompt in a named tag - <document>...</document> for
+          reference text, <example>...</example> for samples, <instructions>...
+          </instructions> for the task. Tags can be nested and specific (<email>,
+          <code>, <user_input>). Then reference them - "Using only the text in
+          <document>, answer the question in <instructions>." This scales cleanly to
+          long, multi-source prompts.
+      - heading: Tagging the output
+        body: >-
+          You can also ask Claude to STRUCTURE ITS OUTPUT with tags - "Put your final
+          answer inside <answer>...</answer>" or "Reason inside <scratchpad>, then
+          give the result in <result>." Tagged output is trivial to parse out, and a
+          <scratchpad> you ignore lets the model reason without polluting the final
+          answer. For a hard guarantee on machine-bound output, prefer tool use /
+          structured outputs; tags are a strong, flexible convention.
+    rubric: [format, context, task, specificity]
+    exercises:
+      - id: tag-inputs
+        title: Tag the inputs of a prompt
+        goal: >-
+          Write a prompt that wraps its reference material and its instruction in
+          named XML-style tags (e.g. <document>...</document> and <instructions>...
+          </instructions>) and references a tagged section in the task.
+        starter: |
+          <document>
+          FixitLab sessions auto-terminate after 30 minutes idle.
+          </document>
+          <instructions>
+        success:
+          min_words: 12
+          has_delimiter: true
+          require:
+            - ["document", "instructions", "context", "example", "input", "text", "tag"]
+          any_of:
+            - ["using", "based on", "answer", "summarize", "extract", "from the", "in the"]
+        success_response: >-
+          Tagged inputs make the structure unambiguous - I can act on exactly the
+          <document> you point to and follow the task in <instructions>. This is the
+          Claude-friendly way to lay out a multi-part prompt.
+        partial_response: >-
+          Wrap BOTH the reference text and the instruction in named tags (e.g.
+          <document> and <instructions>) and reference one by name in the task.
+          Claude attends to these tags and they keep the sections separate.
+      - id: tag-output
+        title: Ask for tagged output
+        goal: >-
+          Write a prompt that asks the model to put its OUTPUT inside named tags —
+          for example its final answer in <answer>...</answer>, optionally with
+          reasoning in a <scratchpad> you can discard — so the result is easy to
+          extract.
+        starter: ""
+        success:
+          min_words: 10
+          has_delimiter: true
+          any_of:
+            - ["answer", "result", "output", "scratchpad", "response", "final", "inside", "wrap", "put your"]
+        success_response: >-
+          Asking for the answer inside <answer> tags makes it trivial to extract, and
+          a discardable <scratchpad> lets the model reason without cluttering the
+          result. Tagged output is a clean, parseable contract.
+        partial_response: >-
+          Tell the model to WRAP its output in named tags (e.g. "put your final answer
+          inside <answer>...</answer>"). Tagged output is what makes the result easy
+          to pull out programmatically.
+hints:
+  - content: Claude is trained to respect XML tags. Use them to separate parts of a prompt — <document>, <example>, <instructions> — and reference sections by name.
+    cost: 10
+    order: 1
+  - content: 'Tag the OUTPUT too: "Put your final answer inside <answer>...</answer>" makes it trivial to extract. A <scratchpad> you discard lets the model reason without cluttering the result.'
+    cost: 15
+    order: 2
+  - content: Tags are a flexible convention, not a strict schema. For a hard guarantee on machine-bound output (validated JSON), use tool use / structured outputs instead.
+    cost: 20
+    order: 3

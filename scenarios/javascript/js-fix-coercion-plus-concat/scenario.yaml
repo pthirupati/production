@@ -1,0 +1,71 @@
+title: Fix the String-Concatenation Bug in addUp
+slug: js-fix-coercion-plus-concat
+category: JavaScript Development
+description: addUp(values) should numerically sum an array that may contain numeric STRINGS (like '3'),
+  but reduce uses `+` directly, so a string operand turns the whole thing into string concatenation ('0'
+  + 3 -> '03'). Coerce each value to a Number before adding.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See numbers concatenated instead of added
+- Convert each value to a Number before summing
+- Return a numeric total
+initial_state: addUp(values) should numerically sum an array that may contain numeric STRINGS (like '3'),
+  but reduce uses `+` directly, so a string operand turns the whole thing into string concatenation ('0'
+  + 3 -> '03'). Coerce each value to a Number before adding.
+solution_explanation: |
+  A single string operand flips + into concatenation. Coercing each value with Number keeps the reduce arithmetic and returns a numeric total.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix addUp(values): return the numeric sum, coercing numeric strings.
+      addUp([1, '2', 3]) -> 6
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function addUp(values) {
+        return values.reduce((acc, v) => acc + v, 0); // '2' makes acc a string
+      }
+    readonly: false
+  visible_tests:
+  - name: mixed strings and numbers
+    code: |
+      assert(addUp([1, '2', 3]) === 6, addUp([1, '2', 3]));
+  - name: all numbers
+    code: |
+      assert(addUp([1, 2, 3]) === 6);
+  hidden_tests:
+  - name: all strings
+    code: |
+      assert(addUp(['10', '20']) === 30, addUp(['10', '20']));
+  - name: returns a number
+    code: |
+      assert(typeof addUp(['1', 2]) === 'number' && addUp(['1', 2]) === 3);
+  - name: empty is zero
+    code: |
+      assert(addUp([]) === 0);
+  - name: negatives as strings
+    code: |
+      assert(addUp(['-5', 5]) === 0);
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: addUp([1, '2', 3]) returns '0123' — once acc meets a string, + concatenates.
+- order: 2
+  cost: 20
+  content: The + operator concatenates if either side is a string.
+- order: 3
+  cost: 30
+  content: 'Add Number(v) (or +v) so every operand is numeric: acc + Number(v).'

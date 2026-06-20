@@ -1,49 +1,32 @@
 ---
 slug: jacoco-coverage-missing
-title: "JaCoCo Coverage Report Not Generated — Maven Plugin Misconfigured"
+title: "JaCoCo Coverage Report Missing — Build Gate Fails"
 technology: Java
-category: Testing
-difficulty: easy
-time_limit: 600
+category: "Maven Build"
+difficulty: medium
+time_limit: 900
 max_score: 100
 lab_mode: simulation
 simulation_type: java
 infrastructure_type: simulation
-jira_priority: Low
+jira_priority: Medium
 is_free: false
 description: |
-  The CI pipeline requires a JaCoCo code coverage report but the target/site/jacoco/
-  directory is empty after running mvn verify. The jacoco-maven-plugin is listed as a
-  dependency in pom.xml but is missing the required execution configuration to bind
-  the prepare-agent and report goals to the Maven lifecycle. Engineers must fix the
-  plugin configuration so the coverage report is generated on every build.
+  The CI coverage gate fails because no JaCoCo report is produced: the jacoco-maven-plugin is either missing or its prepare-agent/report executions are not bound to the build lifecycle, so target/site/jacoco/jacoco.xml never appears. Wire the plugin correctly so coverage is measured and the report is generated.
 objectives:
-  - Run mvn verify and confirm the jacoco report directory is not created
-  - Inspect the current jacoco-maven-plugin configuration in pom.xml
-  - Add the correct execution entries to bind prepare-agent and report goals
-  - Run mvn verify again and confirm the HTML report is generated
+  - "Confirm no jacoco.xml is generated after the test phase"
+  - "Add/repair the jacoco-maven-plugin with prepare-agent and report executions"
+  - "Bind the executions to the correct lifecycle phases"
+  - "Verify target/site/jacoco/jacoco.xml is produced"
 initial_state: |
-  Simulated build server. Maven project at /opt/project/.
-  pom.xml has jacoco-maven-plugin declared under <plugins> but with no <executions>.
-  target/site/jacoco/ directory is missing after running mvn verify.
+  Maven POM at /app/pom.xml lacks a working jacoco-maven-plugin binding; mvn test produces no coverage report and the gate fails.
 hints:
   - order: 1
     cost: 10
-    content: "Run: cd /opt/project && mvn verify then check: ls target/site/jacoco/
-      Confirm the directory is absent. Also check: cat pom.xml | grep -A 20 jacoco"
+    content: "ls target/site/jacoco — empty means the agent never attached."
   - order: 2
     cost: 15
-    content: "In pom.xml, inside the jacoco-maven-plugin <plugin> block, add:
-      <executions>
-        <execution><id>prepare-agent</id>
-          <goals><goal>prepare-agent</goal></goals>
-        </execution>
-        <execution><id>report</id><phase>verify</phase>
-          <goals><goal>report</goal></goals>
-        </execution>
-      </executions>"
+    content: "Add jacoco-maven-plugin with a prepare-agent execution (binds the JVM agent)."
   - order: 3
     cost: 20
-    content: "After updating pom.xml, run: mvn verify
-      Check that target/site/jacoco/index.html now exists and shows coverage data.
-      You can also add a coverage minimum rule with <rules> inside a check execution."
+    content: "Add a report execution bound to the test phase, then mvn test produces jacoco.xml."

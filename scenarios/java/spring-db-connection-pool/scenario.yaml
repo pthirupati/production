@@ -1,9 +1,9 @@
 ---
 slug: spring-db-connection-pool
-title: "HikariCP Connection Pool Exhausted — Database Calls Timing Out"
+title: "HikariCP Pool Exhausted — Connection Is Not Available"
 technology: Java
-category: Spring Boot
-difficulty: medium
+category: "Spring Boot"
+difficulty: hard
 time_limit: 1200
 max_score: 100
 lab_mode: simulation
@@ -12,35 +12,21 @@ infrastructure_type: simulation
 jira_priority: High
 is_free: false
 description: |
-  A Spring Boot service is intermittently throwing: Connection is not available,
-  request timed out after 30000ms. The HikariCP connection pool is configured with
-  the default maximum pool size of 10. Under moderate load, database connections
-  are not released promptly due to a slow query, causing the pool to exhaust.
-  Engineers must tune pool settings and identify the slow query holding connections.
+  Requests fail with 'HikariPool-1 - Connection is not available, request timed out'. The Hikari maximum-pool-size is far too small for the concurrency and a slow query holds connections, so the pool starves. Size the pool and connection timeout correctly and address the long-held connection so the app stops timing out.
 objectives:
-  - Identify the HikariCP pool exhaustion in application logs
-  - Check the current pool configuration in application.yml
-  - Increase maximum-pool-size and set appropriate timeout values
-  - Identify and optimize the slow query holding connections open
+  - "Reproduce the Hikari connection-timeout under load"
+  - "Right-size maximum-pool-size for the real concurrency"
+  - "Set a sane connection-timeout and detect leaks"
+  - "Verify requests stop timing out under load"
 initial_state: |
-  Simulated server. Spring Boot app with Postgres backend.
-  Config at /opt/app/src/main/resources/application.yml.
-  Application logs show HikariPool-1 connection timeout errors.
+  Config at /app/src/main/resources/application.yml sets Hikari maximum-pool-size to 1; under load requests time out waiting for a connection.
 hints:
   - order: 1
     cost: 10
-    content: "Search logs: grep 'HikariPool' /opt/app/logs/app.log | grep -i timeout
-      to see the pool exhaustion events and their frequency."
+    content: "'Connection is not available, request timed out' = pool too small or connections held."
   - order: 2
     cost: 15
-    content: "In application.yml, under spring.datasource.hikari, set:
-      maximum-pool-size: 30
-      minimum-idle: 10
-      connection-timeout: 20000
-      idle-timeout: 300000"
+    content: "Raise spring.datasource.hikari.maximum-pool-size to match concurrent demand."
   - order: 3
     cost: 20
-    content: "Check Postgres slow query log or use:
-      SELECT pid, now()-query_start AS duration, query FROM pg_stat_activity
-      WHERE state='active' ORDER BY duration DESC;
-      Look for queries running >5s. Add an index or rewrite the query."
+    content: "Set a connection-timeout and leak-detection-threshold to surface held connections."

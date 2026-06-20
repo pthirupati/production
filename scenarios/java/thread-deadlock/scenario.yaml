@@ -1,43 +1,32 @@
 ---
 slug: thread-deadlock
-title: "Thread Deadlock — Application Hanging Under Concurrent Load"
+title: "Thread Pool Starvation From a Synchronized Bottleneck"
 technology: Java
-category: Concurrency
+category: "Concurrency"
 difficulty: hard
-time_limit: 1500
+time_limit: 1200
 max_score: 100
 lab_mode: simulation
 simulation_type: java
 infrastructure_type: simulation
-jira_priority: Critical
+jira_priority: High
 is_free: false
 description: |
-  A Java REST API has been completely unresponsive for 45 minutes. All incoming
-  requests hang indefinitely and no responses are returned. The service process
-  is still running (not crashed). Operations suspects a thread deadlock caused by
-  two synchronized methods acquiring locks in opposite order. Engineers must use
-  jstack to capture a thread dump, identify the deadlock cycle, and fix the code.
+  The request thread pool is exhausted and latency climbs to timeouts. A coarse synchronized block around a cache refresh serializes every request behind one slow I/O call, so all worker threads pile up waiting on the same monitor. Narrow the critical section (or use a concurrent structure) so threads stop starving.
 objectives:
-  - Capture a thread dump using jstack <pid>
-  - Locate the "Found one Java-level deadlock" section in the thread dump
-  - Identify the two threads and the two monitor locks involved
-  - Fix the lock acquisition order in the source code to eliminate the deadlock
+  - "Capture a thread dump and see many threads BLOCKED on one monitor"
+  - "Locate the over-broad synchronized region doing slow work under the lock"
+  - "Move slow I/O out of the lock / use a concurrent cache"
+  - "Verify threads are no longer blocked and latency recovers"
 initial_state: |
-  Simulated server. The hanging Java process PID is in /var/run/app.pid.
-  Source code is at /opt/app/src/. jstack is installed and on PATH.
-  The deadlock involves AccountService.transfer() and AccountService.audit().
+  Code at /app/src/main/java/com/example/CacheManager.java holds a synchronized lock across a slow refresh; worker threads block en masse.
 hints:
   - order: 1
     cost: 10
-    content: "Run: jstack $(cat /var/run/app.pid) > /tmp/threaddump.txt then search
-      the file for the string 'deadlock' to find the relevant section."
+    content: "jstack shows N threads BLOCKED waiting to lock the same <CacheManager> monitor."
   - order: 2
     cost: 15
-    content: "The thread dump will show two threads each waiting for a lock held by
-      the other. Note the object addresses in the 'waiting to lock' and 'locked'
-      lines to map the cycle."
+    content: "Do the slow load OUTSIDE the lock; only synchronize the brief map update."
   - order: 3
     cost: 20
-    content: "In /opt/app/src/AccountService.java, the transfer() method locks
-      accountA then accountB, while audit() locks accountB then accountA. Fix by
-      always acquiring locks in the same order: sort by account ID before locking."
+    content: "Better: use ConcurrentHashMap.computeIfAbsent / a loading cache to avoid the global lock."

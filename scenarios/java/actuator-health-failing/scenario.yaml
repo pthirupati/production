@@ -2,7 +2,7 @@
 slug: actuator-health-failing
 title: "Spring Boot Actuator Health Endpoint Returning DOWN"
 technology: Java
-category: Spring Boot
+category: "Spring Boot"
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -12,36 +12,21 @@ infrastructure_type: simulation
 jira_priority: High
 is_free: false
 description: |
-  The Kubernetes liveness probe is failing because GET /actuator/health returns
-  HTTP 503 with status DOWN. This causes Kubernetes to restart the pod repeatedly.
-  The health check is DOWN because a downstream dependency (a Postgres database)
-  has a misconfigured health indicator, and a custom health check pointing to a
-  decommissioned internal service is marking the overall status as DOWN.
+  The Kubernetes liveness probe is failing because GET /actuator/health returns HTTP 503 with status DOWN, so the pod restarts in a loop. A custom health indicator for a decommissioned 'legacyPaymentService' and a misconfigured datasource health check are both forcing the aggregate status to DOWN.
 objectives:
-  - Call /actuator/health/detail to see the individual health component statuses
-  - Identify which health indicator is causing the DOWN status
-  - Either fix the misconfigured database connection or disable the defunct indicator
-  - Verify /actuator/health returns {"status":"UP"} with HTTP 200
+  - "Call /actuator/health with show-details to see each component status"
+  - "Identify which health indicator is forcing the DOWN status"
+  - "Disable the defunct indicator or repair the datasource health check"
+  - "Confirm /actuator/health returns status UP with HTTP 200"
 initial_state: |
-  Simulated server. Spring Boot app running on port 8080.
-  GET http://localhost:8080/actuator/health returns 503 DOWN.
-  Config at /opt/app/src/main/resources/application.yml.
-  A custom health indicator for 'legacyPaymentService' points to a retired endpoint.
+  Spring Boot app on port 8080. GET /actuator/health returns 503 DOWN. Config at /app/src/main/resources/application.yml has a legacyPaymentService health indicator pointing at a retired endpoint.
 hints:
   - order: 1
     cost: 10
-    content: "Enable health details in application.yml:
-      management.endpoint.health.show-details: always
-      Then call: curl http://localhost:8080/actuator/health | python3 -m json.tool
-      to see which component is DOWN."
+    content: "Enable details: management.endpoint.health.show-details: always, then curl http://localhost:8080/actuator/health | python3 -m json.tool to see the DOWN component."
   - order: 2
     cost: 15
-    content: "If the legacyPaymentService health indicator is failing, disable it:
-      management.health.legacyPaymentService.enabled: false
-      Or remove the @Component annotation from the LegacyPaymentServiceHealthIndicator class."
+    content: "Disable the dead indicator: management.health.legacyPaymentService.enabled: false, or remove its @Component bean."
   - order: 3
     cost: 20
-    content: "For the database health check failure, verify the datasource config:
-      spring.datasource.url should point to the correct DB host.
-      Test with: psql -h <db-host> -U <user> -c 'SELECT 1'
-      Fix the URL, restart, and confirm /actuator/health shows UP."
+    content: "Fix spring.datasource.url to the correct DB host, restart, and confirm the aggregate health is UP."

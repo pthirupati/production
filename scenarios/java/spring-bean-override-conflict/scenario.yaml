@@ -1,0 +1,32 @@
+---
+slug: java-spring-bean-override-conflict
+title: "Duplicate Bean Definition — Overriding Disabled"
+technology: Java
+category: "Spring Boot"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  Startup fails with 'A bean with that name has already been defined and overriding is disabled' (Spring Boot 2.1+ default). Two configurations declare the same bean name. Decide the correct resolution — rename/qualify the bean or mark the intended one @Primary — rather than blindly re-enabling overriding.
+objectives:
+  - "Read the error and find the two conflicting bean definitions"
+  - "Decide which bean should win and why"
+  - "Rename/qualify or mark @Primary to disambiguate"
+  - "Confirm the context starts with one unambiguous bean"
+initial_state: |
+  Config at /app/src/main/resources/application.yml plus a second @Configuration declare the same bean name; startup fails because overriding is disabled.
+hints:
+  - order: 1
+    cost: 10
+    content: "The error names the duplicate bean and both defining sources."
+  - order: 2
+    cost: 15
+    content: "Give them distinct names/@Qualifiers, or mark the intended one @Primary."
+  - order: 3
+    cost: 20
+    content: "Re-enabling spring.main.allow-bean-definition-overriding hides the real ambiguity — avoid it."

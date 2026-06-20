@@ -1,0 +1,32 @@
+---
+slug: java-keystore-wrong-password
+title: "TLS Keystore Password Wrong — Server Won't Start HTTPS"
+technology: Java
+category: "Java Security"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  Enabling HTTPS fails at startup with 'keystore password was incorrect' / 'Cannot recover key'. The configured key-store-password (or key-password) does not match the keystore, so the connector cannot load the private key. Correct the keystore/key passwords (and type) so the TLS connector starts.
+objectives:
+  - "Reproduce the keystore password failure at startup"
+  - "Verify the keystore type and the correct passwords"
+  - "Set matching key-store-password / key-password"
+  - "Confirm the HTTPS connector starts and serves TLS"
+initial_state: |
+  Config at /app/src/main/resources/application.yml sets the wrong key-store-password; the TLS connector fails with 'keystore password was incorrect'.
+hints:
+  - order: 1
+    cost: 10
+    content: "keytool -list -keystore keystore.p12 with the password tells you if it is right."
+  - order: 2
+    cost: 15
+    content: "Set server.ssl.key-store-password (and key-password) to the real value."
+  - order: 3
+    cost: 20
+    content: "Match server.ssl.key-store-type (PKCS12/JKS) to the actual file format."

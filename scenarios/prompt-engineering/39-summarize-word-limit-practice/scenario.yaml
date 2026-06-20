@@ -1,0 +1,114 @@
+title: "Practice: Summarize Under a Strict Word Limit"
+slug: summarize-word-limit-practice
+category: Prompt Engineering
+description: >-
+  A hands-on, graded lab. Write prompts that summarize text under a hard length
+  cap — "in exactly 20 words", "in 3 bullets", "in one sentence." Length control
+  is one of the most common real-world prompting needs (UI snippets, alerts,
+  tweets, TL;DRs) and one models routinely overshoot without a firm constraint.
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Write a summarization prompt with an explicit, checkable length cap
+  - Keep your own prompt tight while still naming the source, the task, and the limit
+  - Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: >-
+  The guided AI practice console opens with two graded summarization exercises.
+  Write prompts that summarize under a strict limit (words, bullets, or a single
+  sentence). Rule-based and free — a prompt with a real length cap passes, a
+  vague one fails.
+solution_explanation: >-
+  Length control needs an explicit, checkable cap: "in no more than 20 words",
+  "in exactly 3 bullet points", "in one sentence." Vague words like "short" or
+  "briefly" leave the model guessing. Pair the cap with the task and, ideally, a
+  focus ("summarize the decision, not the discussion"). For production, you can
+  also enforce length in code (truncate, or reject and re-ask) since models
+  occasionally drift a word or two over — but a firm cap in the prompt does most
+  of the work. The checker here rewards a concrete limit plus a format.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A summarization assistant that respects explicit length and format limits.
+    lesson:
+      - heading: Make the limit checkable
+        body: >-
+          "Summarize this briefly" is unmeasurable — brief to whom? Give a number
+          and a unit: "in no more than 25 words", "in exactly 3 bullets", "in one
+          sentence under 15 words." A checkable cap is one you (or a script)
+          could verify, which is also what makes it enforceable.
+      - heading: Limit + task + focus
+        body: >-
+          The strongest summarization prompts combine three things: the TASK
+          (summarize / TL;DR / headline), the LIMIT (the cap), and a FOCUS (what
+          matters — "the decision and owner, not the back-and-forth"). Focus
+          keeps a tight summary from wasting its few words on filler.
+      - heading: Enforce in code for guarantees
+        body: >-
+          Models occasionally run a word or two over a hard cap. If you need a
+          true guarantee (a fixed-width UI slot, an SMS), enforce it on your side:
+          count words and either truncate or send it back with "that was 27 words,
+          redo it in 20 or fewer." The prompt does 90% of the work; code closes
+          the gap.
+    rubric: [task, constraints, format, specificity]
+    exercises:
+      - id: summarize-hard-cap
+        title: "Graded: summarize under a hard cap"
+        goal: >-
+          Write a prompt that asks the model to summarize a given paragraph under
+          a STRICT, checkable length limit — a specific number of words, a fixed
+          number of bullets, or a single sentence.
+        starter: Summarize this paragraph.
+        success:
+          min_words: 10
+          mentions_limit: true
+          any_of:
+            - ["summarize", "summary", "tl;dr", "tldr", "headline", "recap", "condense", "boil down"]
+        success_response: >-
+          New pricing launches Monday; the team agreed to grandfather existing
+          customers for 90 days.
+        partial_response: >-
+          You asked for a summary — now add a checkable cap. "In no more than 20
+          words", "in 3 bullets", or "in one sentence" all work. Without a number,
+          the model decides the length for you.
+      - id: tight-prompt-tight-output
+        title: "Graded: a tight prompt for a tight output"
+        goal: >-
+          Write a concise prompt (keep it short yourself) that still names the
+          task, states an explicit length cap, and asks for a specific format
+          (bullets, one sentence, a word count, etc.).
+        starter: ""
+        success:
+          min_words: 6
+          max_words: 40
+          mentions_limit: true
+          require:
+            - ["summarize", "summary", "tl;dr", "tldr", "recap", "condense", "headline", "boil down", "distill"]
+          any_of:
+            - ["bullet", "bullets", "sentence", "sentences", "tl;dr", "tldr", "one line", "headline", "list", "word"]
+        success_response: |
+          - Pricing changes Monday
+          - Existing customers grandfathered 90 days
+          - No action needed from current users
+        partial_response: >-
+          Tighten it and add the cap. A strong short prompt is something like
+          "TL;DR in 3 bullets, max 8 words each." Name the format and the limit
+          without padding your own prompt.
+hints:
+  - content: Replace vague words like "short" or "briefly" with a number and unit — "in no more than 20 words" or "in exactly 3 bullets."
+    cost: 10
+    order: 1
+  - content: Combine the task, the limit, and a focus. "Summarize the decision in one sentence under 15 words" beats "summarize this."
+    cost: 15
+    order: 2
+  - content: 'Try: "Summarize the paragraph below in no more than 20 words, focusing on the decision and who owns it. One sentence, no preamble."'
+    cost: 20
+    order: 3

@@ -1,0 +1,121 @@
+title: "Extended & Adaptive Thinking"
+slug: extended-thinking
+category: Prompt Engineering
+description: >-
+  Modern Claude models can reason internally before answering — "thinking" — which
+  sharply improves hard, multi-step tasks. Learn how thinking differs from prompted
+  chain-of-thought, when to turn it on, how the effort setting trades quality for
+  cost, and how to prompt so the model reasons well without over-thinking simple
+  asks.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Explain model "thinking" and how it differs from prompted chain-of-thought
+  - Decide when thinking earns its extra cost and latency
+  - Write a prompt that asks for careful reasoning on a genuinely hard task
+initial_state: >-
+  The guided AI practice console opens. Practice framing a hard task so the model
+  reasons carefully first, and reason about when thinking is worth it. Rule-based
+  and free.
+solution_explanation: >-
+  Modern reasoning models (including current Claude) can do an internal THINKING
+  pass before the final answer. It differs from prompted chain-of-thought - CoT is
+  reasoning you elicit in the visible output ("think step by step"), while model
+  thinking is a built-in capability you enable (on current Claude via adaptive
+  thinking, where the model decides how much to think; older models used a fixed
+  thinking budget, now deprecated). An EFFORT setting trades depth/cost - higher
+  effort means more reasoning and tokens, lower effort is cheaper and faster. Turn
+  thinking on for genuinely hard, multi-step problems (complex debugging, math,
+  planning, deep analysis); leave it off for simple, high-volume tasks where it just
+  adds cost and latency. In the prompt, you still help by stating the task clearly
+  and, when needed, asking it to reason carefully before committing - but avoid
+  forcing heavy reasoning on trivial asks.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A reasoning model that can think carefully before answering hard problems.
+    lesson:
+      - heading: Thinking vs prompted chain-of-thought
+        body: >-
+          Prompted chain-of-thought is reasoning you ask for in the OUTPUT ("show
+          your work"). Model THINKING is a built-in step the model takes BEFORE the
+          answer - a place to work through the problem that isn't your final output.
+          On current Claude models you enable adaptive thinking and the model decides
+          how much to think; older models took a fixed thinking budget (now
+          deprecated). Both aim at the same thing - better answers on hard problems -
+          but thinking is a capability you switch on, not just a phrase in the prompt.
+      - heading: Effort and cost
+        body: >-
+          Thinking isn't free - more reasoning means more tokens and higher latency.
+          An EFFORT control (low / medium / high) trades quality against cost - crank
+          it up for genuinely hard problems, keep it low for easy, high-volume work.
+          The right setting is task-dependent; measure on your own evals rather than
+          maxing it out by default.
+      - heading: When to use it (and prompt for it)
+        body: >-
+          Turn thinking on for multi-step, high-stakes, or novel problems - tricky
+          debugging, math and logic, planning, deep analysis - where working through
+          it first clearly helps. Leave it off for simple lookups and classification
+          where it only adds cost. In the prompt, state the task clearly and, for a
+          hard task, ask the model to reason carefully before committing to an answer;
+          but don't force heavy reasoning on a one-line question - that wastes
+          tokens and can cause over-thinking.
+    rubric: [task, reasoning, specificity, constraints]
+    exercises:
+      - id: prompt-careful-reasoning
+        title: Frame a hard task for careful reasoning
+        goal: >-
+          Write a prompt for a genuinely HARD, multi-step problem (complex debugging,
+          math, or planning) that tells the model to reason carefully / think through
+          it thoroughly BEFORE giving its final answer.
+        starter: ""
+        success:
+          min_words: 14
+          any_of:
+            - ["think", "reason", "reasoning", "step by step", "step-by-step", "work through", "think through", "carefully", "thoroughly", "deliberate", "before answering", "before you answer"]
+        success_response: >-
+          Good — framing a hard problem and asking the model to reason carefully first
+          is exactly when thinking pays off. The model can work through the steps
+          before committing instead of guessing.
+        partial_response: >-
+          For a hard task, explicitly ask the model to think through it carefully
+          BEFORE answering (e.g. "reason step by step, then give the final answer").
+          That's what engages careful reasoning on multi-step problems.
+      - id: when-thinking-worth-it
+        title: Decide when thinking is worth the cost
+        goal: >-
+          Write a short note picking ONE task and deciding whether to enable thinking
+          (or high effort) — tie it to whether the task is genuinely hard/multi-step
+          versus simple and high-volume where thinking just adds cost.
+        starter: ""
+        success:
+          min_words: 14
+          any_of:
+            - ["hard", "complex", "multi-step", "multistep", "high-stakes", "simple", "high-volume", "high volume", "cost", "latency", "effort", "overkill", "overthink", "over-think", "worth"]
+        success_response: >-
+          Sound judgment. Thinking (or high effort) earns its cost on genuinely hard,
+          multi-step problems; for simple, high-volume tasks it just adds latency and
+          spend, so keep it off or low.
+        partial_response: >-
+          Tie the decision to the task - hard/multi-step (turn thinking on or raise
+          effort) versus simple/high-volume (leave it off, it only adds cost). Name
+          the task and justify the trade-off.
+hints:
+  - content: Model "thinking" is a built-in reasoning pass before the answer — distinct from prompted chain-of-thought (reasoning in the visible output). On current Claude, adaptive thinking lets the model decide how much to think.
+    cost: 10
+    order: 1
+  - content: An effort setting (low/medium/high) trades quality for cost. Turn thinking on / raise effort for genuinely hard, multi-step problems; keep it low for simple, high-volume tasks.
+    cost: 15
+    order: 2
+  - content: 'In the prompt, state the task clearly and, for hard problems, ask it to reason carefully before answering — but don''t force heavy reasoning on a one-line question; that wastes tokens and can cause over-thinking.'
+    cost: 20
+    order: 3

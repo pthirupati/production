@@ -1,0 +1,115 @@
+title: "Reducing Hallucination"
+slug: reducing-hallucination
+category: Prompt Engineering
+description: >-
+  Models sometimes state false things with confidence. You can sharply reduce that
+  with the right prompt: ground answers in provided sources, give the model
+  permission to say "I don't know," ask it to cite or quote, and have it separate
+  what it knows from what it's inferring.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Name the prompt techniques that reduce hallucination
+  - Write a prompt that grounds answers and permits "I don't know"
+  - Require quotes/citations so claims are checkable
+initial_state: >-
+  The guided AI practice console opens. Practice prompts that ground the model in
+  sources and let it abstain instead of inventing answers. Rule-based and free.
+solution_explanation: >-
+  Hallucination is the model filling a gap with a plausible-sounding guess. Prompt
+  techniques that cut it down - (1) GROUND - provide the source text and require
+  "answer only from this"; (2) PERMIT ABSTENTION - explicitly allow "I don't know /
+  not stated," which removes the pressure to fabricate; (3) CITE/QUOTE - require the
+  model to quote the supporting span or cite a source for each claim, making answers
+  checkable; (4) SEPARATE KNOWN FROM INFERRED - ask it to mark what's directly
+  supported versus an inference; (5) for facts it can't verify, ask for confidence
+  or a caveat. Combine with retrieval (RAG) and, for the strongest guarantees, a
+  verification step. No prompt eliminates hallucination entirely - design so wrong
+  answers are caught.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A careful assistant that grounds claims and admits uncertainty.
+    lesson:
+      - heading: Ground in sources
+        body: >-
+          The biggest lever is grounding. If the answer should come from a document,
+          PUT the document in the prompt and say "answer using only this text." With
+          nothing to anchor to, the model leans on fuzzy parametric memory and is
+          far more likely to invent specifics like dates, numbers, and names.
+      - heading: Permit "I don't know"
+        body: >-
+          Models often fabricate because the prompt implies an answer must exist.
+          Explicitly grant permission to abstain - "If the answer isn't in the
+          provided text (or you're not sure), say 'I don't know' rather than
+          guessing." Removing the pressure to always answer is one of the simplest,
+          most effective anti-hallucination moves.
+      - heading: Cite, quote, and separate inference
+        body: >-
+          Make claims checkable. Require the model to QUOTE the supporting sentence
+          or CITE a source for each fact. Ask it to SEPARATE what's directly
+          supported from what it's inferring ("Supported: ... / Inferred: ..."). For
+          unverifiable facts, ask for a confidence level or a caveat. Pair these with
+          retrieval (RAG) and, where it matters, a second verification pass. No
+          prompt is a guarantee - build so mistakes get caught downstream.
+    rubric: [context, constraints, specificity, format]
+    exercises:
+      - id: ground-and-abstain
+        title: Ground the answer and allow "I don't know"
+        goal: >-
+          Write a prompt that instructs the model to answer ONLY from a provided
+          source AND to say "I don't know" (or "not stated") when the answer isn't
+          there, instead of guessing.
+        starter: ""
+        success:
+          min_words: 14
+          any_of:
+            - ["only from", "based only", "using only", "from the text", "from the source", "from the passage", "according to"]
+          require:
+            - ["don't know", "do not know", "not stated", "not sure", "if not", "if absent", "not in the", "isn't there", "uncertain", "say so"]
+        success_response: >-
+          That's well grounded - answering only from the source and allowing an
+          honest "I don't know" removes the pressure to fabricate. Abstention beats a
+          confident wrong answer.
+        partial_response: >-
+          Combine TWO instructions - answer only from the provided source AND
+          explicitly permit "I don't know / not stated" when it's absent. The
+          permission to abstain is what stops the model filling the gap.
+      - id: require-quotes
+        title: Require quotes or citations
+        goal: >-
+          Write a prompt that requires the model to support each claim with a direct
+          QUOTE from the source or a CITATION, so every statement can be checked back
+          against the text.
+        starter: ""
+        success:
+          min_words: 12
+          any_of:
+            - ["quote", "cite", "citation", "reference", "exact words", "verbatim", "point to", "which sentence", "supporting", "source for"]
+        success_response: >-
+          Requiring a quote or citation per claim makes the answer auditable — anyone
+          can trace each statement back to the text, and the model is far less likely
+          to assert something the source doesn't contain.
+        partial_response: >-
+          Ask the model to back each claim with a direct QUOTE or a CITATION to the
+          source. Requiring evidence per claim is what makes the output checkable and
+          discourages invented facts.
+hints:
+  - content: The biggest lever is grounding — provide the source text and require "answer using only this." With nothing to anchor to, the model invents specifics.
+    cost: 10
+    order: 1
+  - content: Explicitly permit abstention — "If it's not in the text or you're unsure, say 'I don't know.'" Removing the pressure to always answer cuts fabrication dramatically.
+    cost: 15
+    order: 2
+  - content: Require a QUOTE or CITATION per claim, and ask the model to separate what's supported from what it's inferring. Pair with retrieval and a verification step — no prompt is a full guarantee.
+    cost: 20
+    order: 3

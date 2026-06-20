@@ -1,0 +1,32 @@
+---
+slug: java-hibernate-lazy-init-exception
+title: "LazyInitializationException Outside the Session"
+technology: Java
+category: "Spring Data JPA"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  Serializing an entity in the controller throws 'LazyInitializationException: could not initialize proxy - no Session'. A lazy association is accessed after the transaction/session closed. Fix it the right way — fetch what you need inside the transaction (DTO projection or entity graph) rather than papering over it with open-session-in-view.
+objectives:
+  - "Reproduce the LazyInitializationException on the response path"
+  - "Identify the lazy association touched after the session closed"
+  - "Load the needed data within the transaction (DTO/JOIN FETCH/@EntityGraph)"
+  - "Verify the response serializes without the exception"
+initial_state: |
+  Config at /app/src/main/resources/application.yml disables open-session-in-view and the controller touches a lazy field after the tx ends, throwing LazyInitializationException.
+hints:
+  - order: 1
+    cost: 10
+    content: "The trace says 'no Session' — a proxy was accessed after the tx closed."
+  - order: 2
+    cost: 15
+    content: "Fetch the association in the service layer (JOIN FETCH / @EntityGraph) before returning."
+  - order: 3
+    cost: 20
+    content: "Prefer a DTO projection over re-enabling open-session-in-view, which hides N+1s."

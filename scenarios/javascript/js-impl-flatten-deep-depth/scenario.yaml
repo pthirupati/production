@@ -1,0 +1,81 @@
+title: Implement flattenDepth
+slug: js-impl-flatten-deep-depth
+category: JavaScript Development
+description: 'Implement flattenDepth(arr, depth): flatten a nested array by AT MOST `depth` levels (depth
+  defaults to 1). Elements deeper than `depth` stay nested. Do not use Array.prototype.flat, and do not
+  mutate the input. The stub is empty so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Flatten exactly `depth` levels, no more
+- Leave deeper nesting intact
+- Default depth to 1 and avoid flat()/mutation
+initial_state: 'Implement flattenDepth(arr, depth): flatten a nested array by AT MOST `depth` levels (depth
+  defaults to 1). Elements deeper than `depth` stay nested. Do not use Array.prototype.flat, and do not
+  mutate the input. The stub is empty so tests fail.'
+solution_explanation: |
+  Recursing into array elements only while depth > 0, decrementing depth per level, flattens exactly the requested number of levels and leaves deeper structure untouched without mutating the input.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement flattenDepth(arr, depth=1) -> array flattened up to `depth` levels.
+      flattenDepth([1, [2, [3, [4]]]], 1) -> [1, 2, [3, [4]]]
+      flattenDepth([1, [2, [3, [4]]]], 2) -> [1, 2, 3, [4]]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function flattenDepth(arr, depth = 1) {
+        // TODO: flatten up to `depth` levels (no flat(), no mutation)
+      }
+    readonly: false
+  visible_tests:
+  - name: depth one
+    code: |
+      assert(JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 1)) === JSON.stringify([1, 2, [3, [4]]]), JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 1)));
+  - name: depth two
+    code: |
+      assert(JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 2)) === JSON.stringify([1, 2, 3, [4]]), JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 2)));
+  hidden_tests:
+  - name: default depth is one
+    code: |
+      assert(JSON.stringify(flattenDepth([1, [2, [3]]])) === JSON.stringify([1, 2, [3]]), JSON.stringify(flattenDepth([1, [2, [3]]])));
+  - name: depth zero is unchanged
+    code: |
+      assert(JSON.stringify(flattenDepth([1, [2, [3]]], 0)) === JSON.stringify([1, [2, [3]]]), JSON.stringify(flattenDepth([1, [2, [3]]], 0)));
+  - name: deep enough fully flattens
+    code: |
+      assert(JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 5)) === JSON.stringify([1, 2, 3, 4]), JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 5)));
+  - name: already flat
+    code: |
+      assert(JSON.stringify(flattenDepth([1, 2, 3], 3)) === JSON.stringify([1, 2, 3]), JSON.stringify(flattenDepth([1, 2, 3], 3)));
+  - name: does not mutate input
+    code: |
+      const src = [1, [2, [3]]];
+      const snap = JSON.stringify(src);
+      flattenDepth(src, 2);
+      assert(JSON.stringify(src) === snap, 'input mutated');
+  - name: mixed shapes
+    code: |
+      assert(JSON.stringify(flattenDepth([[1, 2], [3, [4]]], 1)) === JSON.stringify([1, 2, 3, [4]]), JSON.stringify(flattenDepth([[1, 2], [3, [4]]], 1)));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Walk the array; for an array element, only recurse when depth > 0.
+- order: 2
+  cost: 20
+  content: When you recurse, decrement depth so each level is counted once.
+- order: 3
+  cost: 30
+  content: When depth hits 0, push remaining arrays as-is (don't flatten further).

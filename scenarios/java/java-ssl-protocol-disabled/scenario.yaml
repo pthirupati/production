@@ -1,0 +1,32 @@
+---
+slug: java-ssl-protocol-disabled
+title: "TLSv1.0/1.1 Still Enabled — Harden the TLS Protocols"
+technology: Java
+category: "Java Security"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  A security scan flags the service for negotiating deprecated TLSv1.0/1.1 and weak cipher suites. The connector does not pin enabled-protocols, so the JVM accepts legacy protocols. Restrict the server to TLSv1.2/1.3 and a strong cipher list so the handshake rejects downgrades.
+objectives:
+  - "Confirm the server still negotiates TLSv1.0/1.1"
+  - "Pin enabled-protocols to TLSv1.2 and TLSv1.3 only"
+  - "Restrict to strong cipher suites"
+  - "Verify a TLSv1.0 handshake is now refused"
+initial_state: |
+  Config at /app/src/main/resources/application.yml leaves server.ssl.enabled-protocols unset; the connector still allows TLSv1.0/1.1.
+hints:
+  - order: 1
+    cost: 10
+    content: "openssl s_client -tls1 -connect host:443 succeeding proves legacy TLS is on."
+  - order: 2
+    cost: 15
+    content: "Set server.ssl.enabled-protocols=TLSv1.3,TLSv1.2 to drop the old ones."
+  - order: 3
+    cost: 20
+    content: "Pin server.ssl.ciphers to a strong suite list and re-scan."

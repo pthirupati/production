@@ -1,0 +1,32 @@
+---
+slug: java-spring-circular-dependency
+title: "Spring Circular Bean Dependency Aborts Startup"
+technology: Java
+category: "Spring Boot"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  Startup fails with 'The dependencies of some of the beans in the application context form a cycle'. Two singletons inject each other by constructor, which Spring cannot resolve. Break the cycle by redesigning the dependency (extract a third bean, use setter/@Lazy injection, or an event) so the context refreshes.
+objectives:
+  - "Read the startup error and identify the two beans in the cycle"
+  - "Decide how to break the cycle (extract, @Lazy, or events)"
+  - "Apply the fix so neither bean hard-requires the other at construction"
+  - "Confirm the context starts without the cycle error"
+initial_state: |
+  BeanConfig at /app/src/main/java/com/example/config/BeanConfig.java wires two beans that constructor-inject each other; startup reports a bean cycle.
+hints:
+  - order: 1
+    cost: 10
+    content: "Spring prints the exact cycle: beanA -> beanB -> beanA."
+  - order: 2
+    cost: 15
+    content: "Constructor cycles are fatal; @Lazy on one injection point or setter injection breaks it."
+  - order: 3
+    cost: 20
+    content: "Cleaner: extract the shared logic into a third bean both depend on."

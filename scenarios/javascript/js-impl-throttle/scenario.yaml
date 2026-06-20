@@ -1,0 +1,106 @@
+title: Implement throttle (Leading Edge)
+slug: js-impl-throttle
+category: JavaScript Development
+description: 'Implement throttle(fn, interval): return a function that calls fn immediately on the first
+  invocation, then ignores further calls until `interval` ms have elapsed (leading-edge throttling). Use
+  setTimeout to re-open the gate. The stub is empty so tests fail.'
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Call fn immediately on the leading edge
+- Block calls during the cooldown window
+- Re-open after `interval` ms via setTimeout
+initial_state: 'Implement throttle(fn, interval): return a function that calls fn immediately on the first
+  invocation, then ignores further calls until `interval` ms have elapsed (leading-edge throttling). Use
+  setTimeout to re-open the gate. The stub is empty so tests fail.'
+solution_explanation: |
+  A closure flag gates calls: the first call runs fn and sets the flag; subsequent calls return until a setTimeout clears the flag after `interval` ms, implementing leading-edge throttling.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement throttle(fn, interval) -> throttled function. The first call runs fn right away; calls during the next `interval` ms are dropped; after the window the next call runs again.
+    Use the global setTimeout.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function throttle(fn, interval) {
+        // TODO: run fn on the leading edge, then ignore calls for `interval` ms
+      }
+    readonly: false
+  visible_tests:
+  - name: fires immediately, then blocks
+    code: |
+      const _oST=globalThis.setTimeout;let _q=[];
+      globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};
+      const flush=()=>{const live=_q.slice();_q=[];live.forEach(cb=>cb());};
+      try {
+        let calls=0; const t=throttle(()=>{calls++;},100);
+        t(); t(); t();
+        assert(calls===1,'leading call only, got '+calls);
+        flush();
+        t();
+        assert(calls===2,'fires again after window, got '+calls);
+      } finally { globalThis.setTimeout=_oST; }
+  - name: returns a function
+    code: |
+      assert(typeof throttle(()=>{},10)==='function');
+  hidden_tests:
+  - name: first arg used on leading call
+    code: |
+      const _oST=globalThis.setTimeout;let _q=[];
+      globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};
+      try {
+        let seen=null; const t=throttle((x)=>{seen=x;},50);
+        t('a'); t('b');
+        assert(seen==='a','leading arg should be a, got '+seen);
+      } finally { globalThis.setTimeout=_oST; }
+  - name: blocks every call within the window
+    code: |
+      const _oST=globalThis.setTimeout;let _q=[];
+      globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};
+      try {
+        let calls=0; const t=throttle(()=>{calls++;},100);
+        for (let i=0;i<10;i++) t();
+        assert(calls===1,'only one call in window, got '+calls);
+      } finally { globalThis.setTimeout=_oST; }
+  - name: multiple windows
+    code: |
+      const _oST=globalThis.setTimeout;let _q=[];
+      globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};
+      const flush=()=>{const live=_q.slice();_q=[];live.forEach(cb=>cb());};
+      try {
+        let calls=0; const t=throttle(()=>{calls++;},10);
+        t(); flush(); t(); flush(); t();
+        assert(calls===3,'expected 3 across windows, got '+calls);
+      } finally { globalThis.setTimeout=_oST; }
+  - name: forwards multiple args on leading call
+    code: |
+      const _oST=globalThis.setTimeout;let _q=[];
+      globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};
+      try {
+        let sum=0; const t=throttle((a,b)=>{sum=a+b;},10);
+        t(4,5); t(1,1);
+        assert(sum===9,'expected 9 from leading call, got '+sum);
+      } finally { globalThis.setTimeout=_oST; }
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Track a `blocked` flag in a closure.
+- order: 2
+  cost: 20
+  content: If blocked, return early; otherwise set blocked, call fn, and schedule clearing the flag.
+- order: 3
+  cost: 30
+  content: Use setTimeout(() => { blocked = false; }, interval) to re-open the gate.

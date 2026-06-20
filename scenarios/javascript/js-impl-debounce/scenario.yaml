@@ -1,0 +1,111 @@
+title: Implement debounce
+slug: js-impl-debounce
+category: JavaScript Development
+description: 'Implement debounce(fn, delay): return a function that postpones calling fn until `delay`
+  ms have passed since the LAST invocation; rapid repeated calls collapse into a single trailing call
+  with the most recent arguments. Use setTimeout/clearTimeout. The stub is empty so tests fail.'
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Schedule the call with setTimeout after delay
+- Cancel the pending timer on each new call (clearTimeout)
+- Fire once, with the latest arguments
+initial_state: 'Implement debounce(fn, delay): return a function that postpones calling fn until `delay`
+  ms have passed since the LAST invocation; rapid repeated calls collapse into a single trailing call
+  with the most recent arguments. Use setTimeout/clearTimeout. The stub is empty so tests fail.'
+solution_explanation: |
+  A closure holds the pending timer. Each call cancels the previous timer and schedules a fresh one, so only the final call in a burst survives and fires after `delay` ms with the most recent arguments.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement debounce(fn, delay) -> debounced function. Only the final call in a burst runs, after `delay` ms of quiet, with the latest args.
+    Use the global setTimeout/clearTimeout.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function debounce(fn, delay) {
+        // TODO: return a function that defers fn until `delay` ms after the last call
+      }
+    readonly: false
+  visible_tests:
+  - name: defers until flush
+    code: |
+      const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];
+      globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};
+      globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};
+      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};
+      try {
+        let calls=0; const d=debounce(()=>{calls++;},100);
+        d(); d(); d();
+        assert(calls===0,'should not fire before flush, got '+calls);
+        flush();
+        assert(calls===1,'should fire once after quiet, got '+calls);
+      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }
+  - name: uses latest args
+    code: |
+      const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];
+      globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};
+      globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};
+      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};
+      try {
+        let last=null; const d=debounce((x)=>{last=x;},50);
+        d(1); d(2); d(3); flush();
+        assert(last===3,'expected latest arg 3, got '+last);
+      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }
+  hidden_tests:
+  - name: only one timer survives a burst
+    code: |
+      const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];
+      globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};
+      globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};
+      try {
+        const d=debounce(()=>{},10); d(); d(); d(); d();
+        assert(_q.length===1,'expected 1 pending timer, got '+_q.length);
+      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }
+  - name: separate bursts each fire
+    code: |
+      const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];
+      globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};
+      globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};
+      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};
+      try {
+        let calls=0; const d=debounce(()=>{calls++;},10);
+        d(); flush(); d(); flush();
+        assert(calls===2,'expected 2 calls across bursts, got '+calls);
+      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }
+  - name: returns a function
+    code: |
+      assert(typeof debounce(()=>{},10)==='function');
+  - name: forwards multiple args
+    code: |
+      const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];
+      globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};
+      globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};
+      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};
+      try {
+        let sum=0; const d=debounce((a,b)=>{sum=a+b;},10);
+        d(2,3); flush();
+        assert(sum===5,'expected 5, got '+sum);
+      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Keep a timer handle in a closure variable shared across calls.
+- order: 2
+  cost: 20
+  content: On each call, clearTimeout the previous handle, then setTimeout a new one for `delay`.
+- order: 3
+  cost: 30
+  content: In the timeout callback, call fn with the latest args (fn.apply(this, args)).

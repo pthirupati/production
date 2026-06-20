@@ -1,10 +1,10 @@
 ---
 slug: rabbitmq-consumer-stuck
-title: "RabbitMQ Consumer Stuck — Messages Queuing Up, No Throughput"
+title: "RabbitMQ Consumer Stuck — Unacked Messages Pile Up"
 technology: Java
-category: Messaging
+category: "Messaging"
 difficulty: medium
-time_limit: 1200
+time_limit: 900
 max_score: 100
 lab_mode: simulation
 simulation_type: java
@@ -12,42 +12,21 @@ infrastructure_type: simulation
 jira_priority: High
 is_free: false
 description: |
-  A Spring AMQP consumer is processing messages at near-zero throughput while the
-  queue depth grows past 50,000 messages. The consumer is configured with prefetchCount=1
-  and has a processing time of ~2 seconds per message. With only 3 consumer threads and
-  a prefetch of 1, each thread waits for the broker's acknowledgment before fetching the
-  next message, creating massive back-pressure. Engineers must increase prefetch count and
-  the consumer concurrency.
+  A Spring AMQP consumer stops making progress: the queue shows a growing 'unacked' count and processing stalls. A poison message throws on every redelivery and, with manual acks never sent plus no prefetch limit, the channel is blocked. Fix the ack mode, add a prefetch limit, and route poison messages to a dead-letter queue.
 objectives:
-  - Check the RabbitMQ management UI or CLI to see queue depth and consumer count
-  - Identify the prefetch and concurrency configuration in the application
-  - Increase prefetchCount to at least 10 and consumer concurrency to match
-  - Verify queue depth begins to decrease after the change
+  - "Confirm messages are stuck in unacked and the consumer is blocked"
+  - "Set a sane prefetch (basic.qos) so one consumer cannot hog the channel"
+  - "Acknowledge or reject messages correctly (no infinite redelivery)"
+  - "Route poison messages to a DLQ and confirm the queue drains"
 initial_state: |
-  Simulated server. Spring Boot app with spring-amqp.
-  Config at /opt/app/src/main/resources/application.yml.
-  RabbitMQ management API available at http://localhost:15672/ (guest/guest).
-  Current config: prefetch=1, concurrency=3-3.
+  Consumer config at /app/src/main/resources/application.yml uses manual acks but never acks, has no prefetch, and no DLQ; unacked messages pile up.
 hints:
   - order: 1
     cost: 10
-    content: "Check queue depth: curl -s -u guest:guest http://localhost:15672/api/queues/%2F/order-processing
-      | python3 -m json.tool | grep messages_ready
-      Also check consumer utilization to see if threads are idle."
+    content: "RabbitMQ UI shows high 'Unacked' — the consumer holds messages without acking."
   - order: 2
     cost: 15
-    content: "In application.yml update:
-      spring:
-        rabbitmq:
-          listener:
-            simple:
-              prefetch: 10
-              concurrency: 10
-              max-concurrency: 20
-      This allows each of 10 threads to hold 10 messages at once."
+    content: "Set spring.rabbitmq.listener.simple.prefetch and ensure ack/nack is actually sent."
   - order: 3
     cost: 20
-    content: "Prefetch is a balance — too high can cause message loss on consumer
-      crash. A value of 10-50 is typical for 2s processing time.
-      Also ensure your processing logic is thread-safe before increasing concurrency.
-      Restart the service and monitor: watch -n2 'curl -s -u guest:guest http://localhost:15672/api/queues/%2F/order-processing | python3 -m json.tool | grep messages_ready'"
+    content: "Configure a dead-letter exchange/queue so a poison message stops re-blocking the channel."

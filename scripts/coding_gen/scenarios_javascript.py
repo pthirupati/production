@@ -1957,3 +1957,906 @@ add(Scenario(
         "Assigning the item overwrites with a value, not a tally. Initializing to "
         "0 and incrementing accumulates the count per key."),
 ))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BATCH 2 (37 -> 50): more fix-bug, implement, log-analysis, refactor.
+#
+# Timing-based utilities (debounce/throttle) are graded deterministically: the
+# tests monkeypatch the global setTimeout/clearTimeout with a controllable queue
+# and a manual flush(), restoring the originals in a finally block. No real
+# timers fire, so grading is synchronous and reproducible. Promise/async LOGIC
+# is exercised through synchronously-resolvable shapes — never via assertions
+# inside a .then callback (those would run AFTER the verdict is emitted).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── fix-bug ──────────────────────────────────────────────────────────────────
+
+add(Scenario(
+    slug="js-fix-async-await-in-loop",
+    title="Fix the Sequential await Inside forEach",
+    language="javascript", kind="fix", difficulty="hard", scenario_type="fix",
+    description=(
+        "runAll(tasks) should run each thunk and return an array of their results "
+        "in order, but it uses `forEach(async ...)` — forEach ignores the returned "
+        "promises, so the function returns undefined and nothing is collected. "
+        "Each task here is SYNCHRONOUS (returns a value), so the fix is to collect "
+        "results with map and return the array. The stub returns undefined."),
+    objectives=[
+        "See forEach swallow the per-item results",
+        "Collect each task's result into an array",
+        "Return the results in input order",
+    ],
+    instructions=(
+        "Fix runAll(tasks): call each task (a zero-arg function) and return an "
+        "array of the results, in order.\n"
+        "  runAll([() => 1, () => 2]) -> [1, 2]\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "function runAll(tasks) {\n"
+        "  const out = [];\n"
+        "  tasks.forEach((task) => { task(); }); // results discarded; returns undefined\n"
+        "}\n"),
+    reference=(
+        "function runAll(tasks) {\n"
+        "  return tasks.map((task) => task());\n"
+        "}\n"),
+    visible_tests=[
+        Test("collects results", eq("runAll([() => 1, () => 2])", "[1, 2]")),
+        Test("returns an array",
+             "assert(Array.isArray(runAll([() => 'x'])), 'should return an array');"),
+    ],
+    hidden_tests=[
+        Test("order preserved", eq("runAll([() => 'a', () => 'b', () => 'c'])", "['a','b','c']")),
+        Test("empty", eq("runAll([])", "[]")),
+        Test("computes values",
+             "const r = runAll([() => 2 + 2, () => 3 * 3]);\nassert(r[0] === 4 && r[1] === 9, JSON.stringify(r));"),
+        Test("not undefined",
+             "assert(runAll([() => 1]) !== undefined, 'forEach returns undefined');"),
+    ],
+    hints=[
+        "runAll([() => 1]) returns undefined — forEach throws away each task() result.",
+        "forEach is for side effects; it never builds or returns a value.",
+        "Use tasks.map((task) => task()) and return it.",
+    ],
+    solution_explanation=(
+        "forEach evaluates each task but discards the return values and yields "
+        "undefined. map collects each result into a new array, returned in order."),
+))
+
+add(Scenario(
+    slug="js-fix-filter-truthy-predicate",
+    title="Fix compact Dropping Valid Falsy-ish Values",
+    language="javascript", kind="fix", difficulty="medium", scenario_type="fix",
+    description=(
+        "compact(arr) should remove only null and undefined, keeping every other "
+        "value (including 0, '', false, NaN). It currently filters with the value "
+        "itself as the predicate (`arr.filter(x => x)`), which also drops 0, '', "
+        "false, and NaN. Fix the predicate to reject only null/undefined."),
+    objectives=[
+        "See 0, '', false, NaN wrongly removed",
+        "Keep all defined values, including falsy ones",
+        "Remove only null and undefined",
+    ],
+    instructions=(
+        "Fix compact(arr): return a new array with only null and undefined "
+        "removed; keep 0, '', false, and NaN.\n"
+        "  compact([0, null, 1, undefined, '']) -> [0, 1, '']\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "function compact(arr) {\n"
+        "  return arr.filter((x) => x); // also drops 0, '', false, NaN\n"
+        "}\n"),
+    reference=(
+        "function compact(arr) {\n"
+        "  return arr.filter((x) => x !== null && x !== undefined);\n"
+        "}\n"),
+    visible_tests=[
+        Test("keeps falsy, drops nullish",
+             eq("compact([0, null, 1, undefined, ''])", "[0, 1, '']")),
+        Test("keeps false", eq("compact([false, null])", "[false]")),
+    ],
+    hidden_tests=[
+        Test("keeps zero", eq("compact([0, 0, null])", "[0, 0]")),
+        Test("drops only nullish",
+             eq("compact([1, null, 2, undefined, 3])", "[1, 2, 3]")),
+        Test("keeps NaN",
+             "const r = compact([NaN, null, 1]);\nassert(r.length === 2 && Number.isNaN(r[0]) && r[1] === 1, JSON.stringify(r));"),
+        Test("nothing to drop", eq("compact([1, 2, 3])", "[1, 2, 3]")),
+        Test("all nullish", eq("compact([null, undefined])", "[]")),
+    ],
+    hints=[
+        "compact([0, '']) returns [] because 0 and '' are falsy and the predicate is just `x`.",
+        "You want to remove ONLY null and undefined, not all falsy values.",
+        "Filter with (x) => x !== null && x !== undefined (or x != null).",
+    ],
+    solution_explanation=(
+        "Using the value as the predicate drops every falsy value. Explicitly "
+        "comparing against null and undefined keeps legitimate falsy values like "
+        "0, '', false, and NaN."),
+))
+
+add(Scenario(
+    slug="js-fix-hoisting-tdz",
+    title="Fix the Hoisting Bug in buildLabels",
+    language="javascript", kind="fix", difficulty="medium", scenario_type="fix",
+    description=(
+        "buildLabels(items) should return ['#0: a', '#1: b', ...], but the helper "
+        "result variable is USED before it is declared with const, and the loop "
+        "reads `label` outside its block. Function-declaration hoisting masks the "
+        "intent and the labels come out wrong/undefined. Fix the declaration order "
+        "and scoping so each label is built correctly."),
+    objectives=[
+        "See undefined / wrong values from use-before-declare",
+        "Declare variables before use, in the right scope",
+        "Return the correctly numbered labels",
+    ],
+    instructions=(
+        "Fix buildLabels(items): return an array where item i becomes '#i: ' + "
+        "item.\n"
+        "  buildLabels(['a','b']) -> ['#0: a', '#1: b']\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "function buildLabels(items) {\n"
+        "  const out = [];\n"
+        "  for (let i = 0; i < items.length; i++) {\n"
+        "    out.push(label);              // used before declaration (undefined/TDZ)\n"
+        "    var label = '#' + i + ': ' + items[i];\n"
+        "  }\n"
+        "  return out;\n"
+        "}\n"),
+    reference=(
+        "function buildLabels(items) {\n"
+        "  const out = [];\n"
+        "  for (let i = 0; i < items.length; i++) {\n"
+        "    const label = '#' + i + ': ' + items[i];\n"
+        "    out.push(label);\n"
+        "  }\n"
+        "  return out;\n"
+        "}\n"),
+    visible_tests=[
+        Test("two items", eq("buildLabels(['a', 'b'])", "['#0: a', '#1: b']")),
+        Test("single", eq("buildLabels(['x'])", "['#0: x']")),
+    ],
+    hidden_tests=[
+        Test("three items", eq("buildLabels(['p', 'q', 'r'])", "['#0: p', '#1: q', '#2: r']")),
+        Test("no undefined leaked",
+             "const r = buildLabels(['a']);\nassert(r[0].indexOf('undefined') === -1, r[0]);"),
+        Test("empty", eq("buildLabels([])", "[]")),
+        Test("numbers as items", eq("buildLabels([10, 20])", "['#0: 10', '#1: 20']")),
+    ],
+    hints=[
+        "buildLabels(['a']) pushes undefined because `label` is read before it is assigned.",
+        "var is hoisted (initialized undefined) so the push sees undefined, not the string.",
+        "Declare `const label = ...;` BEFORE out.push(label) inside the loop body.",
+    ],
+    solution_explanation=(
+        "Reading a var before its assignment yields undefined due to hoisting. "
+        "Declaring the label with const before pushing it builds each entry "
+        "correctly within the loop's block scope."),
+))
+
+add(Scenario(
+    slug="js-fix-coercion-plus-concat",
+    title="Fix the String-Concatenation Bug in addUp",
+    language="javascript", kind="fix", difficulty="easy", scenario_type="fix",
+    description=(
+        "addUp(values) should numerically sum an array that may contain numeric "
+        "STRINGS (like '3'), but reduce uses `+` directly, so a string operand "
+        "turns the whole thing into string concatenation ('0' + 3 -> '03'). "
+        "Coerce each value to a Number before adding."),
+    objectives=[
+        "See numbers concatenated instead of added",
+        "Convert each value to a Number before summing",
+        "Return a numeric total",
+    ],
+    instructions=(
+        "Fix addUp(values): return the numeric sum, coercing numeric strings.\n"
+        "  addUp([1, '2', 3]) -> 6\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "function addUp(values) {\n"
+        "  return values.reduce((acc, v) => acc + v, 0); // '2' makes acc a string\n"
+        "}\n"),
+    reference=(
+        "function addUp(values) {\n"
+        "  return values.reduce((acc, v) => acc + Number(v), 0);\n"
+        "}\n"),
+    visible_tests=[
+        Test("mixed strings and numbers", "assert(addUp([1, '2', 3]) === 6, addUp([1, '2', 3]));"),
+        Test("all numbers", "assert(addUp([1, 2, 3]) === 6);"),
+    ],
+    hidden_tests=[
+        Test("all strings", "assert(addUp(['10', '20']) === 30, addUp(['10', '20']));"),
+        Test("returns a number",
+             "assert(typeof addUp(['1', 2]) === 'number' && addUp(['1', 2]) === 3);"),
+        Test("empty is zero", "assert(addUp([]) === 0);"),
+        Test("negatives as strings", "assert(addUp(['-5', 5]) === 0);"),
+    ],
+    hints=[
+        "addUp([1, '2', 3]) returns '0123' — once acc meets a string, + concatenates.",
+        "The + operator concatenates if either side is a string.",
+        "Add Number(v) (or +v) so every operand is numeric: acc + Number(v).",
+    ],
+    solution_explanation=(
+        "A single string operand flips + into concatenation. Coercing each value "
+        "with Number keeps the reduce arithmetic and returns a numeric total."),
+))
+
+add(Scenario(
+    slug="js-fix-regex-global-lastindex",
+    title="Fix the Stateful Global Regex in isHex",
+    language="javascript", kind="fix", difficulty="hard", scenario_type="fix",
+    description=(
+        "isHex(s) should return whether s is a string of one or more hex digits, "
+        "but it reuses a single regex literal declared with the global (g) flag "
+        "and calls .test() on it. A global regex keeps lastIndex between calls, so "
+        "repeated tests of the SAME string alternate true/false. Fix it so each "
+        "call is independent (drop the g flag, or reset/avoid shared state)."),
+    objectives=[
+        "Reproduce the alternating true/false on repeated calls",
+        "Understand that /g regexes carry lastIndex across .test()",
+        "Make every call independent and correct",
+    ],
+    instructions=(
+        "Fix isHex(s): return true iff s is one or more hex digits (0-9a-fA-F). "
+        "Repeated calls with the same input must give the same answer.\n"
+        "  isHex('1a2f') -> true (every time)\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "const HEX = /^[0-9a-f]+$/gi; // global flag => stateful lastIndex\n"
+        "\n"
+        "function isHex(s) {\n"
+        "  return HEX.test(s); // alternates true/false on repeated same input\n"
+        "}\n"),
+    reference=(
+        "function isHex(s) {\n"
+        "  return /^[0-9a-f]+$/i.test(s);\n"
+        "}\n"),
+    visible_tests=[
+        Test("valid hex", "assert(isHex('1a2f') === true, 'should be hex');"),
+        Test("stable on repeat",
+             "assert(isHex('1a2f') === true && isHex('1a2f') === true && isHex('1a2f') === true, 'must not alternate');"),
+    ],
+    hidden_tests=[
+        Test("uppercase hex", "assert(isHex('FF') === true);"),
+        Test("non-hex", "assert(isHex('xyz') === false);"),
+        Test("empty is false", "assert(isHex('') === false);"),
+        Test("repeated non-hex stable",
+             "assert(isHex('zz') === false && isHex('zz') === false);"),
+        Test("mixed invalid", "assert(isHex('1g') === false);"),
+    ],
+    hints=[
+        "Call isHex('1a2f') twice — it returns true then false. The regex is stateful.",
+        "A regex with the g flag advances lastIndex on each .test(), so it desyncs across calls.",
+        "Drop the g flag (use /^[0-9a-f]+$/i) or build a fresh regex each call.",
+    ],
+    solution_explanation=(
+        "A global-flag regex remembers lastIndex between .test() calls, so it "
+        "alternates results for the same input. Removing the g flag makes each "
+        "match start from the beginning, so the test is stateless and correct."),
+))
+
+# ── implement ────────────────────────────────────────────────────────────────
+
+add(Scenario(
+    slug="js-impl-debounce",
+    title="Implement debounce",
+    language="javascript", kind="impl", difficulty="hard", scenario_type="do",
+    description=(
+        "Implement debounce(fn, delay): return a function that postpones calling "
+        "fn until `delay` ms have passed since the LAST invocation; rapid repeated "
+        "calls collapse into a single trailing call with the most recent "
+        "arguments. Use setTimeout/clearTimeout. The stub is empty so tests fail."),
+    objectives=[
+        "Schedule the call with setTimeout after delay",
+        "Cancel the pending timer on each new call (clearTimeout)",
+        "Fire once, with the latest arguments",
+    ],
+    instructions=(
+        "Implement debounce(fn, delay) -> debounced function. Only the final call "
+        "in a burst runs, after `delay` ms of quiet, with the latest args.\n"
+        "Use the global setTimeout/clearTimeout.\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "function debounce(fn, delay) {\n"
+        "  // TODO: return a function that defers fn until `delay` ms after the last call\n"
+        "}\n"),
+    reference=(
+        "function debounce(fn, delay) {\n"
+        "  let timer = null;\n"
+        "  return function (...args) {\n"
+        "    clearTimeout(timer);\n"
+        "    timer = setTimeout(() => { fn.apply(this, args); }, delay);\n"
+        "  };\n"
+        "}\n"),
+    visible_tests=[
+        Test("defers until flush",
+             "const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];\n"
+             "globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};\n"
+             "globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};\n"
+             "const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};\n"
+             "try {\n"
+             "  let calls=0; const d=debounce(()=>{calls++;},100);\n"
+             "  d(); d(); d();\n"
+             "  assert(calls===0,'should not fire before flush, got '+calls);\n"
+             "  flush();\n"
+             "  assert(calls===1,'should fire once after quiet, got '+calls);\n"
+             "} finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }"),
+        Test("uses latest args",
+             "const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];\n"
+             "globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};\n"
+             "globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};\n"
+             "const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};\n"
+             "try {\n"
+             "  let last=null; const d=debounce((x)=>{last=x;},50);\n"
+             "  d(1); d(2); d(3); flush();\n"
+             "  assert(last===3,'expected latest arg 3, got '+last);\n"
+             "} finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }"),
+    ],
+    hidden_tests=[
+        Test("only one timer survives a burst",
+             "const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];\n"
+             "globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};\n"
+             "globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};\n"
+             "try {\n"
+             "  const d=debounce(()=>{},10); d(); d(); d(); d();\n"
+             "  assert(_q.length===1,'expected 1 pending timer, got '+_q.length);\n"
+             "} finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }"),
+        Test("separate bursts each fire",
+             "const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];\n"
+             "globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};\n"
+             "globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};\n"
+             "const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};\n"
+             "try {\n"
+             "  let calls=0; const d=debounce(()=>{calls++;},10);\n"
+             "  d(); flush(); d(); flush();\n"
+             "  assert(calls===2,'expected 2 calls across bursts, got '+calls);\n"
+             "} finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }"),
+        Test("returns a function",
+             "assert(typeof debounce(()=>{},10)==='function');"),
+        Test("forwards multiple args",
+             "const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];\n"
+             "globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};\n"
+             "globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};\n"
+             "const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};\n"
+             "try {\n"
+             "  let sum=0; const d=debounce((a,b)=>{sum=a+b;},10);\n"
+             "  d(2,3); flush();\n"
+             "  assert(sum===5,'expected 5, got '+sum);\n"
+             "} finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }"),
+    ],
+    hints=[
+        "Keep a timer handle in a closure variable shared across calls.",
+        "On each call, clearTimeout the previous handle, then setTimeout a new one for `delay`.",
+        "In the timeout callback, call fn with the latest args (fn.apply(this, args)).",
+    ],
+    solution_explanation=(
+        "A closure holds the pending timer. Each call cancels the previous timer "
+        "and schedules a fresh one, so only the final call in a burst survives and "
+        "fires after `delay` ms with the most recent arguments."),
+))
+
+add(Scenario(
+    slug="js-impl-throttle",
+    title="Implement throttle (Leading Edge)",
+    language="javascript", kind="impl", difficulty="hard", scenario_type="do",
+    description=(
+        "Implement throttle(fn, interval): return a function that calls fn "
+        "immediately on the first invocation, then ignores further calls until "
+        "`interval` ms have elapsed (leading-edge throttling). Use setTimeout to "
+        "re-open the gate. The stub is empty so tests fail."),
+    objectives=[
+        "Call fn immediately on the leading edge",
+        "Block calls during the cooldown window",
+        "Re-open after `interval` ms via setTimeout",
+    ],
+    instructions=(
+        "Implement throttle(fn, interval) -> throttled function. The first call "
+        "runs fn right away; calls during the next `interval` ms are dropped; "
+        "after the window the next call runs again.\n"
+        "Use the global setTimeout.\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "function throttle(fn, interval) {\n"
+        "  // TODO: run fn on the leading edge, then ignore calls for `interval` ms\n"
+        "}\n"),
+    reference=(
+        "function throttle(fn, interval) {\n"
+        "  let blocked = false;\n"
+        "  return function (...args) {\n"
+        "    if (blocked) return;\n"
+        "    blocked = true;\n"
+        "    fn.apply(this, args);\n"
+        "    setTimeout(() => { blocked = false; }, interval);\n"
+        "  };\n"
+        "}\n"),
+    visible_tests=[
+        Test("fires immediately, then blocks",
+             "const _oST=globalThis.setTimeout;let _q=[];\n"
+             "globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};\n"
+             "const flush=()=>{const live=_q.slice();_q=[];live.forEach(cb=>cb());};\n"
+             "try {\n"
+             "  let calls=0; const t=throttle(()=>{calls++;},100);\n"
+             "  t(); t(); t();\n"
+             "  assert(calls===1,'leading call only, got '+calls);\n"
+             "  flush();\n"
+             "  t();\n"
+             "  assert(calls===2,'fires again after window, got '+calls);\n"
+             "} finally { globalThis.setTimeout=_oST; }"),
+        Test("returns a function",
+             "assert(typeof throttle(()=>{},10)==='function');"),
+    ],
+    hidden_tests=[
+        Test("first arg used on leading call",
+             "const _oST=globalThis.setTimeout;let _q=[];\n"
+             "globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};\n"
+             "try {\n"
+             "  let seen=null; const t=throttle((x)=>{seen=x;},50);\n"
+             "  t('a'); t('b');\n"
+             "  assert(seen==='a','leading arg should be a, got '+seen);\n"
+             "} finally { globalThis.setTimeout=_oST; }"),
+        Test("blocks every call within the window",
+             "const _oST=globalThis.setTimeout;let _q=[];\n"
+             "globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};\n"
+             "try {\n"
+             "  let calls=0; const t=throttle(()=>{calls++;},100);\n"
+             "  for (let i=0;i<10;i++) t();\n"
+             "  assert(calls===1,'only one call in window, got '+calls);\n"
+             "} finally { globalThis.setTimeout=_oST; }"),
+        Test("multiple windows",
+             "const _oST=globalThis.setTimeout;let _q=[];\n"
+             "globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};\n"
+             "const flush=()=>{const live=_q.slice();_q=[];live.forEach(cb=>cb());};\n"
+             "try {\n"
+             "  let calls=0; const t=throttle(()=>{calls++;},10);\n"
+             "  t(); flush(); t(); flush(); t();\n"
+             "  assert(calls===3,'expected 3 across windows, got '+calls);\n"
+             "} finally { globalThis.setTimeout=_oST; }"),
+        Test("forwards multiple args on leading call",
+             "const _oST=globalThis.setTimeout;let _q=[];\n"
+             "globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};\n"
+             "try {\n"
+             "  let sum=0; const t=throttle((a,b)=>{sum=a+b;},10);\n"
+             "  t(4,5); t(1,1);\n"
+             "  assert(sum===9,'expected 9 from leading call, got '+sum);\n"
+             "} finally { globalThis.setTimeout=_oST; }"),
+    ],
+    hints=[
+        "Track a `blocked` flag in a closure.",
+        "If blocked, return early; otherwise set blocked, call fn, and schedule clearing the flag.",
+        "Use setTimeout(() => { blocked = false; }, interval) to re-open the gate.",
+    ],
+    solution_explanation=(
+        "A closure flag gates calls: the first call runs fn and sets the flag; "
+        "subsequent calls return until a setTimeout clears the flag after "
+        "`interval` ms, implementing leading-edge throttling."),
+))
+
+add(Scenario(
+    slug="js-impl-deep-clone",
+    title="Implement deepClone",
+    language="javascript", kind="impl", difficulty="medium", scenario_type="do",
+    description=(
+        "Implement deepClone(value): return a deep copy of a JSON-like value "
+        "(primitives, arrays, plain objects, nested). Mutating the clone must not "
+        "affect the original, at any depth. Do not use structuredClone. The stub "
+        "is empty so tests fail."),
+    objectives=[
+        "Return primitives as-is",
+        "Recursively copy arrays and plain objects",
+        "Ensure nested mutations don't leak back to the source",
+    ],
+    instructions=(
+        "Implement deepClone(value) -> a deep copy. Nested arrays/objects are "
+        "copied recursively so the clone is fully independent.\n"
+        "  const c = deepClone({a:[1,2]}); c.a.push(3); // original.a stays [1,2]\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "function deepClone(value) {\n"
+        "  // TODO: return a deep copy of value (primitives, arrays, plain objects)\n"
+        "}\n"),
+    reference=(
+        "function deepClone(value) {\n"
+        "  if (value === null || typeof value !== 'object') {\n"
+        "    return value;\n"
+        "  }\n"
+        "  if (Array.isArray(value)) {\n"
+        "    return value.map((v) => deepClone(v));\n"
+        "  }\n"
+        "  const out = {};\n"
+        "  for (const k of Object.keys(value)) {\n"
+        "    out[k] = deepClone(value[k]);\n"
+        "  }\n"
+        "  return out;\n"
+        "}\n"),
+    visible_tests=[
+        Test("clones nested object",
+             "const src = {a:1, b:{c:2}};\nconst c = deepClone(src);\n"
+             "assert(JSON.stringify(c) === JSON.stringify(src) && c !== src && c.b !== src.b, 'shallow or unequal');"),
+        Test("primitive passthrough",
+             "assert(deepClone(5) === 5 && deepClone('x') === 'x' && deepClone(null) === null);"),
+    ],
+    hidden_tests=[
+        Test("nested mutation does not leak",
+             "const src = {a:[1,2]};\nconst c = deepClone(src);\nc.a.push(3);\n"
+             "assert(JSON.stringify(src.a) === JSON.stringify([1,2]), 'source mutated: ' + JSON.stringify(src.a));"),
+        Test("array of objects independent",
+             "const src = [{n:1}, {n:2}];\nconst c = deepClone(src);\nc[0].n = 99;\n"
+             "assert(src[0].n === 1, 'source element mutated');"),
+        Test("deep equality preserved",
+             "const src = {a:{b:{c:[1,{d:2}]}}};\nassert(JSON.stringify(deepClone(src)) === JSON.stringify(src));"),
+        Test("empty structures",
+             "assert(JSON.stringify(deepClone({})) === '{}' && JSON.stringify(deepClone([])) === '[]');"),
+        Test("top-level array copy is new",
+             "const src = [1,2,3];\nconst c = deepClone(src);\nassert(c !== src && JSON.stringify(c) === JSON.stringify(src));"),
+    ],
+    hints=[
+        "Primitives (and null) can be returned directly — there's nothing to copy.",
+        "For arrays, map each element through deepClone; for objects, rebuild key by key.",
+        "Recurse on every element/value so nested containers are also fresh copies.",
+    ],
+    solution_explanation=(
+        "Primitives are returned as-is; arrays and plain objects are rebuilt with "
+        "each element/value recursively cloned, producing a structure that shares "
+        "no references with the original at any depth."),
+))
+
+add(Scenario(
+    slug="js-impl-retry-backoff",
+    title="Implement retry with Backoff (Synchronous)",
+    language="javascript", kind="impl", difficulty="medium", scenario_type="do",
+    description=(
+        "Implement retry(fn, maxAttempts, onWait): call the synchronous fn; if it "
+        "throws, retry up to maxAttempts total attempts. Before each RETRY (not "
+        "the first attempt), call onWait(attemptNumber) so a caller can observe "
+        "the backoff schedule. Return fn's value on success; if all attempts "
+        "throw, rethrow the last error. The stub is empty so tests fail."),
+    objectives=[
+        "Attempt fn and return its value on success",
+        "Retry on throw up to maxAttempts, signalling each wait via onWait",
+        "Rethrow the final error if every attempt fails",
+    ],
+    instructions=(
+        "Implement retry(fn, maxAttempts, onWait) -> fn's result, retrying on "
+        "throw. Call onWait(n) before the n-th retry (n starts at 1). Rethrow the "
+        "last error if all attempts fail.\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "function retry(fn, maxAttempts, onWait) {\n"
+        "  // TODO: call fn; on throw, retry up to maxAttempts, onWait(n) before each retry\n"
+        "}\n"),
+    reference=(
+        "function retry(fn, maxAttempts, onWait) {\n"
+        "  let lastError;\n"
+        "  for (let attempt = 1; attempt <= maxAttempts; attempt++) {\n"
+        "    try {\n"
+        "      return fn();\n"
+        "    } catch (e) {\n"
+        "      lastError = e;\n"
+        "      if (attempt < maxAttempts) {\n"
+        "        onWait(attempt);\n"
+        "      }\n"
+        "    }\n"
+        "  }\n"
+        "  throw lastError;\n"
+        "}\n"),
+    visible_tests=[
+        Test("succeeds after failures",
+             "let n = 0;\nconst r = retry(() => { n++; if (n < 3) throw new Error('no'); return 'ok'; }, 5, () => {});\n"
+             "assert(r === 'ok' && n === 3, 'r=' + r + ' n=' + n);"),
+        Test("first try success calls fn once",
+             "let n = 0;\nconst r = retry(() => { n++; return 42; }, 3, () => {});\n"
+             "assert(r === 42 && n === 1, 'n=' + n);"),
+    ],
+    hidden_tests=[
+        Test("rethrows after exhausting attempts",
+             "let threw = false; let n = 0;\n"
+             "try { retry(() => { n++; throw new Error('always'); }, 3, () => {}); }\n"
+             "catch (e) { threw = (e.message === 'always'); }\n"
+             "assert(threw && n === 3, 'threw=' + threw + ' n=' + n);"),
+        Test("onWait called once per retry, not before first",
+             "let waits = [];\nlet n = 0;\nretry(() => { n++; if (n < 3) throw new Error('x'); return 1; }, 5, (a) => waits.push(a));\n"
+             "assert(JSON.stringify(waits) === JSON.stringify([1, 2]), 'waits=' + JSON.stringify(waits));"),
+        Test("no wait on immediate success",
+             "let waited = false;\nretry(() => 'done', 3, () => { waited = true; });\n"
+             "assert(waited === false, 'should not wait on success');"),
+        Test("single attempt rethrows without waiting",
+             "let waited = false; let threw = false;\n"
+             "try { retry(() => { throw new Error('one'); }, 1, () => { waited = true; }); }\n"
+             "catch (e) { threw = true; }\n"
+             "assert(threw && waited === false, 'threw=' + threw + ' waited=' + waited);"),
+    ],
+    hints=[
+        "Loop attempt from 1 to maxAttempts; return fn() inside a try.",
+        "On catch, remember the error; if more attempts remain, call onWait(attempt).",
+        "After the loop (all failed), throw the last error you saved.",
+    ],
+    solution_explanation=(
+        "A loop tries fn each attempt, returning on success. On failure it records "
+        "the error and, when attempts remain, signals onWait(attempt) for the "
+        "backoff. If the loop ends without success, the last error is rethrown."),
+))
+
+add(Scenario(
+    slug="js-impl-binary-search",
+    title="Implement binarySearch",
+    language="javascript", kind="impl", difficulty="medium", scenario_type="do",
+    description=(
+        "Implement binarySearch(sortedArr, target): return the index of target in "
+        "an ascending-sorted array, or -1 if absent. Must be O(log n) (halve the "
+        "search range each step), not a linear scan. The stub is empty so tests "
+        "fail."),
+    objectives=[
+        "Maintain low/high bounds and inspect the midpoint",
+        "Halve the range based on the comparison",
+        "Return the index, or -1 when not found",
+    ],
+    instructions=(
+        "Implement binarySearch(sortedArr, target) -> index or -1.\n"
+        "  binarySearch([1,3,5,7,9], 7) -> 3; binarySearch([1,3,5], 4) -> -1\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "function binarySearch(sortedArr, target) {\n"
+        "  // TODO: return index of target via binary search, or -1\n"
+        "}\n"),
+    reference=(
+        "function binarySearch(sortedArr, target) {\n"
+        "  let low = 0;\n"
+        "  let high = sortedArr.length - 1;\n"
+        "  while (low <= high) {\n"
+        "    const mid = Math.floor((low + high) / 2);\n"
+        "    if (sortedArr[mid] === target) {\n"
+        "      return mid;\n"
+        "    }\n"
+        "    if (sortedArr[mid] < target) {\n"
+        "      low = mid + 1;\n"
+        "    } else {\n"
+        "      high = mid - 1;\n"
+        "    }\n"
+        "  }\n"
+        "  return -1;\n"
+        "}\n"),
+    visible_tests=[
+        Test("finds middle", "assert(binarySearch([1,3,5,7,9], 7) === 3, binarySearch([1,3,5,7,9], 7));"),
+        Test("absent is -1", "assert(binarySearch([1,3,5], 4) === -1);"),
+    ],
+    hidden_tests=[
+        Test("first element", "assert(binarySearch([2,4,6], 2) === 0);"),
+        Test("last element", "assert(binarySearch([2,4,6,8], 8) === 3);"),
+        Test("empty array", "assert(binarySearch([], 1) === -1);"),
+        Test("single found", "assert(binarySearch([5], 5) === 0);"),
+        Test("single absent", "assert(binarySearch([5], 9) === -1);"),
+        Test("below range", "assert(binarySearch([10,20,30], 5) === -1);"),
+        Test("all positions",
+             "const a = [1,2,3,4,5,6,7,8];\nlet ok = true;\nfor (let i = 0; i < a.length; i++) { if (binarySearch(a, a[i]) !== i) ok = false; }\nassert(ok, 'wrong index somewhere');"),
+    ],
+    hints=[
+        "Track low and high indices bounding the remaining search range.",
+        "Compare the middle element to target: equal -> return mid; smaller -> search right; larger -> search left.",
+        "Loop while low <= high; return -1 if the range empties.",
+    ],
+    solution_explanation=(
+        "Binary search keeps a [low, high] window, compares the midpoint to the "
+        "target, and discards half the range each iteration, finding the index in "
+        "O(log n) or returning -1 when the window closes."),
+))
+
+add(Scenario(
+    slug="js-impl-parse-query-string",
+    title="Implement parseQueryString",
+    language="javascript", kind="impl", difficulty="medium", scenario_type="do",
+    description=(
+        "Implement parseQueryString(qs): parse a URL query string into an object. "
+        "Accept an optional leading '?'. Split on '&', then on the first '='. "
+        "URL-decode keys and values (decodeURIComponent). A key with no '=' maps "
+        "to ''. Ignore empty segments. The stub is empty so tests fail."),
+    objectives=[
+        "Strip an optional leading '?' and split on '&'",
+        "Split each pair on the FIRST '=' and decode both sides",
+        "Map a bare key to '' and skip empty segments",
+    ],
+    instructions=(
+        "Implement parseQueryString(qs) -> { key: value }.\n"
+        "  parseQueryString('?a=1&b=2') -> {a:'1', b:'2'}\n"
+        "  parseQueryString('q=hello%20world') -> {q:'hello world'}\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "function parseQueryString(qs) {\n"
+        "  // TODO: parse a query string into an object (handle '?', '&', '=', decoding)\n"
+        "}\n"),
+    reference=(
+        "function parseQueryString(qs) {\n"
+        "  const out = {};\n"
+        "  let s = qs;\n"
+        "  if (s.charAt(0) === '?') {\n"
+        "    s = s.slice(1);\n"
+        "  }\n"
+        "  if (s === '') {\n"
+        "    return out;\n"
+        "  }\n"
+        "  for (const pair of s.split('&')) {\n"
+        "    if (pair === '') {\n"
+        "      continue;\n"
+        "    }\n"
+        "    const eq = pair.indexOf('=');\n"
+        "    let key;\n"
+        "    let value;\n"
+        "    if (eq === -1) {\n"
+        "      key = pair;\n"
+        "      value = '';\n"
+        "    } else {\n"
+        "      key = pair.slice(0, eq);\n"
+        "      value = pair.slice(eq + 1);\n"
+        "    }\n"
+        "    out[decodeURIComponent(key)] = decodeURIComponent(value);\n"
+        "  }\n"
+        "  return out;\n"
+        "}\n"),
+    visible_tests=[
+        Test("basic pairs", eq("parseQueryString('?a=1&b=2')", "{a:'1', b:'2'}")),
+        Test("decodes percent-encoding",
+             eq("parseQueryString('q=hello%20world')", "{q:'hello world'}")),
+    ],
+    hidden_tests=[
+        Test("no leading question mark", eq("parseQueryString('x=10&y=20')", "{x:'10', y:'20'}")),
+        Test("empty string", eq("parseQueryString('')", "{}")),
+        Test("bare key maps to empty", eq("parseQueryString('flag')", "{flag:''}")),
+        Test("value containing equals",
+             eq("parseQueryString('eq=a=b')", "{eq:'a=b'}")),
+        Test("decodes keys too",
+             eq("parseQueryString('a%20b=c')", "{'a b':'c'}")),
+        Test("skips empty segments",
+             eq("parseQueryString('a=1&&b=2')", "{a:'1', b:'2'}")),
+    ],
+    hints=[
+        "If the string starts with '?', drop it; an empty remainder means {}.",
+        "Split on '&'; for each pair, find the FIRST '=' (indexOf) so values may contain '='.",
+        "decodeURIComponent both the key and the value; a pair with no '=' has value ''.",
+    ],
+    solution_explanation=(
+        "After stripping an optional '?', the string is split on '&'; each "
+        "non-empty pair is split at its first '=' and both halves are URL-decoded, "
+        "with a bare key mapping to an empty string."),
+))
+
+add(Scenario(
+    slug="js-impl-flatten-deep-depth",
+    title="Implement flattenDepth",
+    language="javascript", kind="impl", difficulty="medium", scenario_type="do",
+    description=(
+        "Implement flattenDepth(arr, depth): flatten a nested array by AT MOST "
+        "`depth` levels (depth defaults to 1). Elements deeper than `depth` stay "
+        "nested. Do not use Array.prototype.flat, and do not mutate the input. The "
+        "stub is empty so tests fail."),
+    objectives=[
+        "Flatten exactly `depth` levels, no more",
+        "Leave deeper nesting intact",
+        "Default depth to 1 and avoid flat()/mutation",
+    ],
+    instructions=(
+        "Implement flattenDepth(arr, depth=1) -> array flattened up to `depth` "
+        "levels.\n"
+        "  flattenDepth([1, [2, [3, [4]]]], 1) -> [1, 2, [3, [4]]]\n"
+        "  flattenDepth([1, [2, [3, [4]]]], 2) -> [1, 2, 3, [4]]\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "function flattenDepth(arr, depth = 1) {\n"
+        "  // TODO: flatten up to `depth` levels (no flat(), no mutation)\n"
+        "}\n"),
+    reference=(
+        "function flattenDepth(arr, depth = 1) {\n"
+        "  const out = [];\n"
+        "  for (const el of arr) {\n"
+        "    if (Array.isArray(el) && depth > 0) {\n"
+        "      out.push(...flattenDepth(el, depth - 1));\n"
+        "    } else {\n"
+        "      out.push(el);\n"
+        "    }\n"
+        "  }\n"
+        "  return out;\n"
+        "}\n"),
+    visible_tests=[
+        Test("depth one", eq("flattenDepth([1, [2, [3, [4]]]], 1)", "[1, 2, [3, [4]]]")),
+        Test("depth two", eq("flattenDepth([1, [2, [3, [4]]]], 2)", "[1, 2, 3, [4]]")),
+    ],
+    hidden_tests=[
+        Test("default depth is one",
+             eq("flattenDepth([1, [2, [3]]])", "[1, 2, [3]]")),
+        Test("depth zero is unchanged",
+             eq("flattenDepth([1, [2, [3]]], 0)", "[1, [2, [3]]]")),
+        Test("deep enough fully flattens",
+             eq("flattenDepth([1, [2, [3, [4]]]], 5)", "[1, 2, 3, 4]")),
+        Test("already flat", eq("flattenDepth([1, 2, 3], 3)", "[1, 2, 3]")),
+        Test("does not mutate input",
+             "const src = [1, [2, [3]]];\nconst snap = JSON.stringify(src);\nflattenDepth(src, 2);\n"
+             "assert(JSON.stringify(src) === snap, 'input mutated');"),
+        Test("mixed shapes",
+             eq("flattenDepth([[1, 2], [3, [4]]], 1)", "[1, 2, 3, [4]]")),
+    ],
+    hints=[
+        "Walk the array; for an array element, only recurse when depth > 0.",
+        "When you recurse, decrement depth so each level is counted once.",
+        "When depth hits 0, push remaining arrays as-is (don't flatten further).",
+    ],
+    solution_explanation=(
+        "Recursing into array elements only while depth > 0, decrementing depth "
+        "per level, flattens exactly the requested number of levels and leaves "
+        "deeper structure untouched without mutating the input."),
+))
+
+# ── log-analysis + fix ───────────────────────────────────────────────────────
+
+add(Scenario(
+    slug="js-logfix-assignment-in-condition",
+    title="Log Analysis: Fix the Accidental Assignment in an if",
+    language="javascript", kind="logfix", difficulty="medium", scenario_type="fix",
+    description=(
+        "QA reported that classify(n) labels EVERYTHING 'special', even normal "
+        "numbers. The log shows the branch always taken. The bug: the if condition "
+        "uses assignment (=) instead of comparison (===), so it assigns 0 to a "
+        "variable and the truthiness is wrong. Fix the comparison so only n === 0 "
+        "is 'special'."),
+    objectives=[
+        "Read the log and spot the always-true branch",
+        "Replace assignment (=) with comparison (===)",
+        "Label only 0 as 'special'",
+    ],
+    instructions=(
+        "Fix classify(n): return 'special' when n === 0, otherwise 'normal'. The "
+        "log shows the branch is always taken because of an accidental "
+        "assignment.\n"
+        "  classify(0) -> 'special'; classify(5) -> 'normal'\n"
+        "Click Run to try it, then Check Solution to grade against all tests."),
+    entrypoint="solution.js",
+    broken=(
+        "// QA log:\n"
+        "//   classify(5) -> 'special'  (expected 'normal')\n"
+        "//   classify(9) -> 'special'  (expected 'normal')\n"
+        "//   every input takes the 'special' branch\n"
+        "\n"
+        "function classify(n) {\n"
+        "  let flag = 1;\n"
+        "  if (flag = 0) {            // assignment, not comparison\n"
+        "    return 'normal';\n"
+        "  }\n"
+        "  return 'special';\n"
+        "}\n"),
+    reference=(
+        "function classify(n) {\n"
+        "  if (n === 0) {\n"
+        "    return 'special';\n"
+        "  }\n"
+        "  return 'normal';\n"
+        "}\n"),
+    visible_tests=[
+        Test("zero is special", "assert(classify(0) === 'special', classify(0));"),
+        Test("nonzero is normal", "assert(classify(5) === 'normal', classify(5));"),
+    ],
+    hidden_tests=[
+        Test("negative is normal", "assert(classify(-3) === 'normal');"),
+        Test("large is normal", "assert(classify(1000) === 'normal');"),
+        Test("one is normal", "assert(classify(1) === 'normal');"),
+        Test("zero stays special", "assert(classify(0) === 'special');"),
+    ],
+    hints=[
+        "The log shows every input is 'special' — the if branch never runs as intended.",
+        "`if (flag = 0)` assigns 0 (falsy) and evaluates to 0, so the branch is always skipped.",
+        "Compare n to 0 with ===: `if (n === 0) return 'special';` else 'normal'.",
+    ],
+    solution_explanation=(
+        "A single = assigns instead of compares, so the condition's value was the "
+        "assigned operand, not a comparison. Using n === 0 tests the actual value "
+        "and labels only zero as special."),
+))

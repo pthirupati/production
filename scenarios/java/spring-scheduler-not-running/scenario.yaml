@@ -1,0 +1,32 @@
+---
+slug: java-spring-scheduler-not-running
+title: "Scheduled Job Never Fires (@Scheduled Not Enabled)"
+technology: Java
+category: "Spring Boot"
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  A nightly cleanup never runs: the @Scheduled method exists but the application never enabled scheduling (@EnableScheduling is missing) and the cron expression is malformed, so the task is silently ignored. Enable scheduling and fix the cron so the job fires on time.
+objectives:
+  - "Confirm the @Scheduled task never executes"
+  - "Enable scheduling on a configuration class"
+  - "Correct the cron expression to the intended schedule"
+  - "Verify the job fires at the expected time"
+initial_state: |
+  CleanupJob at /app/src/main/java/com/example/jobs/CleanupJob.java has @Scheduled but the app lacks @EnableScheduling and the cron string is invalid.
+hints:
+  - order: 1
+    cost: 10
+    content: "No 'Scheduled tasks' thread runs — scheduling was never enabled."
+  - order: 2
+    cost: 15
+    content: "Add @EnableScheduling to a @Configuration class."
+  - order: 3
+    cost: 20
+    content: "Fix the 6-field Spring cron (sec min hour dom mon dow) and confirm it triggers."

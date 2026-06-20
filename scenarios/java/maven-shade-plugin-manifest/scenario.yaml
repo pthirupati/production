@@ -1,0 +1,32 @@
+---
+slug: java-maven-shade-plugin-manifest
+title: "Shaded Uber-JAR Has No Main-Class Manifest"
+technology: Java
+category: "Maven Build"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  java -jar app.jar fails with 'no main manifest attribute, in app.jar'. The maven-shade-plugin builds an uber-jar but no ManifestResourceTransformer sets Main-Class, so the JAR is not runnable. Configure the shade transformer (and service-file merging) so the packaged JAR launches.
+objectives:
+  - "Reproduce 'no main manifest attribute' running the JAR"
+  - "Add the ManifestResourceTransformer with the Main-Class"
+  - "Merge service files (ServicesResourceTransformer) to avoid SPI breakage"
+  - "Verify java -jar runs the application"
+initial_state: |
+  POM at /app/pom.xml configures maven-shade-plugin without a manifest transformer; the uber-jar has no Main-Class.
+hints:
+  - order: 1
+    cost: 10
+    content: "unzip -p app.jar META-INF/MANIFEST.MF shows no Main-Class line."
+  - order: 2
+    cost: 15
+    content: "Add ManifestResourceTransformer with <mainClass> in the shade execution."
+  - order: 3
+    cost: 20
+    content: "Also add ServicesResourceTransformer so META-INF/services entries merge correctly."

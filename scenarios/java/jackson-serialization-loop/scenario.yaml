@@ -1,0 +1,32 @@
+---
+slug: java-jackson-serialization-loop
+title: "Jackson Infinite Recursion on a Bidirectional Relationship"
+technology: Java
+category: "Spring Boot"
+difficulty: medium
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  Returning an entity from a REST controller throws 'Infinite recursion (StackOverflowError)' because a bidirectional JPA relationship (Order <-> LineItem) serializes back and forth forever. Break the serialization cycle with @JsonManagedReference/@JsonBackReference or @JsonIgnore (or use a DTO).
+objectives:
+  - "Reproduce the StackOverflowError on the JSON response"
+  - "Identify the bidirectional relationship causing the loop"
+  - "Annotate one side to break the serialization cycle"
+  - "Verify the endpoint returns valid JSON"
+initial_state: |
+  Order at /app/src/main/java/com/example/model/Order.java references LineItem which references Order; Jackson recurses infinitely.
+hints:
+  - order: 1
+    cost: 10
+    content: "The stack trace is Jackson writing the same two objects over and over."
+  - order: 2
+    cost: 15
+    content: "Mark the parent side @JsonManagedReference and the child @JsonBackReference."
+  - order: 3
+    cost: 20
+    content: "Or @JsonIgnore the back-reference — best of all, serialize a DTO not the entity."

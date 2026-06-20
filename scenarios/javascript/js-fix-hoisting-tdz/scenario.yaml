@@ -1,0 +1,79 @@
+title: Fix the Hoisting Bug in buildLabels
+slug: js-fix-hoisting-tdz
+category: JavaScript Development
+description: 'buildLabels(items) should return [''#0: a'', ''#1: b'', ...], but the helper result variable
+  is USED before it is declared with const, and the loop reads `label` outside its block. Function-declaration
+  hoisting masks the intent and the labels come out wrong/undefined. Fix the declaration order and scoping
+  so each label is built correctly.'
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See undefined / wrong values from use-before-declare
+- Declare variables before use, in the right scope
+- Return the correctly numbered labels
+initial_state: 'buildLabels(items) should return [''#0: a'', ''#1: b'', ...], but the helper result variable
+  is USED before it is declared with const, and the loop reads `label` outside its block. Function-declaration
+  hoisting masks the intent and the labels come out wrong/undefined. Fix the declaration order and scoping
+  so each label is built correctly.'
+solution_explanation: |
+  Reading a var before its assignment yields undefined due to hoisting. Declaring the label with const before pushing it builds each entry correctly within the loop's block scope.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix buildLabels(items): return an array where item i becomes '#i: ' + item.
+      buildLabels(['a','b']) -> ['#0: a', '#1: b']
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function buildLabels(items) {
+        const out = [];
+        for (let i = 0; i < items.length; i++) {
+          out.push(label);              // used before declaration (undefined/TDZ)
+          var label = '#' + i + ': ' + items[i];
+        }
+        return out;
+      }
+    readonly: false
+  visible_tests:
+  - name: two items
+    code: |
+      assert(JSON.stringify(buildLabels(['a', 'b'])) === JSON.stringify(['#0: a', '#1: b']), JSON.stringify(buildLabels(['a', 'b'])));
+  - name: single
+    code: |
+      assert(JSON.stringify(buildLabels(['x'])) === JSON.stringify(['#0: x']), JSON.stringify(buildLabels(['x'])));
+  hidden_tests:
+  - name: three items
+    code: |
+      assert(JSON.stringify(buildLabels(['p', 'q', 'r'])) === JSON.stringify(['#0: p', '#1: q', '#2: r']), JSON.stringify(buildLabels(['p', 'q', 'r'])));
+  - name: no undefined leaked
+    code: |
+      const r = buildLabels(['a']);
+      assert(r[0].indexOf('undefined') === -1, r[0]);
+  - name: empty
+    code: |
+      assert(JSON.stringify(buildLabels([])) === JSON.stringify([]), JSON.stringify(buildLabels([])));
+  - name: numbers as items
+    code: |
+      assert(JSON.stringify(buildLabels([10, 20])) === JSON.stringify(['#0: 10', '#1: 20']), JSON.stringify(buildLabels([10, 20])));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: buildLabels(['a']) pushes undefined because `label` is read before it is assigned.
+- order: 2
+  cost: 20
+  content: var is hoisted (initialized undefined) so the push sees undefined, not the string.
+- order: 3
+  cost: 30
+  content: Declare `const label = ...;` BEFORE out.push(label) inside the loop body.

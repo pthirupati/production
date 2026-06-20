@@ -1,0 +1,32 @@
+---
+slug: java-logback-rolling-policy
+title: "Logback Without Rolling Policy Fills the Disk"
+technology: Java
+category: "Logging"
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  The application log grows without bound because the Logback file appender has no rolling policy, eventually filling the disk and taking the service down. Add a SizeAndTimeBasedRollingPolicy with sensible max file size, history, and total cap so logs rotate and old files are purged.
+objectives:
+  - "Confirm the single log file grows unbounded"
+  - "Switch to a RollingFileAppender with a rolling policy"
+  - "Set max file size, max history, and total size cap"
+  - "Verify logs rotate and disk usage is bounded"
+initial_state: |
+  logback-spring.xml at /app/src/main/resources/ uses a plain FileAppender with no rolling policy; the log file never rotates.
+hints:
+  - order: 1
+    cost: 10
+    content: "df shows the partition filling; the appender is FileAppender, not RollingFileAppender."
+  - order: 2
+    cost: 15
+    content: "Use RollingFileAppender + SizeAndTimeBasedRollingPolicy (e.g. 100MB, daily)."
+  - order: 3
+    cost: 20
+    content: "Set maxHistory and totalSizeCap so old logs are deleted automatically."

@@ -1,0 +1,32 @@
+---
+slug: java-spring-transaction-rollback
+title: "@Transactional Not Rolling Back on a Checked Exception"
+technology: Java
+category: "Spring Boot"
+difficulty: hard
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: High
+is_free: false
+description: |
+  A multi-step operation leaves the database half-updated after a failure: @Transactional does not roll back because Spring only rolls back on runtime exceptions by default and the service throws a checked exception (also, the method is called from within the same bean, bypassing the proxy). Make the rollback semantics correct so partial writes never persist.
+objectives:
+  - "Reproduce a partial commit when the operation fails midway"
+  - "Configure rollback for the checked exception (rollbackFor)"
+  - "Ensure the transactional method is invoked through the proxy"
+  - "Verify a failure rolls the whole operation back"
+initial_state: |
+  PaymentService at /app/src/main/java/com/example/service/PaymentService.java is @Transactional but throws a checked exception and self-invokes, so no rollback occurs.
+hints:
+  - order: 1
+    cost: 10
+    content: "By default Spring rolls back only on RuntimeException/Error, not checked exceptions."
+  - order: 2
+    cost: 15
+    content: "Add @Transactional(rollbackFor = Exception.class) (or throw a runtime exception)."
+  - order: 3
+    cost: 20
+    content: "Self-invocation bypasses the proxy — call the @Transactional method from another bean."

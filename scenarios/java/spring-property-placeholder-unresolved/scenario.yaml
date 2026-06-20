@@ -1,0 +1,32 @@
+---
+slug: java-spring-property-placeholder
+title: "Unresolved ${} Property Placeholder Crashes Startup"
+technology: Java
+category: "Spring Boot"
+difficulty: easy
+time_limit: 600
+max_score: 100
+lab_mode: simulation
+simulation_type: java
+infrastructure_type: simulation
+jira_priority: Medium
+is_free: false
+description: |
+  Startup aborts with 'Could not resolve placeholder ...' because a configuration value references an environment variable / property that is never provided and has no default. Spring cannot resolve the ${} placeholder, so binding fails. Provide the value or a sensible default so the placeholder resolves.
+objectives:
+  - "Read the startup error naming the unresolved placeholder"
+  - "Decide whether to supply the value or give it a default"
+  - "Provide the property/env var or a ${name:default} fallback"
+  - "Confirm the context starts with the placeholder resolved"
+initial_state: |
+  application.yml at /app/src/main/resources/ references ${APP_API_KEY} with no value and no default; startup fails to resolve the placeholder.
+hints:
+  - order: 1
+    cost: 10
+    content: "'Could not resolve placeholder APP_API_KEY' means nothing supplies it."
+  - order: 2
+    cost: 15
+    content: "Provide it via env/config, or add a default: ${APP_API_KEY:changeme}."
+  - order: 3
+    cost: 20
+    content: "Restart and confirm the value binds and the context refreshes."
