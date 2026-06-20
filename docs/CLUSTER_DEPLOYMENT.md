@@ -57,7 +57,7 @@ Environment **production** secrets:
 | `PRODUCTION_ENV_B64` | base64 of the full `.env` template (OAuth/payment/Jira/business config preserved) |
 | `PROD_USER` | usually `root` |
 | `SENDGRID_API_KEY` | sending the credentials email |
-| `GH_ADMIN_TOKEN` | (optional) PAT to write Environment secrets; falls back to `github.token` |
+| `GH_ADMIN_TOKEN` | **REQUIRED for four-droplet.** PAT with Environment `secrets: write` on this repo. The default `github.token` CANNOT write Environment secrets (HTTP 403), and the cluster persists `PROD_HOST` / `PROD_APP_HOST` / `PROD_DB_HOST` / `PROD_LABS_HOST` / `VAULT_*` as Environment secrets the bootstrap/deploy jobs read. A preflight step now aborts **before** creating any droplet if this token can't write secrets. (Single-droplet does not need it.) |
 | `DO_PROTECTED_DROPLET_IDS` | (optional) droplet IDs the automation must never modify |
 
 Repo **variables** (optional): `DO_REGION`, `DO_SIZE`, `CREDENTIALS_EMAIL_REQUIRED`
