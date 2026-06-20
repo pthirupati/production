@@ -40,6 +40,8 @@ MAX_OUTPUT_CHARS = 20_000
 _CPU_SECONDS = 10          # RLIMIT_CPU (POSIX only)
 _ADDRESS_SPACE_BYTES = 512 * 1024 * 1024   # 512 MB RLIMIT_AS
 _FILE_SIZE_BYTES = 16 * 1024 * 1024        # 16 MB RLIMIT_FSIZE
+_MAX_PROCESSES = 64        # RLIMIT_NPROC — stop fork bombs taking down the host
+_MAX_OPEN_FILES = 256      # RLIMIT_NOFILE — bound fd exhaustion
 
 SUPPORTED_LANGUAGES = {"python", "javascript"}
 # Languages we recognise but cannot safely auto-grade on the backend yet.
@@ -123,9 +125,21 @@ def _posix_preexec(limit_address_space: bool = True):
     large *virtual* address space at startup — an RLIMIT_AS that is fine for
     CPython makes node abort immediately on Linux. Node memory is instead bounded
     by --max-old-space-size plus the CPU limit and wall-clock timeout.
+
+    SECURITY NOTE: these rlimits bound *resource use* only. They do NOT provide
+    network or filesystem isolation — user code still runs as this OS user and
+    can read host files / open sockets. True isolation requires running the
+    grader in a dedicated, network-less, read-only, non-root container (or
+    nsjail/seccomp). See docs/SECURITY_AUDIT.md (finding C-01).
     """
     try:
         os.setsid()
+    except OSError:
+        pass
+    # No core dumps (a crash could otherwise spill process memory to disk) and a
+    # tight umask so any file the child writes isn't group/world readable.
+    try:
+        os.umask(0o077)
     except OSError:
         pass
     try:
@@ -133,6 +147,12 @@ def _posix_preexec(limit_address_space: bool = True):
         limits = [
             (resource.RLIMIT_CPU, _CPU_SECONDS, _CPU_SECONDS),
             (resource.RLIMIT_FSIZE, _FILE_SIZE_BYTES, _FILE_SIZE_BYTES),
+            # Anti fork-bomb: cap processes for the child. Best-effort — on a
+            # shared uid the kernel counts existing processes too, so we never
+            # let a failure here crash the grade (guarded below).
+            (resource.RLIMIT_NPROC, _MAX_PROCESSES, _MAX_PROCESSES),
+            (resource.RLIMIT_NOFILE, _MAX_OPEN_FILES, _MAX_OPEN_FILES),
+            (resource.RLIMIT_CORE, 0, 0),
         ]
         if limit_address_space:
             limits.append((resource.RLIMIT_AS, _ADDRESS_SPACE_BYTES, _ADDRESS_SPACE_BYTES))

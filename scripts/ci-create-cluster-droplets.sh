@@ -250,6 +250,12 @@ main() {
   emit_output db_id "$db_id"
   emit_output labs_id "$labs_id"
   emit_output edge_public_ip "$edge_public"
+  # Also emit a base64 variant: the raw public IP matches a registered secret, so
+  # GitHub skips the raw job OUTPUT ("may contain secret"), leaving downstream
+  # consumers with an empty value. base64 of the IP does not match the secret, so
+  # this output passes through; each consumer decodes it. (Works for the DRY_RUN
+  # placeholder too.)
+  emit_output edge_public_ip_b64 "$(printf '%s' "$edge_public" | base64 | tr -d '\n')"
   emit_output edge_private_ip "$edge_private"
   emit_output app_private_ip "$app_private"
   emit_output db_private_ip "$db_private"

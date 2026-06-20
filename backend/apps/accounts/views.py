@@ -585,11 +585,26 @@ class ChangePasswordView(APIView):
         if not user.check_password(old_password):
             return Response({"error": "Current password is incorrect"}, status=400)
 
-        if len(new_password) < 8:
-            return Response({"error": "Password must be at least 8 characters"}, status=400)
+        # Enforce the same password policy as registration (length + complexity)
+        # instead of a weaker ad-hoc 8-char minimum.
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as exc:
+            return Response({"error": " ".join(exc.messages)}, status=400)
 
         user.set_password(new_password)
         user.save()
+
+        # Revoke all active JWT sessions so any token issued before the change
+        # (e.g. one held by an attacker) can no longer be used. The client's own
+        # next request will fail the session check and be prompted to re-login.
+        try:
+            SessionTracker.invalidate_all_sessions(user.id)
+        except Exception:
+            logger.warning("Failed to invalidate sessions after password change for user %s", user.id)
+
         return Response({"message": "Password changed successfully"})
 
 

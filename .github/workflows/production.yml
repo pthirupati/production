@@ -746,7 +746,12 @@ jobs:
     permissions:
       contents: write
     outputs:
-      edge_public_ip: ${{ steps.create.outputs.edge_public_ip }}
+      # Edge PUBLIC IP is exposed ONLY as base64 (edge_public_ip_b64): the raw IP
+      # matches a registered secret, so GitHub skips the raw job/step output
+      # ("may contain secret") and downstream consumers receive an EMPTY value.
+      # Every consumer decodes edge_public_ip_b64. Private IPs are not secrets and
+      # pass through raw. (D2/D3/D4 are private-only — no public IP is needed.)
+      edge_public_ip_b64: ${{ steps.create.outputs.edge_public_ip_b64 }}
       edge_private_ip: ${{ steps.create.outputs.edge_private_ip }}
       app_private_ip: ${{ steps.create.outputs.app_private_ip }}
       db_private_ip: ${{ steps.create.outputs.db_private_ip }}
@@ -833,9 +838,10 @@ jobs:
           APP_PRIVATE_IP: ${{ steps.create.outputs.app_private_ip }}
           DATA_PRIVATE_IP: ${{ steps.create.outputs.db_private_ip }}
           LABS_PRIVATE_IP: ${{ steps.create.outputs.labs_private_ip }}
-          EDGE_PUBLIC_IP: ${{ steps.create.outputs.edge_public_ip }}
+          EDGE_PUBLIC_IP_B64: ${{ steps.create.outputs.edge_public_ip_b64 }}
           OUT_FILE: .env.cluster
         run: |
+          export EDGE_PUBLIC_IP="$(printf '%s' "$EDGE_PUBLIC_IP_B64" | base64 -d)"
           chmod +x scripts/ci-wire-cluster-env.py
           python3 scripts/ci-wire-cluster-env.py --file .env.cluster
           # Stash the rotated+wired env for downstream jobs (masked artifact).
@@ -850,7 +856,7 @@ jobs:
           CLUSTER_MODE: "1"
           GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN || github.token }}
           GITHUB_ENVIRONMENT: production
-          EDGE_PUBLIC_IP: ${{ steps.create.outputs.edge_public_ip }}
+          EDGE_PUBLIC_IP_B64: ${{ steps.create.outputs.edge_public_ip_b64 }}
           EDGE_PRIVATE_IP: ${{ steps.create.outputs.edge_private_ip }}
           APP_PRIVATE_IP: ${{ steps.create.outputs.app_private_ip }}
           DATA_PRIVATE_IP: ${{ steps.create.outputs.db_private_ip }}
@@ -863,6 +869,7 @@ jobs:
           VAULT_ENABLED: "true"
           CLUSTER_ENV_B64: ${{ steps.wire.outputs.env_b64 }}
         run: |
+          export EDGE_PUBLIC_IP="$(printf '%s' "$EDGE_PUBLIC_IP_B64" | base64 -d)"
           chmod +x scripts/ci-sync-droplet-secrets.sh
           ./scripts/ci-sync-droplet-secrets.sh
           echo "updated_secrets=PROD_HOST,PROD_APP_HOST,PROD_DB_HOST,PROD_LABS_HOST,PRODUCTION_ENV_B64,VAULT_ROLE_ID,VAULT_SECRET_ID,VAULT_UNSEAL_KEY,VAULT_ENABLED" >> "$GITHUB_OUTPUT"
@@ -888,13 +895,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
-          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          EDGE_PUBLIC_IP_B64: ${{ needs.create-cluster.outputs.edge_public_ip_b64 }}
           EDGE_PRIVATE_IP: ${{ needs.create-cluster.outputs.edge_private_ip }}
           APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
           DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
           LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
           GIT_REF: ${{ inputs.git_ref }}
         run: |
+          export EDGE_PUBLIC_IP="$(printf '%s' "$EDGE_PUBLIC_IP_B64" | base64 -d)"
           export GIT_REPO="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
           chmod +x scripts/ci-bootstrap-cluster.sh scripts/ci-setup-labs-ssh.sh
           ./scripts/ci-bootstrap-cluster.sh
@@ -916,8 +924,9 @@ jobs:
         id: vault
         env:
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
-          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          EDGE_PUBLIC_IP_B64: ${{ needs.create-cluster.outputs.edge_public_ip_b64 }}
         run: |
+          export EDGE_PUBLIC_IP="$(printf '%s' "$EDGE_PUBLIC_IP_B64" | base64 -d)"
           chmod +x scripts/ci-vault-cluster-bootstrap.sh
           ./scripts/ci-vault-cluster-bootstrap.sh
       - name: Store Vault AppRole as GitHub secrets
@@ -925,7 +934,7 @@ jobs:
           CLUSTER_MODE: "1"
           GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN || github.token }}
           GITHUB_ENVIRONMENT: production
-          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          EDGE_PUBLIC_IP_B64: ${{ needs.create-cluster.outputs.edge_public_ip_b64 }}
           APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
           DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
           LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
@@ -933,6 +942,7 @@ jobs:
           VAULT_SECRET_ID: ${{ steps.vault.outputs.vault_secret_id }}
           VAULT_UNSEAL_KEY: ${{ steps.vault.outputs.vault_unseal_key }}
         run: |
+          export EDGE_PUBLIC_IP="$(printf '%s' "$EDGE_PUBLIC_IP_B64" | base64 -d)"
           chmod +x scripts/ci-sync-droplet-secrets.sh
           ./scripts/ci-sync-droplet-secrets.sh
 
@@ -949,24 +959,27 @@ jobs:
     timeout-minutes: 55
     environment: production
     outputs:
-      edge_public_ip: ${{ needs.create-cluster.outputs.edge_public_ip }}
+      edge_public_ip_b64: ${{ needs.create-cluster.outputs.edge_public_ip_b64 }}
     steps:
       - uses: actions/checkout@v4
       - name: Ordered deploy (data → edge → app → labs images)
         env:
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
-          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          EDGE_PUBLIC_IP_B64: ${{ needs.create-cluster.outputs.edge_public_ip_b64 }}
           EDGE_PRIVATE_IP: ${{ needs.create-cluster.outputs.edge_private_ip }}
           APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
           DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
           LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
           BUILD_SCENARIOS: ${{ inputs.build_scenarios }}
         run: |
+          export EDGE_PUBLIC_IP="$(printf '%s' "$EDGE_PUBLIC_IP_B64" | base64 -d)"
           chmod +x scripts/ci-cluster-deploy.sh
           ./scripts/ci-cluster-deploy.sh
       - name: Public health (through edge gateway)
+        env:
+          EDGE_PUBLIC_IP_B64: ${{ needs.create-cluster.outputs.edge_public_ip_b64 }}
         run: |
-          HOST="${{ needs.create-cluster.outputs.edge_public_ip }}"
+          HOST="$(printf '%s' "$EDGE_PUBLIC_IP_B64" | base64 -d)"
           for i in $(seq 1 20); do
             if curl -sf --max-time 10 -H "Host: fixitlab.in" "http://${HOST}/health" | grep -q ok; then
               echo "Public health OK (attempt ${i})"; exit 0
@@ -992,13 +1005,14 @@ jobs:
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           CRED_TO: ${{ inputs.credentials_email }}
-          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          EDGE_PUBLIC_IP_B64: ${{ needs.create-cluster.outputs.edge_public_ip_b64 }}
           APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
           DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
           LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
           UPDATED_SECRETS: ${{ needs.create-cluster.outputs.updated_secrets }}
           CREDENTIALS_EMAIL_REQUIRED: ${{ vars.CREDENTIALS_EMAIL_REQUIRED || '0' }}
         run: |
+          export EDGE_PUBLIC_IP="$(printf '%s' "$EDGE_PUBLIC_IP_B64" | base64 -d)"
           # Pull the (DO-token-free) .env.production from the edge node so the
           # attachment matches what is actually deployed; the script strips the
           # DO_API_TOKEN line again as a defence-in-depth measure.
@@ -1020,10 +1034,12 @@ jobs:
     timeout-minutes: 15
     environment: production
     steps:
+      - name: Resolve edge host
+        run: echo "EDGE_HOST=$(printf '%s' '${{ needs.create-cluster.outputs.edge_public_ip_b64 }}' | base64 -d)" >> "$GITHUB_ENV"
       - name: Container health per node (via edge)
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          host: ${{ env.EDGE_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           command_timeout: 10m
@@ -1051,10 +1067,12 @@ jobs:
     timeout-minutes: 20
     environment: production
     steps:
+      - name: Resolve edge host
+        run: echo "EDGE_HOST=$(printf '%s' '${{ needs.create-cluster.outputs.edge_public_ip_b64 }}' | base64 -d)" >> "$GITHUB_ENV"
       - name: Django unit tests in backend container on D2 (via edge)
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          host: ${{ env.EDGE_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           command_timeout: 15m
@@ -1080,10 +1098,12 @@ jobs:
     timeout-minutes: 10
     environment: production
     steps:
+      - name: Resolve edge host
+        run: echo "EDGE_HOST=$(printf '%s' '${{ needs.create-cluster.outputs.edge_public_ip_b64 }}' | base64 -d)" >> "$GITHUB_ENV"
       - name: Disable JWT session enforcement on D2 backend (via edge)
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          host: ${{ env.EDGE_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           command_timeout: 5m
@@ -1108,10 +1128,12 @@ jobs:
     timeout-minutes: 30
     environment: production
     steps:
+      - name: Resolve edge host
+        run: echo "EDGE_HOST=$(printf '%s' '${{ needs.create-cluster.outputs.edge_public_ip_b64 }}' | base64 -d)" >> "$GITHUB_ENV"
       - name: Internal API E2E on D2 (via edge)
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          host: ${{ env.EDGE_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           command_timeout: 20m
@@ -1140,10 +1162,12 @@ jobs:
     timeout-minutes: 45
     environment: production
     steps:
+      - name: Resolve edge host
+        run: echo "EDGE_HOST=$(printf '%s' '${{ needs.create-cluster.outputs.edge_public_ip_b64 }}' | base64 -d)" >> "$GITHUB_ENV"
       - name: All-scenarios lab E2E on D2 (labs run on D4 via remote docker)
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          host: ${{ env.EDGE_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           command_timeout: 40m
@@ -1166,10 +1190,12 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve edge host
+        run: echo "EDGE_HOST=$(printf '%s' '${{ needs.create-cluster.outputs.edge_public_ip_b64 }}' | base64 -d)" >> "$GITHUB_ENV"
       - name: Remove E2E data + restore JWT enforcement on D2 (via edge)
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          host: ${{ env.EDGE_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           command_timeout: 10m
@@ -1184,9 +1210,10 @@ jobs:
       - name: Install daily pg_dump cron on D3
         env:
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
-          EDGE_PUBLIC_IP: ${{ needs.create-cluster.outputs.edge_public_ip }}
+          EDGE_PUBLIC_IP_B64: ${{ needs.create-cluster.outputs.edge_public_ip_b64 }}
           DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
         run: |
+          export EDGE_PUBLIC_IP="$(printf '%s' "$EDGE_PUBLIC_IP_B64" | base64 -d)"
           chmod +x scripts/ci-pg-backup-cron.sh
           ./scripts/ci-pg-backup-cron.sh
 
@@ -1198,14 +1225,17 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Write cluster summary
+        env:
+          EDGE_PUBLIC_IP_B64: ${{ needs.create-cluster.outputs.edge_public_ip_b64 }}
         run: |
+          EDGE_PUBLIC_IP="$(printf '%s' "$EDGE_PUBLIC_IP_B64" | base64 -d)"
           {
             echo "## FixitLab Production — four-droplet"
             echo ""
             echo "| | |"
             echo "|---|---|"
             echo "| Topology | \`four-droplet\` |"
-            echo "| Edge (D1) | \`${{ needs.create-cluster.outputs.edge_public_ip }}\` (public) |"
+            echo "| Edge (D1) | \`${EDGE_PUBLIC_IP}\` (public) |"
             echo "| App (D2) | \`${{ needs.create-cluster.outputs.app_private_ip }}\` (private) |"
             echo "| Data (D3) | \`${{ needs.create-cluster.outputs.db_private_ip }}\` (private) |"
             echo "| Labs (D4) | \`${{ needs.create-cluster.outputs.labs_private_ip }}\` (private) |"

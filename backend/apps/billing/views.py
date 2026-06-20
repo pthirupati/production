@@ -1546,8 +1546,10 @@ class RazorpayRefundView(APIView):
             }, status=http_status.HTTP_201_CREATED)
 
         except Exception as e:
+            # Log the detail server-side; do not echo the raw gateway/SDK
+            # exception text back to the client (may leak internals).
             logger.error(f"Razorpay refund failed for {payment_id}: {e}")
             return Response(
-                {"error": f"Refund failed: {str(e)}"},
+                {"error": "Refund failed. Please check the payment ID and try again, or contact support."},
                 status=http_status.HTTP_502_BAD_GATEWAY,
             )
