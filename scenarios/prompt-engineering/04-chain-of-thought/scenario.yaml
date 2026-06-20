@@ -1,0 +1,114 @@
+title: "Chain-of-Thought Reasoning"
+slug: chain-of-thought
+category: Prompt Engineering
+description: >-
+  For multi-step problems — math, logic, debugging, planning — asking the AI to
+  reason step by step before answering produces dramatically better results.
+  Learn how and when to use chain-of-thought, and how to keep the reasoning from
+  bloating your final output.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Explain why step-by-step reasoning improves accuracy on hard tasks
+  - Write a prompt that explicitly requests reasoning before the answer
+  - Pass the exercise that asks the model to think first, then give a final answer
+initial_state: >-
+  The guided AI practice console opens. Pose a multi-step problem two ways — "just
+  give the answer" vs "think step by step, then answer" — and compare. Rule-based
+  and free.
+solution_explanation: >-
+  Chain-of-thought (CoT) means instructing the model to lay out its reasoning
+  before committing to an answer ("Let's think step by step"). It helps most on
+  arithmetic, logic, debugging, and planning. Two practical patterns: (1) ask for
+  reasoning then a clearly-labeled final answer; (2) when you only want the
+  answer, ask it to reason privately and return just the conclusion — or use a
+  scratchpad section you then ignore. Modern reasoning models do much of this
+  internally, but explicit CoT still helps on novel, multi-step tasks.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A reasoning assistant that can show its work when asked.
+    lesson:
+      - heading: Why it works
+        body: >-
+          Language models predict the next token. When the answer requires
+          several steps, jumping straight to a conclusion forces the model to
+          compress all that work into one leap — and it often slips. Writing the
+          steps out gives each intermediate result a place to live, so the final
+          answer is grounded in explicit reasoning rather than a guess.
+      - heading: How to trigger it
+        body: >-
+          The classic trigger is "Let's think step by step." More structured:
+          "First list what we know. Then work through it one step at a time.
+          Finally, give the answer on its own line prefixed with ANSWER:." For
+          debugging: "Walk through what each line does, identify where the actual
+          behavior diverges from expected, then propose the fix."
+      - heading: Keeping output clean
+        body: >-
+          Reasoning can be verbose. If you only want the result, either ask the
+          model to "reason briefly, then give just the final answer" or request a
+          dedicated section (e.g. <scratchpad>...</scratchpad>) that you discard
+          programmatically. Reasoning models (extended thinking) handle much of
+          this internally, but explicit CoT still helps for unusual problems.
+    rubric: [task, reasoning, format, specificity]
+    exercises:
+      - id: request-reasoning
+        title: Ask for step-by-step reasoning
+        goal: >-
+          Write a prompt for a multi-step problem (math, logic, or debugging) that
+          explicitly tells the model to reason step by step BEFORE giving its
+          final answer.
+        starter: ""
+        success:
+          min_words: 10
+          any_of:
+            - ["step by step", "step-by-step", "reason", "reasoning", "think through", "work through", "show your work", "walk through", "one step at a time"]
+        success_response: |
+          Step 1: A train travels 60 km in the first hour.
+          Step 2: It travels 90 km in the next 1.5 hours (60 km/h is wrong here; given speeds differ).
+          Step 3: Total distance = 60 + 90 = 150 km over 2.5 hours.
+          ANSWER: average speed = 150 / 2.5 = 60 km/h.
+        partial_response: >-
+          Add an explicit instruction to reason step by step (e.g. "think through
+          it one step at a time, then give the final answer"). Otherwise I may
+          jump straight to a guess.
+      - id: reason-then-answer
+        title: Reason first, then a clean final answer
+        goal: >-
+          Write a prompt that asks the model to reason step by step AND to put the
+          final answer on its own line in a fixed format (for example prefixed
+          with "ANSWER:") so it's easy to extract.
+        starter: ""
+        success:
+          min_words: 12
+          any_of:
+            - ["step by step", "reason", "think", "work through", "walk through"]
+          require:
+            - ["answer:", "final answer", "on its own line", "prefix", "label", "format", "last line"]
+        success_response: |
+          Reasoning: there are 3 boxes, each with 4 apples, and 2 are removed.
+          3 x 4 = 12, minus 2 = 10.
+          ANSWER: 10
+        partial_response: >-
+          Good — you asked for reasoning. Now also pin the final answer's format
+          (e.g. "put the result on its own line as ANSWER: <value>") so it's
+          trivial to parse out.
+hints:
+  - content: The simplest trigger is literally "Let's think step by step." It reliably improves multi-step math and logic.
+    cost: 10
+    order: 1
+  - content: 'To keep output tidy, ask the model to reason first and then put the result on its own line, e.g. with an "ANSWER:" prefix. That makes it easy to extract programmatically.'
+    cost: 15
+    order: 2
+  - content: 'Try: "Solve this step by step, showing each calculation. Then on the last line, give just the result prefixed with ANSWER:."'
+    cost: 20
+    order: 3

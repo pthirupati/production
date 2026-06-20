@@ -1,0 +1,135 @@
+title: "Installing MCP Servers in Claude Code"
+slug: installing-mcp-servers
+category: Prompt Engineering
+description: >-
+  The Model Context Protocol (MCP) is an open standard that lets AI assistants
+  connect to external tools and data — GitHub, databases, your filesystem, Slack,
+  and more. Learn what MCP is, the three transports (stdio, SSE, HTTP), and the
+  exact `claude mcp add` commands to install and manage MCP servers in Claude
+  Code.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Explain what MCP is and why it standardizes tool access for AI assistants
+  - Name the three MCP transports and when each applies (stdio, SSE, HTTP)
+  - Write a correct `claude mcp add` command to install a server
+initial_state: >-
+  The guided console opens with a reference lesson plus a practice exercise where
+  you compose a real `claude mcp add` command. Rule-based and free — no servers
+  are actually installed.
+solution_explanation: >-
+  MCP is an open protocol (think "USB-C for AI tools") that exposes tools,
+  resources, and prompts to an AI client in a uniform way. In Claude Code you add
+  a server with `claude mcp add`. For a local command-launched (stdio) server -
+  `claude mcp add <name> -- <command> [args]` (everything after `--` is the
+  command Claude Code runs). For a remote server - `claude mcp add --transport
+  http <name> <url>` or `--transport sse <name> <url>`. Use `--scope user` to make
+  it available across all your projects, `--scope project` to share via a
+  committed .mcp.json. Manage with `claude mcp list`, `claude mcp get <name>`, and
+  `claude mcp remove <name>`.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A reference guide for the Model Context Protocol and Claude Code.
+    lesson:
+      - heading: What MCP is
+        body: >-
+          The Model Context Protocol (MCP) is an open standard for connecting AI
+          assistants to external systems. Instead of every tool inventing its own
+          integration, an MCP server exposes three things in a uniform way - TOOLS
+          (functions the model can call, like "create_issue"), RESOURCES (data the
+          model can read, like a file or a database row), and PROMPTS (reusable
+          prompt templates). Any MCP-compatible client (Claude Code, the Claude
+          apps, and others) can use any MCP server. It's often described as
+          "USB-C for AI."
+      - heading: The three transports
+        body: >-
+          MCP servers speak over one of three transports. STDIO - the server is a
+          local program Claude Code launches as a subprocess and talks to over
+          stdin/stdout; best for local tools (filesystem, git, a database on your
+          machine). SSE (Server-Sent Events) - a remote server you connect to over
+          HTTP with a streaming response. HTTP (streamable HTTP) - the modern
+          remote transport, a single HTTP endpoint; best for hosted/team servers.
+          Pick stdio for local, HTTP (or SSE) for remote.
+      - heading: Installing in Claude Code
+        body: >-
+          Use the `claude mcp add` command. LOCAL (stdio) - everything after `--`
+          is the launch command - `claude mcp add filesystem -- npx -y
+          @modelcontextprotocol/server-filesystem /path/to/dir`. REMOTE (HTTP) -
+          `claude mcp add --transport http sentry https://mcp.sentry.dev/mcp`.
+          REMOTE (SSE) - `claude mcp add --transport sse linear
+          https://mcp.linear.app/sse`. Pass environment variables/secrets with
+          `--env KEY=value`. Choose where it lives with `--scope local` (default,
+          this project only), `--scope user` (all your projects), or `--scope
+          project` (shared via a committed .mcp.json).
+      - heading: Managing and using servers
+        body: >-
+          `claude mcp list` shows configured servers and whether they connected.
+          `claude mcp get <name>` shows one server's details. `claude mcp remove
+          <name>` deletes it. Inside Claude Code, `/mcp` lists servers and lets you
+          authenticate (OAuth) to remote ones. Once connected, the server's tools
+          appear to Claude automatically — you just ask in natural language ("file
+          a Linear issue titled ...") and Claude calls the right MCP tool.
+    rubric: [task, specificity, format]
+    exercises:
+      - id: write-add-command
+        title: Compose a `claude mcp add` command
+        goal: >-
+          Write a Claude Code command that installs an MCP server. Use the real
+          `claude mcp add` command with a server name, and either a local launch
+          command (after `--`) or a remote `--transport http/sse <url>`.
+        starter: "claude mcp add "
+        success:
+          min_words: 4
+          must_contain_all:
+            - ["claude mcp add"]
+          any_of:
+            - ["--", "--transport http", "--transport sse", "http://", "https://"]
+        success_response: >-
+          That's a valid install command. Run it in your project directory, then
+          `claude mcp list` to confirm it connected, and `/mcp` inside Claude Code
+          to authenticate if it's a remote server. Claude can now call that
+          server's tools when you ask in plain language.
+        partial_response: >-
+          Start with `claude mcp add <name>`, then specify HOW to reach the server -
+          for a local tool put the launch command after `--`, or for a remote one
+          add `--transport http <url>` (or `--transport sse <url>`).
+      - id: choose-transport
+        title: Pick the right transport
+        goal: >-
+          Write a short note choosing a transport (stdio, SSE, or HTTP) for a
+          specific MCP server and justify it — for example a local filesystem
+          server vs a hosted team service.
+        starter: ""
+        success:
+          min_words: 10
+          any_of:
+            - ["stdio", "http", "sse", "local", "remote", "subprocess", "hosted", "streamable"]
+        success_response: >-
+          Good reasoning. Local tools that run on your machine use stdio (Claude
+          Code launches them as a subprocess); hosted or team servers use HTTP (or
+          SSE) over the network. Matching the transport to where the server runs is
+          exactly the call to make.
+        partial_response: >-
+          Tie the transport to WHERE the server runs - stdio for a local program
+          Claude Code launches, HTTP/SSE for a remote URL. State which one and why
+          for your chosen server.
+hints:
+  - content: 'The core command is `claude mcp add <name> ...`. For a LOCAL server, everything after `--` is the launch command Claude Code runs.'
+    cost: 10
+    order: 1
+  - content: 'For a REMOTE server use `--transport http <url>` (modern) or `--transport sse <url>`. Add secrets with `--env KEY=value` and pick visibility with `--scope user|project|local`.'
+    cost: 15
+    order: 2
+  - content: 'Example local: `claude mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem ~/projects`. Example remote: `claude mcp add --transport http sentry https://mcp.sentry.dev/mcp`. Then run `claude mcp list` and `/mcp` to verify and authenticate.'
+    cost: 20
+    order: 3

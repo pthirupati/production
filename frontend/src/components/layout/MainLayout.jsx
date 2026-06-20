@@ -9,6 +9,7 @@ import NotificationBell from './NotificationBell'
 import SupportBotWidget from '../SupportBotWidget'
 import api from '../../api/client'
 import { PlatformBanners } from '../PlatformBanners'
+import CampaignBanner from '../CampaignBanner'
 import { FixitLogo } from '../design'
 
 const navItems = [
@@ -234,6 +235,7 @@ export default function MainLayout() {
                 <FixitLogo to="/dashboard" size="sm" />
               </div>
               <PlatformBanners config={platformConfig} showMaintenance={!isLabRoute} showPromo={false} />
+              {!isLabRoute && <CampaignBanner placement="banner_top" />}
             </div>
           </div>
 

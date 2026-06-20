@@ -1,0 +1,112 @@
+title: "Structured Output: Get Clean JSON"
+slug: structured-output
+category: Prompt Engineering
+description: >-
+  When an AI feeds another program, you need machine-readable output — not prose.
+  Learn the techniques that make models return clean, parseable JSON every time:
+  specify the exact schema, show an example, forbid extra text, and prefill the
+  opening brace. This is the flagship exercise: get the simulator to emit valid
+  JSON.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - List the techniques that reliably produce parseable structured output
+  - Write a prompt that returns ONLY valid JSON matching a given schema
+  - Pass the flagship exercise — a prompt that extracts fields into JSON with no extra prose
+initial_state: >-
+  The guided AI practice console opens with a flagship JSON-extraction exercise.
+  Write a prompt that makes the simulator return clean JSON and nothing else.
+  Rule-based and free.
+solution_explanation: >-
+  Reliable structured output comes from four habits: (1) state the EXACT schema
+  with field names and types; (2) show ONE example of the desired JSON; (3)
+  explicitly forbid extra text ("Return ONLY the JSON, no prose, no markdown
+  fences"); (4) optionally prefill the assistant turn with "{" so the model must
+  continue valid JSON. With the Claude API, tool use / structured outputs enforce
+  a schema even more strictly than prompting alone.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A data-extraction assistant that returns structured data on request.
+    lesson:
+      - heading: Specify the schema
+        body: >-
+          Don't say "return JSON" — say exactly which fields and types: "Return a
+          JSON object with keys name (string), age (integer), and skills (array of
+          strings)." The more precise the schema, the fewer surprises. Naming the
+          types prevents the model from guessing (e.g. returning "30" vs 30).
+      - heading: Show an example and forbid extra text
+        body: >-
+          Include one example of the exact output, then add a hard rule: "Return
+          ONLY the JSON object. Do not include explanations, comments, or markdown
+          code fences." Stray prose or ```json fences are the #1 cause of parse
+          failures in production.
+      - heading: Prefill the opening brace
+        body: >-
+          A powerful trick with chat APIs: put "{" as the start of the assistant's
+          response. The model must continue from there, so it can't preface the
+          JSON with "Sure, here you go:". In the Claude API you do this by adding
+          an assistant message that ends in "{". For the strongest guarantee, use
+          tool use / structured outputs, which validate against a real schema.
+    rubric: [format, task, constraints, examples, specificity]
+    exercises:
+      - id: extract-json
+        title: "Flagship: extract fields into JSON"
+        goal: >-
+          You are given this text - "Ada Lovelace, age 36, knows math and
+          programming." Write a prompt that extracts it into a JSON object with
+          keys name, age, and skills — and returns ONLY the JSON, no other text.
+        starter: >-
+          Extract the following into JSON. Text: "Ada Lovelace, age 36, knows math
+          and programming."
+        success:
+          min_words: 12
+          requires_json_request: true
+          any_of:
+            - ["only", "no other text", "no prose", "no explanation", "no markdown", "no code fence", "nothing else", "just the json"]
+          require:
+            - ["name", "age", "skills", "key", "field", "schema"]
+        success_response: |
+          {"name": "Ada Lovelace", "age": 36, "skills": ["math", "programming"]}
+        partial_response: >-
+          You're asking for JSON — good. Now lock it down: name the exact keys
+          (name, age, skills) and add "Return ONLY the JSON, no prose or markdown
+          fences." Otherwise I might wrap it in text or ```json fences.
+      - id: define-schema
+        title: Define an explicit schema
+        goal: >-
+          Write a prompt that specifies an exact JSON schema — at least two field
+          names AND their types (string, integer, boolean, array) — and shows one
+          example of the desired output.
+        starter: ""
+        success:
+          min_words: 12
+          requires_json_request: true
+          require:
+            - ["string", "integer", "int", "number", "boolean", "bool", "array", "list", "object"]
+          mentions_example: true
+        success_response: |
+          {"title": "Fix login bug", "priority": 1, "resolved": false}
+        partial_response: >-
+          Name the field TYPES (string, integer, boolean, array) and include one
+          example object. A typed schema plus an example is what makes the output
+          predictable.
+hints:
+  - content: Say exactly which keys and types you want, then add the magic rule "Return ONLY the JSON — no prose, no markdown code fences."
+    cost: 10
+    order: 1
+  - content: Including one example of the exact JSON you want is the single most effective trick. The model copies the shape.
+    cost: 15
+    order: 2
+  - content: 'Try: ''Extract name (string), age (integer), and skills (array of strings) from the text. Return ONLY a JSON object, e.g. {"name": "...", "age": 0, "skills": []}. No other text.'''
+    cost: 20
+    order: 3

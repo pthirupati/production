@@ -59,6 +59,7 @@ const AdminInvoices = lazy(() => import('../pages/admin/AdminInvoices'))
 const AdminMonitoring = lazy(() => import('../pages/admin/AdminMonitoring'))
 const Team = lazy(() => import('../pages/Team'))
 const AdminSettings = lazy(() => import('../pages/admin/AdminSettings'))
+const AdminCampaigns = lazy(() => import('../pages/admin/AdminCampaigns'))
 const InterviewHub = lazy(() => import('../pages/interviews/InterviewHub'))
 const InterviewSetup = lazy(() => import('../pages/interviews/InterviewSetup'))
 const InterviewCampaign = lazy(() => import('../pages/interviews/InterviewCampaign'))
@@ -177,6 +178,7 @@ export default function AppRouter() {
           <Route path="/admin/jira" element={<AdminJira />} />
           <Route path="/admin/threads" element={<AdminThreads />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
+          <Route path="/admin/campaigns" element={<AdminCampaigns />} />
           <Route path="/admin/coupons" element={<AdminCoupons />} />
           <Route path="/admin/analytics" element={<AdminAnalytics />} />
           <Route path="/admin/teams" element={<AdminTeams />} />

@@ -1,0 +1,109 @@
+title: "Prompt Fundamentals: Be Specific"
+slug: prompt-fundamentals
+category: Prompt Engineering
+description: >-
+  Learn the single highest-leverage skill in working with AI: writing clear,
+  specific prompts. Vague prompts get vague answers. In this lesson you will use
+  a guided practice console to turn weak prompts into strong ones, scored live
+  on role, context, task, constraints, and output format.
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Understand the five ingredients of a strong prompt (role, context, task, constraints, format)
+  - Rewrite a vague prompt so the practice console scores it 80+ /100
+  - Complete the guided exercise that asks for a specific, constrained answer
+initial_state: >-
+  A guided AI practice console opens in your browser. It is a rule-based
+  simulator (no real model, no API cost) that scores your prompt and replies
+  with a representative answer so you can feel the difference specificity makes.
+solution_explanation: >-
+  Strong prompts almost always include: WHO the AI should act as, the CONTEXT it
+  needs, the exact TASK, any CONSTRAINTS (length, tone, what to avoid), and the
+  desired OUTPUT FORMAT. "Write about dogs" scores low; "You are a vet. In 3
+  bullet points for new owners, list the most important first-week care tasks for
+  a puppy" scores high because every ingredient is present.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A general-purpose AI writing assistant.
+    lesson:
+      - heading: Why specificity wins
+        body: >-
+          An AI can only respond to what you actually asked. "Tell me about
+          databases" could mean a one-line definition or a 50-page book. The
+          model guesses — and guesses are usually generic. Every detail you add
+          (audience, length, format, focus) removes ambiguity and pushes the
+          answer toward what you actually want.
+      - heading: The five ingredients
+        body: >-
+          A reliable prompt has: (1) ROLE — who the AI should act as; (2)
+          CONTEXT — the background it needs; (3) TASK — the specific thing to do,
+          ideally with an action verb; (4) CONSTRAINTS — length, tone, audience,
+          things to avoid; (5) OUTPUT FORMAT — bullets, JSON, a table, a number.
+          You don't always need all five, but the more high-stakes the task, the
+          more of them you want.
+      - heading: Weak vs strong
+        body: >-
+          Weak: "explain recursion". Strong: "You are a CS tutor. Explain
+          recursion to a first-year student in under 120 words, using one
+          concrete example (factorial) and no jargon." The strong version is
+          specific about audience, length, example, and tone.
+    rubric: [role, context, task, constraints, format, specificity]
+    exercises:
+      - id: rewrite-vague
+        title: Rewrite a vague prompt
+        goal: >-
+          The prompt "write something about Python" is far too vague. Rewrite it
+          into a specific request. Aim to include an audience, a length limit,
+          and a clear output format.
+        starter: write something about Python
+        success:
+          min_words: 12
+          require_any_role: true
+          any_of:
+            - ["bullet", "list", "table", "steps", "numbered", "paragraph", "json"]
+          require:
+            - ["beginner", "junior", "student", "new", "audience", "team", "developer", "engineer"]
+          mentions_limit: true
+        success_response: >-
+          Here are 3 beginner-friendly facts about Python:
+          1. It reads almost like English, so it's a great first language.
+          2. Indentation defines code blocks instead of curly braces.
+          3. A huge standard library means "batteries included" for common tasks.
+        partial_response: >-
+          I can answer that, but it's broad. Who is the audience, how long should
+          it be, and what format do you want (bullets, a paragraph, a table)?
+      - id: extract-fact
+        title: Ask for one precise answer
+        goal: >-
+          Write a prompt that forces a single, unambiguous answer — for example,
+          asking for exactly one number, one word, or one sentence, with no extra
+          explanation.
+        starter: ""
+        success:
+          min_words: 6
+          any_of:
+            - ["only", "just", "exactly", "single", "one word", "one sentence", "one number", "no explanation", "no other text"]
+        success_response: "42"
+        partial_response: >-
+          That could produce a paragraph. Add a constraint like "answer with only
+          the number, no explanation" to force a precise reply.
+hints:
+  - content: A strong prompt usually names WHO the AI is, gives CONTEXT, states the TASK, adds CONSTRAINTS, and asks for a FORMAT. How many of those does your prompt have?
+    cost: 10
+    order: 1
+  - content: Add an audience ("for a beginner"), a length limit ("in under 100 words" or "3 bullets"), and a format ("as a bullet list"). The console rewards each one.
+    cost: 15
+    order: 2
+  - content: 'Try: "You are a Python instructor. In 3 bullet points for a complete beginner, list what makes Python a good first language. Keep it under 60 words."'
+    cost: 20
+    order: 3

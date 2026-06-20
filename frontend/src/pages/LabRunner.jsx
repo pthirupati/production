@@ -16,6 +16,7 @@ import JiraTicketPanel from '../components/JiraTicketPanel'
 import JiraTicketLink from '../components/JiraTicketLink'
 import LabTerminal from '../components/LabTerminal'
 import CodingIDE from '../components/ide/CodingIDE'
+import PromptPlayground from '../components/promptlab/PromptPlayground'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
@@ -783,9 +784,15 @@ export default function LabRunner() {
   const isVmwareLab = (scenario?.slug || '').includes('vmware')
     || scenario?.technology?.slug === 'vmware'
     || scenario?.simulation_type === 'vmware'
-  // Coding scenarios open the browser IDE instead of a terminal. Mirrors the
-  // vmware detection above; backed by the scenario.coding_mode flag.
-  const isCodingLab = Boolean(scenario?.coding_mode)
+  // coding_mode scenarios open a browser surface instead of a terminal. Prompt
+  // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
+  // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
+  // Mirrors the vmware detection above.
+  const promptKind = scenario?.coding_kind === 'prompt'
+    || scenario?.coding_spec?.kind === 'prompt'
+    || scenario?.technology?.slug === 'prompt-engineering'
+  const isPromptLab = Boolean(scenario?.coding_mode) && promptKind
+  const isCodingLab = Boolean(scenario?.coding_mode) && !isPromptLab
 
   const labUnavailable = session && !['RUNNING', 'PROVISIONING'].includes(session.status)
 
@@ -838,6 +845,53 @@ export default function LabRunner() {
     }
     const slug = session?.scenario?.slug || session?.scenario_detail?.slug || ''
     scheduleLabClose(result, slug)
+  }
+
+  // ── Prompt Engineering layout (rule-based AI practice console, free) ──
+  if (isPromptLab) {
+    return (
+      <div className="fixed inset-0 sm:relative flex flex-col bg-surface-950 sm:min-h-[100dvh] sm:h-[100dvh] z-20">
+        <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-surface-900 border-b border-surface-700/50">
+          <div className="flex items-center gap-3 min-w-0">
+            <Sparkles size={15} className="text-accent-purple shrink-0" />
+            <h2 className="text-sm font-semibold text-white truncate max-w-[280px]">
+              {scenario.title || 'Prompt Engineering'}
+            </h2>
+            {scenario.difficulty && <span className={`badge-${scenario.difficulty} text-[10px] py-0`}>{scenario.difficulty}</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            <LabTimerBadge variant="desktop" />
+            <button
+              onClick={() => setShowStopConfirm(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-red-500/30 text-red-400 bg-red-500/10 hover:bg-red-500/20 text-xs"
+            >
+              <StopCircle size={13} /> Stop
+            </button>
+          </div>
+        </div>
+        {closingIn != null && (
+          <div className="shrink-0 px-4 py-2 bg-accent-green/15 border-b border-accent-green/30 text-center text-sm text-accent-green font-medium animate-pulse">
+            Lesson complete — closing in {closingIn}s…
+          </div>
+        )}
+        <PromptPlayground
+          sessionId={sessionId}
+          scenario={scenario}
+          solved={solved}
+          onSolved={handleCodingSolved}
+        />
+        <ConfirmDialog
+          open={showStopConfirm}
+          onClose={() => !stopping && setShowStopConfirm(false)}
+          title={stopping ? 'Stopping Lab...' : 'Exit Lesson?'}
+          message={stopping ? 'Closing the practice console...' : 'Are you sure you want to exit? Your progress in this lesson will be lost.'}
+          confirmLabel={stopping ? 'Exiting...' : 'Exit Lesson'}
+          danger
+          onConfirm={handleStop}
+          loading={stopping}
+        />
+      </div>
+    )
   }
 
   // ── Coding IDE layout (browser editor instead of terminal) ──

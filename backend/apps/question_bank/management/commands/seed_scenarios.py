@@ -26,6 +26,7 @@ TECH_META = {
     "shell-script": {"slug": "shell-script", "name": "Shell Scripting", "icon": "terminal", "color": "teal", "order": 19},
     "devops": {"slug": "devops", "name": "DevOps", "icon": "layers", "color": "purple", "order": 20},
     "security": {"slug": "security", "name": "Security", "icon": "shield", "color": "red", "order": 21},
+    "prompt-engineering": {"slug": "prompt-engineering", "name": "Prompt Engineering & AI Mastery", "icon": "sparkles", "color": "purple", "order": 1, "price": 0},
 }
 
 

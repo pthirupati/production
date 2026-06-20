@@ -3268,6 +3268,143 @@ class AdminBlogPostDetailView(APIView):
         return Response({"deleted": True})
 
 
+# ─── Campaigns / Ads / Announcements ────────────────────────────────
+
+_CAMPAIGN_WRITE_FIELDS = (
+    "kind", "title", "body", "media_type", "media_url", "placement",
+    "bg_color", "text_color", "cta_label", "cta_url", "audience",
+)
+
+
+def _apply_campaign_payload(campaign, data):
+    """Mutate a Campaign instance from request data (shared create/update)."""
+    from django.utils.dateparse import parse_datetime
+
+    for field in _CAMPAIGN_WRITE_FIELDS:
+        if field in data:
+            setattr(campaign, field, data[field] or ("" if field != "kind" else "campaign"))
+    if "text_style" in data and isinstance(data["text_style"], dict):
+        campaign.text_style = data["text_style"]
+    if "dismissible" in data:
+        campaign.dismissible = bool(data["dismissible"])
+    for dt_field in ("starts_at", "ends_at"):
+        if dt_field in data:
+            val = data[dt_field]
+            setattr(campaign, dt_field, parse_datetime(val) if val else None)
+
+
+class AdminCampaignsView(APIView):
+    """List + create marketing campaigns / announcements / offers."""
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.adminpanel.models import Campaign
+        from apps.adminpanel.campaigns import serialize_campaign
+
+        qs = Campaign.objects.select_related("created_by").all()
+        kind = request.query_params.get("kind")
+        if kind:
+            qs = qs.filter(kind=kind)
+        return Response([serialize_campaign(c, admin=True) for c in qs])
+
+    def post(self, request):
+        from apps.adminpanel.models import Campaign
+        from apps.adminpanel.campaigns import serialize_campaign
+
+        title = (request.data.get("title") or "").strip()
+        if not title:
+            return Response({"error": "title is required"}, status=status.HTTP_400_BAD_REQUEST)
+        campaign = Campaign(title=title, created_by=request.user)
+        _apply_campaign_payload(campaign, request.data)
+        # New campaigns always start as draft; enabling is an explicit action.
+        campaign.status = "draft"
+        campaign.save()
+        return Response(serialize_campaign(campaign, admin=True), status=status.HTTP_201_CREATED)
+
+
+class AdminCampaignDetailView(APIView):
+    """Update / enable / cancel / delete a single campaign."""
+    permission_classes = [IsPlatformAdmin]
+
+    def _get(self, pk):
+        from apps.adminpanel.models import Campaign
+
+        try:
+            return Campaign.objects.get(pk=pk)
+        except Campaign.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        from apps.adminpanel.campaigns import serialize_campaign
+
+        campaign = self._get(pk)
+        if not campaign:
+            return Response({"error": "Not found"}, status=404)
+        return Response(serialize_campaign(campaign, admin=True))
+
+    def patch(self, request, pk):
+        from apps.adminpanel.campaigns import serialize_campaign
+
+        campaign = self._get(pk)
+        if not campaign:
+            return Response({"error": "Not found"}, status=404)
+
+        # Lifecycle action shortcut: ?action=enable|cancel|draft or body action.
+        action = request.data.get("action") or request.query_params.get("action")
+        if action == "enable":
+            campaign.status = "enabled"
+        elif action == "cancel":
+            campaign.status = "cancelled"
+        elif action == "draft":
+            campaign.status = "draft"
+        elif "status" in request.data and request.data["status"] in dict(campaign.STATUS_CHOICES):
+            campaign.status = request.data["status"]
+
+        _apply_campaign_payload(campaign, request.data)
+        campaign.save()
+        return Response(serialize_campaign(campaign, admin=True))
+
+    def delete(self, request, pk):
+        from apps.adminpanel.models import Campaign
+
+        deleted, _ = Campaign.objects.filter(pk=pk).delete()
+        if not deleted:
+            return Response({"error": "Not found"}, status=404)
+        return Response({"deleted": True})
+
+
+class AdminCampaignSocialView(APIView):
+    """Generate ready-to-paste social posts (LinkedIn/Twitter/Reddit).
+
+    FREE / no-paid-API: returns post text + share-intent links for manual
+    posting. ``campaign_id`` (optional) seeds the post from a campaign.
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        from apps.adminpanel.models import Campaign
+        from apps.adminpanel.campaigns import build_social_posts
+
+        campaign = None
+        campaign_id = request.data.get("campaign_id")
+        if campaign_id:
+            campaign = Campaign.objects.filter(pk=campaign_id).first()
+
+        current_features = request.data.get("current_features") or []
+        upcoming_features = request.data.get("upcoming_features") or []
+        if not isinstance(current_features, list):
+            current_features = []
+        if not isinstance(upcoming_features, list):
+            upcoming_features = []
+
+        posts = build_social_posts(
+            campaign,
+            current_features=current_features,
+            upcoming_features=upcoming_features,
+        )
+        return Response(posts)
+
+
 class AdminCertificatesView(APIView):
     """List user technology certificates, interview certificates, and achievements."""
 

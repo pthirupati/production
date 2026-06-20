@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
     PlatformConfigView,
+    ActiveCampaignsView,
     TechnologiesListView,
     TechnologyDetailView,
     ScenariosListView,
@@ -14,6 +15,7 @@ from .views import (
     ValidateLabView,
     CodingSpecView,
     CodeValidateView,
+    PromptValidateView,
     ActiveLabsView,
     LabSessionStatusView,
     LabHintsView,
@@ -40,6 +42,7 @@ from .views import (
 urlpatterns = [
     # Platform configuration
     path("config/", PlatformConfigView.as_view()),
+    path("campaigns/active/", ActiveCampaignsView.as_view()),
 
     # Public catalog
     path("technologies/", TechnologiesListView.as_view()),
@@ -60,6 +63,7 @@ urlpatterns = [
     path("labs/<uuid:session_id>/validate/", ValidateLabView.as_view()),
     path("labs/<uuid:session_id>/coding-spec/", CodingSpecView.as_view()),
     path("labs/<uuid:session_id>/code-validate/", CodeValidateView.as_view()),
+    path("labs/<uuid:session_id>/prompt-validate/", PromptValidateView.as_view()),
     path("labs/<uuid:session_id>/hints/", LabHintsView.as_view()),
     path("labs/<uuid:session_id>/ai-hint/", LabAiHintView.as_view()),
     path("labs/<uuid:session_id>/commands/", CommandHistoryView.as_view()),

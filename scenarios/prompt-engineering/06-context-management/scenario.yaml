@@ -1,0 +1,116 @@
+title: "Context Management"
+slug: context-management
+category: Prompt Engineering
+description: >-
+  An AI only knows what's in its context window. Learn to give it the right
+  information — and only the right information: how much context to include,
+  where to put instructions, how to reference long documents, and why a bloated
+  context actually makes answers worse.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Explain what the context window is and why irrelevant context hurts quality
+  - Structure a prompt that places the document first and the question last
+  - Pass the exercise that provides focused, well-organized context
+initial_state: >-
+  The guided AI practice console opens. Practice feeding the assistant a chunk of
+  reference text plus a focused question, and see how placement and relevance
+  change the answer. Rule-based and free.
+solution_explanation: >-
+  The context window is everything the model can "see": system prompt,
+  conversation history, documents you paste, and the current question. Three
+  rules: (1) include what's needed and prune what isn't — irrelevant text dilutes
+  attention and can mislead; (2) for long documents, put the document BEFORE the
+  question and clearly delimit it (e.g. <document>...</document>); (3) summarize
+  or drop stale history in long sessions. In Claude Code, CLAUDE.md and the files
+  you reference are your curated context — keep them tight and relevant.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: An assistant that answers strictly from the context you provide.
+    lesson:
+      - heading: What the model can see
+        body: >-
+          The context window holds the system prompt, the running conversation,
+          anything you paste, and the current question. The model has no memory
+          beyond it. If a fact isn't in context, the model will either say it
+          doesn't know or — worse — guess. Giving it the right reference material
+          is often more important than clever wording.
+      - heading: Less is more
+        body: >-
+          More context is not better. Dumping an entire codebase or ten documents
+          dilutes the model's attention and invites it to latch onto irrelevant
+          details. Curate: include the specific function, the relevant doc
+          section, the actual error — not everything tangentially related.
+      - heading: Placement and delimiters
+        body: >-
+          For long inputs, put the reference material FIRST and the instruction
+          LAST, and wrap the material in clear delimiters like
+          <document>...</document> or triple backticks. This helps the model
+          separate "data to use" from "what to do," and it tends to follow the
+          most recent instruction most closely.
+    rubric: [context, task, format, specificity, constraints]
+    exercises:
+      - id: ground-answer
+        title: Ground the answer in provided context
+        goal: >-
+          Write a prompt that includes a short reference passage AND a focused
+          question about it, and instruct the model to answer ONLY from that
+          passage (say "I don't know" if the answer isn't there).
+        starter: |
+          Context:
+          """
+          FixitLab labs auto-terminate after 30 minutes of inactivity.
+          """
+          Question:
+        success:
+          min_words: 12
+          any_of:
+            - ["only", "based on", "according to", "from the context", "from the passage", "using the text", "don't know", "do not know", "not in the text"]
+        success_response: >-
+          Based only on the provided context: labs auto-terminate after 30
+          minutes of inactivity. The passage doesn't mention anything else, so I
+          won't speculate beyond it.
+        partial_response: >-
+          You included context — good. Now instruct me to answer ONLY from it
+          (e.g. "Using only the passage above, answer; if it's not there, say you
+          don't know"). That prevents me from inventing details.
+      - id: delimit-document
+        title: Delimit a document and put the task last
+        goal: >-
+          Write a prompt that wraps a block of reference text in clear delimiters
+          (like triple quotes or <document> tags) and places the actual
+          instruction AFTER the document.
+        starter: ""
+        success:
+          min_words: 12
+          has_delimiter: true
+          any_of:
+            - ["summarize", "answer", "extract", "list", "explain", "question", "task", "instruction"]
+        success_response: >-
+          Here's a 1-sentence summary of the delimited document, with my
+          instruction taken from the line after it. Clear delimiters made it easy
+          to tell the data apart from the task.
+        partial_response: >-
+          Wrap the reference text in delimiters (triple backticks, triple quotes,
+          or <document>...</document>) and put the instruction after it. That
+          separation is what keeps data and task from blurring together.
+hints:
+  - content: The model only knows what's in the context window. Include the specific document/error/function you care about — and prune everything irrelevant.
+    cost: 10
+    order: 1
+  - content: Put long reference text FIRST, wrap it in delimiters, and put your question LAST. The model tends to follow the most recent instruction most closely.
+    cost: 15
+    order: 2
+  - content: 'Add "Answer using ONLY the text above; if the answer is not present, say you don''t know." This grounds the model and prevents fabrication.'
+    cost: 20
+    order: 3

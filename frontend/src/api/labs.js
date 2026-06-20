@@ -29,6 +29,14 @@ export const labApi = {
     return data
   },
 
+  // ── Prompt Engineering scenarios (rule-based, free — no LLM) ──
+  // `submissions` is { exerciseId: promptText }. The backend re-checks each
+  // prompt against the scenario's rubric and finalizes only when all pass.
+  async promptValidate(sessionId, submissions) {
+    const { data } = await api.post(`/labs/${sessionId}/prompt-validate/`, { submissions })
+    return data
+  },
+
   async getHints(sessionId) {
     const { data } = await api.get(`/labs/${sessionId}/hints/`)
     return data

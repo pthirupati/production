@@ -1,0 +1,117 @@
+title: "When to Use Tools & Agents"
+slug: tools-and-agents
+category: Prompt Engineering
+description: >-
+  A bare model can only produce text. Give it TOOLS (functions it can call) and
+  it can fetch data, run code, and act in the real world. Chain those calls with
+  a goal and you have an AGENT. Learn when tool use and agents are the right
+  pattern — and when a single prompt is simpler and better.
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Explain tool use (function calling) and how an agent loops over it
+  - Write a clear tool definition (name, description, input schema) in plain terms
+  - Decide when an agent is warranted vs a single prompt
+initial_state: >-
+  The guided AI practice console opens. Practice describing a tool the model
+  could call and reasoning about when an agent loop is worth it. Rule-based and
+  free.
+solution_explanation: >-
+  TOOL USE (function calling) - you describe functions the model may call (name,
+  what it does, JSON input schema). The model decides when to call one, you
+  execute it, and you feed the result back. AGENT - a loop where the model
+  repeatedly thinks, calls a tool, observes the result, and continues until the
+  goal is met. Use tools when the task needs fresh data, computation, or
+  side-effects. Use an agent when the task is multi-step and the path isn't known
+  in advance. Don't reach for an agent when one well-formed prompt (or a single
+  tool call) would do - agents add latency, cost, and failure modes. Good tool
+  descriptions are the #1 driver of correct tool use.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: An assistant that can call tools you define and loop toward a goal.
+    lesson:
+      - heading: Tools = functions the model can call
+        body: >-
+          Tool use (a.k.a. function calling) lets the model invoke functions you
+          expose - get_weather(city), search_db(query), run_tests(). You provide
+          each tool's name, a clear description, and a JSON input schema. The model
+          chooses when to call it and with what arguments; your code runs the
+          function and returns the result, which the model uses in its next step.
+      - heading: Agents = tools in a loop
+        body: >-
+          An agent wraps tool use in a loop - think, act (call a tool), observe
+          the result, repeat, until the objective is met or a stop condition
+          fires. This lets the model handle multi-step tasks whose exact steps
+          aren't known up front (debug this failing test, research and summarize
+          X, refactor this module). Claude Code is itself an agent over file,
+          shell, and search tools.
+      - heading: When NOT to use them
+        body: >-
+          Tools and agents add latency, cost, and new failure modes (bad
+          arguments, tool errors, loops). If a single prompt answers the question,
+          use a single prompt. If one tool call suffices, don't build an agent
+          loop. Reach for agents when the task is genuinely multi-step and
+          adaptive. Always give the model a way to stop and a budget on steps.
+    rubric: [task, format, specificity, constraints]
+    exercises:
+      - id: define-tool
+        title: Describe a tool the model can call
+        goal: >-
+          Write a plain-language tool definition the model could use - include the
+          tool NAME, a one-line DESCRIPTION of what it does and when to use it, and
+          its INPUT parameters (with types). For example a weather lookup.
+        starter: "Tool name: get_weather\nDescription: "
+        success:
+          min_words: 12
+          require:
+            - ["description", "describe", "use it", "returns", "input", "parameter", "argument", "schema"]
+          any_of:
+            - ["string", "integer", "number", "boolean", "city", "query", "param", "input", "object", "array"]
+        success_response: >-
+          Clear tool spec. With a precise name, a description of WHEN to use it,
+          and typed inputs, I can decide to call get_weather(city: string) and
+          pass the right argument. Vague descriptions are the top cause of wrong
+          tool calls.
+        partial_response: >-
+          A usable tool needs three things - NAME, a DESCRIPTION of what it does
+          and when to use it, and typed INPUT parameters (e.g. city: string). Add
+          the missing pieces so the model knows how and when to call it.
+      - id: agent-or-not
+        title: Decide agent vs single prompt
+        goal: >-
+          Write a short note describing ONE task and arguing whether it needs an
+          agent loop or just a single prompt/tool call — and why (think about
+          whether the steps are known in advance).
+        starter: ""
+        success:
+          min_words: 12
+          any_of:
+            - ["single prompt", "one prompt", "single call", "one call", "agent", "loop", "multi-step", "multiple steps", "steps are", "unknown", "in advance", "adaptive"]
+        success_response: >-
+          Reasonable call. If the steps are known and few, a single prompt or one
+          tool call is simpler and cheaper; reserve the agent loop for genuinely
+          multi-step, adaptive tasks where the path isn't known up front.
+        partial_response: >-
+          Tie the decision to the task's shape - is it one step (use a single
+          prompt/tool call) or many unknown steps (use an agent loop)? State the
+          task and justify which pattern fits.
+hints:
+  - content: Tool use = you describe functions (name, description, JSON input schema); the model decides when to call them and you run them.
+    cost: 10
+    order: 1
+  - content: An agent is just tool use in a loop - think, call a tool, observe, repeat - for multi-step tasks. Claude Code is an agent over file/shell/search tools.
+    cost: 15
+    order: 2
+  - content: Don't over-engineer - if one prompt or one tool call solves it, skip the agent. Reach for agents only when steps are unknown in advance, and always cap the steps.
+    cost: 20
+    order: 3

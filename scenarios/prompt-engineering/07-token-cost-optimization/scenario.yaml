@@ -1,0 +1,118 @@
+title: "Reducing Cost & Tokens"
+slug: token-cost-optimization
+category: Prompt Engineering
+description: >-
+  Every token costs money and latency. Learn the practical levers that cut AI
+  spend without hurting quality: concise prompts, prompt caching for repeated
+  context, batching many items in one call, capping output length, and choosing
+  the right model size for the job.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Name the main cost levers - concise prompts, caching, batching, output caps, model choice
+  - Rewrite a bloated prompt to be concise while keeping every requirement
+  - Pass the exercise that batches multiple items into a single request
+solution_explanation: >-
+  Cost scales with input + output tokens. Levers - (1) be concise; cut filler and
+  redundant restatements; (2) prompt caching - when you reuse a big system prompt
+  or document across calls, cache it so you don't pay full price each time; (3)
+  batching - classify or transform many items in ONE call instead of N calls; (4)
+  cap max output tokens and ask for terse answers; (5) right-size the model - use
+  a smaller/faster model for easy, high-volume tasks and reserve the largest model
+  for hard reasoning. Measure with token counting before optimizing.
+initial_state: >-
+  The guided AI practice console opens. Compare a wordy prompt against a tight
+  one, and try batching several inputs into a single request. Rule-based and free.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A cost-conscious assistant that rewards concise, batched requests.
+    lesson:
+      - heading: Concise prompts
+        body: >-
+          You pay for input tokens too. Long preambles, repeated instructions,
+          and "please and thank you" padding add cost and can bury the real ask.
+          Cut to: role (if needed), the task, the constraints, the format. Clear
+          and short beats long and polite.
+      - heading: Caching and batching
+        body: >-
+          PROMPT CACHING - if many requests share a large prefix (a system prompt,
+          a big reference doc, a long set of examples), cache that prefix so
+          repeated calls are much cheaper and faster. Anthropic's prompt caching
+          can cut cost on the cached portion dramatically. BATCHING - instead of
+          calling the model once per item, send 20 items in one prompt and ask for
+          20 labeled outputs. One call, far fewer overhead tokens, lower latency.
+      - heading: Output caps and model choice
+        body: >-
+          Set a max output length and ask for terse answers - unbounded responses
+          are a common hidden cost. And right-size the model - a small, fast model
+          handles classification and extraction cheaply at high volume; save the
+          largest model for genuinely hard reasoning. Use token counting to
+          measure before and after you optimize.
+    rubric: [task, constraints, format, specificity]
+    exercises:
+      - id: tighten-prompt
+        title: Rewrite a bloated prompt concisely
+        goal: >-
+          Take a long, padded request and rewrite it tightly - keep the role,
+          task, constraints, and format, but cut filler. Aim for a short prompt
+          that still asks for a length-capped, formatted answer.
+        starter: >-
+          Hello there, I was hoping you might possibly be able to help me out if
+          it's not too much trouble, I'd really love it if you could maybe write
+          something for me about how caching works, thanks so much!!
+        success:
+          max_words: 45
+          mentions_limit: true
+          any_of:
+            - ["bullet", "list", "sentence", "words", "concise", "brief", "json", "table", "steps"]
+        success_response: >-
+          Caching stores the result of expensive work so repeat requests are
+          served instantly instead of recomputed. (Concise, capped, on-format -
+          exactly as asked.)
+        partial_response: >-
+          Trim the politeness padding and restatements. Keep just the task plus a
+          length cap and a format (e.g. "Explain caching in 2 sentences"). Shorter
+          input = lower cost and a clearer ask.
+      - id: batch-items
+        title: Batch many items into one call
+        goal: >-
+          Instead of one request per item, write a single prompt that processes
+          MULTIPLE inputs at once (e.g. classify a numbered list of sentences) and
+          asks for one labeled output per item.
+        starter: |
+          Classify each sentence as POSITIVE or NEGATIVE. Return one label per line.
+          1.
+        success:
+          min_words: 12
+          min_list_items: 2
+          any_of:
+            - ["each", "per line", "one per", "for every", "all of", "list", "numbered", "respectively"]
+        success_response: |
+          1. POSITIVE
+          2. NEGATIVE
+          3. POSITIVE
+          (Three items handled in a single call - far cheaper than three separate requests.)
+        partial_response: >-
+          Batching means putting SEVERAL items in one prompt. Add a numbered list
+          of at least two inputs and ask for "one label per line." One call does
+          the work of many.
+hints:
+  - content: Cost = input tokens + output tokens. Cut filler from your prompt and cap the output length ("answer in 2 sentences").
+    cost: 10
+    order: 1
+  - content: Reuse a big system prompt or document across many calls? Use prompt caching so you don't pay full price for that prefix every time.
+    cost: 15
+    order: 2
+  - content: Batch - send 20 items in ONE prompt and ask for 20 labeled outputs instead of making 20 separate calls. Fewer overhead tokens, lower latency.
+    cost: 20
+    order: 3

@@ -1,0 +1,127 @@
+title: "Using Claude Code Effectively"
+slug: using-claude-code
+category: Prompt Engineering
+description: >-
+  Claude Code is an agentic coding assistant that lives in your terminal — it
+  reads and edits files, runs commands, and works across your whole repo. Learn
+  the habits that make it dramatically more effective: a good CLAUDE.md, clear
+  up-front goals, letting it explore before editing, verifying its work, and
+  steering instead of micromanaging.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Describe what CLAUDE.md is and what belongs in it
+  - Write a clear, well-specified task prompt for an agentic coding assistant
+  - Explain the explore -> plan -> implement -> verify loop and how to steer it
+initial_state: >-
+  The guided console opens with practical Claude Code guidance plus an exercise
+  where you write a strong task request for an agentic coding assistant.
+  Rule-based and free.
+solution_explanation: >-
+  Claude Code works best when you - (1) keep a CLAUDE.md at the repo root with
+  durable project context (how to run tests, conventions, do/don't rules) - it
+  acts like a persistent system prompt; (2) give the full goal up front in one
+  well-specified message rather than dribbling requirements across turns; (3) let
+  it explore the codebase before it edits, and ask for a plan on non-trivial work;
+  (4) always verify - have it run tests/linters and review the diff; (5) steer
+  with short corrections instead of restarting. Use higher effort for hard tasks,
+  commit at good checkpoints, and keep changes scoped.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A coach for working effectively with the Claude Code agentic assistant.
+    lesson:
+      - heading: CLAUDE.md is your project's memory
+        body: >-
+          Claude Code automatically reads a CLAUDE.md file at your repo root and
+          treats it like a persistent system prompt for the project. Put durable
+          context there - how to run the build and tests, code style and
+          conventions, architecture notes, and always/never rules ("always run the
+          test suite before committing", "never edit generated files"). A good
+          CLAUDE.md means you stop repeating yourself every session.
+      - heading: State the goal clearly, up front
+        body: >-
+          Agentic models do best with a clear objective given in a single,
+          well-specified first message - the task, the constraints, and what "done"
+          looks like. Vague, drip-fed requirements over many turns reduce both
+          quality and efficiency. "Fix the bug" is weak; "Users can't reset their
+          password — the reset email never sends. Find why, fix it, and add a test.
+          Don't change the email template." is strong.
+      - heading: Explore, plan, implement, verify
+        body: >-
+          For anything non-trivial, let Claude Code EXPLORE the relevant files
+          first, then ask it to PLAN ("outline your approach before editing"), then
+          IMPLEMENT, then VERIFY by running tests/linters and reviewing the diff.
+          The verify step is the one people skip and regret - ask "run the tests and
+          show me the diff." Treat it like a teammate whose work you review, not a
+          vending machine.
+      - heading: Steer, don't micromanage
+        body: >-
+          When it goes slightly wrong, give a short correction ("use the existing
+          util in lib/http.js instead of writing a new one") rather than starting
+          over - it keeps the context it has built. Keep changes scoped, commit at
+          good checkpoints so you can roll back, and crank up effort for genuinely
+          hard problems. Let it do the small decisions; reserve your attention for
+          scope, correctness, and destructive actions.
+    rubric: [task, context, constraints, specificity]
+    exercises:
+      - id: write-task-prompt
+        title: Write a strong coding task request
+        goal: >-
+          Write a task you'd give an agentic coding assistant. A strong one states
+          the goal, gives the relevant context (where/what), adds a constraint
+          (what NOT to change), and says how you'll know it's done.
+        starter: ""
+        success:
+          min_words: 16
+          require:
+            - ["test", "verify", "don't", "do not", "only", "without", "keep", "constraint", "make sure", "ensure"]
+          any_of:
+            - ["fix", "add", "implement", "refactor", "build", "update", "migrate", "investigate"]
+        success_response: >-
+          That's a request an agent can act on confidently - clear goal, enough
+          context to find the right code, a guardrail on scope, and a verifiable
+          definition of done. This is the kind of up-front spec that produces good
+          autonomous work.
+        partial_response: >-
+          Add the missing pieces - WHERE/WHAT context so it can find the code, a
+          CONSTRAINT (what not to touch), and a "done" signal (e.g. "and add a test
+          that passes"). The clearer the spec, the better the result.
+      - id: claude-md-rule
+        title: Write a CLAUDE.md rule
+        goal: >-
+          Write one durable rule you'd put in a project's CLAUDE.md — something
+          Claude Code should always or never do for this repo (e.g. how to run
+          tests, a convention, or a guardrail).
+        starter: ""
+        success:
+          min_words: 6
+          any_of:
+            - ["always", "never", "run", "use", "do not", "don't", "must", "before", "convention", "prefer"]
+        success_response: >-
+          Perfect CLAUDE.md material — a persistent, repo-wide rule like that means
+          Claude Code follows it every session without you repeating it. Durable
+          context belongs in CLAUDE.md, not in each prompt.
+        partial_response: >-
+          Phrase it as a durable always/never rule for the repo, e.g. "Always run
+          `npm test` before committing" or "Never edit files in /generated." That's
+          what CLAUDE.md is for.
+hints:
+  - content: Keep a CLAUDE.md at the repo root with how-to-run-tests, conventions, and always/never rules. Claude Code reads it automatically as persistent context.
+    cost: 10
+    order: 1
+  - content: Give the full goal up front in one clear message — task, constraints, and what "done" looks like. Then let it explore and plan before editing.
+    cost: 15
+    order: 2
+  - content: Always verify - ask it to run tests and show the diff. Steer with short corrections instead of restarting, keep changes scoped, and commit at checkpoints so you can roll back.
+    cost: 20
+    order: 3

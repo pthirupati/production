@@ -495,6 +495,34 @@ export const adminApi = {
     const { data } = await api.post('/admin/interviews/maintenance/', payload)
     return data
   },
+
+  // ── Campaigns / Ads / Announcements ──
+  async getCampaigns(params = {}) {
+    const qs = new URLSearchParams(params).toString()
+    const { data } = await api.get(qs ? `/admin/campaigns/?${qs}` : '/admin/campaigns/')
+    return data
+  },
+  async createCampaign(payload) {
+    const { data } = await api.post('/admin/campaigns/', payload)
+    return data
+  },
+  async updateCampaign(id, payload) {
+    const { data } = await api.patch(`/admin/campaigns/${id}/`, payload)
+    return data
+  },
+  async setCampaignStatus(id, action) {
+    // action: 'enable' | 'cancel' | 'draft'
+    const { data } = await api.patch(`/admin/campaigns/${id}/`, { action })
+    return data
+  },
+  async deleteCampaign(id) {
+    const { data } = await api.delete(`/admin/campaigns/${id}/`)
+    return data
+  },
+  async generateSocialPosts(payload) {
+    const { data } = await api.post('/admin/campaigns/social/', payload)
+    return data
+  },
 }
 
 /** Trigger a browser download for a Blob */

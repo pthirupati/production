@@ -45,6 +45,9 @@ from .views import (
     AdminSyncScenariosView,
     AdminBlogPostsView,
     AdminBlogPostDetailView,
+    AdminCampaignsView,
+    AdminCampaignDetailView,
+    AdminCampaignSocialView,
     AdminCertificatesView,
     AdminTechnologyMaintenanceView,
     AdminTechnologySubscribersView,
@@ -112,6 +115,11 @@ urlpatterns = [
     # Blog CMS
     path("blog/", AdminBlogPostsView.as_view()),
     path("blog/<uuid:post_id>/", AdminBlogPostDetailView.as_view()),
+
+    # Campaigns / Ads / Announcements
+    path("campaigns/", AdminCampaignsView.as_view()),
+    path("campaigns/social/", AdminCampaignSocialView.as_view()),
+    path("campaigns/<uuid:pk>/", AdminCampaignDetailView.as_view()),
 
     # Hints CRUD
     path("scenarios/<int:scenario_id>/hints/", AdminHintsView.as_view()),

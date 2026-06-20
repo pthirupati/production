@@ -171,6 +171,37 @@ class PlatformConfigView(APIView):
         return Response(payload)
 
 
+class ActiveCampaignsView(APIView):
+    """Public: currently-enabled marketing banners for the user's audience.
+
+    AllowAny + must never 500 — returns [] on any error so the layout banner
+    fetch is always safe. Anonymous users are treated as the "free" audience.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from apps.adminpanel.campaigns import active_campaigns_for
+
+        placement = request.query_params.get("placement")
+        user = request.user if getattr(request.user, "is_authenticated", False) else None
+        # Cache the common anon/all slice briefly; audience-specific results are
+        # cheap to recompute and small in volume.
+        cache_key = None
+        if user is None and not placement:
+            cache_key = "campaigns_active_anon"
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+        try:
+            data = active_campaigns_for(user, placement=placement)
+        except Exception:
+            logger.exception("ActiveCampaignsView failed — returning empty list")
+            data = []
+        if cache_key is not None:
+            cache.set(cache_key, data, 30)
+        return Response(data)
+
+
 class TechnologiesListView(APIView):
     permission_classes = [AllowAny]
 
@@ -990,7 +1021,7 @@ def public_coding_spec(scenario):
     spec = dict(scenario.coding_spec or {})
     visible = spec.get("visible_tests") or []
     hidden = spec.get("hidden_tests") or []
-    return {
+    payload = {
         "language": spec.get("language", "python"),
         "files": spec.get("files", []),
         "entrypoint": spec.get("entrypoint", ""),
@@ -1002,6 +1033,17 @@ def public_coding_spec(scenario):
         "hidden_test_count": len(hidden),
         "starter_note": spec.get("starter_note", ""),
     }
+    # Prompt Engineering scenarios reuse coding_mode to open a custom in-browser
+    # surface (PromptPlayground) instead of the code editor. The whole
+    # prompt_config is purely educational content (lessons, rubric, exercises) —
+    # there are no hidden answers or secrets to strip, so it is sent as-is so the
+    # client can render the guided, rule-based AI practice simulator offline.
+    kind = spec.get("kind")
+    if kind:
+        payload["kind"] = kind
+    if kind == "prompt":
+        payload["prompt_config"] = spec.get("prompt_config", {}) or {}
+    return payload
 
 
 class CodingSpecView(APIView):
@@ -1131,6 +1173,63 @@ class CodeValidateView(APIView):
         return ""
 
 
+class PromptValidateView(APIView):
+    """Grade a Prompt Engineering ("prompt") scenario — rule-based, FREE.
+
+    Prompt scenarios reuse the coding_mode flag to open the browser
+    PromptPlayground instead of the code editor. There is NO LLM call here — the
+    simulator and grader are pure lexical heuristics (see apps.labs.prompt_eval),
+    and the code is honest that it's a guided practice tool, not a real model.
+
+    Integrity (same rule as code grading): the browser's feedback is advisory;
+    completion is decided ONLY by re-checking the user's submitted prompts on the
+    server against the scenario's embedded rubric, then finalizing through the
+    SAME finalize_validated_session() path as every other lab type.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [LabStartThrottle]
+
+    def post(self, request, session_id):
+        from apps.labs.prompt_eval import evaluate_course
+
+        session = get_object_or_404(
+            LabSession, pk=session_id, user=request.user, status="RUNNING"
+        )
+        scenario = session.scenario
+        spec = scenario.coding_spec or {}
+        if not getattr(scenario, "coding_mode", False) or spec.get("kind") != "prompt":
+            return Response({"error": "Not a prompt scenario"}, status=400)
+
+        submissions = request.data.get("submissions") or {}
+        if not isinstance(submissions, dict):
+            return Response(
+                {"error": "submissions must be an object of {exercise_id: prompt}"},
+                status=400,
+            )
+
+        verdict = evaluate_course(spec.get("prompt_config", {}) or {}, submissions)
+
+        if verdict["all_passed"]:
+            provisioner = None
+            try:
+                provisioner = get_provisioner(session.provider or "simulation")
+            except Exception:
+                provisioner = None
+            completion = finalize_validated_session(session, request.user, provisioner)
+            verdict.update(completion)
+            verdict["passed"] = True
+            verdict["message"] = "Lesson complete! " + completion.get("message", "")
+            return Response(verdict)
+
+        verdict["passed"] = False
+        remaining = verdict["total"] - verdict["passed_count"]
+        verdict["message"] = (
+            f"{verdict['passed_count']}/{verdict['total']} exercises cleared — "
+            f"{remaining} to go. Refine the prompts the playground flags."
+        )
+        return Response(verdict)
+
+
 class ActiveLabsView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1192,6 +1291,10 @@ class LabSessionStatusView(APIView):
                 "lab_mode": session.scenario.lab_mode,
                 "simulation_type": session.scenario.simulation_type,
                 "coding_mode": bool(getattr(session.scenario, "coding_mode", False)),
+                # coding_kind lets the frontend route coding_mode scenarios to the
+                # right surface without fetching the full spec — "prompt" opens the
+                # PromptPlayground, anything else opens the code IDE.
+                "coding_kind": (session.scenario.coding_spec or {}).get("kind", ""),
                 "technology": {
                     "name": session.scenario.technology.name,
                     "slug": session.scenario.technology.slug,

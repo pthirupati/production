@@ -3,7 +3,7 @@ import { useThemeStore } from '../../store/themeStore'
 import { useState } from 'react'
 import {
   LayoutDashboard, Target, Cpu, Users, MonitorPlay, ArrowLeft, Shield, Menu, X, Ticket, Activity, ScrollText, FileText, Tag, ShieldAlert,
-  BarChart3, Building2, Mic2, Award, CreditCard, MessageSquare, Wrench,
+  BarChart3, Building2, Mic2, Award, CreditCard, MessageSquare, Wrench, Megaphone,
 } from 'lucide-react'
 import AdminTopbar from './AdminTopbar'
 
@@ -24,6 +24,7 @@ const NAV_GROUPS = [
       { path: '/admin/technologies', icon: Cpu, label: 'Technologies' },
       { path: '/admin/jira', icon: Ticket, label: 'Jira Tickets' },
       { path: '/admin/interviews', icon: Mic2, label: 'Interviews' },
+      { path: '/admin/campaigns', icon: Megaphone, label: 'Ads & Campaigns' },
     ],
   },
   {

@@ -1,0 +1,169 @@
+title: "Build Your Own MCP Server"
+slug: build-your-own-mcp
+category: Prompt Engineering
+description: >-
+  Once you understand MCP, building your own server is surprisingly small. Walk
+  through a minimal, working MCP server in both Python (FastMCP) and TypeScript
+  (the official SDK) that exposes a single tool, then wire it into Claude Code
+  with one command. Accurate, copy-pasteable starter code.
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 2400
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Describe the parts of a minimal MCP server (server object, a tool, a transport)
+  - Read and understand a minimal Python and TypeScript MCP server
+  - Write the `claude mcp add` command that registers your local server
+initial_state: >-
+  The guided console opens with two complete minimal MCP servers (Python and
+  TypeScript) and a practice exercise to register one in Claude Code. Rule-based
+  and free.
+solution_explanation: >-
+  A minimal MCP server is - (1) a server object, (2) one or more tools (a named
+  function with a description and typed inputs), and (3) a transport to run on
+  (stdio for local). In Python, the `mcp` package's FastMCP makes a tool a
+  decorated function whose docstring becomes the description. In TypeScript, the
+  `@modelcontextprotocol/sdk` exposes `registerTool` with a Zod input schema, run
+  over `StdioServerTransport`. Register a local stdio server in Claude Code with
+  `claude mcp add <name> -- <command to run it>`.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A hands-on guide to building Model Context Protocol servers.
+    lesson:
+      - heading: The three parts
+        body: >-
+          Every MCP server has - (1) a SERVER object that holds your tools; (2) one
+          or more TOOLS - each a named function with a clear description and a typed
+          input schema (the description is what Claude uses to decide when to call
+          it); and (3) a TRANSPORT to run on. For a local server you run on stdio so
+          Claude Code can launch it as a subprocess. Start with one tool; add more
+          once it works.
+      - heading: Minimal Python server (FastMCP)
+        body: |
+          Install the SDK with: pip install "mcp[cli]"   (or: uv add "mcp[cli]")
+
+          server.py:
+
+              from mcp.server.fastmcp import FastMCP
+
+              mcp = FastMCP("weather")  # the server name
+
+              @mcp.tool()
+              def get_forecast(city: str) -> str:
+                  \"\"\"Get a short weather forecast for a city.
+
+                  Args:
+                      city: The city name, e.g. "Austin".
+                  \"\"\"
+                  # In a real server you'd call an API here.
+                  return f"{city}: sunny, 24C, light breeze."
+
+              if __name__ == "__main__":
+                  mcp.run()  # defaults to the stdio transport
+
+          The docstring becomes the tool description; the type hints become the
+          input schema. That's a complete, working MCP server.
+      - heading: Minimal TypeScript server
+        body: |
+          Install: npm install @modelcontextprotocol/sdk zod
+
+          server.ts:
+
+              import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+              import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+              import { z } from "zod";
+
+              const server = new McpServer({ name: "weather", version: "1.0.0" });
+
+              server.registerTool(
+                "get_forecast",
+                {
+                  description: "Get a short weather forecast for a city.",
+                  inputSchema: { city: z.string().describe("City name") },
+                },
+                async ({ city }) => ({
+                  content: [{ type: "text", text: `${city}: sunny, 24C, light breeze.` }],
+                }),
+              );
+
+              await server.connect(new StdioServerTransport());
+
+          Same three parts - a server, one registered tool with a Zod input schema,
+          connected over stdio.
+      - heading: Run it in Claude Code
+        body: |
+          Register your local (stdio) server so Claude Code launches it - everything
+          after `--` is the command:
+
+              # Python
+              claude mcp add weather -- python /abs/path/to/server.py
+              # TypeScript (compiled)
+              claude mcp add weather -- node /abs/path/to/server.js
+
+          Then `claude mcp list` to confirm it connected and `/mcp` inside Claude
+          Code to inspect its tools. Ask Claude "what's the forecast for Austin?"
+          and it will call your get_forecast tool. Tip - test the server first with
+          the MCP Inspector (npx @modelcontextprotocol/inspector) before wiring it
+          in. Write tool descriptions carefully; they are the #1 driver of whether
+          Claude calls the tool correctly.
+    rubric: [task, specificity, format]
+    exercises:
+      - id: register-local-server
+        title: Register your local MCP server
+        goal: >-
+          Write the `claude mcp add` command that registers a LOCAL stdio MCP
+          server you wrote — remember everything after `--` is the command Claude
+          Code runs to launch it (e.g. python or node plus the file path).
+        starter: "claude mcp add weather -- "
+        success:
+          min_words: 4
+          must_contain_all:
+            - ["claude mcp add", "--"]
+          any_of:
+            - ["python", "node", "uv", "deno", "./", "/"]
+        success_response: >-
+          That registers your server as a local stdio server. Run `claude mcp list`
+          to confirm it connected, then ask Claude something that should trigger
+          your tool. If it doesn't fire, sharpen the tool's description — that's
+          almost always the fix.
+        partial_response: >-
+          Put the launch command AFTER `--` (Claude Code runs everything past it),
+          e.g. `claude mcp add weather -- python /abs/path/server.py`. Use an
+          absolute path so it works from any directory.
+      - id: name-a-tool
+        title: Describe a tool for your server
+        goal: >-
+          Write a one-line tool DESCRIPTION for a tool you'd add to your MCP
+          server. Make it prescriptive about WHEN Claude should call it, since the
+          description is what drives correct tool use.
+        starter: ""
+        success:
+          min_words: 8
+          any_of:
+            - ["when", "use this", "call this", "returns", "fetch", "create", "look up", "search", "get"]
+        success_response: >-
+          Strong description — stating WHEN to call the tool (not just what it does)
+          is exactly what makes Claude invoke it at the right time. Vague
+          descriptions are the top cause of a tool never firing.
+        partial_response: >-
+          Make it prescriptive about WHEN to use it, e.g. "Call this when the user
+          asks for the current weather in a city." The trigger condition matters
+          more than a generic "gets weather."
+hints:
+  - content: A minimal server is three things — a server object, one tool (name + description + typed inputs), and a transport (stdio for local).
+    cost: 10
+    order: 1
+  - content: 'In Python use FastMCP - @mcp.tool() turns a function into a tool, and its docstring + type hints become the description and schema. In TypeScript use server.registerTool with a Zod inputSchema, over StdioServerTransport.'
+    cost: 15
+    order: 2
+  - content: 'Register a local server with `claude mcp add <name> -- <command>`, e.g. `claude mcp add weather -- python /abs/path/server.py`. Test first with `npx @modelcontextprotocol/inspector`, then confirm via `claude mcp list` and `/mcp`.'
+    cost: 20
+    order: 3

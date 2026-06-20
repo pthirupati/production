@@ -1,0 +1,113 @@
+title: "Role & System Prompts"
+slug: role-system-prompts
+category: Prompt Engineering
+description: >-
+  The fastest way to change an AI's behavior is to tell it who to be. Learn the
+  difference between a system prompt (the persistent instructions that frame the
+  whole conversation) and a user prompt, and practice setting a strong role so
+  answers come back in the voice, depth, and format you need.
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+coding_mode: true
+jira_priority: Low
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+  - Explain how a system prompt differs from a user message
+  - Write a role/persona instruction that sets expertise, audience, and tone
+  - Pass the exercise that requires a clear persona plus behavioral rules
+initial_state: >-
+  The guided AI practice console opens. Set a role for the assistant and watch
+  how the simulated reply changes tone and depth. Everything is rule-based and
+  free — no API key required.
+solution_explanation: >-
+  System prompts set durable behavior ("You are a senior SRE. Always show the
+  command first, then a one-line why."). They persist across the conversation,
+  unlike a one-off user message. A good role specifies expertise level, the
+  audience, the tone, and any always/never rules. With Claude, system-level
+  guidance is passed via the system parameter; in Claude Code it lives in
+  CLAUDE.md and your settings.
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: An assistant that adopts whatever role you assign in your prompt.
+    lesson:
+      - heading: System vs user prompts
+        body: >-
+          A USER prompt is a single request. A SYSTEM prompt is standing
+          instruction that frames every reply in the conversation — the AI's
+          role, rules, and style. Think of the system prompt as the job
+          description and the user prompts as the individual tasks. With the
+          Claude API you pass it via the top-level `system` parameter; in Claude
+          Code, your CLAUDE.md file acts like a persistent system prompt for the
+          whole repo.
+      - heading: Anatomy of a good role
+        body: >-
+          A strong role sets four things: EXPERTISE ("You are a senior security
+          engineer"), AUDIENCE ("explaining to a junior dev"), TONE ("concise and
+          direct, no fluff"), and RULES ("always show the command first, never
+          invent APIs you're unsure about"). Roles work because they prime the
+          model toward a consistent slice of its training.
+      - heading: Always / never rules
+        body: >-
+          Behavioral rules are powerful in system prompts: "Always cite the file
+          and line you changed." "Never modify tests to make them pass." "If you
+          are unsure, say so instead of guessing." These constraints shape every
+          answer without you repeating them each turn.
+    rubric: [role, constraints, tone, audience, specificity]
+    exercises:
+      - id: set-persona
+        title: Assign an expert persona
+        goal: >-
+          Write a system-style instruction that gives the assistant a clear
+          expert role, names the audience it's speaking to, and sets a tone. For
+          example a security reviewer explaining findings to developers.
+        starter: "You are a "
+        success:
+          min_words: 10
+          require_any_role: true
+          require:
+            - ["concise", "brief", "direct", "friendly", "formal", "plain", "no jargon", "simple", "professional", "blunt", "tone"]
+          any_of:
+            - ["junior", "developer", "engineer", "beginner", "team", "student", "manager", "customer", "user", "audience"]
+        success_response: >-
+          Understood. I'll act as a senior security engineer, keep things concise
+          and jargon-light for developers, and flag the risk and the fix for each
+          issue. What would you like me to review?
+        partial_response: >-
+          Good start on the role. Now also tell me the AUDIENCE (who I'm talking
+          to) and the TONE you want (concise? formal? friendly?) so I stay
+          consistent.
+      - id: behavior-rule
+        title: Add an always/never rule
+        goal: >-
+          Add a behavioral rule to the assistant's instructions — something it
+          should ALWAYS do or NEVER do (for example: always show the command
+          first, or never guess when unsure).
+        starter: "You are a coding assistant. Always "
+        success:
+          min_words: 8
+          any_of:
+            - ["always", "never", "must", "do not", "don't", "if unsure", "if you are not sure"]
+        success_response: >-
+          Got it. I'll follow that rule on every reply. For example, I'll lead
+          with the exact command and add one line on why — and I won't pretend to
+          know an API I'm unsure about.
+        partial_response: >-
+          A persistent rule should use ALWAYS or NEVER (or "if unsure, ..."). Try
+          phrasing one concrete behavior I should follow every time.
+hints:
+  - content: A system prompt is persistent context. The strongest ones set expertise, audience, tone, and always/never rules in one or two sentences.
+    cost: 10
+    order: 1
+  - content: 'In Claude Code, CLAUDE.md is effectively your system prompt for the repo. Put durable rules there ("always run tests before committing") instead of repeating them.'
+    cost: 15
+    order: 2
+  - content: 'Try: "You are a senior SRE explaining to a junior developer. Be concise and avoid jargon. Always show the exact command first, then one line on why."'
+    cost: 20
+    order: 3
