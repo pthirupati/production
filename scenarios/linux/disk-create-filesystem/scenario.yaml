@@ -2,17 +2,29 @@ title: Create Filesystem on New Disk
 slug: linux-disk-create-filesystem
 category: Storage
 difficulty: medium
-description: |
-  A visible but unformatted disk must be partitioned, formatted with ext4, and mounted at /data.
+description: A new block device (/dev/sdb) is visible to the system but unformatted, so it can't be used
+  for storage yet. It must be given an ext4 filesystem and mounted at /data so applications can write
+  to it. Format the disk, mount it, and (for persistence) add it to fstab.
 lab_mode: simulation
 simulation_type: rhel
 time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Format /dev/sdb with mkfs.ext4
-  - Mount to /data and verify with df -h
+- Create an ext4 filesystem on /dev/sdb
+- Mount it at /data and confirm with df -h
+- Make the mount persistent across reboots (fstab)
 hints:
-  - content: "mkfs.ext4 /dev/sdb && mkdir -p /data && mount /dev/sdb /data"
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: 'Confirm the device is raw: `lsblk` and `blkid /dev/sdb` (no FS type). Format it: `mkfs.ext4
+    /dev/sdb`.'
+- order: 2
+  cost: 15
+  content: 'Mount it: `mkdir -p /data && mount /dev/sdb /data`, then confirm with `df -h /data`.'
+- order: 3
+  cost: 20
+  content: 'Persist it in /etc/fstab using the UUID (`blkid /dev/sdb`): e.g. `UUID=... /data ext4 defaults
+    0 2`, then `mount -a` to validate the entry.'
+initial_state: Linux server with a raw, unformatted disk /dev/sdb present in lsblk. /data does not yet
+  hold a mounted filesystem.

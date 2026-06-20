@@ -2,18 +2,33 @@ title: HPA Not Scaling Under Load
 slug: k8s-hpa-scaling
 category: Kubernetes
 difficulty: medium
-description: |
-  HorizontalPodAutoscaler is misconfigured and worker deployment does not scale under CPU pressure.
-  Fix HPA metrics target and min/max replicas.
+description: A HorizontalPodAutoscaler is not adding replicas even though the workload is under load.
+  The HPA shows targets as <unknown> because the metrics-server isn't returning pod metrics, or the Deployment's
+  containers have no CPU resource requests for the HPA to compute utilization against. Restore metrics
+  so the HPA can scale.
 lab_mode: simulation
 simulation_type: kubernetes
 time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Inspect HPA and deployment worker
-  - Apply corrected HorizontalPodAutoscaler manifest
+- Inspect the HPA and see why current utilization is <unknown>
+- Verify metrics-server availability and that pods declare CPU requests
+- Restore metrics/requests so the HPA scales the Deployment up under load
 hints:
-  - content: "kubectl get hpa worker and apply HPA with valid metrics and scaleTargetRef"
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: '`kubectl get hpa` shows TARGETS as <unknown>/50%. Describe it: `kubectl describe hpa <name>`
+    — "unable to fetch metrics" or "missing request for cpu" tells you the cause.'
+- order: 2
+  cost: 15
+  content: 'Check metrics: `kubectl top pods` should return CPU. If it errors, metrics-server is unhealthy.
+    If it works, the Deployment is likely missing resources.requests.cpu, which the HPA needs to compute
+    a percentage.'
+- order: 3
+  cost: 20
+  content: 'Add CPU requests so the HPA can compute utilization: `kubectl set resources deployment/<name>
+    --requests=cpu=100m`. Once metrics flow and requests exist, the HPA scales out; watch with `kubectl
+    get hpa -w`.'
+initial_state: Simulated Kubernetes cluster with an HPA targeting a Deployment. The HPA's TARGETS column
+  shows <unknown>/50% and replica count stays at the minimum despite sustained CPU load.

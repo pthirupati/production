@@ -2,34 +2,37 @@ title: Syntax Error in Ansible Playbook
 slug: ansible-playbook-syntax-error
 difficulty: easy
 category: Ansible Automation
-description: 'Running an Ansible playbook fails immediately with a YAML parse error.
-  The playbook has incorrect indentation, a missing colon, and a duplicate key that
-  confuse the YAML parser. You must read the error output, locate the offending lines,
-  and correct the syntax before the playbook can be executed.
+description: 'Running an Ansible playbook fails immediately with a YAML parse error. The playbook has
+  incorrect indentation, a missing colon, and a duplicate key that confuse the YAML parser. You must read
+  the error output, locate the offending lines, and correct the syntax before the playbook can be executed.
 
   '
-initial_state: 'Simulated control node. Running ansible-playbook site.yml returns
-  a YAML syntax error and the play does not start. Managed hosts are reachable.
+initial_state: 'Simulated control node. Running ansible-playbook site.yml returns a YAML syntax error
+  and the play does not start. Managed hosts are reachable.
 
   '
 objectives:
-  - Run ansible-playbook --syntax-check to get the exact error location
-  - Fix all YAML syntax issues in the playbook
-  - Confirm ansible-playbook site.yml runs without parse errors
+- Run ansible-playbook --syntax-check to get the exact error location
+- Fix all YAML syntax issues in the playbook
+- Confirm ansible-playbook site.yml runs without parse errors
 lab_mode: simulation
 simulation_type: ansible
 time_limit: 900
 max_score: 100
 is_free: true
 hints:
-  - content: 'Use: ansible-playbook site.yml --syntax-check to get a detailed error
-      message including the line number.'
-    cost: 10
-    order: 1
-  - content: 'Use yamllint site.yml for a full lint pass to catch all YAML issues
-      at once before re-running.'
-    cost: 10
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Get the precise location: `ansible-playbook site.yml --syntax-check` prints the offending
+    line and column.'
+- order: 2
+  cost: 15
+  content: 'Lint the whole file to catch every issue at once: `yamllint site.yml`. Look for bad indentation,
+    a missing colon after a key, and a duplicate key.'
+- order: 3
+  cost: 20
+  content: Fix the indentation (consistent 2-space), add the missing colon, and remove the duplicate key.
+    Re-run `ansible-playbook site.yml --syntax-check` until it's clean, then run the play.
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Low

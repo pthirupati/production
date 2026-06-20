@@ -8,33 +8,41 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  Prometheus is showing targets as DOWN and metrics are not being scraped.
+description: 'Prometheus is showing targets as DOWN and metrics are not being scraped.
+
   The scrape config in prometheus.yml points to the wrong port and the
-  service labels don't match the scrape selector. Fix the scrape config
+
+  service labels don''t match the scrape selector. Fix the scrape config
+
   and service labels so Prometheus can discover and scrape the targets.
+
+  '
 objectives:
-  - Identify why Prometheus targets show as DOWN
-  - Fix the scrape configuration in prometheus.yml
-  - Add correct service labels to match the scrape selector
-  - Verify targets show as UP in Prometheus
-initial_state: |
-  Ubuntu server running Prometheus at /etc/prometheus/prometheus.yml.
+- Identify why Prometheus targets show as DOWN
+- Fix the scrape configuration in prometheus.yml
+- Add correct service labels to match the scrape selector
+- Verify targets show as UP in Prometheus
+initial_state: 'Ubuntu server running Prometheus at /etc/prometheus/prometheus.yml.
+
   The myapp service is running on port 8080 but prometheus.yml has port 9090.
-  The service label "app: myapp-service" doesn't match the selector "app: myapp".
+
+  The service label "app: myapp-service" doesn''t match the selector "app: myapp".
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check Prometheus config: cat /etc/prometheus/prometheus.yml"
-  - order: 2
-    cost: 15
-    content: "Look at the scrape_configs section — find the wrong port number"
-  - order: 3
-    cost: 20
-    content: "Change the target port from 9090 to 8080 in the static_configs targets"
-  - order: 4
-    cost: 25
-    content: "Also fix the relabel_configs or match labels to use 'app: myapp'"
-  - order: 5
-    cost: 30
-    content: "Reload Prometheus: curl -X POST http://localhost:9090/-/reload"
+- order: 1
+  cost: 10
+  content: 'Inspect the scrape config: `cat /etc/prometheus/prometheus.yml`. In the UI, Status > Targets
+    shows the job DOWN.'
+- order: 2
+  cost: 15
+  content: The job's `static_configs` target uses the wrong port (9090 instead of the app's 8080), and
+    the label selector doesn't match the service.
+- order: 3
+  cost: 20
+  content: 'Fix the target port to 8080 and correct the labels/relabel_configs to match `app: myapp` so
+    the target is selected.'
+- order: 4
+  cost: 25
+  content: Reload Prometheus (`curl -X POST http://localhost:9090/-/reload`) and confirm the target flips
+    to UP in Status > Targets.

@@ -2,8 +2,11 @@ title: Memory Leak Profiling
 slug: sim-python-memory-leak
 category: Python Development
 difficulty: hard
-description: 'A long-running Python process grows memory indefinitely. Use tracemalloc or objgraph to find the leak and fix it.'
-initial_state: 'Simulated RHEL 9 server. A long-running Python process grows memory indefinitely. Use tracemalloc or objgraph to find the leak and fix it.'
+description: A long-running Python process steadily grows in memory until it's killed (OOM) or slows the
+  host. Objects are being retained unintentionally — e.g. an ever-growing cache/list or a reference held
+  in a global. Profile allocations to find what accumulates, then fix the retention so memory stays flat.
+initial_state: Python service whose RSS grows over time without leveling off. Under sustained use it eventually
+  exhausts memory. Heap growth is driven by retained objects, not real workload.
 lab_mode: simulation
 simulation_type: python
 is_free: false
@@ -13,10 +16,19 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: python3 -c ''import tracemalloc; tracemalloc.start()'''
-- Verify validation passes
+- Confirm RSS grows over time under steady load
+- Profile allocations to find the object type/site that accumulates
+- Fix the retention so memory usage stabilizes
 hints:
-- content: 'Try: python3 -c ''import tracemalloc; tracemalloc.start()'''
+- order: 1
   cost: 10
-  order: 1
+  content: 'Confirm the trend: watch the process RSS over time (`ps -o rss= -p <pid>` repeatedly, or `top`).
+    It climbs and never drops even when idle.'
+- order: 2
+  cost: 15
+  content: 'Find what''s growing with tracemalloc: start it, take two snapshots a while apart, and `snapshot2.compare_to(snapshot1,
+    ''lineno'')` — the top line is the leak site (often an unbounded list/dict or cache).'
+- order: 3
+  cost: 20
+  content: 'Fix the retention: bound the cache (e.g. functools.lru_cache(maxsize=...)), clear/evict the
+    growing structure, or drop the lingering global reference. Re-profile to confirm RSS plateaus.'

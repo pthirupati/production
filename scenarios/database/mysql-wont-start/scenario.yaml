@@ -1,25 +1,33 @@
 category: Database Administration
-description: 'mysqld failed to start. Check logs and fix configuration.
-
-  '
+description: The mysqld service fails to start and the database is down. The error log points at a concrete
+  cause — usually a bad directive in the MySQL config, wrong datadir permissions, or a stale PID/socket
+  — so systemd reports the unit as failed. Read the log, fix the underlying problem, and bring mysqld
+  back to active.
 difficulty: easy
 dual_terminal: false
 hints:
-- content: 'Try: systemctl start mysqld'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. mysqld failed to start. Check logs and fix
-  configuration.
-
-  '
+  content: 'See the failure reason: `systemctl status mysqld` then `journalctl -u mysqld -n 40` (and `/var/log/mysqld.log`).
+    The last lines name the bad directive or the path it can''t access.'
+- order: 2
+  cost: 15
+  content: 'Common causes: an invalid line in /etc/my.cnf, the datadir (/var/lib/mysql) owned by the wrong
+    user, or a leftover PID/socket. Validate options with `mysqld --validate-config` if available.'
+- order: 3
+  cost: 20
+  content: Apply the fix (correct/remove the bad my.cnf line, `chown -R mysql:mysql /var/lib/mysql`, or
+    remove the stale lock), then `systemctl start mysqld` and confirm `systemctl is-active mysqld`.
+initial_state: Simulated RHEL host. `systemctl start mysqld` fails and the unit is in a failed state;
+  the MySQL error log records why startup aborted (config error or permission/lock issue).
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: systemctl start mysqld'
-- Verify validation passes
+- Read the MySQL error log to find why startup fails
+- Fix the underlying cause (config directive, permissions, or stale lock)
+- Start mysqld and confirm the service is active
 requires_companion_hosts: false
 simulation_type: database
 slug: sim-mysql-wont-start

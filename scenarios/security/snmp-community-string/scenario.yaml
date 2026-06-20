@@ -1,5 +1,5 @@
 slug: snmp-community-string
-title: "SNMP Public Community String — Change to Secure Value"
+title: SNMP Public Community String — Change to Secure Value
 technology: Security
 category: Network Security
 difficulty: easy
@@ -8,31 +8,42 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  The SNMP daemon is configured with the default community string 'public', which
+description: 'The SNMP daemon is configured with the default community string ''public'', which
+
   allows any host on the network to query the full SNMP MIB — including sensitive
+
   system information like running processes, network interfaces, and routing tables.
+
   Additionally, the SNMP service is listening on all interfaces including the public
+
   one. Change the community string to a secure value and restrict access to the
+
   management network only.
+
+  '
 objectives:
-  - Identify the 'public' community string in snmpd.conf
-  - Change the community string to a strong random value
-  - Restrict SNMP access to the management network (192.168.10.0/24)
-  - Restart snmpd and verify 'public' no longer works
-initial_state: |
-  Ubuntu 22.04 with snmpd. /etc/snmp/snmpd.conf has `rocommunity public default`.
+- Identify the 'public' community string in snmpd.conf
+- Change the community string to a strong random value
+- Restrict SNMP access to the management network (192.168.10.0/24)
+- Restart snmpd and verify 'public' no longer works
+initial_state: 'Ubuntu 22.04 with snmpd. /etc/snmp/snmpd.conf has `rocommunity public default`.
+
   SNMP accessible from any host. `snmpwalk -c public -v2c localhost` dumps full MIB.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check config: `grep -E 'community|rocommunity' /etc/snmp/snmpd.conf`"
-  - order: 2
-    cost: 15
-    content: "Replace: change `rocommunity public default` to `rocommunity <strong-string> 192.168.10.0/24`"
-  - order: 3
-    cost: 10
-    content: "Generate a strong string: `openssl rand -hex 16`"
-  - order: 4
-    cost: 10
-    content: "Restart: `systemctl restart snmpd`. Verify: `snmpwalk -c public -v2c localhost` should fail."
+- order: 1
+  cost: 10
+  content: 'Find the weak config: `grep -E ''community|rocommunity'' /etc/snmp/snmpd.conf` shows the default
+    `public` string open to any host.'
+- order: 2
+  cost: 15
+  content: 'Generate a strong community string: `openssl rand -hex 16`.'
+- order: 3
+  cost: 20
+  content: Replace `rocommunity public default` with `rocommunity <strong-string> 192.168.10.0/24` (restrict
+    to the monitoring subnet).
+- order: 4
+  cost: 25
+  content: 'Restart and verify: `systemctl restart snmpd`, then `snmpwalk -c public -v2c localhost` now
+    FAILS (the default no longer works) while the new string from the allowed subnet succeeds.'

@@ -2,38 +2,47 @@ title: PostgreSQL Refusing New Connections (max_connections)
 slug: db-postgres-max-connections
 difficulty: medium
 category: Database Administration
-description: |
-  A production PostgreSQL instance is rejecting new client connections with
+description: 'A production PostgreSQL instance is rejecting new client connections with
+
   "FATAL: sorry, too many clients already". The configured max_connections is far too
+
   low for the current workload after an application scale-up, and the service is now
+
   effectively down for new sessions. You must raise max_connections in postgresql.conf
+
   and restart PostgreSQL so the new limit takes effect.
 
-initial_state: |
-  Simulated RHEL 9 database server. The postgresql service is down (it crashed under the
+  '
+initial_state: 'Simulated RHEL 9 database server. The postgresql service is down (it crashed under the
+
   connection storm). /var/lib/pgsql/data/postgresql.conf has max_connections = 20. psql
+
   reports the server is not accepting connections.
 
+  '
 objectives:
-  - Inspect /var/lib/pgsql/data/postgresql.conf and find max_connections set too low
-  - Raise max_connections to a production-appropriate value (e.g. 200)
-  - Restart PostgreSQL so the new setting takes effect
-  - Verify the service is active and accepting connections
+- Inspect /var/lib/pgsql/data/postgresql.conf and find max_connections set too low
+- Raise max_connections to a production-appropriate value (e.g. 200)
+- Restart PostgreSQL so the new setting takes effect
+- Verify the service is active and accepting connections
 lab_mode: simulation
 simulation_type: database
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check the running config: grep max_connections /var/lib/pgsql/data/postgresql.conf — it is set to 20, far too low after the scale-up.'
-    cost: 10
-    order: 1
-  - content: 'Edit postgresql.conf to set max_connections = 200 (changing this parameter requires a full restart, not just a reload).'
-    cost: 20
-    order: 2
-  - content: 'Apply with systemctl restart postgresql, then confirm with systemctl is-active postgresql.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 10
+  content: 'Inspect the running config: `grep -n max_connections /var/lib/pgsql/data/postgresql.conf`
+    — it''s set far too low (e.g. 20) for the scaled-up workload, which caused "too many clients".'
+- order: 2
+  cost: 20
+  content: 'Raise it: edit postgresql.conf and set `max_connections = 200`. This parameter is not reloadable
+    — it requires a full restart, not a `pg_ctl reload`.'
+- order: 3
+  cost: 30
+  content: 'Apply and verify: `systemctl restart postgresql`, then `systemctl is-active postgresql` and
+    `psql -c ''SHOW max_connections;''` to confirm the new limit; new clients connect again.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High

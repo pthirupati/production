@@ -1,24 +1,33 @@
 category: Linux Administration
-description: 'Nginx config typo prevents start.
-
-  '
+description: Nginx is installed but fails to start because of a typo in its configuration (commonly a
+  misspelled directive such as `listn` instead of `listen`). `nginx -t` reports the syntax error and systemd
+  refuses to start the service, so the site is down. Find the bad directive, fix it, start nginx, and
+  confirm port 80 serves.
 difficulty: easy
 dual_terminal: false
 hints:
-- content: 'Try: systemctl start nginx'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. Nginx config typo prevents start.
-
-  '
+  content: 'Test the config to get the exact file and line: `nginx -t`. It prints the offending directive
+    (e.g. unknown directive "listn").'
+- order: 2
+  cost: 15
+  content: Open the named file (often /etc/nginx/nginx.conf or a file under /etc/nginx/conf.d/ or sites-enabled/)
+    and correct the typo on that line.
+- order: 3
+  cost: 20
+  content: Re-run `nginx -t` until it says "syntax is ok / test is successful", then `systemctl enable
+    --now nginx`. Verify with `curl -I http://localhost` (expect HTTP/1.1 200).
+initial_state: Simulated RHEL 9 server. nginx is installed but the active site config contains a typo,
+  so `systemctl start nginx` fails and `nginx -t` reports a syntax error. The website is unreachable.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: systemctl start nginx'
-- Verify validation passes
+- Run nginx -t to locate the configuration syntax error
+- Fix the misspelled/invalid directive in the site config
+- Start and enable nginx, then verify it serves on port 80
 requires_companion_hosts: false
 simulation_type: generic
 slug: sim-rhel-broken-nginx

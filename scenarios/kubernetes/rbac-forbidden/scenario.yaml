@@ -2,8 +2,12 @@ title: ServiceAccount RBAC Forbidden
 slug: sim-k8s-rbac
 category: Kubernetes
 difficulty: hard
-description: 'A pod running as a ServiceAccount gets 403 Forbidden when calling the Kubernetes API. Create the correct Role and RoleBinding.'
-initial_state: 'Simulated RHEL 9 server. A pod running as a ServiceAccount gets 403 Forbidden when calling the Kubernetes API. Create the correct Role and RoleBinding.'
+description: An application's ServiceAccount is getting "Forbidden" errors when calling the Kubernetes
+  API (e.g. listing pods). The ServiceAccount has no Role/RoleBinding granting the verbs and resources
+  it needs, so the API server denies the request. Create the appropriate Role and RoleBinding to grant
+  least-privilege access.
+initial_state: Simulated Kubernetes cluster. A pod uses a ServiceAccount that lacks RBAC permissions;
+  API calls fail with "User \"system:serviceaccount:...\" cannot list resource pods".
 lab_mode: simulation
 simulation_type: kubernetes
 is_free: false
@@ -13,10 +17,20 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: kubectl auth can-i list pods --as=system:serviceaccount:default:app-sa'
-- Verify validation passes
+- Identify the ServiceAccount and the exact forbidden verb/resource
+- Create a Role granting the needed permissions in the namespace
+- Bind the Role to the ServiceAccount and confirm the call succeeds
 hints:
-- content: 'Try: kubectl auth can-i list pods --as=system:serviceaccount:default:app-sa'
+- order: 1
   cost: 10
-  order: 1
+  content: Read the error — it names the ServiceAccount and the denied action, e.g. "cannot list resource
+    \"pods\"". Confirm with `kubectl auth can-i list pods --as=system:serviceaccount:<ns>:<sa>` (returns
+    no).
+- order: 2
+  cost: 15
+  content: 'Create a Role with just those rights: `kubectl create role pod-reader --verb=get,list,watch
+    --resource=pods -n <ns>`.'
+- order: 3
+  cost: 20
+  content: 'Bind it: `kubectl create rolebinding pod-reader-bind --role=pod-reader --serviceaccount=<ns>:<sa>
+    -n <ns>`. Re-run `kubectl auth can-i list pods --as=...` — now yes.'

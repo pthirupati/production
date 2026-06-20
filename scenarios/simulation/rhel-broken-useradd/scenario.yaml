@@ -1,4 +1,4 @@
-title: "RHEL Simulation: Repair Broken /etc/passwd"
+title: 'RHEL Simulation: Repair Broken /etc/passwd'
 slug: sim-rhel-broken-useradd
 technology: Simulation
 category: User Management
@@ -10,23 +10,27 @@ simulation_type: generic
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: true
-description: |
-  A malformed /etc/passwd entry prevents useradd from working.
-  Clean up the corrupt line, run pwck, and create appuser.
+description: New user creation fails because /etc/passwd contains a malformed account entry. useradd and
+  related tools refuse to run (or behave unpredictably) when the passwd database is corrupt — a line is
+  missing required colon-separated fields. Identify the bad line with pwck, repair or remove it, and then
+  successfully create the appuser account.
 objectives:
-  - Identify the malformed passwd entry
-  - Remove or fix the corrupt line
-  - Run pwck to verify account files
-  - Create user appuser with useradd -m
-initial_state: |
-  Simulated RHEL 9 server with a corrupt /etc/passwd line blocking new users.
+- Identify the malformed passwd entry
+- Remove or fix the corrupt line
+- Run pwck to verify account files
+- Create user appuser with useradd -m
+initial_state: Simulated RHEL 9 server whose /etc/passwd has a corrupt line (e.g. missing UID/GID fields),
+  which blocks creating new users until the passwd database is clean.
 hints:
-  - order: 1
-    cost: 10
-    content: Run `pwck` to see which line is malformed.
-  - order: 2
-    cost: 15
-    content: Edit /etc/passwd and remove the line with missing UID fields.
-  - order: 3
-    cost: 20
-    content: Use `useradd -m appuser` after passwd is clean.
+- order: 1
+  cost: 10
+  content: 'Find the corrupt account entry: `pwck` reports which line in /etc/passwd is malformed (e.g.
+    missing UID/GID fields).'
+- order: 2
+  cost: 15
+  content: Open /etc/passwd and remove or correct that malformed line (a passwd entry needs all 7 colon-separated
+    fields). Keep a backup first.
+- order: 3
+  cost: 20
+  content: 'Re-run `pwck` until it''s clean, then create the user: `useradd -m appuser`. Confirm with
+    `id appuser`.'

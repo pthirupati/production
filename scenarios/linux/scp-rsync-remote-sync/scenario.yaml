@@ -10,25 +10,47 @@ max_score: 100
 infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
-description: |
-  Sync /var/www/app to the backup server using scp or rsync over SSH.
-  SSH keys work but the destination directory permissions block writes.
+description: 'Syncing /var/www/app to the backup server over SSH fails on the write side: SSH key auth
+  works, but the destination directory on backup-server isn''t writable by the sync user, so scp/rsync
+  errors with permission denied. Fix the ownership/permissions of the destination so the transfer completes.'
 companion_hosts:
-  - name: backup
-    role: backup-server
-    hostname: backup-server
-    ssh_user: syncuser
-    setup_command: |
-      apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server rsync >/dev/null
-      useradd -m syncuser 2>/dev/null || true
-      mkdir -p /var/www/backup && chown root:root /var/www/backup && chmod 755 /var/www/backup
-      mkdir -p /home/syncuser/.ssh && chmod 700 /home/syncuser/.ssh
-      service ssh restart 2>/dev/null || /usr/sbin/sshd
+- name: backup
+  role: backup-server
+  hostname: backup-server
+  ssh_user: syncuser
+  setup_command: 'apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server
+    rsync >/dev/null
+
+    useradd -m syncuser 2>/dev/null || true
+
+    mkdir -p /var/www/backup && chown root:root /var/www/backup && chmod 755 /var/www/backup
+
+    mkdir -p /home/syncuser/.ssh && chmod 700 /home/syncuser/.ssh
+
+    service ssh restart 2>/dev/null || /usr/sbin/sshd
+
+    '
 objectives:
-  - Fix permissions so rsync/scp can write to backup-server:/var/www/backup/
+- Confirm the transfer fails on destination write permissions (not auth)
+- Fix ownership/permissions on backup-server:/var/www/backup/
+- Verify rsync/scp completes the sync successfully
 hints:
-  - order: 1
-    cost: 10
-    content: On backup-server (SSH tab), ensure syncuser owns /var/www/backup or has group write access.
-validation_script: |
-  test -f /var/www/app/index.html && rsync -az -e "ssh -o StrictHostKeyChecking=no" /var/www/app/ syncuser@backup-server:/var/www/backup/ && ssh -o BatchMode=yes syncuser@backup-server test -f /var/www/backup/index.html
+- order: 1
+  cost: 10
+  content: 'Auth succeeds but writes fail. On backup-server (the SSH tab), check the destination: `ls
+    -ld /var/www/backup` — it''s not owned/writable by syncuser.'
+- order: 2
+  cost: 15
+  content: 'Grant write access: `chown -R syncuser /var/www/backup` (or add group write: `chmod -R g+w`
+    with the right group).'
+- order: 3
+  cost: 20
+  content: 'From the client, run the sync: `rsync -avz /var/www/app/ syncuser@backup-server:/var/www/backup/`
+    — it now completes without permission errors.'
+validation_script: 'test -f /var/www/app/index.html && rsync -az -e "ssh -o StrictHostKeyChecking=no"
+  /var/www/app/ syncuser@backup-server:/var/www/backup/ && ssh -o BatchMode=yes syncuser@backup-server
+  test -f /var/www/backup/index.html
+
+  '
+initial_state: Two-host lab. SSH key auth between client and backup-server works, but backup-server:/var/www/backup/
+  isn't writable by syncuser, so rsync/scp can't write there.

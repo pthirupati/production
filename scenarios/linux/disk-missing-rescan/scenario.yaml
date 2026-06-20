@@ -2,19 +2,30 @@ title: Rescan SCSI Bus for Missing Disk
 slug: linux-disk-missing-rescan
 category: Storage
 difficulty: medium
-description: |
-  A new disk was attached at the hypervisor but is not visible inside the Linux guest.
-  Rescan the SCSI host and verify with lsblk.
+description: A new disk was hot-added at the hypervisor/SAN, but it doesn't appear inside the Linux guest
+  because the SCSI bus hasn't been rescanned. Linux won't see the device until the relevant SCSI host
+  is told to look for new LUNs. Trigger a rescan and confirm the new disk shows up in lsblk.
 lab_mode: simulation
 simulation_type: rhel
 time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Run echo "- - -" > /sys/class/scsi_host/host0/scan
-  - Confirm new disk appears in lsblk output
-initial_state: Simulated RHEL server with hidden /dev/sdb disk.
+- Confirm the new disk is not yet visible to the guest
+- Rescan the SCSI host bus to detect the new device
+- Verify the new disk appears in lsblk
+initial_state: Linux guest where a freshly attached disk is not yet visible (missing from lsblk) because
+  the SCSI host needs a rescan to detect it.
 hints:
-  - content: "echo '- - -' > /sys/class/scsi_host/host0/scan && lsblk"
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: 'It''s not in `lsblk` yet. Identify the SCSI hosts: `ls /sys/class/scsi_host/` (host0, host1,
+    ...).'
+- order: 2
+  cost: 15
+  content: 'Trigger a rescan of the bus: `echo ''- - -'' > /sys/class/scsi_host/host0/scan` (repeat for
+    each host, or use `rescan-scsi-bus.sh` if available).'
+- order: 3
+  cost: 20
+  content: 'Confirm the device now appears: `lsblk` (and `dmesg | tail` shows the new disk attaching).
+    You can now partition/format it.'

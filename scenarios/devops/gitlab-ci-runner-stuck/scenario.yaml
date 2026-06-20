@@ -8,29 +8,39 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  All GitLab CI jobs are stuck in a pending state. The existing CI runner has gone
+description: 'All GitLab CI jobs are stuck in a pending state. The existing CI runner has gone
+
   offline and there are no available runners to pick up jobs. You need to register
+
   a new GitLab Runner on this server so pipelines can resume.
+
+  '
 objectives:
-  - Identify why jobs are stuck in pending state
-  - Install gitlab-runner if not present
-  - Register a new runner using the registration token
-  - Verify the runner is active and picking up jobs
-initial_state: |
-  Ubuntu server. GitLab CI jobs stuck in pending. The GitLab instance is at
+- Identify why jobs are stuck in pending state
+- Install gitlab-runner if not present
+- Register a new runner using the registration token
+- Verify the runner is active and picking up jobs
+initial_state: 'Ubuntu server. GitLab CI jobs stuck in pending. The GitLab instance is at
+
   http://gitlab.internal. Registration token is in /etc/gitlab-runner/registration_token.
+
   gitlab-runner binary may need to be installed.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check runner status: gitlab-runner status"
-  - order: 2
-    cost: 15
-    content: "Get the registration token: cat /etc/gitlab-runner/registration_token"
-  - order: 3
-    cost: 20
-    content: "Register a new runner: gitlab-runner register --url http://gitlab.internal --registration-token <TOKEN> --executor shell --non-interactive"
-  - order: 4
-    cost: 25
-    content: "Start the runner service: gitlab-runner start && gitlab-runner verify"
+- order: 1
+  cost: 10
+  content: 'Confirm there''s no runner to pick up jobs: `gitlab-runner status` and check the project''s
+    CI/CD > Runners (none online), which is why jobs sit pending.'
+- order: 2
+  cost: 15
+  content: 'Get the registration token (project/instance): `cat /etc/gitlab-runner/registration_token`
+    (or copy it from the GitLab Runners settings page).'
+- order: 3
+  cost: 20
+  content: 'Register a new runner: `gitlab-runner register --url http://gitlab.internal --registration-token
+    <token> --executor shell` (pick the right executor).'
+- order: 4
+  cost: 25
+  content: 'Start and verify: `gitlab-runner start && gitlab-runner verify` — the runner shows online
+    and pending jobs begin running.'

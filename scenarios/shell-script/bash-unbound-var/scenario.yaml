@@ -1,25 +1,33 @@
 category: Shell Scripting
-description: 'backup.sh fails due to unset variable. Fix script.
-
-  '
+description: A backup script (/opt/scripts/backup.sh) aborts immediately under strict mode because it
+  references a variable that was never set. With `set -u` active, expanding an unset variable is a fatal
+  error, so the backup never runs. Find the unbound variable, give it a safe value or default, and get
+  the script to complete.
 difficulty: easy
 dual_terminal: false
 hints:
-- content: 'Try: bash /opt/scripts/backup.sh'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. backup.sh fails due to unset variable. Fix
-  script.
-
-  '
+  content: 'Run it and read the error: `bash /opt/scripts/backup.sh` prints "<VARNAME>: unbound variable"
+    with the line number. Trace execution with `bash -x /opt/scripts/backup.sh`.'
+- order: 2
+  cost: 15
+  content: 'The script has `set -u`, so any unset variable is fatal. Either assign the variable before
+    use or use a default expansion: `"${VARNAME:-/default/path}"`.'
+- order: 3
+  cost: 20
+  content: Fix the offending reference (e.g. set BACKUP_DIR or use `${BACKUP_DIR:-/var/backups}`), then
+    re-run the script — it completes and writes the backup. Confirm the output file exists.
+initial_state: 'Simulated RHEL host. Running `bash /opt/scripts/backup.sh` exits early with a "<VAR>:
+  unbound variable" error (the script uses set -u) before any backup is produced.'
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: bash /opt/scripts/backup.sh'
-- Verify validation passes
+- Run the script and identify which variable is unbound
+- Set the variable or provide a default expansion
+- Confirm the script runs to completion and produces the backup
 requires_companion_hosts: false
 simulation_type: rhel
 slug: sim-bash-unbound-var

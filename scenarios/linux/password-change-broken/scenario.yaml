@@ -9,31 +9,26 @@ time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Users report they cannot change their passwords. The PAM
-
-  configuration was recently modified and passwd commands fail
-
-  affected user account.'
+description: Users can't change their passwords — `passwd` fails — because the PAM password stack was
+  recently edited and now contains an error (a typo in a module name such as pam_unixx.so), and one account
+  may also be locked. A broken /etc/pam.d/common-password breaks passwd for everyone. Fix the PAM typo,
+  unlock the affected account, and confirm password changes work.
 objectives:
 - Diagnose why passwd fails for devuser
-- Affected service behaves normally
-- Unlock the devuser account if locked
-- Successfully change devuser's password
-initial_state: 'You have root shell access to an Ubuntu 22.04 server.
-
-  PAM configuration has a typo preventing password changes.
-
-  '
+- Fix the typo in the PAM password configuration
+- Unlock devuser if locked and successfully change its password
+initial_state: Linux server where /etc/pam.d/common-password has a typo in a module name, so passwd fails;
+  the devuser account may also be locked.
 hints:
 - order: 1
   cost: 10
-  content: Try `passwd devuser` and read the error message.
+  content: 'Reproduce and read the error: `passwd devuser`. Then inspect the stack: `cat /etc/pam.d/common-password`
+    for a bad module name.'
 - order: 2
   cost: 15
-  content: Inspect /etc/pam.d/common-password for typos in module names.
+  content: 'Fix the typo — e.g. `pam_unixx.so` → `pam_unix.so`. Check the account isn''t locked: `passwd
+    -S devuser`.'
 - order: 3
-  cost: 25
-  content: Fix pam_unixx.so → pam_unix.so and unlock devuser with `passwd -u devuser`.
-- order: 4
-  cost: 15
-  content: Fix the typo in /etc/pam.d/common-password
+  cost: 20
+  content: Unlock if needed (`passwd -u devuser`) and verify a password change succeeds. Be careful editing
+    PAM — keep a root shell open until you've confirmed it works.

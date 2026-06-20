@@ -7,28 +7,26 @@ time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
-description: 'The deployment pipeline has been failing since yesterday''s merge.
-
-  GitLab CI reports YAML errors and invalid Docker image references.'
+description: The deployment pipeline has failed since yesterday's merge. GitLab CI rejects the .gitlab-ci.yml
+  with YAML errors (bad indentation under script:) and the build references a Docker image whose tag is
+  mistyped, so jobs never run. Fix the YAML structure and the image reference so the pipeline parses and
+  the build succeeds.
 objectives:
-- Affected service behaves normally
-- Ensure build script steps are properly indented
-initial_state: 'Repository at /opt/app with a broken .gitlab-ci.yml file.
-
-  '
+- Validate the .gitlab-ci.yml and find the YAML/indentation errors
+- 'Fix the indentation under script: and correct the Docker image tag'
+- Confirm the pipeline parses and the build job succeeds
+initial_state: 'Repository at /opt/app with a broken .gitlab-ci.yml: inconsistent indentation under the
+  script: block and a typo''d Docker image tag cause the pipeline to fail validation/builds.'
 hints:
 - order: 1
   cost: 10
-  content: 'Validate YAML: `python3 -c "import yaml; yaml.safe_load(open(''.gitlab-ci.yml''))"`'
+  content: 'Validate the YAML locally: `python3 -c "import yaml; yaml.safe_load(open(''.gitlab-ci.yml''))"`
+    (or GitLab''s CI Lint) to get the exact parse error.'
 - order: 2
   cost: 15
-  content: Check the `image:` line for typos in the tag name.
+  content: Fix the indentation under `script:` (YAML needs consistent spacing for the list items) and
+    check the `image:` line for a typo in the tag (e.g. `node:18-buster` not `node:18-bustr`).
 - order: 3
   cost: 20
-  content: Fix indentation under `script:` — YAML requires consistent spacing.
-- order: 4
-  cost: 15
-  content: Fix YAML syntax errors in .gitlab-ci.yml
-- order: 5
-  cost: 15
-  content: Correct the Docker image tag typo
+  content: Re-validate until the YAML parses cleanly, then push/re-run — the build job picks the correct
+    image and the pipeline succeeds.

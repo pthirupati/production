@@ -2,8 +2,12 @@ title: Java OutOfMemoryError
 slug: sim-java-oom
 category: Java Development
 difficulty: medium
-description: 'A Java app crashes with java.lang.OutOfMemoryError: Java heap space. Increase heap size and identify the leak.'
-initial_state: 'Simulated RHEL 9 server. A Java app crashes with java.lang.OutOfMemoryError: Java heap space. Increase heap size and identify the leak.'
+description: 'A Java application crashes with java.lang.OutOfMemoryError: Java heap space. The heap is
+  too small for the workload and/or the app is leaking objects so the heap fills and GC can''t recover.
+  Give the JVM enough heap to run, and investigate the allocation pattern to confirm whether it''s a sizing
+  issue or a genuine leak.'
+initial_state: 'Simulated RHEL 9 server running a Java app that throws OutOfMemoryError: Java heap space
+  under load because the max heap is too low (and/or memory is being retained).'
 lab_mode: simulation
 simulation_type: java
 is_free: false
@@ -13,10 +17,20 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: java -Xmx512m -jar app.jar'
-- Verify validation passes
+- Confirm the OutOfMemoryError and the current max heap
+- Run the app with an adequate max heap (-Xmx)
+- Inspect allocations to determine whether it's a sizing issue or a leak
 hints:
-- content: 'Try: java -Xmx512m -jar app.jar'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Confirm it''s heap space (not metaspace) from the crash message, and check the current max
+    heap: `java -XX:+PrintFlagsFinal -version | grep MaxHeapSize` (or the launch args).'
+- order: 2
+  cost: 15
+  content: 'Give it more headroom: run with `java -Xmx512m -jar app.jar` (raise as needed). If it still
+    OOMs with ample heap, it''s a leak, not just sizing.'
+- order: 3
+  cost: 20
+  content: 'Capture evidence for a leak: add `-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp` and
+    analyze the dump (or use `jmap -histo:live <pid>`). Fix the unbounded retention if found; otherwise
+    keep the larger -Xmx.'

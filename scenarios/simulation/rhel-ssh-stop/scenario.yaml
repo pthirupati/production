@@ -1,4 +1,4 @@
-title: "RHEL Simulation: SSH Service Down"
+title: 'RHEL Simulation: SSH Service Down'
 slug: sim-rhel-ssh-stop
 technology: Simulation
 category: Linux Administration
@@ -11,23 +11,29 @@ dual_terminal: true
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  Remote users cannot SSH to the server because sshd is stopped.
-  Use the dual terminals — try SSH from the client pane, fix sshd on the server console, then verify SSH works.
+description: Remote users can no longer SSH into the server (10.0.0.10) because the sshd service is stopped,
+  so every connection is refused. Using the dual-terminal lab, confirm the refusal from the SSH client
+  pane, start sshd on the server console, and verify that SSH login then succeeds from the client — restoring
+  remote administrative access.
 objectives:
-  - Diagnose SSH connection refused from the SSH client terminal
-  - Start sshd on the server (primary console): systemctl start sshd
-  - Verify SSH login succeeds from the client terminal
-initial_state: |
-  primary (10.0.0.10): root console, sshd inactive
+- Diagnose SSH connection refused from the SSH client terminal
+- Start sshd on the server (primary console): systemctl start sshd
+- Verify SSH login succeeds from the client terminal
+initial_state: 'primary (10.0.0.10): root console, sshd inactive
+
   ssh_client (10.0.0.5): use ssh root@10.0.0.10 to test remote access
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "From SSH Client: ssh root@10.0.0.10 — expect connection refused."
-  - order: 2
-    cost: 15
-    content: "On Server console: systemctl status sshd then systemctl start sshd"
-  - order: 3
-    cost: 20
-    content: "Retry SSH from client — password is redhat if prompted."
+- order: 1
+  cost: 10
+  content: 'From the SSH Client pane: `ssh root@10.0.0.10` — expect "Connection refused" because sshd
+    isn''t listening on the server.'
+- order: 2
+  cost: 15
+  content: 'On the Server console, check and start it: `systemctl status sshd` (inactive), then `systemctl
+    start sshd` (and `systemctl enable sshd` so it survives reboot).'
+- order: 3
+  cost: 20
+  content: Back in the SSH Client, retry `ssh root@10.0.0.10` — the login now succeeds (the password is
+    redhat if prompted).

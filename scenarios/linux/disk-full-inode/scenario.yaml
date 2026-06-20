@@ -2,34 +2,34 @@ title: Disk Shows Full But df -h Shows Space
 slug: linux-disk-full-inode
 difficulty: medium
 category: Linux Administration
-description: 'The system reports "No space left on device" errors even though df -h
-  shows the filesystem is only 40% full. The root cause is inode exhaustion — the
-  filesystem has run out of inodes due to millions of tiny temporary files created
-  by a runaway process, even though block space remains available.
-
-  '
-initial_state: 'Simulated RHEL 9 server. Application writes are failing with "No
-  space left on device". df -h shows 40% usage but new files cannot be created on
-  /var.
-
-  '
+description: 'The system throws "No space left on device" even though `df -h` shows the filesystem only
+  ~40% used. The real problem is inode exhaustion: a directory full of millions of tiny files has consumed
+  every inode, so no new files can be created despite free blocks. Find and clear the offending files
+  to recover inodes.'
+initial_state: Linux server where a filesystem has free space by bytes but 100% of its inodes are consumed
+  by a directory of countless small files, causing ENOSPC on file creation.
 objectives:
-  - Use df -i to discover that inodes are exhausted on the filesystem
-  - Identify the directory with millions of small files consuming all inodes
-  - Remove the excess files and confirm inode space is recovered
+- Use df -i to discover inodes are exhausted
+- Identify the directory consuming all the inodes
+- Remove the excess files and confirm inode usage recovers
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: true
 hints:
-  - content: 'Run: df -i to check inode usage across filesystems. Look for 100% iuse.'
-    cost: 10
-    order: 1
-  - content: 'Find the directory: for i in /*; do echo $i; find $i -xdev | wc -l;
-      done | sort -k2 -rn | head'
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Bytes vs inodes: `df -h` shows space free, but `df -i` shows IUse% at 100% on the affected
+    filesystem — that''s the real limit.'
+- order: 2
+  cost: 15
+  content: 'Locate the culprit directory: `for d in /*; do echo -n "$d "; find "$d" -xdev | wc -l; done
+    | sort -k2 -rn | head` — the top entry holds the millions of small files.'
+- order: 3
+  cost: 20
+  content: 'Clear them (verify first!): e.g. `find /path/to/dir -type f -delete`. Re-check `df -i` — IUse%
+    drops and file creation works again. Address what generated them (rotate/clean).'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

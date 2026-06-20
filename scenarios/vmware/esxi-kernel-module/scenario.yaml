@@ -1,9 +1,9 @@
 title: Guest Kernel Module Missing
 slug: vmware-guest-kernel-module
 category: VMware vSphere
-description: |
-  web-prod-01 networking fails because a required kernel module is not loaded.
-  Use the guest console to load the module with modprobe.
+description: Networking on the guest web-prod-01 is degraded because a required kernel module (nf_conntrack)
+  isn't loaded, so connection tracking / NAT-dependent traffic misbehaves. The fix is inside the guest,
+  via the VM console. Load the module, verify it, and make it load on boot so the problem doesn't recur.
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -12,10 +12,21 @@ time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Open console on web-prod-01
-  - Load missing module (modprobe nf_conntrack)
-initial_state: nf_conntrack module not loaded — connectivity degraded.
+- Open the console on web-prod-01 and confirm the module is missing
+- Load nf_conntrack and verify with lsmod
+- Persist the module so it loads on boot
+initial_state: vCenter guest web-prod-01 where the nf_conntrack kernel module is not loaded, degrading
+  connectivity. The fix is performed from the VM's console.
 hints:
-  - content: "Run modprobe nf_conntrack and verify with lsmod"
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: 'Open the web console for web-prod-01. Check whether the module is loaded: `lsmod | grep nf_conntrack`
+    (empty).'
+- order: 2
+  cost: 15
+  content: 'Load it now: `modprobe nf_conntrack`, then confirm `lsmod | grep nf_conntrack` shows it and
+    connectivity recovers.'
+- order: 3
+  cost: 20
+  content: 'Make it persistent: add `nf_conntrack` to /etc/modules-load.d/ (e.g. echo it into /etc/modules-load.d/conntrack.conf)
+    so it loads automatically on the next boot.'

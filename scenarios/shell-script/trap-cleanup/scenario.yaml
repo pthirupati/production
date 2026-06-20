@@ -2,34 +2,39 @@ title: Script Leaves Temp Files on Exit
 slug: shell-trap-cleanup
 difficulty: medium
 category: Shell Scripting
-description: 'A data-processing script creates temporary files in /tmp during execution
-  but fails to clean them up when it exits — especially when killed with SIGINT or
-  SIGTERM. Over time, gigabytes of temp data accumulate. The script must be refactored
-  to use a trap handler that cleans up on all exit paths including signals.
+description: 'A data-processing script creates temporary files in /tmp during execution but fails to clean
+  them up when it exits — especially when killed with SIGINT or SIGTERM. Over time, gigabytes of temp
+  data accumulate. The script must be refactored to use a trap handler that cleans up on all exit paths
+  including signals.
 
   '
-initial_state: 'Simulated RHEL 9 server. /tmp is filling with files named proc_*.tmp
-  left behind by process.sh. Killing the script mid-run always leaves orphaned files.
+initial_state: 'Simulated RHEL 9 server. /tmp is filling with files named proc_*.tmp left behind by process.sh.
+  Killing the script mid-run always leaves orphaned files.
 
   '
 objectives:
-  - Identify the missing trap statement in the script
-  - Add a cleanup function and trap it on EXIT, INT, and TERM signals
-  - Confirm that temp files are removed whether the script exits normally or is killed
+- Identify the missing trap statement in the script
+- Add a cleanup function and trap it on EXIT, INT, and TERM signals
+- Confirm that temp files are removed whether the script exits normally or is killed
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Add a cleanup function and register it: trap cleanup EXIT INT TERM to
-      ensure it runs on all exit paths.'
-    cost: 10
-    order: 1
-  - content: 'Store temp file paths in a variable at creation time so the cleanup
-      function knows exactly what to remove.'
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Reproduce the leak: run process.sh, kill it mid-run, and see orphaned `proc_*.tmp` files left
+    in /tmp. The script has no trap to clean up on exit.'
+- order: 2
+  cost: 15
+  content: 'Add a cleanup function and register it for all exit paths: `trap cleanup EXIT INT TERM`. Storing
+    temp paths in a variable at creation time lets cleanup know exactly what to remove.'
+- order: 3
+  cost: 20
+  content: 'Implement `cleanup() { rm -f "$TMPFILE"; }` (or use `mktemp` and track the names), then `trap
+    cleanup EXIT INT TERM`. Re-test: whether the script finishes or is killed with Ctrl-C/SIGTERM, /tmp
+    is left clean.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

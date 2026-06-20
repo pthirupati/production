@@ -11,19 +11,26 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q15 mdadm — cat /proc/mdstat, add disk, rebuild
-description: ''
+description: A software RAID array (/dev/md0) is running degraded — one member device has failed or dropped
+  out, shown by a missing slot in /proc/mdstat (e.g. [U_]). The array is up but has no redundancy. Identify
+  the failed/missing slot, add a replacement device, and monitor the rebuild until the array is fully
+  redundant again ([UU]).
 objectives:
-- Check /proc/mdstat
-- Identify failed/missing slot
-- mdadm --add replacement device
-- Monitor rebuild to [UU]
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Check /proc/mdstat and mdadm --detail to find the failed/missing slot
+- Add the replacement device to the array
+- Monitor the rebuild until the array reaches [UU]
+initial_state: Linux server with a degraded mdadm array /dev/md0 (one slot failed/missing). A spare partition
+  is available to add; the array needs to be rebuilt to a clean redundant state.
 hints:
 - order: 1
-  cost: 20
-  content: '`cat /proc/mdstat` and `mdadm --detail /dev/md0`'
+  cost: 10
+  content: 'Inspect the array: `cat /proc/mdstat` shows a degraded array (e.g. [U_]); `mdadm --detail
+    /dev/md0` names the failed/removed member.'
 - order: 2
-  cost: 40
-  content: '`mdadm --manage /dev/md0 --add /dev/loopXp2` (use spare loop partition)'
+  cost: 20
+  content: 'Add the replacement (remove the failed member first if it''s still listed): `mdadm --manage
+    /dev/md0 --add /dev/loopXp2` (use the spare partition path).'
+- order: 3
+  cost: 30
+  content: 'Watch recovery: `cat /proc/mdstat` shows a rebuild progress bar; when done it reads [UU] and
+    `mdadm --detail /dev/md0` reports State: clean.'

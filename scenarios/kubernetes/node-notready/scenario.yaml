@@ -2,34 +2,38 @@ title: Node in NotReady State
 slug: k8s-node-notready
 difficulty: hard
 category: Kubernetes
-description: 'A worker node has transitioned to NotReady and all pods scheduled on
-  it are evicted. The kubelet service on the node has stopped, preventing it from
-  sending heartbeats to the control plane. You must SSH to the node, diagnose the
-  kubelet failure, and restore the node to Ready state.
+description: 'A worker node has transitioned to NotReady and all pods scheduled on it are evicted. The
+  kubelet service on the node has stopped, preventing it from sending heartbeats to the control plane.
+  You must SSH to the node, diagnose the kubelet failure, and restore the node to Ready state.
 
   '
-initial_state: 'Simulated Kubernetes cluster. Node "worker-1" is in NotReady state.
-  Multiple pods have been evicted and workloads are degraded.
+initial_state: 'Simulated Kubernetes cluster. Node "worker-1" is in NotReady state. Multiple pods have
+  been evicted and workloads are degraded.
 
   '
 objectives:
-  - Identify which node is NotReady and investigate why the kubelet stopped
-  - Restart the kubelet service and resolve any configuration errors
-  - Confirm the node returns to Ready state and pods are rescheduled
+- Identify which node is NotReady and investigate why the kubelet stopped
+- Restart the kubelet service and resolve any configuration errors
+- Confirm the node returns to Ready state and pods are rescheduled
 lab_mode: simulation
 simulation_type: kubernetes
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: kubectl describe node worker-1 and look at the Conditions section
-      for the failure reason.'
-    cost: 10
-    order: 1
-  - content: 'On the node: sudo systemctl status kubelet and sudo journalctl -u kubelet
-      -n 50 to see the error.'
-    cost: 20
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Find the bad node and why: `kubectl get nodes` then `kubectl describe node worker-1` — read
+    the Conditions section (e.g. KubeletNotReady / "PLEG is not healthy").'
+- order: 2
+  cost: 20
+  content: 'On the node, inspect the kubelet: `sudo systemctl status kubelet` and `sudo journalctl -u
+    kubelet -n 50 --no-pager`. A stopped service or a config/cert error is the usual cause.'
+- order: 3
+  cost: 30
+  content: 'Restart it once the config is valid: `sudo systemctl restart kubelet` (run `sudo systemctl
+    enable kubelet` if it was disabled). Within ~40s `kubectl get nodes` shows worker-1 as Ready and pods
+    reschedule.'
 requires_companion_hosts: true
 dual_terminal: true
 jira_priority: High

@@ -11,21 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q5 mount options — noexec, findmnt, remount exec
-description: Installer script copied to /tmp fails with 'Permission denied' when executed. /tmp was remounted with noexec.
+description: An installer script copied into /tmp fails to run with "Permission denied" even though it's
+  executable, because /tmp is mounted with the `noexec` option, which forbids executing binaries from
+  that filesystem. Either run the script from a path that permits execution or temporarily remount /tmp
+  with exec to complete the install.
 objectives:
-- findmnt /tmp for noexec
-- /data accepts writes again
-- Affected service behaves normally
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm /tmp is mounted noexec and that's why execution is blocked
+- Remount /tmp with exec (or run the script from an exec-permitted path)
+- Run the installer successfully
+initial_state: Linux server where /tmp is mounted noexec, so executing a script placed there is blocked
+  regardless of its file permissions.
 hints:
 - order: 1
-  cost: 15
-  content: '`mount -o remount,exec /tmp`'
+  cost: 10
+  content: 'The file is +x but won''t run. Check the mount: `findmnt /tmp` shows the `noexec` option —
+    that''s the blocker.'
 - order: 2
   cost: 15
-  content: Remount /tmp with exec
+  content: 'Temporarily allow execution: `mount -o remount,exec /tmp` (or copy the script to /root and
+    run it there).'
 - order: 3
-  cost: 15
-  content: Run installer successfully
+  cost: 20
+  content: Run the installer; it now executes. Restore the hardening afterward with `mount -o remount,noexec
+    /tmp` if /tmp should stay noexec.

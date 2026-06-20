@@ -158,6 +158,7 @@ def run_public_tests(s: Suite):
         ("GET", "/api/stats/", None, (200,)),
         ("GET", "/api/technologies/", None, (200,)),
         ("GET", "/api/scenarios/", None, (200,)),
+        ("GET", "/api/campaigns/active/", None, (200,)),  # Ads/Campaigns banner — must never 500
         ("GET", "/api/categories/", None, (200,)),
         ("GET", "/api/tags/", None, (200,)),
         ("GET", "/api/config/", None, (200,)),
@@ -195,6 +196,103 @@ def run_public_tests(s: Suite):
         )
     elif status == 200:
         s.record("GitHub OAuth callback_url", True, detail="GitHub OAuth disabled — skipped")
+
+
+def _scenario_results(data):
+    """Unwrap a scenarios list response (paginated envelope or bare list)."""
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        return data.get("results", []) or []
+    return []
+
+
+def run_new_endpoint_smoke(s: Suite, token: str | None = None):
+    """Smoke-test the recently-added public surfaces so a regression here fails
+    the deploy gate rather than 500ing in production:
+
+      1. GET /api/campaigns/active/ — 200 + a JSON list, never 500 (Ads/Campaigns).
+      2. Scenario list filtered by technology_slug — 200 AND only that tech's
+         scenarios come back (no cross-tech bleed).
+      3. The coding/prompt IDE spec is reachable for a coding_mode scenario
+         (CodingSpecView), with prompt lessons carrying kind == "prompt".
+    """
+    print("\n=== New endpoints smoke (campaigns / tech filter / coding spec) ===")
+
+    # 1. Active campaigns — must be a list and must never 500.
+    status, data = api("GET", "/api/campaigns/active/")
+    is_list = isinstance(data, list)
+    s.record(
+        "GET /api/campaigns/active/ (200 list, never 500)",
+        status == 200 and is_list,
+        status,
+        err_msg(data) if status != 200 else ("not a list" if not is_list else ""),
+    )
+
+    # 2. Scenario list filtered by technology_slug returns only that tech.
+    status, techs = api("GET", "/api/technologies/", token=token)
+    tech_list = techs if isinstance(techs, list) else _scenario_results(techs)
+    target_slug = next((t.get("slug") for t in tech_list if t.get("slug")), None)
+    if not target_slug:
+        s.record("Scenario list technology_slug filter", True, status, detail="no technologies seeded — skipped")
+    else:
+        status, data = api("GET", f"/api/scenarios/?technology_slug={target_slug}", token=token)
+        results = _scenario_results(data)
+        # Every scenario returned must belong to the requested technology.
+        def _slug_of(sc):
+            tech = sc.get("technology")
+            return tech.get("slug") if isinstance(tech, dict) else None
+        only_target = all(_slug_of(sc) == target_slug for sc in results)
+        bad = next((_slug_of(sc) for sc in results if _slug_of(sc) != target_slug), None)
+        s.record(
+            f"Scenario list ?technology_slug={target_slug} (only that tech)",
+            status == 200 and only_target,
+            status,
+            (f"got foreign tech {bad}" if bad else err_msg(data)) if not (status == 200 and only_target) else "",
+        )
+
+    # 3. Coding/prompt IDE spec reachable for a coding_mode scenario.
+    if SKIP_LAB:
+        s.record("Coding/prompt spec reachable", True, detail="skipped E2E_SKIP_LAB=1")
+        return
+    if not token:
+        s.record("Coding/prompt spec reachable", True, detail="no token — skipped")
+        return
+    # Find a coding_mode scenario from the public catalog (list serializer
+    # exposes coding_mode); prefer one we can actually start.
+    status, data = api("GET", "/api/scenarios/?page_size=200", token=token)
+    catalog = _scenario_results(data)
+    coding = [sc for sc in catalog if sc.get("coding_mode") and sc.get("is_active")]
+    if not coding:
+        s.record("Coding/prompt spec reachable", True, detail="no coding_mode scenarios seeded — skipped")
+        return
+    last_err = ""
+    for sc in coding[:5]:
+        sid = sc.get("id")
+        st, start = api("POST", f"/api/labs/{sid}/start/", token=token)
+        if st not in (200, 201, 202):
+            last_err = f"start={st} {err_msg(start)}"
+            continue
+        session_id = start.get("session_id") or start.get("id")
+        if not session_id:
+            last_err = "no session_id on start"
+            continue
+        st_spec, spec_body = api("GET", f"/api/labs/{session_id}/coding-spec/", token=token)
+        spec = spec_body.get("spec") if isinstance(spec_body, dict) else None
+        ok = st_spec == 200 and isinstance(spec, dict) and bool(spec)
+        kind = spec.get("kind") if isinstance(spec, dict) else None
+        # Prompt lessons must surface kind=="prompt" + prompt_config.
+        if ok and kind == "prompt":
+            ok = isinstance(spec.get("prompt_config"), dict)
+        s.record(
+            f"Coding/prompt spec reachable [{(sc.get('slug') or '')[:30]}] kind={kind or '?'}",
+            ok,
+            st_spec,
+            "" if ok else (err_msg(spec_body) or "spec missing/empty"),
+        )
+        api("POST", f"/api/labs/{session_id}/stop/", token=token)
+        return  # one successful coding-spec check is enough
+    s.record("Coding/prompt spec reachable", False, detail=last_err or "no coding scenario could start")
 
 
 def run_auth_registration(s: Suite) -> tuple[str | None, str, str]:
@@ -662,6 +760,13 @@ def main():
         run_public_tests(s)
         clear_rate_limit_cache()
         token, test_email, refresh = run_auth_registration(s)
+        # Smoke-test the newly-added endpoints (campaigns, tech-slug filter,
+        # coding/prompt IDE spec). Token enables the authed coding-spec check;
+        # the campaign + filter checks run regardless.
+        try:
+            run_new_endpoint_smoke(s, token)
+        except Exception as exc:
+            s.record("New endpoints smoke", False, detail=str(exc)[:120])
         if token:
             from e2e_tab_coverage import run_full_ui_coverage
             run_full_ui_coverage(s, token, test_email, "E2eTestPass123!", refresh)

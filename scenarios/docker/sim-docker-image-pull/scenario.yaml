@@ -9,15 +9,26 @@ time_limit: 900
 max_score: 100
 jira_priority: Medium
 is_free: false
-description: |
-  docker pull fails for the required nginx image tag. Diagnose and pull a working image,
-  then start the web container.
+description: Starting a container fails because the image cannot be pulled. The image name or tag is wrong
+  (manifest unknown), or the registry/credentials are misconfigured, so docker cannot fetch the image.
+  Identify the exact pull error and correct the reference (or auth) so the image pulls and the container
+  runs.
 objectives:
-  - Run docker pull for a valid nginx tag
-  - Start the web container
-  - Verify docker ps shows Up status
-initial_state: Simulated host; container exited; image tag missing locally.
+- Reproduce the pull failure and read the exact error
+- Identify the wrong image name/tag or missing registry auth
+- Pull the corrected image and run the container successfully
+initial_state: Docker host. `docker run` / `docker pull` fails for an image — the tag does not exist in
+  the registry ("manifest unknown") or authentication is required and missing.
 hints:
-  - content: Try `docker pull nginx:latest` then `docker start web`.
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: 'Reproduce it directly: `docker pull <image>:<tag>`. "manifest unknown" or "not found" means
+    the name/tag is wrong; "unauthorized" means you need to log in.'
+- order: 2
+  cost: 15
+  content: 'List the tags that actually exist (or check the project''s intended tag). For a private registry,
+    authenticate: `docker login <registry>`.'
+- order: 3
+  cost: 20
+  content: Pull the correct reference, e.g. `docker pull nginx:1.25` instead of nginx:latset, then `docker
+    run -d --name web nginx:1.25` and confirm with `docker ps`.

@@ -1,25 +1,33 @@
 category: Docker & Containers
-description: 'Cannot pull image. Fix registry auth or image name.
-
-  '
+description: Starting a container fails because the image cannot be pulled. The image name or tag is wrong
+  (manifest unknown), or the registry/credentials are misconfigured, so docker cannot fetch the image.
+  Identify the exact pull error and correct the reference (or auth) so the image pulls and the container
+  runs.
 difficulty: medium
 dual_terminal: false
 hints:
-- content: 'Try: docker pull nginx:latest'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. Cannot pull image. Fix registry auth or image
-  name.
-
-  '
+  content: 'Reproduce it directly: `docker pull <image>:<tag>`. "manifest unknown" or "not found" means
+    the name/tag is wrong; "unauthorized" means you need to log in.'
+- order: 2
+  cost: 15
+  content: 'List the tags that actually exist (or check the project''s intended tag). For a private registry,
+    authenticate: `docker login <registry>`.'
+- order: 3
+  cost: 20
+  content: Pull the correct reference, e.g. `docker pull nginx:1.25` instead of nginx:latset, then `docker
+    run -d --name web nginx:1.25` and confirm with `docker ps`.
+initial_state: Docker host. `docker run` / `docker pull` fails for an image — the tag does not exist in
+  the registry ("manifest unknown") or authentication is required and missing.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: docker pull nginx:latest'
-- Verify validation passes
+- Reproduce the pull failure and read the exact error
+- Identify the wrong image name/tag or missing registry auth
+- Pull the corrected image and run the container successfully
 requires_companion_hosts: false
 simulation_type: generic
 slug: sim-docker-image-pull

@@ -2,36 +2,33 @@ title: NFS Files Show UID Numbers Instead of Usernames
 slug: linux-nfs-uid-mapping
 difficulty: easy
 category: Linux Administration
-description: |
-  An NFS share is mounted and accessible, but ls -l output displays numeric UID and GID
-  values (e.g., "1001 1001") instead of the username and group name. This happens when
-  the NFS ID mapping daemon is not configured or the domain settings differ between client
-  and server. Installing and configuring nfs-idmapd resolves the problem.
-
-initial_state: |
-  Simulated RHEL 9 server. The NFS share is mounted at /mnt/shared and files are readable.
-  Running ls -ltr /mnt/shared shows output like:
-  -rw-r--r-- 1 1001 1001 1234 Jun 10 09:00 report.txt
-  instead of the expected username. The nfs-idmapd service is not running.
-
+description: An NFS share is mounted and usable, but `ls -l` shows raw numeric UIDs/GIDs (e.g. 1001 1001)
+  instead of names. With NFSv4 idmapping, names only resolve when the idmapd service is running and both
+  ends share the same configured Domain. Enable idmapd, set the matching Domain, and confirm ownership
+  displays as names.
+initial_state: Linux NFS client where the share displays numeric owner/group IDs because nfs-idmapd isn't
+  running or the idmapd Domain doesn't match the server.
 objectives:
-  - Confirm the uid mapping issue with ls -l /mnt/shared
-  - Install or enable the rpcbind and nfs-idmapd services
-  - Configure /etc/idmapd.conf to set the correct Domain matching the NFS server
-  - Restart the nfs-idmapd service with systemctl restart nfs-idmapd
-  - Verify ls -l /mnt/shared now shows usernames instead of numeric IDs
+- Confirm the numeric-UID display on the mounted share
+- Enable nfs-idmapd and set the correct Domain in /etc/idmapd.conf
+- Restart idmapd and verify ls -l shows usernames
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check systemctl status nfs-idmapd. If not running, start it. The domain in /etc/idmapd.conf must match on both client and server.'
-    cost: 10
-    order: 1
-  - content: 'Edit /etc/idmapd.conf and set Domain = your.domain.com under [General]. After editing, run: systemctl restart nfs-idmapd and remount the share to see the change.'
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Reproduce: `ls -l /mnt/shared` shows numbers. Check the service: `systemctl status nfs-idmapd`
+    (often not running).'
+- order: 2
+  cost: 15
+  content: 'Set the domain to match the server in `/etc/idmapd.conf` under [General]: `Domain = your.domain.com`.'
+- order: 3
+  cost: 20
+  content: 'Apply: `systemctl restart nfs-idmapd` (and clear the keyring with `nfsidmap -c`). Re-run `ls
+    -l /mnt/shared` — owners now show as names.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

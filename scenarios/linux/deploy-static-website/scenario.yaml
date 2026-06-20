@@ -10,21 +10,28 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — deploy a static website from scratch. Create the HTML file,
-  configure nginx to serve it on port 80, and verify it responds.
+description: 'Build task: deploy a static website from scratch and serve it with nginx on port 80. Starting
+  from a host with nginx but no site, create the page content, add an nginx server block pointing at it,
+  enable the site, and verify the page is served over HTTP.'
 objectives:
-  - Create /var/www/mysite/index.html with your page content
-  - Configure nginx site at /etc/nginx/sites-available/mysite
-  - Enable the site and start nginx
-  - Verify curl http://localhost returns your page
-initial_state: |
-  Fresh Ubuntu server with nginx installed but not configured.
+- Create /var/www/mysite/index.html with your page content
+- Configure and enable an nginx site at /etc/nginx/sites-available/mysite (root /var/www/mysite)
+- Start nginx and verify curl http://localhost returns your page
+initial_state: 'Fresh Ubuntu server with nginx installed but not configured.
+
   No website is deployed yet — this is a greenfield task.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Create `/var/www/mysite/index.html` with an `<h1>` tag."
-  - order: 2
-    cost: 15
-    content: "Symlink sites-available to sites-enabled and run `nginx -t`."
+- order: 1
+  cost: 10
+  content: 'Create the content: `mkdir -p /var/www/mysite` and write `/var/www/mysite/index.html` with
+    an `<h1>` so there''s something to serve.'
+- order: 2
+  cost: 15
+  content: 'Add an nginx server block at /etc/nginx/sites-available/mysite with `root /var/www/mysite;`
+    and `listen 80;`, symlink it into sites-enabled, then validate: `nginx -t`.'
+- order: 3
+  cost: 20
+  content: 'Enable and start: `systemctl enable --now nginx` (or reload). Verify: `curl -s http://localhost`
+    returns your page.'

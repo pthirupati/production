@@ -11,23 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q95 resolv.conf — fix nameserver, getent hosts
-description: DNS lookups fail for internal host app.fixitlab.local. resolv.conf points to dead 192.0.2.1; local dnsmasq on 127.0.0.1 is running.
+description: DNS lookups for the internal host app.fixitlab.local fail because /etc/resolv.conf points
+  at a dead nameserver (192.0.2.1) while a working local resolver (dnsmasq on 127.0.0.1) is already running
+  and authoritative for the internal zone. Point the resolver at the live local DNS so internal names
+  resolve.
 objectives:
-- Internal hostname resolution works
-- DNS lookups succeed for required hostnames
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm internal-name resolution fails and the configured nameserver is dead
+- Point resolv.conf at the working local resolver (127.0.0.1)
+- Verify internal hostname resolution succeeds
+initial_state: Linux server where /etc/resolv.conf lists a dead nameserver (192.0.2.1); a functioning
+  local dnsmasq on 127.0.0.1 already serves app.fixitlab.local.
 hints:
 - order: 1
-  cost: 15
-  content: Set `nameserver 127.0.0.1` — dnsmasq is already running
+  cost: 10
+  content: 'Reproduce: `getent hosts app.fixitlab.local` fails. Check the resolver: `cat /etc/resolv.conf`
+    lists 192.0.2.1, which is unreachable (dnsmasq on 127.0.0.1 is up).'
 - order: 2
   cost: 15
-  content: Test with getent hosts app.fixitlab.local
+  content: Set `nameserver 127.0.0.1` in /etc/resolv.conf (remove the dead one). On systems managing resolv.conf,
+    make it stick via the resolver config rather than a transient edit.
 - order: 3
-  cost: 15
-  content: Fix nameserver in resolv.conf
-- order: 4
-  cost: 15
-  content: Verify local DNS resolves
+  cost: 20
+  content: 'Verify: `getent hosts app.fixitlab.local` (or `dig @127.0.0.1 app.fixitlab.local`) now returns
+    the address.'

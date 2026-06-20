@@ -11,17 +11,26 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q33 faillock — faillock --user --reset
-description: lockeduser account disabled after brute-force lockout (faillock/passwd -l).
+description: The 'lockeduser' account has been locked out after too many failed login attempts — pam_faillock
+  has tripped its deny threshold (and/or the account was manually locked with passwd -l), so even correct
+  credentials are rejected. Confirm the lock, reset the failed-attempt counter, unlock the account, and
+  verify the user can authenticate again.
 objectives:
-- Check faillock/passwd -S
-- Affected service behaves normally
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm the account is locked (faillock / passwd -S)
+- Reset the failed-login counter and unlock the account
+- Verify lockeduser can authenticate successfully again
+initial_state: Linux server with pam_faillock enforced. The 'lockeduser' account is locked after repeated
+  failed logins; authentication attempts are denied even with the right password.
 hints:
 - order: 1
-  cost: 15
-  content: '`faillock --user lockeduser --reset` or `passwd -u lockeduser`'
+  cost: 10
+  content: 'Check the lock state: `faillock --user lockeduser` shows the failed attempts, and `passwd
+    -S lockeduser` shows whether the password is locked (LK).'
 - order: 2
   cost: 15
-  content: Reset lockout and unlock account
+  content: 'Reset the faillock counter: `faillock --user lockeduser --reset`. If the password was also
+    locked with passwd -l, unlock it: `passwd -u lockeduser`.'
+- order: 3
+  cost: 20
+  content: 'Verify: `faillock --user lockeduser` now shows 0 failures and `passwd -S lockeduser` shows
+    PS (usable). The user can log in again.'

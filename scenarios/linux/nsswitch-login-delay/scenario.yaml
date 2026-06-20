@@ -11,20 +11,25 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q169 login delay — nsswitch, UseDNS no
-description: SSH password prompt takes 30+ seconds. Misconfigured nsswitch causes lookup timeouts.
+description: SSH logins take 30+ seconds at the password prompt because name-service lookups are timing
+  out — /etc/nsswitch.conf lists an unreachable/slow source before the local files/DNS, so each lookup
+  waits for a timeout. Fix the nsswitch hosts ordering (and optionally disable sshd's reverse-DNS) to
+  make logins fast again.
 objectives:
-- Affected service behaves normally
-- Optionally set UseDNS no in sshd_config
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Trace the login delay to nsswitch lookup timeouts
+- Correct the hosts line ordering in /etc/nsswitch.conf
+- Verify logins are fast (optionally set UseDNS no in sshd_config)
+initial_state: Linux server where a misconfigured /etc/nsswitch.conf hosts line causes lookups to hang
+  on a slow source, adding a 30s+ delay to SSH password prompts.
 hints:
 - order: 1
-  cost: 15
-  content: 'Set `hosts: files dns` in /etc/nsswitch.conf'
+  cost: 10
+  content: 'Time it: the delay hits before the password prompt, pointing at name lookups. Inspect `/etc/nsswitch.conf`
+    — the `hosts:` line lists a slow/unreachable source first.'
 - order: 2
   cost: 15
-  content: Inspect /etc/nsswitch.conf
+  content: 'Set a sane order: `hosts: files dns` in /etc/nsswitch.conf (remove the offending source).'
 - order: 3
-  cost: 15
-  content: Fix hosts line order
+  cost: 20
+  content: Optionally add `UseDNS no` to /etc/ssh/sshd_config and `systemctl reload sshd` to skip reverse
+    lookups. Re-test SSH — the prompt is immediate.

@@ -1,28 +1,32 @@
 category: Boot / GRUB
-description: 'Practice booting a simulated RHEL system through GRUB, login, and maintenance
-  shell.
-
-  '
+description: A guided practice lab for booting a RHEL system through GRUB and reaching a working shell.
+  You start at the GRUB menu; the goal is to boot the default kernel entry, log in as root, and confirm
+  you can operate the system (e.g. inspect a service). It builds familiarity with the boot path and recovery
+  entry points.
 difficulty: medium
 hints:
-- content: At grub>, press Enter or type `boot` to start the default entry.
+- order: 1
   cost: 10
-  order: 1
-- content: Login as root (any password works in simulation).
+  content: At the GRUB menu, the top/default entry is preselected — press Enter (or type `boot`) to start
+    the default kernel.
+- order: 2
   cost: 15
-  order: 2
+  content: At the login prompt, log in as root (in this simulation any password is accepted).
+- order: 3
+  cost: 20
+  content: 'Confirm you have a working system: run `systemctl status sshd` — it returns the service state
+    in the full shell.'
 infrastructure_type: docker
-initial_state: 'You start at the GRUB menu. Press Enter to boot, then log in as root.
-
-  '
+initial_state: Simulated RHEL system paused at the GRUB boot menu. Boot the default entry to proceed to
+  login, then operate as root in the full shell.
 is_free: true
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Boot the default RHEL entry from GRUB
+- Boot the default RHEL entry from the GRUB menu
 - Log in as root
-- Run systemctl status sshd in the full shell
+- Run systemctl status sshd in the full shell to confirm the system is operational
 simulation_type: rhel
 slug: sim-rhel-boot-grub
 technology: Linux Administration

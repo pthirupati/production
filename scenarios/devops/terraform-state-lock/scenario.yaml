@@ -8,29 +8,39 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  A Terraform apply was interrupted mid-run and left the state file locked.
+description: 'A Terraform apply was interrupted mid-run and left the state file locked.
+
   Now no one on the team can run terraform plan or apply — every command
+
   returns "Error acquiring the state lock". You need to force-unlock the
+
   state and restore normal Terraform operations.
+
+  '
 objectives:
-  - Identify the Terraform state lock ID
-  - Force-unlock the Terraform state
-  - Verify terraform plan runs without lock errors
-initial_state: |
-  Ubuntu server with Terraform installed. Working directory is /opt/terraform/infra.
+- Identify the Terraform state lock ID
+- Force-unlock the Terraform state
+- Verify terraform plan runs without lock errors
+initial_state: 'Ubuntu server with Terraform installed. Working directory is /opt/terraform/infra.
+
   The state file is locked by a previous interrupted run. Lock ID is stored
+
   in the .terraform/lock_id file.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check lock details: terraform force-unlock --help"
-  - order: 2
-    cost: 15
-    content: "Get the lock ID: cat /opt/terraform/infra/.terraform/lock_id"
-  - order: 3
-    cost: 20
-    content: "Force unlock: cd /opt/terraform/infra && terraform force-unlock <LOCK_ID>"
-  - order: 4
-    cost: 25
-    content: "Confirm with yes when prompted. Then verify: terraform plan"
+- order: 1
+  cost: 10
+  content: 'Reproduce the error: `terraform plan` fails with "Error acquiring the state lock". The message
+    itself prints the Lock ID and who holds it.'
+- order: 2
+  cost: 15
+  content: Make sure no apply is genuinely still running (force-unlocking a live operation corrupts state).
+    The stale lock id is shown in the error (or `cat .terraform/lock_id` in this lab).
+- order: 3
+  cost: 20
+  content: 'Release it: `cd /opt/terraform/infra && terraform force-unlock <LOCK_ID>` and confirm with
+    `yes`.'
+- order: 4
+  cost: 25
+  content: 'Verify recovery: `terraform plan` now runs without the lock error.'

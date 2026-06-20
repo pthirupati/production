@@ -2,18 +2,31 @@ title: CI Pipeline Failure on Deploy Stage
 slug: devops-ci-pipeline-failure
 category: DevOps
 difficulty: hard
-description: |
-  GitLab CI pipeline fails at deploy stage due to missing kubeconfig and wrong image tag.
-  Fix pipeline variables and redeploy.
+description: A GitLab CI pipeline fails at the deploy stage. The deploy job can't authenticate to the
+  cluster because its KUBECONFIG is missing/empty, and it references an image tag that doesn't exist,
+  so the rollout never happens. Read the failed job log, fix the pipeline variables, and re-run the deploy
+  to a green pipeline.
 lab_mode: simulation
 simulation_type: devops
 time_limit: 1200
 max_score: 100
 is_free: false
 objectives:
-  - Identify failing deploy job in pipeline logs
-  - Fix KUBECONFIG and IMAGE_TAG variables
+- Identify the failing deploy job and its error in the pipeline logs
+- Fix the KUBECONFIG and IMAGE_TAG variables
+- Re-run the pipeline and confirm the deploy stage passes
 hints:
-  - content: "Check deploy job logs for 'unauthorized' or 'image not found'"
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: Open the failed job log in the pipeline and read the deploy stage error — look for "unauthorized"
+    (bad/empty KUBECONFIG) and/or "image not found" (wrong IMAGE_TAG).
+- order: 2
+  cost: 15
+  content: 'Set the variables correctly: provide a valid KUBECONFIG (as a masked CI/CD variable or file)
+    and set IMAGE_TAG to a tag that actually exists in the registry.'
+- order: 3
+  cost: 20
+  content: Re-run the pipeline (or just the deploy job). With valid credentials and a real image, the
+    deploy succeeds and the pipeline goes green.
+initial_state: 'GitLab CI project whose deploy job fails: KUBECONFIG is not provided to the job and IMAGE_TAG
+  points at a non-existent image, so deployment errors out with unauthorized / image-not-found.'

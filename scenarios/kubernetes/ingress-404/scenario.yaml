@@ -2,8 +2,12 @@ title: Ingress Returns 404
 slug: sim-k8s-ingress-404
 category: Kubernetes
 difficulty: medium
-description: 'An Nginx Ingress rule is in place but all requests return 404. Debug the Ingress annotations, backend service selector, and path rules.'
-initial_state: 'Simulated RHEL 9 server. An Nginx Ingress rule is in place but all requests return 404. Debug the Ingress annotations, backend service selector, and path rules.'
+description: An Ingress returns 404 Not Found for the application hostname. The Ingress rule points to
+  a Service name or port that does not exist (or the path/host doesn't match the request), so the ingress
+  controller has no backend to route to. Correct the Ingress backend so the site loads.
+initial_state: Simulated Kubernetes cluster with an ingress controller. An Ingress resource routes the
+  app hostname, but the backend Service name or port is wrong, producing 404s for every request to that
+  host.
 lab_mode: simulation
 simulation_type: kubernetes
 is_free: false
@@ -13,10 +17,19 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: kubectl describe ingress app-ingress'
-- Verify validation passes
+- Reproduce the 404 and inspect the Ingress rules
+- Verify the referenced Service name and port actually exist
+- Fix the Ingress backend so requests reach the Service and return 200
 hints:
-- content: 'Try: kubectl describe ingress app-ingress'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Describe the Ingress: `kubectl describe ingress <name>`. Note the host, path, and the backend
+    service:port each rule points to.'
+- order: 2
+  cost: 15
+  content: 'Confirm that backend exists: `kubectl get svc`. A 404 from the controller usually means the
+    rule names a Service that doesn''t exist or uses the wrong port (e.g. 8080 vs 80).'
+- order: 3
+  cost: 20
+  content: 'Fix the rule: `kubectl edit ingress <name>` and set backend.service.name/port to the real
+    Service. Test with `curl -H ''Host: <host>'' http://<ingress-ip>/` — expect 200.'

@@ -18,9 +18,9 @@ description: 'A web server was recently deployed, but it refuses to start.
 
   the default page on port 80.'
 objectives:
-- Find the error in the Nginx configuration
-- Affected service behaves normally
-- Verify that http://localhost returns a 200 status
+- Find the error in the nginx configuration with nginx -t
+- Fix the invalid directive so the config validates
+- Start nginx and verify http://localhost returns HTTP 200
 initial_state: 'You have SSH access to an Ubuntu 22.04 server.
 
   Nginx is installed but fails to start.
@@ -31,19 +31,12 @@ initial_state: 'You have SSH access to an Ubuntu 22.04 server.
 hints:
 - order: 1
   cost: 10
-  content: Try running `nginx -t` to check the configuration for syntax errors.
+  content: 'Test the config to pinpoint the error: `nginx -t` reports the file and line of the bad directive.'
 - order: 2
   cost: 15
-  content: Look at the `listen` directive in `/etc/nginx/sites-available/default`.
+  content: Look at the `listen` directive in /etc/nginx/sites-available/default — it's misspelled (e.g.
+    `listn`).
 - order: 3
-  cost: 25
-  content: The word `listen` has a typo — it says `listn`. Fix it and restart nginx.
-- order: 4
-  cost: 15
-  content: Fix the configuration so `nginx -t` passes
-- order: 5
-  cost: 15
-  content: Start the Nginx service
-- order: 6
-  cost: 15
-  content: Verify that http://localhost returns a 200 status
+  cost: 20
+  content: Fix the typo so `nginx -t` passes, then `systemctl start nginx` and verify with `curl -I http://localhost`
+    (expect HTTP/1.1 200).

@@ -11,21 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q140 limits.conf — ulimit -u
-description: Applications fail with 'cannot fork' or 'resource temporarily unavailable'. nproc limit too low.
+description: Applications and shells start failing with "cannot fork" / "Resource temporarily unavailable"
+  because a too-low nproc (max user processes) limit is being hit. A restrictive limits.d entry caps the
+  number of processes the user may create. Raise the nproc limit appropriately and verify new shells get
+  the higher limit.
 objectives:
-- Check ulimit -u
-- Affected service behaves normally
-- Verify new shell limits
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm the failures are due to the nproc limit (ulimit -u)
+- Raise the nproc soft/hard limit (or fix the restrictive rule)
+- Verify a new shell/session gets the increased limit
+initial_state: Linux server where a /etc/security/limits.d/ rule sets nproc too low for a user, so process
+  creation fails once the cap is reached.
 hints:
 - order: 1
-  cost: 15
-  content: Set nproc soft/hard to 1024 or remove restrictive file
+  cost: 10
+  content: 'Check the current limit: `ulimit -u` (low) and count processes for the user: `ps -u <user>
+    -o pid= | wc -l`. The fork failures appear at the cap.'
 - order: 2
   cost: 15
-  content: Fix /etc/security/limits.d/
+  content: 'Find and fix the rule under `/etc/security/limits.d/` (or /etc/security/limits.conf): set
+    e.g. `<user> soft nproc 4096` and `<user> hard nproc 8192`.'
 - order: 3
-  cost: 15
-  content: Verify new shell limits
+  cost: 20
+  content: Limits apply at login, so open a NEW session and verify `ulimit -u` reflects the higher value;
+    the application can fork again.

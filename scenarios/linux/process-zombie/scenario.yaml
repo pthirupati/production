@@ -2,33 +2,34 @@ title: Zombie Processes Accumulating
 slug: linux-process-zombie
 difficulty: medium
 category: Linux Administration
-description: 'The system is accumulating zombie (defunct) processes and the process
-  table is nearly full. A poorly written parent process is not calling wait() to
-  reap its children, leaving them in the zombie state. You must identify the parent,
-  fix or restart it, and clear the zombie entries.
-
-  '
-initial_state: 'Simulated RHEL 9 server. Several hundred zombie processes are visible
-  in ps output. New processes cannot be forked on the system.
-
-  '
+description: The process table is filling with zombie (defunct) processes because a parent process isn't
+  reaping its children — it fails to call wait(), so finished children linger as <defunct>. Zombies hold
+  PID-table slots and can eventually exhaust them. Trace the zombies to their parent and clear them by
+  signaling or restarting that parent.
+initial_state: Linux server accumulating zombie processes from a buggy parent that doesn't reap children;
+  the process table is approaching exhaustion.
 objectives:
-  - Use ps to identify zombie processes and trace them to their parent process
-  - Determine why the parent is not reaping children (crashed, stuck, or buggy)
-  - Kill or restart the parent process to clear the zombie entries
+- Identify the zombie processes and their parent (PPID)
+- Determine why the parent isn't reaping children
+- Clear the zombies by signaling or restarting the parent
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: ps aux | grep Z to list zombie processes and note the PPID column.'
-    cost: 10
-    order: 1
-  - content: 'Send SIGCHLD to the parent: kill -SIGCHLD <ppid> or kill the parent
-      if it is unresponsive.'
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: 'List zombies and note the PPID column: `ps aux | awk ''$8 ~ /Z/''` (or `ps -el | grep Z`).
+    Zombies can''t be killed directly — their parent must reap them.'
+- order: 2
+  cost: 15
+  content: 'Nudge the parent to reap: `kill -SIGCHLD <ppid>`. If it''s stuck/buggy and ignores it, the
+    parent itself must be restarted.'
+- order: 3
+  cost: 20
+  content: 'Restart (or kill) the offending parent so init reaps the orphans: `kill <ppid>` (then restart
+    the service). Confirm the zombies are gone with `ps aux | grep -c defunct`.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

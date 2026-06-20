@@ -2,17 +2,32 @@ title: Gateway API HTTPRoute Misconfigured
 slug: k8s-gateway-api-routing
 category: Kubernetes
 difficulty: hard
-description: |
-  Gateway API HTTPRoute returns 404 for the api service. Fix routing rules and backend references.
+description: Requests through the Gateway return 404 instead of reaching the backend Service. The HTTPRoute
+  is misconfigured — either its parentRef does not bind to the Gateway listener, its hostname/path match
+  is wrong, or its backendRef points at the wrong Service or port. Fix the HTTPRoute so traffic is routed
+  to the intended backend.
 lab_mode: simulation
 simulation_type: kubernetes
 time_limit: 1200
 max_score: 100
 is_free: false
 objectives:
-  - Inspect Gateway and HTTPRoute resources
-  - Apply corrected HTTPRoute for api service
+- Inspect the Gateway and HTTPRoute status and the route rules
+- Identify the broken parentRef, match rule, or backendRef
+- Correct the HTTPRoute so requests reach the backend Service
 hints:
-  - content: "kubectl apply -f httproute with correct backendRefs to api Service"
-    cost: 15
-    order: 1
+- order: 1
+  cost: 10
+  content: 'Check the route status: `kubectl describe httproute <name>`. Look at the Parents/conditions
+    — Accepted=False or ResolvedRefs=False tells you whether the bind or the backendRef is the problem.'
+- order: 2
+  cost: 15
+  content: 'Compare the HTTPRoute''s backendRef name/port against the actual Service: `kubectl get svc`.
+    Also confirm spec.parentRefs matches the Gateway name and the listener''s hostname/path.'
+- order: 3
+  cost: 20
+  content: 'Edit the route: `kubectl edit httproute <name>` and fix the backendRef (correct Service name
+    and port) and the parentRef/match. Re-test with `curl -H ''Host: <hostname>'' http://<gateway-ip>/<path>`.'
+initial_state: Simulated Kubernetes cluster with Gateway API installed. A Gateway and HTTPRoute exist,
+  but requests return 404 because the HTTPRoute does not correctly bind to the Gateway or target the backend
+  Service.

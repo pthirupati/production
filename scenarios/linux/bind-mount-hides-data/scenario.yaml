@@ -11,25 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q5 bind mounts — findmnt, umount overlay, restore content
-description: Nginx serves a blank page. Real site files exist on disk but an empty directory is bind-mounted over /var/www/html.
+description: Nginx serves a blank page even though the real site files clearly exist under /var/www/html
+  on disk. An empty directory has been bind-mounted on top of /var/www/html, so the web server sees the
+  empty overlay instead of the actual content. Identify and remove the bind mount to reveal the real files
+  — without deleting anything underneath.
 objectives:
-- Affected service behaves normally
-- Identify bind mount
-- Unmount overlay
-- Verify index.html content
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Identify that /var/www/html is masked by a bind mount
+- Unmount the overlay without deleting the underlying files
+- Verify the real index.html content is served again
+initial_state: Linux web server. The real site lives in /var/www/html on disk, but an empty directory
+  is bind-mounted over that path, so nginx serves a blank/empty page.
 hints:
 - order: 1
-  cost: 15
-  content: '`findmnt /var/www/html` shows a bind mount'
+  cost: 10
+  content: 'Compare what''s mounted vs what''s on disk: `findmnt /var/www/html` reveals a bind mount shadowing
+    the directory, and `ls /var/www/html` shows the empty overlay.'
 - order: 2
-  cost: 25
-  content: '`umount /var/www/html` — do not delete files under /var/www'
+  cost: 15
+  content: 'Unmount the overlay — do NOT delete files: `umount /var/www/html`. The original contents underneath
+    reappear immediately.'
 - order: 3
-  cost: 15
-  content: Compare ls vs findmnt
-- order: 4
-  cost: 15
-  content: Verify index.html content
+  cost: 20
+  content: 'Confirm: `ls /var/www/html` now shows index.html and `curl -s http://localhost` returns the
+    real page. Remove the offending bind-mount line from /etc/fstab so it doesn''t return.'

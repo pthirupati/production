@@ -1,6 +1,5 @@
----
 slug: nsx-microsegmentation
-title: "NSX-T Micro-Segmentation Rule Missing"
+title: NSX-T Micro-Segmentation Rule Missing
 technology: VMware
 category: vCenter Administration
 difficulty: medium
@@ -12,12 +11,26 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  Production tier requires NSX-T DFW micro-segmentation. Connect NSX and create the rule.
+description: The production tier needs NSX-T distributed-firewall micro-segmentation, but the NSX-T manager
+  isn't connected and the required Distributed Firewall (DFW) allow rule doesn't exist — so the intended
+  east-west security policy isn't being enforced. Connect NSX-T and create the DFW rule that permits the
+  prod tier's required traffic.
 objectives:
-  - Connect NSX-T manager
-  - Create required DFW allow rule for prod tier
+- Connect the NSX-T manager
+- Create the required DFW allow rule for the prod tier
+- Verify the rule is published and enforcing
 hints:
-  - order: 1
-    cost: 10
-    content: "Use the inventory tree and platform services panels in the VMware simulator."
+- order: 1
+  cost: 10
+  content: First connect NSX-T from the platform services panel in the simulator (register the NSX-T manager
+    with vCenter).
+- order: 2
+  cost: 15
+  content: 'In the NSX Distributed Firewall, add a new rule for the prod tier: source/destination groups
+    for the production workloads, the required service/ports, and Action: Allow.'
+- order: 3
+  cost: 20
+  content: Publish the rule and confirm it shows as applied to the prod tier so the intended micro-segmentation
+    policy is enforced.
+initial_state: vCenter environment where NSX-T isn't connected and no DFW micro-segmentation rule exists
+  for the production tier.

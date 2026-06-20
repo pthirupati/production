@@ -9,15 +9,25 @@ time_limit: 900
 max_score: 100
 jira_priority: Medium
 is_free: false
-description: |
-  The api deployment pods are stuck in ImagePullBackOff due to a bad image tag. Fix the
-  deployment image and verify pods reach Running state.
+description: The api deployment's pods are stuck in ImagePullBackOff because the deployment references
+  a bad image tag (api:missing-tag) that does not exist in the registry. Every pull fails, so the pods
+  never start. Repoint the deployment to the correct, existing tag and confirm the pods reach Running.
 objectives:
-  - Describe the failing pod and identify the bad image tag
-  - Patch the deployment to use api:v1
-  - Verify pods are Running
-initial_state: api deployment uses api:missing-tag.
+- Describe a failing api pod and confirm the bad image tag
+- Set the api deployment to a valid image (api:v1)
+- Verify the api pods reach Running state
+initial_state: Simulated Kubernetes cluster. The api deployment uses image api:missing-tag, which the
+  registry does not have. Pods report ErrImagePull then ImagePullBackOff.
 hints:
-  - content: Run `kubectl set image deployment/api api=api:v1`.
-    cost: 15
-    order: 1
+- order: 1
+  cost: 10
+  content: '`kubectl describe pod <api-pod>` Events show "Failed to pull image api:missing-tag". The deployment
+    is pinned to a tag that doesn''t exist.'
+- order: 2
+  cost: 15
+  content: 'Confirm the requested image: `kubectl get deploy api -o jsonpath=''{.spec.template.spec.containers[0].image}''`
+    → api:missing-tag. The working tag is api:v1.'
+- order: 3
+  cost: 20
+  content: 'Fix and roll out: `kubectl set image deployment/api api=api:v1` then `kubectl rollout status
+    deployment/api`. Pods pull api:v1 and reach Running.'

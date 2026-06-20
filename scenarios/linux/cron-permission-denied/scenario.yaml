@@ -2,36 +2,33 @@ title: User Cannot Create Cron Jobs — Access Denied
 slug: linux-cron-permission-denied
 difficulty: easy
 category: Linux Administration
-description: |
-  A developer tries to schedule a backup cron job with crontab -e but receives the error
-  "You (developer) are not allowed to use this program (crontab)". The system has cron
-  access control files configured that are denying this user. The cron allow/deny file
-  mechanism must be understood and the user must be granted access.
-
-initial_state: |
-  Simulated RHEL 9 server. User 'developer' is logged in. Running crontab -e returns:
-  "You (developer) are not allowed to use this program (crontab)
-  See crontab(1) for more information"
-  The file /etc/cron.deny exists on the system.
-
+description: 'A developer running `crontab -e` gets "You (developer) are not allowed to use this program".
+  cron access is controlled by /etc/cron.allow and /etc/cron.deny: if cron.allow exists, only users listed
+  there may use cron; otherwise users in cron.deny are blocked. Grant the developer access per that precedence
+  and confirm crontab works.'
+initial_state: Linux server using cron access control. The developer user is blocked from crontab — either
+  listed in /etc/cron.deny or absent from an existing /etc/cron.allow.
 objectives:
-  - Check /etc/cron.deny to see if the user is listed there
-  - Check whether /etc/cron.allow exists and if it restricts access
-  - Remove the user from /etc/cron.deny or add them to /etc/cron.allow
-  - Verify crontab -l no longer returns an access denied error
-  - Understand the precedence: cron.allow takes priority over cron.deny
+- Check whether the user is in /etc/cron.deny
+- Check whether /etc/cron.allow exists and restricts access (it takes precedence)
+- Grant the developer access and verify crontab -l no longer errors
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check: cat /etc/cron.deny — if the username is listed there, remove it. If /etc/cron.allow exists, add the username there (when allow exists, only listed users can use cron).'
-    cost: 10
-    order: 1
-  - content: 'Access control rules: If cron.allow exists, only users in it can use cron. If only cron.deny exists, all users except those listed can use cron. If neither file exists, only root can use cron on some systems.'
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Inspect both files: `cat /etc/cron.deny /etc/cron.allow 2>/dev/null`. Remember cron.allow
+    takes priority — if it exists, only listed users may use cron.'
+- order: 2
+  cost: 15
+  content: If developer is in cron.deny, remove that line; if cron.allow exists, add `developer` to it.
+- order: 3
+  cost: 20
+  content: 'Verify as the user: `sudo -u developer crontab -l` no longer returns the access-denied error
+    and `crontab -e` opens.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

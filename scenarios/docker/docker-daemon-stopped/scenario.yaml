@@ -11,20 +11,25 @@ lab_mode: docker
 docker_privileged: true
 jira_priority: Medium
 is_free: false
-description: |
-  Docker is installed on this server but the daemon is not running.
-  Start the Docker engine and verify `docker ps` works.
+description: Docker commands fail with "Cannot connect to the Docker daemon". The dockerd service is not
+  running, so the CLI has no daemon socket to talk to. Start and enable the Docker engine service, then
+  confirm the daemon responds and containers can run again.
 objectives:
-  - Diagnose why docker commands fail
-  - Start the Docker service
-  - Verify docker ps succeeds
-initial_state: |
-  Real Ubuntu 22.04 container with Docker CE installed.
-  The docker daemon is stopped — `docker ps` returns a connection error.
+- Confirm the Docker daemon is not running
+- Start and enable the docker service
+- Verify the daemon responds and can run a container
+initial_state: Linux host where the Docker CLI is installed but the dockerd service is stopped. Every
+  docker command errors with "Cannot connect to the Docker daemon at unix:///var/run/docker.sock".
 hints:
-  - order: 1
-    cost: 10
-    content: "Run `systemctl status docker` to see service state."
-  - order: 2
-    cost: 15
-    content: "Start Docker with `systemctl start docker`."
+- order: 1
+  cost: 10
+  content: '`docker info` errors with "Cannot connect to the Docker daemon". Check the service: `sudo
+    systemctl status docker`.'
+- order: 2
+  cost: 15
+  content: 'Start it and enable it on boot: `sudo systemctl start docker && sudo systemctl enable docker`.
+    If start fails, read `sudo journalctl -u docker -n 50 --no-pager` for a config error.'
+- order: 3
+  cost: 20
+  content: 'Verify the engine works end to end: `docker info` now succeeds and `docker run --rm hello-world`
+    prints the confirmation message.'

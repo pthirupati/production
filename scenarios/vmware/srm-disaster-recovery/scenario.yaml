@@ -1,6 +1,5 @@
----
 slug: srm-disaster-recovery
-title: "SRM Site Recovery Not Configured"
+title: SRM Site Recovery Not Configured
 technology: VMware
 category: vCenter Administration
 difficulty: medium
@@ -12,13 +11,26 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  Site Recovery Manager replication between DC-Prod and DC-DR is missing. Configure and test recovery.
+description: Site Recovery Manager (SRM) protection between the production site (DC-Prod) and the recovery
+  site (DC-DR) isn't configured, so there is no orchestrated disaster-recovery plan and protected VMs
+  can't be failed over. Configure SRM protection groups and a recovery plan, then run a non-disruptive
+  test to validate recovery.
 objectives:
-  - Enable linked mode if needed
-  - Configure SRM protection groups
-  - Run recovery plan test
+- Ensure the sites are linked, then configure SRM protection groups
+- Create a recovery plan covering the protected VMs
+- Run a recovery plan test and confirm it succeeds
 hints:
-  - order: 1
-    cost: 10
-    content: "Use the inventory tree and platform services panels in the VMware simulator."
+- order: 1
+  cost: 10
+  content: If the sites aren't linked yet, enable linked mode / pair the sites first so SRM can see both
+    DC-Prod and DC-DR.
+- order: 2
+  cost: 15
+  content: In Site Recovery, create a protection group for the production VMs (backed by replication),
+    then build a recovery plan that includes that group.
+- order: 3
+  cost: 20
+  content: Run the recovery plan in Test mode (non-disruptive) and confirm the test completes successfully,
+    validating failover to DC-DR.
+initial_state: vCenter spanning DC-Prod and DC-DR where SRM replication/protection is not configured;
+  no protection groups or recovery plans exist.

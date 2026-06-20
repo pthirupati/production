@@ -2,33 +2,34 @@ title: PersistentVolumeClaim Stuck Pending
 slug: k8s-pvc-pending
 difficulty: medium
 category: Kubernetes
-description: 'A PersistentVolumeClaim remains in Pending state and the pod that depends
-  on it cannot start. The StorageClass referenced in the PVC does not exist in the
-  cluster, so no PersistentVolume can be dynamically provisioned.
-
-  '
-initial_state: 'Simulated Kubernetes cluster. A StatefulSet pod is stuck in Pending
-  because its PVC "data-pvc" cannot bind. No storage has been provisioned.
-
-  '
+description: A PersistentVolumeClaim is stuck in Pending and the pod that needs it won't start. No PersistentVolume
+  satisfies the claim — either there is no default StorageClass to dynamically provision one, or the requested
+  StorageClass/size/accessModes don't match any available PV. Provide a binding so the PVC is satisfied
+  and the pod can mount its volume.
+initial_state: Simulated Kubernetes cluster. A PVC sits in Pending because no PV matches and no default
+  StorageClass is configured to provision one. The dependent pod is stuck ContainerCreating.
 objectives:
-  - Identify why the PVC is stuck in Pending state
-  - Create or correct the StorageClass so the PVC can be satisfied
-  - Confirm the PVC transitions to Bound and the pod starts successfully
+- Inspect the PVC and see why it cannot bind
+- Check StorageClasses and any available PersistentVolumes
+- Provide a matching StorageClass/PV so the PVC binds and the pod starts
 lab_mode: simulation
 simulation_type: kubernetes
 time_limit: 1200
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: kubectl describe pvc data-pvc and look at the Events for provisioning
-      errors.'
-    cost: 10
-    order: 1
-  - content: 'Check available storage classes: kubectl get storageclass. The PVC requests
-      a class that may not exist.'
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: '`kubectl get pvc` shows Pending. Describe it: `kubectl describe pvc <name>` — Events say "no
+    persistent volumes available" or "no default StorageClass".'
+- order: 2
+  cost: 15
+  content: 'List options: `kubectl get storageclass` and `kubectl get pv`. If there''s no (default) StorageClass,
+    dynamic provisioning can''t happen; if a PV exists, its size/accessModes must match the claim.'
+- order: 3
+  cost: 20
+  content: Mark a class default — `kubectl patch storageclass <sc> -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'`
+    — or create a matching PV. The PVC binds and the pod proceeds.
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

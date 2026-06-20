@@ -11,21 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q24 umask — /etc/profile.d
-description: New files created world-writable. Global umask set to 000 in profile.d.
+description: Newly created files are coming out world-writable because the global umask was set to 000
+  (in a /etc/profile.d script or login config). A 000 umask removes no permission bits, so files are created
+  666 and directories 777 — a security problem. Restore a safe default umask (022) and verify new files
+  get sane permissions.
 objectives:
-- Check umask command
-- Affected service behaves normally
-- Verify new file permissions
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm the current umask is 000 and find where it's set
+- Restore a safe default umask (022)
+- Verify newly created files get correct permissions
+initial_state: Linux server where a global umask of 000 causes new files to be created world-writable;
+  the umask is set too permissively in the login environment.
 hints:
 - order: 1
   cost: 10
-  content: Change to `umask 022`
+  content: 'Check it: `umask` prints `0000`. Find the source: `grep -rn umask /etc/profile /etc/profile.d/
+    /etc/login.defs`.'
 - order: 2
   cost: 15
-  content: Fix system umask to 022
+  content: 'Set a sane default: change the offending entry to `umask 022` (in the profile.d file or login.defs
+    UMASK).'
 - order: 3
-  cost: 15
-  content: Verify new file permissions
+  cost: 20
+  content: 'Apply in a fresh login shell and verify: `umask` shows `0022`, and `touch /tmp/t; ls -l /tmp/t`
+    shows `-rw-r--r--` (644).'

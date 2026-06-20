@@ -8,30 +8,41 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  The CI pipeline is blocked by a failing SonarQube quality gate. The gate
+description: 'The CI pipeline is blocked by a failing SonarQube quality gate. The gate
+
   requires 80% code coverage but the project is reporting 0% because the
+
   coverage report path in sonar-project.properties is wrong. Fix the path
+
   so SonarQube picks up the coverage data.
+
+  '
 objectives:
-  - Identify the incorrect coverage report path in sonar-project.properties
-  - Fix the sonar.coverage.exclusions or sonar.python.coverage.reportPaths
-  - Verify SonarQube analysis reports coverage above the quality gate threshold
-initial_state: |
-  Ubuntu server. Project at /opt/app. sonar-project.properties has
+- Identify the incorrect coverage report path in sonar-project.properties
+- Fix the sonar.coverage.exclusions or sonar.python.coverage.reportPaths
+- Verify SonarQube analysis reports coverage above the quality gate threshold
+initial_state: 'Ubuntu server. Project at /opt/app. sonar-project.properties has
+
   sonar.python.coverage.reportPaths=coverage/coverage.xml but coverage
+
   report is actually at /opt/app/reports/coverage.xml. The quality gate
+
   fails because no coverage data is found.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check current config: cat /opt/app/sonar-project.properties"
-  - order: 2
-    cost: 15
-    content: "Find the actual coverage report: find /opt/app -name coverage.xml"
-  - order: 3
-    cost: 20
-    content: "The coverage file is at reports/coverage.xml not coverage/coverage.xml"
-  - order: 4
-    cost: 25
-    content: "Fix sonar-project.properties: change sonar.python.coverage.reportPaths=coverage/coverage.xml to sonar.python.coverage.reportPaths=reports/coverage.xml"
+- order: 1
+  cost: 10
+  content: 'Inspect the analysis config: `cat /opt/app/sonar-project.properties`. Coverage reads 0%, so
+    the gate (80%) fails — the report path is wrong.'
+- order: 2
+  cost: 15
+  content: 'Find where the coverage report actually is: `find /opt/app -name coverage.xml` (it''s at reports/coverage.xml,
+    not coverage/coverage.xml).'
+- order: 3
+  cost: 20
+  content: Fix `sonar.python.coverage.reportPaths` to point at the real path `reports/coverage.xml`.
+- order: 4
+  cost: 25
+  content: Re-run the scanner (`sonar-scanner`) and confirm reported coverage clears the quality-gate
+    threshold so the pipeline passes.

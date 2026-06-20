@@ -1,24 +1,32 @@
 category: Python Development
-description: 'ImportError for requests. Install with pip.
-
-  '
+description: 'A Python script fails with "ModuleNotFoundError: No module named X" because a required third-party
+  package is not installed in the active environment. Identify the missing dependency, install it (ideally
+  pinned via requirements), and confirm the script imports and runs.'
 difficulty: easy
 dual_terminal: false
 hints:
-- content: 'Try: pip3 install requests'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. ImportError for requests. Install with pip.
-
-  '
+  content: 'Run the script and read the error: `ModuleNotFoundError: No module named ''requests''` names
+    the missing import. Confirm it''s absent: `pip show requests`.'
+- order: 2
+  cost: 15
+  content: 'Install it into the active interpreter (note the import name can differ from the package name,
+    e.g. `import cv2` → `pip install opencv-python`): `pip install requests`.'
+- order: 3
+  cost: 20
+  content: Re-run the script — the import resolves. Pin it for reproducibility by adding it to requirements.txt
+    (`pip freeze | grep requests >> requirements.txt`).
+initial_state: Python environment where a script imports a third-party package that isn't installed. Running
+  it raises ModuleNotFoundError for that package.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: pip3 install requests'
-- Verify validation passes
+- Identify the missing module from the traceback
+- Install the correct package into the active environment
+- Confirm the script imports and runs successfully
 requires_companion_hosts: false
 simulation_type: python
 slug: sim-python-pip-missing

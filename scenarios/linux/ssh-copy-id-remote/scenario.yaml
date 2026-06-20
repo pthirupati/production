@@ -11,31 +11,47 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: ssh-copy-id, authorized_keys, multi-host labs
-description: |
-  Passwordless SSH from the lab client to remote-server is required for deployment scripts.
-  ssh-copy-id has not been run — the remote host rejects key auth.
+description: Deployment scripts need passwordless SSH from the lab client to remote-server, but ssh-copy-id
+  hasn't been run yet, so the remote host still prompts for a password (or rejects the key). Install the
+  client's public key into labuser's authorized_keys on remote-server and verify non-interactive SSH works.
 companion_hosts:
-  - name: server
-    role: server
-    hostname: remote-server
-    ssh_user: labuser
-    setup_command: |
-      apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server >/dev/null
-      useradd -m labuser 2>/dev/null || true
-      mkdir -p /home/labuser/.ssh && chmod 700 /home/labuser/.ssh
-      chown -R labuser:labuser /home/labuser/.ssh
-      sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-      service ssh restart 2>/dev/null || /usr/sbin/sshd
+- name: server
+  role: server
+  hostname: remote-server
+  ssh_user: labuser
+  setup_command: 'apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server
+    >/dev/null
+
+    useradd -m labuser 2>/dev/null || true
+
+    mkdir -p /home/labuser/.ssh && chmod 700 /home/labuser/.ssh
+
+    chown -R labuser:labuser /home/labuser/.ssh
+
+    sed -i ''s/#PasswordAuthentication yes/PasswordAuthentication yes/'' /etc/ssh/sshd_config
+
+    service ssh restart 2>/dev/null || /usr/sbin/sshd
+
+    '
 objectives:
-  - Copy your SSH public key to labuser@remote-server
-initial_state: |
-  Client container has an SSH key pair. Server remote-server runs sshd but has no authorized_keys for labuser.
+- Copy the client's SSH public key to labuser@remote-server
+- Confirm the key is installed in the remote authorized_keys
+- Verify non-interactive (key-based) SSH succeeds
+initial_state: Two-host lab. Passwordless SSH from the client to labuser@remote-server is required but
+  not set up; the key isn't yet in the remote authorized_keys.
 hints:
-  - order: 1
-    cost: 10
-    content: Run `ssh-copy-id labuser@remote-server` from the client (accept host key if prompted).
-  - order: 2
-    cost: 15
-    content: Test with `ssh -o BatchMode=yes labuser@remote-server echo ok`
-validation_script: |
-  ssh -o BatchMode=yes -o StrictHostKeyChecking=no labuser@remote-server echo fixitlab-ok
+- order: 1
+  cost: 10
+  content: 'Generate a key if you don''t have one (`ssh-keygen -t ed25519`), then distribute it: `ssh-copy-id
+    labuser@remote-server` (accept the host key if prompted; enter the password this one time).'
+- order: 2
+  cost: 15
+  content: 'Confirm it landed: `ssh labuser@remote-server ''cat ~/.ssh/authorized_keys''` shows your public
+    key.'
+- order: 3
+  cost: 20
+  content: 'Verify passwordless, non-interactive auth: `ssh -o BatchMode=yes labuser@remote-server echo
+    ok` prints `ok` with no prompt — deployment scripts will now work.'
+validation_script: 'ssh -o BatchMode=yes -o StrictHostKeyChecking=no labuser@remote-server echo fixitlab-ok
+
+  '

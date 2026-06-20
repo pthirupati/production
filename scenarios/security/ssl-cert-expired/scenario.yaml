@@ -7,20 +7,26 @@ time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: 'HTTPS endpoints fail certificate validation. The nginx SSL certificate
-
-  expires in one day. Generate a new certificate and reload nginx.'
+description: HTTPS endpoints are failing certificate validation because the nginx TLS certificate is expired
+  (or expires within a day). Browsers and clients reject the connection. Generate/install a valid certificate,
+  point nginx at it, and reload so secure connections work again with a non-expired certificate.
 objectives:
-- Check certificate expiry with openssl
-- Generate new self-signed cert for /etc/nginx/ssl/
-- Validate nginx config and reload
-initial_state: 'Nginx with 1-day self-signed certificate in /etc/nginx/ssl/.
-
-  '
+- Confirm the current certificate's expiry
+- Generate/install a new valid certificate and key
+- Reload nginx and verify HTTPS serves a non-expired certificate
+initial_state: Linux server running nginx with an expired (or about-to-expire) TLS certificate at /etc/nginx/ssl/cert.pem,
+  causing HTTPS validation failures.
 hints:
 - order: 1
   cost: 10
-  content: '`openssl x509 -in /etc/nginx/ssl/cert.pem -noout -dates`'
+  content: 'Check the dates: `openssl x509 -in /etc/nginx/ssl/cert.pem -noout -dates` — notAfter is in
+    the past (or imminent).'
 - order: 2
+  cost: 15
+  content: 'Issue a replacement (self-signed here; in prod use your CA/ACME): `openssl req -x509 -newkey
+    rsa:2048 -nodes -keyout /etc/nginx/ssl/key.pem -out /etc/nginx/ssl/cert.pem -days 365 -subj ''/CN=<host>''`.'
+- order: 3
   cost: 20
-  content: Regenerate with `openssl req -x509 -days 365 ...` then `nginx -t && service nginx reload`
+  content: 'Make sure nginx points at the new cert/key, validate and reload: `nginx -t && systemctl reload
+    nginx`. Verify: `echo | openssl s_client -connect localhost:443 2>/dev/null | openssl x509 -noout
+    -dates` shows a future notAfter.'

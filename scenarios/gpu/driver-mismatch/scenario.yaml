@@ -2,8 +2,11 @@ title: CUDA Driver Version Mismatch
 slug: sim-gpu-driver-mismatch
 category: GPU & NVIDIA
 difficulty: easy
-description: 'nvidia-smi reports driver/CUDA version mismatch preventing GPU usage. Identify the versions, install the correct driver, and verify.'
-initial_state: 'Simulated RHEL 9 server. nvidia-smi reports driver/CUDA version mismatch preventing GPU usage. Identify the versions, install the correct driver, and verify.'
+description: CUDA workloads fail with "CUDA driver version is insufficient for CUDA runtime version".
+  The installed NVIDIA kernel driver is older than what the CUDA runtime/toolkit in use requires, so applications
+  can't initialize the GPU. Reconcile the driver and runtime versions so CUDA initializes successfully.
+initial_state: Linux host with NVIDIA GPU. The CUDA runtime/toolkit is newer than the installed driver,
+  so GPU programs abort with "CUDA driver version is insufficient for CUDA runtime version".
 lab_mode: simulation
 simulation_type: gpu
 is_free: false
@@ -13,10 +16,20 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: nvidia-smi'
-- Verify validation passes
+- Read the driver and CUDA runtime versions and confirm the mismatch
+- Determine the minimum driver required by the CUDA version in use
+- Align driver/runtime versions so CUDA programs initialize
 hints:
-- content: 'Try: nvidia-smi'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Check what''s installed: `nvidia-smi` shows the driver version and the max CUDA it supports
+    (top-right). `nvcc --version` shows the toolkit version — note the gap.'
+- order: 2
+  cost: 15
+  content: Each CUDA release has a minimum driver. Either upgrade the driver to satisfy the newer CUDA,
+    or use a CUDA runtime compatible with the current driver.
+- order: 3
+  cost: 20
+  content: Upgrade the driver to a version that supports the CUDA runtime, then reload the modules (or
+    reboot) and re-run `nvidia-smi`; the CUDA program now initializes without the insufficient-driver
+    error.

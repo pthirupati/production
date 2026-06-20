@@ -10,14 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Create an IPMI user and verify ipmitool power status.
+description: 'Build task: create a dedicated IPMI/BMC user with operator privileges so the server can
+  be power-managed out-of-band, then confirm it works. Starting with no such user, add the account, set
+  its password and privilege level, enable it, and verify it can query chassis power.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Create an IPMI user and set its password
+- Grant the user operator/admin privilege on the LAN channel and enable it
+- Verify the user can query chassis power status via ipmitool
+initial_state: Bare-metal host with IPMI tooling available and access to the local BMC. No dedicated IPMI
+  user has been provisioned for power management yet.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Find a free user slot: `ipmitool user list 1`. Create the user: `ipmitool user set name <id>
+    opsuser` and `ipmitool user set password <id>`.'
+- order: 2
+  cost: 15
+  content: 'Grant privilege on the LAN channel and enable the account: `ipmitool user priv <id> 4 1` (4
+    = ADMIN on channel 1) and `ipmitool user enable <id>`.'
+- order: 3
+  cost: 20
+  content: 'Verify it works: `ipmitool -U opsuser -P <password> chassis power status` returns the current
+    power state. The new user can now manage power out-of-band.'

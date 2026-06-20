@@ -2,33 +2,33 @@ title: Deployment ImagePullBackOff
 slug: k8s-deployment-imagepull
 difficulty: easy
 category: Kubernetes
-description: 'A Deployment is stuck with pods in ImagePullBackOff state. The container
-  image tag does not exist in the registry, preventing the deployment from rolling
-  out. Identify the bad image reference and correct it.
-
-  '
-initial_state: 'Simulated Kubernetes cluster. A Deployment named "api-server" has
-  pods stuck in ImagePullBackOff. No application traffic is being served.
-
-  '
+description: Pods for a deployment are stuck in ImagePullBackOff. The container spec references an image
+  tag that does not exist in the registry, so every pull attempt fails and the pods never become Ready.
+  Identify the bad image reference and patch the deployment to a valid, existing tag.
+initial_state: Simulated Kubernetes cluster. A deployment's container image points to a tag that does
+  not exist in the registry. Pods cycle through ErrImagePull and ImagePullBackOff.
 objectives:
-  - Use kubectl to inspect the Deployment and identify the failing image reference
-  - Patch the Deployment to use the correct image tag
-  - Confirm all pods reach Running state and the rollout completes
+- Describe a failing pod and read the exact image-pull error
+- Identify the incorrect image name or tag in the deployment
+- Patch the deployment to a valid image and confirm pods reach Running
 lab_mode: simulation
 simulation_type: kubernetes
 time_limit: 900
 max_score: 100
 is_free: true
 hints:
-  - content: 'Run: kubectl describe pod <pod-name> and look at the Events section for
-      the exact image pull error.'
-    cost: 10
-    order: 1
-  - content: 'Use: kubectl set image deployment/api-server api-server=myrepo/api-server:v1.2
-      to update the image tag.'
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: '`kubectl get pods` shows ImagePullBackOff. Run `kubectl describe pod <pod>` and read Events:
+    "Failed to pull image ... manifest unknown" names the bad tag.'
+- order: 2
+  cost: 15
+  content: 'Check what the deployment requests: `kubectl get deploy <name> -o jsonpath=''{.spec.template.spec.containers[0].image}''`.
+    Compare the tag against tags that actually exist.'
+- order: 3
+  cost: 20
+  content: 'Fix it without editing YAML by hand: `kubectl set image deployment/<name> <container>=<image>:<valid-tag>`,
+    then `kubectl rollout status deployment/<name>`.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

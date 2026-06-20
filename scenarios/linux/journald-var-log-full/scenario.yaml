@@ -11,18 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q6 journal vacuum — journalctl --vacuum-size
-description: journalctl and apps logging to /var/log fail. /var/log is full from oversized application logs.
+description: Logging has broken because /var/log is full — journalctl and applications that write there
+  fail to record anything. The space is consumed by an oversized systemd journal and/or large application
+  log files. Reclaim space by vacuuming the journal and clearing stale logs, then cap journal growth so
+  it doesn't recur.
 objectives:
-- df -h /var/log
-- Find large files under /var/log
-- Vacuum journal or delete stale logs
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm /var/log is full and find the largest consumers
+- Vacuum the systemd journal and remove stale logs to reclaim space
+- Cap journal size so it doesn't fill again
+initial_state: Linux server where /var/log is at capacity, so journald and apps can't write logs. A large
+  journal and oversized log files are consuming the space.
 hints:
 - order: 1
-  cost: 15
-  content: '`du -sh /var/log/* | sort -h`'
+  cost: 10
+  content: 'Confirm and find the big files: `df -h /var/log` (full), then `du -sh /var/log/* | sort -h`
+    and `journalctl --disk-usage`.'
 - order: 2
-  cost: 25
-  content: '`journalctl --vacuum-size=50M` and remove /var/log/big/*.log'
+  cost: 20
+  content: 'Reclaim space: `journalctl --vacuum-size=50M` (or `--vacuum-time=7d`) and remove/truncate
+    stale app logs (`truncate -s 0 /var/log/big/*.log`).'
+- order: 3
+  cost: 30
+  content: 'Prevent recurrence: set `SystemMaxUse=200M` in /etc/systemd/journald.conf and `systemctl restart
+    systemd-journald`. Confirm `df -h /var/log` has healthy free space and journalctl writes again.'

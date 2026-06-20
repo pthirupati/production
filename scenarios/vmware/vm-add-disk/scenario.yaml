@@ -1,9 +1,10 @@
 title: Expand VM Disk Capacity
 slug: vmware-add-disk
 category: VMware vSphere
-description: |
-  The web-prod-01 application VM requires at least 100 GB disk but currently has only 40 GB.
-  Add disk capacity from vCenter without downtime.
+description: The application VM web-prod-01 needs at least 100 GB of disk but currently has only 40 GB,
+  so it's running out of space. Additional disk capacity should be added from vCenter without taking the
+  VM down (hot-add). Add at least 60 GB more so the VM meets the 100 GB requirement, then confirm the
+  new capacity.
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -12,11 +13,20 @@ time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Locate web-prod-01 in vCenter inventory
-  - Add at least 60 GB additional disk capacity
-  - Verify validation passes
-initial_state: web-prod-01 disk is 40 GB; requirement is 100 GB.
+- Locate web-prod-01 in the vCenter inventory
+- Add at least 60 GB of additional disk capacity (hot-add)
+- Verify the VM now meets the 100 GB requirement
+initial_state: vCenter VM web-prod-01 with a single 40 GB disk; the application requires at least 100
+  GB, so more capacity must be added (online).
 hints:
-  - content: Select web-prod-01 → Edit Settings or use Add Hard Disk from VM actions.
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: Select web-prod-01 in inventory and open Edit Settings (or Actions -> Edit Settings).
+- order: 2
+  cost: 15
+  content: Either grow the existing virtual disk or use "Add New Device" -> Hard Disk to add ≥60 GB (modern
+    hardware allows this while powered on).
+- order: 3
+  cost: 20
+  content: Apply the change and confirm the VM's total disk capacity is now ≥100 GB. (Inside the guest
+    you'd then rescan/grow the filesystem to use it.)

@@ -9,20 +9,25 @@ time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Low
-description: User devops cannot run sudo commands. The sudoers file has a typo.
+description: User 'devops' can no longer run sudo — commands fail (often with a parse/syntax complaint)
+  because a typo was introduced into the sudoers configuration (e.g. `ALLL` instead of `ALL`). A malformed
+  sudoers line breaks privilege escalation for that user. Repair the entry safely with visudo and confirm
+  devops regains sudo.
 objectives:
 - Diagnose why sudo fails for devops
-- Affected service behaves normally
-initial_state: 'User devops exists but sudo reports syntax or permission errors.
-
-  '
+- Fix the sudoers typo safely with visudo
+- Verify devops can run sudo commands again
+initial_state: Linux server where the sudoers configuration has a typo in the devops rule, so devops cannot
+  use sudo. Editing must be done safely to avoid locking out sudo entirely.
 hints:
 - order: 1
   cost: 10
-  content: Run `sudo -u devops sudo -n true` and check visudo.
+  content: 'Reproduce and inspect: `sudo -l -U devops` or `sudo -u devops sudo -n true` surfaces the error.
+    Always edit with `visudo` (it validates before saving).'
 - order: 2
-  cost: 20
-  content: Change ALLL to ALL in the devops sudoers line.
-- order: 3
   cost: 15
-  content: Fix /etc/sudoers typo
+  content: The devops line has a typo — e.g. `devops ALLL=(ALL) ...`. Correct `ALLL` to `ALL`.
+- order: 3
+  cost: 20
+  content: visudo will refuse to save a broken file; once it saves cleanly, verify with `sudo -u devops
+    sudo -n true` (no error) — devops has sudo back.

@@ -1,8 +1,10 @@
 title: Deploy VM from Content Library OVF
 slug: vmware-ovf-content-library
 category: VMware vSphere
-description: |
-  Deploy a new Linux VM from the FixitLab content library OVF template using the OVF deploy wizard.
+description: A new Linux VM should be deployed from the FixitLab content library's OVF template (tiny-linux.ova)
+  using the Deploy OVF wizard, but it hasn't been done yet. Deploying from the content library is the
+  standard, repeatable way to stamp out VMs from a known-good image. Run the OVF deploy wizard to create
+  the VM on the cluster.
 difficulty: easy
 lab_mode: simulation
 simulation_type: vmware
@@ -11,10 +13,20 @@ time_limit: 600
 max_score: 100
 is_free: true
 objectives:
-  - Open content library (O button in inventory)
-  - Deploy tiny-linux.ova to the cluster
-initial_state: Content library contains OVF templates ready to deploy.
+- Open the content library and locate the tiny-linux OVF template
+- Deploy tiny-linux.ova to the cluster via the OVF wizard
+- Verify the new VM is created in inventory
+initial_state: vCenter with a content library containing OVF templates (including tiny-linux.ova). No
+  VM has been deployed from it yet.
 hints:
-  - content: "Inventory toolbar → O → select tiny-linux.ova → Deploy"
-    cost: 5
-    order: 1
+- order: 1
+  cost: 10
+  content: Open the content library (the O button on the inventory toolbar in the simulator) and find
+    tiny-linux.ova.
+- order: 2
+  cost: 15
+  content: Select tiny-linux.ova -> Deploy. In the wizard, choose a name, the target cluster, and a datastore/network.
+- order: 3
+  cost: 20
+  content: Finish the wizard and confirm the new VM appears in the cluster's inventory (power it on if
+    the task requires).

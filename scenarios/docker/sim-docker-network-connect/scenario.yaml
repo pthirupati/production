@@ -9,15 +9,27 @@ time_limit: 900
 max_score: 100
 jira_priority: Medium
 is_free: false
-description: |
-  The web container is running but not attached to the application bridge network, so it
-  cannot reach the database sidecar. Connect it to the correct network.
+description: Two containers that need to talk to each other can't resolve or reach one another because
+  they are not on the same user-defined Docker network. On the default bridge, DNS-based service discovery
+  doesn't work; on separate networks, there's no connectivity at all. Put both containers on a shared
+  user-defined network so they can communicate by name.
 objectives:
-  - Inspect docker network ls and container networks
-  - Connect the web container to the bridge network
-  - Verify connectivity with docker ps
-initial_state: Container web is Exited; network attachment missing.
+- Confirm the containers cannot reach each other across networks
+- Identify which networks each container is attached to
+- Attach both to a shared user-defined network and verify name-based connectivity
+initial_state: Docker host running an app container and its dependency (e.g. a database) on different
+  networks. The app can't reach the dependency by name; connections fail with name-resolution or connection
+  errors.
 hints:
-  - content: Use `docker network connect bridge web` after starting the container.
-    cost: 15
-    order: 1
+- order: 1
+  cost: 10
+  content: 'See each container''s networks: `docker inspect <container> --format ''{{json .NetworkSettings.Networks}}''`.
+    They''re on different networks (or the default bridge, which has no DNS).'
+- order: 2
+  cost: 15
+  content: 'Create a user-defined network (DNS works there): `docker network create appnet`, then connect
+    the dependency: `docker network connect appnet <db-container>`.'
+- order: 3
+  cost: 20
+  content: 'Connect the app too: `docker network connect appnet <app-container>`. Now `docker exec <app>
+    ping <db-container-name>` resolves and succeeds — DNS works by container name on user-defined networks.'

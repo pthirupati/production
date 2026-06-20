@@ -1,5 +1,5 @@
 slug: vlan-misconfigured
-title: "VLAN Misconfigured — Fix Trunk Port to Pass Traffic"
+title: VLAN Misconfigured — Fix Trunk Port to Pass Traffic
 technology: Networking
 category: Switching
 difficulty: medium
@@ -8,31 +8,42 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  After a switch port was changed from access to trunk mode, hosts on VLAN 20 and
+description: 'After a switch port was changed from access to trunk mode, hosts on VLAN 20 and
+
   VLAN 30 lost connectivity to each other and to the upstream router. The trunk
+
   port is not passing the required VLANs. The switchport configuration is missing
+
   the allowed VLAN list and the native VLAN is misconfigured, causing all tagged
+
   frames to be dropped.
+
+  '
 objectives:
-  - Identify the misconfigured trunk port
-  - Add VLAN 20 and VLAN 30 to the allowed VLAN list on the trunk
-  - Correct the native VLAN configuration
-  - Verify inter-VLAN traffic flows through the trunk
-initial_state: |
-  Open vSwitch (OVS) bridge configured. Port eth2 is set as trunk but allowed
+- Identify the misconfigured trunk port
+- Add VLAN 20 and VLAN 30 to the allowed VLAN list on the trunk
+- Correct the native VLAN configuration
+- Verify inter-VLAN traffic flows through the trunk
+initial_state: 'Open vSwitch (OVS) bridge configured. Port eth2 is set as trunk but allowed
+
   VLAN list is empty. Native VLAN is set to 1 instead of the required 20.
+
   Hosts on VLAN 20 and 30 cannot communicate.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "`ovs-vsctl show` displays the current bridge and port configuration."
-  - order: 2
-    cost: 15
-    content: "Set trunk VLANs: `ovs-vsctl set port eth2 trunks=20,30`"
-  - order: 3
-    cost: 15
-    content: "Set native VLAN: `ovs-vsctl set port eth2 vlan_mode=native-untagged tag=20`"
-  - order: 4
-    cost: 20
-    content: "Verify with `ovs-vsctl list port eth2` and test connectivity with `ping` across VLANs."
+- order: 1
+  cost: 10
+  content: 'Inspect the bridge/port config: `ovs-vsctl show` — the trunk port isn''t passing VLANs 20
+    and 30 after being switched from access to trunk.'
+- order: 2
+  cost: 15
+  content: 'Set the trunk to carry the right VLANs: `ovs-vsctl set port eth2 trunks=20,30`.'
+- order: 3
+  cost: 20
+  content: 'Set the native/untagged behavior correctly: `ovs-vsctl set port eth2 vlan_mode=native-untagged
+    tag=20` (match your design).'
+- order: 4
+  cost: 25
+  content: Confirm with `ovs-vsctl list port eth2` and test cross-VLAN reachability with `ping` between
+    a VLAN 20 and VLAN 30 host and to the upstream router.

@@ -1,25 +1,34 @@
 category: Kubernetes
-description: 'nginx pod keeps crashing. Describe pod and fix image.
-
-  '
+description: An nginx pod is stuck in CrashLoopBackOff and restarts continuously. The container exits
+  immediately on startup — typically a bad image tag, a missing config file the container expects, or
+  a failing command. Inspect the pod's logs and previous-container output to find why it exits, then fix
+  the deployment so the pod stays Running.
 difficulty: medium
 dual_terminal: false
 hints:
-- content: 'Try: kubectl get pods'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. nginx pod keeps crashing. Describe pod and
-  fix image.
-
-  '
+  content: '`kubectl get pods` shows CrashLoopBackOff with a climbing RESTARTS count. Describe it: `kubectl
+    describe pod <pod>` to see the last state and exit code.'
+- order: 2
+  cost: 15
+  content: 'Read the logs from the crashed instance: `kubectl logs <pod> --previous`. The error (e.g.
+    bad image, missing file, exec format) points straight to the fix.'
+- order: 3
+  cost: 20
+  content: If it's a bad image, `kubectl set image deployment/<name> <container>=nginx:1.25`. If it's
+    a missing config, create the ConfigMap/Secret it mounts. Then confirm Running with `kubectl get pods
+    -w`.
+initial_state: 'Simulated Kubernetes cluster. An nginx pod enters CrashLoopBackOff: it starts, the container
+  immediately exits non-zero, and the kubelet keeps restarting it with growing backoff.'
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: kubectl get pods'
-- Verify validation passes
+- Identify the crash-looping pod and its restart count
+- Read the crashing container's logs to find the exit cause
+- Fix the deployment (image/config/command) so the pod stays Running
 requires_companion_hosts: false
 simulation_type: kubernetes
 slug: sim-k8s-crashloop

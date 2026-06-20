@@ -2,8 +2,11 @@ title: Java Compilation Error
 slug: sim-java-compile-error
 category: Java Development
 difficulty: easy
-description: 'App.java fails to compile with a syntax error. Fix the source file and compile successfully.'
-initial_state: 'Simulated RHEL 9 server. App.java fails to compile with a syntax error. Fix the source file and compile successfully.'
+description: App.java fails to compile — javac reports a syntax error (a missing semicolon, an unbalanced
+  brace, or a mismatched type), so no .class file is produced. Read the compiler's file/line diagnostic,
+  correct the source, and compile cleanly.
+initial_state: Simulated RHEL 9 server with App.java containing a compile-time syntax error; `javac App.java`
+  aborts with an error and produces no class file.
 lab_mode: simulation
 simulation_type: java
 is_free: false
@@ -13,10 +16,19 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: javac App.java'
-- Verify validation passes
+- Run javac and read the exact file, line, and error
+- Correct the offending Java syntax
+- Compile successfully so App.class is produced
 hints:
-- content: 'Try: javac App.java'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Compile to see the diagnostic: `javac App.java`. The error includes the line number and a
+    `^` pointing at the problem.'
+- order: 2
+  cost: 15
+  content: Inspect that line and the one before it — common causes are a missing `;`, an unbalanced `{`/`}`,
+    or a type mismatch the message describes.
+- order: 3
+  cost: 20
+  content: Fix the syntax and re-run `javac App.java` until it's clean; confirm `App.class` exists (`ls
+    App.class`) and the program runs with `java App`.

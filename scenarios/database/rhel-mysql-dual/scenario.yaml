@@ -1,4 +1,4 @@
-title: "RHEL Simulation: MySQL Down (Dual Terminal)"
+title: 'RHEL Simulation: MySQL Down (Dual Terminal)'
 slug: sim-rhel-mysql-dual
 technology: Database Administration
 category: Database Administration
@@ -11,23 +11,26 @@ dual_terminal: true
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  mysqld is stopped on the database server. Use the SSH client to test remote connectivity,
-  start MySQL on the server console, then verify mysqladmin ping succeeds.
+description: MySQL is stopped on the database server (10.0.0.10), so remote clients can't reach it. Using
+  the dual-terminal setup, confirm from the SSH client pane that `mysqladmin ping` fails, then start mysqld
+  from the server console and verify the remote ping now succeeds — restoring database connectivity for
+  clients.
 objectives:
-  - mysqladmin ping from client fails while mysqld is down
-  - Start mysqld on the server
-  - Remote mysqladmin ping succeeds
-initial_state: |
-  primary (10.0.0.10): mysqld inactive
-  ssh_client: mysqladmin ping -h 10.0.0.10
+- From the SSH client, confirm mysqladmin ping fails while mysqld is down
+- Start mysqld on the server console
+- Verify the remote mysqladmin ping from the client now succeeds
+initial_state: 'Dual-terminal lab. primary (10.0.0.10): mysqld is inactive. ssh_client: used to run `mysqladmin
+  ping -h 10.0.0.10` against the server. Remote connections currently fail.'
 hints:
-  - order: 1
-    cost: 10
-    content: "SSH Client: mysqladmin ping -h 10.0.0.10 — expect failure."
-  - order: 2
-    cost: 15
-    content: "Server console: systemctl status mysqld && journalctl -u mysqld -n 20"
-  - order: 3
-    cost: 20
-    content: "Server: systemctl start mysqld — retry mysqladmin ping from client."
+- order: 1
+  cost: 10
+  content: 'SSH Client pane: `mysqladmin ping -h 10.0.0.10` — expect "connect ... failed" because the
+    server''s mysqld is down.'
+- order: 2
+  cost: 15
+  content: 'Server console: inspect it first — `systemctl status mysqld` and `journalctl -u mysqld -n
+    20` to confirm it''s simply stopped (not failing).'
+- order: 3
+  cost: 20
+  content: 'Server console: `systemctl start mysqld`. Back in the SSH Client, retry `mysqladmin ping -h
+    10.0.0.10` — it now returns "mysqld is alive".'

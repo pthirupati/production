@@ -2,8 +2,12 @@ title: GPU Out of Memory Error
 slug: sim-gpu-oom
 category: GPU & NVIDIA
 difficulty: medium
-description: 'A training job crashes with CUDA out of memory. Identify which process is holding GPU memory, free it, and relaunch with correct batch size.'
-initial_state: 'Simulated RHEL 9 server. A training job crashes with CUDA out of memory. Identify which process is holding GPU memory, free it, and relaunch with correct batch size.'
+description: A GPU job crashes with "CUDA out of memory". The model/batch is trying to allocate more GPU
+  memory than the device has free — often because of an oversized batch size or leftover memory held by
+  zombie processes. Identify what's consuming VRAM, free it or reduce the footprint, and get the job running
+  within the GPU's memory.
+initial_state: 'Linux host with an NVIDIA GPU. A training/inference job aborts with "CUDA out of memory:
+  Tried to allocate ...". GPU memory is exhausted, possibly by stale processes.'
 lab_mode: simulation
 simulation_type: gpu
 is_free: false
@@ -13,10 +17,20 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: nvidia-smi --query-compute-apps=pid,used_memory --format=csv'
-- Verify validation passes
+- Confirm GPU memory is exhausted and see what's holding it
+- Free leftover/zombie GPU memory or reduce the job's footprint
+- Run the job within the available GPU memory
 hints:
-- content: 'Try: nvidia-smi --query-compute-apps=pid,used_memory --format=csv'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Check usage and which PIDs hold memory: `nvidia-smi`. The Processes table lists each PID and
+    its memory; near-100% Memory-Usage confirms the OOM.'
+- order: 2
+  cost: 15
+  content: 'Reclaim memory from stale jobs: kill orphaned processes shown in nvidia-smi (`kill -9 <pid>`).
+    If memory stays pinned, it''s leaked by a crashed process and needs cleanup.'
+- order: 3
+  cost: 20
+  content: If a single job legitimately needs less, lower the batch size or enable gradient checkpointing
+    / mixed precision. Re-run and confirm steady-state memory in `nvidia-smi -l 1` stays under the device
+    limit.

@@ -7,28 +7,27 @@ time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: 'The application team reports database connection failures after a config
-
-  configuration and restore database connectivity.'
+description: The application team reports database connection failures after a recent PostgreSQL config
+  change. Connections to 127.0.0.1 are refused because listen_addresses was misconfigured (or an invalid
+  line keeps the service from starting), so Postgres isn't accepting TCP connections. Restore a valid
+  configuration and connectivity.
 objectives:
 - Diagnose why PostgreSQL refuses connections
-- Affected service behaves normally
-initial_state: 'Ubuntu server with PostgreSQL 14 installed. Connections to 127.0.0.1 fail.
-
-  '
+- Fix listen_addresses (and any invalid line) in postgresql.conf
+- Restart PostgreSQL and verify psql connects
+initial_state: Ubuntu server with PostgreSQL 14. Connections to 127.0.0.1 fail because postgresql.conf
+  (/etc/postgresql/14/main/postgresql.conf) has a bad listen_addresses/invalid line, so the server doesn't
+  listen or won't start.
 hints:
 - order: 1
   cost: 10
-  content: 'Check if PostgreSQL is running: `service postgresql status`'
+  content: 'Check whether it''s even running/listening: `service postgresql status` and `ss -tlnp | grep
+    5432`. If it failed to start, read `journalctl -u postgresql`.'
 - order: 2
   cost: 15
-  content: Inspect `/etc/postgresql/14/main/postgresql.conf` for listen_addresses.
+  content: Inspect `/etc/postgresql/14/main/postgresql.conf` — `listen_addresses` may be wrong/commented
+    (or there's an invalid directive). Set `listen_addresses = 'localhost'` (or `'*'`).
 - order: 3
-  cost: 25
-  content: Set `listen_addresses = 'localhost'` or `'*'`, remove invalid lines, restart postgres.
-- order: 4
-  cost: 15
-  content: Fix listen_addresses in postgresql.conf
-- order: 5
-  cost: 15
-  content: Restart PostgreSQL and verify psql connects
+  cost: 20
+  content: 'Restart and verify: `systemctl restart postgresql`, then `psql -h 127.0.0.1 -U postgres -c
+    ''SELECT 1;''` (or `pg_isready -h 127.0.0.1`) connects.'

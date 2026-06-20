@@ -1,9 +1,10 @@
 title: Guest Disk Not Visible After Add
 slug: vmware-guest-disk-missing
 category: VMware vSphere
-description: |
-  A new virtual disk was added to web-prod-01 from vCenter but the Linux guest does not see it.
-  Rescan the SCSI bus, create a filesystem, and mount the disk.
+description: A new 20 GB virtual disk was added to web-prod-01 at the vSphere layer, but the Linux guest
+  doesn't see it because the SCSI bus hasn't been rescanned. The disk must be detected inside the guest,
+  then partitioned/formatted and mounted before it's usable. Rescan, create a filesystem, and mount the
+  new disk from the VM console.
 difficulty: hard
 lab_mode: simulation
 simulation_type: vmware
@@ -12,14 +13,21 @@ time_limit: 1200
 max_score: 100
 is_free: false
 objectives:
-  - Power on web-prod-01 and open the web console
-  - Rescan SCSI host (echo "- - -" > /sys/class/scsi_host/host0/scan)
-  - Verify disk with lsblk, create ext4 filesystem, mount to /data
-initial_state: New 20 GB disk attached at vSphere layer but hidden from guest OS.
+- Open the web-prod-01 console and confirm the new disk isn't visible
+- Rescan the SCSI bus so the guest detects the disk
+- Create an ext4 filesystem and mount the disk at /data
+initial_state: vCenter guest web-prod-01 with a freshly attached 20 GB disk at the hypervisor that the
+  OS hasn't detected; the disk must be rescanned and prepared from the console.
 hints:
-  - content: "In console run: echo '- - -' > /sys/class/scsi_host/host0/scan then lsblk"
-    cost: 15
-    order: 1
-  - content: "mkfs.ext4 /dev/sdb && mkdir -p /data && mount /dev/sdb /data"
-    cost: 20
-    order: 2
+- order: 1
+  cost: 10
+  content: 'In the console, `lsblk` doesn''t show the new disk yet. Trigger a rescan: `echo ''- - -''
+    > /sys/class/scsi_host/host0/scan`.'
+- order: 2
+  cost: 15
+  content: 'Confirm it appeared: `lsblk` now lists the new device (e.g. /dev/sdb), and `dmesg | tail`
+    shows it attaching.'
+- order: 3
+  cost: 20
+  content: 'Prepare and mount it: `mkfs.ext4 /dev/sdb && mkdir -p /data && mount /dev/sdb /data` (add
+    it to /etc/fstab by UUID to persist). Verify with `df -h /data`.'

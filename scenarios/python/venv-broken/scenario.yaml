@@ -2,8 +2,11 @@ title: Broken Virtual Environment
 slug: sim-python-venv-broken
 category: Python Development
 difficulty: medium
-description: 'A Python venv is broken — pip and python3 point to system instead of the venv. Reactivate or recreate the environment and verify the app runs.'
-initial_state: 'Simulated RHEL 9 server. A Python venv is broken — pip and python3 point to system instead of the venv. Reactivate or recreate the environment and verify the app runs.'
+description: A Python virtual environment is broken — activating it fails or its interpreter/pip errors
+  (commonly because the base Python it was created against moved, or the venv is corrupt). Packages can't
+  be installed and scripts won't run in it. Recreate or repair the venv and reinstall the project's dependencies.
+initial_state: 'Project with a virtual environment that no longer works: activation or the venv''s python/pip
+  fails (e.g. "bad interpreter" or missing modules), blocking installs and runs.'
 lab_mode: simulation
 simulation_type: python
 is_free: false
@@ -13,10 +16,18 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: source venv/bin/activate'
-- Verify validation passes
+- Confirm the existing venv's interpreter/pip is broken
+- Recreate (or repair) the virtual environment
+- Reinstall dependencies and confirm the project runs in the venv
 hints:
-- content: 'Try: source venv/bin/activate'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Activate and test: `source venv/bin/activate` then `python -V` / `pip -V`. A "bad interpreter"
+    or import error confirms the venv is broken (often the base python it linked changed).'
+- order: 2
+  cost: 15
+  content: 'Cleanly recreate it: `deactivate; rm -rf venv; python3 -m venv venv; source venv/bin/activate`.'
+- order: 3
+  cost: 20
+  content: 'Reinstall the project''s deps: `pip install -r requirements.txt` (or `pip install -e .`).
+    Run the app/tests inside the fresh venv to confirm it works.'

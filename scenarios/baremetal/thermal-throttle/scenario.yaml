@@ -2,8 +2,12 @@ title: CPU Thermal Throttling
 slug: sim-bm-thermal
 category: Bare Metal & IPMI
 difficulty: medium
-description: 'Server performance is degraded due to CPU thermal throttling. Check IPMI sensor readings, identify overheating cause, and apply fixes.'
-initial_state: 'Simulated RHEL 9 server. Server performance is degraded due to CPU thermal throttling. Check IPMI sensor readings, identify overheating cause, and apply fixes.'
+description: A bare-metal server is throttling its CPUs due to high temperature, degrading application
+  performance. IPMI temperature sensors are reading near or above their thresholds — typically from failed/spun-down
+  fans, blocked airflow, or a fan policy set too low. Read the sensors, find the overheating cause, and
+  restore proper cooling so the CPU stops throttling.
+initial_state: Simulated bare-metal RHEL host. CPU frequency is being throttled because IPMI temperature
+  sensors are high; fan readings and/or thermal thresholds indicate a cooling problem.
 lab_mode: simulation
 simulation_type: baremetal
 is_free: false
@@ -13,10 +17,20 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: ipmitool sensor list | grep Temp'
-- Verify validation passes
+- Read IPMI temperature and fan sensor values
+- Identify the cause of overheating (fans, airflow, or fan policy)
+- Restore cooling so the CPUs stop thermal throttling
 hints:
-- content: 'Try: ipmitool sensor list | grep Temp'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Read the sensors: `ipmitool sensor list | grep -iE ''temp|fan''`. Compare CPU temps against
+    their upper-critical thresholds and check whether any fan reads 0 RPM.'
+- order: 2
+  cost: 15
+  content: 'Confirm throttling in-band: `grep -i mhz /proc/cpuinfo` (clocks pinned low) or check `turbostat`.
+    A dead fan or a fan profile stuck on "quiet" is the usual culprit.'
+- order: 3
+  cost: 20
+  content: 'Restore cooling: set the BMC fan policy higher / replace the failed fan, and clear airflow
+    obstructions. Re-read `ipmitool sensor list` until temps fall below threshold and fans spin up; CPU
+    clocks then return to normal.'

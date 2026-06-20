@@ -10,14 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Create site, app pool, and verify HTTP 200.
+description: 'Build task: publish a website on Windows IIS from scratch. Starting with no site configured,
+  create a dedicated application pool and an IIS website bound to HTTP, drop in a default document, start
+  the site, and verify it returns HTTP 200.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Create a dedicated IIS application pool
+- Create a website bound to HTTP (port 80) with a physical path and a default document
+- Start the site and verify it returns HTTP 200
+initial_state: Windows Server with the IIS role available but no application site configured yet. You
+  will create the app pool, site, and content.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Create an app pool (PowerShell, WebAdministration module): `New-WebAppPool -Name MyAppPool`.
+    Create the content folder and an index file (e.g. C:\inetpub\mysite\index.html).'
+- order: 2
+  cost: 15
+  content: 'Create the site bound to port 80 using that pool: `New-Website -Name MySite -Port 80 -PhysicalPath
+    C:\inetpub\mysite -ApplicationPool MyAppPool`.'
+- order: 3
+  cost: 20
+  content: 'Start it and verify: `Start-Website -Name MySite`, then `Invoke-WebRequest http://localhost
+    -UseBasicParsing` returns StatusCode 200 (or check in IIS Manager).'

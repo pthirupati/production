@@ -2,36 +2,33 @@ title: Load Kernel Module and Make It Persistent Across Reboots
 slug: linux-kernel-module-load
 difficulty: easy
 category: Linux Administration
-description: |
-  A Kubernetes node setup script requires the br_netfilter kernel module to be loaded
-  for pod network traffic bridging to work correctly. The module is not currently loaded
-  and must be loaded immediately and also configured to load automatically on every reboot.
-  Without this module, kube-proxy cannot manage iptables rules for pod networking.
-
-initial_state: |
-  Simulated RHEL 9 server being prepared for Kubernetes. Running:
-  lsmod | grep br_netfilter
-  returns no output, confirming the module is not loaded. The kubeadm preflight checks
-  are failing with: "br_netfilter module not found in /proc/modules".
-
+description: A Kubernetes node setup requires the br_netfilter kernel module so that bridged pod traffic
+  is processed by iptables, but the module isn't loaded (and won't persist across reboots). Without it,
+  the related sysctls can't be set and pod networking misbehaves. Load the module now, make it load at
+  boot, and enable the bridge-nf sysctl.
+initial_state: Linux node intended for Kubernetes where br_netfilter is not loaded; bridged traffic isn't
+  subject to iptables and the bridge-nf sysctls are unavailable.
 objectives:
-  - Load the module immediately with modprobe br_netfilter
-  - Verify it is loaded with lsmod | grep br_netfilter
-  - Create /etc/modules-load.d/k8s.conf with the content: br_netfilter
-  - Verify the file persists and will load the module on next boot
-  - Also enable net.bridge.bridge-nf-call-iptables=1 in /etc/sysctl.d/k8s.conf
+- Load br_netfilter immediately and confirm with lsmod
+- Make it load on boot via /etc/modules-load.d/
+- Enable net.bridge.bridge-nf-call-iptables=1 persistently
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Load immediately: modprobe br_netfilter. To make persistent, create /etc/modules-load.d/k8s.conf containing just the module name: br_netfilter'
-    cost: 10
-    order: 1
-  - content: 'Files in /etc/modules-load.d/ are read by systemd-modules-load.service at boot. Each line in the file is a module name to load. No modprobe flags needed.'
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Load it now: `modprobe br_netfilter`, then confirm `lsmod | grep br_netfilter`.'
+- order: 2
+  cost: 15
+  content: 'Persist the module: create `/etc/modules-load.d/k8s.conf` containing `br_netfilter` (systemd-modules-load
+    reads it at boot).'
+- order: 3
+  cost: 20
+  content: 'Enable the sysctl persistently: add `net.bridge.bridge-nf-call-iptables=1` to `/etc/sysctl.d/k8s.conf`
+    and apply with `sysctl --system`. Verify with `sysctl net.bridge.bridge-nf-call-iptables`.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

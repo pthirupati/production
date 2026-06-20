@@ -1,11 +1,10 @@
-title: "Coding: Fix the FizzBuzz Bug"
+title: 'Coding: Fix the FizzBuzz Bug'
 slug: sim-coding-fizzbuzz-bug
 category: Python Development
-description: |
-  The fizzbuzz(n) function is supposed to return a list for 1..n where multiples
-  of 3 become "Fizz", multiples of 5 become "Buzz", multiples of both become
-  "FizzBuzz", and everything else is the number as a string. There is a bug in
-  the implementation — find it and fix it so all tests pass.
+description: 'Coding task: the provided FizzBuzz implementation has a logic bug, so its output is wrong
+  for some inputs (commonly the multiples-of-15 case is mishandled, or the order of checks is wrong).
+  Read the code and the failing expectations, fix the conditional logic, and make the output correct for
+  all n.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -17,72 +16,85 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Read the failing tests to understand the expected output
-  - Locate and fix the bug in fizzbuzz()
-  - Pass all visible and hidden tests
-initial_state: A browser IDE opens with fizzbuzz.py. The function has a subtle bug.
-solution_explanation: |
-  The original code checked `n % 3 == 0` before the combined `n % 15 == 0` case,
+- Run the code/tests and identify which inputs produce wrong output
+- Locate the faulty conditional ordering or modulus check
+- Fix the logic so FizzBuzz is correct for all numbers
+initial_state: 'A FizzBuzz function is provided with a bug: it prints the wrong token for some numbers
+  (e.g. 15 prints "Fizz" instead of "FizzBuzz" because the 15-case is checked after 3/5).'
+solution_explanation: 'The original code checked `n % 3 == 0` before the combined `n % 15 == 0` case,
+
   so multiples of 15 returned "Fizz" instead of "FizzBuzz". Check the n % 15 (or
+
   n % 3 and n % 5 together) case first.
+
+  '
 coding_spec:
   language: python
   entrypoint: fizzbuzz.py
-  instructions: |
-    Fix fizzbuzz(n) so it returns the correct list for 1..n.
-      - multiples of 3        -> "Fizz"
-      - multiples of 5        -> "Buzz"
-      - multiples of 3 AND 5  -> "FizzBuzz"
-      - otherwise             -> str(number)
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix fizzbuzz(n) so it returns the correct list for 1..n.\n  - multiples of 3        ->\
+    \ \"Fizz\"\n  - multiples of 5        -> \"Buzz\"\n  - multiples of 3 AND 5  -> \"FizzBuzz\"\n  -\
+    \ otherwise             -> str(number)\nClick Run to try it, then Check Solution to grade against\
+    \ all tests.\n"
   files:
-    - path: fizzbuzz.py
-      content: |
-        def fizzbuzz(n):
-            result = []
-            for i in range(1, n + 1):
-                if i % 3 == 0:
-                    result.append("Fizz")
-                elif i % 5 == 0:
-                    result.append("Buzz")
-                elif i % 3 == 0 and i % 5 == 0:
-                    result.append("FizzBuzz")
-                else:
-                    result.append(str(i))
-            return result
+  - path: fizzbuzz.py
+    content: "def fizzbuzz(n):\n    result = []\n    for i in range(1, n + 1):\n        if i % 3 == 0:\n\
+      \            result.append(\"Fizz\")\n        elif i % 5 == 0:\n            result.append(\"Buzz\"\
+      )\n        elif i % 3 == 0 and i % 5 == 0:\n            result.append(\"FizzBuzz\")\n        else:\n\
+      \            result.append(str(i))\n    return result\n"
   visible_tests:
-    - name: returns a list of length n
-      code: |
-        out = fizzbuzz(5)
-        assert isinstance(out, list), "should return a list"
-        assert len(out) == 5, f"expected length 5, got {len(out)}"
-    - name: handles plain numbers
-      code: |
-        assert fizzbuzz(2) == ["1", "2"], fizzbuzz(2)
-    - name: fizz on 3, buzz on 5
-      code: |
-        out = fizzbuzz(5)
-        assert out[2] == "Fizz", out
-        assert out[4] == "Buzz", out
+  - name: returns a list of length n
+    code: 'out = fizzbuzz(5)
+
+      assert isinstance(out, list), "should return a list"
+
+      assert len(out) == 5, f"expected length 5, got {len(out)}"
+
+      '
+  - name: handles plain numbers
+    code: 'assert fizzbuzz(2) == ["1", "2"], fizzbuzz(2)
+
+      '
+  - name: fizz on 3, buzz on 5
+    code: 'out = fizzbuzz(5)
+
+      assert out[2] == "Fizz", out
+
+      assert out[4] == "Buzz", out
+
+      '
   hidden_tests:
-    - name: fizzbuzz on 15
-      code: |
-        out = fizzbuzz(15)
-        assert out[14] == "FizzBuzz", f"index 15 should be FizzBuzz, got {out[14]}"
-    - name: fizzbuzz on 30 (two multiples of 15)
-      code: |
-        out = fizzbuzz(30)
-        assert out[14] == "FizzBuzz", out[14]
-        assert out[29] == "FizzBuzz", out[29]
-    - name: no FizzBuzz where not expected
-      code: |
-        out = fizzbuzz(15)
-        assert out[2] == "Fizz" and out[4] == "Buzz" and out[8] == "Fizz"
-        assert out[0] == "1"
+  - name: fizzbuzz on 15
+    code: 'out = fizzbuzz(15)
+
+      assert out[14] == "FizzBuzz", f"index 15 should be FizzBuzz, got {out[14]}"
+
+      '
+  - name: fizzbuzz on 30 (two multiples of 15)
+    code: 'out = fizzbuzz(30)
+
+      assert out[14] == "FizzBuzz", out[14]
+
+      assert out[29] == "FizzBuzz", out[29]
+
+      '
+  - name: no FizzBuzz where not expected
+    code: 'out = fizzbuzz(15)
+
+      assert out[2] == "Fizz" and out[4] == "Buzz" and out[8] == "Fizz"
+
+      assert out[0] == "1"
+
+      '
 hints:
-  - content: Run the code and read which test fails. Look closely at the order of the if/elif branches.
-    cost: 10
-    order: 1
-  - content: An `elif i % 3 == 0 and i % 5 == 0` branch can never be reached if `i % 3 == 0` is checked first. Check the combined case first.
-    cost: 20
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Run the tests/output and compare against expected FizzBuzz: the divergence is usually at multiples
+    of 15 (should be "FizzBuzz") or an off-by-one in the range.'
+- order: 2
+  cost: 15
+  content: The classic bug is checking `n % 3` (or `% 5`) before `n % 15`. Once a 3/5 branch matches,
+    the 15 branch never runs.
+- order: 3
+  cost: 20
+  content: 'Test the combined case first: `if n % 15 == 0: ''FizzBuzz'' elif n % 3 == 0: ''Fizz'' elif
+    n % 5 == 0: ''Buzz'' else: str(n)`. Re-run the tests — all cases pass.'

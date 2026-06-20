@@ -7,24 +7,25 @@ time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Redis fails to start after changing bind address. Fix redis.conf
-
-  so the service listens on localhost and accepts connections.'
+description: Redis fails to start after its bind address was changed to an IP that doesn't exist on the
+  host, so the daemon can't bind its listening socket and exits. With Redis down, every client connection
+  is refused. Correct the bind directive so Redis listens on a valid address (localhost), restart it,
+  and confirm it answers.
 objectives:
-- Affected service behaves normally
-initial_state: 'Redis configured with invalid bind IP 10.255.255.1.
-
-  '
+- Confirm Redis won't start and that the bind address is invalid
+- Set the bind directive to a valid address (127.0.0.1)
+- Restart Redis and verify it responds to PING
+initial_state: Linux host where /etc/redis/redis.conf has `bind 10.255.255.1` — an address not present
+  on the machine. The redis-server service fails to start because it cannot bind that IP.
 hints:
 - order: 1
   cost: 10
-  content: Set `bind 127.0.0.1` in /etc/redis/redis.conf
+  content: 'Check why it failed: `systemctl status redis-server` / `journalctl -u redis-server` shows
+    a "Cannot bind" / "Cannot assign requested address" error from the bad IP in /etc/redis/redis.conf.'
 - order: 2
   cost: 15
-  content: '`service redis-server restart`'
+  content: Edit /etc/redis/redis.conf and set `bind 127.0.0.1` (an address that exists on the host). Keep
+    it on localhost unless remote access is explicitly required.
 - order: 3
-  cost: 15
-  content: Fix bind directive in /etc/redis/redis.conf
-- order: 4
-  cost: 15
-  content: Start Redis and verify with redis-cli ping
+  cost: 20
+  content: 'Restart and verify: `systemctl restart redis-server`, then `redis-cli ping` returns PONG.'

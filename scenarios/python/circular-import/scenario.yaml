@@ -2,8 +2,11 @@ title: Circular Import Error
 slug: sim-python-circular-import
 category: Python Development
 difficulty: medium
-description: 'An app raises ImportError due to a circular module dependency. Identify the cycle and refactor to break it.'
-initial_state: 'Simulated RHEL 9 server. An app raises ImportError due to a circular module dependency. Identify the cycle and refactor to break it.'
+description: 'A Python application fails to start with "ImportError: cannot import name X from partially
+  initialized module ... (most likely due to a circular import)". Two modules import each other at top
+  level, so neither finishes initializing. Break the cycle so the app imports cleanly.'
+initial_state: Python project. Two modules import each other at module load time, producing an ImportError
+  about a partially initialized module the moment the app is imported/run.
 lab_mode: simulation
 simulation_type: python
 is_free: false
@@ -13,10 +16,19 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: refactor circular imports'
-- Verify validation passes
+- Reproduce the ImportError and read which modules form the cycle
+- Locate the mutual top-level imports causing the circular dependency
+- Break the cycle and confirm the app imports/runs cleanly
 hints:
-- content: 'Try: python3 -c "import app" to trace the import error'
+- order: 1
   cost: 10
-  order: 1
+  content: Run the entrypoint (`python app.py`) and read the traceback bottom-up — it names both modules
+    and says "partially initialized module ... circular import".
+- order: 2
+  cost: 15
+  content: Open the two modules; each has a top-level `from other import ...`. The cycle resolves by removing
+    one side's load-time dependency.
+- order: 3
+  cost: 20
+  content: Fix it by moving one import inside the function that uses it (deferred import), or extract
+    the shared symbol into a third module both import. Re-run — the ImportError is gone.

@@ -1,5 +1,5 @@
 slug: ssh-brute-force
-title: "SSH Brute Force — Fix fail2ban jail.conf to Block Attackers"
+title: SSH Brute Force — Fix fail2ban jail.conf to Block Attackers
 technology: Security
 category: Intrusion Prevention
 difficulty: medium
@@ -8,31 +8,42 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  The server is receiving thousands of SSH brute force login attempts per hour.
+description: 'The server is receiving thousands of SSH brute force login attempts per hour.
+
   fail2ban is installed but not blocking the attackers. The SSH jail in jail.conf
+
   has the enabled flag set to false, and the logpath points to a non-existent
+
   file. Fix the fail2ban configuration to enable the SSH jail with a maxretry
+
   of 3 and a bantime of 1 hour, then verify it is actively banning attacking IPs.
+
+  '
 objectives:
-  - Identify that the fail2ban SSH jail is disabled
-  - Enable the sshd jail in /etc/fail2ban/jail.local
-  - Set maxretry=3 and bantime=3600
-  - Restart fail2ban and verify it bans repeated failed login IPs
-initial_state: |
-  Ubuntu 22.04 with fail2ban installed. /etc/fail2ban/jail.conf has [sshd] jail
+- Identify that the fail2ban SSH jail is disabled
+- Enable the sshd jail in /etc/fail2ban/jail.local
+- Set maxretry=3 and bantime=3600
+- Restart fail2ban and verify it bans repeated failed login IPs
+initial_state: 'Ubuntu 22.04 with fail2ban installed. /etc/fail2ban/jail.conf has [sshd] jail
+
   with enabled=false. /var/log/auth.log shows hundreds of failed password attempts.
+
   No IPs are being banned. fail2ban service is running but doing nothing for SSH.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check jail status: `fail2ban-client status sshd`"
-  - order: 2
-    cost: 15
-    content: "Create /etc/fail2ban/jail.local with: [sshd]\\nenabled = true\\nmaxretry = 3\\nbantime = 3600\\nfindtime = 600"
-  - order: 3
-    cost: 10
-    content: "Restart: `systemctl restart fail2ban` then check: `fail2ban-client status sshd`"
-  - order: 4
-    cost: 15
-    content: "Verify bans: `fail2ban-client status sshd | grep 'Banned IP'` should show attacking IPs."
+- order: 1
+  cost: 10
+  content: 'Check the jail: `fail2ban-client status sshd` shows it''s not actually banning despite the
+    flood of attempts (the jail isn''t enabled/configured).'
+- order: 2
+  cost: 15
+  content: 'Create /etc/fail2ban/jail.local with an active sshd jail: `[sshd]` `enabled = true` `maxretry
+    = 3` `findtime = 600` `bantime = 3600`.'
+- order: 3
+  cost: 20
+  content: 'Apply: `systemctl restart fail2ban`, then re-check `fail2ban-client status sshd`.'
+- order: 4
+  cost: 25
+  content: 'Verify it''s working: `fail2ban-client status sshd` lists "Banned IP list" containing the
+    attacking addresses, and the auth log shows new attempts being dropped.'

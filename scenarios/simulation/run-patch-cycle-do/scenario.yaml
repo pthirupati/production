@@ -10,14 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Complete precheck, dnf update, reboot, and postcheck.
+description: 'Build task: perform a complete, safe RHEL patch cycle end to end. Starting from a running
+  system, capture a pre-patch baseline, apply available updates with dnf, reboot into the new kernel,
+  and run a post-patch check to confirm the system is healthy and services are back.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Run a precheck baseline (current kernel, disk space, running services)
+- Apply updates with dnf update and reboot into the new kernel
+- Run a postcheck confirming the new kernel booted and services are healthy
+initial_state: RHEL host that needs patching. No pre/post checks have been run yet; you will drive the
+  full precheck -> dnf update -> reboot -> postcheck cycle.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Precheck/baseline first: `uname -r` (current kernel), `df -h` (space for the update), and
+    `systemctl --failed` (should be empty before you start).'
+- order: 2
+  cost: 15
+  content: 'Apply and reboot: `dnf update -y` then `systemctl reboot`. Patching the kernel requires the
+    reboot to take effect.'
+- order: 3
+  cost: 20
+  content: 'Postcheck after reboot: `uname -r` shows the newer kernel, `systemctl --failed` is still empty,
+    and your key services are active (`systemctl is-active <svc>`).'

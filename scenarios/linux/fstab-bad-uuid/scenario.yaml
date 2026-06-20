@@ -11,23 +11,25 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q9 fstab UUID — blkid, fix mount entry
-description: After reboot /mnt/data is empty. /etc/fstab references the wrong UUID for the data volume.
+description: After a reboot, /mnt/data is empty because /etc/fstab references a UUID that no longer matches
+  the data volume (e.g. the disk was re-created or cloned). The mount silently fails (or mounts nothing),
+  so the data appears missing. Find the correct UUID, fix the fstab entry, and remount so the data is
+  accessible.
 objectives:
-- /mnt/data is mounted and data is accessible
-- All fstab entries mount successfully
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm /mnt/data isn't mounted and find the wrong UUID in fstab
+- Look up the device's real UUID and correct the fstab entry
+- Run mount -a and verify the data is accessible
+initial_state: Linux server where /etc/fstab has a stale/wrong UUID for the /mnt/data volume, so it doesn't
+  mount on boot and /mnt/data shows empty.
 hints:
 - order: 1
-  cost: 20
-  content: '`blkid` then replace bad UUID in /etc/fstab for /mnt/data'
+  cost: 10
+  content: '`findmnt /mnt/data` shows nothing mounted. Compare the fstab UUID against reality: `blkid`
+    lists each device''s true UUID.'
 - order: 2
   cost: 15
-  content: Compare blkid vs fstab
+  content: Edit /etc/fstab and replace the bad UUID on the /mnt/data line with the correct one from blkid.
 - order: 3
-  cost: 15
-  content: Fix UUID entry
-- order: 4
-  cost: 15
-  content: mount -a and verify production.dat
+  cost: 20
+  content: 'Apply it: `mount -a` (no errors), then `ls /mnt/data` shows the data (e.g. production.dat)
+    and `findmnt /mnt/data` confirms it''s mounted.'

@@ -11,20 +11,25 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q33 PAM access — /etc/security/access.conf
-description: opsuser receives 'access denied' on login. PAM access.conf contains a negative rule for this account.
+description: User 'opsuser' is denied at login with "access denied" because /etc/security/access.conf
+  (pam_access) contains a negative rule matching that account. pam_access evaluates its rules top-down
+  and the first match wins, so a `-` rule for opsuser blocks the login. Adjust the access rules so opsuser
+  can log in.
 objectives:
-- Affected service behaves normally
-- Understand +/- PAM access syntax
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Identify the pam_access rule denying opsuser
+- Correct the access.conf rule (remove the deny or add an allow first)
+- Verify opsuser can log in
+initial_state: Linux server using pam_access where /etc/security/access.conf has a negative (-) rule that
+  matches opsuser, denying their logins.
 hints:
 - order: 1
-  cost: 20
-  content: 'Remove `- : opsuser : ALL` or add `+ : opsuser : LOCAL`'
+  cost: 10
+  content: 'Logs show a pam_access denial. Inspect the rules: `grep -n opsuser /etc/security/access.conf`
+    — there''s a line like `- : opsuser : ALL`.'
 - order: 2
   cost: 15
-  content: Inspect /etc/security/access.conf
+  content: 'Remember first-match-wins: remove that `-` line, or add a permit ABOVE it, e.g. `+ : opsuser
+    : ALL` (or `LOCAL`).'
 - order: 3
-  cost: 15
-  content: Restore opsuser login
+  cost: 20
+  content: Verify opsuser can authenticate again (`su - opsuser` or an SSH login). No more access-denied.

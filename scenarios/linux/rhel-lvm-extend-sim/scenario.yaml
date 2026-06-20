@@ -1,20 +1,30 @@
 category: Linux Administration
-description: |
-  Root filesystem is full. Request a new disk from @storage team in Jira, verify with
-  fdisk/lsblk, then extend LVM (pvcreate, vgextend, lvextend, xfs_growfs).
+description: The root filesystem is full and the volume group has no free space, so writes are failing.
+  A new disk must be requested from the @storage team via the Jira ticket; once it's attached, you add
+  it as an LVM physical volume, extend the volume group and root logical volume, and grow the XFS filesystem
+  online to reclaim capacity.
 difficulty: medium
 hints:
-  - content: '@storage team please add a 50G disk for LVM extension'
-    cost: 10
-    order: 1
-initial_state: |
-  VG rhel is low on free space. New disk is NOT attached until @storage team confirms in Jira.
-  After ~30s, verify /dev/sdb with fdisk -l, then extend LVM.
+- order: 1
+  cost: 10
+  content: '@storage team please add a 50G disk for LVM extension'
+- order: 2
+  cost: 20
+  content: 'After the disk is attached, confirm it: `lsblk` / `fdisk -l` shows /dev/sdb. Add it to LVM:
+    `pvcreate /dev/sdb` then `vgextend rhel /dev/sdb` (verify with `vgs`).'
+- order: 3
+  cost: 30
+  content: 'Grow the volume and filesystem: `lvextend -l +100%FREE /dev/rhel/root` then `xfs_growfs /`
+    (XFS grows online). Confirm with `df -h /` that free space increased.'
+initial_state: Simulated RHEL 9 server. The 'rhel' volume group is out of free extents and / is full.
+  A new disk is NOT attached until the @storage team confirms in Jira; after ~30s, /dev/sdb appears and
+  you can extend LVM.
 is_free: false
 lab_mode: simulation
 objectives:
-  - Request disk from @storage team in Jira
-  - pvcreate /dev/sdb && vgextend rhel /dev/sdb && lvextend
+- Request a new disk from the @storage team in Jira
+- 'Verify the new disk (lsblk/fdisk) and add it: pvcreate, vgextend'
+- Extend the logical volume and grow the XFS filesystem (lvextend + xfs_growfs)
 simulation_type: rhel
 slug: sim-rhel-lvm-extend
 time_limit: 900

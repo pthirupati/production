@@ -2,18 +2,31 @@ title: Deployment Rollout Failed
 slug: k8s-deployment-rollout-failed
 category: Kubernetes
 difficulty: hard
-description: |
-  A Deployment rollout is stuck with CrashLoopBackOff and ImagePullBackOff pods after a bad image tag push.
-  Roll back or restart the rollout with a valid image.
+description: A deployment rollout is stuck and `kubectl rollout status` never completes. The new ReplicaSet's
+  pods are failing their readiness probe (or crashing on a bad config), so the rollout is paused mid-progress
+  and old pods remain. Diagnose why the new pods are not becoming Ready and either fix the spec or roll
+  back.
 lab_mode: simulation
 simulation_type: kubernetes
 time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Inspect deployment web and failing pods
-  - Fix rollout (kubectl rollout restart deployment/web)
+- Inspect rollout status and the new vs old ReplicaSet
+- Determine why the new pods fail to become Ready (probe, image, or config)
+- Fix the spec or roll back so the deployment fully progresses
 hints:
-  - content: "kubectl describe pod and kubectl rollout restart deployment/web"
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: '`kubectl rollout status deployment/<name>` hangs. List ReplicaSets with `kubectl get rs` and
+    describe the newest one: `kubectl describe rs <new-rs>` to see why pods aren''t Ready.'
+- order: 2
+  cost: 15
+  content: 'Describe a new pod and check Events and probe results: `kubectl describe pod <pod>`. Failing
+    readiness probes or a CrashLoop point to the bad change introduced in the update.'
+- order: 3
+  cost: 20
+  content: 'If the new revision is broken, roll back: `kubectl rollout undo deployment/<name>`. If it''s
+    a fixable probe/config issue, `kubectl edit deployment/<name>` and correct it, then re-watch the rollout.'
+initial_state: Simulated Kubernetes cluster. A deployment was updated, but the new ReplicaSet's pods never
+  become Ready, so the rollout is wedged and `kubectl rollout status` hangs.

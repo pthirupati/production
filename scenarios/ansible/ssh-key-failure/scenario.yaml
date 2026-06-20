@@ -1,24 +1,31 @@
 category: Ansible Automation
-description: 'web2 unreachable via SSH. Fix key distribution.
-
-  '
+description: Managed host web2 is UNREACHABLE to Ansible because SSH key-based authentication isn't set
+  up for it — the control node's public key is missing from web2's authorized_keys, so the ping module
+  fails with a publickey error. Distribute the key to web2 and confirm Ansible can reach all webservers.
 difficulty: medium
 dual_terminal: true
 hints:
-- content: 'Try: ansible webservers -m ping'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. web2 unreachable via SSH. Fix key distribution.
-
-  '
+  content: 'Pinpoint the bad host: `ansible webservers -m ping` shows web2 UNREACHABLE with a publickey/permission-denied
+    message.'
+- order: 2
+  cost: 20
+  content: 'Install your key on web2: `ssh-copy-id root@web2` (or append your ~/.ssh/id_rsa.pub to its
+    ~/.ssh/authorized_keys), then test plain SSH: `ssh root@web2 hostname`.'
+- order: 3
+  cost: 30
+  content: Re-run `ansible webservers -m ping` — web2 now returns "pong" along with the rest of the group.
+initial_state: Simulated Ansible control node. web2 is unreachable over SSH (publickey auth fails) while
+  the other webservers respond. The control node's key has not been copied to web2.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: ansible webservers -m ping'
-- Verify validation passes
+- Identify that web2 fails Ansible's ping on publickey authentication
+- Copy the control node's SSH key to web2
+- Verify all webservers respond to ansible -m ping
 requires_companion_hosts: true
 simulation_type: ansible
 slug: sim-ansible-ssh-key

@@ -10,14 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Install driver modules and verify nvidia-smi output.
+description: 'Build task: this host has an NVIDIA GPU but no working driver — nvidia-smi reports "NVIDIA-SMI
+  has failed because it couldn''t communicate with the NVIDIA driver". Install the NVIDIA driver stack,
+  load the kernel module, and confirm nvidia-smi enumerates the GPU.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Confirm no NVIDIA driver/module is currently loaded
+- Install the NVIDIA driver package and load the kernel module
+- Verify nvidia-smi enumerates the GPU successfully
+initial_state: Linux host with an NVIDIA GPU and no driver installed. `nvidia-smi` fails because no kernel
+  module is loaded; the GPU is not usable for CUDA.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Confirm the GPU is present but driverless: `lspci | grep -i nvidia` lists the card, while
+    `nvidia-smi` fails and `lsmod | grep nvidia` shows nothing loaded.'
+- order: 2
+  cost: 15
+  content: Install the recommended driver for the distro (e.g. `sudo ubuntu-drivers autoinstall`, or `sudo
+    apt install -y nvidia-driver-550`). Installing builds/loads the kernel module.
+- order: 3
+  cost: 20
+  content: Load the module if needed (`sudo modprobe nvidia`) or reboot, then run `nvidia-smi` — it prints
+    the driver version and the GPU in the device table.

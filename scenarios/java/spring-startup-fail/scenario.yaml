@@ -2,8 +2,12 @@ title: Spring Boot Startup Failure
 slug: sim-java-spring-fail
 category: Java Development
 difficulty: medium
-description: 'A Spring Boot application fails to start with UnsatisfiedDependencyException. Fix the misconfigured bean and restart.'
-initial_state: 'Simulated RHEL 9 server. A Spring Boot application fails to start with UnsatisfiedDependencyException. Fix the misconfigured bean and restart.'
+description: A Spring Boot application fails to start with UnsatisfiedDependencyException / BeanCreationException.
+  A bean can't be wired — a missing component, an ambiguous autowire, or a misconfigured property prevents
+  the context from initializing, so the app exits on startup. Read the failure analysis, fix the bean/configuration,
+  and start the app.
+initial_state: Simulated RHEL 9 server with a Spring Boot app that aborts at startup because a required
+  bean can't be created/wired (UnsatisfiedDependencyException).
 lab_mode: simulation
 simulation_type: java
 is_free: false
@@ -13,10 +17,19 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: java -jar app.jar'
-- Verify validation passes
+- Read the startup failure and identify the bean that can't be satisfied
+- Fix the missing component, ambiguous wiring, or misconfigured property
+- Start the application successfully
 hints:
-- content: 'Try: java -jar app.jar'
+- order: 1
   cost: 10
-  order: 1
+  content: Run the jar and read the startup log — Spring prints a "Description"/"Action" block naming
+    the bean and why it couldn't be created or which dependency is missing.
+- order: 2
+  cost: 15
+  content: 'Trace it: the field/constructor needing the bean lacks a matching @Component/@Bean, or two
+    candidates exist (add @Qualifier/@Primary), or a required `@Value`/property is unset in application.properties.'
+- order: 3
+  cost: 20
+  content: Fix the root cause (define/annotate the bean, disambiguate the autowire, or set the property),
+    then `java -jar app.jar` — the context starts and the app reports it's running.

@@ -11,31 +11,26 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q14 pvmove — migrate extents off failing PV
-description: Operations must retire /dev/loop disk1. LV datalv spans two PVs; evacuate all extents to disk2 with pvmove before vgreduce.
+description: A physical volume (the /dev/loop 'disk1' device) is being retired, but the datalv logical
+  volume currently spans both PVs, so the disk can't simply be removed. Its extents must be migrated off
+  the doomed PV onto the remaining disk with pvmove (online, data-safe) before the PV is removed from
+  the volume group with vgreduce.
 objectives:
-- Storage layout and utilization are understood
-- Affected service behaves normally
-- Verify PV is empty and data intact
-- vgreduce old PV (optional)
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Inspect the PV/LV extent layout and confirm datalv uses the old PV
+- Evacuate all extents off the old PV with pvmove
+- Verify the PV is empty and data intact, then vgreduce it out
+initial_state: Linux server using LVM where datalv spans two PVs. The old PV (a /dev/loop device) must
+  be evacuated with pvmove and then removed from VG fixitlab, with data left intact.
 hints:
 - order: 1
-  cost: 20
-  content: '`pvs -o+pv_used,vg_name` — datalv uses both PVs'
+  cost: 10
+  content: 'Map the layout: `pvs -o+pv_used,vg_name` and `lvs -o+devices` show datalv occupying both PVs,
+    including the old loop device you must retire.'
 - order: 2
-  cost: 40
-  content: '`pvmove /dev/loop0p1` (use actual old PV path from pvs)'
+  cost: 20
+  content: 'Migrate the extents off it (online, safe): `pvmove /dev/loop0p1` (use the real old-PV path
+    from pvs). Watch progress until it completes.'
 - order: 3
-  cost: 55
-  content: '`vgreduce fixitlab /dev/loop0p1` after pvmove completes'
-- order: 4
-  cost: 15
-  content: Inspect pvs/lvs extent layout
-- order: 5
-  cost: 15
-  content: Run pvmove for old PV
-- order: 6
-  cost: 15
-  content: Verify PV is empty and data intact
+  cost: 30
+  content: 'Confirm it''s empty (`pvs` shows 0 used on that PV) and data is intact, then remove it: `vgreduce
+    fixitlab /dev/loop0p1` (and `pvremove` if decommissioning).'

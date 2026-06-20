@@ -1,9 +1,10 @@
 title: Guest OS Boot Failure (initramfs)
 slug: vmware-guest-boot-failure
 category: VMware vSphere
-description: |
-  web-prod-01 powers on but drops to initramfs/recovery shell after a failed patch.
-  Diagnose from the VMware web console and recover the boot process.
+description: The guest web-prod-01 powers on but drops into an initramfs/recovery shell instead of booting
+  normally — a failed patch left the root filesystem needing a check (or an entry needs resolving). The
+  fix is done from the VM web console. Diagnose the boot failure and recover the boot so the OS comes
+  up.
 difficulty: hard
 lab_mode: simulation
 simulation_type: vmware
@@ -12,10 +13,21 @@ time_limit: 1200
 max_score: 100
 is_free: false
 objectives:
-  - Open web console and identify boot failure
-  - Run fsck or exit recovery shell to complete boot
-initial_state: Guest drops to maintenance shell on power-on.
+- Open the web console and identify why boot drops to the recovery shell
+- Repair the root filesystem (or resolve the failing step)
+- Complete the boot so the guest reaches normal multi-user state
+initial_state: vCenter guest web-prod-01 that powers on but lands in the initramfs/maintenance shell after
+  a failed patch; recovery is performed from the VM console.
 hints:
-  - content: "In recovery shell run fsck -y /dev/sda1 or type exit to continue boot"
-    cost: 15
-    order: 1
+- order: 1
+  cost: 10
+  content: Open the web console for web-prod-01 — it's sitting at an `(initramfs)` / emergency prompt.
+    Read the message to see which device/filesystem failed.
+- order: 2
+  cost: 15
+  content: 'Run a filesystem check on the root device: `fsck -y /dev/sda1` (answer yes to repairs). A
+    dirty/damaged root FS after a failed patch is the usual cause.'
+- order: 3
+  cost: 20
+  content: 'Once fsck is clean, continue booting: type `exit` (or reboot). The guest proceeds to a normal
+    login; verify services are back up.'

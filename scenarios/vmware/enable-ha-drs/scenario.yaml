@@ -1,9 +1,9 @@
 title: Enable HA and DRS on Production Cluster
 slug: vmware-enable-ha-drs
 category: VMware vSphere
-description: |
-  Cluster-01 has both vSphere HA and DRS disabled after maintenance. Re-enable HA protection
-  and DRS balancing for production workloads.
+description: After maintenance, Cluster-01 has both vSphere HA and DRS left disabled. Without HA, VMs
+  won't automatically restart if a host fails; without DRS, load is not balanced and one host is overloaded.
+  Re-enable HA for failover protection and DRS for load balancing, then trigger an initial balancing pass.
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -12,14 +12,21 @@ time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Open cluster Configure tab and verify HA and DRS are off
-  - Enable vSphere HA on Cluster-01
-  - Enable vSphere DRS and run an initial balance
-initial_state: Cluster-01 HA and DRS disabled; hosts imbalanced.
+- Open the cluster Configure tab and confirm HA and DRS are off
+- Enable vSphere HA on Cluster-01
+- Enable vSphere DRS and run an initial balancing pass
+initial_state: vCenter cluster Cluster-01 with vSphere HA and DRS turned off; hosts are imbalanced and
+  VMs have no failover protection.
 hints:
-  - content: Cluster → Configure → vSphere Availability → Enable HA.
-    cost: 10
-    order: 1
-  - content: Configure → vSphere DRS → Enable, then Run DRS Now from cluster actions.
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: Select Cluster-01 -> Configure tab. Under "vSphere Availability" and "vSphere DRS" both show
+    disabled.
+- order: 2
+  cost: 15
+  content: 'Enable HA first: Configure -> vSphere Availability -> Edit -> turn on vSphere HA (this provides
+    VM restart on host failure).'
+- order: 3
+  cost: 20
+  content: Then Configure -> vSphere DRS -> Edit -> enable DRS (set automation, e.g. Fully Automated),
+    and use the cluster Actions -> "Run DRS Now" to rebalance the hosts.

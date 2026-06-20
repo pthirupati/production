@@ -2,8 +2,11 @@ title: NIC Not Coming Up
 slug: sim-bm-nic-down
 category: Bare Metal & IPMI
 difficulty: easy
-description: 'A server''s eth0 interface is DOWN after reboot. Bring the interface up and make the change persistent.'
-initial_state: 'Simulated RHEL 9 server. A server''s eth0 interface is DOWN after reboot. Bring the interface up and make the change persistent.'
+description: After a reboot, a bare-metal server's primary network interface (eth0) is administratively
+  DOWN and the host has no network connectivity. Bring the interface up to restore connectivity, then
+  make the change persistent so it survives the next reboot.
+initial_state: Simulated bare-metal RHEL host. eth0 is DOWN after a reboot and has no IP/connectivity;
+  the interface needs to be brought up and its configuration made persistent.
 lab_mode: simulation
 simulation_type: baremetal
 is_free: false
@@ -13,10 +16,20 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: ip link set eth0 up'
-- Verify validation passes
+- Confirm eth0 is DOWN and has no connectivity
+- Bring the interface up and restore its IP
+- Make the configuration persistent across reboots
 hints:
-- content: 'Try: ip link set eth0 up'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Check link state: `ip link show eth0` shows state DOWN, and `ip addr` shows no address. Bring
+    it up immediately: `ip link set eth0 up`.'
+- order: 2
+  cost: 15
+  content: 'Restore addressing via the network manager rather than ad hoc: on RHEL, `nmcli con up <connection>`
+    (or bring up the ifcfg profile). Confirm with `ip addr show eth0`.'
+- order: 3
+  cost: 20
+  content: 'Make it persistent: ensure the connection has `ONBOOT=yes` / autoconnect set (`nmcli con mod
+    <connection> connection.autoconnect yes`). Reboot-test or `nmcli con reload` and verify eth0 comes
+    up with its IP.'

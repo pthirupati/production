@@ -1,25 +1,32 @@
 category: Bare Metal & IPMI
-description: 'VM guest is shut off. Use virsh to start it.
-
-  '
+description: A virtual machine guest on a KVM/libvirt host is powered off and its service is unavailable.
+  Using virsh, list the defined domains, confirm the guest is shut off, start it, and verify it transitions
+  to the running state so the workload comes back online.
 difficulty: medium
 dual_terminal: false
 hints:
-- content: 'Try: virsh list --all'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. VM guest is shut off. Use virsh to start
-  it.
-
-  '
+  content: 'List all domains including stopped ones: `virsh list --all`. The target guest shows state
+    "shut off".'
+- order: 2
+  cost: 15
+  content: 'Start it by name: `virsh start <domain>`. If it fails, inspect the domain: `virsh dominfo
+    <domain>` and check the libvirt log under /var/log/libvirt/.'
+- order: 3
+  cost: 20
+  content: 'Confirm it''s up: `virsh list` now shows the domain as "running". Set it to autostart so it
+    survives host reboots: `virsh autostart <domain>`.'
+initial_state: Simulated RHEL host running libvirt/KVM. A defined guest domain is in the "shut off" state
+  and needs to be started; the application it hosts is currently down.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: virsh list --all'
-- Verify validation passes
+- List libvirt domains and confirm the guest is shut off
+- Start the guest domain with virsh
+- Verify the domain transitions to the running state
 requires_companion_hosts: false
 simulation_type: baremetal
 slug: sim-vmware-guest-down

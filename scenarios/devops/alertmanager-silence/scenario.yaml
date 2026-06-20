@@ -8,35 +8,45 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  Alertmanager is routing all alerts — including critical ones — to a low-priority
+description: 'Alertmanager is routing all alerts — including critical ones — to a low-priority
+
   Slack channel for warnings. The routing tree has a catch-all rule that sends
+
   everything to the warning receiver before severity-specific rules can match.
+
   Fix the routing rules so critical alerts go to the critical channel and
+
   warning alerts go to the warning channel.
+
+  '
 objectives:
-  - Inspect the Alertmanager routing configuration
-  - Identify why critical alerts are being misrouted to the warning receiver
-  - Fix the route matchers and ordering in alertmanager.yml
-  - Verify critical alerts route to the correct receiver
-initial_state: |
-  Ubuntu server running Alertmanager. Config at /etc/alertmanager/alertmanager.yml.
+- Inspect the Alertmanager routing configuration
+- Identify why critical alerts are misrouted to the warning receiver
+- Fix the route matchers/ordering in alertmanager.yml
+- Verify critical alerts route to the correct receiver
+initial_state: 'Ubuntu server running Alertmanager. Config at /etc/alertmanager/alertmanager.yml.
+
   The routes section has a catch-all route before the severity-specific routes,
+
   meaning critical alerts match the first catch-all rule and never reach the
+
   critical severity route.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check config: cat /etc/alertmanager/alertmanager.yml"
-  - order: 2
-    cost: 15
-    content: "Look at the routes: section — order matters, first match wins"
-  - order: 3
-    cost: 20
-    content: "Move specific severity routes BEFORE the catch-all route"
-  - order: 4
-    cost: 25
-    content: "Add match: severity: critical as the first route with receiver: critical-channel"
-  - order: 5
-    cost: 30
-    content: "Reload: curl -X POST http://localhost:9093/-/reload"
+- order: 1
+  cost: 10
+  content: 'Read the routing tree: `cat /etc/alertmanager/alertmanager.yml` and find the catch-all route
+    that''s swallowing everything.'
+- order: 2
+  cost: 15
+  content: In Alertmanager, route matching is first-match-wins within a level — a broad catch-all placed
+    before specific routes captures critical alerts.
+- order: 3
+  cost: 20
+  content: 'Reorder so specific severity routes come BEFORE the catch-all: add a first route `match: {severity:
+    critical}` -> `receiver: critical-channel`.'
+- order: 4
+  cost: 25
+  content: 'Validate the config with `amtool check-config /etc/alertmanager/alertmanager.yml`, then reload:
+    `curl -X POST http://localhost:9093/-/reload` and confirm critical alerts hit the right receiver.'

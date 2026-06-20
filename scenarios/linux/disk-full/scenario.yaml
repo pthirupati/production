@@ -9,36 +9,28 @@ time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: 'Production alerts fired: disk usage at 98%. A web application
-
-  cannot write logs and services are failing. Find what''s consuming
-
-  disk space, stop runaway processes, and free enough space for
-
-  normal operations.'
+description: 'Production alerts fired: a filesystem is at 98% and the web application can no longer write
+  logs, so services are failing. Disk space is being consumed by oversized logs, a hidden cache directory,
+  and a runaway process that keeps generating log data. Find the consumers, stop the runaway writer, and
+  reclaim enough space to restore service.'
 objectives:
-- Identify large files and directories consuming disk space
-- Affected service behaves normally
-- Find and remove hidden cache files
-- Kill the log_generator process that keeps growing logs
-initial_state: 'You have shell access to a Linux server with critically low disk space.
-
-  df -h shows the root filesystem is nearly full.
-
-  '
+- Identify the largest files/directories consuming disk space
+- Find and remove hidden cache files and oversized logs
+- Kill the log_generator process so logs stop growing, and confirm space is reclaimed
+initial_state: Linux server with a filesystem at ~98% capacity. A log_generator process keeps growing
+  logs, oversized files sit under /var/log, and hidden cache files add to the pressure; the app can't
+  write.
 hints:
 - order: 1
   cost: 10
-  content: Start with `df -h` and `du -sh /*` to find large directories.
+  content: 'Find the big consumers top-down: `df -h` then `du -sh /* 2>/dev/null | sort -h` and drill
+    into the largest (e.g. /var/log/webapp/).'
 - order: 2
   cost: 15
-  content: Check /var/log/webapp/ for oversized log files.
+  content: 'Don''t forget hidden dirs: `du -sh /tmp/.* 2>/dev/null`. And catch the writer: `ps aux | grep
+    log_generator` shows a process appending continuously.'
 - order: 3
   cost: 20
-  content: 'Look for hidden directories: `du -sh /tmp/.*`'
-- order: 4
-  cost: 25
-  content: Kill the log_generator process with `pkill -f log_generator`.
-- order: 5
-  cost: 15
-  content: Remove or truncate oversized log files
+  content: Stop the runaway first (`pkill -f log_generator`) so space stops filling, then truncate/remove
+    oversized logs (`truncate -s 0 /var/log/webapp/*.log`) and clear the cache. Confirm `df -h` drops
+    well below the alert threshold.

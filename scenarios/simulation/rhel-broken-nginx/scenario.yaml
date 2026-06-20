@@ -1,4 +1,4 @@
-title: "RHEL Simulation: Fix Broken Nginx"
+title: 'RHEL Simulation: Fix Broken Nginx'
 slug: sim-rhel-broken-nginx
 technology: Simulation
 category: Web Servers
@@ -10,24 +10,26 @@ simulation_type: generic
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: true
-description: |
-  A simulated RHEL 9 server runs Nginx but the service fails to start.
-  Investigate the configuration, fix the typo, start nginx, and verify port 80.
+description: Nginx is installed but fails to start because of a typo in its configuration (commonly a
+  misspelled directive such as `listn` instead of `listen`). `nginx -t` reports the syntax error and systemd
+  refuses to start the service, so the site is down. Find the bad directive, fix it, start nginx, and
+  confirm port 80 serves.
 objectives:
-  - Find the configuration error with nginx -t
-  - Fix the listen directive typo
-  - Start and enable the nginx service
-  - Verify http://localhost returns HTTP 200
-initial_state: |
-  You are root on a simulated RHEL 9.3 server (no Docker required).
-  Nginx is installed but failed to start due to a bad site config.
+- Run nginx -t to locate the configuration syntax error
+- Fix the misspelled/invalid directive in the site config
+- Start and enable nginx, then verify it serves on port 80
+initial_state: Simulated RHEL 9 server. nginx is installed but the active site config contains a typo,
+  so `systemctl start nginx` fails and `nginx -t` reports a syntax error. The website is unreachable.
 hints:
-  - order: 1
-    cost: 10
-    content: Run `nginx -t` to test the configuration syntax.
-  - order: 2
-    cost: 15
-    content: Check `/etc/nginx/sites-enabled/default` for typos in the listen directive.
-  - order: 3
-    cost: 20
-    content: Fix `listn` to `listen`, then `systemctl start nginx`.
+- order: 1
+  cost: 10
+  content: 'Test the config to get the exact file and line: `nginx -t`. It prints the offending directive
+    (e.g. unknown directive "listn").'
+- order: 2
+  cost: 15
+  content: Open the named file (often /etc/nginx/nginx.conf or a file under /etc/nginx/conf.d/ or sites-enabled/)
+    and correct the typo on that line.
+- order: 3
+  cost: 20
+  content: Re-run `nginx -t` until it says "syntax is ok / test is successful", then `systemctl enable
+    --now nginx`. Verify with `curl -I http://localhost` (expect HTTP/1.1 200).

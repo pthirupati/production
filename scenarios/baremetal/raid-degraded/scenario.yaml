@@ -2,8 +2,11 @@ title: RAID Array Degraded
 slug: sim-bm-raid-degraded
 category: Bare Metal & IPMI
 difficulty: medium
-description: 'mdadm reports the RAID-1 array /dev/md0 is in a degraded state. Identify the failed disk, add the spare, and rebuild.'
-initial_state: 'Simulated RHEL 9 server. mdadm reports the RAID-1 array /dev/md0 is in a degraded state. Identify the failed disk, add the spare, and rebuild.'
+description: A software RAID-1 array (/dev/md0) is running in a degraded state — one of its member disks
+  has failed and the array is operating on a single drive with no redundancy. Identify the failed disk,
+  remove it, add a healthy replacement, and let the array rebuild back to a clean redundant state.
+initial_state: 'Simulated bare-metal RHEL host. mdadm reports /dev/md0 (RAID-1) as degraded: one member
+  is [F]/removed, the array is active on the remaining disk, and redundancy is lost.'
 lab_mode: simulation
 simulation_type: baremetal
 is_free: false
@@ -13,10 +16,19 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: mdadm --detail /dev/md0'
-- Verify validation passes
+- Inspect the array and identify the failed member disk
+- Remove the failed disk and add a healthy replacement
+- Confirm the array rebuilds and returns to a clean, redundant state
 hints:
-- content: 'Try: mdadm --detail /dev/md0'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Inspect the array: `mdadm --detail /dev/md0` and `cat /proc/mdstat`. The failed disk is marked
+    (F) or shows as removed; note which device it is.'
+- order: 2
+  cost: 15
+  content: 'Remove the failed member, then add the replacement disk: `mdadm /dev/md0 --remove /dev/sdX`
+    then `mdadm /dev/md0 --add /dev/sdY`.'
+- order: 3
+  cost: 20
+  content: 'Watch the rebuild: `cat /proc/mdstat` shows a recovery progress bar. When it finishes, `mdadm
+    --detail /dev/md0` reports State: clean and both members active/in-sync.'

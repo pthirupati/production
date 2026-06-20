@@ -10,21 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: High
 is_free: false
-description: |
-  Real hands-on Kubernetes troubleshooting lab. The deployment manifest at
-  /opt/k8s/deployment.yaml has a Service targetPort mismatch causing pods to
-  appear unreachable. Fix the manifest and start nginx.
+description: A Service cannot reach its pods because of a port mismatch. The Service's targetPort does
+  not match the containerPort the application actually listens on, so connections to the Service are refused
+  even though endpoints exist. Align the targetPort with the container's real listening port.
 objectives:
-  - Analyze /opt/k8s/deployment.yaml for port mismatches
-  - Align Service targetPort with containerPort (80)
-  - Start nginx and verify the web server responds
-initial_state: |
-  Ubuntu container simulating a broken K8s deployment.
-  Manifest at /opt/k8s/deployment.yaml — Service points to port 8080 but nginx listens on 80.
+- Confirm the pods are Ready but Service requests are refused
+- Compare the Service targetPort with the container's listening port
+- Fix the targetPort so the Service reaches the application
+initial_state: Simulated Kubernetes cluster. A Service routes to healthy pods, but its targetPort (e.g.
+  8080) doesn't match the container's listening port (e.g. 80), so requests are refused.
 hints:
-  - order: 1
-    cost: 10
-    content: "Compare targetPort in the Service with containerPort in the Deployment."
-  - order: 2
-    cost: 20
-    content: "Change targetPort from 8080 to 80, then `service nginx start`."
+- order: 1
+  cost: 10
+  content: Endpoints exist (`kubectl get endpoints <svc>`) but curling the Service is refused. That points
+    to a port mismatch rather than a selector problem.
+- order: 2
+  cost: 15
+  content: 'Compare: `kubectl get svc <svc> -o jsonpath=''{.spec.ports[0].targetPort}''` vs the container''s
+    port `kubectl get pod <pod> -o jsonpath=''{.spec.containers[0].ports[0].containerPort}''`. They differ.'
+- order: 3
+  cost: 20
+  content: 'Set targetPort to the real container port: `kubectl patch svc <svc> -p ''{"spec":{"ports":[{"port":80,"targetPort":80}]}}''`,
+    then re-test the Service.'

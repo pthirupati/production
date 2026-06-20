@@ -1,4 +1,4 @@
-title: "RHEL Simulation: GPU Fallen Off Bus"
+title: 'RHEL Simulation: GPU Fallen Off Bus'
 slug: sim-rhel-gpu-fallen-off
 technology: Linux Administration
 category: GPU / NVIDIA
@@ -10,19 +10,26 @@ simulation_type: gpu
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  nvidia-smi fails on a simulated GPU node. Use dmesg and modprobe to recover the driver.
+description: On a RHEL GPU node, nvidia-smi fails because the GPU has fallen off the PCIe bus — the driver
+  was loaded but the device stopped responding (an Xid/NVRM bus error). Use kernel logs to confirm the
+  cause, then reload the NVIDIA kernel module (or reset the device) to bring the GPU back so nvidia-smi
+  enumerates it again.
 objectives:
-  - Confirm GPU driver failure with nvidia-smi
-  - Inspect dmesg for NVRM errors
-  - Reload the nvidia kernel module
-  - Verify nvidia-smi shows GPUs again
-initial_state: |
-  Simulated RHEL GPU node. NVIDIA driver loaded but GPU has fallen off the bus.
+- Confirm the GPU failure with nvidia-smi
+- Inspect dmesg for NVRM/Xid bus errors
+- Reload the nvidia kernel module (or reset) and verify nvidia-smi lists the GPU
+initial_state: Simulated RHEL GPU node. The NVIDIA driver is loaded, but the GPU has fallen off the bus,
+  so `nvidia-smi` errors and CUDA workloads can't run.
 hints:
-  - order: 1
-    cost: 10
-    content: Run `dmesg | grep -i nvrm` for bus errors.
-  - order: 2
-    cost: 20
-    content: Try `modprobe nvidia` to reinitialize the driver.
+- order: 1
+  cost: 10
+  content: 'Confirm and gather evidence: `nvidia-smi` fails; check the kernel log for the bus drop: `dmesg
+    | grep -i nvrm` (look for an Xid error and "fallen off the bus").'
+- order: 2
+  cost: 20
+  content: 'Stop any GPU users, then reload the driver stack: `rmmod nvidia_uvm nvidia_drm nvidia_modeset
+    nvidia` followed by `modprobe nvidia`.'
+- order: 3
+  cost: 30
+  content: Re-run `nvidia-smi` — the GPU is enumerated again. If a reload isn't enough, a device reset
+    (`nvidia-smi --gpu-reset`) or a reboot clears a hard bus fault.

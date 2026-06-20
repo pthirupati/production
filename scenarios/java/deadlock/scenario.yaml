@@ -2,8 +2,12 @@ title: Deadlock Detection
 slug: sim-java-deadlock
 category: Java Development
 difficulty: hard
-description: 'A multi-threaded Java app hangs indefinitely. Use jstack to detect the deadlock and fix the synchronization.'
-initial_state: 'Simulated RHEL 9 server. A multi-threaded Java app hangs indefinitely. Use jstack to detect the deadlock and fix the synchronization.'
+description: A multi-threaded Java application hangs indefinitely and makes no progress. Two threads have
+  each locked a resource the other needs and are waiting on each other — a classic deadlock. Capture a
+  thread dump to confirm the deadlock and identify the lock-ordering problem, then fix the synchronization
+  so the application runs to completion.
+initial_state: Simulated RHEL 9 server running a Java app that hangs. Two threads acquire two locks in
+  opposite orders, producing a deadlock so the process never finishes.
 lab_mode: simulation
 simulation_type: java
 is_free: false
@@ -13,10 +17,19 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: jstack $(pgrep -f app.jar)'
-- Verify validation passes
+- Capture a thread dump and confirm a deadlock
+- Identify the two threads and the conflicting lock order
+- Fix the synchronization (consistent lock ordering) so the app completes
 hints:
-- content: 'Try: jstack $(pgrep -f app.jar)'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Take a thread dump of the hung process: `jstack $(pgrep -f app.jar)`. jstack explicitly reports
+    "Found one Java-level deadlock" and the involved threads.'
+- order: 2
+  cost: 15
+  content: Read which monitors each thread holds vs waits for — Thread-1 holds A wants B while Thread-2
+    holds B wants A. That inconsistent lock ordering is the bug.
+- order: 3
+  cost: 20
+  content: Fix it by always acquiring locks in the SAME global order in both threads (or use a single
+    lock / tryLock with timeout). Re-run and confirm a fresh `jstack` shows no deadlock and the app finishes.

@@ -2,33 +2,34 @@ title: Cron Jobs Not Executing
 slug: linux-cron-not-running
 difficulty: easy
 category: Linux Administration
-description: 'Scheduled cron jobs are silently not running. The crond service is active
-  but jobs are skipped. The issue stems from a missing PATH in the crontab, a permission
-  error on the script, and the cron access control file blocking the user. All three
-  issues must be resolved for jobs to execute correctly.
-
-  '
-initial_state: 'Simulated RHEL 9 server. A cron job scheduled to run every minute
-  has not produced any output or logs for the past hour. Crond reports as active.
-
-  '
+description: 'Scheduled cron jobs are silently skipped even though the crond service is active. The job
+  fails for environment reasons that produce no obvious error: a missing PATH in the crontab, the script
+  lacking its execute bit, and/or cron access control blocking the user. Diagnose from the logs and fix
+  all three so the job runs on schedule.'
+initial_state: Linux server where crond is active but a scheduled job never executes, due to a combination
+  of missing PATH, non-executable script, and/or cron.allow/deny restrictions.
 objectives:
-  - Check cron logs and identify why jobs are not executing
-  - Fix the PATH, script permissions, and cron access control issues
-  - Confirm the job runs on the next scheduled minute
+- Check cron logs and identify why jobs are not executing
+- Fix the PATH, script permissions, and cron access-control issues
+- Confirm the job runs on the next scheduled minute
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check cron logs: grep CRON /var/log/syslog or journalctl -u crond'
-    cost: 10
-    order: 1
-  - content: 'Check /etc/cron.allow and /etc/cron.deny — if cron.allow exists, only
-      listed users may run cron jobs.'
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Look at the logs first: `grep CRON /var/log/syslog` or `journalctl -u crond`. Note "command
+    not found", permission errors, or access-denied messages.'
+- order: 2
+  cost: 15
+  content: 'Address each: add `PATH=` (or use absolute paths) in the crontab, `chmod +x` the script, and
+    check `/etc/cron.allow`/`/etc/cron.deny` (if cron.allow exists, the user must be in it).'
+- order: 3
+  cost: 20
+  content: Wait for the next minute and confirm the job's effect (its output file/log). The job now runs
+    reliably on schedule.
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Low

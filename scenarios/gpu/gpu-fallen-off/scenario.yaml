@@ -1,25 +1,34 @@
 category: GPU & NVIDIA
-description: 'nvidia-smi fails. Check dmesg and reload driver.
-
-  '
+description: nvidia-smi reports "GPU has fallen off the bus" and the device is no longer usable. The GPU
+  dropped off the PCIe bus — typically from a power/thermal event or a driver fault — so the kernel can
+  no longer communicate with it. Investigate the cause, reset the device or reload the driver, and confirm
+  the GPU returns to the bus.
 difficulty: hard
 dual_terminal: false
 hints:
-- content: 'Try: modprobe nvidia'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. nvidia-smi fails. Check dmesg and reload
-  driver.
-
-  '
+  content: 'Look at the kernel ring buffer: `dmesg | grep -i -E ''nvrm|xid|fallen off''`. An Xid error
+    and "GPU has fallen off the bus" confirm the drop and often hint at the cause.'
+- order: 2
+  cost: 15
+  content: 'Check the PCIe link: `lspci | grep -i nvidia` (may show as "rev ff" when off the bus). Review
+    power/thermal history if available; a hard fault usually needs a device reset.'
+- order: 3
+  cost: 20
+  content: 'Attempt a reset without rebooting: `nvidia-smi --gpu-reset -i <idx>` (stop GPU processes first).
+    If that''s blocked, reload the driver stack (`sudo rmmod nvidia_uvm nvidia_drm nvidia_modeset nvidia
+    && sudo modprobe nvidia`) or reboot, then confirm with `nvidia-smi`.'
+initial_state: Linux host with NVIDIA GPU. dmesg/nvidia-smi report "GPU has fallen off the bus"; the GPU
+  is unresponsive and CUDA/inference jobs fail.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: modprobe nvidia'
-- Verify validation passes
+- Confirm the GPU has fallen off the PCIe bus and gather kernel evidence
+- Identify a likely cause (power, thermal, Xid error) from logs
+- Reset the device / reload the driver and verify the GPU is back
 requires_companion_hosts: false
 simulation_type: gpu
 slug: sim-gpu-fallen-off

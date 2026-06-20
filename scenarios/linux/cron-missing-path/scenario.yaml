@@ -11,18 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q193 cron environment — PATH in crontab
-description: Minute cron job never creates /var/run/cron-ok. Crontab calls backup.sh without PATH or full path.
+description: A per-minute cron job is supposed to create /var/run/cron-ok but never does. cron runs with
+  a minimal PATH (typically /usr/bin:/bin), and the crontab invokes backup.sh by bare name without an
+  absolute path, so cron can't find it. Fix the job to use a full path (or set PATH in the crontab) so
+  it runs.
 objectives:
-- Check /var/log/syslog for cron errors
-- Affected service behaves normally
-- Wait for job or run manually
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Find from cron logs why the job fails to run the script
+- Fix the crontab to use an absolute path (or set PATH)
+- Verify the job creates /var/run/cron-ok
+initial_state: Linux server where a minute-interval cron job calls backup.sh without a full path or PATH,
+  so it silently fails and /var/run/cron-ok is never created.
 hints:
 - order: 1
-  cost: 20
-  content: Use `* * * * * /usr/local/bin/backup.sh` or set PATH in crontab
+  cost: 10
+  content: 'Check cron''s log: `grep CRON /var/log/syslog` (or `journalctl -u cron`). You''ll see it can''t
+    find `backup.sh` because cron''s PATH is minimal.'
 - order: 2
   cost: 15
-  content: Fix crontab PATH or use absolute path
+  content: Either invoke it absolutely — `* * * * * /usr/local/bin/backup.sh` — or add a `PATH=` line
+    at the top of the crontab.
+- order: 3
+  cost: 20
+  content: 'Wait for the next minute (or run the absolute command yourself) and confirm: `ls -l /var/run/cron-ok`
+    now exists.'

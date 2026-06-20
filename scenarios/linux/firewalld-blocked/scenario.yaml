@@ -1,15 +1,30 @@
 category: Linux Administration
-description: Nginx runs but port 80 blocked by firewalld.
+description: nginx is running and serving locally, but remote clients can't reach it because firewalld
+  is blocking inbound port 80. The web service has no firewall exception, so connections from outside
+  time out or are refused. Open port 80 (or the http service) in firewalld, reload, and confirm the site
+  becomes reachable.
 difficulty: easy
 hints:
-- content: firewall-cmd --add-port=80/tcp
+- order: 1
   cost: 10
-  order: 1
-initial_state: Nginx runs but port 80 blocked by firewalld.
+  content: 'Local curl works but remote doesn''t. Inspect the firewall: `firewall-cmd --list-all` — neither
+    port 80 nor the http service is allowed.'
+- order: 2
+  cost: 15
+  content: 'Open it permanently and reload: `firewall-cmd --permanent --add-port=80/tcp` (or `--add-service=http`)
+    then `firewall-cmd --reload`.'
+- order: 3
+  cost: 20
+  content: 'Confirm: `firewall-cmd --list-ports` shows 80/tcp, and a request to the host''s IP on port
+    80 now returns the page (`curl -I http://localhost` → 200).'
+initial_state: Simulated RHEL host. nginx is active and answers on localhost, but firewalld does not permit
+  inbound HTTP, so external access to port 80 is blocked.
 is_free: false
 lab_mode: simulation
 objectives:
-- firewall-cmd --add-port=80/tcp
+- Confirm nginx serves locally but port 80 is blocked by firewalld
+- Open the HTTP port/service in firewalld and reload
+- Verify port 80 is reachable
 simulation_type: generic
 slug: sim-rhel-firewalld-port
 title: Open Firewall Port 80

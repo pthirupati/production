@@ -11,20 +11,25 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q49 NTP port 123 — chrony sources
-description: System clock drifts. chrony configured with invalid time server.
+description: The system clock is drifting because chrony is configured with an invalid/unreachable time
+  source, so it never synchronizes. `chronyc sources` shows no usable server. Point chrony at a valid
+  NTP pool, restart it, and confirm it begins disciplining the clock.
 objectives:
-- Check chronyc sources
-- Affected service behaves normally
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm chrony has no usable time source
+- Configure a valid NTP pool/server and restart chrony
+- Verify chrony selects a source and synchronizes
+initial_state: Linux server running chrony with a bad time server in /etc/chrony.conf. The clock drifts
+  and chrony reports no reachable source.
 hints:
 - order: 1
-  cost: 15
-  content: Use `pool pool.ntp.org iburst`
+  cost: 10
+  content: 'Check sync state: `chronyc sources -v` and `chronyc tracking`. No source is reachable because
+    the configured server is invalid.'
 - order: 2
   cost: 15
-  content: Fix chrony.conf pool/server
+  content: 'Edit /etc/chrony.conf and use a working pool: `pool pool.ntp.org iburst` (remove the bad server
+    line), then `systemctl restart chronyd`.'
 - order: 3
-  cost: 15
-  content: Restart chrony
+  cost: 20
+  content: 'Verify: `chronyc sources` now shows a selected source (^*), and `chronyc tracking` reports
+    a small offset — the clock is syncing.'

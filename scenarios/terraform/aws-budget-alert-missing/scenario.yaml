@@ -2,26 +2,35 @@ title: AWS Budget Alert Not Firing
 slug: aws-budget-alert-missing
 difficulty: easy
 category: AWS
-description: 'An AWS Budgets alert is configured but never sends a notification when the monthly cost threshold is exceeded. The budget exists but the notification subscriber email or threshold type is misconfigured.'
-initial_state: 'Simulated AWS environment with a cost budget defined. The notification configuration is missing or has an incorrect threshold type, preventing alerts from being delivered when costs exceed the budget.'
+description: An AWS Budgets alert is configured but never sends a notification when the monthly cost threshold
+  is exceeded. The budget itself exists, but its notification is missing a valid subscriber (or the threshold
+  type is wrong), so no email is delivered when actual spend crosses the limit. Repair the notification
+  so cost alerts are actually sent.
+initial_state: Simulated AWS environment with a cost budget defined. The notification configuration is
+  missing or has an incorrect threshold type, preventing alerts from being delivered when costs exceed
+  the budget.
 objectives:
-  - Inspect the AWS Budget notification configuration and identify the missing or broken subscriber
-  - Fix the notification so it sends an email alert when actual spend exceeds the defined threshold
+- Inspect the AWS Budget and its notification/subscriber configuration
+- Identify the missing/broken subscriber or wrong threshold type
+- Add a valid email subscriber so an alert fires when spend exceeds the threshold
 lab_mode: simulation
 simulation_type: aws
 time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-  - content: 'Run: aws budgets describe-budget --account-id <id> --budget-name <name> to inspect the budget and its notifications.'
-    cost: 10
-    order: 1
-  - content: 'Check that the notification has a SUBSCRIBER of type EMAIL and that the threshold type is PERCENTAGE or ABSOLUTE_VALUE.'
-    cost: 15
-    order: 2
-  - content: 'Use aws budgets create-notification or update-budget to add the missing email subscriber to the notification.'
-    cost: 20
-    order: 3
+- content: 'Run: aws budgets describe-budget --account-id <id> --budget-name <name> to inspect the budget
+    and its notifications.'
+  cost: 10
+  order: 1
+- content: Check that the notification has a SUBSCRIBER of type EMAIL and that the threshold type is PERCENTAGE
+    or ABSOLUTE_VALUE.
+  cost: 15
+  order: 2
+- content: Use aws budgets create-notification or update-budget to add the missing email subscriber to
+    the notification.
+  cost: 20
+  order: 3
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Low

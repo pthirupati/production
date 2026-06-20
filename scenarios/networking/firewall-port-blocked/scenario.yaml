@@ -7,26 +7,25 @@ time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: 'Nginx is running but users cannot reach the site on port 80.
-
-  A firewall rule is dropping HTTP traffic. Remove the blocking rule.'
+description: nginx is running and serving locally, but external users can't reach the site on port 80
+  because an iptables rule in the INPUT chain is dropping inbound HTTP. The DROP rule shadows the web
+  traffic before it ever reaches nginx. Find and remove the blocking rule so port 80 is reachable again.
 objectives:
-- Verify nginx is running
-- Find iptables rule blocking port 80
-- Affected service behaves normally
-initial_state: 'Ubuntu with nginx and an iptables DROP rule on tcp/80.
-
-  '
+- Confirm nginx is up locally but port 80 is blocked from outside
+- Find the iptables DROP rule for port 80
+- Remove the rule and verify HTTP is reachable
+initial_state: Linux server where nginx listens on port 80 but an iptables INPUT rule drops inbound dpt:80
+  traffic, so remote clients can't load the site.
 hints:
 - order: 1
   cost: 10
-  content: '`iptables -L INPUT -n --line-numbers`'
+  content: 'Local curl works, remote doesn''t. List the firewall with line numbers: `iptables -L INPUT
+    -n --line-numbers` and find the DROP rule matching dpt:80.'
 - order: 2
-  cost: 20
-  content: '`iptables -D INPUT <line>` to delete the DROP rule for dpt:80'
+  cost: 15
+  content: 'Delete that specific rule by its line number: `iptables -D INPUT <line>` (the line number
+    from the previous command).'
 - order: 3
-  cost: 15
-  content: Verify nginx is running
-- order: 4
-  cost: 15
-  content: Remove the rule and confirm curl works
+  cost: 20
+  content: Confirm nginx is listening (`ss -tlnp | grep :80`) and the rule is gone; a request to the server's
+    IP on port 80 now returns the page. Persist the ruleset so it survives reboot.

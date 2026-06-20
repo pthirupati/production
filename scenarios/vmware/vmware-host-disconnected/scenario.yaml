@@ -1,7 +1,10 @@
 title: ESXi Host Disconnected
 slug: vmware-host-disconnected
 category: VMware vSphere
-description: An ESXi host shows as disconnected in vCenter. Reconnect the host and verify cluster health.
+description: An ESXi host (esxi-01.fixitlab.local) shows as Disconnected in vCenter, so its VMs can't
+  be managed through the GUI and the host isn't contributing to the cluster. The management agents or
+  connection state need restoring. Reconnect the host from vCenter and verify the cluster returns to a
+  healthy, fully-connected state.
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -11,14 +14,21 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-  - Open VMware vCenter Simulator from the Jira ticket
-  - Identify the disconnected ESXi host
-  - Reconnect the host and verify validation passes
-initial_state: vCenter shows esxi-01.fixitlab.local as disconnected. VMs may be affected.
+- Open the vCenter simulator from the Jira ticket and find the disconnected host
+- Reconnect esxi-01 to vCenter
+- Verify the host and cluster return to a healthy connected state
+initial_state: vCenter shows esxi-01.fixitlab.local as disconnected; its VMs are unmanageable via the
+  GUI until the host is reconnected.
 hints:
-  - content: Check host connection state under the cluster in vCenter.
-    cost: 10
-    order: 1
-  - content: Use Reconnect host from the monitor tab.
-    cost: 20
-    order: 2
+- order: 1
+  cost: 10
+  content: In vCenter, the host esxi-01.fixitlab.local shows Disconnected under the cluster (its VMs are
+    grayed out / unmanageable).
+- order: 2
+  cost: 15
+  content: 'Reconnect it: right-click the host -> Connection -> Reconnect (or use Reconnect Host from
+    the host''s Monitor/Actions).'
+- order: 3
+  cost: 20
+  content: After reconnecting, confirm the host state returns to Connected, its VMs are manageable again,
+    and no host-connection alarms remain.

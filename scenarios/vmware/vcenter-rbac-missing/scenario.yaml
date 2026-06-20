@@ -1,9 +1,10 @@
 title: vCenter RBAC Permission Missing
 slug: vmware-vcenter-rbac-missing
 category: VMware vSphere
-description: |
-  Lab operator cannot perform required VM operations because vCenter RBAC permissions are missing.
-  Assign the correct role on DC-Prod.
+description: A lab operator (lab_vmware) can't perform required VM operations because they have no vCenter
+  role assigned at the right inventory level — vCenter denies the actions for lack of permission. Assign
+  the appropriate role (Virtual Machine Administrator) on the DC-Prod datacenter so the operator can manage
+  VMs, following least-privilege scoping.
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -12,10 +13,21 @@ time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Navigate to DC-Prod → Permissions tab
-  - Add Virtual Machine Administrator role for lab_vmware
-initial_state: Operator lacks VM admin permissions on datacenter.
+- Confirm lab_vmware lacks permissions on DC-Prod
+- Add the Virtual Machine Administrator role for lab_vmware on DC-Prod
+- Verify the operator can now perform the required VM operations
+initial_state: vCenter where the lab_vmware principal lacks VM-admin permissions on the DC-Prod datacenter,
+  so VM operations are denied.
 hints:
-  - content: "Permissions → Add permission → principal lab_vmware → Virtual Machine Administrator"
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: Navigate to DC-Prod -> Permissions tab. lab_vmware has no role here, which is why the operations
+    are denied.
+- order: 2
+  cost: 15
+  content: 'Add a permission: Permissions -> Add -> principal lab_vmware -> assign the "Virtual Machine
+    Administrator" role (propagate to children as appropriate).'
+- order: 3
+  cost: 20
+  content: Confirm the new permission is listed and, acting as lab_vmware, verify the previously blocked
+    VM operations now succeed.

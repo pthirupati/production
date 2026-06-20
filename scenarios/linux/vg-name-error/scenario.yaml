@@ -2,36 +2,32 @@ title: vgcreate Fails — Invalid VG Name with Hyphen
 slug: linux-vg-name-error
 difficulty: easy
 category: Linux Administration
-description: |
-  A junior admin is setting up LVM storage and runs vgcreate vg-data /dev/sdb but the
-  command fails with an error about the name not being allowed. LVM volume group names
-  have specific naming rules — leading hyphens are not permitted and hyphens in names
-  conflict with LVM's internal device mapper naming convention. The admin must understand
-  the rule and create the VG with a valid name.
-
-initial_state: |
-  Simulated RHEL 9 server. /dev/sdb has already been initialized as a PV with pvcreate.
-  Running vgcreate vg-data /dev/sdb returns:
-  "vgcreate: Name vg-data is not allowed: A Volume Group name may not contain hyphens."
-  The disk is ready but no VG exists yet.
-
+description: 'Creating an LVM volume group fails: `vgcreate vg-data /dev/sdb` errors because the name
+  contains a hyphen. LVM/device-mapper reserve the hyphen as a separator in /dev/mapper device names,
+  so VG and LV names can''t contain it. Recreate the volume group with a valid name (underscore instead
+  of hyphen) and verify it exists.'
+initial_state: Linux server where `vgcreate vg-data /dev/sdb` fails due to the hyphen in the VG name (invalid
+  for device-mapper).
 objectives:
-  - Read the vgcreate error message carefully to understand the naming restriction
-  - Identify that hyphens are not allowed in LVM VG names due to device mapper conflicts
-  - Create the volume group using an underscore instead: vgcreate vg_data /dev/sdb
-  - Verify the VG was created successfully with vgs
+- Read the vgcreate error and understand the naming restriction
+- Recreate the VG with a valid name (no hyphen)
+- Verify the volume group was created with vgs
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'LVM VG names cannot contain hyphens because device mapper uses hyphens as separators in /dev/mapper/ paths (e.g. vg_name-lv_name). Use underscores instead.'
-    cost: 10
-    order: 1
-  - content: 'Run: vgcreate vg_data /dev/sdb — replacing the hyphen with an underscore. Verify with vgs to see the new volume group.'
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: 'The error is about the name: LVM names can''t contain `-` because device-mapper uses it as
+    a separator in /dev/mapper paths.'
+- order: 2
+  cost: 15
+  content: 'Use an underscore instead: `vgcreate vg_data /dev/sdb`.'
+- order: 3
+  cost: 20
+  content: 'Verify it was created: `vgs` lists `vg_data` on /dev/sdb.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

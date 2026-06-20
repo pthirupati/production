@@ -10,14 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Create deploy.sh without unbound variable errors.
+description: 'Build task: write a robust backup shell script (deploy.sh) from scratch that runs cleanly
+  under strict mode. The script should use a proper shebang, enable safe options, and avoid unbound-variable
+  errors by giving its inputs sensible defaults, then perform its backup step and exit zero.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Create deploy.sh with a shebang and strict mode (set -euo pipefail)
+- Provide safe defaults so no unbound-variable errors occur
+- Run the script successfully and have it exit zero
+initial_state: Linux host with a shell available. No backup script exists yet; you'll author deploy.sh
+  from scratch.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: Start the file with `#!/usr/bin/env bash` and `set -euo pipefail`, then `chmod +x deploy.sh`
+    so it's executable.
+- order: 2
+  cost: 15
+  content: 'Because `set -u` is on, default every optional input: `SRC="${SRC:-/var/www}"`, `DEST="${DEST:-/backups}"`
+    so the script never trips on an unset variable.'
+- order: 3
+  cost: 20
+  content: Do the work safely (e.g. `mkdir -p "$DEST" && tar czf "$DEST/backup-$(date +%F).tgz" "$SRC"`)
+    and end with `exit 0`. Run `./deploy.sh` and confirm it completes with no errors.

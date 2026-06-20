@@ -10,14 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Write Dockerfile, build image, and run container on port 8080.
+description: 'Build task: package a small application into a Docker image and run it. There is a project
+  directory with source but no working image yet. Write/complete a Dockerfile, build a tagged image, and
+  run a container, verifying the app responds on its published port.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Create or complete a Dockerfile for the application
+- Build a tagged image with docker build
+- Run a container and verify the app responds on the published port
+initial_state: Ubuntu host with Docker installed and a project directory containing application source.
+  No image has been built for it yet.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Inspect the project, then build from its directory: `docker build -t myapp:1.0 .` (the trailing
+    dot is the build context). Watch each layer succeed.'
+- order: 2
+  cost: 15
+  content: 'Run it with a port mapping: `docker run -d --name myapp -p 8080:80 myapp:1.0`, then `docker
+    ps` to confirm it''s Up.'
+- order: 3
+  cost: 20
+  content: 'Verify the app: `curl -s http://localhost:8080`. If it fails, check `docker logs myapp` —
+    usually the EXPOSE/CMD or the published port doesn''t match what the app listens on.'

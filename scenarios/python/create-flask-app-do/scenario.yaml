@@ -10,14 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Fix syntax in /opt/app/main.py and verify py_compile.
+description: 'Build task: create a minimal Flask web application from scratch. There is no app yet. Write
+  a small Flask app that defines a route returning a response, install Flask if needed, run the development
+  server, and verify the endpoint responds over HTTP.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Install Flask and create a minimal app with at least one route
+- Run the Flask development server
+- Verify the route responds over HTTP
+initial_state: Python environment with pip available. No Flask application exists in the working directory
+  yet.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Install Flask: `pip install flask`. Create app.py with a route, e.g. `@app.route(''/'')` returning
+    a string, and an `app.run(host=''0.0.0.0'', port=5000)`.'
+- order: 2
+  cost: 15
+  content: 'Run it: `python app.py` (or `flask --app app run --host 0.0.0.0`). Watch the log for "Running
+    on http://...:5000".'
+- order: 3
+  cost: 20
+  content: 'Verify: `curl -s http://localhost:5000/` returns your response. If the connection is refused,
+    ensure host is 0.0.0.0 and the port matches.'

@@ -7,24 +7,25 @@ time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security audit flagged world-readable application secrets.
-
-  /opt/app/config.env must be owned by appuser with mode 600.'
+description: 'A security audit flagged application secrets as world-readable: /opt/app/config.env (which
+  holds credentials) is readable by every user, and its ownership is wrong. Secrets files must be owned
+  by the service account and readable only by it (mode 600). Restore correct ownership and permissions
+  so the secrets are no longer exposed.'
 objectives:
-- Affected service behaves normally
-initial_state: 'Config file owned by root, mode 644.
-
-  '
+- Confirm /opt/app/config.env is world-readable / wrongly owned
+- Set ownership to appuser
+- Set mode 600 so only the owner can read it, and verify
+initial_state: Linux server where /opt/app/config.env is world-readable and not owned by appuser, exposing
+  application secrets to any local user.
 hints:
 - order: 1
   cost: 10
-  content: '`ls -la /opt/app/config.env`'
+  content: 'Inspect it: `ls -la /opt/app/config.env` — it''s group/world-readable and not owned by appuser,
+    so any user can read the secrets.'
 - order: 2
   cost: 15
-  content: '`chown appuser /opt/app/config.env && chmod 600 /opt/app/config.env`'
+  content: 'Fix ownership and permissions: `chown appuser /opt/app/config.env && chmod 600 /opt/app/config.env`.'
 - order: 3
-  cost: 15
-  content: Fix ownership of /opt/app/config.env
-- order: 4
-  cost: 15
-  content: Set permissions to 600
+  cost: 20
+  content: 'Verify: `ls -la /opt/app/config.env` shows `-rw------- appuser`, and another user can no longer
+    read it. Audit for siblings: `find /opt/app -perm -o+r -name ''*.env''`.'

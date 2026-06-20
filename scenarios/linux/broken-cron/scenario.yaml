@@ -9,34 +9,26 @@ time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
-description: 'The nightly backup cron job stopped running three days ago.
-
-  Operations reported missing backup files. Investigate why cron
-
-  is not executing the backup script and restore the scheduled job.'
+description: The nightly backup cron job stopped running about three days ago and operators noticed missing
+  backup files. cron itself is healthy, but the job no longer executes — typically because the backup
+  script lost its execute bit (or the crontab entry is missing/malformed). Restore a working, scheduled,
+  executable backup job.
 objectives:
 - Find why the backup cron job is not running
-- Affected service behaves normally
-- Ensure a valid crontab entry exists for the backup
+- Ensure /opt/backup.sh is executable and a valid crontab entry exists
 - Verify the backup script runs successfully
-initial_state: 'You have shell access to an Ubuntu 22.04 server.
-
-  A backup script exists at /opt/backup.sh but cron is not running it.
-
-  '
+initial_state: Linux server whose nightly backup hasn't run in days. The cron daemon is active, but the
+  backup job is not executing and no recent backup files exist.
 hints:
 - order: 1
   cost: 10
-  content: Check `crontab -l` and look for backup-related entries.
+  content: 'Inspect the schedule and logs: `crontab -l` for the backup entry and `grep CRON /var/log/syslog`
+    (or `journalctl -u cron`) for execution errors.'
 - order: 2
   cost: 15
-  content: Run `ls -la /opt/backup.sh` — the script must be executable.
+  content: 'Check the script itself: `ls -l /opt/backup.sh` — it''s likely missing the execute bit, so
+    cron can''t run it.'
 - order: 3
-  cost: 25
-  content: Fix with `chmod 755 /opt/backup.sh` and add `0 2 * * * /opt/backup.sh` to crontab.
-- order: 4
-  cost: 15
-  content: Fix permissions on /opt/backup.sh
-- order: 5
-  cost: 15
-  content: Verify the backup script runs successfully
+  cost: 20
+  content: 'Fix it: `chmod 755 /opt/backup.sh` and ensure the crontab has `0 2 * * * /opt/backup.sh`.
+    Test immediately by running `/opt/backup.sh` and confirm a backup file is produced.'

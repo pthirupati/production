@@ -2,17 +2,31 @@ title: BGP Session Down Between Routers
 slug: networking-bgp-session-down
 category: Networking
 difficulty: hard
-description: |
-  BGP peering between core routers is down causing route withdrawal. Restore the BGP session.
+description: BGP peering between two core routers has gone down, so the routes that peer advertised are
+  withdrawn and traffic to those networks is black-holed. The session won't establish because of a configuration
+  mismatch — typically a wrong remote-AS or a mismatched MD5 authentication password. Diagnose why the
+  session is stuck and restore the BGP adjacency.
 lab_mode: simulation
 simulation_type: networking
 time_limit: 1200
 max_score: 100
 is_free: false
 objectives:
-  - Verify BGP state with show ip bgp summary
-  - Fix AS number or neighbor authentication mismatch
+- Check the BGP session state and why it isn't Established
+- Identify the remote-AS or MD5 password mismatch
+- Correct the configuration and confirm the session reaches Established with routes exchanged
 hints:
-  - content: "Compare configured remote-as with peer router; check MD5 password"
-    cost: 15
-    order: 1
+- order: 1
+  cost: 10
+  content: 'Look at the session state: `vtysh -c ''show ip bgp summary''` (or `show bgp neighbors <ip>`).
+    It''s stuck in Idle/Active/Connect, not Established.'
+- order: 2
+  cost: 15
+  content: 'Compare both ends: the locally configured `remote-as` must match the peer''s actual AS, and
+    any `neighbor <ip> password` (MD5) must match exactly on both routers.'
+- order: 3
+  cost: 20
+  content: Fix the mismatch (correct remote-as or the MD5 password), clear the session (`clear ip bgp
+    <ip>`), and confirm `show ip bgp summary` shows Established with a non-zero prefix count.
+initial_state: Two core routers whose BGP session is down (Idle/Active/Connect, not Established) due to
+  a remote-AS or MD5 password mismatch; routes from the peer are withdrawn.

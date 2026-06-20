@@ -26,16 +26,17 @@ initial_state: 'You have shell access to a Linux server where DNS resolution is 
 hints:
 - order: 1
   cost: 10
-  content: Check /etc/resolv.conf for valid nameserver entries.
+  content: 'Confirm it''s resolution, not connectivity: `getent hosts google.com` fails with "Temporary
+    failure in name resolution". Inspect `/etc/resolv.conf`.'
 - order: 2
   cost: 15
-  content: Try `resolvectl status` or `systemd-resolve --status`.
+  content: 'Check the resolver stack: `resolvectl status` (or `systemd-resolve --status`) shows whether
+    systemd-resolved has a usable upstream.'
 - order: 3
-  cost: 25
-  content: Add nameserver 8.8.8.8 to /etc/resolv.conf or fix systemd-resolved.
+  cost: 20
+  content: 'Fix it: add a valid `nameserver 8.8.8.8` to /etc/resolv.conf, or repair systemd-resolved''s
+    DNS= setting and restart it.'
 - order: 4
-  cost: 15
-  content: Fix /etc/resolv.conf or systemd-resolved configuration
-- order: 5
-  cost: 15
-  content: Verify hostname resolution works (e.g., ping google.com)
+  cost: 25
+  content: 'Verify resolution works end to end: `getent hosts google.com` returns an address and `curl
+    -sI https://example.com` connects — DNS is restored.'

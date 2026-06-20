@@ -7,28 +7,26 @@ time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: 'Production pods are in CrashLoopBackOff. The Service routes traffic to
-
-  and ensure the web application is reachable.'
+description: Production pods backing an nginx web service are in CrashLoopBackOff and the site is unreachable.
+  In this manifest the Service's targetPort doesn't match nginx's containerPort, and the web server isn't
+  actually serving — so traffic never reaches a working backend. Fix the manifest port mapping and get
+  nginx responding.
 objectives:
-- Analyze /opt/k8s/deployment.yaml for port mismatches
-- Align Service targetPort with containerPort
+- Analyze /opt/k8s/deployment.yaml for the port mismatch
+- Align the Service targetPort with nginx's containerPort (80)
 - Verify the web server responds on the correct port
-initial_state: 'Simulated Kubernetes environment on Ubuntu. Manifest at /opt/k8s/deployment.yaml.
-
-  Nginx is installed but Service config points to wrong port.
-
-  '
+initial_state: Simulated Kubernetes environment on Ubuntu with a manifest at /opt/k8s/deployment.yaml.
+  The Service targetPort (8080) doesn't match nginx's containerPort (80), and nginx isn't serving, so
+  the app is down.
 hints:
 - order: 1
   cost: 10
-  content: Compare `targetPort` in the Service spec with `containerPort` in the Deployment.
+  content: Compare the Service `targetPort` against the Deployment's `containerPort` in /opt/k8s/deployment.yaml
+    — they don't match (8080 vs 80).
 - order: 2
   cost: 15
-  content: Change targetPort from 8080 to 80 to match nginx.
+  content: 'Set the Service targetPort to 80 to match nginx, and re-apply: `kubectl apply -f /opt/k8s/deployment.yaml`.'
 - order: 3
-  cost: 25
-  content: 'Start nginx: `service nginx start` and verify with `curl localhost`.'
-- order: 4
-  cost: 15
-  content: Verify the web server responds on the correct port
+  cost: 20
+  content: Make sure nginx is actually serving (`service nginx start` in the sim) and verify end to end
+    with `curl -s localhost` returning the nginx welcome page.

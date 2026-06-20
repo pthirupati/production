@@ -11,23 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q117 package DB — dpkg --configure -a, rm /var/lib/dpkg/lock*
-description: apt/dpkg fails with lock errors after interrupted upgrade.
+description: apt/dpkg operations fail with lock or "dpkg was interrupted" errors after an upgrade was
+  cut off partway through. The package database is in an inconsistent state and stale lock files remain,
+  so no further package operations succeed. Clear the locks (only if no apt/dpkg is actually running)
+  and complete the interrupted configuration so apt works again.
 objectives:
-- Affected service behaves normally
-- Verify apt works
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm apt/dpkg is failing due to interruption/locks (with nothing actually running)
+- Clear stale locks and finish the interrupted dpkg configuration
+- Verify apt operations work again
+initial_state: Debian/Ubuntu server where a previous apt/dpkg run was interrupted, leaving stale locks
+  and a half-configured package state; apt commands now error out.
 hints:
 - order: 1
-  cost: 20
-  content: '`rm /var/lib/dpkg/lock* && dpkg --configure -a`'
+  cost: 10
+  content: 'Read the exact error from `apt update`. Make sure no real package manager is running first:
+    `ps aux | grep -E ''apt|dpkg''` (don''t remove locks if one is active).'
 - order: 2
   cost: 15
-  content: Remove stale dpkg locks
+  content: 'With nothing running, the database needs finishing: `dpkg --configure -a`. If stale locks
+    block it, remove them: `rm -f /var/lib/dpkg/lock* /var/cache/apt/archives/lock`.'
 - order: 3
-  cost: 15
-  content: Run dpkg --configure -a
-- order: 4
-  cost: 15
-  content: Verify apt works
+  cost: 20
+  content: 'Verify recovery: `dpkg --configure -a` completes and `apt-get -f install` reports nothing
+    broken, then `apt update` runs cleanly.'

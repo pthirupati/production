@@ -1,5 +1,5 @@
 slug: interface-duplex-mismatch
-title: "NIC Duplex Mismatch — Fix Half/Full Duplex Causing Errors"
+title: NIC Duplex Mismatch — Fix Half/Full Duplex Causing Errors
 technology: Networking
 category: Physical Layer
 difficulty: medium
@@ -8,31 +8,42 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  A server is experiencing high collision and error rates on its network interface.
+description: 'A server is experiencing high collision and error rates on its network interface.
+
   Throughput is severely degraded — transfers that should run at near-gigabit speeds
+
   are achieving only 10-20 Mbit/s. The root cause is a duplex mismatch: the NIC is
+
   forced to half-duplex while the upstream switch port is operating at full-duplex.
+
   Set the NIC to full-duplex (or enable autonegotiation) to resolve the mismatch.
+
+  '
 objectives:
-  - Identify the duplex setting on the NIC using ethtool
-  - Detect the high collision/error rate caused by the mismatch
-  - Set the interface to full-duplex at the correct speed
-  - Verify error counters stop incrementing
-initial_state: |
-  Ubuntu 22.04. `ethtool eth0` shows Speed=1000Mb/s but Duplex=Half. The upstream
+- Identify the duplex setting on the NIC using ethtool
+- Detect the high collision/error rate caused by the mismatch
+- Set the interface to full-duplex at the correct speed
+- Verify error counters stop incrementing
+initial_state: 'Ubuntu 22.04. `ethtool eth0` shows Speed=1000Mb/s but Duplex=Half. The upstream
+
   switch port is Full duplex. `ethtool -S eth0` shows collisions and late_collision
+
   counters increasing rapidly. Throughput capped at ~15Mbit/s.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Inspect: `ethtool eth0` — check Speed and Duplex fields."
-  - order: 2
-    cost: 15
-    content: "Enable autoneg: `ethtool -s eth0 autoneg on` (preferred approach)."
-  - order: 3
-    cost: 15
-    content: "Force full-duplex: `ethtool -s eth0 speed 1000 duplex full autoneg off`"
-  - order: 4
-    cost: 20
-    content: "Persist via /etc/network/interfaces (pre-up ethtool command) or systemd network link file."
+- order: 1
+  cost: 10
+  content: 'Inspect the link: `ethtool eth0` — check Speed/Duplex and watch error/collision counters climb
+    with `ip -s link show eth0`.'
+- order: 2
+  cost: 15
+  content: 'Prefer autonegotiation so both ends agree: `ethtool -s eth0 autoneg on`.'
+- order: 3
+  cost: 20
+  content: 'If the link partner can''t autoneg, force matching full-duplex: `ethtool -s eth0 speed 1000
+    duplex full autoneg off` (both ends must match).'
+- order: 4
+  cost: 25
+  content: Persist it (systemd .link file or `pre-up ethtool` in the interface config) and confirm errors
+    stop and throughput recovers with `ethtool eth0` + an `iperf3` test.

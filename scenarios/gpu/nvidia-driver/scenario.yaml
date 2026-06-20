@@ -1,25 +1,32 @@
 category: GPU & NVIDIA
-description: 'Driver not loaded. Install and load nvidia module.
-
-  '
+description: nvidia-smi fails with "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA
+  driver" even though the GPU is in the machine. The kernel module isn't loaded — the driver was never
+  installed, or a kernel update left the module unbuilt. Restore the driver/module so the GPU is detected.
 difficulty: medium
 dual_terminal: false
 hints:
-- content: 'Try: lsmod | grep nvidia'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. Driver not loaded. Install and load nvidia
-  module.
-
-  '
+  content: '`nvidia-smi` errors that it can''t communicate with the driver. Check the module: `lsmod |
+    grep nvidia` (empty) and the card: `lspci | grep -i nvidia` (present).'
+- order: 2
+  cost: 15
+  content: 'Try loading it: `sudo modprobe nvidia`. If modprobe errors "module not found", the driver
+    isn''t installed (or DKMS didn''t rebuild after a kernel upgrade) — (re)install it.'
+- order: 3
+  cost: 20
+  content: After installing/rebuilding (e.g. `sudo apt install --reinstall nvidia-driver-550` or `sudo
+    dkms autoinstall`), load the module and run `nvidia-smi` — the GPU now appears.
+initial_state: Linux host with an NVIDIA GPU. The nvidia kernel module is not loaded, so nvidia-smi can't
+  talk to the driver and the GPU is unavailable to applications.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: lsmod | grep nvidia'
-- Verify validation passes
+- Confirm the nvidia kernel module is not loaded
+- Install/rebuild and load the driver module
+- Verify nvidia-smi communicates with the driver and lists the GPU
 requires_companion_hosts: false
 simulation_type: gpu
 slug: sim-nvidia-driver-missing

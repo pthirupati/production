@@ -11,21 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q7 ext fsck — e2fsck -y
-description: ext4 volume on /data fails to mount cleanly after unclean shutdown.
+description: An ext4 volume mounted at /data won't mount cleanly after an unclean shutdown — the primary
+  superblock is damaged, so mount fails with a superblock/structure error. ext4 keeps backup superblocks
+  that fsck can use to repair the filesystem. Unmount, run a filesystem check (with a backup superblock
+  if needed), and restore read-write access to /data.
 objectives:
-- Unmount filesystem
-- Affected service behaves normally
-- /data accepts writes again
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm the mount failure is a superblock/filesystem corruption
+- Unmount and repair the filesystem with fsck (using a backup superblock if required)
+- Remount /data read-write and verify it accepts writes
+initial_state: Linux server where the ext4 filesystem for /data fails to mount after a crash due to a
+  corrupt primary superblock; the data device needs fsck repair.
 hints:
 - order: 1
-  cost: 20
-  content: '`umount /data && fsck.ext4 -y /data.img`'
+  cost: 10
+  content: 'See why it won''t mount: `mount /data` errors and `dmesg | tail` shows an EXT4 superblock/bad-magic
+    error. Find backup superblocks with `dumpe2fs <dev> | grep -i superblock`.'
 - order: 2
   cost: 15
-  content: Run fsck.ext4
+  content: 'Unmount and repair: `umount /data` then `fsck.ext4 -y <dev>`. If the primary superblock is
+    unusable, point fsck at a backup: `fsck.ext4 -y -b 32768 <dev>`.'
 - order: 3
-  cost: 15
-  content: Remount and verify data
+  cost: 20
+  content: 'Remount and verify: `mount /data && touch /data/test && rm /data/test` — writes succeed, confirming
+    /data is healthy again.'

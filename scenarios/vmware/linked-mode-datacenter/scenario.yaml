@@ -1,6 +1,5 @@
----
 slug: linked-mode-datacenter
-title: "Enhanced Linked Mode — DC-DR Not Visible"
+title: Enhanced Linked Mode — DC-DR Not Visible
 technology: VMware
 category: vCenter Administration
 difficulty: medium
@@ -12,12 +11,26 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  Recovery datacenter DC-DR is not linked to vCenter. Enable Enhanced Linked Mode.
+description: The recovery datacenter DC-DR (and its host esxi-dr-01) isn't visible because Enhanced Linked
+  Mode hasn't been enabled, so the two vCenter instances aren't sharing a single inventory view. Enable
+  Enhanced Linked Mode so DC-DR appears alongside the production datacenter and can be managed from one
+  pane.
 objectives:
-  - Enable Enhanced Linked Mode
-  - Verify DC-DR and esxi-dr-01 appear in inventory
+- Confirm DC-DR / esxi-dr-01 are absent from the shared inventory
+- Enable Enhanced Linked Mode to join the vCenter instances
+- Verify DC-DR and esxi-dr-01 appear in inventory
 hints:
-  - order: 1
-    cost: 10
-    content: "Use the inventory tree and platform services panels in the VMware simulator."
+- order: 1
+  cost: 10
+  content: In the inventory tree, only the production datacenter is visible — DC-DR and esxi-dr-01 are
+    missing because the vCenters aren't linked.
+- order: 2
+  cost: 15
+  content: Enable Enhanced Linked Mode from the platform services / vCenter linking panel in the simulator
+    (join the DR vCenter to the same SSO domain).
+- order: 3
+  cost: 20
+  content: After linking, refresh the inventory tree and confirm DC-DR and its host esxi-dr-01 now appear
+    and are manageable from the same client.
+initial_state: vCenter where DC-DR is not joined via Enhanced Linked Mode, so the DR datacenter and esxi-dr-01
+  don't show in the shared inventory.

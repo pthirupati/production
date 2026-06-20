@@ -9,15 +9,25 @@ time_limit: 900
 max_score: 100
 jira_priority: Medium
 is_free: false
-description: |
-  worker-1 is in NotReady state after maintenance. Uncordon the node and verify the cluster
-  is healthy again.
+description: A worker node is shown as NotReady/SchedulingDisabled and no new pods land on it. The node
+  was cordoned (and possibly drained) for maintenance and never brought back into service, so the scheduler
+  skips it. Verify the node is healthy, then uncordon it so it accepts workloads again.
 objectives:
-  - Run kubectl get nodes and confirm worker-1 is NotReady
-  - Uncordon worker-1
-  - Verify all nodes show Ready
-initial_state: Simulated k8s master; worker-1 NotReady.
+- Identify the cordoned node and confirm it is otherwise healthy
+- Verify the kubelet/node conditions are Ready
+- Uncordon the node so it accepts pods again
+initial_state: Simulated Kubernetes cluster. A worker node is marked SchedulingDisabled (cordoned). It
+  is otherwise healthy, but the scheduler won't place pods on it and capacity is reduced.
 hints:
-  - content: Use `kubectl uncordon worker-1`.
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: '`kubectl get nodes` shows the node as Ready,SchedulingDisabled. That "SchedulingDisabled"
+    means it was cordoned, not broken.'
+- order: 2
+  cost: 15
+  content: 'Confirm health before re-enabling: `kubectl describe node <node>` — Conditions should be Ready=True
+    with no MemoryPressure/DiskPressure.'
+- order: 3
+  cost: 20
+  content: 'Bring it back: `kubectl uncordon <node>`. The taint clears and the scheduler resumes placing
+    pods; confirm with `kubectl get nodes` (status returns to Ready).'

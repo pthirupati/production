@@ -2,17 +2,30 @@ title: NetworkPolicy Blocks Backend Traffic
 slug: k8s-network-policy-block
 category: Kubernetes
 difficulty: hard
-description: |
-  Pods cannot reach the backend service due to a restrictive NetworkPolicy. Create an allow policy.
+description: Backend pods became unreachable after a NetworkPolicy was applied. A default-deny or overly-narrow
+  ingress policy now blocks traffic from the frontend pods to the backend, causing connection timeouts.
+  Adjust the NetworkPolicy to allow the legitimate frontend traffic while keeping everything else denied.
 lab_mode: simulation
 simulation_type: kubernetes
 time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Identify blocked traffic with kubectl logs
-  - Apply NetworkPolicy allowing frontend → backend on port 9090
+- Reproduce the blocked frontend-to-backend connection
+- Inspect the NetworkPolicy selecting the backend pods
+- Add an ingress rule that permits the frontend pods and verify connectivity
 hints:
-  - content: "kubectl apply NetworkPolicy with ingress from app=frontend to app=backend"
-    cost: 15
-    order: 1
+- order: 1
+  cost: 10
+  content: 'From a frontend pod, calls to the backend hang. List policies: `kubectl get networkpolicy`
+    and describe the one on the backend: `kubectl describe networkpolicy <name>`.'
+- order: 2
+  cost: 15
+  content: Check the policy's podSelector (which pods it protects) and its ingress.from rules. A default-deny
+    with no matching `from` for the frontend label is what blocks the traffic.
+- order: 3
+  cost: 20
+  content: 'Edit the policy (`kubectl edit networkpolicy <name>`) and add an ingress rule with `from:
+    - podSelector: matchLabels: {app: frontend}` on the backend''s port. Re-test the call.'
+initial_state: Simulated Kubernetes cluster with NetworkPolicies enforced. A NetworkPolicy on the backend
+  denies ingress from the frontend pods, so frontend-to-backend calls time out.

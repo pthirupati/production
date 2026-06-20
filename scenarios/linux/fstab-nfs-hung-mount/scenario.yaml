@@ -11,20 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q10 df hang — noserver, nobootwait, fix fstab
-description: df and ls hang on /mnt/nfs. Unreachable NFS server in /etc/fstab blocks mount lookups.
+description: Commands like `df` and `ls` hang on /mnt/nfs because an NFS server referenced in /etc/fstab
+  is unreachable and the mount uses hard/blocking options, so any access to the path blocks indefinitely.
+  Stop the hang and make the entry resilient — use soft/timeout/nofail options or remove the stale entry
+  — so the system isn't held up by a dead NFS server.
 objectives:
-- Identify stale NFS in fstab
-- Affected service behaves normally
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Identify the stale NFS entry causing the hang
+- Recover the hung mount and make the fstab entry resilient (or remove it)
+- Verify df/ls no longer hang
+initial_state: Linux server with an unreachable NFS server in /etc/fstab. Accessing /mnt/nfs (or running
+  df) hangs because the mount blocks on the dead server.
 hints:
 - order: 1
-  cost: 20
-  content: Comment bad line or use `nofail,nobootwait,soft,timeo=5`
+  cost: 10
+  content: 'Confirm where it hangs: `findmnt /mnt/nfs` and a backgrounded `df` that blocks. The fstab
+    NFS line points at an unreachable server with blocking options.'
 - order: 2
   cost: 15
-  content: Add nofail/nobootwait or remove entry
+  content: 'Force-unmount the dead mount: `umount -f -l /mnt/nfs`. Then edit /etc/fstab to add resilient
+    options — `nofail,soft,timeo=50,retrans=2` — or remove the entry if it''s obsolete.'
 - order: 3
-  cost: 15
-  content: Use timeout mount options
+  cost: 20
+  content: 'Verify: `df -h` and `ls /` complete instantly. With `nofail`, a future outage won''t hang
+    boot or commands.'

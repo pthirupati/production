@@ -459,12 +459,18 @@ def main():
             if not fresh:
                 stats.skip(f"[{tech.slug}/{sc.slug}]", "scenario missing after refresh")
                 continue
-            # Coding-IDE scenarios validate through the dedicated code-validate
-            # endpoint (hidden tests run in a backend sandbox), not the shell
-            # check flow exercised here. They have their own coverage in
-            # tests/test_coding_ide.py, so skip them in the shell E2E.
-            if getattr(fresh, "coding_mode", False):
-                stats.skip(f"[{tech.slug}/{sc.slug}]", "coding-mode scenario (validated via code-validate)")
+            # Coding-IDE and Prompt-Engineering scenarios validate through their
+            # own endpoints (/labs/<id>/code-validate/ and prompt-validate/),
+            # not the shell check.sh flow exercised here — they have no check.sh
+            # nor fix map. Both set coding_mode=True; prompt lessons additionally
+            # carry coding_spec.kind == "prompt". Skip either kind so the shell
+            # sweep doesn't fail on them. Covered by tests/test_coding_ide.py.
+            coding_spec = getattr(fresh, "coding_spec", None) or {}
+            spec_kind = coding_spec.get("kind") if isinstance(coding_spec, dict) else None
+            if getattr(fresh, "coding_mode", False) or spec_kind in ("code", "prompt"):
+                detail = "prompt-mode scenario (validated via prompt-validate)" if spec_kind == "prompt" \
+                    else "coding-mode scenario (validated via code-validate)"
+                stats.skip(f"[{tech.slug}/{sc.slug}]", detail)
                 continue
             # Re-apply subs — parallel E2E jobs may revoke test subscriptions mid-run.
             user_a = refresh_test_user(user_a)

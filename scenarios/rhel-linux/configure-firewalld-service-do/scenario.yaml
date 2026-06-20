@@ -10,14 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Allow http service and start nginx.
+description: 'Build task: serve a web app through firewalld. Starting from a host where the firewall does
+  not allow web traffic, permit the http service permanently, reload firewalld, start nginx, and verify
+  the port is reachable so the site is accessible from clients.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Allow the http service in firewalld permanently
+- Reload firewalld and start/enable nginx
+- Verify HTTP traffic is permitted and the site responds
+initial_state: RHEL host with firewalld active and the http service not yet allowed. nginx may be installed
+  but the firewall blocks inbound web traffic.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Check the current zone: `firewall-cmd --list-all`. http isn''t listed. Add it permanently:
+    `firewall-cmd --permanent --add-service=http`.'
+- order: 2
+  cost: 15
+  content: 'Apply the change with `firewall-cmd --reload`, then make sure the web server is up: `systemctl
+    enable --now nginx`.'
+- order: 3
+  cost: 20
+  content: 'Verify the service is now allowed (`firewall-cmd --list-services` shows http) and the site
+    responds: `curl -I http://localhost` returns 200.'

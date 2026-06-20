@@ -10,14 +10,26 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Create database appdb and user appuser with proper grants.
+description: 'Build task: provision a PostgreSQL application database and a dedicated user with the right
+  privileges. Starting from a running PostgreSQL with only the default roles, create the database appdb
+  and a login role appuser, grant appuser ownership/privileges on appdb, and verify appuser can connect
+  and use it.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Create a login role appuser with a password
+- Create database appdb owned by (or granted to) appuser
+- Verify appuser can connect to appdb and the grants are correct
+initial_state: RHEL host with PostgreSQL running and only default roles present. No appdb database or
+  appuser role exists yet.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'As the postgres superuser, open psql: `sudo -u postgres psql`. Create the role: `CREATE ROLE
+    appuser WITH LOGIN PASSWORD ''secret'';`'
+- order: 2
+  cost: 15
+  content: 'Create the database owned by the new user: `CREATE DATABASE appdb OWNER appuser;` then `GRANT
+    ALL PRIVILEGES ON DATABASE appdb TO appuser;`'
+- order: 3
+  cost: 20
+  content: 'Verify the user can actually connect and use it: `psql ''postgresql://appuser:secret@localhost/appdb''
+    -c ''\conninfo''` (or `psql -U appuser -d appdb -h localhost`).'

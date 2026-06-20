@@ -9,6 +9,7 @@ Covers the bugs fixed in the scenario browsing experience:
     (free scenarios accessible, paid scenarios locked but still listed).
 """
 
+from django.core.cache import cache
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -39,6 +40,10 @@ class ScenariosListFilterTests(TestCase):
         )
 
     def setUp(self):
+        # The anonymous scenario list is cached for 2 min in a process-global
+        # LocMemCache under test settings; clear it so a sibling test's cached
+        # slice (e.g. a fixture with different scenarios) can't leak in here.
+        cache.clear()
         self.client = APIClient()
 
     def _results(self, resp):
@@ -119,6 +124,7 @@ class ScenarioDetailAccessTests(TestCase):
         )
 
     def setUp(self):
+        cache.clear()  # avoid anon-response cache leaking between tests
         self.client = APIClient()
 
     def test_detail_viewable_anonymous_and_flags_access(self):

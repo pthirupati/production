@@ -10,14 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Configure .gitlab-ci.yml and verify pipeline passes.
+description: 'Build task: create a working GitLab CI pipeline from scratch. Starting with no CI config,
+  author a .gitlab-ci.yml that defines at least a build and test stage, commit it, and confirm the pipeline
+  runs to a passing (green) state.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Create a .gitlab-ci.yml defining build and test stages
+- Use a valid image and correct YAML structure
+- Confirm the pipeline runs and all jobs pass
+initial_state: Repository with no CI configuration yet. You will create a .gitlab-ci.yml and get the pipeline
+  passing.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Create .gitlab-ci.yml with `stages: [build, test]`, a base `image:` (e.g. python:3.12 or node:20),
+    and one job per stage with a `script:` block.'
+- order: 2
+  cost: 15
+  content: Keep the YAML valid — consistent indentation under `script:`. Validate with GitLab's CI Lint
+    (or `python3 -c "import yaml; yaml.safe_load(open('.gitlab-ci.yml'))"`).
+- order: 3
+  cost: 20
+  content: Commit and push to trigger the pipeline; watch it under CI/CD > Pipelines and confirm both
+    the build and test jobs pass (green).

@@ -10,14 +10,28 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Add a webserver host to inventory and verify with ansible-inventory --list.
+description: 'Build task: register a new webserver host in the Ansible inventory and confirm Ansible can
+  see it. Starting from an empty inventory, add the host under an appropriate group with its connection
+  details, then verify it appears via ansible-inventory and responds to a ping.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Add a webserver host (with ansible_host/user) under a [webservers] group in the inventory
+- List the inventory and confirm the host and group are present
+- Verify Ansible can reach the host with the ping module
+initial_state: Ansible control node with a default/empty inventory. No managed webserver host is defined
+  yet.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Add the host to the inventory (e.g. /etc/ansible/hosts or ./inventory.ini):
+
+    [webservers]
+
+    web1 ansible_host=10.0.0.11 ansible_user=ansible'
+- order: 2
+  cost: 15
+  content: 'Confirm Ansible parses it: `ansible-inventory --list` (or `-i inventory.ini --list`) should
+    show web1 under the webservers group.'
+- order: 3
+  cost: 20
+  content: 'Verify connectivity: `ansible webservers -m ping` returns "pong" for web1. If it''s UNREACHABLE,
+    check ansible_host/user and SSH key access.'

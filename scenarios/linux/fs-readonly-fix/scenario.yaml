@@ -2,36 +2,34 @@ title: Filesystem Mounted Read-Only After Disk Errors
 slug: linux-fs-readonly-fix
 difficulty: medium
 category: Linux Administration
-description: |
-  The /data filesystem has been automatically remounted read-only by the kernel after
-  detecting I/O errors on the underlying block device. Applications writing to /data are
-  now failing. The filesystem must be checked with fsck to clear errors and then safely
-  remounted read-write. The fstab entry should also be updated with the nofail option to
-  prevent the system from hanging on boot if the disk has issues in future.
-
-initial_state: |
-  Simulated RHEL 9 server. Attempting to write to /data fails with "Read-only file system".
-  dmesg shows recent EXT4-fs errors and an I/O error on /dev/sdb1. The /data directory
-  is currently mounted but all write operations are rejected by the kernel.
-
+description: The /data filesystem was automatically remounted read-only by the kernel after it detected
+  I/O errors on the underlying block device — a safety measure to prevent further corruption. Applications
+  now fail with "Read-only file system". Confirm the cause, repair the filesystem, remount it read-write,
+  and harden the fstab entry against future boot hangs.
+initial_state: Linux server where the kernel flipped /data to read-only after I/O errors. Writes fail;
+  the filesystem on /dev/sdb1 needs checking and a clean read-write remount.
 objectives:
-  - Identify the read-only condition using mount | grep /data and dmesg | grep -i error
-  - Unmount /data cleanly with umount /data
-  - Run fsck.ext4 -y /dev/sdb1 to automatically repair filesystem errors
-  - Remount the filesystem read-write with mount /data and verify with touch /data/test
-  - Update /etc/fstab to add the nofail option for the /data entry
+- Identify the read-only condition via mount and dmesg
+- Unmount cleanly and repair with fsck.ext4 -y
+- Remount read-write, verify writes, and add nofail to the fstab entry
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check dmesg | tail -30 for I/O errors and EXT4-fs remount messages to confirm the filesystem went read-only due to disk errors.'
-    cost: 10
-    order: 1
-  - content: 'Unmount first: umount /data, then run fsck.ext4 -y /dev/sdb1. The -y flag auto-answers yes to all repair prompts.'
-    cost: 20
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Confirm it: `mount | grep /data` shows `ro`, and `dmesg | tail -30` shows EXT4 I/O errors
+    and the "Remounting filesystem read-only" message.'
+- order: 2
+  cost: 20
+  content: 'Unmount and check the device: `umount /data` then `fsck.ext4 -y /dev/sdb1` to auto-repair
+    errors.'
+- order: 3
+  cost: 30
+  content: 'Remount rw and validate: `mount /data && touch /data/test`. Add `nofail` to the /data line
+    in /etc/fstab so a future device error doesn''t block boot.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

@@ -1,5 +1,5 @@
 slug: cron-writable-by-all
-title: "World-Writable Cron Directory — Fix /etc/cron.daily Permissions"
+title: World-Writable Cron Directory — Fix /etc/cron.daily Permissions
 technology: Security
 category: File Permissions
 difficulty: easy
@@ -8,31 +8,42 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  A security audit found that /etc/cron.daily is world-writable (mode 777).
+description: 'A security audit found that /etc/cron.daily is world-writable (mode 777).
+
   This is a critical misconfiguration: any user on the system can place scripts
+
   in this directory and have them executed as root by the cron daemon. This
+
   provides a trivial privilege escalation path for any local user. Fix the
+
   permissions on /etc/cron.daily and audit other cron directories for similar issues.
+
+  '
 objectives:
-  - Verify /etc/cron.daily is world-writable using ls -ld
-  - Fix permissions to 755 (root:root)
-  - Audit /etc/cron.d, /etc/cron.weekly, /etc/cron.monthly for similar issues
-  - Verify cron still runs normally after the fix
-initial_state: |
-  Ubuntu 22.04. `ls -ld /etc/cron.daily` shows drwxrwxrwx (world-writable).
-  Any user can add scripts: `echo 'cp /bin/bash /tmp/bash && chmod +s /tmp/bash' > /etc/cron.daily/evil`
+- Verify /etc/cron.daily is world-writable using ls -ld
+- Fix permissions to 755 (root:root)
+- Audit /etc/cron.d, /etc/cron.weekly, /etc/cron.monthly for similar issues
+- Verify cron still runs normally after the fix
+initial_state: 'Ubuntu 22.04. `ls -ld /etc/cron.daily` shows drwxrwxrwx (world-writable).
+
+  Any user can add scripts: `echo ''cp /bin/bash /tmp/bash && chmod +s /tmp/bash'' > /etc/cron.daily/evil`
+
   The fix requires setting proper permissions.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check all cron dirs: `ls -ld /etc/cron.* /etc/cron.d`"
-  - order: 2
-    cost: 10
-    content: "Fix /etc/cron.daily: `chmod 755 /etc/cron.daily && chown root:root /etc/cron.daily`"
-  - order: 3
-    cost: 10
-    content: "Fix all at once: `chmod 755 /etc/cron.daily /etc/cron.weekly /etc/cron.monthly /etc/cron.hourly /etc/cron.d`"
-  - order: 4
-    cost: 10
-    content: "Verify: `ls -ld /etc/cron.*` — should show drwxr-xr-x and owner root:root."
+- order: 1
+  cost: 10
+  content: 'Audit the cron directories: `ls -ld /etc/cron.* /etc/cron.d` — /etc/cron.daily is mode 777
+    (world-writable), a privilege-escalation risk.'
+- order: 2
+  cost: 15
+  content: 'Fix the flagged directory: `chmod 755 /etc/cron.daily && chown root:root /etc/cron.daily`.'
+- order: 3
+  cost: 20
+  content: 'Harden all of them at once: `chmod 755 /etc/cron.daily /etc/cron.weekly /etc/cron.monthly
+    /etc/cron.hourly /etc/cron.d`.'
+- order: 4
+  cost: 25
+  content: 'Verify the fix: `ls -ld /etc/cron.*` shows `drwxr-xr-x` owned by `root:root` for every directory
+    — no user can drop root-run scripts anymore.'

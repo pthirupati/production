@@ -10,14 +10,24 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Fix pom.xml and run mvn package successfully.
+description: 'Build task: get a Java Maven project building. The pom.xml is incomplete/broken (missing
+  or wrong elements), so `mvn package` fails. Repair the POM so dependencies resolve and the project compiles,
+  tests, and packages cleanly.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Run mvn package and identify what the POM is missing or has wrong
+- Fix the pom.xml (coordinates, plugins, or dependencies)
+- Build successfully so the artifact is produced under target/
+initial_state: Java Maven project where pom.xml needs fixing before it will build; `mvn package` currently
+  fails.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: Run `mvn package` and read the first error — it points at the missing/invalid POM element or
+    unresolved dependency.
+- order: 2
+  cost: 15
+  content: 'Fix the pom.xml: ensure groupId/artifactId/version and packaging are set, the compiler plugin/Java
+    version is correct, and dependency coordinates are valid.'
+- order: 3
+  cost: 20
+  content: Re-run `mvn package` until BUILD SUCCESS; confirm the JAR exists under `target/` (`ls target/*.jar`).

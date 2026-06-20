@@ -8,28 +8,38 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  A Jenkins pipeline is failing to start because of a Groovy syntax error in the Jenkinsfile.
+description: 'A Jenkins pipeline is failing to start because of a Groovy syntax error in the Jenkinsfile.
+
   The development team pushed a broken Jenkinsfile and the build is completely blocked.
+
   Your job is to identify and fix the Groovy syntax error so the pipeline can run.
+
+  '
 objectives:
-  - Identify the syntax error in the Jenkinsfile
-  - Fix the Groovy syntax so the pipeline block is valid
-  - Verify the pipeline configuration is correct
-initial_state: |
-  Ubuntu server with Jenkins installed. The pipeline Jenkinsfile at
+- Identify the syntax error in the Jenkinsfile
+- Fix the Groovy syntax so the pipeline block is valid
+- Verify the pipeline configuration is correct
+initial_state: 'Ubuntu server with Jenkins installed. The pipeline Jenkinsfile at
+
   /var/jenkins_home/workspace/myapp/Jenkinsfile has a broken Groovy syntax that
+
   prevents the pipeline from starting.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run: cat /var/jenkins_home/workspace/myapp/Jenkinsfile"
-  - order: 2
-    cost: 15
-    content: "Look for unclosed braces or missing quotes in the pipeline block"
-  - order: 3
-    cost: 20
-    content: "Every stage { } block needs proper closing braces. Count opening and closing braces."
-  - order: 4
-    cost: 25
-    content: "The steps block inside the Build stage is missing its closing brace. Add } after the sh line."
+- order: 1
+  cost: 10
+  content: 'Read the Jenkinsfile to spot the syntax problem: `cat /var/jenkins_home/workspace/myapp/Jenkinsfile`
+    — the pipeline fails to even start (Groovy parse error).'
+- order: 2
+  cost: 15
+  content: Look for unbalanced braces or missing quotes inside the `pipeline { ... }` block; count opening
+    vs closing `{}`.
+- order: 3
+  cost: 20
+  content: The `steps` block inside the Build stage is missing its closing brace — add the `}` after the
+    `sh` line so the stage/steps blocks are balanced.
+- order: 4
+  cost: 25
+  content: Re-run the pipeline (or use "Replay"/Pipeline Linter) and confirm the Jenkinsfile parses and
+    the build proceeds.

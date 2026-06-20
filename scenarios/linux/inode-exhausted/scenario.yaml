@@ -11,21 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q8 inodes — df -i, delete tiny files
-description: Cannot create new files though df shows space available. Inodes on /var/cache are exhausted.
+description: Files can no longer be created ("No space left on device") even though `df` reports free
+  space, because the inodes on /var/cache are fully consumed by a huge number of small cache files. A
+  filesystem can run out of inodes long before it runs out of blocks. Find the directory hoarding inodes
+  and remove the excess files to recover.
 objectives:
-- Check inode usage with df -i
-- Find directories with many small files
-- Affected service behaves normally
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm inode exhaustion with df -i
+- Find the directory holding the bulk of the small files
+- Remove the excess files and verify inodes are recovered
+initial_state: Linux server where /var/cache has exhausted its inodes (df -i at 100%) due to a directory
+  full of small files, so new files can't be created despite free space.
 hints:
 - order: 1
   cost: 10
-  content: '`df -i /var/cache` — look at IUse%'
+  content: 'Check inodes, not bytes: `df -i /var/cache` — IUse% is 100%. That''s why creation fails even
+    with free space.'
 - order: 2
-  cost: 20
-  content: '`find /var/cache/app -type f | wc -l` — remove old cache files'
-- order: 3
   cost: 15
-  content: Delete unneeded files to free inodes
+  content: 'Find the offending directory: `find /var/cache -xdev -type f | wc -l` and drill into subdirs
+    (e.g. `for d in /var/cache/*; do echo -n "$d "; find "$d" | wc -l; done`).'
+- order: 3
+  cost: 20
+  content: 'Remove the stale cache files (verify first): `find /var/cache/app -type f -delete`. Re-check
+    `df -i /var/cache` — IUse% drops and files can be created again.'

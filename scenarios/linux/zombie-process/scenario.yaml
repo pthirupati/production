@@ -9,30 +9,23 @@ time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CPU usage spiked to 100% on a production node. Monitoring shows
-
-  a runaway process consuming all CPU cycles. Find and terminate
-
-  the offending process to restore normal system performance.'
+description: CPU usage on a production node spiked to 100% due to a runaway process (e.g. runaway.sh)
+  consuming all cycles, degrading every other workload. Use process tools to find the top CPU consumer,
+  confirm it's the offending script, terminate it, and verify CPU usage returns to normal.
 objectives:
 - Identify the process consuming excessive CPU
 - Terminate the runaway.sh process
-- Verify CPU usage returns to normal levels
-initial_state: 'You have shell access to a Linux server with CPU at 100%.
-
-  A background script is running in an infinite loop.
-
-  '
+- Verify CPU usage returns to normal
+initial_state: Linux server pinned at 100% CPU by a runaway process (runaway.sh) that must be identified
+  and terminated to restore normal load.
 hints:
 - order: 1
   cost: 10
-  content: Use `top` or `ps aux --sort=-%cpu` to find the highest CPU consumer.
+  content: 'Find the top consumer: `top` (press P to sort by CPU) or `ps aux --sort=-%cpu | head`.'
 - order: 2
   cost: 15
-  content: Look for a process named runaway.sh or similar.
+  content: Confirm it's the culprit — a process like `runaway.sh` pegging a core. Note its PID.
 - order: 3
   cost: 20
-  content: Kill it with `kill <PID>` or `pkill -f runaway.sh`.
-- order: 4
-  cost: 15
-  content: Verify CPU usage returns to normal levels
+  content: 'Terminate it: `kill <PID>` (escalate to `kill -9` / `pkill -f runaway.sh` if it ignores SIGTERM).
+    Re-check `top` — load returns to normal.'

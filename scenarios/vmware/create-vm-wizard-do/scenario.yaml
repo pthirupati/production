@@ -1,6 +1,5 @@
----
 slug: create-vm-wizard-do
-title: "Create VM Using New Virtual Machine Wizard"
+title: Create VM Using New Virtual Machine Wizard
 technology: VMware
 category: vCenter Administration
 difficulty: medium
@@ -12,12 +11,25 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  Build lab — create a new VM using the full 14-step New Virtual Machine wizard.
+description: 'Build lab: create a brand-new virtual machine end to end using the full New Virtual Machine
+  wizard. Starting from an empty target, walk all wizard steps — name, compute resource, storage, compatibility,
+  guest OS, and hardware customization — and finish so the VM is created and visible in inventory.'
 objectives:
-  - Launch New VM wizard
-  - Complete all 14 steps and create the VM
+- Launch the New Virtual Machine wizard
+- Complete every wizard step (name, resource, storage, OS, hardware)
+- Finish the wizard and verify the VM appears in inventory
 hints:
-  - order: 1
-    cost: 10
-    content: "Use the inventory tree and platform services panels in the VMware simulator."
+- order: 1
+  cost: 10
+  content: 'Start it: right-click the cluster (or Datacenter) -> New Virtual Machine -> "Create a new
+    virtual machine".'
+- order: 2
+  cost: 15
+  content: 'Work through each step: give it a name and folder, pick the compute resource and datastore,
+    set compatibility and the guest OS, then customize CPU/memory/disk/network.'
+- order: 3
+  cost: 20
+  content: Click Finish on the Ready-to-complete step and confirm the new VM is listed in the inventory
+    tree (power it on if the task requires).
+initial_state: vCenter with a cluster, datastore, and network available. No new VM has been created yet;
+  you will build one through the New Virtual Machine wizard.

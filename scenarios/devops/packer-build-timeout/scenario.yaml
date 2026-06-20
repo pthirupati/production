@@ -8,30 +8,40 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  A Packer build is timing out during the provisioning phase. The build template
+description: 'A Packer build is timing out during the provisioning phase. The build template
+
   has a default SSH handshake timeout that is too short for the slow provisioning
+
   scripts to complete. The build fails with "Timeout waiting for SSH" after 5 minutes.
+
   Increase the timeout settings so the build completes successfully.
+
+  '
 objectives:
-  - Identify the timeout settings in the Packer template
-  - Increase ssh_handshake_attempts and ssh_timeout
-  - Optionally increase the provisioner timeout
-  - Verify the Packer template validates without errors
-initial_state: |
-  Ubuntu server with Packer installed. Build template at /opt/packer/build.pkr.hcl.
+- Identify the timeout settings in the Packer template
+- Increase ssh_handshake_attempts and ssh_timeout
+- Optionally increase the provisioner timeout
+- Verify the Packer template validates without errors
+initial_state: 'Ubuntu server with Packer installed. Build template at /opt/packer/build.pkr.hcl.
+
   Current settings: ssh_timeout = "5m" which is too short. Provisioning takes ~15 minutes.
+
   Increase ssh_timeout to "30m" and ssh_handshake_attempts to 50.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "View template: cat /opt/packer/build.pkr.hcl"
-  - order: 2
-    cost: 15
-    content: "Find ssh_timeout in the source block — currently set to 5m"
-  - order: 3
-    cost: 20
-    content: "Change ssh_timeout from \"5m\" to \"30m\""
-  - order: 4
-    cost: 25
-    content: "Add or increase ssh_handshake_attempts to 50 and validate: packer validate /opt/packer/build.pkr.hcl"
+- order: 1
+  cost: 10
+  content: 'Inspect the template: `cat /opt/packer/build.pkr.hcl`. The build times out waiting on SSH
+    during slow provisioning.'
+- order: 2
+  cost: 15
+  content: Find `ssh_timeout` in the source block — it's only `5m`, too short for the slow steps.
+- order: 3
+  cost: 20
+  content: Increase it (e.g. `ssh_timeout = "30m"`) and raise `ssh_handshake_attempts` to ~50 to tolerate
+    the slow boot.
+- order: 4
+  cost: 25
+  content: 'Validate before building: `packer validate /opt/packer/build.pkr.hcl` passes, and the build
+    no longer times out.'

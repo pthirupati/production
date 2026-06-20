@@ -1,24 +1,32 @@
 category: Linux Administration
-description: 'System drops to grub rescue. Reinstall GRUB.
-
-  '
+description: The system boots into the limited `grub rescue>` prompt instead of the OS because the GRUB
+  bootloader can't find its configuration/modules (a damaged install or a moved /boot). You must locate
+  the boot partition, load the OS, and reinstall GRUB so the machine boots normally again.
 difficulty: hard
 dual_terminal: false
 hints:
-- content: 'Try: grub2-install /dev/sda'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. System drops to grub rescue. Reinstall GRUB.
-
-  '
+  content: 'At `grub rescue>`, find the partitions: `ls` lists devices like (hd0,gpt2). Locate the one
+    with /boot (e.g. `ls (hd0,gpt1)/`) to identify boot vs root.'
+- order: 2
+  cost: 15
+  content: 'Set prefix/root to the boot partition and load the normal module to reach a real menu: `set
+    prefix=(hd0,gpt1)/grub2`, `set root=(hd0,gpt1)`, `insmod normal`, `normal` — then boot the OS.'
+- order: 3
+  cost: 20
+  content: 'Once booted (or in chroot from rescue media), reinstall and rebuild: `grub2-install /dev/sda`
+    and `grub2-mkconfig -o /boot/grub2/grub.cfg`. Reboot and confirm it comes up normally.'
+initial_state: Simulated RHEL 9 server that drops to the `grub rescue>` prompt at boot. GRUB cannot load
+  its normal configuration, so the OS does not start.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: grub2-install /dev/sda'
-- Verify validation passes
+- Identify the boot/root partition from the grub rescue prompt
+- Boot into the OS (or a rescue environment)
+- Reinstall GRUB and regenerate its config so the system boots normally
 requires_companion_hosts: false
 simulation_type: rhel
 slug: sim-rhel-grub-rescue

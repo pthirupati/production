@@ -10,14 +10,26 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Move interface to public zone and open only required ports.
+description: 'Build/hardening task: place the server''s network interface into the firewalld public zone
+  and open only the ports the service genuinely needs, removing anything unnecessary. The goal is a minimal,
+  least-privilege firewall posture — the interface bound to the right zone, with an explicit, small allow-list,
+  made persistent.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Assign the interface to the firewalld public zone
+- Open only the required ports/services and remove the rest
+- Make the configuration permanent and verify it
+initial_state: Linux host with firewalld active. The interface zone assignment and allowed services aren't
+  yet hardened to a minimal public-zone configuration.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Bind the interface to the public zone: `firewall-cmd --permanent --zone=public --change-interface=<iface>`.
+    Review current rules with `firewall-cmd --list-all`.'
+- order: 2
+  cost: 15
+  content: 'Add only what''s needed (e.g. `--add-service=https`) permanently, and remove anything extra:
+    `firewall-cmd --permanent --zone=public --remove-service=<unneeded>`.'
+- order: 3
+  cost: 20
+  content: 'Apply and verify: `firewall-cmd --reload`, then `firewall-cmd --zone=public --list-all` shows
+    the interface and only the intended services.'

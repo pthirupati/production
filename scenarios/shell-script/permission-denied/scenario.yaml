@@ -2,35 +2,38 @@ title: Script Not Executable
 slug: shell-permission-denied
 difficulty: easy
 category: Shell Scripting
-description: 'A deployment script fails with "Permission denied" when invoked from
-  a CI pipeline. The script file lacks the execute bit, the shebang line is missing
-  so the shell cannot determine the interpreter, and the script is owned by a different
-  user than the one running the pipeline. All three must be resolved for the script
-  to execute correctly.
+description: 'A deployment script fails with "Permission denied" when invoked from a CI pipeline. The
+  script file lacks the execute bit, the shebang line is missing so the shell cannot determine the interpreter,
+  and the script is owned by a different user than the one running the pipeline. All three must be resolved
+  for the script to execute correctly.
 
   '
-initial_state: 'Simulated RHEL 9 server. Running ./deploy.sh returns "Permission denied".
-  The file exists and contains valid bash commands.
+initial_state: 'Simulated RHEL 9 server. Running ./deploy.sh returns "Permission denied". The file exists
+  and contains valid bash commands.
 
   '
 objectives:
-  - Diagnose why the script cannot be executed (missing execute bit and shebang)
-  - Add the correct shebang line and set the execute permission with chmod
-  - Fix file ownership so the CI user can run the script
+- Diagnose why the script cannot be executed (missing execute bit and shebang)
+- Add the correct shebang line and set the execute permission with chmod
+- Fix file ownership so the CI user can run the script
 lab_mode: simulation
 simulation_type: generic
 time_limit: 600
 max_score: 100
 is_free: true
 hints:
-  - content: 'Run: ls -l deploy.sh to check permissions and owner. Look for the x
-      bit in the permission string.'
-    cost: 10
-    order: 1
-  - content: 'Fix permissions: chmod +x deploy.sh. Add shebang: the first line must
-      be #!/usr/bin/env bash'
-    cost: 10
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Check the file: `ls -l deploy.sh`. Look for the missing `x` (execute) bit and note the owner
+    — running `./deploy.sh` gives "Permission denied".'
+- order: 2
+  cost: 15
+  content: 'Two more causes: a missing shebang means the kernel can''t pick an interpreter, and the file
+    may be owned by another user than the CI user. View the first line: `head -1 deploy.sh`.'
+- order: 3
+  cost: 20
+  content: 'Fix all three: add `#!/usr/bin/env bash` as line 1, `chmod +x deploy.sh`, and `chown <ci-user>
+    deploy.sh` (or run via `bash deploy.sh`). Re-run `./deploy.sh` — it executes.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Low

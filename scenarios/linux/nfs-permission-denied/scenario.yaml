@@ -2,36 +2,33 @@ title: NFS Mount Shows Permission Denied
 slug: linux-nfs-permission-denied
 difficulty: medium
 category: Linux Administration
-description: |
-  An NFS share is mounted on the client and shows in df -h output, but any attempt to
-  list or create files returns "Permission denied". The NFS server configuration has a
-  root squash setting that is incorrectly preventing access. The exports configuration
-  must be corrected and re-applied without unmounting the share.
-
-initial_state: |
-  Simulated RHEL 9 server. The NFS share server:/srv/shared is mounted at /mnt/shared.
-  Running ls /mnt/shared returns "ls: cannot open directory '/mnt/shared': Permission denied".
-  The share was working yesterday but started failing after an /etc/exports update was
-  applied to the server.
-
+description: An NFS share is mounted on the client (it shows in df -h) but any attempt to list or create
+  files returns "Permission denied". The export uses root_squash (the default), which maps the client's
+  root to nobody, blocking root-owned access. Adjust the export options on the server so the intended
+  access works, then re-export without a restart.
+initial_state: Linux NFS client/server where /srv/shared is exported with root_squash, so root on the
+  client is squashed to nobody and gets Permission denied on the mounted share.
 objectives:
-  - Verify the mount exists with mount | grep nfs and showmount -e localhost
-  - Check /etc/exports for incorrect squash settings or missing no_root_squash
-  - Add no_root_squash to the export options for the affected entry
-  - Apply the change with exportfs -ra without needing to restart the NFS server
-  - Verify access is restored by running ls /mnt/shared and creating a test file
+- Verify the mount/export and confirm root_squash is the cause
+- Add no_root_squash (or appropriate options) to the export
+- Re-export with exportfs -ra and verify access is restored
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run showmount -e localhost to see current exports. Check /etc/exports — the default root_squash maps root on the client to the nobody user, causing permission issues.'
-    cost: 10
-    order: 1
-  - content: 'Edit /etc/exports and add no_root_squash to the options: /srv/shared 192.168.1.0/24(rw,sync,no_subtree_check,no_root_squash). Then run exportfs -ra to re-export.'
-    cost: 20
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Confirm the export and options: `showmount -e localhost` and inspect `/etc/exports` — the
+    default `root_squash` maps client-root to nobody, hence the denial.'
+- order: 2
+  cost: 15
+  content: Edit /etc/exports and add `no_root_squash` to the entry, e.g. `/srv/shared 192.168.1.0/24(rw,sync,no_root_squash)`.
+- order: 3
+  cost: 20
+  content: 'Apply without restarting NFS: `exportfs -ra`. Re-test on the client: `ls /mnt/shared` and
+    `touch /mnt/shared/test` now succeed.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

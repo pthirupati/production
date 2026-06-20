@@ -2,8 +2,13 @@ title: PXE Boot Failure
 slug: sim-bm-pxe-fail
 category: Bare Metal & IPMI
 difficulty: hard
-description: 'A bare-metal server fails PXE boot with ''No bootable device''. Verify DHCP, TFTP, and the PXE configuration files.'
-initial_state: 'Simulated RHEL 9 server. A bare-metal server fails PXE boot with ''No bootable device''. Verify DHCP, TFTP, and the PXE configuration files.'
+description: A bare-metal server fails to PXE boot and the console shows "No bootable device". The network
+  boot chain is broken at one of its links — the server isn't configured to boot from the NIC, the DHCP/next-server
+  (TFTP) pointer is wrong, or the PXE/pxelinux config file the TFTP server hands out is missing. Walk
+  the chain and restore a successful network boot.
+initial_state: Simulated bare-metal host managed via IPMI plus a provisioning server (DHCP + TFTP). The
+  server fails PXE with "No bootable device"; the boot order, DHCP next-server, or pxelinux config is
+  misconfigured.
 lab_mode: simulation
 simulation_type: baremetal
 is_free: false
@@ -13,10 +18,21 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: ipmitool chassis bootdev pxe'
-- Verify validation passes
+- Confirm the server attempts (and fails) a network boot
+- 'Verify each link in the PXE chain: boot order, DHCP/next-server, TFTP files'
+- Correct the broken link so the host PXE-boots successfully
 hints:
-- content: 'Try: ipmitool chassis bootdev pxe'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Force a network boot for the next power-on: `ipmitool chassis bootdev pxe` then `ipmitool
+    power cycle`. Watch the console — note whether it gets a DHCP lease at all.'
+- order: 2
+  cost: 15
+  content: 'Check the provisioning server: DHCP must hand out the correct `next-server` (TFTP IP) and
+    `filename` (e.g. pxelinux.0). Confirm TFTP serves it: `tftp <server> -c get pxelinux.0`. Then verify
+    the per-MAC config exists under pxelinux.cfg/.'
+- order: 3
+  cost: 20
+  content: Fix the broken link — set the right next-server/filename in dhcpd.conf and restart dhcpd, ensure
+    pxelinux.0 and the pxelinux.cfg/<mac> file are present and readable on the TFTP server — then `ipmitool
+    power cycle` and confirm the installer loads.

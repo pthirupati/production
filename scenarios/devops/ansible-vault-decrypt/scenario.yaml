@@ -8,30 +8,40 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  An Ansible playbook is failing because it cannot decrypt a vault-encrypted
+description: 'An Ansible playbook is failing because it cannot decrypt a vault-encrypted
+
   variables file. The vault password file path is misconfigured in ansible.cfg.
+
   Fix the vault password configuration so the playbook can decrypt and use
+
   the encrypted variables.
+
+  '
 objectives:
-  - Identify why Ansible vault decryption is failing
-  - Fix the vault_password_file path in ansible.cfg
-  - Verify the vault file can be decrypted successfully
-initial_state: |
-  Ubuntu server with Ansible installed. Playbook at /opt/ansible/site.yml uses
+- Identify why Ansible vault decryption is failing
+- Fix the vault_password_file path in ansible.cfg
+- Verify the vault file can be decrypted successfully
+initial_state: 'Ubuntu server with Ansible installed. Playbook at /opt/ansible/site.yml uses
+
   encrypted vars at /opt/ansible/vars/secrets.yml. The ansible.cfg has a wrong
+
   path for vault_password_file pointing to /etc/ansible/vault_pass which does
+
   not exist. The actual vault password file is at /opt/ansible/.vault_pass.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check ansible.cfg: cat /opt/ansible/ansible.cfg"
-  - order: 2
-    cost: 15
-    content: "Look for vault_password_file setting — the path is wrong"
-  - order: 3
-    cost: 20
-    content: "Find the actual vault pass file: ls -la /opt/ansible/.vault_pass"
-  - order: 4
-    cost: 25
-    content: "Edit ansible.cfg: change vault_password_file = /etc/ansible/vault_pass to vault_password_file = /opt/ansible/.vault_pass"
+- order: 1
+  cost: 10
+  content: 'Reproduce and inspect config: run the playbook to see the decrypt failure, then `cat /opt/ansible/ansible.cfg`.'
+- order: 2
+  cost: 15
+  content: Look at the `vault_password_file` setting in ansible.cfg — the path it points to doesn't exist,
+    so Ansible can't get the key to decrypt the vars file.
+- order: 3
+  cost: 20
+  content: 'Find the real password file: `ls -la /opt/ansible/.vault_pass` (the actual location).'
+- order: 4
+  cost: 25
+  content: 'Edit ansible.cfg so `vault_password_file` points to the real file (e.g. `/opt/ansible/.vault_pass`),
+    then verify: `ansible-vault view <encrypted-file>` decrypts successfully.'

@@ -10,14 +10,24 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Write terraform config and run terraform validate.
+description: 'Build task: provision an S3 bucket with Terraform from scratch. Starting with no Terraform
+  configuration, write the provider and an aws_s3_bucket resource (with sensible settings), validate the
+  configuration, and run it through plan/apply so the bucket is created and the config is clean.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- 'Write Terraform config: the AWS provider and an aws_s3_bucket resource'
+- Run terraform init and terraform validate successfully
+- Apply the plan and confirm the bucket is created
+initial_state: Empty Terraform working directory with AWS access available. No .tf files exist yet.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Create main.tf with a `provider "aws" { region = "us-east-1" }` block and a resource: `resource
+    "aws_s3_bucket" "this" { bucket = "my-unique-bucket-name" }`.'
+- order: 2
+  cost: 15
+  content: 'Initialize and validate: `terraform init` then `terraform validate` (fix any HCL/type errors
+    it reports).'
+- order: 3
+  cost: 20
+  content: 'Preview and apply: `terraform plan` then `terraform apply`. Confirm the bucket exists with
+    `aws s3 ls | grep my-unique-bucket-name` (or `terraform state list`).'

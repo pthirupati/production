@@ -1,24 +1,32 @@
 category: Python Development
-description: 'app.py has a syntax error. Fix and run.
-
-  '
+description: A Python program won't run because of a SyntaxError raised at import/parse time — a missing
+  colon, unbalanced brackets/quotes, or bad indentation. Read the error's file and line, correct the syntax,
+  and confirm the program parses and runs.
 difficulty: easy
 dual_terminal: false
 hints:
-- content: 'Try: python3 app.py'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. app.py has a syntax error. Fix and run.
-
-  '
+  content: 'Run it: `python file.py`. The SyntaxError prints the file, the line number, and a `^` under
+    the spot the parser choked on.'
+- order: 2
+  cost: 15
+  content: Inspect that line and the one above it — missing `:` after def/if/for, an unclosed `(`/`[`/quote,
+    or mixed tabs/spaces are the usual culprits. `python -m py_compile file.py` checks without running.
+- order: 3
+  cost: 20
+  content: Fix the character (add the colon, close the bracket, normalize indentation to spaces), re-run
+    `python -m py_compile file.py` to confirm it parses, then run the program.
+initial_state: Python file containing a syntax error (e.g. missing colon on a def/if, unclosed parenthesis,
+  or inconsistent indentation). `python file.py` aborts before executing with a SyntaxError.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: python3 app.py'
-- Verify validation passes
+- Read the SyntaxError's filename, line number, and caret position
+- Correct the offending syntax
+- Confirm the file parses and the program runs
 requires_companion_hosts: false
 simulation_type: python
 slug: sim-python-syntax-error

@@ -1,5 +1,5 @@
 slug: weak-password-policy
-title: "Weak Password Policy — Fix PAM to Enforce Complexity"
+title: Weak Password Policy — Fix PAM to Enforce Complexity
 technology: Security
 category: Authentication
 difficulty: medium
@@ -8,31 +8,43 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  A security audit found that system password policy is not enforcing any complexity
+description: 'A security audit found that system password policy is not enforcing any complexity
+
   requirements. Users can set passwords like "password", "123456", or their own
+
   username. The pam_pwquality module is installed but not configured — minlen is 0
+
   and no complexity checks are enabled. Configure PAM to require passwords of at
+
   least 12 characters with mixed case, digits, and special characters.
+
+  '
 objectives:
-  - Identify that pam_pwquality is not enforcing complexity
-  - Configure /etc/security/pwquality.conf with appropriate settings
-  - Set minlen=12, dcredit=-1, ucredit=-1, ocredit=-1, lcredit=-1
-  - Verify the policy is enforced for new password changes
-initial_state: |
-  Ubuntu 22.04 with libpam-pwquality installed. /etc/security/pwquality.conf has
+- Identify that pam_pwquality is not enforcing complexity
+- Configure /etc/security/pwquality.conf with appropriate settings
+- Set minlen=12, dcredit=-1, ucredit=-1, ocredit=-1, lcredit=-1
+- Verify the policy is enforced for new password changes
+initial_state: 'Ubuntu 22.04 with libpam-pwquality installed. /etc/security/pwquality.conf has
+
   all settings commented out or set to 0. Users can set weak passwords without
+
   restriction. /etc/pam.d/common-password does include pam_pwquality.so.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check current policy: `cat /etc/security/pwquality.conf`"
-  - order: 2
-    cost: 15
-    content: "Edit /etc/security/pwquality.conf — set: minlen=12, dcredit=-1, ucredit=-1, ocredit=-1, lcredit=-1, minclass=4"
-  - order: 3
-    cost: 10
-    content: "Test enforcement: `passwd testuser` and try setting a weak password — it should be rejected."
-  - order: 4
-    cost: 15
-    content: "Also set `retry=3` to limit password attempts and `enforce_for_root=1` to apply policy to root."
+- order: 1
+  cost: 10
+  content: 'Check the current policy: `cat /etc/security/pwquality.conf` — no complexity is enforced,
+    so trivial passwords are accepted.'
+- order: 2
+  cost: 15
+  content: 'Set complexity in /etc/security/pwquality.conf: `minlen=12`, `dcredit=-1 ucredit=-1 ocredit=-1
+    lcredit=-1` (require each class), `minclass=4`.'
+- order: 3
+  cost: 20
+  content: Also add `retry=3` and `enforce_for_root=1` so the policy is fully enforced, including for
+    root.
+- order: 4
+  cost: 25
+  content: 'Test enforcement: run `passwd testuser` and try a weak password like "password" — it is rejected,
+    while a strong 12+ char mixed password is accepted.'

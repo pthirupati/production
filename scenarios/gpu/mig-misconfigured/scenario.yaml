@@ -2,8 +2,12 @@ title: MIG Partition Misconfigured
 slug: sim-gpu-mig
 category: GPU & NVIDIA
 difficulty: hard
-description: 'An A100 GPU has MIG mode enabled but partitions are misconfigured, blocking workloads. Reconfigure MIG profiles and verify workload access.'
-initial_state: 'Simulated RHEL 9 server. An A100 GPU has MIG mode enabled but partitions are misconfigured, blocking workloads. Reconfigure MIG profiles and verify workload access.'
+description: A workload requesting a MIG GPU instance can't be scheduled or sees the wrong amount of memory
+  because MIG is misconfigured. Either MIG mode isn't enabled, or the GPU instance / compute instance
+  profile created doesn't match what the job requests. Configure the correct MIG layout so the workload
+  gets its slice.
+initial_state: Host with a MIG-capable NVIDIA GPU (e.g. A100). MIG is either disabled or partitioned into
+  the wrong profile sizes, so the requested MIG instance is unavailable to workloads.
 lab_mode: simulation
 simulation_type: gpu
 is_free: false
@@ -13,10 +17,20 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: nvidia-smi mig -lgip'
-- Verify validation passes
+- Inspect current MIG mode and existing GPU/compute instances
+- Determine the required MIG profile for the workload
+- Create the correct MIG instances and verify they are available
 hints:
-- content: 'Try: nvidia-smi mig -lgip'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Check MIG state: `nvidia-smi --query-gpu=mig.mode.current --format=csv` and `nvidia-smi mig
+    -lgi` (list GPU instances). If MIG is Disabled, that''s why no instances exist.'
+- order: 2
+  cost: 15
+  content: 'Enable MIG if needed: `sudo nvidia-smi -mig 1` (may require no running GPU processes / a reset).
+    List available profiles: `nvidia-smi mig -lgip`.'
+- order: 3
+  cost: 20
+  content: 'Create the matching instances, e.g. a 3g.20gb GPU instance and its compute instance: `sudo
+    nvidia-smi mig -cgi 3g.20gb -C`. Confirm with `nvidia-smi mig -lgi` that the slice the workload requests
+    now exists.'

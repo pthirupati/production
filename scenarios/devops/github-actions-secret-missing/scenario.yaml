@@ -8,29 +8,40 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  A GitHub Actions workflow is failing because it references a secret DEPLOY_KEY
+description: 'A GitHub Actions workflow is failing because it references a secret DEPLOY_KEY
+
   that has not been added to the repository. The deploy step exits with an error
+
   about an empty or missing environment variable. Add the required secret so the
+
   workflow can complete successfully.
+
+  '
 objectives:
-  - Identify the missing secret referenced in the workflow file
-  - Add the DEPLOY_KEY secret to the repository secrets
-  - Verify the workflow can access the secret without errors
-initial_state: |
-  A GitHub repository with a workflow at .github/workflows/deploy.yml that references
+- Identify the missing secret referenced in the workflow file
+- Add the DEPLOY_KEY secret to the repository secrets
+- Verify the workflow can access the secret without errors
+initial_state: 'A GitHub repository with a workflow at .github/workflows/deploy.yml that references
+
   ${{ secrets.DEPLOY_KEY }} but the secret has not been configured. The deploy key
+
   value is stored at /opt/deploy/deploy_key.pem on this server.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "View the workflow: cat .github/workflows/deploy.yml"
-  - order: 2
-    cost: 15
-    content: "Look for ${{ secrets.DEPLOY_KEY }} — this secret must be added to repository settings"
-  - order: 3
-    cost: 20
-    content: "Use gh CLI: gh secret set DEPLOY_KEY < /opt/deploy/deploy_key.pem"
-  - order: 4
-    cost: 25
-    content: "Verify the secret was added: gh secret list"
+- order: 1
+  cost: 10
+  content: 'Read the workflow to find the referenced secret: `cat .github/workflows/deploy.yml` — the
+    deploy step uses `${{ secrets.DEPLOY_KEY }}`.'
+- order: 2
+  cost: 15
+  content: That secret hasn't been added to the repo, so it resolves empty and the step fails — it must
+    be created in repository (or environment) secrets.
+- order: 3
+  cost: 20
+  content: 'Add it with the gh CLI: `gh secret set DEPLOY_KEY < /opt/deploy/deploy_key.pem` (or via Settings
+    > Secrets and variables > Actions).'
+- order: 4
+  cost: 25
+  content: Verify it exists (`gh secret list` shows DEPLOY_KEY) and re-run the workflow — the deploy step
+    now has the key and succeeds.

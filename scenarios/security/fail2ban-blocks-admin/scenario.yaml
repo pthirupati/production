@@ -2,17 +2,32 @@ title: fail2ban Blocks Admin SSH
 slug: security-fail2ban-blocks-admin
 category: Security
 difficulty: medium
-description: |
-  Admin SSH access is blocked after brute-force triggers fail2ban. Unban IP and whitelist admin subnet.
+description: After a burst of failed logins from the admin's own network, fail2ban banned the admin's
+  IP and now legitimate SSH from that subnet is blocked. The immediate need is to unban the admin IP and
+  then whitelist the admin subnet (ignoreip) so this doesn't recur, while keeping protection against real
+  attackers.
 lab_mode: simulation
 simulation_type: rhel
 time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Check fail2ban status and banned IPs
-  - Unban admin IP and add to ignoreip
+- Confirm the admin IP is banned in the sshd jail
+- Unban the admin IP to restore access
+- Whitelist the admin subnet (ignoreip) so it isn't banned again
 hints:
-  - content: "fail2ban-client status sshd && fail2ban-client set sshd unbanip ADMIN_IP"
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: 'Check who''s banned: `fail2ban-client status sshd` lists the banned IPs (the admin''s IP is
+    among them).'
+- order: 2
+  cost: 15
+  content: 'Unban it immediately: `fail2ban-client set sshd unbanip <ADMIN_IP>` to restore SSH from that
+    address.'
+- order: 3
+  cost: 20
+  content: 'Prevent recurrence: add the admin subnet to `ignoreip` in /etc/fail2ban/jail.local (e.g. `ignoreip
+    = 127.0.0.1/8 <admin-subnet>`), then `systemctl restart fail2ban` and confirm the admin can SSH while
+    real attackers still get banned.'
+initial_state: Linux server where fail2ban's sshd jail has banned the administrator's IP, blocking legitimate
+  SSH; the admin subnet is not in the ignore list.

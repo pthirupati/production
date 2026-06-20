@@ -1,25 +1,33 @@
 category: Linux Administration
-description: 'Boot hangs at dracut initqueue. Regenerate initramfs.
-
-  '
+description: 'Boot hangs in the dracut initqueue ("Warning: dracut-initqueue timeout") and eventually
+  drops to an emergency shell because the initramfs can''t assemble the root device. A missing driver/module
+  or a stale initramfs is preventing the root filesystem from being mounted. Regenerate a correct initramfs
+  so the system boots.'
 difficulty: hard
 dual_terminal: false
 hints:
-- content: 'Try: dracut -f'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. Boot hangs at dracut initqueue. Regenerate
-  initramfs.
-
-  '
+  content: 'In the dracut emergency shell, check why root isn''t ready: `dmesg | tail`, `cat /proc/cmdline`
+    (is the root= correct?), and `ls /dev/mapper` / `blkid` to see if the device exists.'
+- order: 2
+  cost: 15
+  content: If a needed storage driver is absent from the initramfs (or it's just stale), it must be rebuilt
+    with the right modules — e.g. force-add the driver and LVM support.
+- order: 3
+  cost: 20
+  content: 'Regenerate it (booting from rescue media or after mounting root): `dracut -f --regenerate-all`
+    (or `dracut -f /boot/initramfs-$(uname -r).img $(uname -r)`). Reboot — root mounts and boot completes.'
+initial_state: Simulated RHEL 9 server. Boot stalls at the dracut initqueue and times out into the dracut
+  emergency shell; the root device isn't being found by the current initramfs.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: dracut -f'
-- Verify validation passes
+- Recognize the dracut initqueue timeout and that root can't be assembled
+- Determine the missing module/driver or stale initramfs
+- Regenerate the initramfs so the root device mounts and the system boots
 requires_companion_hosts: false
 simulation_type: rhel
 slug: sim-rhel-initramfs-dracut

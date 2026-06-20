@@ -11,21 +11,24 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q21 nologin shell — usermod -s /bin/bash
-description: deploy user exists but interactive login immediately closes. Shell is /usr/sbin/nologin.
+description: The 'deploy' user exists and authenticates, but any interactive login closes immediately
+  because its login shell is set to /usr/sbin/nologin (a shell designed to refuse logins). Service accounts
+  use nologin intentionally, but deploy needs an interactive shell. Set a real shell for the account and
+  verify login works.
 objectives:
-- Check /etc/passwd shell field
-- Affected service behaves normally
-- Verify login works
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm deploy's login shell is nologin in /etc/passwd
+- Change the shell to an interactive shell (e.g. /bin/bash)
+- Verify deploy can log in interactively
+initial_state: Linux server where the deploy user's login shell is /usr/sbin/nologin, so interactive logins
+  are immediately terminated.
 hints:
 - order: 1
   cost: 10
-  content: '`usermod -s /bin/bash deploy`'
+  content: 'Check the shell field: `getent passwd deploy` ends in `/usr/sbin/nologin`, which prints a
+    message and exits on login.'
 - order: 2
   cost: 15
-  content: Change shell with usermod -s
+  content: 'Set a real shell: `usermod -s /bin/bash deploy` (ensure /bin/bash is listed in /etc/shells).'
 - order: 3
-  cost: 15
-  content: Verify login works
+  cost: 20
+  content: 'Verify: `su - deploy` now opens an interactive shell instead of closing immediately.'

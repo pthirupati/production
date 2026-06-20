@@ -9,37 +9,27 @@ time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: 'After a rushed security hardening, SSH access to the production
-
-  the sshd configuration, restore valid host key permissions, and
-
-  get SSH running on port 22 again.'
+description: 'After a rushed security hardening pass, SSH to the production host is broken: sshd_config
+  contains invalid directives so the service won''t start (or won''t listen on port 22), and the host
+  key file permissions were changed so sshd refuses them. Validate and fix the config, restore correct
+  host-key permissions, and get sshd listening on 22 again.'
 objectives:
-- Affected service behaves normally
-initial_state: 'You have console/shell access to an Ubuntu 22.04 DigitalOcean droplet.
-
-  SSH daemon fails to start due to configuration errors.
-
-  '
+- Validate sshd_config and identify the invalid directives
+- Fix the config (restore listening on port 22) and host-key file permissions
+- Start sshd and verify it is serving SSH
+initial_state: 'Linux server where over-aggressive hardening broke SSH: sshd_config has invalid options
+  (and/or a non-standard port), and /etc/ssh/ssh_host_*_key files have wrong permissions, so sshd fails
+  to serve.'
 hints:
 - order: 1
   cost: 10
-  content: Run `sshd -t` to validate the configuration syntax.
+  content: 'Validate the config: `sshd -t` prints the offending line(s). Also confirm the intended `Port
+    22`/`ListenAddress` settings.'
 - order: 2
   cost: 15
-  content: Check for typos in sshd_config — look for invalid directives.
+  content: 'Correct the invalid directives in /etc/ssh/sshd_config. Host keys must be tightly permissioned:
+    `chmod 600 /etc/ssh/ssh_host_*_key`.'
 - order: 3
   cost: 20
-  content: 'Host keys must be mode 600: `chmod 600 /etc/ssh/ssh_host_*_key`'
-- order: 4
-  cost: 15
-  content: Fix invalid options in /etc/ssh/sshd_config
-- order: 5
-  cost: 15
-  content: Restore SSH to listen on port 22
-- order: 6
-  cost: 15
-  content: Fix host key file permissions (600)
-- order: 7
-  cost: 15
-  content: Start and verify the sshd service
+  content: 'Once `sshd -t` is clean, `systemctl restart sshd` and confirm it''s listening: `ss -tlnp |
+    grep :22`. Test a connection before closing your current session.'

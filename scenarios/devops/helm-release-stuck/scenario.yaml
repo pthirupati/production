@@ -2,18 +2,31 @@ title: Helm Release Stuck Pending Upgrade
 slug: devops-helm-release-stuck
 category: DevOps
 difficulty: medium
-description: |
-  Helm release is stuck in pending-upgrade state after a failed chart values change.
-  Roll back or complete the upgrade.
+description: A Helm release is stuck in pending-upgrade state after a failed chart/values change, so Helm
+  refuses further operations on it ("another operation is in progress" or it stays pending). The release
+  must be recovered by rolling back to the last good revision or completing the upgrade. Identify the
+  failed revision and restore the release to deployed.
 lab_mode: simulation
 simulation_type: devops
 time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Run helm history and identify failed revision
-  - helm rollback or helm upgrade --force
+- Run helm history and identify the failed/pending revision
+- Roll back to the last good revision (or force-complete the upgrade)
+- Verify the release returns to deployed and pods are healthy
 hints:
-  - content: "helm history release-name && helm rollback release-name REV"
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: 'Inspect the release: `helm history <release> -n <ns>` and `helm status <release> -n <ns>`
+    — the latest revision is pending-upgrade/failed.'
+- order: 2
+  cost: 15
+  content: 'Recover by rolling back to the last DEPLOYED revision: `helm rollback <release> <good-rev>
+    -n <ns>` (or re-run `helm upgrade --force` if you mean to complete it).'
+- order: 3
+  cost: 20
+  content: 'Confirm: `helm status <release> -n <ns>` shows STATUS deployed and `kubectl get pods -n <ns>`
+    shows the pods Running.'
+initial_state: Kubernetes cluster with Helm. A release is stuck in pending-upgrade after an upgrade failed
+  mid-flight, blocking new upgrades until it's rolled back or forced to complete.

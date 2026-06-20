@@ -2,17 +2,29 @@ title: Kernel Update Requires Reboot
 slug: linux-patch-reboot-required
 category: Patching
 difficulty: easy
-description: |
-  Security patches were installed but the system still runs the old kernel. Reboot to activate.
+description: Security patches (including a kernel update) were installed, but the system is still running
+  the old kernel because it hasn't been rebooted — the new kernel only takes effect after a reboot. Confirm
+  the running kernel lags the installed one, then reboot and verify the new kernel is active.
 lab_mode: simulation
 simulation_type: rhel
 time_limit: 600
 max_score: 100
 is_free: false
 objectives:
-  - Verify pending kernel with uname -r vs rpm -q kernel
-  - Reboot and confirm new kernel is active
+- Confirm the running kernel differs from the latest installed kernel
+- Reboot the system
+- Verify the new kernel is active after reboot
 hints:
-  - content: "Compare uname -r with rpm -q kernel --last; reboot when needed"
-    cost: 5
-    order: 1
+- order: 1
+  cost: 10
+  content: 'Compare running vs installed: `uname -r` (running) against the newest in `rpm -q kernel --last`
+    (or `dpkg -l ''linux-image*''`). The running one is older.'
+- order: 2
+  cost: 15
+  content: A kernel update only applies on boot — schedule and `reboot` (or `systemctl reboot`).
+- order: 3
+  cost: 20
+  content: After it comes back, `uname -r` matches the newly installed kernel, confirming the patch is
+    active.
+initial_state: Linux server where a newer kernel package is installed but the running kernel is older;
+  a reboot is required to activate the patched kernel.

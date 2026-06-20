@@ -10,14 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Create index.html and serve via nginx on port 80.
+description: 'Build task: publish a static HTML page and serve it with nginx on port 80. Starting from
+  a host with nginx but no site, create an index.html, place it in the web root, ensure nginx is configured
+  and running, and verify the page is served over HTTP.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Create an index.html in the nginx document root
+- Ensure nginx is configured to serve it on port 80 and is running
+- Verify the page is reachable over HTTP
+initial_state: Linux host with nginx installed but no site content deployed. Port 80 should serve your
+  static page once configured.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Create the page in the default root: write `/usr/share/nginx/html/index.html` (or /var/www/html/index.html
+    on Debian) with some HTML content.'
+- order: 2
+  cost: 15
+  content: 'Make sure nginx serves it: `nginx -t` to validate config, then `systemctl enable --now nginx`
+    (or `systemctl restart nginx`). The default server listens on port 80.'
+- order: 3
+  cost: 20
+  content: 'Verify: `curl -s http://localhost/` returns your HTML. If you get a 403/404, check the `root`
+    directive and that index.html exists and is readable by nginx.'

@@ -11,24 +11,26 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q6 df vs du — lsof /proc/fd, restart process
-description: df shows /var/log 100% full but du sums to much less. A process holds a deleted log file open.
+description: '`df` reports /var/log at 100% full, but `du` of the directory sums to far less. A running
+  process still holds a large log file open after it was deleted, so the space isn''t released until the
+  file descriptor is closed. Find the process holding the deleted file and reclaim the space without a
+  reboot.'
 objectives:
-- Storage layout and utilization are understood
-- Find open deleted files with lsof
-- Affected service behaves normally
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Recognize the df-vs-du discrepancy points to a deleted-but-open file
+- Find the process and descriptor holding the deleted file
+- Reclaim the space (close/truncate the fd or restart the holder)
+initial_state: Linux server where /var/log shows full in df but not in du. A process keeps a deleted log
+  file open, pinning its blocks.
 hints:
 - order: 1
-  cost: 15
-  content: '`lsof +L1 /var/log` or `lsof | grep deleted`'
+  cost: 10
+  content: Compare `df -h /var/log` (100%) with `du -sh /var/log` (much less). The gap means space is
+    held by deleted-but-open files.
 - order: 2
-  cost: 25
-  content: 'Kill the holder PID or `>: /proc/PID/fd/N`'
+  cost: 15
+  content: 'Find the holder: `lsof +L1 /var/log` (or `lsof | grep deleted`) lists the PID and the open
+    fd pointing at the deleted file.'
 - order: 3
-  cost: 15
-  content: Compare df vs du
-- order: 4
-  cost: 15
-  content: Stop process or truncate via /proc/PID/fd
+  cost: 20
+  content: 'Release the space without rebooting: truncate the descriptor with `: > /proc/<PID>/fd/<N>`
+    or restart/HUP the process. `df -h /var/log` immediately shows the space back.'

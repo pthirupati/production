@@ -11,25 +11,26 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q7 XFS repair — xfs_repair, mount after clean log
-description: /data fails to mount after unclean shutdown. xfs_repair is required before the application config can be read.
+description: The /data XFS filesystem fails to mount after an unclean shutdown, and the application can't
+  read its config until the volume is healthy. XFS may need its log replayed or, if that's not possible,
+  an explicit xfs_repair (which must be run on an UNMOUNTED filesystem). Check the errors, repair the
+  filesystem, and remount so /data accepts writes again.
 objectives:
-- Read mount/dmesg errors
-- Unmount broken mountpoint
-- Affected service behaves normally
-- /data accepts writes again
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Read the mount/dmesg errors and confirm XFS corruption
+- Unmount and repair the filesystem with xfs_repair
+- Remount /data and verify it accepts writes
+initial_state: Linux server where the XFS filesystem on /data won't mount cleanly after a crash; xfs_repair
+  is required before the data is accessible.
 hints:
 - order: 1
-  cost: 15
-  content: '`dmesg | tail` and `xfs_repair -n /dev/loop0`'
+  cost: 10
+  content: 'See why mount fails: `mount /data` errors and `dmesg | tail` shows XFS corruption/log messages.
+    Preview the repair read-only: `xfs_repair -n /dev/loop0`.'
 - order: 2
-  cost: 30
-  content: '`umount /data && xfs_repair /dev/loop0 && mount /data`'
+  cost: 20
+  content: 'xfs_repair requires the FS unmounted: `umount /data` then `xfs_repair /dev/loop0`. (If it
+    asks to mount-and-replay the log first, do that; only use `-L` to zero a damaged log as a last resort.)'
 - order: 3
-  cost: 15
-  content: Run xfs_repair
-- order: 4
-  cost: 15
-  content: Remount and verify data
+  cost: 30
+  content: 'Remount and verify: `mount /data && touch /data/test && rm /data/test` succeeds, and the application
+    can read its config.'

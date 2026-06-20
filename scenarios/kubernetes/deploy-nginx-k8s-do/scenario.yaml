@@ -10,14 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: |
-  Task lab — Apply deployment and service; verify pod Running.
+description: 'Build task: deploy a basic nginx web server to the cluster and expose it. There is no running
+  nginx workload yet. Create a Deployment running the nginx image and a Service so the page is reachable,
+  then verify the pods are Ready and the endpoint serves the default nginx welcome page.'
 objectives:
-  - Complete the build task from scratch
-  - Pass validation when finished
-initial_state: |
-  Greenfield environment — nothing pre-configured for this task.
+- Create an nginx Deployment with at least one replica
+- Expose the Deployment with a Service on port 80
+- Verify the pods are Running/Ready and the Service has endpoints
+initial_state: Simulated Kubernetes cluster with kubectl configured against the default namespace. No
+  nginx Deployment or Service exists yet.
 hints:
-  - order: 1
-    cost: 10
-    content: "Read objectives carefully — this is a creation lab, not a break/fix scenario."
+- order: 1
+  cost: 10
+  content: 'Create the workload: `kubectl create deployment nginx --image=nginx:1.25 --replicas=2`. Watch
+    it come up with `kubectl get pods -w`.'
+- order: 2
+  cost: 15
+  content: 'Expose it: `kubectl expose deployment nginx --port=80 --target-port=80`. Confirm the Service
+    got endpoints with `kubectl get endpoints nginx`.'
+- order: 3
+  cost: 20
+  content: 'Verify end to end: `kubectl run curl --image=curlimages/curl -it --rm -- curl -s http://nginx`
+    should return the "Welcome to nginx" HTML.'

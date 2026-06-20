@@ -8,29 +8,39 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  CI/CD pipeline artifact uploads to Nexus Repository Manager are failing with
-  HTTP 403 Forbidden. The deploy user account doesn't have the correct role
+description: 'CI/CD pipeline artifact uploads to Nexus Repository Manager are failing with
+
+  HTTP 403 Forbidden. The deploy user account doesn''t have the correct role
+
   assigned to upload to the releases repository. Fix the permissions so the
+
   pipeline can upload artifacts.
+
+  '
 objectives:
-  - Identify the Nexus user missing upload permissions
-  - Assign the nx-repository-write role to the deploy user
-  - Verify artifact upload succeeds after permission fix
-initial_state: |
-  Nexus Repository Manager running at http://localhost:8081. The "deploy" user
+- Identify the Nexus user missing upload permissions
+- Assign the nx-repository-write role to the deploy user
+- Verify artifact upload succeeds after permission fix
+initial_state: 'Nexus Repository Manager running at http://localhost:8081. The "deploy" user
+
   exists but only has the nx-anonymous role. The releases repository requires
+
   nx-repository-write permission. Admin credentials are in /opt/nexus/admin_creds.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Test upload: curl -u deploy:deploy123 -X POST http://localhost:8081/repository/releases/ -F file=@test.jar"
-  - order: 2
-    cost: 15
-    content: "Get admin creds: cat /opt/nexus/admin_creds"
-  - order: 3
-    cost: 20
-    content: "Use Nexus REST API to add role: curl -u admin:<pass> -X PUT http://localhost:8081/service/rest/v1/security/users/deploy with updated roles"
-  - order: 4
-    cost: 25
-    content: "Add role nx-repository-write or nx-releases-write to the deploy user via API or UI"
+- order: 1
+  cost: 10
+  content: 'Reproduce the 403: `curl -u deploy:deploy123 -X POST http://localhost:8081/repository/releases/
+    -F file=@<artifact>` returns Forbidden — the deploy user lacks write rights.'
+- order: 2
+  cost: 15
+  content: 'Get admin credentials to manage roles: `cat /opt/nexus/admin_creds`.'
+- order: 3
+  cost: 20
+  content: 'Grant the deploy user a write role via the REST API (or UI): add `nx-repository-write` (or
+    `nx-releases-write`) to the user, e.g. `curl -u admin:<pass> -X PUT http://localhost:8081/service/rest/v1/security/users/deploy
+    ...`.'
+- order: 4
+  cost: 25
+  content: Re-test the upload as deploy — it now returns 201/succeeds.

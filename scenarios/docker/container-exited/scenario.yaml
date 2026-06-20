@@ -1,25 +1,33 @@
 category: Docker & Containers
-description: 'Web container exited with code 1. Investigate and restart.
-
-  '
+description: A container that should be running has exited immediately and shows status Exited. The container's
+  main process either errored on startup, finished and returned, or hit a bad command/config. Inspect
+  why it exited, fix the cause, and restart it so it stays Up.
 difficulty: easy
 dual_terminal: false
 hints:
-- content: 'Try: docker start web'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. Web container exited with code 1. Investigate
-  and restart.
-
-  '
+  content: 'List all containers including stopped ones: `docker ps -a`. Note the STATUS/exit code of the
+    exited container.'
+- order: 2
+  cost: 15
+  content: 'Read why it died: `docker logs <container>`. Inspect its config if logs are empty: `docker
+    inspect <container> --format ''{{.Config.Cmd}} {{.State.Error}}''`.'
+- order: 3
+  cost: 20
+  content: Fix the root cause (bad command, missing env var/volume, or a foreground process that exits),
+    then `docker start <container>` (or `docker rm` and `docker run` with the correction). Confirm with
+    `docker ps`.
+initial_state: Docker host. A container is in Exited state instead of Up — its main process terminated
+  shortly after start. `docker ps -a` shows a non-zero (or zero) exit code.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: docker start web'
-- Verify validation passes
+- Find the exited container and its exit code
+- Read the container logs to learn why it stopped
+- Fix the cause and restart the container so it stays running
 requires_companion_hosts: false
 simulation_type: generic
 slug: sim-docker-container-exited

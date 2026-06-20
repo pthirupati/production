@@ -1,5 +1,5 @@
 slug: ssl-cert-expired
-title: "SSL Certificate Expired — Replace nginx TLS Certificate"
+title: SSL Certificate Expired — Replace nginx TLS Certificate
 technology: Networking
 category: TLS/SSL
 difficulty: medium
@@ -8,32 +8,26 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  Users are receiving SSL_ERROR_EXPIRED errors when connecting to the nginx
-  web server. The TLS certificate expired 3 days ago and was never rotated.
-  The certificate was originally issued by an internal CA. A new certificate
-  and private key have been generated and placed in /tmp/new-cert.pem and
-  /tmp/new-key.pem. Update the nginx configuration to use the new certificate
-  and reload the service.
+description: HTTPS endpoints are failing certificate validation because the nginx TLS certificate is expired
+  (or expires within a day). Browsers and clients reject the connection. Generate/install a valid certificate,
+  point nginx at it, and reload so secure connections work again with a non-expired certificate.
 objectives:
-  - Verify the current certificate is expired using openssl
-  - Replace the certificate and key files referenced in nginx config
-  - Reload nginx without downtime
-  - Confirm the new certificate is valid and nginx serves HTTPS correctly
-initial_state: |
-  Ubuntu 22.04 with nginx. Current cert at /etc/nginx/ssl/server.crt expired
-  3 days ago. New cert and key ready at /tmp/new-cert.pem and /tmp/new-key.pem.
-  HTTPS returns ERR_CERT_DATE_INVALID to clients.
+- Confirm the current certificate's expiry
+- Generate/install a new valid certificate and key
+- Reload nginx and verify HTTPS serves a non-expired certificate
+initial_state: Linux server running nginx with an expired (or about-to-expire) TLS certificate at /etc/nginx/ssl/cert.pem,
+  causing HTTPS validation failures.
 hints:
-  - order: 1
-    cost: 10
-    content: "Check expiry: `openssl x509 -in /etc/nginx/ssl/server.crt -noout -dates`"
-  - order: 2
-    cost: 15
-    content: "Copy new files: `cp /tmp/new-cert.pem /etc/nginx/ssl/server.crt && cp /tmp/new-key.pem /etc/nginx/ssl/server.key`"
-  - order: 3
-    cost: 10
-    content: "Validate nginx config: `nginx -t` then reload: `systemctl reload nginx`"
-  - order: 4
-    cost: 15
-    content: "Verify: `openssl s_client -connect localhost:443 </dev/null 2>/dev/null | openssl x509 -noout -dates`"
+- order: 1
+  cost: 10
+  content: 'Check the dates: `openssl x509 -in /etc/nginx/ssl/cert.pem -noout -dates` — notAfter is in
+    the past (or imminent).'
+- order: 2
+  cost: 15
+  content: 'Issue a replacement (self-signed here; in prod use your CA/ACME): `openssl req -x509 -newkey
+    rsa:2048 -nodes -keyout /etc/nginx/ssl/key.pem -out /etc/nginx/ssl/cert.pem -days 365 -subj ''/CN=<host>''`.'
+- order: 3
+  cost: 20
+  content: 'Make sure nginx points at the new cert/key, validate and reload: `nginx -t && systemctl reload
+    nginx`. Verify: `echo | openssl s_client -connect localhost:443 2>/dev/null | openssl x509 -noout
+    -dates` shows a future notAfter.'

@@ -2,8 +2,11 @@ title: PVC Stuck — Wrong StorageClass
 slug: sim-k8s-pvc-storageclass
 category: Kubernetes
 difficulty: medium
-description: 'A PersistentVolumeClaim stays in Pending state because the requested StorageClass does not exist. Fix the PVC to use the available storage class.'
-initial_state: 'Simulated RHEL 9 server. A PersistentVolumeClaim stays in Pending state because the requested StorageClass does not exist. Fix the PVC to use the available storage class.'
+description: A PVC will not bind because it requests a StorageClass that does not exist in the cluster.
+  The claim names a class (e.g. fast-ssd) with no matching provisioner or PV, so it stays Pending forever
+  and the workload can't start. Point the PVC at an existing StorageClass so it can be provisioned.
+initial_state: 'Simulated Kubernetes cluster. A PVC specifies storageClassName: fast-ssd, but no such
+  StorageClass exists. The PVC remains Pending and its pod stays ContainerCreating.'
 lab_mode: simulation
 simulation_type: kubernetes
 is_free: false
@@ -13,10 +16,20 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: kubectl get storageclass'
-- Verify validation passes
+- Confirm the PVC is Pending due to a missing StorageClass
+- List the StorageClasses that actually exist in the cluster
+- Bind the PVC to a valid StorageClass so the volume provisions
 hints:
-- content: 'Try: kubectl get storageclass'
+- order: 1
   cost: 10
-  order: 1
+  content: '`kubectl describe pvc <name>` shows it references storageClassName fast-ssd and Events report
+    it can''t find a provisioner for that class.'
+- order: 2
+  cost: 15
+  content: 'See what''s available: `kubectl get storageclass`. The requested class isn''t listed — you
+    must use one that is (often `standard` or the cluster default).'
+- order: 3
+  cost: 20
+  content: 'A PVC''s storageClassName is immutable, so recreate it: edit the manifest to `storageClassName:
+    standard` (or drop it to use the default), `kubectl delete pvc <name>` and re-apply. It binds and
+    the pod starts.'

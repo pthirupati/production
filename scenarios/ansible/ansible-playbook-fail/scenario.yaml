@@ -1,24 +1,33 @@
 category: Ansible Automation
-description: 'Playbook fails on web2. Fix service and re-run.
-
-  '
+description: An Ansible playbook run fails on host web2 during execution. A task (typically starting or
+  enabling a service) returns a non-zero result on that host while the others succeed, so the play aborts.
+  Read the failed task output, fix the underlying problem on web2, and re-run the playbook to a clean
+  PLAY RECAP.
 difficulty: hard
 dual_terminal: false
 hints:
-- content: 'Try: ansible-playbook site.yml'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. Playbook fails on web2. Fix service and re-run.
-
-  '
+  content: 'Run it and read the failure: `ansible-playbook site.yml`. The fatal line names the task and
+    web2. Re-run just that host verbosely: `ansible-playbook site.yml --limit web2 -vvv`.'
+- order: 2
+  cost: 15
+  content: 'Reproduce the failing step directly on web2 to see the real error, e.g. `ansible web2 -m service
+    -a ''name=<svc> state=started''` or check the service: `ansible web2 -a ''systemctl status <svc>''`.'
+- order: 3
+  cost: 20
+  content: Fix the root cause on web2 (correct the service unit/config or install the missing package),
+    then re-run `ansible-playbook site.yml`. The PLAY RECAP should show web2 with failed=0.
+initial_state: Simulated Ansible control node with an inventory including web1 and web2. Running ansible-playbook
+  site.yml fails on web2 (a task errors there); web1 completes successfully.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: ansible-playbook site.yml'
-- Verify validation passes
+- Run the playbook and identify the exact failed task and host (web2)
+- Fix the underlying cause on web2 (e.g. the failing service or its config)
+- Re-run the playbook and confirm web2 shows ok/changed with failed=0
 requires_companion_hosts: false
 simulation_type: ansible
 slug: sim-ansible-playbook-fail

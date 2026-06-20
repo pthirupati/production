@@ -11,17 +11,24 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q19 sticky bit — chmod +t
-description: Users delete each other's files in shared /tmp/app. Sticky bit not set.
+description: In the shared directory /tmp/app, users can delete each other's files because the sticky
+  bit isn't set. On a world-writable shared directory, the sticky bit restricts deletion/renaming to each
+  file's owner (and root). Set the sticky bit so users can no longer remove files they don't own.
 objectives:
-- Understand sticky bit on world-writable dirs
-- Affected service behaves normally
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Understand why files are deletable by non-owners (missing sticky bit)
+- Set the sticky bit on the shared directory
+- Verify users can no longer delete files they don't own
+initial_state: Linux server where the world-writable /tmp/app lacks the sticky bit, allowing any user
+  to delete other users' files.
 hints:
 - order: 1
   cost: 10
-  content: '`chmod 1777 /tmp/app` or `chmod +t /tmp/app`'
+  content: 'Inspect the dir: `ls -ld /tmp/app` — it''s world-writable (drwxrwxrwx) with no trailing `t`,
+    so anyone can delete anything.'
 - order: 2
   cost: 15
-  content: Apply chmod +t or 1777
+  content: 'Set the sticky bit: `chmod +t /tmp/app` (or `chmod 1777 /tmp/app`).'
+- order: 3
+  cost: 20
+  content: 'Verify: `ls -ld /tmp/app` now shows `drwxrwxrwt`. A non-owner attempting to delete another
+    user''s file gets "Operation not permitted".'

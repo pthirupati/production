@@ -1,6 +1,5 @@
----
 slug: vcenter-vami-patch
-title: "vCenter VAMI Pending Appliance Patches"
+title: vCenter VAMI Pending Appliance Patches
 technology: VMware
 category: vCenter Administration
 difficulty: medium
@@ -12,12 +11,24 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  vCenter appliance has pending VAMI patches. Stage and install updates via VAMI.
+description: The vCenter Server Appliance has pending VAMI (appliance-management) patches that haven't
+  been applied, leaving the appliance OS/components out of date. Using the VAMI interface, check for the
+  pending appliance updates, stage them, and install so the appliance is patched and current.
 objectives:
-  - Check pending patches in VAMI
-  - Stage and install appliance patches
+- Check the pending appliance patches in VAMI
+- Stage the available updates
+- Install the patches and confirm the appliance is up to date
 hints:
-  - order: 1
-    cost: 10
-    content: "Use the inventory tree and platform services panels in the VMware simulator."
+- order: 1
+  cost: 10
+  content: Open the VAMI (appliance management) panel in the simulator and go to Update — it lists the
+    pending appliance patches.
+- order: 2
+  cost: 15
+  content: Stage the updates first (download/prepare), which validates them before applying.
+- order: 3
+  cost: 20
+  content: Install the staged updates; once complete, the Update view shows the appliance current with
+    no pending patches.
+initial_state: vCenter Server Appliance with pending updates available in VAMI that have not been staged
+  or installed.

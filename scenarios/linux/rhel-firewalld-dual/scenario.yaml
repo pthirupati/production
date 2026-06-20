@@ -1,4 +1,4 @@
-title: "RHEL Simulation: Firewall Blocks HTTP (Dual Terminal)"
+title: 'RHEL Simulation: Firewall Blocks HTTP (Dual Terminal)'
 slug: sim-rhel-firewalld-dual
 technology: Linux Administration
 category: Linux Administration
@@ -11,23 +11,26 @@ dual_terminal: true
 infrastructure_type: docker
 jira_priority: Low
 is_free: false
-description: |
-  Nginx is running on the server but firewalld blocks port 80. Use the SSH client to curl the server,
-  open the firewall on the server console, then verify HTTP works remotely.
+description: nginx is serving on the database/web server (10.0.0.10) but firewalld is blocking inbound
+  port 80, so remote clients can't reach it. Using the dual-terminal lab, confirm from the SSH client
+  that the request is refused, open HTTP through firewalld on the server console, then verify the remote
+  request succeeds.
 objectives:
-  - curl from SSH client fails until firewall is opened
-  - Allow HTTP through firewalld on the server
-  - Remote curl returns 200
-initial_state: |
-  primary (10.0.0.10): nginx active, firewalld blocks port 80
-  ssh_client: curl http://10.0.0.10 to test connectivity
+- From the SSH client, confirm curl to the server is refused while the port is blocked
+- Allow HTTP through firewalld on the server console
+- Verify the remote curl now returns 200
+initial_state: 'Dual-terminal lab. primary (10.0.0.10): nginx is active but firewalld blocks port 80.
+  ssh_client: used to `curl http://10.0.0.10` to test connectivity from outside.'
 hints:
-  - order: 1
-    cost: 10
-    content: "From SSH Client: curl -v http://10.0.0.10/ — expect connection refused."
-  - order: 2
-    cost: 15
-    content: "On server: firewall-cmd --list-all then firewall-cmd --permanent --add-service=http && firewall-cmd --reload"
-  - order: 3
-    cost: 20
-    content: "Retry curl from SSH client — should return HTML."
+- order: 1
+  cost: 10
+  content: 'SSH Client pane: `curl -v http://10.0.0.10/` — expect connection refused/timeout because port
+    80 is blocked.'
+- order: 2
+  cost: 15
+  content: 'Server console: inspect and open it — `firewall-cmd --list-all`, then `firewall-cmd --permanent
+    --add-service=http && firewall-cmd --reload`.'
+- order: 3
+  cost: 20
+  content: Back in the SSH Client, retry `curl http://10.0.0.10/` — it now returns the nginx HTML (HTTP
+    200).

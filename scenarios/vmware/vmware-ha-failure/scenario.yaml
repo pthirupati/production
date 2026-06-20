@@ -1,7 +1,10 @@
 title: HA Host Failure
 slug: vmware-ha-failure
 category: VMware vSphere
-description: An ESXi host is not responding and a production VM is down. Investigate HA and restore the workload.
+description: An ESXi host (esxi-01) has stopped responding and a production VM (web-prod-01) that was
+  running on it is now down. In a properly configured cluster, vSphere HA should restart the VM on a surviving
+  host. Investigate the host/HA state, identify the affected VM, and restore the workload — confirming
+  HA behavior or powering the VM on elsewhere.
 difficulty: hard
 lab_mode: simulation
 simulation_type: vmware
@@ -9,11 +12,21 @@ jira_priority: Critical
 time_limit: 1500
 max_score: 100
 objectives:
-  - Review cluster HA status and host health
-  - Identify affected VMs
-  - Restore VM power state
-initial_state: esxi-01 is not responding. web-prod-01 is powered off.
+- Review cluster HA status and the health of the unresponsive host
+- Identify the VMs affected by the host failure
+- Restore the affected VM's power state on a healthy host
+initial_state: vCenter cluster where esxi-01 is "not responding" and web-prod-01 is powered off as a result;
+  HA should recover the VM on another host.
 hints:
-  - content: Check alarms and recent events for HA failures.
-    cost: 15
-    order: 1
+- order: 1
+  cost: 10
+  content: Check the cluster's Monitor/alarms and the host state — esxi-01 shows "not responding", and
+    recent events reference an HA host failure.
+- order: 2
+  cost: 15
+  content: Identify the impacted VM (web-prod-01 was on esxi-01 and is now down) and confirm a healthy
+    host with capacity is available in the cluster.
+- order: 3
+  cost: 20
+  content: 'Restore the workload: let HA restart it, or manually power on web-prod-01 on a surviving host
+    (VM Actions -> Power On). Verify it returns to powered-on and reachable.'

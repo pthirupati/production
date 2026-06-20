@@ -1,24 +1,34 @@
 category: RHEL Linux
-description: |
-  Monthly patching window. Coordinate with @backup team, @database team, and @application team
-  in Jira before patching. After reboot, resolve any mount issues before starting services.
+description: It's the monthly patching change window. Before touching the server you must coordinate in
+  Jira with the @backup, @database, and @application teams to stop services and take backups. Then run
+  a pre-check, apply updates with dnf, reboot, and run a post-check — resolving any mount problem that
+  appears after reboot before bringing services back via Jira.
 difficulty: medium
 dual_terminal: false
 hints:
-  - content: 'Jira: @backup team @database team @application team — stop and backup before patch'
-    cost: 10
-    order: 1
-initial_state: |
-  Simulated RHEL 9 server. Use the Jira ticket to request change-window actions from
-  @backup team, @database team, and @application team (~30s replies), then patch via terminal.
+- order: 1
+  cost: 10
+  content: 'Jira: @backup team @database team @application team — stop and backup before patch'
+- order: 2
+  cost: 20
+  content: 'After approvals, pre-check and patch: `uname -r` / `df -h` for a baseline, then `dnf update
+    -y` and `systemctl reboot`.'
+- order: 3
+  cost: 30
+  content: 'Post-reboot, validate: `uname -r` shows the new kernel; if a mount failed, check `systemctl
+    --failed` and `mount -a` (fix the offending /etc/fstab line). Then have the teams start the DB/app
+    via Jira.'
+initial_state: Simulated RHEL 9 server in a change window. Use the Jira ticket to request change-window
+  actions from the @backup, @database, and @application teams (~30s replies), then patch and reboot in
+  the terminal.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-  - Request stop/backup from teams in Jira before precheck
-  - Run precheck, dnf update, reboot, postcheck in terminal
-  - Fix mount issue if reported; start DB/app via Jira after patching
+- Request stop/backup from the @backup, @database, and @application teams in Jira before patching
+- Run precheck, apply dnf update, reboot, and run postcheck in the terminal
+- Fix any mount issue reported after reboot, then start DB/app via Jira
 requires_companion_hosts: false
 simulation_type: rhel
 slug: sim-rhel-patching

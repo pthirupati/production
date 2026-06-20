@@ -2,37 +2,46 @@ title: MySQL MyISAM Table Marked as Crashed
 slug: db-mysql-table-crashed
 difficulty: medium
 category: Database Administration
-description: |
-  After an unclean shutdown, a heavily-used MyISAM table reports "Table './appdb/orders'
+description: 'After an unclean shutdown, a heavily-used MyISAM table reports "Table ''./appdb/orders''
+
   is marked as crashed and should be repaired" and the mysqld service has failed. The
+
   application cannot read or write orders. You must repair the crashed table and bring
+
   mysqld back up.
 
-initial_state: |
-  Simulated RHEL 9 database server. mysqld has failed. The error log shows the orders
+  '
+initial_state: 'Simulated RHEL 9 database server. mysqld has failed. The error log shows the orders
+
   MyISAM table is marked as crashed following a power loss. A repair flag file exists at
+
   /var/lib/mysql/appdb/orders.CRASHED.
 
+  '
 objectives:
-  - Diagnose the crashed MyISAM table from the error log
-  - Repair the table (myisamchk -r or REPAIR TABLE / mysqlcheck --repair)
-  - Restart the mysqld service
-  - Verify mysqld is active and the table is readable
+- Diagnose the crashed MyISAM table from the error log
+- Repair the table (myisamchk -r or REPAIR TABLE / mysqlcheck --repair)
+- Restart the mysqld service
+- Verify mysqld is active and the table is readable
 lab_mode: simulation
 simulation_type: database
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'The error log points at a crashed MyISAM table (orders). MyISAM tables can be repaired in place rather than restored from backup.'
-    cost: 10
-    order: 1
-  - content: 'Repair it, e.g. myisamchk -r /var/lib/mysql/appdb/orders or mysqlcheck --repair appdb orders, which clears the crashed marker.'
-    cost: 20
-    order: 2
-  - content: 'Bring the service back with systemctl restart mysqld and confirm with systemctl is-active mysqld.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 10
+  content: 'Confirm the cause from the error log: `journalctl -u mysqld -n 30` / `tail /var/log/mysqld.log`
+    points at the orders MyISAM table being "marked as crashed".'
+- order: 2
+  cost: 20
+  content: 'Repair the MyISAM table in place: with mysqld stopped, `myisamchk -r /var/lib/mysql/appdb/orders`
+    (or, if mysqld can start, `mysqlcheck --repair appdb orders`). This clears the crashed flag and rebuilds
+    indexes.'
+- order: 3
+  cost: 30
+  content: 'Bring the service back and verify: `systemctl restart mysqld`, `systemctl is-active mysqld`,
+    and `mysql -e ''SELECT COUNT(*) FROM appdb.orders;''` to confirm the table reads cleanly.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High

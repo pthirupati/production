@@ -1,4 +1,4 @@
-title: "RHEL Simulation: Ansible SSH Key Failure"
+title: 'RHEL Simulation: Ansible SSH Key Failure'
 slug: sim-rhel-ansible-ssh
 technology: Ansible Automation
 category: Automation
@@ -12,19 +12,27 @@ dual_terminal: true
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  Ansible control node cannot reach web2 via SSH. Fix key distribution and re-run ping.
+description: The Ansible control node cannot reach managed host web2 over SSH — `ansible webservers -m
+  ping` returns web2 UNREACHABLE with a publickey/permission-denied error, while web1 succeeds. The control
+  node's public key is not installed in web2's authorized_keys. Distribute the key to web2 and confirm
+  all hosts ping.
 objectives:
-  - Run ansible webservers -m ping and identify unreachable host
-  - Copy SSH key to web2 with ssh-copy-id
-  - Verify all hosts respond to ansible ping
-initial_state: |
-  Simulated ansible-control node with inventory at /etc/ansible/hosts.
-  web1 is reachable; web2 rejects publickey auth.
+- Run the ping and identify that web2 is UNREACHABLE on publickey auth
+- Install the control node's public key into web2's authorized_keys
+- Verify every host in the group responds to the Ansible ping
+initial_state: Simulated ansible-control node with inventory at /etc/ansible/hosts. web1 is reachable
+  over SSH key auth; web2 rejects publickey authentication because the control node's key isn't authorized
+  there.
 hints:
-  - order: 1
-    cost: 10
-    content: Run `ansible webservers -m ping` from the control node.
-  - order: 2
-    cost: 20
-    content: Use `ssh-copy-id root@web2` (simulated) to install your key.
+- order: 1
+  cost: 10
+  content: 'Find the failing host: `ansible webservers -m ping`. web2 returns UNREACHABLE / "Permission
+    denied (publickey)".'
+- order: 2
+  cost: 20
+  content: 'The control node''s key isn''t in web2''s authorized_keys. Distribute it: `ssh-copy-id root@web2`
+    (you''ll authenticate once), or append ~/.ssh/id_rsa.pub to web2''s ~/.ssh/authorized_keys.'
+- order: 3
+  cost: 30
+  content: Confirm direct SSH works (`ssh root@web2 hostname`), then re-run `ansible webservers -m ping`
+    — both web1 and web2 now return "pong".

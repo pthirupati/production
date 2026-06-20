@@ -2,8 +2,11 @@ title: Flask App Returns 500
 slug: sim-python-flask-500
 category: Python Development
 difficulty: medium
-description: 'A Flask app starts but all routes return HTTP 500. Check the app logs, find the misconfigured route handler, and fix it.'
-initial_state: 'Simulated RHEL 9 server. A Flask app starts but all routes return HTTP 500. Check the app logs, find the misconfigured route handler, and fix it.'
+description: A Flask endpoint returns HTTP 500 Internal Server Error. An unhandled exception is raised
+  inside the view (a bug, a None value, a missing key, or a failed dependency call). Read the traceback
+  from the server log, fix the offending code path, and confirm the route returns a successful response.
+initial_state: Flask application serving a route that raises an unhandled exception, so the endpoint responds
+  500. The traceback is visible in the server's stderr/log.
 lab_mode: simulation
 simulation_type: python
 is_free: false
@@ -13,10 +16,19 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: flask run --debug'
-- Verify validation passes
+- Reproduce the 500 and capture the traceback from the Flask log
+- Identify the line/exception inside the view that fails
+- Fix the code so the endpoint returns a 2xx response
 hints:
-- content: 'Try: flask run --debug'
+- order: 1
   cost: 10
-  order: 1
+  content: Hit the route (`curl -i http://localhost:5000/<path>`) to get the 500, then read the Flask
+    process log — the traceback's last frame points to the failing line in the view.
+- order: 2
+  cost: 15
+  content: 'Common causes: indexing a dict/JSON key that''s absent, calling a method on None, or an uncaught
+    error from a downstream call. Reproduce with the same input to confirm.'
+- order: 3
+  cost: 20
+  content: Fix the view (guard the missing key with .get(), null-check the value, or handle the downstream
+    error), reload the app, and re-curl — the route now returns 200.

@@ -8,19 +8,26 @@ max_score: 100
 infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
-description: Applications cannot reach the 10.50.0.0/24 subnet after a network change.
+description: Applications can't reach hosts on the 10.50.0.0/24 subnet after a network change because
+  the static route to that network is missing from the routing table — packets fall through to a default
+  gateway that can't deliver them (or are dropped). Add the correct static route via the proper next-hop
+  and make it persistent.
 objectives:
-- Affected service behaves normally
-initial_state: 'Ubuntu server missing route to internal subnet 10.50.0.0/24.
-
-  '
+- Confirm 10.50.0.0/24 is unreachable and the route is missing
+- Add the static route via the correct gateway
+- Verify connectivity and persist the route
+initial_state: Linux server missing a static route for 10.50.0.0/24, so traffic to that subnet isn't delivered
+  after a recent network change.
 hints:
 - order: 1
-  cost: 15
-  content: '`ip route add 10.50.0.0/24 via 172.16.0.1`'
+  cost: 10
+  content: 'Confirm the gap: `ip route get 10.50.0.10` shows it using the default route (or no route).
+    Inspect the table: `ip route` — there''s no 10.50.0.0/24 entry.'
 - order: 2
   cost: 15
-  content: Inspect routing table with ip route
+  content: 'Add the route via the correct next-hop: `ip route add 10.50.0.0/24 via 172.16.0.1` (adjust
+    the gateway to your topology).'
 - order: 3
-  cost: 15
-  content: Add static route for 10.50.0.0/24
+  cost: 20
+  content: 'Verify: `ip route get 10.50.0.10` now uses the new route and a ping/connection to the subnet
+    works. Persist it (NetworkManager route or /etc/sysconfig/network-scripts) so it survives reboot.'

@@ -2,33 +2,33 @@ title: Service Cannot Reach Pod
 slug: k8s-service-unreachable
 difficulty: medium
 category: Kubernetes
-description: 'A Kubernetes Service is not routing traffic to its backing pods. Curl
-  requests to the Service ClusterIP return connection refused. The pod selector label
-  in the Service spec does not match the labels on the pods, causing the Endpoints
-  object to remain empty.
-
-  '
-initial_state: 'Simulated Kubernetes cluster. A Service named "frontend-svc" exists
-  but has no Endpoints. Pods are Running but receive no traffic.
-
-  '
+description: A Service's ClusterIP is unreachable from other pods even though the target pods are running.
+  The most common causes are a selector that doesn't match the pod labels (no endpoints) or a port/targetPort
+  mismatch. Diagnose which it is and restore connectivity between the Service and its pods.
+initial_state: Simulated Kubernetes cluster. Pods are Running, but connecting to the Service's ClusterIP
+  from another pod times out or is refused. Endpoints may be empty or the ports may not line up.
 objectives:
-  - Inspect the Service and the target pods to find the label mismatch
-  - Patch the Service selector to correctly match the pod labels
-  - Verify the Endpoints object is populated and traffic routes successfully
+- Reproduce the failed connection to the Service ClusterIP
+- Check the Service's endpoints, selector, and ports against the pods
+- Fix the selector or port mapping so the Service reaches the pods
 lab_mode: simulation
 simulation_type: kubernetes
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Compare: kubectl get svc frontend-svc -o yaml vs kubectl get pods --show-labels'
-    cost: 10
-    order: 1
-  - content: 'Use: kubectl patch svc frontend-svc -p ''{"spec":{"selector":{"app":"frontend"}}}''
-      to fix the selector.'
-    cost: 15
-    order: 2
+- order: 1
+  cost: 10
+  content: 'From a debug pod: `kubectl run tmp --image=busybox -it --rm -- wget -qO- <svc>:<port>` fails.
+    First check `kubectl get endpoints <svc>`.'
+- order: 2
+  cost: 15
+  content: If endpoints are <none>, the selector is wrong — compare `kubectl get svc <svc> -o jsonpath='{.spec.selector}'`
+    to `kubectl get pods --show-labels`. If endpoints exist, it's a targetPort mismatch.
+- order: 3
+  cost: 20
+  content: 'Fix the mismatch: patch the selector to match the pods, or set targetPort to the real containerPort
+    (`kubectl patch svc <svc> -p ''{"spec":{"ports":[{"port":80,"targetPort":80}]}}''`). Re-test the connection.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

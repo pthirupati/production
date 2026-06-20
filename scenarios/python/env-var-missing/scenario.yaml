@@ -2,8 +2,11 @@ title: Missing Environment Variable
 slug: sim-python-env-missing
 category: Python Development
 difficulty: easy
-description: 'A Python script crashes with KeyError on os.environ. Export the missing variable in the environment and re-run.'
-initial_state: 'Simulated RHEL 9 server. A Python script crashes with KeyError on os.environ. Export the missing variable in the environment and re-run.'
+description: A Python app crashes on startup with a KeyError/None because a required environment variable
+  (e.g. DATABASE_URL or SECRET_KEY) is not set. The code reads `os.environ['VAR']` and the variable is
+  absent in the runtime environment. Provide the variable so the app starts.
+initial_state: Python application that reads a required environment variable at startup. The variable
+  is unset, so the app raises a KeyError (or fails configuration) immediately on launch.
 lab_mode: simulation
 simulation_type: python
 is_free: false
@@ -13,10 +16,19 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: export DB_HOST=localhost'
-- Verify validation passes
+- Identify which environment variable the app requires and where it's read
+- Set the variable in the runtime environment
+- Start the app successfully with the variable present
 hints:
-- content: 'Try: export DB_HOST=localhost'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Run the app and read the traceback — a `KeyError: ''VARNAME''` from `os.environ[''VARNAME'']`
+    names the missing variable. Confirm it''s unset: `printenv VARNAME`.'
+- order: 2
+  cost: 15
+  content: 'Set it for the process (or export it / add to the .env the app loads): `export VARNAME=<value>`.
+    Use the value the app expects (e.g. a DATABASE_URL or a SECRET_KEY).'
+- order: 3
+  cost: 20
+  content: Re-launch the app in the same shell. If it's a service, add the variable to its unit's Environment=
+    (or EnvironmentFile=) and restart. The app starts past the config step.

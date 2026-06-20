@@ -2,8 +2,12 @@ title: Disk SMART Failure Warning
 slug: sim-bm-disk-smart
 category: Bare Metal & IPMI
 difficulty: medium
-description: 'SMART monitoring reports a disk is pre-failing. Run a SMART test, identify the failing attribute, and plan disk replacement steps.'
-initial_state: 'Simulated RHEL 9 server. SMART monitoring reports a disk is pre-failing. Run a SMART test, identify the failing attribute, and plan disk replacement steps.'
+description: SMART monitoring has flagged a disk as pre-failing on a bare-metal server. One or more critical
+  SMART attributes (Reallocated_Sector_Ct, Current_Pending_Sector, or Offline_Uncorrectable) have crossed
+  their threshold, signaling imminent drive failure. Confirm the failure with a self-test, identify the
+  failing attribute, and prepare the disk for replacement.
+initial_state: Simulated bare-metal RHEL host. smartd has logged a SMART warning for /dev/sda; its reallocated/pending
+  sector counts are rising and overall SMART health is marginal.
 lab_mode: simulation
 simulation_type: baremetal
 is_free: false
@@ -13,10 +17,21 @@ time_limit: 900
 dual_terminal: false
 requires_companion_hosts: false
 objectives:
-- Diagnose the issue
-- 'Apply fix: smartctl -a /dev/sda'
-- Verify validation passes
+- Read the disk's SMART attributes and overall health assessment
+- Run a self-test and identify the specific failing attribute(s)
+- Confirm the disk is pre-failing and outline the replacement steps
 hints:
-- content: 'Try: smartctl -a /dev/sda'
+- order: 1
   cost: 10
-  order: 1
+  content: 'Read full SMART data: `smartctl -a /dev/sda`. Check the overall health line and the VALUE/THRESH
+    columns for Reallocated_Sector_Ct and Current_Pending_Sector.'
+- order: 2
+  cost: 15
+  content: 'Run a short self-test and review the log: `smartctl -t short /dev/sda`, wait, then `smartctl
+    -l selftest /dev/sda`. A failed/aborted test plus growing reallocated sectors confirms the drive is
+    dying.'
+- order: 3
+  cost: 20
+  content: 'The disk is pre-failing — schedule replacement: if it''s in a RAID, mark it failed and remove
+    it (`mdadm --fail`/`--remove`) or use the controller, swap the physical disk, then rebuild/restore.
+    Re-run `smartctl -H` on the replacement to confirm PASSED.'

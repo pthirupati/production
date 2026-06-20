@@ -1,25 +1,33 @@
 category: HTML & Web Servers
-description: 'Site shows wrong content. Fix nginx root path.
-
-  '
+description: A website is serving the wrong content (or a 404/403) because nginx's `root` directive points
+  at the wrong directory. The document root in the server block doesn't match where the site's files actually
+  live, so requests don't find index.html. Correct the root path, reload nginx, and confirm the right
+  page is served.
 difficulty: easy
 dual_terminal: false
 hints:
-- content: 'Try: nginx -t'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. Site shows wrong content. Fix nginx root
-  path.
-
-  '
+  content: 'See what''s served (`curl -s http://localhost/`), then find the active config and its root:
+    `nginx -T | grep -nE ''root|server_name''`. Note the path the root points to.'
+- order: 2
+  cost: 15
+  content: Compare that path against where the real site files live (the directory containing the intended
+    index.html). They differ — that's why the wrong content shows.
+- order: 3
+  cost: 20
+  content: Edit the server block's `root` to the correct directory, validate with `nginx -t`, then `systemctl
+    reload nginx`. Re-curl http://localhost/ and confirm the correct page returns.
+initial_state: Simulated RHEL host running nginx. The active server block's `root` points to a directory
+  that doesn't contain the intended site files, so the wrong page (or an error) is returned on port 80.
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: nginx -t'
-- Verify validation passes
+- Confirm nginx is serving the wrong content and find the active server block
+- Correct the root directive to the directory holding the site files
+- Reload nginx and verify the correct page is served
 requires_companion_hosts: false
 simulation_type: rhel
 slug: sim-html-nginx-root

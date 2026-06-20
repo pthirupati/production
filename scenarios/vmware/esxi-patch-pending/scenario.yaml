@@ -1,9 +1,10 @@
 title: ESXi Host Patch Pending Reboot
 slug: vmware-esxi-patch-pending
 category: VMware vSphere
-description: |
-  ESXi host has pending security patches that require installation from the Updates tab.
-  Install patches and clear compliance alarms.
+description: ESXi host esxi-01 has pending security patches and is raising a compliance alarm. Until the
+  updates are staged and installed (and the host is remediated), it remains non-compliant and potentially
+  vulnerable. Use the host's Updates tab to check for and install the pending patches, clearing the compliance
+  alarm.
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -12,10 +13,20 @@ time_limit: 900
 max_score: 100
 is_free: false
 objectives:
-  - Select esxi-01 host → Updates tab
-  - Check for updates and install pending ESXi patches
-initial_state: Host reports 3 pending ESXi patches.
+- Open esxi-01 -> Updates tab and review the pending patches
+- Check for updates and install the pending ESXi patches
+- Confirm the host becomes compliant and the alarm clears
+initial_state: vCenter-managed host esxi-01 reporting 3 pending ESXi patches and an active compliance
+  alarm; updates have not been installed.
 hints:
-  - content: "Host → Updates → Check for updates → Install updates"
-    cost: 10
-    order: 1
+- order: 1
+  cost: 10
+  content: Select the host esxi-01 -> Updates tab. It lists 3 pending patches and shows the host as non-compliant.
+- order: 2
+  cost: 15
+  content: Run "Check for Updates", then start the remediation/Install to apply the pending ESXi patches
+    (the host may enter maintenance mode during install).
+- order: 3
+  cost: 20
+  content: After installation completes, re-check compliance on the Updates tab — the host shows compliant
+    and the patch/compliance alarm clears.

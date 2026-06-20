@@ -9,20 +9,24 @@ time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
-description: After a storage migration, the server fails to mount /mnt/data on boot.
+description: After a storage migration the server fails to mount /mnt/data at boot because its /etc/fstab
+  entry is invalid — typically a wrong UUID/device for the migrated volume. Depending on options this
+  can also drop boot into emergency mode. Identify and correct the bad line so /mnt/data mounts cleanly.
 objectives:
-- Identify the invalid fstab line
-- /mnt/data is mounted and data is accessible
-initial_state: 'Shell access to Ubuntu. /etc/fstab contains a bogus UUID for /mnt/data.
-
-  '
+- Identify the invalid fstab line for /mnt/data
+- Correct it to the right UUID/device (or remove it if obsolete)
+- Verify /mnt/data mounts and the data is accessible
+initial_state: Linux server post storage-migration where the /etc/fstab line for /mnt/data is invalid,
+  so the mount fails (and `mount -a` errors).
 hints:
 - order: 1
   cost: 10
-  content: Run `mount -a` or read /etc/fstab for invalid UUIDs.
+  content: 'Reproduce the failure: `mount -a` reports the error, or read /etc/fstab and spot the bad /mnt/data
+    entry (e.g. a placeholder UUID like dead-beef...).'
 - order: 2
-  cost: 20
-  content: Comment out or fix the line with UUID dead-beef...
-- order: 3
   cost: 15
-  content: Remove or correct the UUID entry for /mnt/data
+  content: Find the real device/UUID with `blkid` / `lsblk -f` and fix the fstab line (or comment it out
+    if the volume is gone).
+- order: 3
+  cost: 20
+  content: Validate with `mount -a` (no errors) and confirm with `findmnt /mnt/data` and `ls /mnt/data`.

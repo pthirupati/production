@@ -1,5 +1,5 @@
 slug: ssh-root-login-enabled
-title: "SSH Root Login Enabled — Disable PermitRootLogin"
+title: SSH Root Login Enabled — Disable PermitRootLogin
 technology: Security
 category: SSH Hardening
 difficulty: easy
@@ -8,30 +8,40 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: true
-description: |
-  A security baseline scan flagged that SSH direct root login is enabled on this
+description: 'A security baseline scan flagged that SSH direct root login is enabled on this
+
   server. Allowing root to log in directly via SSH bypasses the audit trail
+
   (no sudo logging of root actions), makes brute force attacks more impactful,
+
   and violates principle of least privilege. Disable direct root SSH login and
+
   ensure admins must SSH as their own user and then use sudo.
+
+  '
 objectives:
-  - Verify that PermitRootLogin is set to 'yes' in sshd_config
-  - Change PermitRootLogin to 'no' or 'prohibit-password'
-  - Reload sshd without dropping existing connections
-  - Verify root cannot SSH in directly
-initial_state: |
-  Ubuntu 22.04. /etc/ssh/sshd_config has `PermitRootLogin yes`.
+- Verify that PermitRootLogin is set to 'yes' in sshd_config
+- Change PermitRootLogin to 'no' or 'prohibit-password'
+- Reload sshd without dropping existing connections
+- Verify root cannot SSH in directly
+initial_state: 'Ubuntu 22.04. /etc/ssh/sshd_config has `PermitRootLogin yes`.
+
   Root can SSH directly: `ssh root@server`. An admin user exists with sudo rights.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check current setting: `grep PermitRootLogin /etc/ssh/sshd_config`"
-  - order: 2
-    cost: 10
-    content: "Edit /etc/ssh/sshd_config — change `PermitRootLogin yes` to `PermitRootLogin no`"
-  - order: 3
-    cost: 10
-    content: "Check syntax: `sshd -t` (exits 0 if valid)"
-  - order: 4
-    cost: 10
-    content: "Reload without dropping sessions: `systemctl reload sshd` (not restart)"
+- order: 1
+  cost: 10
+  content: 'Confirm the finding: `grep -i PermitRootLogin /etc/ssh/sshd_config` shows `yes`, allowing
+    direct root SSH (bypassing the sudo audit trail).'
+- order: 2
+  cost: 15
+  content: 'Disable it: edit /etc/ssh/sshd_config and set `PermitRootLogin no` (ensure a sudo-capable
+    user exists first so you don''t lock yourself out).'
+- order: 3
+  cost: 20
+  content: 'Validate the syntax: `sshd -t` (exit 0 = OK).'
+- order: 4
+  cost: 25
+  content: 'Apply without dropping sessions: `systemctl reload sshd`, then verify a direct `ssh root@host`
+    is refused while normal users + sudo still work.'

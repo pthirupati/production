@@ -1,5 +1,5 @@
 slug: mtu-blackhole
-title: "MTU Black Hole — Fix Path MTU Discovery Settings"
+title: MTU Black Hole — Fix Path MTU Discovery Settings
 technology: Networking
 category: MTU
 difficulty: hard
@@ -8,32 +8,44 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  Large TCP transfers are silently failing or stalling while small packets and
+description: 'Large TCP transfers are silently failing or stalling while small packets and
+
   ICMP pings succeed. This is a classic PMTUD (Path MTU Discovery) black hole
+
   problem. ICMP "Fragmentation Needed" messages are being dropped by an intermediate
+
   firewall, so the sending host never learns it needs to reduce packet size.
+
   Fix the kernel PMTUD settings and add an iptables rule to ensure ICMP type 3
+
   messages are not filtered, allowing Path MTU Discovery to work correctly.
+
+  '
 objectives:
-  - Diagnose the PMTUD black hole — small packets work, large ones stall
-  - Enable PMTUD via sysctl (net.ipv4.ip_no_pmtu_disc=0)
-  - Add iptables rule to allow ICMP type 3 (Destination Unreachable) messages
-  - Verify large file transfers complete successfully
-initial_state: |
-  Ubuntu 22.04. `sysctl net.ipv4.ip_no_pmtu_disc=1` (PMTUD disabled). An iptables
+- Diagnose the PMTUD black hole — small packets work, large ones stall
+- Enable PMTUD via sysctl (net.ipv4.ip_no_pmtu_disc=0)
+- Add iptables rule to allow ICMP type 3 (Destination Unreachable) messages
+- Verify large file transfers complete successfully
+initial_state: 'Ubuntu 22.04. `sysctl net.ipv4.ip_no_pmtu_disc=1` (PMTUD disabled). An iptables
+
   rule is blocking all ICMP except ping. Large TCP transfers (>1400 bytes) stall
+
   after the initial packets. Small pings work fine.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Diagnose: `ping -M do -s 1400 <target>` — if it hangs, PMTUD is broken. Small `-s 100` works."
-  - order: 2
-    cost: 15
-    content: "Enable PMTUD: `sysctl -w net.ipv4.ip_no_pmtu_disc=0`"
-  - order: 3
-    cost: 20
-    content: "Allow ICMP type 3: `iptables -I INPUT -p icmp --icmp-type 3 -j ACCEPT` and same for OUTPUT and FORWARD."
-  - order: 4
-    cost: 15
-    content: "Alternative: use MSS clamping with `iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu`"
+- order: 1
+  cost: 10
+  content: 'Diagnose the PMTUD black hole: `ping -M do -s 1400 <target>` hangs while `-s 100` works —
+    large packets with DF set are being dropped silently.'
+- order: 2
+  cost: 15
+  content: 'Make sure PMTUD isn''t disabled: `sysctl -w net.ipv4.ip_no_pmtu_disc=0`.'
+- order: 3
+  cost: 20
+  content: 'Allow the ICMP "fragmentation needed" (type 3) messages that PMTUD relies on: `iptables -I
+    INPUT -p icmp --icmp-type 3 -j ACCEPT` (and the same on OUTPUT/FORWARD).'
+- order: 4
+  cost: 25
+  content: 'If you can''t fix ICMP end-to-end, clamp MSS: `iptables -t mangle -A FORWARD -p tcp --tcp-flags
+    SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu`. Re-test a large transfer — it completes.'

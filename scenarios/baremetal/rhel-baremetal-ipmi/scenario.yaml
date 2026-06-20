@@ -1,4 +1,4 @@
-title: "RHEL Simulation: IPMI Power Control"
+title: 'RHEL Simulation: IPMI Power Control'
 slug: sim-rhel-baremetal-ipmi
 technology: Bare Metal & IPMI
 category: Bare Metal
@@ -10,18 +10,25 @@ simulation_type: baremetal
 infrastructure_type: docker
 jira_priority: Low
 is_free: true
-description: |
-  Use ipmitool on a simulated bare-metal host to check chassis power and cycle the server.
+description: Practice out-of-band power management on a simulated HPE bare-metal host using ipmitool from
+  RHEL. The goal is to query the chassis power state through the BMC, perform a controlled power cycle,
+  and confirm the server comes back on — the core workflow for recovering an unresponsive physical host
+  without console access.
 objectives:
-  - Check chassis power status with ipmitool
-  - Perform a power cycle
-  - Verify power is on after cycle
-initial_state: |
-  Simulated HPE DL380 with IPMI tools available on RHEL.
+- Check chassis power status with ipmitool
+- Perform a power cycle
+- Verify power is on after cycle
+initial_state: Simulated HPE DL380 bare-metal host with IPMI tooling available on RHEL. You manage chassis
+  power through the BMC; the host can be queried and cycled via ipmitool.
 hints:
-  - order: 1
-    cost: 10
-    content: Run `ipmitool power status` to see current state.
-  - order: 2
-    cost: 15
-    content: Use `ipmitool power cycle` to reset the chassis.
+- order: 1
+  cost: 10
+  content: 'Check the current chassis power state: `ipmitool power status` (or `ipmitool chassis power
+    status`).'
+- order: 2
+  cost: 15
+  content: 'Perform a controlled power cycle: `ipmitool power cycle`. Use `ipmitool chassis power on`
+    if it was off.'
+- order: 3
+  cost: 20
+  content: Re-query `ipmitool power status` and confirm it reports "on" after the cycle completes.

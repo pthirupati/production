@@ -8,30 +8,40 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  Nginx is reporting all upstream servers as unavailable. Health checks are
+description: 'Nginx is reporting all upstream servers as unavailable. Health checks are
+
   failing because the upstream port is wrong in the nginx.conf — the app
+
   servers listen on port 8080 but nginx is configured to forward to port 80.
+
   Fix the upstream server port so traffic is correctly forwarded.
+
+  '
 objectives:
-  - Identify the misconfigured upstream server port in nginx.conf
-  - Fix the upstream port from 80 to 8080
-  - Test the Nginx configuration syntax
-  - Reload Nginx and verify upstreams are healthy
-initial_state: |
-  Ubuntu server running Nginx as a reverse proxy. Config at /etc/nginx/nginx.conf.
+- Identify the misconfigured upstream server port in nginx.conf
+- Fix the upstream port from 80 to 8080
+- Test the Nginx configuration syntax
+- Reload Nginx and verify upstreams are healthy
+initial_state: 'Ubuntu server running Nginx as a reverse proxy. Config at /etc/nginx/nginx.conf.
+
   Upstream app servers (app1.internal, app2.internal) listen on port 8080 but
+
   the upstream block specifies port 80. The 502 errors confirm all backends are down.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check nginx config: cat /etc/nginx/nginx.conf | grep -A10 'upstream'"
-  - order: 2
-    cost: 15
-    content: "The upstream block has app1.internal:80 — should be app1.internal:8080"
-  - order: 3
-    cost: 20
-    content: "Fix both app1.internal:80 and app2.internal:80 to use port 8080"
-  - order: 4
-    cost: 25
-    content: "Test config: nginx -t then reload: systemctl reload nginx"
+- order: 1
+  cost: 10
+  content: 'Inspect the proxy config: `grep -A10 ''upstream'' /etc/nginx/nginx.conf`. All upstreams are
+    marked down because the configured port is wrong.'
+- order: 2
+  cost: 15
+  content: The upstream lists `app1.internal:80` / `app2.internal:80`, but the app servers actually listen
+    on 8080.
+- order: 3
+  cost: 20
+  content: Change both upstream entries to port 8080 (`app1.internal:8080`, `app2.internal:8080`).
+- order: 4
+  cost: 25
+  content: 'Test and reload: `nginx -t` then `systemctl reload nginx`; confirm upstreams are healthy and
+    the proxy returns 200.'

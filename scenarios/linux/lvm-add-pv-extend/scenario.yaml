@@ -11,25 +11,26 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q11-Q14 LVM — pvcreate, vgextend, lvextend, xfs_growfs
-description: /data is 100% full. Volume group fixitlab has no free extents. A second disk is attached at /dev/fixitlab-disk2 but is not yet in the VG (ignore tiny /dev/vdb — it is not usable).
+description: /data is 100% full and the volume group 'fixitlab' has no free extents, so applications can't
+  write. A second disk is attached as /dev/fixitlab-disk2 but hasn't been added to the VG. Add the new
+  disk as a physical volume, extend the volume group and the datalv logical volume, then grow the XFS
+  filesystem to reclaim capacity.
 objectives:
-- Confirm VG is full with vgs/pvs
-- Initialize /dev/fixitlab-disk2 with pvcreate
-- vgextend and lvextend datalv
-- Filesystem on /data accepts new writes
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Confirm the VG is full and identify the spare disk
+- pvcreate the new disk and vgextend the volume group
+- lvextend datalv into the new space and xfs_growfs /data
+initial_state: 'Linux server using LVM where VG fixitlab is out of free extents and /data is full. The
+  spare disk is /dev/fixitlab-disk2 (note: not /dev/vdb), not yet a PV.'
 hints:
 - order: 1
-  cost: 15
-  content: '`lsblk` and `pvs` — spare disk is /dev/fixitlab-disk2 (not /dev/vdb)'
+  cost: 10
+  content: 'Confirm there''s no room: `vgs` (0 free) and `df -h /data` (100%). Identify the unused disk:
+    `lsblk` / `pvs` — it''s `/dev/fixitlab-disk2`.'
 - order: 2
-  cost: 30
-  content: '`pvcreate /dev/fixitlab-disk2 && vgextend fixitlab /dev/fixitlab-disk2`'
+  cost: 20
+  content: 'Add it to LVM: `pvcreate /dev/fixitlab-disk2` then `vgextend fixitlab /dev/fixitlab-disk2`.
+    `vgs` now shows free extents.'
 - order: 3
-  cost: 45
-  content: '`lvextend -l +100%FREE /dev/fixitlab/datalv && xfs_growfs /data`'
-- order: 4
-  cost: 15
-  content: Run xfs_growfs /data
+  cost: 30
+  content: 'Grow the LV and filesystem: `lvextend -l +100%FREE /dev/fixitlab/datalv` then `xfs_growfs
+    /data`. Confirm new space with `df -h /data` and a test write.'

@@ -11,18 +11,24 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q39 Q40 AllowUsers/DenyUsers
-description: deploy user cannot SSH. AllowUsers directive permits only adminonly.
+description: The 'deploy' user can't SSH in because sshd_config has an `AllowUsers` directive that only
+  permits 'adminonly' — any user not on that allow-list is rejected after connecting. Add deploy to the
+  allow-list (or adjust the directive), validate the config, and reload sshd so deploy can log in.
 objectives:
-- grep AllowUsers in sshd_config
-- Affected service behaves normally
-- sshd -t to validate
-initial_state: 'Ubuntu 22.04 lab container with a realistic misconfiguration.
-
-  '
+- Find the AllowUsers directive restricting SSH logins
+- Permit the deploy user and validate the sshd config
+- Reload sshd and verify deploy can SSH in
+initial_state: Linux server where sshd_config contains `AllowUsers adminonly`, so the deploy user is denied
+  SSH access even with valid credentials.
 hints:
 - order: 1
-  cost: 15
-  content: Change to `AllowUsers adminonly deploy` or remove file
+  cost: 10
+  content: 'Inspect the policy: `grep -i AllowUsers /etc/ssh/sshd_config` shows only `adminonly` is allowed.'
 - order: 2
   cost: 15
-  content: Add deploy or fix directive
+  content: 'Add deploy: change it to `AllowUsers adminonly deploy` (or remove the directive if not needed).
+    Validate: `sshd -t` (no output = OK).'
+- order: 3
+  cost: 20
+  content: Apply with `systemctl reload sshd`, then test `ssh deploy@<host>` — login succeeds. Keep a
+    session open while you change SSH config.

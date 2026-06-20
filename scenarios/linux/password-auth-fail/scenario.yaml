@@ -2,38 +2,34 @@ title: Changing User Password Shows Authentication Failure
 slug: linux-password-auth-fail
 difficulty: medium
 category: Linux Administration
-description: |
-  A non-root user reports they cannot change another account's password. Running
-  passwd username as a regular user returns "passwd: Authentication failure" even though
-  the user is supposed to have delegated admin access. The underlying cause is a
-  misconfigured PAM password policy or incorrect /etc/shadow permissions that prevent
-  the passwd binary from reading shadow entries.
-
-initial_state: |
-  Simulated RHEL 9 server. Logged in as user 'admin' (not root). Running:
-  passwd appuser
-  returns: "passwd: Authentication failure"
-  The /etc/shadow file permissions have been recently changed during a security audit
-  and something broke. Other authentication operations work normally.
-
+description: A non-root user can't change another account's password — `passwd <user>` returns "Authentication
+  token manipulation error". The /etc/shadow file's permissions were altered from their secure default
+  (000, root:shadow), which breaks the passwd helper, and/or the PAM passwd stack was disturbed. Restore
+  the correct shadow permissions/ownership and PAM config.
+initial_state: Linux server where /etc/shadow has incorrect permissions/ownership (changed from the default
+  000 root:shadow), causing passwd to fail with a token-manipulation error.
 objectives:
-  - Check /etc/shadow permissions with ls -la /etc/shadow (should be 000 owned by root:shadow)
-  - Identify if permissions were incorrectly changed from the default
-  - Restore correct permissions with chmod 000 /etc/shadow and chown root:shadow /etc/shadow
-  - Review /etc/pam.d/passwd to confirm pam_unix.so is present and uncorrupted
-  - Verify password change works after restoring correct shadow file permissions
+- Check /etc/shadow permissions/ownership against the secure default
+- Restore chmod 000 and chown root:shadow on /etc/shadow
+- Confirm /etc/pam.d/passwd is intact and verify password changes work
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check: ls -la /etc/shadow — the correct permissions are ---------- (000) with ownership root:shadow. The setuid bit on /usr/bin/passwd lets it read shadow as root.'
-    cost: 10
-    order: 1
-  - content: 'Restore with: chmod 000 /etc/shadow && chown root:shadow /etc/shadow. Also check /etc/pam.d/passwd for any commented-out pam_unix.so line.'
-    cost: 20
-    order: 2
+- order: 1
+  cost: 10
+  content: 'Inspect the file: `ls -la /etc/shadow` — the correct state is `----------` (000) owned by
+    `root:shadow`. Anything more permissive breaks the setuid passwd flow.'
+- order: 2
+  cost: 20
+  content: 'Restore it: `chown root:shadow /etc/shadow && chmod 000 /etc/shadow`. Also confirm `/etc/pam.d/passwd`
+    still references `pam_unix.so` correctly.'
+- order: 3
+  cost: 30
+  content: 'Verify: changing a password (`passwd <user>`) now completes without the token-manipulation
+    error.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

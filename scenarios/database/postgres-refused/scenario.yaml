@@ -1,25 +1,33 @@
 category: Database Administration
-description: 'PostgreSQL is down. Start the service and verify connectivity.
-
-  '
+description: Clients get "connection refused" when connecting to PostgreSQL because the service is down
+  (or not listening on the expected address). The postgresql unit failed to start, or listen_addresses/port
+  is misconfigured, so nothing is accepting connections. Start the service (fixing any startup error)
+  and confirm it accepts connections.
 difficulty: medium
 dual_terminal: false
 hints:
-- content: 'Try: systemctl start postgresql'
+- order: 1
   cost: 10
-  order: 1
-initial_state: 'Simulated RHEL 9 server. PostgreSQL is down. Start the service and
-  verify connectivity.
-
-  '
+  content: 'Check the service: `systemctl status postgresql`. If it failed, read `journalctl -u postgresql
+    -n 40` for the startup error; if it''s just stopped, that alone explains the refusal.'
+- order: 2
+  cost: 15
+  content: If it won't start, the log names the cause (bad postgresql.conf, permissions on the data dir,
+    or a port conflict). If it's running but still refused, check listen_addresses/port and pg_hba.conf.
+- order: 3
+  cost: 20
+  content: 'Start it and verify: `systemctl start postgresql`, then `systemctl is-active postgresql` and
+    `psql -h localhost -c ''SELECT 1;''` (or `pg_isready`) to confirm it accepts connections.'
+initial_state: Simulated RHEL host. PostgreSQL is not accepting connections — the service is stopped or
+  failed. Connection attempts return "could not connect ... Connection refused".
 is_free: false
 jira_priority: Medium
 lab_mode: simulation
 max_score: 100
 objectives:
-- Diagnose the issue
-- 'Apply fix: systemctl start postgresql'
-- Verify validation passes
+- Confirm PostgreSQL is down / not listening and why
+- Start the service, resolving any startup error
+- Verify the server accepts connections
 requires_companion_hosts: false
 simulation_type: database
 slug: sim-postgres-refused

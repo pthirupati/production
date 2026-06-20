@@ -10,30 +10,25 @@ max_score: 100
 infrastructure_type: docker
 docker_privileged: true
 jira_priority: High
-description: |
-  /data is full on a server using LVM. Applications report "No space left on device"
-  even though `vgs` shows free extents in the volume group. The logical volume was never
-  grown to use available space.
+description: /data is full and applications report "No space left on device", but `vgs` shows the volume
+  group still has free extents — the logical volume simply hasn't been grown into them yet. Extend the
+  datalv logical volume to use the free space, then grow the XFS filesystem online so /data has room again.
 objectives:
-- Storage layout and utilization are understood
-- /data has sufficient free space for applications
-- Filesystem on /data accepts new writes
-initial_state: 'Ubuntu container with loop-backed LVM. VG fixitlab, LV datalv mounted at /data.
-
-  '
+- Confirm free extents exist in the VG while /data is full
+- Extend the datalv logical volume
+- Grow the XFS filesystem on /data and verify free space
+initial_state: Linux server using LVM where /data is full but VG fixitlab has free extents. The datalv
+  LV and its XFS filesystem need to be extended.
 hints:
 - order: 1
   cost: 10
-  content: Run `vgs` and `lvs` to see free space in the volume group.
+  content: 'See the mismatch: `df -h /data` is 100%, but `vgs`/`lvs` show free extents in VG fixitlab
+    — the LV just needs extending.'
 - order: 2
   cost: 20
-  content: '`lvextend -L +200M /dev/fixitlab/datalv` then `xfs_growfs /data`.'
+  content: 'Extend the LV into free space: `lvextend -L +200M /dev/fixitlab/datalv` (or `-l +100%FREE`
+    to use it all).'
 - order: 3
-  cost: 15
-  content: Inspect VG/LV with vgs, lvs, df
-- order: 4
-  cost: 15
-  content: Extend logical volume datalv in VG fixitlab
-- order: 5
-  cost: 15
-  content: Grow the XFS filesystem on /data
+  cost: 30
+  content: 'Grow the filesystem online: `xfs_growfs /data` (XFS grows mounted). Confirm with `df -h /data`
+    and a test write.'

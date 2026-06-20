@@ -2,26 +2,34 @@ title: EC2 Security Group Allows Unrestricted SSH
 slug: aws-ec2-sg-too-open
 difficulty: easy
 category: AWS
-description: 'An EC2 security group has an inbound rule allowing SSH (port 22) from 0.0.0.0/0, exposing the instance to the entire internet. Restrict SSH access to a specific trusted CIDR range.'
-initial_state: 'Simulated AWS environment with an EC2 instance and a security group that has a permissive inbound rule: port 22 open to all IPv4 addresses. This violates least-privilege network access principles.'
+description: An EC2 security group has an inbound rule allowing SSH (port 22) from 0.0.0.0/0, exposing
+  the instance to brute-force attempts from the entire internet. This violates least-privilege network
+  access. Replace the open rule with a tightly-scoped CIDR so only trusted networks can reach SSH, without
+  locking out legitimate administrators.
+initial_state: 'Simulated AWS environment with an EC2 instance and a security group that has a permissive
+  inbound rule: port 22 open to all IPv4 addresses. This violates least-privilege network access principles.'
 objectives:
-  - Identify the security group with the overly permissive SSH rule using the AWS CLI
-  - Revoke the 0.0.0.0/0 inbound rule and replace it with a specific CIDR (e.g., your corporate IP range)
+- Identify the security group with the 0.0.0.0/0 SSH rule using the AWS CLI
+- Revoke the world-open SSH ingress rule
+- Re-authorize SSH from a specific trusted CIDR and verify the rule is scoped
 lab_mode: simulation
 simulation_type: aws
 time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-  - content: 'Run: aws ec2 describe-security-groups --filters Name=ip-permission.to-port,Values=22 to find groups with SSH open.'
-    cost: 10
-    order: 1
-  - content: 'Use aws ec2 revoke-security-group-ingress to remove the 0.0.0.0/0 rule, then aws ec2 authorize-security-group-ingress to add the restricted CIDR.'
-    cost: 15
-    order: 2
-  - content: 'Replace with a specific CIDR like 203.0.113.0/24 (your office IP range). Never use 0.0.0.0/0 for SSH in production.'
-    cost: 20
-    order: 3
+- content: 'Run: aws ec2 describe-security-groups --filters Name=ip-permission.to-port,Values=22 to find
+    groups with SSH open.'
+  cost: 10
+  order: 1
+- content: Use aws ec2 revoke-security-group-ingress to remove the 0.0.0.0/0 rule, then aws ec2 authorize-security-group-ingress
+    to add the restricted CIDR.
+  cost: 15
+  order: 2
+- content: Replace with a specific CIDR like 203.0.113.0/24 (your office IP range). Never use 0.0.0.0/0
+    for SSH in production.
+  cost: 20
+  order: 3
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High

@@ -10,21 +10,25 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: High
 is_free: false
-description: |
-  CTF-style privilege escalation lab. A misconfigured SUID binary allows
-  reading protected files. Find the vulnerability and retrieve the flag at
-  /root/flag.txt as the low-privilege user `ctf`.
+description: 'CTF-style privilege-escalation lab: a misconfigured SUID binary on the system can be abused
+  to read files as root. Enumerate SUID binaries, identify the exploitable one and how it can be coerced
+  into reading arbitrary files, and use it to retrieve the protected flag at /root/flag.txt.'
 objectives:
-  - Enumerate SUID binaries on the system
-  - Exploit the misconfiguration to read /root/flag.txt
-  - Submit the flag via validation
-initial_state: |
-  You are logged in as user `ctf` on a hardened Linux server.
-  A SUID binary has been misconfigured — find and exploit it.
+- Enumerate the system's SUID binaries
+- Identify the misconfigured SUID binary and how to abuse it
+- Use it to read /root/flag.txt and capture the flag
+initial_state: Linux system with an over-privileged custom SUID binary (e.g. /usr/local/bin/readflag)
+  that can read root-owned files; the goal is to read /root/flag.txt via it.
 hints:
-  - order: 1
-    cost: 15
-    content: "Run `find / -perm -4000 -type f 2>/dev/null` to list SUID binaries."
-  - order: 2
-    cost: 25
-    content: "Check `/usr/local/bin/readflag` — it may read any file when invoked incorrectly."
+- order: 1
+  cost: 10
+  content: 'List SUID binaries: `find / -perm -4000 -type f 2>/dev/null`. One of them is a custom, non-standard
+    binary that shouldn''t be SUID-root.'
+- order: 2
+  cost: 15
+  content: Inspect the suspect (e.g. `/usr/local/bin/readflag`) — `strings`/`ltrace` it. Because it runs
+    as root and reads a path you control, it can be coerced into reading any file.
+- order: 3
+  cost: 20
+  content: 'Invoke it against the protected file: e.g. `/usr/local/bin/readflag /root/flag.txt` (or the
+    argument form it expects) to print the flag. Submit the FIXITLAB{...} value.'
