@@ -73,8 +73,14 @@ deploy_edge() {
 
 deploy_app() {
   echo "[3/4] Deploy D2 App (backend + celery + migrate)"
-  remote "$APP_PRIVATE_IP" via-edge \
-    "CLUSTER_ROLE=app BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"
+  if ! remote "$APP_PRIVATE_IP" via-edge \
+    "CLUSTER_ROLE=app BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"; then
+    echo "===== [diagnostic] D2 backend startup logs (last 120 lines) ====="
+    remote "$APP_PRIVATE_IP" via-edge \
+      "docker logs fixitlab-backend-1 --tail 120 2>&1 || (cd /opt/fixitlab && docker compose -f docker-compose.app.yml logs --tail 120 backend 2>&1) || true" || true
+    echo "===== [diagnostic] end backend logs ====="
+    return 1
+  fi
 }
 
 build_labs_images() {
