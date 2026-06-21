@@ -822,15 +822,29 @@ jobs:
           chmod +x scripts/ci-create-cluster-droplets.sh
           ./scripts/ci-create-cluster-droplets.sh
 
-      - name: Publish edge host artifact
+      - name: Publish edge host + private IPs artifact
         run: |
           mkdir -p _cluster
           printf '%s' '${{ steps.create.outputs.edge_public_ip_b64 }}' | base64 -d > _cluster/edge_host.txt
           echo "edge=$(cat _cluster/edge_host.txt)"  # log only; masked in display, fine
+          # Private IPs travel via the artifact, NOT job outputs: the later secret
+          # sync ::add-mask::s these values, and GitHub blanks any job output that
+          # matches a masked value (also true once PROD_*_HOST become real secrets).
+          # The artifact is written here, before any masking, so it always carries
+          # the real IPs. Consumers load it into $GITHUB_ENV in their "Load edge host" step.
+          {
+            echo "EDGE_PRIVATE_IP=${{ steps.create.outputs.edge_private_ip }}"
+            echo "APP_PRIVATE_IP=${{ steps.create.outputs.app_private_ip }}"
+            echo "DATA_PRIVATE_IP=${{ steps.create.outputs.db_private_ip }}"
+            echo "LABS_PRIVATE_IP=${{ steps.create.outputs.labs_private_ip }}"
+          } > _cluster/cluster_ips.env
+          echo "wrote _cluster/cluster_ips.env ($(wc -l < _cluster/cluster_ips.env) IPs)"
       - uses: actions/upload-artifact@v4
         with:
           name: cluster-edge-host
-          path: _cluster/edge_host.txt
+          path: |
+            _cluster/edge_host.txt
+            _cluster/cluster_ips.env
           retention-days: 1
 
       - name: Configure cloud firewalls
@@ -929,15 +943,15 @@ jobs:
         with: { name: cluster-env-enc, path: _cluster }
         continue-on-error: true   # absent only on legacy reruns; bootstrap still proceeds
       - name: Load edge host
-        run: echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Parallel SSH bootstrap per role
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
-          EDGE_PRIVATE_IP: ${{ needs.create-cluster.outputs.edge_private_ip }}
-          APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
-          DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
-          LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
+          # EDGE/APP/DATA/LABS_PRIVATE_IP come from _cluster/cluster_ips.env via the
+          # "Load edge host" step ($GITHUB_ENV) — job outputs get blanked by masking.
           GIT_REF: ${{ inputs.git_ref }}
         run: |
           export GIT_REPO="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
@@ -972,7 +986,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
-        run: echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Init/unseal Vault + AppRole + seed KV on edge
         id: vault
         env:
@@ -986,9 +1002,7 @@ jobs:
           CLUSTER_MODE: "1"
           GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN || github.token }}
           GITHUB_ENVIRONMENT: production
-          APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
-          DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
-          LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
+          # APP/DATA/LABS_PRIVATE_IP + EDGE_PUBLIC_IP come from cluster_ips.env via $GITHUB_ENV.
           VAULT_ROLE_ID: ${{ steps.vault.outputs.vault_role_id }}
           VAULT_SECRET_ID: ${{ steps.vault.outputs.vault_secret_id }}
           VAULT_UNSEAL_KEY: ${{ steps.vault.outputs.vault_unseal_key }}
@@ -1013,14 +1027,13 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
-        run: echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Ordered deploy (data → edge → app → labs images)
         env:
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
-          EDGE_PRIVATE_IP: ${{ needs.create-cluster.outputs.edge_private_ip }}
-          APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
-          DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
-          LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
+          # EDGE/APP/DATA/LABS_PRIVATE_IP come from cluster_ips.env via $GITHUB_ENV.
           BUILD_SCENARIOS: ${{ inputs.build_scenarios }}
         run: |
           chmod +x scripts/ci-cluster-deploy.sh
@@ -1051,15 +1064,15 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
-        run: echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Render redacted env from edge and email bundle
         env:
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           CRED_TO: ${{ inputs.credentials_email }}
-          APP_PRIVATE_IP: ${{ needs.create-cluster.outputs.app_private_ip }}
-          DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
-          LABS_PRIVATE_IP: ${{ needs.create-cluster.outputs.labs_private_ip }}
+          # APP/DATA/LABS_PRIVATE_IP come from cluster_ips.env via $GITHUB_ENV.
           UPDATED_SECRETS: ${{ needs.create-cluster.outputs.updated_secrets }}
           CREDENTIALS_EMAIL_REQUIRED: ${{ vars.CREDENTIALS_EMAIL_REQUIRED || '0' }}
         run: |
@@ -1087,7 +1100,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
-        run: echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Container health per node (via edge)
         uses: appleboy/ssh-action@v1
         with:
@@ -1122,7 +1137,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
-        run: echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Django unit tests in backend container on D2 (via edge)
         uses: appleboy/ssh-action@v1
         with:
@@ -1155,7 +1172,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
-        run: echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Disable JWT session enforcement on D2 backend (via edge)
         uses: appleboy/ssh-action@v1
         with:
@@ -1187,7 +1206,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
-        run: echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Internal API E2E on D2 (via edge)
         uses: appleboy/ssh-action@v1
         with:
@@ -1223,7 +1244,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
-        run: echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: All-scenarios lab E2E on D2 (labs run on D4 via remote docker)
         uses: appleboy/ssh-action@v1
         with:
@@ -1253,7 +1276,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
-        run: echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Remove E2E data + restore JWT enforcement on D2 (via edge)
         uses: appleboy/ssh-action@v1
         with:
@@ -1261,8 +1286,9 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           command_timeout: 10m
+          envs: APP_PRIVATE_IP
           script: |
-            ssh -o StrictHostKeyChecking=no "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
+            ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@${APP_PRIVATE_IP}" '
               cd /opt/fixitlab
               docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
                 python /scripts/cleanup-test-data.py || echo "WARN: cleanup warnings"
@@ -1272,7 +1298,7 @@ jobs:
       - name: Install daily pg_dump cron on D3
         env:
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
-          DATA_PRIVATE_IP: ${{ needs.create-cluster.outputs.db_private_ip }}
+          # DATA_PRIVATE_IP comes from cluster_ips.env via $GITHUB_ENV (Load edge host).
         run: |
           chmod +x scripts/ci-pg-backup-cron.sh
           ./scripts/ci-pg-backup-cron.sh
@@ -1287,7 +1313,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
-        run: echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Write cluster summary
         run: |
           {

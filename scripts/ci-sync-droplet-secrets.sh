@@ -44,10 +44,11 @@ if [ "${CLUSTER_MODE:-0}" = "1" ]; then
   # Edge public IP is the canonical PROD_HOST (gateway lives on D1).
   gh_secret PROD_HOST "$EDGE_PUBLIC_IP"
   gh_secret PROD_EDGE_HOST "$EDGE_PUBLIC_IP"
-  gh_secret PROD_APP_HOST "$APP_PRIVATE_IP"
-  gh_secret PROD_DB_HOST "$DATA_PRIVATE_IP"
-  gh_secret PROD_LABS_HOST "$LABS_PRIVATE_IP"
-  [ -n "${EDGE_PRIVATE_IP:-}" ] && gh_secret PROD_EDGE_PRIVATE_HOST "$EDGE_PRIVATE_IP"
+  # NOTE: the private IPs (app/data/labs/edge-private) are deliberately NOT stored
+  # as secrets. Nothing reads them as secrets, and registering them — or even
+  # ::add-mask::-ing them here — blanks the matching create-cluster JOB OUTPUTS that
+  # the health / e2e / summary jobs consume inline. They travel to every node and
+  # job via the cluster-edge-host artifact (cluster_ips.env) -> $GITHUB_ENV instead.
 
   # Vault AppRole secrets captured by ci-vault-cluster-bootstrap.sh
   gh_secret VAULT_ROLE_ID "${VAULT_ROLE_ID:-}"
