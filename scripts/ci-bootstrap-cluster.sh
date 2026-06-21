@@ -45,29 +45,52 @@ trap ssh_cleanup EXIT
 
 # Run a command on a node. We hop through the edge node for private droplets
 # (ProxyJump) since D2/D3/D4 have no public IP.
+# Build SSH options into the global SSH_OPTS array (shared by remote() and the
+# env writer). via_edge="via-edge" routes through the edge with an explicit
+# ProxyCommand — ProxyJump does not reliably pass our -i key / StrictHostKeyChecking
+# to the jump-host connection, so the hop would fail with "Permission denied
+# (publickey)" / "Host key verification failed". UserKnownHostsFile=/dev/null also
+# avoids the parallel known_hosts race.
+_build_ssh_opts() {
+  local via_edge="$1"
+  SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes)
+  [ -n "$KEY_FILE" ] && SSH_OPTS+=(-i "$KEY_FILE" -o IdentitiesOnly=yes)
+  if [ "$via_edge" = "via-edge" ]; then
+    local jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10"
+    [ -n "$KEY_FILE" ] && jopts="$jopts -i $KEY_FILE -o IdentitiesOnly=yes"
+    SSH_OPTS+=(-o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE_PUBLIC_IP}")
+  fi
+}
+
 remote() {
   local target_ip="$1" via_edge="$2"; shift 2
   local script="$*"
-  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes)
-  [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE" -o IdentitiesOnly=yes)
-  if [ "$via_edge" = "via-edge" ]; then
-    # Explicit ProxyCommand, NOT -o ProxyJump=: ProxyJump does not reliably pass
-    # our -i key / StrictHostKeyChecking to the jump-host (edge) connection, so
-    # the hop fails with "Permission denied (publickey)" / "Host key verification
-    # failed". UserKnownHostsFile=/dev/null also avoids the parallel known_hosts race.
-    local jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10"
-    [ -n "$KEY_FILE" ] && jopts="$jopts -i $KEY_FILE -o IdentitiesOnly=yes"
-    opts+=(-o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE_PUBLIC_IP}")
-  fi
   if _is_true "$DRY_RUN"; then
     local hop=""; [ "$via_edge" = "via-edge" ] && hop=" -J root@${EDGE_PUBLIC_IP}"
     echo "DRY_RUN ssh${hop} root@${target_ip} '<bootstrap script: ${script%%$'\n'*} ...>'"
     return 0
   fi
-  ssh "${opts[@]}" "root@${target_ip}" "bash -s" <<EOF
+  _build_ssh_opts "$via_edge"
+  ssh "${SSH_OPTS[@]}" "root@${target_ip}" "bash -s" <<EOF
 set -e
 ${script}
 EOF
+}
+
+# Write the cluster-wired env onto a node from the file in CLUSTER_ENV_FILE. The
+# base64 is sent over SSH stdin — never as an argument — so it is not logged or
+# visible in the node's process list. Vault reads deploy/production.env and the
+# deploy reads .env.production. No-op if CLUSTER_ENV_FILE is unset/missing.
+write_node_env() {
+  local ip="$1" via_edge="$2"
+  [ -n "${CLUSTER_ENV_FILE:-}" ] && [ -f "${CLUSTER_ENV_FILE:-}" ] || return 0
+  if _is_true "$DRY_RUN"; then
+    echo "DRY_RUN write env -> root@${ip}:/opt/fixitlab/.env.production (+ deploy/production.env)"
+    return 0
+  fi
+  _build_ssh_opts "$via_edge"
+  base64 < "$CLUSTER_ENV_FILE" | tr -d '\n' | ssh "${SSH_OPTS[@]}" "root@${ip}" \
+    'umask 077; mkdir -p /opt/fixitlab/deploy; base64 -d > /opt/fixitlab/.env.production && cp /opt/fixitlab/.env.production /opt/fixitlab/deploy/production.env && echo "[env] wrote .env.production ($(wc -l < /opt/fixitlab/.env.production) lines) on $(hostname)"'
 }
 
 BOOTSTRAP_COMMON='
@@ -148,6 +171,18 @@ main() {
     wait $pd || rc=1
     wait $pl || rc=1
     [ "$rc" -eq 0 ] || { echo "ERROR: one or more nodes failed to bootstrap"; exit 1; }
+  fi
+
+  # Distribute the cluster-wired env to the app-bearing nodes (edge/app/data).
+  # Vault reads deploy/production.env; deploy reads .env.production. Labs runs a
+  # bare docker engine (no app stack) so it needs no env.
+  if [ -n "${CLUSTER_ENV_FILE:-}" ] && [ -f "${CLUSTER_ENV_FILE:-}" ]; then
+    echo "[env] distributing cluster env to edge/app/data"
+    write_node_env "$EDGE_PUBLIC_IP" direct
+    write_node_env "$APP_PRIVATE_IP" via-edge
+    write_node_env "$DATA_PRIVATE_IP" via-edge
+  else
+    echo "[env] CLUSTER_ENV_FILE unset/missing — skipping env distribution (workflow sets it)"
   fi
   echo "=== cluster bootstrap done ==="
 }
