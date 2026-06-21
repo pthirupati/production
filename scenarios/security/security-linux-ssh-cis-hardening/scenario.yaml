@@ -1,0 +1,38 @@
+title: "Security ↔ Linux: SSH Fails the CIS Hardening Baseline"
+slug: security-linux-ssh-cis-hardening
+technology: Security
+category: System Hardening
+difficulty: medium
+description: |
+  CROSS-TECHNOLOGY task (Security <-> Linux). A compliance scan flagged the SSH
+  daemon on bastion-01 as failing the CIS benchmark: root login is permitted,
+  password authentication is on, and weak MACs/Ciphers are negotiable. The audit
+  team wrote a hardening drop-in at /etc/ssh/sshd_config.d/50-cis.conf, but it is
+  a placeholder that still sets the INSECURE values. Apply the Linux-side SSH
+  hardening so the host passes the security baseline without locking yourself out.
+initial_state: |
+  A bastion-01 Linux host. /etc/ssh/sshd_config.d/50-cis.conf exists but is a
+  broken placeholder (PermitRootLogin yes, PasswordAuthentication yes, no strong
+  Ciphers/MACs). The CIS SSH controls all fail.
+objectives:
+  - Confirm the SSH config fails the CIS controls (root login, password auth, weak crypto)
+  - Harden /etc/ssh/sshd_config.d/50-cis.conf (disable root login + password auth, restrict to strong Ciphers/MACs)
+  - Confirm the hardening drop-in is corrected so the baseline passes and sshd would reload cleanly
+lab_mode: simulation
+simulation_type: generic
+cross_technology: true
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: "The CIS SSH controls require `PermitRootLogin no` and `PasswordAuthentication no`. The drop-in currently sets both to `yes`."
+  - order: 2
+    cost: 15
+    content: "Pin strong crypto: set `Ciphers` and `MACs` to approved algorithms only, and validate the whole config with `sshd -t` before reloading."
+  - order: 3
+    cost: 20
+    content: "Once /etc/ssh/sshd_config.d/50-cis.conf carries the hardened values, the baseline passes."

@@ -7982,6 +7982,441 @@ PROJECTS = [
             },
         ],
     },
+
+    # ──────────────────────────────────────────────────────────────────
+    # P4: additional phased "zero-to-hero" projects, including cross-tech
+    # capstones that exercise the new cross-technology handoff scenarios
+    # (Terraform->Ansible, Docker->K8s, DB<->storage/network, Security<->Linux,
+    # Networking<->Linux, GPU<->K8s). Each phase is a guided Jira ticket with a
+    # depends_on chain so the learner walks the real pipeline order.
+    # ──────────────────────────────────────────────────────────────────
+    {
+        "technology_slug": "terraform",
+        "title": "Capstone: Provision → Configure → Deploy → Observe (Terraform + Ansible + Docker + K8s)",
+        "slug": "capstone-provision-to-prod-iac-config-deploy",
+        "architecture_type": "3tier",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (Terraform + Ansible + Docker + Kubernetes + Linux). Walk a change "
+            "all the way from infrastructure-as-code to a running, observed workload: provision hosts with "
+            "Terraform, hand the outputs to Ansible to configure them, containerise the app, migrate the "
+            "compose service onto Kubernetes, and wire monitoring. Every phase hands its artifact to the "
+            "next technology — exactly where real pipelines break."
+        ),
+        "objectives": [
+            "Provision infrastructure as code with Terraform and expose its outputs",
+            "Reconcile a Terraform-rendered Ansible inventory and configure the hosts",
+            "Containerise the app and migrate the compose service to a valid Kubernetes Deployment",
+            "Expose the workload and stand up monitoring/alerting",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 10,
+        "order": 12,
+        "tasks": [
+            {
+                "jira_key": "CAP6-1",
+                "title": "Provision the fleet with Terraform",
+                "description": "Use Terraform to create the network and the app/db hosts, and publish their private IPs as an output (web_private_ips).",
+                "acceptance_criteria": "terraform apply creates the hosts and `terraform output -json web_private_ips` lists the real addresses.",
+                "hint": "Keep state remote, model hosts in a module, and add an `output` block for the private IPs the next stage consumes. (Terraform skills.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP6-2",
+                "title": "Reconcile the Terraform → Ansible inventory",
+                "description": "The wrapper that renders Terraform output into /home/ansible/inventory/provisioned_hosts.ini drifted. Re-render it so the [webservers] group and addresses match the real state (see the linux-terraform-output-to-ansible-inventory lab).",
+                "acceptance_criteria": "`ansible-inventory -i provisioned_hosts.ini --list` shows the real hosts and `ansible webservers -m ping` reaches them all.",
+                "hint": "Diff `terraform output -json` against the rendered inventory; fix the group header and one host line per real IP. (Terraform→Ansible handoff.)",
+                "order": 2,
+                "depends_on": "CAP6-1",
+            },
+            {
+                "jira_key": "CAP6-3",
+                "title": "Configure the hosts with Ansible",
+                "description": "Run the role that installs the runtime, opens the app port, and lays down the base config across the webservers group.",
+                "acceptance_criteria": "An idempotent playbook run completes with no failed tasks and the runtime is installed on every host.",
+                "hint": "Make tasks idempotent (handlers for restarts), and confirm a second run reports `changed=0`. (Ansible skills.)",
+                "order": 3,
+                "depends_on": "CAP6-2",
+            },
+            {
+                "jira_key": "CAP6-4",
+                "title": "Containerise the application",
+                "description": "Write a multi-stage Dockerfile for the app (non-root, healthcheck) and build the image.",
+                "acceptance_criteria": "The image builds and runs locally as a container exposing the app port.",
+                "hint": "Multi-stage build to keep the runtime image small; add a HEALTHCHECK. (Docker skills.)",
+                "order": 4,
+                "depends_on": "CAP6-3",
+            },
+            {
+                "jira_key": "CAP6-5",
+                "title": "Migrate the compose service to Kubernetes",
+                "description": "Convert the docker-compose `api` service into a valid Kubernetes Deployment (drop compose-only keys, replace the bind mount, add a containerPort and resource requests) — see the docker-compose-to-k8s-manifest-migration lab.",
+                "acceptance_criteria": "`kubectl apply --dry-run=client -f deployment.yaml` is accepted and the Deployment schedules.",
+                "hint": "container_name and host bind mounts are not valid Pod spec; use an emptyDir/configMap volume and set resources.requests. (Docker→Kubernetes migration.)",
+                "order": 5,
+                "depends_on": "CAP6-4",
+            },
+            {
+                "jira_key": "CAP6-6",
+                "title": "Expose the workload",
+                "description": "Add a Service (and Ingress) so the app is reachable by name inside the cluster.",
+                "acceptance_criteria": "`kubectl get svc,ingress` shows the app exposed and endpoints populate.",
+                "hint": "Confirm the Service selector matches the Deployment's pod labels so endpoints fill. (Kubernetes networking.)",
+                "order": 6,
+                "depends_on": "CAP6-5",
+            },
+            {
+                "jira_key": "CAP6-7",
+                "title": "Add monitoring and alerts",
+                "description": "Scrape the app/cluster metrics, build a dashboard, and set an alert on error rate or pod restarts.",
+                "acceptance_criteria": "Metrics are scraped, a dashboard renders, and a test alert fires and resolves.",
+                "hint": "Expose a metrics endpoint, point the scraper at it, and write one meaningful alert rule. (Observability.)",
+                "order": 7,
+                "depends_on": "CAP6-6",
+            },
+            {
+                "jira_key": "CAP6-8",
+                "title": "Validate the full pipeline end to end",
+                "description": "Smoke-test from provision to running workload, then document the runbook for the handoffs.",
+                "acceptance_criteria": "A single pass from `terraform apply` to a served, monitored app succeeds and the runbook captures each handoff.",
+                "hint": "Tear down and re-run once to prove the chain is repeatable. (Cross-tech validation.)",
+                "order": 8,
+                "depends_on": "CAP6-7",
+            },
+        ],
+    },
+    {
+        "technology_slug": "database",
+        "title": "Capstone: Database Platform — Storage, Replication & HA (DB + Linux + Network)",
+        "slug": "capstone-db-platform-storage-replication-ha",
+        "architecture_type": "custom",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (Database + Linux storage + Networking). Build a resilient database "
+            "platform from the ground up: lay out storage on the Linux host for the data and tablespaces, "
+            "tune the engine, then stand up streaming replication to a replica across the network and prove "
+            "failover. Each phase straddles the DB and the host/network beneath it — the seams where "
+            "production databases actually fail."
+        ),
+        "objectives": [
+            "Provision and mount dedicated storage for data and tablespaces on the Linux host",
+            "Reconcile the database engine config with the new storage layout",
+            "Configure cross-host streaming replication over the network",
+            "Validate replication health and perform a controlled failover",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 9,
+        "order": 13,
+        "tasks": [
+            {
+                "jira_key": "CAP7-1",
+                "title": "Lay out storage on the Linux host",
+                "description": "Provision the spare disk(s) for the data directory and a dedicated tablespace mount, and persist them in fstab.",
+                "acceptance_criteria": "The data and tablespace filesystems are mounted with room to grow and survive a remount.",
+                "hint": "Partition/format the spare disk, mount it for the tablespace, and add it to /etc/fstab. (Linux storage.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP7-2",
+                "title": "Move the tablespace onto the new disk",
+                "description": "Reconcile postgresql.conf so the full tablespace lives on the new mount, then start the engine (see the db-postgres-tablespace-new-disk lab).",
+                "acceptance_criteria": "The tablespace points at the new storage, the engine starts, and writes to the large tables succeed.",
+                "hint": "Point the tablespace location at the new mount in /var/lib/pgsql/data/postgresql.conf and confirm `df` shows headroom. (DB↔Linux storage.)",
+                "order": 2,
+                "depends_on": "CAP7-1",
+            },
+            {
+                "jira_key": "CAP7-3",
+                "title": "Tune the engine for the workload",
+                "description": "Set shared_buffers, work_mem, and checkpoint settings appropriate to the host and workload.",
+                "acceptance_criteria": "The engine restarts cleanly with tuned settings and a baseline query benchmark improves.",
+                "hint": "Size shared_buffers to a fraction of RAM; raise work_mem carefully. Validate with a before/after benchmark. (DB tuning.)",
+                "order": 3,
+                "depends_on": "CAP7-2",
+            },
+            {
+                "jira_key": "CAP7-4",
+                "title": "Open the replication network path",
+                "description": "Ensure the replica can reach the primary's database port across the network/firewall.",
+                "acceptance_criteria": "The replica host can open a TCP connection to the primary's DB port.",
+                "hint": "Open the DB port to the replica's address only, and confirm reachability before configuring replication. (Networking.)",
+                "order": 4,
+                "depends_on": "CAP7-3",
+            },
+            {
+                "jira_key": "CAP7-5",
+                "title": "Configure streaming replication",
+                "description": "Reconcile the replica's replication config (unique server-id, correct primary host/port) and start replication (mirrors the db-mysql-replication-network-firewall lab pattern).",
+                "acceptance_criteria": "Replication status reports the replica connected and streaming with no clashing server-id.",
+                "hint": "A duplicate server-id breaks replication outright; set a unique id and the correct primary host/port. (DB↔Network.)",
+                "order": 5,
+                "depends_on": "CAP7-4",
+            },
+            {
+                "jira_key": "CAP7-6",
+                "title": "Verify replication health and lag",
+                "description": "Confirm the replica is caught up and monitor replication lag under write load.",
+                "acceptance_criteria": "Replication lag stays bounded under a write workload and the replica is consistent.",
+                "hint": "Generate writes on the primary and watch lag converge on the replica. (DB operations.)",
+                "order": 6,
+                "depends_on": "CAP7-5",
+            },
+            {
+                "jira_key": "CAP7-7",
+                "title": "Perform a controlled failover",
+                "description": "Promote the replica, repoint the application, and document the recovery procedure.",
+                "acceptance_criteria": "The replica is promoted, the app reconnects, and the runbook captures the failover steps.",
+                "hint": "Promote, verify writeability, then fail back. Capture every step in the runbook. (HA/DR.)",
+                "order": 7,
+                "depends_on": "CAP7-6",
+            },
+        ],
+    },
+    {
+        "technology_slug": "security",
+        "title": "Zero to Hardened: Secure a Linux Host to a CIS Baseline",
+        "slug": "security-zero-to-hardened-host",
+        "architecture_type": "custom",
+        "description": (
+            "CROSS-TECHNOLOGY zero-to-hero (Security + Linux). Take a default Linux host and bring it to a "
+            "defensible CIS-style baseline: harden SSH, tighten the firewall to only the ports the app needs, "
+            "enforce SELinux, lock down accounts and auditing, and prove the controls with a scan. Security "
+            "work is Linux work — every control is applied and verified on the host itself."
+        ),
+        "objectives": [
+            "Harden the SSH daemon to the CIS baseline without locking yourself out",
+            "Reduce the firewall to least-privilege for the app",
+            "Enforce SELinux and fix the resulting denials properly",
+            "Lock down accounts/auditing and prove the baseline with a scan",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 6,
+        "order": 7,
+        "tasks": [
+            {
+                "jira_key": "SECZH-1",
+                "title": "Baseline the host with a scan",
+                "description": "Run the compliance scan to capture the starting posture and the list of failing controls.",
+                "acceptance_criteria": "A baseline scan report exists listing the failing CIS controls.",
+                "hint": "Run the scanner once before changing anything so you can measure improvement. (Security assessment.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "SECZH-2",
+                "title": "Harden SSH to the CIS baseline",
+                "description": "Disable root login and password auth and pin strong Ciphers/MACs in the SSH drop-in (see the security-linux-ssh-cis-hardening lab).",
+                "acceptance_criteria": "The SSH drop-in disables root login + password auth, restricts to strong crypto, and `sshd -t` validates.",
+                "hint": "Edit /etc/ssh/sshd_config.d/50-cis.conf: PermitRootLogin no, PasswordAuthentication no, strong Ciphers/MACs. Keep a session open while testing. (Security↔Linux.)",
+                "order": 2,
+                "depends_on": "SECZH-1",
+            },
+            {
+                "jira_key": "SECZH-3",
+                "title": "Tighten the firewall to least privilege",
+                "description": "Reduce the firewall so only the app's required ports are reachable; drop everything else.",
+                "acceptance_criteria": "Only the required service ports are open; a port scan confirms the rest are closed.",
+                "hint": "Default-deny inbound and add explicit allows only for the app + management. Verify with a scan. (Firewall.)",
+                "order": 3,
+                "depends_on": "SECZH-2",
+            },
+            {
+                "jira_key": "SECZH-4",
+                "title": "Enforce SELinux and fix denials properly",
+                "description": "Put SELinux in Enforcing mode and resolve the resulting denials with the correct labels/booleans (never by disabling it).",
+                "acceptance_criteria": "SELinux is Enforcing, the app works, and there are no unresolved denials in the audit log.",
+                "hint": "Use the correct port labels/booleans for the app rather than setenforce 0. (SELinux.)",
+                "order": 4,
+                "depends_on": "SECZH-3",
+            },
+            {
+                "jira_key": "SECZH-5",
+                "title": "Lock down accounts and auditing",
+                "description": "Enforce password/lockout policy, remove unused accounts, and enable auditd with meaningful rules.",
+                "acceptance_criteria": "Account policy is enforced, stale accounts are gone, and auditd captures the key events.",
+                "hint": "Set faillock + password policy, prune accounts, and add audit rules for privilege use. (Hardening.)",
+                "order": 5,
+                "depends_on": "SECZH-4",
+            },
+            {
+                "jira_key": "SECZH-6",
+                "title": "Re-scan and prove the baseline",
+                "description": "Re-run the compliance scan and show the previously-failing controls now pass; document residual risk.",
+                "acceptance_criteria": "The follow-up scan shows the targeted controls passing and a short residual-risk note exists.",
+                "hint": "Diff the new scan against the baseline to prove each control moved to pass. (Verification.)",
+                "order": 6,
+                "depends_on": "SECZH-5",
+            },
+        ],
+    },
+    {
+        "technology_slug": "networking",
+        "title": "Host to Datacenter: Build Full Connectivity (Networking + Linux)",
+        "slug": "networking-host-to-datacenter-connectivity",
+        "architecture_type": "custom",
+        "description": (
+            "CROSS-TECHNOLOGY zero-to-hero (Networking + Linux). Connect a Linux host into a segmented "
+            "datacenter network the right way: bring up a bonded uplink to an LACP trunk, tag the app VLAN, "
+            "set persistent addressing/routing, open the app through the host firewall, and validate "
+            "reachability end to end. Each step is configured on the Linux host to match the switch fabric."
+        ),
+        "objectives": [
+            "Bring up an LACP bond and tagged VLAN to match the switch trunk",
+            "Set persistent addressing and a default route",
+            "Open the app service through the host firewall",
+            "Validate end-to-end reachability across the segments",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 7,
+        "order": 6,
+        "tasks": [
+            {
+                "jira_key": "NETDC-1",
+                "title": "Confirm the switch trunk and plan the host side",
+                "description": "Read the switch-side trunk config (LACP + tagged VLAN 30) and plan the matching Linux bond/VLAN.",
+                "acceptance_criteria": "A short plan documents the bond mode, VLAN tag, and addressing the host must use.",
+                "hint": "Match the host bonding mode to the switch (LACP = 802.3ad) and note which VLANs are tagged. (Networking design.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "NETDC-2",
+                "title": "Bring up the bonded VLAN uplink",
+                "description": "Configure the LACP bond and the tagged VLAN child on the Linux host so the app subnet comes up (see the networking-linux-bond-vlan-trunk lab).",
+                "acceptance_criteria": "ifcfg-bond0 is mode 802.3ad with a tagged bond0.30 on the app subnet, and the link has carrier.",
+                "hint": "Set BONDING_OPTS=\"mode=802.3ad ...\" and add the bond0.30 VLAN interface. (Networking↔Linux.)",
+                "order": 2,
+                "depends_on": "NETDC-1",
+            },
+            {
+                "jira_key": "NETDC-3",
+                "title": "Set persistent addressing and default route",
+                "description": "Assign the host's app-subnet address and a persistent default gateway that survives reboot.",
+                "acceptance_criteria": "The address and default route persist across a network restart and the gateway is reachable.",
+                "hint": "Persist GATEWAY in the network config; confirm `ip route` shows the default after a restart. (Linux networking.)",
+                "order": 3,
+                "depends_on": "NETDC-2",
+            },
+            {
+                "jira_key": "NETDC-4",
+                "title": "Open the app through the host firewall",
+                "description": "Repair/define the firewalld service for the app's TLS port and bind it to the active zone (mirrors the networking-firewalld-app-reachability lab).",
+                "acceptance_criteria": "The app's port is reachable through the firewall and the custom service is enabled in the zone.",
+                "hint": "Fix the custom service XML to a valid 8443/tcp definition and add it to the active zone permanently. (Firewall.)",
+                "order": 4,
+                "depends_on": "NETDC-3",
+            },
+            {
+                "jira_key": "NETDC-5",
+                "title": "Enable routing/forwarding if required",
+                "description": "If the host bridges segments, enable IP forwarding persistently and confirm the path.",
+                "acceptance_criteria": "net.ipv4.ip_forward is persistently set and inter-segment traffic flows as designed.",
+                "hint": "Set ip_forward in a sysctl drop-in so it persists; only enable it if the host is meant to route. (Routing.)",
+                "order": 5,
+                "depends_on": "NETDC-4",
+            },
+            {
+                "jira_key": "NETDC-6",
+                "title": "Validate end-to-end reachability",
+                "description": "Prove reachability from another segment to the app and capture latency/path.",
+                "acceptance_criteria": "A client on another segment reaches the app, and traceroute/ping confirm the expected path.",
+                "hint": "Test from off-subnet so you exercise the trunk, route, and firewall together. (Validation.)",
+                "order": 6,
+                "depends_on": "NETDC-5",
+            },
+            {
+                "jira_key": "NETDC-7",
+                "title": "Document the network runbook",
+                "description": "Write the runbook covering the bond/VLAN, addressing, firewall, and recovery steps.",
+                "acceptance_criteria": "A runbook captures the full host-to-datacenter configuration and how to recover it.",
+                "hint": "Include the exact config files touched so the next engineer can rebuild it. (Operations.)",
+                "order": 7,
+                "depends_on": "NETDC-6",
+            },
+        ],
+    },
+    {
+        "technology_slug": "gpu",
+        "title": "Accelerated Kubernetes: From GPU Drivers to Scheduled GPU Pods (GPU + Kubernetes)",
+        "slug": "gpu-accelerated-k8s-platform",
+        "architecture_type": "custom",
+        "description": (
+            "CROSS-TECHNOLOGY zero-to-hero (GPU + Kubernetes). Turn a GPU host into a node that can schedule "
+            "accelerated workloads: install/verify the driver, make the NVIDIA container runtime the default, "
+            "deploy the device plugin so the node advertises nvidia.com/gpu, schedule a GPU pod, and add GPU "
+            "health monitoring. Each phase connects the GPU/driver layer to the Kubernetes scheduler above it."
+        ),
+        "objectives": [
+            "Install and verify the NVIDIA driver on the host",
+            "Make the NVIDIA container runtime the default",
+            "Deploy the device plugin so the node advertises nvidia.com/gpu",
+            "Schedule a GPU workload and add GPU health monitoring",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 7,
+        "order": 6,
+        "tasks": [
+            {
+                "jira_key": "GPUK8S-1",
+                "title": "Install and verify the GPU driver",
+                "description": "Load the NVIDIA driver on the host and confirm the GPU is healthy.",
+                "acceptance_criteria": "`nvidia-smi` reports the GPU healthy with the expected driver version.",
+                "hint": "Load the kernel module and confirm with nvidia-smi before touching the container stack. (GPU host.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "GPUK8S-2",
+                "title": "Make the NVIDIA container runtime the default",
+                "description": "Configure the container runtime so GPU containers can access the device.",
+                "acceptance_criteria": "A test GPU container can run nvidia-smi through the runtime.",
+                "hint": "Set the default runtime to nvidia in the runtime config and restart the runtime. (Container runtime.)",
+                "order": 2,
+                "depends_on": "GPUK8S-1",
+            },
+            {
+                "jira_key": "GPUK8S-3",
+                "title": "Deploy the NVIDIA device plugin",
+                "description": "Correct and apply the device-plugin DaemonSet so the node advertises nvidia.com/gpu (see the gpu-k8s-device-plugin-daemonset lab).",
+                "acceptance_criteria": "`kubectl describe node` shows nvidia.com/gpu capacity and the plugin pod is Running.",
+                "hint": "Fix the image tag and the /var/lib/kubelet/device-plugins mount, and ensure the runtime selects nvidia. (GPU↔Kubernetes.)",
+                "order": 3,
+                "depends_on": "GPUK8S-2",
+            },
+            {
+                "jira_key": "GPUK8S-4",
+                "title": "Schedule a GPU workload",
+                "description": "Deploy a pod that requests nvidia.com/gpu and confirm it lands on the GPU node.",
+                "acceptance_criteria": "A pod requesting a GPU is Running on the GPU node and can see the device.",
+                "hint": "Add `resources.limits: nvidia.com/gpu: 1` to the pod spec so the scheduler places it on the GPU node. (Kubernetes scheduling.)",
+                "order": 4,
+                "depends_on": "GPUK8S-3",
+            },
+            {
+                "jira_key": "GPUK8S-5",
+                "title": "Verify isolation and sharing",
+                "description": "Confirm GPU requests are honored and a second pod queues when the GPU is fully allocated.",
+                "acceptance_criteria": "GPU allocation is enforced — an over-subscribed pod stays Pending until capacity frees.",
+                "hint": "Request more GPUs than the node has and confirm the extra pod stays Pending. (Resource isolation.)",
+                "order": 5,
+                "depends_on": "GPUK8S-4",
+            },
+            {
+                "jira_key": "GPUK8S-6",
+                "title": "Add GPU health monitoring",
+                "description": "Export GPU metrics (utilisation, memory, temperature, ECC) and alert on unhealthy GPUs.",
+                "acceptance_criteria": "GPU metrics are scraped and an alert fires when a GPU is marked unhealthy.",
+                "hint": "Run a GPU metrics exporter and add an alert on ECC errors or a fallen-off GPU. (GPU observability.)",
+                "order": 6,
+                "depends_on": "GPUK8S-5",
+            },
+            {
+                "jira_key": "GPUK8S-7",
+                "title": "Document the accelerated-node runbook",
+                "description": "Capture the driver→runtime→device-plugin→scheduling chain and how to recover a node.",
+                "acceptance_criteria": "A runbook documents the full GPU-on-Kubernetes setup and node recovery steps.",
+                "hint": "List the exact configs and manifests so a new GPU node can be brought up the same way. (Operations.)",
+                "order": 7,
+                "depends_on": "GPUK8S-6",
+            },
+        ],
+    },
 ]
 
 

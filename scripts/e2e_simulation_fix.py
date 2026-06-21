@@ -27,6 +27,32 @@ _RS_MARKER_FIX.update({'html-img-missing-alt': '/var/www/html/gallery.html', 'ht
 _RS_MARKER_FIX.update({'actuator-health-failing': '/app/src/main/resources/application.yml', 'sim-java-classpath': '/app/run-app.sh', 'sim-java-compile-error': '/app/src/main/java/com/example/App.java', 'container-startup-probe': '/app/k8s/deployment.yaml', 'sim-java-deadlock': '/app/src/main/java/com/example/TransferService.java', 'gc-pause-excessive': '/app/jvm.options', 'gradle-build-cache-corrupt': '/root/.gradle/gradle.properties', 'jacoco-coverage-missing': '/app/pom.xml', 'jpa-n-plus-1': '/app/src/main/resources/application.yml', 'junit-flaky-test': '/app/src/test/java/com/example/OrderServiceTest.java', 'jvm-heap-oom': '/app/jvm.options', 'jvm-metaspace-oom': '/app/jvm.options', 'jwt-token-expired': '/app/src/main/resources/application.yml', 'kafka-producer-timeout': '/app/src/main/resources/application.yml', 'log4j-config-missing': '/app/src/main/resources/log4j2.xml', 'sim-java-maven-fail': '/app/pom.xml', 'maven-dependency-conflict': '/app/pom.xml', 'sim-java-oom': '/app/jvm.options', 'rabbitmq-consumer-stuck': '/app/src/main/resources/application.yml', 'redis-jedis-connection': '/app/src/main/resources/application.yml', 'spring-boot-startup-fail': '/app/src/main/resources/application.yml', 'spring-db-connection-pool': '/app/src/main/resources/application.yml', 'sim-java-spring-fail': '/app/src/main/resources/application.properties', 'ssl-handshake-failed': '/app/src/main/resources/application.yml', 'thread-deadlock': '/app/src/main/java/com/example/CacheManager.java', 'tomcat-max-threads': '/app/src/main/resources/application.yml', 'java-gradle-wrapper-version-mismatch': '/app/gradle/wrapper/gradle-wrapper.properties', 'java-spring-circular-dependency': '/app/src/main/java/com/example/config/BeanConfig.java', 'java-logback-rolling-policy': '/app/src/main/resources/logback-spring.xml', 'java-maven-surefire-no-tests': '/app/pom.xml', 'java-jdbc-pool-leak': '/app/src/main/java/com/example/repo/ReportDao.java', 'java-hibernate-lazy-init-exception': '/app/src/main/resources/application.yml', 'java-spring-profile-not-active': '/app/src/main/resources/application.yml', 'java-jackson-serialization-loop': '/app/src/main/java/com/example/model/Order.java', 'java-runtime-version-mismatch': '/app/pom.xml', 'java-spring-cors-misconfigured': '/app/src/main/java/com/example/config/WebConfig.java', 'java-maven-shade-plugin-manifest': '/app/pom.xml', 'java-spring-scheduler-not-running': '/app/src/main/java/com/example/jobs/CleanupJob.java', 'java-direct-buffer-oom': '/app/jvm.options', 'java-spring-actuator-exposed': '/app/src/main/resources/application.yml', 'java-keystore-wrong-password': '/app/src/main/resources/application.yml', 'java-gradle-dependency-conflict': '/app/build.gradle', 'java-spring-transaction-rollback': '/app/src/main/java/com/example/service/PaymentService.java', 'java-ssl-protocol-disabled': '/app/src/main/resources/application.yml', 'java-spring-property-placeholder': '/app/src/main/resources/application.yml', 'java-stack-overflow-recursion': '/app/src/main/java/com/example/util/TreeWalker.java', 'java-spring-bean-override-conflict': '/app/src/main/resources/application.yml', 'java-truststore-expired-cert': '/app/src/main/resources/application.yml', 'java-gradle-test-task-skipped': '/app/build.gradle', 'security-java-log4shell-jndi-lookup': '/app/src/main/resources/log4j2.component.properties'})
 
 
+# ── P4: Cross-technology scenarios (two technologies, one broken handoff) ──
+# Marker scenarios reuse the generic _RS_MARKER_FIX branch (rewrites the broken
+# handoff artifact WITH the FIXED-OK sentinel; validation's `grep -q FIXED-OK`
+# reads real file content → fail-closed before the fix). The one service-backed
+# scenario reuses _RS_SERVICE_FIX (starts the failed integration unit). Both maps
+# are matched by EXACT slug BEFORE any generic substring branch, so slugs that
+# contain docker/k8s/gpu/ansible/postgres tokens are handled here, not by a
+# generic handler.
+_RS_MARKER_FIX.update({
+    'linux-terraform-output-to-ansible-inventory': '/home/ansible/inventory/provisioned_hosts.ini',
+    'docker-compose-to-k8s-manifest-migration': '/opt/app/k8s/deployment.yaml',
+    'networking-linux-bond-vlan-trunk': '/etc/sysconfig/network-scripts/ifcfg-bond0',
+    'db-postgres-tablespace-new-disk': '/var/lib/pgsql/data/postgresql.conf',
+    'security-linux-ssh-cis-hardening': '/etc/ssh/sshd_config.d/50-cis.conf',
+    'ansible-deploy-to-k8s-kubeconfig': '/home/ansible/k8s-deploy.yml',
+    'terraform-vmware-vm-clone-from-template': '/root/iac/vsphere-vm.tf',
+    'networking-firewalld-app-reachability': '/etc/firewalld/services/app8443.xml',
+    'gpu-k8s-device-plugin-daemonset': '/etc/nvidia-container-runtime/k8s-device-plugin.yaml',
+    'db-mysql-replication-network-firewall': '/etc/my.cnf.d/replication.cnf',
+    'devops-ci-to-ansible-cd-handoff': '/home/ansible/cd-playbook.yml',
+})
+_RS_SERVICE_FIX.update({
+    'docker-handoff-systemd-managed-stack': 'appstack',
+})
+
+
 def _engine_for_session(session) -> UnifiedSimulationEngine | None:
     entry = get_sim_session(str(session.id))
     if not entry:

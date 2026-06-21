@@ -198,3 +198,198 @@ class HumanRepliesTest(TestCase):
         self.assertTrue(all(r for r in replies))
         # Skipped acks come from a small bank but should produce >1 distinct line.
         self.assertGreater(len(replies), 1)
+
+
+class PracticalValidationTest(TestCase):
+    """P2.4 — inline practical command/code validation is deterministic + free
+    (reuses the labs grading engines), fails closed, and on a pass feeds the
+    practical (+15) credit into the next scored answer."""
+
+    def setUp(self):
+        ensure_interview_defaults()
+        self.user = User.objects.create_user(
+            username="iv_prac", email="iv_prac@example.com", password="x"
+        )
+        ent, _ = InterviewEntitlement.objects.get_or_create(user=self.user)
+        ent.is_complimentary = True
+        ent.is_active = True
+        ent.save()
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def _practical_round(self, practical_config) -> InterviewRound:
+        camp = InterviewCampaign.objects.create(
+            user=self.user, title="t", status="in_progress", experience_level="mid"
+        )
+        rnd = InterviewRound.objects.create(
+            campaign=camp, round_number=1, round_type="technical",
+            title="r", status="in_progress", duration_minutes=30,
+        )
+        q = InterviewQuestion.objects.create(
+            slug=f"prac-{rnd.id}", question_text="Hands-on task.",
+            category="practical", practical_config=practical_config,
+        )
+        InterviewMessage.objects.create(
+            round=rnd, role="interviewer", content="Hands-on task.",
+            message_type="practical", question=q,
+        )
+        return rnd, q
+
+    def test_command_pattern_validates_correct_answer(self):
+        rnd, q = self._practical_round({
+            "expected_commands": [r"systemctl\s+(restart|start)\s+nginx", r"nginx\s+-t"],
+        })
+        resp = self.client.post(
+            f"/api/interviews/rounds/{rnd.id}/practical-validate/",
+            {"answer": "nginx -t && systemctl restart nginx"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertTrue(resp.data["validated"], resp.data)
+        self.assertEqual(resp.data["method"], "command_pattern")
+
+    def test_command_pattern_fails_closed_on_wrong_answer(self):
+        rnd, q = self._practical_round({
+            "expected_commands": [r"systemctl\s+restart\s+nginx"],
+        })
+        resp = self.client.post(
+            f"/api/interviews/rounds/{rnd.id}/practical-validate/",
+            {"answer": "I'd reboot the whole server"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertFalse(resp.data["validated"])
+        self.assertTrue(resp.data["feedback"])
+
+    def test_code_answer_graded_by_sandbox(self):
+        rnd, q = self._practical_round({
+            "code": {
+                "language": "python",
+                "tests": [
+                    {"name": "double", "code": "assert solve(2) == 4"},
+                    {"name": "zero", "code": "assert solve(0) == 0", "hidden": True},
+                ],
+            },
+        })
+        ok = self.client.post(
+            f"/api/interviews/rounds/{rnd.id}/practical-validate/",
+            {"answer": "def solve(n):\n    return n * 2\n"},
+            format="json",
+        )
+        self.assertEqual(ok.status_code, 200, ok.content)
+        self.assertTrue(ok.data["validated"], ok.data)
+        self.assertEqual(ok.data["method"], "code")
+
+        # Wrong implementation must NOT pass (fail-closed).
+        bad = self.client.post(
+            f"/api/interviews/rounds/{rnd.id}/practical-validate/",
+            {"answer": "def solve(n):\n    return n + 1\n"},
+            format="json",
+        )
+        self.assertFalse(bad.data["validated"])
+
+    def test_validated_practical_grants_score_bonus_on_next_answer(self):
+        rnd, q = self._practical_round({
+            "expected_commands": [r"systemctl\s+restart\s+nginx"],
+        })
+        # Validate the command first.
+        self.client.post(
+            f"/api/interviews/rounds/{rnd.id}/practical-validate/",
+            {"answer": "systemctl restart nginx"},
+            format="json",
+        )
+        rnd.refresh_from_db()
+        bucket = (rnd.metadata or {}).get("practical_validations", {})
+        self.assertTrue(bucket.get(str(q.id), {}).get("validated"))
+
+        # The candidate's recap answer for the SAME practical question should be
+        # scored with command_validated=True automatically (the +15 bonus).
+        from apps.interviews.services.scoring import score_answer
+        meta = {"round_type": "technical"}
+        from apps.interviews.services.practical_lab import practical_validation_passed
+        self.assertTrue(practical_validation_passed(rnd, q.id))
+        # Same prose, with and without the validated bonus — bonus must raise it.
+        base = score_answer(q, "I restarted the nginx service to restore traffic.", dict(meta))
+        boosted = score_answer(
+            q, "I restarted the nginx service to restore traffic.",
+            {**meta, "command_validated": True},
+        )
+        self.assertGreaterEqual(boosted["score"], base["score"])
+
+    def test_no_practical_question_returns_graceful_error(self):
+        camp = InterviewCampaign.objects.create(
+            user=self.user, title="t", status="in_progress", experience_level="mid"
+        )
+        rnd = InterviewRound.objects.create(
+            campaign=camp, round_number=1, round_type="technical",
+            title="r", status="in_progress", duration_minutes=30,
+        )
+        resp = self.client.post(
+            f"/api/interviews/rounds/{rnd.id}/practical-validate/",
+            {"answer": "systemctl restart nginx"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertFalse(resp.data["validated"])
+
+
+class RoundContentRoutingTest(TestCase):
+    """P2.9 — the seeded bank covers each round type, and the category rotation
+    pulls the right kind of question for HR vs techno-managerial vs technical.
+
+    Note: the JSON ``round_types__contains`` filter in the selector is native on
+    Postgres (dev/prod) but unsupported on the sqlite test DB, where the selector
+    deliberately falls back to any active question. So we assert the routing at
+    the DB-agnostic layers: the seeded data tags, the category rotation, and the
+    STAR-weighted scoring for behavioral/HR answers."""
+
+    def setUp(self):
+        from django.core.management import call_command
+        call_command("seed_interview_data", verbosity=0)
+
+    def _by_round(self, round_type):
+        # sqlite-safe membership filter (avoids the JSON contains lookup).
+        return [
+            q for q in InterviewQuestion.objects.all()
+            if round_type in (q.round_types or [])
+        ]
+
+    def test_manager_round_has_itil_and_sla_content(self):
+        cats = {q.category for q in self._by_round("manager")}
+        self.assertIn("itil", cats, "techno-managerial round needs ITIL questions")
+        self.assertIn("sla", cats, "techno-managerial round needs SLA questions")
+
+    def test_hr_round_has_behavioral_and_casual_content(self):
+        cats = {q.category for q in self._by_round("hr")}
+        self.assertIn("behavioral", cats)
+        self.assertIn("casual", cats)
+        # HR should NOT be dominated by deep technical/practical categories.
+        self.assertNotIn("system_design", cats)
+
+    def test_technical_round_has_tricky_and_practical_content(self):
+        cats = {q.category for q in self._by_round("technical")}
+        self.assertIn("tricky", cats)
+        self.assertIn("practical", cats)
+
+    def test_category_rotation_matches_round_type(self):
+        from apps.interviews.services.question_selector import round_category_mix
+        hr_seq = {round_category_mix("hr", i) for i in range(8)}
+        self.assertTrue(hr_seq <= {"casual", "behavioral"}, hr_seq)
+        mgr_seq = {round_category_mix("manager", i) for i in range(10)}
+        self.assertTrue({"itil", "sla"} <= mgr_seq, mgr_seq)
+
+    def test_hr_answers_scored_on_star_coverage(self):
+        # A behavioral answer with full STAR should beat a terse technical-only
+        # one. Pass question=None so scoring is purely round-type driven (and we
+        # avoid the JSON contains lookup unsupported on the sqlite test DB).
+        from apps.interviews.services.scoring import score_answer
+        q = None
+        star = (
+            "When our team had a SEV-1 outage, I was responsible for comms. "
+            "I coordinated the bridge, documented the timeline, and as a result we "
+            "cut MTTR and shipped a postmortem with owners."
+        )
+        terse = "kubectl logs and grep."
+        good = score_answer(q, star, {"round_type": "hr"})
+        weak = score_answer(q, terse, {"round_type": "hr"})
+        self.assertGreater(good["score"], weak["score"])

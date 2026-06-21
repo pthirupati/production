@@ -1,0 +1,40 @@
+title: "DB ↔ Linux Storage: Postgres Tablespace Has No Room to Grow"
+slug: db-postgres-tablespace-new-disk
+technology: Database Administration
+category: Storage & Capacity
+difficulty: hard
+description: |
+  CROSS-TECHNOLOGY task (Database <-> Linux storage). The `analytics` tablespace on
+  db-prod-01 is on a filesystem that is 100% full, so writes to its largest tables
+  are failing. A spare disk was attached to the Linux host to host a new tablespace
+  directory, but the database side was never reconciled: postgresql.conf still
+  points the tablespace location at the full volume and lacks the new
+  data-directory mapping. Coordinate the Linux storage with the Postgres config so
+  the tablespace lives on the new disk.
+initial_state: |
+  A db-prod-01 host. PostgreSQL is down because the `analytics` tablespace
+  filesystem is full. A spare disk is available on the Linux side, but
+  /var/lib/pgsql/data/postgresql.conf still references the full path and defines no
+  new tablespace location.
+objectives:
+  - Confirm the analytics tablespace filesystem is full and Postgres cannot write to it
+  - Prepare the new disk on the Linux side and point the tablespace at it, then reconcile postgresql.conf
+  - Confirm the Postgres config is corrected so the tablespace uses the new storage and the service can start
+lab_mode: simulation
+simulation_type: generic
+cross_technology: true
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: Highest
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: "`df -h` shows the analytics tablespace volume at 100%. Writes (and startup) fail until the tablespace lives somewhere with space."
+  - order: 2
+    cost: 15
+    content: "Format/mount the spare disk for the new tablespace dir, then reconcile /var/lib/pgsql/data/postgresql.conf so the tablespace mapping points at the new mount."
+  - order: 3
+    cost: 20
+    content: "Once postgresql.conf is corrected to use the new storage location, the tablespace has room and Postgres can start."

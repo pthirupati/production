@@ -1,0 +1,39 @@
+title: "Terraform → VMware: VM Clone Plan Targets the Wrong Inventory"
+slug: terraform-vmware-vm-clone-from-template
+technology: Terraform
+category: Infrastructure Provisioning
+difficulty: medium
+description: |
+  CROSS-TECHNOLOGY task (Terraform -> VMware vSphere). A Terraform config at
+  /root/iac/vsphere-vm.tf clones an app VM from a template using the
+  vsphere provider, but `terraform plan` errors out: it references a datacenter,
+  resource pool, datastore, and template name that do not exist in the vCenter
+  inventory, and the network is wrong. Reconcile the Terraform vSphere resources
+  with the real inventory so the clone plans and applies.
+initial_state: |
+  A Terraform workspace. /root/iac/vsphere-vm.tf points the vsphere_virtual_machine
+  clone at non-existent datacenter/pool/datastore/template/network names, so
+  `terraform plan` fails during data-source lookups against vCenter.
+objectives:
+  - Run terraform plan and read which vSphere data-source lookups fail
+  - Correct /root/iac/vsphere-vm.tf to reference the real datacenter, resource pool, datastore, template, and network
+  - Confirm the config is corrected so the clone would plan and apply against vCenter
+lab_mode: simulation
+simulation_type: terraform
+cross_technology: true
+vmware_link: true
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: "The vsphere data sources (datacenter, datastore, resource_pool, template) must name objects that exist in vCenter. `terraform plan` tells you which lookup fails first."
+  - order: 2
+    cost: 15
+    content: "Open the VMware simulator to read the real inventory names, then set them in /root/iac/vsphere-vm.tf (including the correct VM network)."
+  - order: 3
+    cost: 20
+    content: "Once the .tf references the real inventory, `terraform validate` + `plan` succeed and the config is corrected."

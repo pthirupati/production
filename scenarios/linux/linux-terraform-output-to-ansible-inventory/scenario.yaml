@@ -1,0 +1,40 @@
+title: "Terraform → Ansible Handoff: Inventory From State Is Broken"
+slug: linux-terraform-output-to-ansible-inventory
+technology: Linux
+category: Infrastructure Automation
+difficulty: medium
+description: |
+  CROSS-TECHNOLOGY task (Terraform -> Ansible). Terraform provisioned three web
+  hosts and wrote their private IPs to an output, and a small wrapper renders that
+  output into the Ansible inventory at /home/ansible/inventory/provisioned_hosts.ini.
+  The render broke: the inventory still carries the OLD placeholder addresses and a
+  malformed group header, so `ansible -i provisioned_hosts.ini webservers -m ping`
+  fails and the configuration stage never starts. Reconcile the inventory with the
+  real Terraform output so the provision -> configure handoff works again.
+initial_state: |
+  A Linux automation host. Terraform state lists web-1/web-2/web-3 at
+  10.20.0.11-13, but /home/ansible/inventory/provisioned_hosts.ini is stale and
+  malformed (placeholder IPs, broken [webservers] header). The Ansible run that
+  consumes it cannot reach any host.
+objectives:
+  - Compare the Terraform output (terraform output -json web_private_ips) with the rendered inventory
+  - Correct /home/ansible/inventory/provisioned_hosts.ini so the group + addresses match the real state
+  - Confirm the file is corrected so the Ansible ping handoff would succeed
+lab_mode: simulation
+simulation_type: generic
+cross_technology: true
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: "Run `terraform output -json web_private_ips` and diff it against /home/ansible/inventory/provisioned_hosts.ini — the IPs and the [webservers] header are wrong."
+  - order: 2
+    cost: 15
+    content: "Re-render the inventory: one host line per real IP under a valid `[webservers]` header. Validate with `ansible-inventory -i provisioned_hosts.ini --list`."
+  - order: 3
+    cost: 20
+    content: "Once the inventory matches Terraform state, the file is corrected and `ansible webservers -m ping` would reach all three hosts."

@@ -477,7 +477,10 @@ class JavaScenarioCatalogTests(SimpleTestCase):
         java = glob.glob(str(SCENARIOS_ROOT / "java" / "*" / "scenario.yaml"))
         security = glob.glob(str(SCENARIOS_ROOT / "security" / "*" / "scenario.yaml"))
         self.assertEqual(len(java), 50, "java scenario count must be 50")
-        self.assertEqual(len(security), 50, "security scenario count must be 50")
+        # Security launched with 50; cross-technology security<->Linux labs (P4)
+        # add to the catalog, so the guarantee is "at least 50", not exactly 50.
+        self.assertGreaterEqual(
+            len(security), 50, "security scenario count must be at least 50")
 
     def test_every_java_simulation_scenario_is_completable(self):
         """No java simulation scenario may ship a trivial (auto-pass) check.sh.
@@ -1065,3 +1068,157 @@ class StoragePartitionScenarioTests(SimpleTestCase):
         self.assertIn("vgdata/lvdata", shell.state.lvm.lvs)
         shell.run("mkfs.ext4 /dev/sdc2")
         self.assertEqual(shell.state.find_block_device("/dev/sdc2").fstype, "ext4")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# P4: cross-technology handoff scenarios (two technologies, one broken seam).
+#
+# Each lab frames a real two-tech workflow and is wired with the existing
+# fail-closed validators (NO new validator code):
+#   • marker scenarios → check.sh runs `grep -q FIXED-OK <file>`; the preset
+#     writes that file WITHOUT the sentinel; the e2e fix (_RS_MARKER_FIX)
+#     rewrites it WITH `# FIXED-OK`.
+#   • the one service scenario → check.sh runs `systemctl is-active <unit>`;
+#     the preset registers the failed integration unit; the e2e fix
+#     (_RS_SERVICE_FIX) starts it.
+# These tests prove, through the REAL validation path and the REAL e2e fix
+# maps loaded from scripts/e2e_simulation_fix.py, that every scenario is
+# fail-closed BEFORE the fix and passes only AFTER the documented remediation.
+# ──────────────────────────────────────────────────────────────────────
+
+# slug -> (relative scenario dir, simulation_type)
+P4_CROSS_TECH_SCENARIOS: dict[str, tuple[str, str]] = {
+    "linux-terraform-output-to-ansible-inventory": (
+        "linux/linux-terraform-output-to-ansible-inventory", "generic"),
+    "docker-compose-to-k8s-manifest-migration": (
+        "docker/docker-compose-to-k8s-manifest-migration", "generic"),
+    "networking-linux-bond-vlan-trunk": (
+        "networking/networking-linux-bond-vlan-trunk", "generic"),
+    "db-postgres-tablespace-new-disk": (
+        "database/db-postgres-tablespace-new-disk", "generic"),
+    "security-linux-ssh-cis-hardening": (
+        "security/security-linux-ssh-cis-hardening", "generic"),
+    "ansible-deploy-to-k8s-kubeconfig": (
+        "ansible/ansible-deploy-to-k8s-kubeconfig", "ansible"),
+    "terraform-vmware-vm-clone-from-template": (
+        "terraform/terraform-vmware-vm-clone-from-template", "terraform"),
+    "docker-handoff-systemd-managed-stack": (
+        "docker/docker-handoff-systemd-managed-stack", "generic"),
+    "networking-firewalld-app-reachability": (
+        "networking/networking-firewalld-app-reachability", "generic"),
+    "gpu-k8s-device-plugin-daemonset": (
+        "gpu/gpu-k8s-device-plugin-daemonset", "gpu"),
+    "db-mysql-replication-network-firewall": (
+        "database/db-mysql-replication-network-firewall", "generic"),
+    "devops-ci-to-ansible-cd-handoff": (
+        "devops/devops-ci-to-ansible-cd-handoff", "ansible"),
+}
+
+
+def _e2e_module():
+    """Load scripts/e2e_simulation_fix.py the way production does (it is not on
+    the Django import path) so the test reads the REAL fix maps."""
+    import importlib.util
+    import os as _os
+
+    e2e_path = _os.path.join(
+        _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+        "scripts", "e2e_simulation_fix.py",
+    )
+    spec = importlib.util.spec_from_file_location("e2e_simulation_fix", e2e_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class P4CrossTechScenarioIntegrityTests(SimpleTestCase):
+    def test_all_registered_in_e2e_fix_maps(self):
+        """Every new cross-tech scenario must have an e2e fix entry (marker or
+        service) so the lab is actually completable end to end."""
+        mod = _e2e_module()
+        for slug in P4_CROSS_TECH_SCENARIOS:
+            with self.subTest(slug=slug):
+                self.assertTrue(
+                    slug in mod._RS_MARKER_FIX or slug in mod._RS_SERVICE_FIX,
+                    f"{slug}: no e2e fix entry (marker or service)",
+                )
+
+    def test_check_scripts_are_non_trivial_and_unreplaced(self):
+        """check.sh must do real validation and must NOT be swapped for a
+        canonical script by resolve() (these are real, hand-written checks)."""
+        for slug, (rel_dir, _) in P4_CROSS_TECH_SCENARIOS.items():
+            with self.subTest(slug=slug):
+                script = _load_check(rel_dir)
+                self.assertFalse(
+                    is_trivial_validation_script(script),
+                    f"{slug}: check.sh is trivial and would auto-pass",
+                )
+                resolved = resolve_simulation_validation_script(slug, script)
+                self.assertEqual(
+                    resolved.strip(), script.strip(),
+                    f"{slug}: real check.sh was replaced by resolve()",
+                )
+
+    def test_each_scenario_fails_before_fix_and_passes_after(self):
+        mod = _e2e_module()
+        for slug, (rel_dir, sim_type) in P4_CROSS_TECH_SCENARIOS.items():
+            with self.subTest(slug=slug):
+                check = _load_check(rel_dir)
+                eng = _engine(slug, sim_type)
+                st = eng.shell.state
+                script = resolve_simulation_validation_script(slug, check)
+
+                before_ok, before_msg = validate_simulation_state(st, script, eng)
+                self.assertFalse(
+                    before_ok,
+                    f"{slug}: validation passed BEFORE any fix ({before_msg})",
+                )
+
+                # Apply EXACTLY what scripts/e2e_simulation_fix.py does.
+                if slug in mod._RS_SERVICE_FIX:
+                    unit = mod._RS_SERVICE_FIX[slug]
+                    eng.shell.run(f"systemctl start {unit}")
+                    svc = st.services.get(unit)
+                    if svc:
+                        svc.active = "active"
+                        svc.sub_state = "running"
+                else:
+                    path = mod._RS_MARKER_FIX[slug]
+                    existing = st.read_file(path) or ""
+                    fixed = (
+                        existing.replace("# broken configuration", "# corrected configuration")
+                        + "\n# FIXED-OK: corrected per the documented remediation\n"
+                    )
+                    st.write_file(path, fixed)
+
+                after_ok, after_msg = validate_simulation_state(st, script, eng)
+                self.assertTrue(
+                    after_ok,
+                    f"{slug}: validation still FAILS after the fix ({after_msg})",
+                )
+
+    def test_touching_marker_without_sentinel_stays_failed(self):
+        """For marker scenarios, editing the file WITHOUT the FIXED-OK sentinel
+        must NOT pass — guards against a 'touched the file' shortcut."""
+        mod = _e2e_module()
+        for slug, (rel_dir, sim_type) in P4_CROSS_TECH_SCENARIOS.items():
+            if slug not in mod._RS_MARKER_FIX:
+                continue
+            with self.subTest(slug=slug):
+                check = _load_check(rel_dir)
+                eng = _engine(slug, sim_type)
+                script = resolve_simulation_validation_script(slug, check)
+                eng.shell.state.write_file(
+                    mod._RS_MARKER_FIX[slug], "still broken, no sentinel\n")
+                ok, _ = validate_simulation_state(eng.shell.state, script, eng)
+                self.assertFalse(ok, f"{slug}: passed without the FIXED-OK sentinel")
+
+    def test_service_scenario_not_active_until_started(self):
+        """The systemd-handoff lab must stay failed until the unit is active —
+        a partial 'I edited something' attempt must not pass."""
+        slug = "docker-handoff-systemd-managed-stack"
+        rel_dir, sim_type = P4_CROSS_TECH_SCENARIOS[slug]
+        script = _load_check(rel_dir)
+        eng = _engine(slug, sim_type)
+        ok, _ = validate_simulation_state(eng.shell.state, script, eng)
+        self.assertFalse(ok, f"{slug}: passed while the appstack unit was failed")

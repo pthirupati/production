@@ -1,0 +1,38 @@
+title: "Ansible → Kubernetes: Deploy Playbook Can't Reach the Cluster"
+slug: ansible-deploy-to-k8s-kubeconfig
+technology: Ansible Automation
+category: Continuous Delivery
+difficulty: medium
+description: |
+  CROSS-TECHNOLOGY task (Ansible -> Kubernetes). The release playbook
+  /home/ansible/k8s-deploy.yml uses the kubernetes.core.k8s module to roll out the
+  `api` Deployment, but every run fails at the first k8s task. The playbook points
+  at a kubeconfig path that does not exist on the control node, targets the wrong
+  namespace, and pins an apiVersion the cluster no longer serves. Fix the Ansible
+  side of the handoff so the playbook can apply manifests to the cluster.
+initial_state: |
+  An Ansible control node. /home/ansible/k8s-deploy.yml references a missing
+  kubeconfig, the wrong namespace, and a removed apiVersion, so the
+  kubernetes.core.k8s tasks fail before touching the cluster.
+objectives:
+  - Run the playbook and read the k8s module error (bad kubeconfig path / namespace / apiVersion)
+  - Correct /home/ansible/k8s-deploy.yml so it uses the real kubeconfig, the right namespace, and a served apiVersion
+  - Confirm the playbook is corrected so `ansible-playbook k8s-deploy.yml` would apply to the cluster
+lab_mode: simulation
+simulation_type: ansible
+cross_technology: true
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: "The kubernetes.core.k8s module needs a valid `kubeconfig:` path that exists on the control node — the current one does not. Check with `ansible-playbook --syntax-check` then a run."
+  - order: 2
+    cost: 15
+    content: "Fix the namespace to match where the Deployment lives, and bump the apiVersion to one the cluster still serves (apps/v1)."
+  - order: 3
+    cost: 20
+    content: "Once /home/ansible/k8s-deploy.yml is corrected, the Ansible->Kubernetes handoff succeeds."

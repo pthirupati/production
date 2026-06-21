@@ -1,0 +1,39 @@
+title: "CI → Ansible CD: Pipeline Artifact Never Reaches the Release Play"
+slug: devops-ci-to-ansible-cd-handoff
+technology: DevOps
+category: CI/CD Handoff
+difficulty: medium
+description: |
+  CROSS-TECHNOLOGY task (DevOps/CI -> Ansible). The CI job builds an artifact and
+  the deploy stage hands off to an Ansible release play at
+  /home/ansible/cd-playbook.yml. The handoff is broken: the play reads an
+  artifact-version variable from the wrong fact, downloads from a stale artifact
+  URL, and targets a host group the inventory does not define — so the CD stage
+  fails and nothing is deployed. Fix the Ansible release play so the CI artifact is
+  actually rolled out.
+initial_state: |
+  A DevOps control host. /home/ansible/cd-playbook.yml references the wrong
+  artifact-version variable, a stale artifact URL, and an undefined host group, so
+  the CD stage that runs it fails immediately after CI.
+objectives:
+  - Trace the failed CD stage to the release play and identify the wrong variable, URL, and host group
+  - Correct /home/ansible/cd-playbook.yml so it consumes the CI artifact version/URL and targets a real group
+  - Confirm the play is corrected so the CI -> Ansible CD handoff completes
+lab_mode: simulation
+simulation_type: ansible
+cross_technology: true
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: "The CD stage passes the build version to Ansible — the play must read THAT variable, not a hard-coded/old one, and use the current artifact URL."
+  - order: 2
+    cost: 15
+    content: "Fix the `hosts:` group to one the inventory actually defines, and wire the artifact version/URL from the CI-provided extra-vars."
+  - order: 3
+    cost: 20
+    content: "Once /home/ansible/cd-playbook.yml is corrected, `ansible-playbook cd-playbook.yml -e build_version=...` deploys the artifact."

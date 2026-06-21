@@ -197,6 +197,17 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     )
     question = last_q_msg.question if last_q_msg else None
 
+    # If the candidate already validated their inline practical command/code for
+    # THIS question (P2.4), honour that verified correctness in scoring (+15) even
+    # if the typed answer here is a prose recap of what they did.
+    if question is not None and getattr(question, "category", "") == "practical" and not meta.get("command_validated"):
+        try:
+            from apps.interviews.services.practical_lab import practical_validation_passed
+            if practical_validation_passed(round_obj, question.id):
+                meta["command_validated"] = True
+        except Exception:  # noqa: BLE001 - never let the bonus lookup break scoring
+            pass
+
     score_result = score_answer(question, answer_text, meta)
     cand_msg = InterviewMessage.objects.create(
         round=round_obj,

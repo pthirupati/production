@@ -12,6 +12,7 @@ import {
   streamHasLiveTrack,
 } from '../../utils/mediaDevices'
 import InterviewVideoPreview from '../../components/interviews/InterviewVideoPreview'
+import PracticalAnswerPanel from '../../components/interviews/PracticalAnswerPanel'
 import { PageHeader } from '../../components/design'
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Clock, MessageSquare, Terminal,
@@ -680,6 +681,35 @@ export default function InterviewRoom() {
     }
   }
 
+  // Validate an inline practical command/code answer. The backend grades it with
+  // the same free engines the labs use and returns { validated, feedback }. We
+  // surface the verdict in the live transcript as the interviewer's response so
+  // the candidate sees real feedback; on a pass, their next answer is scored with
+  // the practical credit automatically (the backend stamps the round).
+  const validatePracticalAnswer = async (answer) => {
+    const res = await interviewsApi.validatePractical(roundId, answer)
+    if (res?.feedback) {
+      setMessages((m) => [
+        ...m,
+        {
+          id: `practical-cmd-${Date.now()}`,
+          role: 'candidate',
+          message_type: 'command',
+          content: answer,
+        },
+        {
+          id: `practical-fb-${Date.now() + 1}`,
+          role: 'interviewer',
+          message_type: 'practical_feedback',
+          content: res.feedback,
+        },
+      ])
+      // Speak the feedback so the loop stays conversational (browser TTS, free).
+      speakThenListen(res.feedback, { autoListen: false })
+    }
+    return res
+  }
+
   const fmt = (s) => {
     if (s == null) return '--:--'
     const m = Math.floor(s / 60)
@@ -1049,9 +1079,19 @@ export default function InterviewRoom() {
                 )}
               </div>
               <p className="text-[10px] text-surface-500">
-                Lab opens in a new tab. Describe what you did in the answer box when finished.
+                Open the full lab in a new tab, or just type the command/code below and I'll check it inline.
               </p>
             </div>
+          )}
+
+          {practicalMode && (
+            <PracticalAnswerPanel
+              onValidate={validatePracticalAnswer}
+              disabled={observerMode}
+              onValidated={() => {
+                toast.success('Verified — nicely done')
+              }}
+            />
           )}
 
           {(isListening || isSpeaking) && (

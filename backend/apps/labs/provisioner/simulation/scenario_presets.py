@@ -4162,6 +4162,220 @@ def _preset_jsm_security_java_log4shell_jndi_lookup(state: RHELOSState) -> None:
         state._mkdir(d)
     state._write_file('/app/src/main/resources/log4j2.component.properties', '# broken configuration for security-java-log4shell-jndi-lookup\n# this file needs the documented fix\n')
 
+
+# ── P4: Cross-technology scenarios (two technologies, one broken handoff) ─────
+# Each lab frames a real two-technology workflow (provision->configure,
+# build->migrate, app<->network, db<->storage, security<->host). The broken
+# state is a misconfigured handoff artifact (a config file the integration
+# target owns) or a failed integration service. Validation reuses the existing
+# fail-closed validators with NO new validator code:
+#   • marker scenarios → check.sh runs `grep -q FIXED-OK <file>`; the preset
+#     writes that file WITHOUT the sentinel, so a fresh lab is fail-closed and
+#     only the genuine documented fix (e2e_simulation_fix `_RS_MARKER_FIX`)
+#     rewrites it WITH `# FIXED-OK`.
+#   • service scenarios → check.sh runs `systemctl is-active <unit>`; the preset
+#     registers the integration unit as failed/disabled.
+# These presets are registered in _PRESETS by EXACT slug so the generic
+# substring fallbacks (gpu/ansible/docker/postgres/etc.) never shadow them.
+
+
+def _preset_xtech_marker(state: RHELOSState, path: str, slug: str) -> None:
+    """Write the cross-tech handoff artifact in a broken state (no FIXED-OK)."""
+    import os
+
+    d = os.path.dirname(path)
+    if d:
+        state._mkdir(d)
+    state._write_file(
+        path,
+        f"# broken configuration for {slug}\n"
+        "# the cross-technology handoff is misconfigured here\n"
+        "# this file needs the documented fix\n",
+    )
+
+
+def _preset_xtech_terraform_to_ansible_inventory(state: RHELOSState) -> None:
+    """Terraform->Ansible: the rendered inventory is stale/malformed."""
+    state.hostname = "automation-01"
+    _preset_xtech_marker(
+        state,
+        "/home/ansible/inventory/provisioned_hosts.ini",
+        "linux-terraform-output-to-ansible-inventory",
+    )
+
+
+def _preset_xtech_docker_to_k8s_manifest(state: RHELOSState) -> None:
+    """Docker->Kubernetes: the converted Deployment manifest is invalid."""
+    # The original compose file is present for reference; the converted manifest
+    # is broken (compose-only keys, bind mount, no requests) and is what's graded.
+    state._mkdir("/opt/app")
+    state._write_file(
+        "/opt/app/docker-compose.yml",
+        "services:\n  api:\n    image: registry.local/api:1.4.2\n"
+        "    container_name: api\n    ports:\n      - \"8080:8080\"\n"
+        "    volumes:\n      - ./config:/etc/api\n",
+    )
+    _preset_xtech_marker(
+        state,
+        "/opt/app/k8s/deployment.yaml",
+        "docker-compose-to-k8s-manifest-migration",
+    )
+
+
+def _preset_xtech_network_bond_vlan(state: RHELOSState) -> None:
+    """Networking<->Linux: bond uses the wrong mode and lacks the tagged VLAN."""
+    _preset_xtech_marker(
+        state,
+        "/etc/sysconfig/network-scripts/ifcfg-bond0",
+        "networking-linux-bond-vlan-trunk",
+    )
+
+
+def _preset_xtech_db_tablespace_new_disk(state: RHELOSState) -> None:
+    """Database<->Linux storage: tablespace volume full; config not reconciled."""
+    from .rhel_os import SimService
+
+    state.services["postgresql"] = SimService(
+        "postgresql", active="failed", enabled="enabled", description="PostgreSQL",
+    )
+    # A spare disk exists on the Linux side for the new tablespace location.
+    state.add_block_device("/dev/sdc", "100G", "disk", present=True)
+    _preset_xtech_marker(
+        state,
+        "/var/lib/pgsql/data/postgresql.conf",
+        "db-postgres-tablespace-new-disk",
+    )
+
+
+def _preset_xtech_security_ssh_hardening(state: RHELOSState) -> None:
+    """Security<->Linux: the CIS SSH drop-in still sets the insecure values."""
+    import os
+
+    state.hostname = "bastion-01"
+    path = "/etc/ssh/sshd_config.d/50-cis.conf"
+    d = os.path.dirname(path)
+    if d:
+        state._mkdir(d)
+    state._write_file(
+        path,
+        f"# broken configuration for security-linux-ssh-cis-hardening\n"
+        "PermitRootLogin yes\n"
+        "PasswordAuthentication yes\n"
+        "# weak crypto still negotiable; this file needs the documented fix\n",
+    )
+
+
+def _preset_xtech_ansible_to_k8s_kubeconfig(state: RHELOSState) -> None:
+    """Ansible->Kubernetes: the deploy play points at a bad kubeconfig/ns/api."""
+    state.hostname = "ansible-control"
+    _preset_xtech_marker(
+        state,
+        "/home/ansible/k8s-deploy.yml",
+        "ansible-deploy-to-k8s-kubeconfig",
+    )
+
+
+def _preset_xtech_terraform_to_vmware_clone(state: RHELOSState) -> None:
+    """Terraform->VMware: the vSphere clone references non-existent inventory."""
+    state.hostname = "terraform-ws"
+    _preset_xtech_marker(
+        state,
+        "/root/iac/vsphere-vm.tf",
+        "terraform-vmware-vm-clone-from-template",
+    )
+
+
+def _preset_xtech_docker_systemd_stack(state: RHELOSState) -> None:
+    """Docker->Linux/systemd: the unit that manages the compose stack is failed."""
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/app")
+    if "docker" not in state.services:
+        state.services["docker"] = SimService(
+            "docker", active="active", enabled="enabled", description="Docker Application Container Engine")
+    state.services["appstack"] = SimService(
+        "appstack", active="failed", enabled="disabled",
+        description="Containerized application stack (docker compose)")
+    state._write_file(
+        "/etc/systemd/system/appstack.service",
+        "# broken configuration: wrong Type/ordering so the unit exits immediately\n"
+        "[Unit]\nDescription=Containerized application stack (docker compose)\n\n"
+        "[Service]\nExecStart=/usr/bin/docker compose -f /opt/app/docker-compose.yml up -d\n\n"
+        "[Install]\nWantedBy=multi-user.target\n",
+    )
+
+
+def _preset_xtech_network_firewalld_app(state: RHELOSState) -> None:
+    """Networking<->Security: the custom firewalld service XML is malformed."""
+    import os
+
+    state.hostname = "api-edge-01"
+    path = "/etc/firewalld/services/app8443.xml"
+    d = os.path.dirname(path)
+    if d:
+        state._mkdir(d)
+    state._write_file(
+        path,
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+        "<!-- broken configuration for networking-firewalld-app-reachability -->\n"
+        "<service>\n  <short>app8443</short>\n"
+        "  <port protocol=\"udp\" port=\"443\"\n"  # wrong proto/port + unclosed tag
+        "</service>\n",
+    )
+
+
+def _preset_xtech_gpu_k8s_device_plugin(state: RHELOSState) -> None:
+    """GPU<->Kubernetes: the NVIDIA device-plugin DaemonSet manifest is broken."""
+    _preset_xtech_marker(
+        state,
+        "/etc/nvidia-container-runtime/k8s-device-plugin.yaml",
+        "gpu-k8s-device-plugin-daemonset",
+    )
+
+
+def _preset_xtech_db_replication_network(state: RHELOSState) -> None:
+    """Database<->Networking: replica config clashes + path to primary is wrong."""
+    import os
+
+    state.hostname = "db-replica-02"
+    path = "/etc/my.cnf.d/replication.cnf"
+    d = os.path.dirname(path)
+    if d:
+        state._mkdir(d)
+    state._write_file(
+        path,
+        "# broken configuration for db-mysql-replication-network-firewall\n"
+        "[mysqld]\nserver-id=1\n"            # clashes with the primary's server-id
+        "# master_host points at a stale primary; 3306 path not open\n"
+        "# this file needs the documented fix\n",
+    )
+
+
+def _preset_xtech_devops_ci_to_ansible_cd(state: RHELOSState) -> None:
+    """DevOps/CI->Ansible: the release play uses wrong var/URL/host group."""
+    state.hostname = "ci-control"
+    _preset_xtech_marker(
+        state,
+        "/home/ansible/cd-playbook.yml",
+        "devops-ci-to-ansible-cd-handoff",
+    )
+
+
+_XTECH_PRESETS = {
+    "linux-terraform-output-to-ansible-inventory": _preset_xtech_terraform_to_ansible_inventory,
+    "docker-compose-to-k8s-manifest-migration": _preset_xtech_docker_to_k8s_manifest,
+    "networking-linux-bond-vlan-trunk": _preset_xtech_network_bond_vlan,
+    "db-postgres-tablespace-new-disk": _preset_xtech_db_tablespace_new_disk,
+    "security-linux-ssh-cis-hardening": _preset_xtech_security_ssh_hardening,
+    "ansible-deploy-to-k8s-kubeconfig": _preset_xtech_ansible_to_k8s_kubeconfig,
+    "terraform-vmware-vm-clone-from-template": _preset_xtech_terraform_to_vmware_clone,
+    "docker-handoff-systemd-managed-stack": _preset_xtech_docker_systemd_stack,
+    "networking-firewalld-app-reachability": _preset_xtech_network_firewalld_app,
+    "gpu-k8s-device-plugin-daemonset": _preset_xtech_gpu_k8s_device_plugin,
+    "db-mysql-replication-network-firewall": _preset_xtech_db_replication_network,
+    "devops-ci-to-ansible-cd-handoff": _preset_xtech_devops_ci_to_ansible_cd,
+}
+
 _JSM_PRESETS = {
     'actuator-health-failing': _preset_jsm_actuator_health_failing,
     'sim-java-classpath': _preset_jsm_sim_java_classpath,
@@ -4216,3 +4430,4 @@ _JSM_PRESETS = {
 }
 
 _PRESETS.update(_JSM_PRESETS)
+_PRESETS.update(_XTECH_PRESETS)

@@ -748,6 +748,57 @@ class InterviewPracticalLabView(APIView):
         return Response(result)
 
 
+class InterviewRoundPracticalValidateView(APIView):
+    """Validate a candidate's inline practical command/code answer (P2.4).
+
+    Deterministic + free (no paid API). Reuses the labs grading engines:
+      * command answers → the same SIMULATION validator the terminal labs use
+        (or configured accepted-command patterns), and
+      * code answers → ``apps.labs.code_exec.grade_submission`` (the coding-IDE
+        sandbox grader).
+    On a pass we stamp the round so the candidate's next /message/ answer is
+    scored with the practical (+15) bonus.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [InterviewRateThrottle]
+
+    def post(self, request, round_id):
+        from apps.interviews.services.practical_lab import validate_practical_answer
+
+        round_obj = get_object_or_404(
+            InterviewRound.objects.select_related("campaign"),
+            id=round_id,
+            campaign__user=request.user,
+        )
+        if round_obj.status != "in_progress":
+            return Response({"error": "Round not in progress"}, status=400)
+
+        answer = request.data.get("answer", "")
+        if len(answer) > 8000:
+            return Response({"error": "Answer is too long (max 8000 characters)"}, status=400)
+
+        # Grading is fully guarded so a malformed scenario/config can never 500 a
+        # live interview — degrade to an unverified result the candidate can retry.
+        try:
+            result = validate_practical_answer(round_obj, answer)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "practical validate failed for round %s", round_id
+            )
+            return Response(
+                {
+                    "validated": False,
+                    "method": "unverified",
+                    "feedback": "Couldn't check that just now — try again or describe your approach.",
+                },
+                status=200,
+            )
+        return Response(result)
+
+
 class InterviewCertificatesListView(APIView):
     permission_classes = [IsAuthenticated]
 

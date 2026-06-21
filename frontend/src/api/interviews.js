@@ -117,6 +117,14 @@ export const interviewsApi = {
     return api.post(`/interviews/rounds/${roundId}/practical-lab/`).then(r => r.data)
   },
 
+  // Validate an inline practical command/code answer for the current question.
+  // Deterministic + free (reuses the labs grading engines). Backend:
+  // POST /interviews/rounds/:id/practical-validate/.
+  // Returns { validated, method, feedback, question_id }.
+  validatePractical(roundId, answer) {
+    return api.post(`/interviews/rounds/${roundId}/practical-validate/`, { answer }).then(r => r.data)
+  },
+
   downloadRoundIcal(roundId) {
     return api.get(`/interviews/rounds/${roundId}/ical/`, { responseType: 'blob' }).then(r => r.data)
   },

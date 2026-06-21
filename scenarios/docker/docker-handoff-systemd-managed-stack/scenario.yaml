@@ -1,0 +1,38 @@
+title: "Docker → Linux: Compose Stack Must Run Under systemd"
+slug: docker-handoff-systemd-managed-stack
+technology: Docker & Containers
+category: Service Management
+difficulty: medium
+description: |
+  CROSS-TECHNOLOGY task (Docker -> Linux/systemd). An app team handed off a
+  docker-compose stack that they used to start by hand. Operations needs it to be
+  a managed boot service so it survives reboots and is supervised like any other
+  daemon. A systemd unit `appstack` was created to run `docker compose up`, but it
+  is failed and disabled — the unit has the wrong ordering/oneshot semantics so it
+  exits immediately. Make the containerized stack a healthy, enabled systemd
+  service.
+initial_state: |
+  A Linux host with Docker installed and a compose stack under /opt/app. The
+  `appstack` systemd unit that should manage the stack is failed and disabled.
+objectives:
+  - Confirm the appstack service is failed/disabled and the stack is not supervised
+  - Correct the unit so it manages `docker compose up -d` correctly (ordering after docker, Type/RemainAfterExit)
+  - Enable and start appstack; verify the service is active
+lab_mode: simulation
+simulation_type: generic
+cross_technology: true
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: "`systemctl status appstack` shows it failed — a `docker compose up` that detaches needs the right Type (oneshot + RemainAfterExit, or a foreground `up`) and `After=docker.service`."
+  - order: 2
+    cost: 15
+    content: "Fix the unit semantics, run `systemctl daemon-reload`, then `systemctl enable --now appstack`."
+  - order: 3
+    cost: 20
+    content: "Verify with `systemctl is-active appstack` — it must report active once the stack is supervised."

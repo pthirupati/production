@@ -1,0 +1,38 @@
+title: "DB ↔ Network: MySQL Replica Can't Reach the Primary"
+slug: db-mysql-replication-network-firewall
+technology: Database Administration
+category: Replication & Connectivity
+difficulty: hard
+description: |
+  CROSS-TECHNOLOGY task (Database <-> Networking). Replication from the MySQL
+  primary to db-replica-02 is broken. Two layers are wrong at once: the replica's
+  /etc/my.cnf.d/replication.cnf has a duplicate server-id and points
+  master_host at a stale primary address, and the replica's path to the primary's
+  3306 was never opened after a network change. Reconcile the database replication
+  config with the corrected network path so the replica can connect and catch up.
+initial_state: |
+  A db-replica-02 host. /etc/my.cnf.d/replication.cnf has a clashing server-id and a
+  stale primary host/port, and the route/filter to the primary's 3306 is wrong, so
+  `SHOW REPLICA STATUS` reports it cannot connect.
+objectives:
+  - Confirm replication is down (cannot connect to the primary on 3306; server-id clash)
+  - Reconcile /etc/my.cnf.d/replication.cnf (unique server-id, correct primary host/port) and the network path to 3306
+  - Confirm the replication config is corrected so the replica can connect and sync
+lab_mode: simulation
+simulation_type: generic
+cross_technology: true
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: Highest
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: "A duplicate server-id breaks replication outright; also confirm the replica can even reach the primary's 3306 (the network path changed)."
+  - order: 2
+    cost: 15
+    content: "In /etc/my.cnf.d/replication.cnf set a unique server-id and the correct primary host/port, and open the route/filter to 3306, then re-point replication."
+  - order: 3
+    cost: 20
+    content: "Once /etc/my.cnf.d/replication.cnf is corrected and the path is open, the replica connects and catches up."

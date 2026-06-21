@@ -1,0 +1,39 @@
+title: "Docker → Kubernetes Migration: Compose Service Won't Translate"
+slug: docker-compose-to-k8s-manifest-migration
+technology: Docker & Containers
+category: Container Migration
+difficulty: medium
+description: |
+  CROSS-TECHNOLOGY task (Docker -> Kubernetes). The team is lifting the `api`
+  service out of docker-compose and onto Kubernetes. A converted manifest was
+  generated at /opt/app/k8s/deployment.yaml, but it is wrong: it still references
+  the compose-only `container_name`, uses a host bind-mount path that does not
+  exist in-cluster, and sets no resource requests — so `kubectl apply` is rejected
+  and the Deployment never schedules. Fix the manifest so the compose service
+  becomes a valid Kubernetes Deployment.
+initial_state: |
+  A host with the original /opt/app/docker-compose.yml (the api service) and a
+  half-converted /opt/app/k8s/deployment.yaml that is invalid Kubernetes
+  (compose-only keys, a bind mount, no probes/limits). kubectl apply fails.
+objectives:
+  - Diff the compose service against the generated Deployment to find the invalid/compose-only fields
+  - Rewrite /opt/app/k8s/deployment.yaml as a valid Deployment (proper image, container port, a volume the cluster can satisfy, resource requests)
+  - Confirm the manifest is corrected so `kubectl apply -f deployment.yaml` would be accepted
+lab_mode: simulation
+simulation_type: generic
+cross_technology: true
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: "Compose-only keys (`container_name`, host bind mounts) are not valid in a Pod spec. Compare /opt/app/docker-compose.yml to /opt/app/k8s/deployment.yaml."
+  - order: 2
+    cost: 15
+    content: "Replace the bind mount with an emptyDir/configMap volume, add a containerPort, and add resources.requests so the scheduler can place the pod."
+  - order: 3
+    cost: 20
+    content: "Validate with `kubectl apply --dry-run=client -f /opt/app/k8s/deployment.yaml`. Once valid, the manifest is corrected."

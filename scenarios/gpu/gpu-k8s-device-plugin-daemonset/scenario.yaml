@@ -1,0 +1,40 @@
+title: "GPU ↔ Kubernetes: Device Plugin Won't Expose nvidia.com/gpu"
+slug: gpu-k8s-device-plugin-daemonset
+technology: GPU & NVIDIA
+category: Accelerated Kubernetes
+difficulty: hard
+description: |
+  CROSS-TECHNOLOGY task (GPU <-> Kubernetes). GPU jobs sit Pending on the cluster
+  because no node advertises the `nvidia.com/gpu` resource. The NVIDIA device-plugin
+  DaemonSet manifest at /etc/nvidia-container-runtime/k8s-device-plugin.yaml is
+  broken: the container runtime is not set to `nvidia` in the runtime config it
+  references, the DaemonSet uses the wrong image tag, and it lacks the privileged
+  /var/lib/kubelet/device-plugins mount — so the plugin never registers the GPU.
+  Reconcile the GPU runtime + device-plugin manifest so the cluster can schedule
+  GPU workloads.
+initial_state: |
+  A GPU node feeding a Kubernetes cluster. The NVIDIA container runtime is not the
+  default, and /etc/nvidia-container-runtime/k8s-device-plugin.yaml (the device
+  plugin DaemonSet) is misconfigured, so `nvidia.com/gpu` is never advertised.
+objectives:
+  - Confirm no node advertises nvidia.com/gpu and GPU pods are Pending
+  - Set the NVIDIA runtime as default and correct the device-plugin DaemonSet manifest (image, device-plugins mount)
+  - Confirm the manifest is corrected so the plugin registers and GPUs become schedulable
+lab_mode: simulation
+simulation_type: gpu
+cross_technology: true
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: Highest
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: "`kubectl describe node` shows no `nvidia.com/gpu` capacity. The device plugin can only register if the NVIDIA container runtime is the default and the DaemonSet is correct."
+  - order: 2
+    cost: 15
+    content: "Fix /etc/nvidia-container-runtime/k8s-device-plugin.yaml: correct image tag, mount /var/lib/kubelet/device-plugins, and ensure the runtime config selects `nvidia`."
+  - order: 3
+    cost: 20
+    content: "Once the device-plugin manifest is corrected, the node advertises nvidia.com/gpu and GPU pods schedule."

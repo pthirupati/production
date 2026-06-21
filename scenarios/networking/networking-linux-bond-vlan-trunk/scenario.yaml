@@ -1,0 +1,40 @@
+title: "Linux ↔ Network: Bonded VLAN Trunk Brings Down the App Subnet"
+slug: networking-linux-bond-vlan-trunk
+technology: Networking
+category: Linux Networking
+difficulty: hard
+description: |
+  CROSS-TECHNOLOGY task (Networking <-> Linux). The switch port for app-host-01
+  was reconfigured as an LACP trunk carrying VLAN 30 (the app subnet), but the
+  Linux side was never updated to match. The bond config at
+  /etc/sysconfig/network-scripts/ifcfg-bond0 uses the wrong bonding mode for LACP
+  and is missing the tagged VLAN 30 sub-interface, so the host has no carrier on
+  the app subnet and every service on it is unreachable. Align the Linux bonding
+  + VLAN configuration with the switch trunk.
+initial_state: |
+  A Linux host whose two NICs should form an 802.3ad (LACP) bond carrying a tagged
+  VLAN 30 sub-interface. /etc/sysconfig/network-scripts/ifcfg-bond0 has the wrong
+  bonding mode and no VLAN child, so bond0.30 never comes up and 10.30.0.0/24 is
+  dark.
+objectives:
+  - Confirm the switch side is an LACP trunk with VLAN 30 tagged and compare it to the host bond config
+  - Correct ifcfg-bond0 to mode 802.3ad and define the tagged bond0.30 VLAN interface on 10.30.0.0/24
+  - Confirm the bonding/VLAN config is corrected so the app subnet comes back up
+lab_mode: simulation
+simulation_type: generic
+cross_technology: true
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: Highest
+dual_terminal: false
+hints:
+  - order: 1
+    cost: 10
+    content: "An LACP (802.3ad) switch trunk requires `BONDING_OPTS=\"mode=802.3ad ...\"` on the host. The current ifcfg-bond0 uses an active-backup mode that will not negotiate LACP."
+  - order: 2
+    cost: 15
+    content: "VLAN 30 is tagged on the trunk, so the host needs a bond0.30 VLAN interface (VLAN=yes) addressed in 10.30.0.0/24 — it is missing entirely."
+  - order: 3
+    cost: 20
+    content: "Fix the bonding mode and add the tagged VLAN child. Once ifcfg-bond0 is corrected, the app subnet carrier returns."
