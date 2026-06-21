@@ -476,6 +476,22 @@ DOCKER_CONTAINER_MEMORY_LIMIT = env("DOCKER_CONTAINER_MEMORY_LIMIT", default="51
 DOCKER_CONTAINER_CPU_LIMIT = env.float("DOCKER_CONTAINER_CPU_LIMIT", default=1.0)
 
 # --------------------------------------------------
+# Code-execution sandbox (SECURITY_AUDIT C-01)
+# --------------------------------------------------
+# When True, the coding-IDE grader (apps.labs.code_exec) runs each user
+# submission inside a throwaway Docker container on the labs engine
+# (DOCKER_SOCKET) with --network none, a read-only rootfs, a non-root user,
+# cap-drop ALL, no-new-privileges, a pids limit, and hard memory/CPU caps —
+# the only backend that isolates network + host filesystem from user code.
+# When False (default), or when the engine is unreachable, grading falls back
+# to the in-process rlimit subprocess so dev/CI keep working. The pass/fail
+# decision is identical either way and always fails closed.
+SANDBOX_DOCKER = env.bool("SANDBOX_DOCKER", default=False)
+# Tiny interpreter base images pulled once onto the labs Docker engine.
+SANDBOX_PYTHON_IMAGE = env("SANDBOX_PYTHON_IMAGE", default="python:3.12-alpine")
+SANDBOX_NODE_IMAGE = env("SANDBOX_NODE_IMAGE", default="node:20-alpine")
+
+# --------------------------------------------------
 # Fleet server monitoring (FREE — no paid APM)
 # --------------------------------------------------
 # Friendly name for THIS node, shown on its monitoring card.
@@ -560,11 +576,20 @@ JIRA_SIMULATION_PREFIX = env("JIRA_SIMULATION_PREFIX", default="KAN")
 # Comma-separated IPs allowed to access /django-admin/ and /api/admin/
 # Empty = allow all (set in production to your office/VPN IP)
 ADMIN_ALLOWED_IPS = [ip.strip() for ip in env("ADMIN_ALLOWED_IPS", default="").split(",") if ip.strip()]
-if not DEBUG and not ADMIN_ALLOWED_IPS:
+# SECURITY_AUDIT I-01: when this is True and the allowlist is empty in
+# production, the admin surface fails CLOSED (default-deny /api/admin/ +
+# /django-admin/) instead of the legacy fail-open warn-and-allow. Default False
+# so existing deploys (whose E2E hits admin endpoints from arbitrary CI IPs and
+# does not set ADMIN_ALLOWED_IPS) are unaffected; flip it on once the allowlist
+# is populated. See AdminIPRestrictionMiddleware.
+ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST = env.bool(
+    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", default=False
+)
+if not DEBUG and not ADMIN_ALLOWED_IPS and not ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST:
     import warnings
     warnings.warn(
         "ADMIN_ALLOWED_IPS is not set — admin endpoints are accessible from all IPs. "
-        "Set ADMIN_ALLOWED_IPS in production.",
+        "Set ADMIN_ALLOWED_IPS (and ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=1) in production.",
         stacklevel=2,
     )
 
@@ -654,6 +679,13 @@ SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
+# SECURITY_AUDIT A-01: require a custom JS header (X-Requested-With) on
+# cookie-authenticated state-changing requests so a cross-site form POST can't
+# ride the httpOnly access_token cookie. The Bearer-header path (the SPA's
+# default for authenticated calls) is unaffected. See apps.auth_app.cookie_auth.
+COOKIE_AUTH_REQUIRE_CSRF_HEADER = env.bool(
+    "COOKIE_AUTH_REQUIRE_CSRF_HEADER", default=True
+)
 SESSION_COOKIE_AGE = 3600 * 8  # 8 hours
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 X_FRAME_OPTIONS = "DENY"

@@ -8,9 +8,10 @@ shared completion path.
 """
 
 import shutil
+from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from apps.labs.code_exec import grade_submission
@@ -464,3 +465,240 @@ class GeneratedCodingScenarioIntegrityTests(TestCase):
                     if shipped == ref.strip():
                         leaked.append(slug)
         self.assertEqual(leaked, [], f"reference solution shipped as starter: {leaked}")
+
+
+# ── Docker sandbox backend (SECURITY_AUDIT C-01) ─────────────────────────────
+
+
+class _FakeExecResult(dict):
+    """Mimics docker-py container.wait() return (a dict with StatusCode)."""
+
+
+class _FakeContainer:
+    """A fake container that *actually runs* the staged harness locally.
+
+    This proves the full container round-trip (build harness -> stage via
+    put_archive -> start -> wait -> read logs -> parse verdict) without a real
+    Docker engine: the harness the runner would have executed in the container
+    is executed here instead, and its real stdout is returned from logs().
+    """
+
+    def __init__(self, image, command, **kwargs):
+        self.image = image
+        self.command = command
+        self.kwargs = kwargs
+        self.id = "fake-container-id"
+        self.started = False
+        self.removed = False
+        self._staged_source = None  # set by put_archive
+        self._stdout = ""
+        self._returncode = 0
+
+    def start(self):
+        self.started = True
+        # Run the staged harness through the SAME interpreter the container
+        # would use, capturing genuine stdout (incl. the verdict line).
+        import subprocess as _sp
+        import sys as _sys
+        if not self._staged_source:
+            self._stdout, self._returncode = "", 1
+            return
+        argv = (
+            [_sys.executable, "-I", "-B", "-c", self._staged_source]
+            if self.command and "python3" in self.command[0]
+            else None
+        )
+        if argv is None:  # JS path not exercised in this fake
+            self._stdout, self._returncode = "", 1
+            return
+        proc = _sp.run(argv, capture_output=True, text=True, timeout=20)
+        self._stdout = proc.stdout
+        self._returncode = proc.returncode
+
+    def wait(self, timeout=None):
+        return _FakeExecResult(StatusCode=self._returncode)
+
+    def logs(self, stdout=True, stderr=False):
+        if stdout and not stderr:
+            return self._stdout.encode("utf-8")
+        return b""
+
+    def remove(self, force=False, v=False):
+        self.removed = True
+
+    def kill(self):
+        pass
+
+
+class _FakeContainers:
+    def __init__(self, holder):
+        self._holder = holder
+
+    def create(self, image, command, **kwargs):
+        c = _FakeContainer(image, command, **kwargs)
+        self._holder["container"] = c
+        self._holder["create_kwargs"] = kwargs
+        return c
+
+
+class _FakeAPI:
+    def __init__(self, holder):
+        self._holder = holder
+
+    def put_archive(self, cid, path, tar_bytes):
+        # Recover the harness source from the tar the runner built and hand it
+        # to the fake container so start() can actually run it.
+        import io as _io
+        import tarfile as _tarfile
+        with _tarfile.open(fileobj=_io.BytesIO(tar_bytes)) as tar:
+            member = tar.getmembers()[0]
+            src = tar.extractfile(member).read().decode("utf-8")
+        self._holder["container"]._staged_source = src
+        self._holder["put_archive_path"] = path
+        return True
+
+
+class _FakeDockerClient:
+    def __init__(self, holder):
+        self._holder = holder
+        self.containers = _FakeContainers(holder)
+        self.api = _FakeAPI(holder)
+
+    def ping(self):
+        return True
+
+    def close(self):
+        pass
+
+
+@override_settings(SANDBOX_DOCKER=True)
+class DockerSandboxBackendTests(TestCase):
+    """Prove grading routes through the locked-down container when enabled."""
+
+    def setUp(self):
+        # Reset the runner's reachability probe cache between tests.
+        from apps.labs import sandbox_runner
+        sandbox_runner._probe_cache.update({"ok": None, "ts": 0.0})
+        self.holder = {}
+
+    def _patch_client(self):
+        from apps.labs import sandbox_runner
+        return mock.patch.object(
+            sandbox_runner, "_get_client",
+            return_value=_FakeDockerClient(self.holder),
+        )
+
+    def test_grade_runs_in_container_with_lockdown_flags(self):
+        tests = [
+            {"name": "adds", "code": "assert add(2, 3) == 5", "hidden": False},
+            {"name": "neg", "code": "assert add(-1, -1) == -2", "hidden": True},
+        ]
+        with self._patch_client():
+            res = grade_submission("python", "def add(a,b): return a+b", tests)
+
+        # It actually used the container path (a fake container was created).
+        self.assertIn("container", self.holder)
+        kw = self.holder["create_kwargs"]
+        # The core C-01 isolation guarantees are all present.
+        self.assertEqual(kw["network_mode"], "none")
+        self.assertTrue(kw["network_disabled"])
+        self.assertTrue(kw["read_only"])
+        self.assertEqual(kw["user"], "65534:65534")
+        self.assertEqual(kw["cap_drop"], ["ALL"])
+        self.assertIn("no-new-privileges:true", kw["security_opt"])
+        self.assertFalse(kw["privileged"])
+        self.assertTrue(kw["pids_limit"] and kw["pids_limit"] <= 256)
+        self.assertTrue(kw["mem_limit"])
+        # No bind mounts of host code/secrets.
+        self.assertNotIn("volumes", kw)
+        self.assertNotIn("mounts", kw)
+        # writable scratch is a tmpfs at /work only
+        self.assertIn("/work", kw["tmpfs"])
+        # And the verdict came back correct + container was cleaned up.
+        self.assertTrue(res.all_passed)
+        self.assertTrue(self.holder["container"].removed)
+
+    def test_container_wrong_code_fails_closed(self):
+        tests = [{"name": "neg", "code": "assert add(-1, -1) == -2", "hidden": True}]
+        with self._patch_client():
+            res = grade_submission("python", "def add(a,b): return a-b", tests)
+        self.assertFalse(res.all_passed)
+        self.assertTrue(res.ran)  # it ran, it just didn't pass
+
+    def test_falls_back_to_in_process_when_engine_unreachable(self):
+        from apps.labs import sandbox_runner
+        tests = [{"name": "adds", "code": "assert add(2, 3) == 5", "hidden": True}]
+        # Engine enabled but unreachable -> docker_runtime_available() False ->
+        # grade still succeeds via the in-process fallback (no auto-fail on infra).
+        with mock.patch.object(sandbox_runner, "_get_client", return_value=None):
+            res = grade_submission("python", "def add(a,b): return a+b", tests)
+        self.assertTrue(res.all_passed)
+        self.assertNotIn("container", self.holder)  # never created one
+
+    def test_sandbox_unavailable_mid_run_falls_back(self):
+        from apps.labs import sandbox_runner
+        tests = [{"name": "adds", "code": "assert add(2, 3) == 5", "hidden": True}]
+
+        # Engine pings OK, but creating the container raises SandboxUnavailable.
+        client = _FakeDockerClient(self.holder)
+
+        def _boom(*a, **k):
+            raise sandbox_runner.SandboxUnavailable("create failed")
+
+        client.containers.create = _boom
+        with mock.patch.object(sandbox_runner, "_get_client", return_value=client):
+            res = grade_submission("python", "def add(a,b): return a+b", tests)
+        # Falls back to in-process and still grades correctly.
+        self.assertTrue(res.all_passed)
+
+    @override_settings(SANDBOX_DOCKER=False)
+    def test_disabled_never_touches_docker(self):
+        from apps.labs import sandbox_runner
+        sandbox_runner._probe_cache.update({"ok": None, "ts": 0.0})
+        tests = [{"name": "adds", "code": "assert add(2, 3) == 5", "hidden": True}]
+        with mock.patch.object(sandbox_runner, "_get_client") as get_client:
+            res = grade_submission("python", "def add(a,b): return a+b", tests)
+        get_client.assert_not_called()  # gate off -> never probes docker
+        self.assertTrue(res.all_passed)
+
+    def test_http_validate_through_container_completes_via_finalize(self):
+        """End-to-end: code-validate routes through the container backend and
+        still completes ONLY via finalize_validated_session (never auto-pass)."""
+        from apps.labs import sandbox_runner
+
+        user = User.objects.create_user(
+            username="dcoder", email="dcoder@test.com", password="Pass123!x"
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        tech = Technology.objects.create(
+            name="Py-D", slug="py-d", description="d", price=0, is_active=True
+        )
+        scenario = Scenario.objects.create(
+            title="add", description="add", technology=tech, slug="d-add",
+            category="Python", difficulty="easy", is_free=True, is_active=True,
+            lab_mode="simulation", simulation_type="python",
+            coding_mode=True, coding_spec=PY_SPEC, time_limit=1200, max_score=100,
+        )
+        session = LabSession.objects.create(
+            user=user, scenario=scenario, status="RUNNING",
+            provider="simulation", duration_limit=1200,
+        )
+        with mock.patch.object(
+            sandbox_runner, "_get_client",
+            return_value=_FakeDockerClient(self.holder),
+        ):
+            resp = client.post(
+                f"/api/labs/{session.id}/code-validate/",
+                {"language": "python", "files": {"solution.py": CORRECT_PY},
+                 "entrypoint": "solution.py"},
+                format="json",
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["passed"], resp.json())
+        # Proves it actually used the container path...
+        self.assertIn("container", self.holder)
+        # ...and completed through the shared finalize path.
+        session.refresh_from_db()
+        self.assertTrue(session.validation_passed)
+        self.assertEqual(session.status, "COMPLETED")

@@ -4,7 +4,13 @@ import toast from 'react-hot-toast'
 
 const api = axios.create({
   baseURL: '/api',
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    // CSRF defense for the httpOnly-cookie auth path (SECURITY_AUDIT A-01):
+    // a custom header a cross-site <form> POST cannot set. The backend requires
+    // it on cookie-authenticated state changes; harmless on the Bearer path.
+    'X-Requested-With': 'XMLHttpRequest',
+  },
   timeout: 45_000, // 45s default timeout — lab operations can be slow
   // Required so the browser sends the httpOnly access_token / refresh_token
   // cookies with every request (cross-origin and same-origin).

@@ -13,15 +13,30 @@ interpreters already present on the host:
     - JavaScript  -> node      (supported when node is on PATH)
     - anything else -> "needs review" (never auto-passed)
 
-Each run is sandboxed as far as a stdlib-only, dependency-free implementation
-allows: a fresh temp dir as cwd, a hard wall-clock timeout (process group
-killed on expiry), scrubbed environment, no inherited network credentials, and
-(on POSIX) RLIMIT_CPU / RLIMIT_AS / RLIMIT_FSIZE caps applied in a preexec hook.
+Execution backends (selected per submission, fail-closed either way):
+
+    1. Container (preferred, SECURITY_AUDIT C-01): when ``settings.SANDBOX_DOCKER``
+       is on AND a Docker engine answers, the harness runs in a throwaway
+       container with ``--network none``, a read-only rootfs, a non-root user,
+       ``--cap-drop ALL``, ``--pids-limit``, and hard memory/CPU caps (see
+       ``apps.labs.sandbox_runner``). This is the only backend that actually
+       isolates network + host filesystem from user code.
+    2. In-process subprocess (fallback / dev / CI): a fresh temp dir as cwd, a
+       hard wall-clock timeout (process group killed on expiry), a scrubbed
+       environment, and (on POSIX) RLIMIT_CPU / RLIMIT_AS / RLIMIT_FSIZE /
+       RLIMIT_NPROC / RLIMIT_NOFILE / RLIMIT_CORE caps in a preexec hook. These
+       bound *resource use* only — they do NOT provide network/FS isolation,
+       which is why the container backend exists and is used in production.
+
+The backend choice never affects the *verdict*: the harness and result parsing
+are identical, so a pass in CI (in-process) is a pass in prod (container), and
+a missing/failed engine falls back rather than auto-passing.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import signal
@@ -31,6 +46,8 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Hard limits — deliberately conservative. Grading a single function should be
 # fast and tiny; anything that needs more is treated as a failure, not a pass.
@@ -128,9 +145,11 @@ def _posix_preexec(limit_address_space: bool = True):
 
     SECURITY NOTE: these rlimits bound *resource use* only. They do NOT provide
     network or filesystem isolation — user code still runs as this OS user and
-    can read host files / open sockets. True isolation requires running the
-    grader in a dedicated, network-less, read-only, non-root container (or
-    nsjail/seccomp). See docs/SECURITY_AUDIT.md (finding C-01).
+    can read host files / open sockets. This in-process path is the FALLBACK for
+    dev/CI; production isolates network + filesystem by running the grader in a
+    dedicated network-less, read-only, non-root container (see
+    apps.labs.sandbox_runner, enabled via settings.SANDBOX_DOCKER) per
+    docs/SECURITY_AUDIT.md finding C-01.
     """
     try:
         os.setsid()
@@ -333,6 +352,54 @@ def _parse_verdict(stdout: str) -> dict | None:
         return None
 
 
+# ── execution backend dispatch ──────────────────────────────────────────────
+
+def _execute(
+    language: str,
+    harness_source: str,
+    script_name: str,
+    argv: list[str],
+    workdir: str,
+    timeout: int,
+    *,
+    limit_address_space: bool,
+) -> tuple[int | None, str, str, bool]:
+    """Run the harness via the best available backend.
+
+    Returns (returncode, stdout, stderr, timed_out). Prefers the isolated
+    Docker container (network-less, read-only, non-root — SECURITY_AUDIT C-01)
+    when SANDBOX_DOCKER is on and the engine is reachable; otherwise runs the
+    in-process subprocess fallback. A container failure (SandboxUnavailable)
+    degrades to the in-process path so a transient engine issue never breaks
+    grading. The fail-closed pass logic in grade_submission is unchanged.
+    """
+    try:
+        from apps.labs import sandbox_runner
+        use_container = sandbox_runner.docker_runtime_available()
+    except Exception:  # pragma: no cover - settings/SDK issue
+        use_container = False
+
+    if use_container:
+        try:
+            return sandbox_runner.run_in_container(
+                language, script_name, harness_source, timeout,
+            )
+        except sandbox_runner.SandboxUnavailable as exc:
+            logger.warning(
+                "code_exec: container sandbox unavailable (%s); "
+                "falling back to in-process grader.", exc,
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning(
+                "code_exec: container sandbox raised %r; "
+                "falling back to in-process grader.", exc,
+            )
+
+    return _run_program(
+        argv, workdir, timeout, limit_address_space=limit_address_space,
+    )
+
+
 # ── public entry point ──────────────────────────────────────────────────────
 
 def grade_submission(
@@ -379,23 +446,32 @@ def grade_submission(
     try:
         if lang == "python":
             harness = _build_python_harness(user_code, tests)
-            script = os.path.join(workdir, "_runner.py")
+            script_name = "_runner.py"
+            script = os.path.join(workdir, script_name)
             with open(script, "w", encoding="utf-8") as fh:
                 fh.write(harness)
             argv = [sys.executable, "-I", "-B", script]
         else:  # javascript
             harness = _build_js_harness(user_code, tests)
-            script = os.path.join(workdir, "_runner.js")
+            script_name = "_runner.js"
+            script = os.path.join(workdir, script_name)
             with open(script, "w", encoding="utf-8") as fh:
                 fh.write(harness)
             node = shutil.which("node") or "node"
             argv = [node, script]
 
+        # Pick the execution backend. Container isolation (network-less,
+        # read-only, non-root) is preferred when enabled+reachable; otherwise we
+        # fall back to the in-process subprocess. The verdict is identical either
+        # way — only the isolation differs.
+        #
         # Node/V8 reserves a huge virtual address space at startup, so RLIMIT_AS
         # (sized for CPython) would make it abort on Linux. Skip the AS limit for
-        # node; --max-old-space-size + RLIMIT_CPU + the timeout still bound it.
-        rc, stdout, stderr, timed_out = _run_program(
-            argv, workdir, timeout, limit_address_space=(lang != "javascript"),
+        # node in the in-process path; --max-old-space-size + RLIMIT_CPU + the
+        # timeout still bound it.
+        rc, stdout, stderr, timed_out = _execute(
+            lang, harness, script_name, argv, workdir, timeout,
+            limit_address_space=(lang != "javascript"),
         )
 
         if timed_out:

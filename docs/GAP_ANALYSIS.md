@@ -209,14 +209,14 @@ Findings below are from reviewing the architecture/state docs and known surfaces
 
 | Area | Concern / why | Impact | Effort | Cost |
 |---|---|---|---|---|
-| **Code-execution sandbox** (`labs/code_exec.py`) | The biggest attack surface — it runs user Python/Node. Confirm: no network egress (it claims none), RLIMIT/cgroups for CPU+mem+pids+wall-clock, no FS escape, temp-dir isolation, and that the **Node path's skipped `RLIMIT_AS`** can't be abused for memory-exhaustion DoS. Consider seccomp/nsjail/firejail for defense-in-depth. | High | M | `FREE` |
+| **Code-execution sandbox** (`labs/code_exec.py`) | ✅ **Addressed (SECURITY_AUDIT C-01).** Grading now runs in a throwaway Docker container (`apps/labs/sandbox_runner.py`) with `--network none`, read-only rootfs, non-root user, `cap-drop ALL`, `no-new-privileges`, `--pids-limit`, and memory/CPU caps — real network + FS isolation, gated by `SANDBOX_DOCKER` with a fail-closed in-process `rlimit` fallback (CPU/mem/pids/fsize/nofile/core) for dev/CI. Node memory bounded by `--max-old-space-size` + the container `--memory` cap. Remaining defense-in-depth: a custom seccomp profile + moving the call to a Celery worker. | High | M | `FREE` |
 | **WebSocket terminal authz** | Ensure per-session ownership checks, idle timeouts, and message-rate limits on the lab terminal so one user can't attach to another's session or flood a worker. | High | S–M | `FREE` |
 | **Fail-closed grading integrity** | Project state shows this was recently fixed (no auto-pass). Add regression tests + a periodic audit so a future scenario can't reintroduce a vacuous pass. | High | S | `FREE` |
 | **Rate limiting / abuse on auth + OTP + AI-hint + validate endpoints** | NUM_PROXIES fix noted; verify throttles on register/OTP, `ai-hint`, `CodeValidate`, `PromptValidate` to prevent brute-force and compute abuse. | Med | S | `FREE` |
 | **Secrets management** | Vault integration exists; verify no secrets committed in `.env`, rotation alerts work, and CI secrets are scoped. | Med | S | `FREE` |
 | **Stripe/Razorpay webhook verification** | Confirm signature verification + idempotency on fulfillment webhooks (billing). | High | S | `FREE` |
 | **Interview media privacy (GDPR)** | `gdpr_views.py` exists; confirm STT transcript/audio handling, retention, and deletion paths, since camera/mic are used. | Med | S | `FREE` |
-| **Standard web hardening** | Verify CSP (esp. with eval-heavy Pyodide/WASM), HSTS, secure cookies, CSRF on state-changing endpoints, and dependency scanning (Dependabot/pip-audit/npm-audit) in CI. | Med | S–M | `FREE` |
+| **Standard web hardening** | HSTS + secure/httpOnly/SameSite cookies are set; dependency scanning (pip-audit + npm audit) runs in CI. **CSRF on state-changing endpoints now enforced for the cookie-JWT path** (SECURITY_AUDIT A-01 — custom-header requirement; the Bearer path is immune). Still open: tighten CSP off `'unsafe-inline'` (H-01). | Med | S–M | `FREE` |
 | **Multi-tenant org isolation** | With org seats/teams, verify object-level authorization (no IDOR on org analytics, invoices, team data). | Med | M | `FREE` |
 
 ---
@@ -283,7 +283,7 @@ pip-audit / `npm audit`.
 | 7 | CI/CD pipeline sim + Prometheus/Grafana observability sim | ⬜ Not implemented | No CI/CD or observability simulation modules under `apps/labs/provisioner/simulation/`. |
 | 8 | Code IDE depth: autosave/resume + bash & SQL grading + first-failing-test | 🟡 Partial | **Autosave/resume** ✅ and **first-failing-test panel** ✅ shipped this session (`frontend/src/components/ide/CodingIDE.jsx`). **Bash/SQL auto-grading** ⬜ still pending — bash stays in `NEEDS_REVIEW_LANGUAGES` (`backend/apps/labs/code_exec.py`); only Python + JavaScript auto-grade. |
 | 9 | Weekly contests + learning campaigns | ⬜ Not implemented | Ads `Campaigns` admin exists, but no learning-contest model reusing it. (Weekly **leaderboard** scope is done — see quick win #11.) |
-| 10 | Sandbox + WebSocket terminal security hardening | 🟡 Partial | Code-exec sandbox runs with resource caps and a fail-closed grader (`backend/apps/labs/code_exec.py`); `tests.test_api_security` runs in CI. Dedicated fail-closed escape/DoS regression suite for the terminal not yet exhaustive. |
+| 10 | Sandbox + WebSocket terminal security hardening | 🟡 Partial (sandbox ✅) | **Code-exec sandbox: done (C-01).** Container-isolated grader (`backend/apps/labs/sandbox_runner.py`, `SANDBOX_DOCKER`) — network-less, read-only, non-root, pids/mem/cpu-capped — with a fail-closed in-process fallback; regression tests in `tests/test_coding_ide.py::DockerSandboxBackendTests` + `tests/test_sandbox_security.py`. Cookie-JWT CSRF (A-01) and admin fail-closed (I-01) also landed. **Remaining:** dedicated WebSocket-terminal escape/DoS/rate-limit regression suite (the terminal authz itself is per-session-owner checked). |
 
 ### Quick wins (§5)
 

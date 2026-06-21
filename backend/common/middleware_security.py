@@ -138,18 +138,41 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
 class AdminIPRestrictionMiddleware(MiddlewareMixin):
     """
     Restrict Django admin and admin API to configured IP addresses.
-    When ADMIN_ALLOWED_IPS is empty, all IPs are allowed (development default).
+
+    When ADMIN_ALLOWED_IPS is empty:
+      * dev (DEBUG) — all IPs allowed (development default).
+      * prod with ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=True — admin paths are
+        default-DENIED (fail closed, SECURITY_AUDIT I-01).
+      * prod with the flag False (default) — legacy fail-open (a startup warning
+        is emitted in settings); set the flag on once the allowlist is populated.
     """
 
     ADMIN_PREFIXES = ("/django-admin/", "/api/admin/")
 
     def process_request(self, request):
         allowed_ips = getattr(settings, "ADMIN_ALLOWED_IPS", None) or []
+        path = request.path
+        is_admin_path = any(path.startswith(prefix) for prefix in self.ADMIN_PREFIXES)
+
         if not allowed_ips:
+            # No allowlist configured. Fail CLOSED in production only when the
+            # operator opted in; otherwise preserve the legacy allow-all.
+            fail_closed = (
+                not getattr(settings, "DEBUG", False)
+                and getattr(settings, "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", False)
+            )
+            if fail_closed and is_admin_path:
+                logger.warning(
+                    "Admin access denied (fail-closed: ADMIN_ALLOWED_IPS unset) on %s",
+                    path,
+                )
+                return JsonResponse(
+                    {"detail": "Admin access is restricted. No allowlist is configured."},
+                    status=403,
+                )
             return None
 
-        path = request.path
-        if not any(path.startswith(prefix) for prefix in self.ADMIN_PREFIXES):
+        if not is_admin_path:
             return None
 
         client_ip = getattr(request, "client_ip", None)
