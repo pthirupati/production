@@ -3818,6 +3818,215 @@ class AdminSyncScenariosView(APIView):
         })
 
 
+# ─── Lab Provisioning (per-technology re-seed) ──────────────────────
+
+# Scenario subfolders that are not standalone technologies (shared fixtures,
+# helper assets) — hidden from the provisioning checklist.
+_PROVISION_IGNORE_DIRS = {"shared", "simulation"}
+
+
+def _resolve_scenarios_dir():
+    """Locate the scenarios/ directory the same way seed_scenarios does.
+
+    Honors an explicit override but falls back to the repo-relative path so the
+    admin action works both in the container (/scenarios) and local dev.
+    """
+    candidates = [
+        getattr(settings, "SCENARIOS_DIR", "") or "",
+        "/scenarios",
+        os.path.normpath(os.path.join(settings.BASE_DIR, "..", "scenarios")),
+    ]
+    for path in candidates:
+        if path and os.path.isdir(path):
+            return path
+    return None
+
+
+def _list_scenario_technologies(scenarios_dir):
+    """Enumerate scenario *folders* (the unit `--technologies` filters on).
+
+    Each folder slug is exactly what `seed_scenarios --technologies` and the
+    GitHub workflow `technologies` input accept. Enrich with a display name +
+    scenario count, and the matching DB Technology row when one exists.
+    """
+    import yaml as _yaml
+
+    tech_by_slug = {t.slug: t for t in Technology.objects.all()}
+    tech_by_name = {t.name: t for t in Technology.objects.all()}
+    rows = []
+    for folder in sorted(os.listdir(scenarios_dir)):
+        folder_path = os.path.join(scenarios_dir, folder)
+        if not os.path.isdir(folder_path) or folder in _PROVISION_IGNORE_DIRS:
+            continue
+        if folder.startswith(".") or folder.startswith("_"):
+            continue
+
+        # Count scenario.yaml files in this folder.
+        scenario_count = 0
+        for sub in os.listdir(folder_path):
+            if os.path.isfile(os.path.join(folder_path, sub, "scenario.yaml")):
+                scenario_count += 1
+        if scenario_count == 0:
+            continue
+
+        # Display name + DB slug from technology.yaml / TECH_META, mirroring the
+        # management command's resolution order.
+        from apps.question_bank.management.commands.seed_scenarios import TECH_META
+
+        meta = dict(TECH_META.get(folder, {}))
+        meta_path = os.path.join(folder_path, "technology.yaml")
+        if os.path.isfile(meta_path):
+            try:
+                with open(meta_path) as fh:
+                    meta.update(_yaml.safe_load(fh) or {})
+            except Exception:
+                pass
+        display_name = meta.get("name") or folder.replace("-", " ").title()
+        db_slug = meta.get("slug")
+
+        db_tech = None
+        if db_slug and db_slug in tech_by_slug:
+            db_tech = tech_by_slug[db_slug]
+        elif display_name in tech_by_name:
+            db_tech = tech_by_name[display_name]
+
+        rows.append({
+            # The folder name — the value to send to --technologies / the workflow.
+            "slug": folder,
+            "name": display_name,
+            "scenario_folders": scenario_count,
+            "db_slug": db_tech.slug if db_tech else db_slug or None,
+            "db_id": db_tech.id if db_tech else None,
+            "is_active": db_tech.is_active if db_tech else None,
+            "coming_soon": db_tech.coming_soon if db_tech else None,
+            "seeded": db_tech is not None,
+            "icon": (db_tech.icon if db_tech else meta.get("icon")) or "",
+            "color": (db_tech.color if db_tech else meta.get("color")) or "cyan",
+        })
+    return rows
+
+
+class AdminLabProvisioningView(APIView):
+    """Admin lab provisioning — list scenario technologies and re-seed selected.
+
+    GET  → catalog of scenario-folder technologies (checkbox source) plus the
+           workflow input name so the UI can render the copy-paste command.
+    POST → run `seed_scenarios --merge-only --technologies <slugs>` for the
+           selected folders (safe, in-app, additive re-seed) and return a
+           summary + the exact `gh workflow run` command for the same selection.
+
+    The comma-separated slug method stays fully supported: the same slugs power
+    both this in-app action and the GitHub `technologies` workflow input.
+    """
+
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        scenarios_dir = _resolve_scenarios_dir()
+        if not scenarios_dir:
+            return Response(
+                {"error": "scenarios directory not found on this host", "technologies": []},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        techs = _list_scenario_technologies(scenarios_dir)
+        return Response({
+            "technologies": techs,
+            "count": len(techs),
+            "scenarios_dir": scenarios_dir,
+            # Mirrors .github/workflows/production.yml `technologies` input.
+            "workflow_input": "technologies",
+            "workflow_file": "production.yml",
+            # No GitHub token is configured server-side (only GitHub OAuth login
+            # creds exist), so the UI renders a copy-paste `gh` command instead of
+            # triggering workflow_dispatch from the server.
+            "github_dispatch_available": False,
+        })
+
+    def post(self, request):
+        from io import StringIO
+        from django.core.management import call_command
+        from django.core.cache import cache
+
+        raw = request.data.get("technologies", request.data.get("slugs", ""))
+        if isinstance(raw, (list, tuple)):
+            requested = [str(s).strip().lower() for s in raw if str(s).strip()]
+        else:
+            requested = [s.strip().lower() for s in str(raw).split(",") if s.strip()]
+
+        if not requested:
+            return Response(
+                {"error": "Select at least one technology to provision."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        scenarios_dir = _resolve_scenarios_dir()
+        if not scenarios_dir:
+            return Response(
+                {"error": "scenarios directory not found on this host"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        # Validate requested slugs against real scenario folders (avoid passing
+        # arbitrary/unknown values through to the management command).
+        valid_slugs = {t["slug"] for t in _list_scenario_technologies(scenarios_dir)}
+        selected = [s for s in requested if s in valid_slugs]
+        unknown = [s for s in requested if s not in valid_slugs]
+        if not selected:
+            return Response(
+                {"error": "None of the requested technologies match a scenario folder.",
+                 "unknown": unknown},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        slug_csv = ",".join(selected)
+        scenarios_before = Scenario.objects.count()
+
+        buf = StringIO()
+        try:
+            # SAFE path: --merge-only never overwrites existing scenario fields.
+            call_command(
+                "seed_scenarios",
+                dir=scenarios_dir,
+                technologies=slug_csv,
+                merge_only=True,
+                stdout=buf,
+                stderr=buf,
+            )
+        except Exception as exc:
+            logger.error("Lab provisioning seed failed for %s: %s", slug_csv, exc)
+            return Response(
+                {"error": str(exc), "technologies": selected},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        scenarios_after = Scenario.objects.count()
+        try:
+            from apps.question_bank.cache_utils import invalidate_technologies_cache
+            invalidate_technologies_cache()
+        except Exception:
+            pass
+        cache.delete("platform_stats")
+        cache.delete("public_platform_stats")
+
+        output = buf.getvalue()
+        # The exact command to run the same selection through the green workflow.
+        gh_command = (
+            f"gh workflow run production.yml -f action=deploy "
+            f"-f technologies={slug_csv} -f merge_seed_only=true"
+        )
+        return Response({
+            "provisioned": True,
+            "technologies": selected,
+            "slug_csv": slug_csv,
+            "unknown": unknown,
+            "scenarios_created": max(0, scenarios_after - scenarios_before),
+            "scenarios_total": scenarios_after,
+            "gh_command": gh_command,
+            "output_tail": output[-4000:] if output else "",
+            "message": f"Re-seeded {len(selected)} technolog{'y' if len(selected) == 1 else 'ies'} (merge-only).",
+        })
+
+
 class AdminBlogPostsView(APIView):
     """CRUD list/create for blog posts."""
     permission_classes = [IsPlatformAdmin]

@@ -45,6 +45,7 @@ from .views import (
     AdminSecurityActionView,
     AdminTestEmailView,
     AdminSyncScenariosView,
+    AdminLabProvisioningView,
     AdminBlogPostsView,
     AdminBlogPostDetailView,
     AdminCampaignsView,
@@ -116,6 +117,9 @@ urlpatterns = [
     # Scenarios CRUD
     path("scenarios/", AdminScenariosView.as_view()),
     path("scenarios/sync/", AdminSyncScenariosView.as_view()),
+
+    # Lab Provisioning — per-technology re-seed (checkbox UI + copy command)
+    path("lab-provisioning/", AdminLabProvisioningView.as_view()),
     path("scenarios/<int:pk>/", AdminScenarioDetailView.as_view()),
 
     # Blog CMS

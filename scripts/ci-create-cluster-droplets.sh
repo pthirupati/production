@@ -26,7 +26,12 @@
 set -euo pipefail
 
 # Tracks whether create_droplet() provisioned a brand-new droplet (vs reused one).
+# create_droplet() runs in a command-substitution subshell (id="$(create_droplet ...)"),
+# so a variable assignment there never reaches main(). Use a marker FILE that
+# survives the subshell instead, and check for it in main() before emitting output.
 CREATED_ANY="false"
+CREATED_FLAG="${RUNNER_TEMP:-/tmp}/fixitlab_created_any.$$"
+rm -f "$CREATED_FLAG"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -173,8 +178,9 @@ create_droplet() {
   fi
   echo "Creating droplet $name ($tag)..." >&2
   # A freshly created droplet has no pre-existing secrets to preserve — flag it so
-  # the workflow can auto-rotate even when rotate_secrets is left unchecked.
-  CREATED_ANY="true"
+  # the workflow can auto-rotate even when rotate_secrets is left unchecked. We run
+  # in a subshell here, so touch a marker file rather than setting a variable.
+  : > "$CREATED_FLAG"
   doctl "${args[@]}" >/dev/null
   droplet_id_by_name "$name"
 }
@@ -270,7 +276,11 @@ main() {
   emit_output app_private_ip "$app_private"
   emit_output db_private_ip "$db_private"
   emit_output labs_private_ip "$labs_private"
+  # create_droplet() touches CREATED_FLAG from its subshell when it provisions a
+  # brand-new droplet; pick that up here so created_any reflects the real result.
+  if [ -f "$CREATED_FLAG" ]; then CREATED_ANY="true"; fi
   # WIRE_EXISTING discovers droplets and never creates — treat as "not fresh".
+  # (Override AFTER the marker check so wire-existing always forces false.)
   if _is_true "$WIRE_EXISTING"; then CREATED_ANY="false"; fi
   emit_output created_any "$CREATED_ANY"
 

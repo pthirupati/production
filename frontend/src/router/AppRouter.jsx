@@ -45,6 +45,7 @@ const FAQ = lazy(() => import('../pages/FAQ'))
 const NotFound = lazy(() => import('../pages/NotFound'))
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'))
 const AdminScenarios = lazy(() => import('../pages/admin/AdminScenarios'))
+const AdminLabProvisioning = lazy(() => import('../pages/admin/AdminLabProvisioning'))
 const AdminTechnologies = lazy(() => import('../pages/admin/AdminTechnologies'))
 const AdminUsers = lazy(() => import('../pages/admin/AdminUsers'))
 const AdminLabs = lazy(() => import('../pages/admin/AdminLabs'))
@@ -171,6 +172,7 @@ export default function AppRouter() {
         <Route element={<AdminRoute><AdminLayout /></AdminRoute>}>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/scenarios" element={<AdminScenarios />} />
+          <Route path="/admin/lab-provisioning" element={<AdminLabProvisioning />} />
           <Route path="/admin/technologies" element={<AdminTechnologies />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/labs" element={<AdminLabs />} />

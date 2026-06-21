@@ -247,6 +247,25 @@ _GENERIC_TECH_QUESTIONS: dict[int, list[str]] = {
     ],
 }
 
+# Open-ended prompts used when the banded generic bank is fully exhausted within a
+# round. Distinct enough that we can rotate through several before repeating.
+_OPEN_ENDED_FALLBACKS = [
+    "Walk me through the most interesting technical problem you've solved recently.",
+    "Tell me about a decision you made that you'd defend even though it was unpopular.",
+    "Describe a system you built or operated that you're genuinely proud of, and why.",
+    "What's a piece of technical debt you've lived with — how did you reason about paying it down?",
+    "Talk me through how you'd ramp up on a large, unfamiliar codebase in your first two weeks.",
+]
+
+# Rotating "angle" suffixes appended to a base prompt so that, even once the whole
+# fallback pool is used in a round, each subsequent question is still unique.
+_FALLBACK_ANGLES = [
+    "— going one level deeper",
+    "— focusing on what you'd do differently now",
+    "— walking through the trade-offs",
+    "— with the hardest edge case in mind",
+]
+
 # Cross-question scaffolds — these QUOTE the candidate's own answer ("you said X")
 # and pivot to a harder dimension. {phrase} is a fragment from their last answer.
 _CROSS_QUESTION_TEMPLATES = [
@@ -455,7 +474,11 @@ def starting_difficulty(profile_snapshot: dict) -> int:
     level = (snap.get("experience_level") or "mid").lower()
     base = {"junior": 1, "mid": 2, "senior": 3, "lead": 4}.get(level, 2)
     parsed = snap.get("resume_parsed") or {}
-    years = int(parsed.get("years_experience_hint") or snap.get("years_experience") or 0)
+    # Years may arrive as a non-numeric hint ("7 years", "5+", "ten") — extract the
+    # first integer defensively and default to 0 instead of raising ValueError.
+    raw_years = parsed.get("years_experience_hint") or snap.get("years_experience") or 0
+    m = re.search(r"\d+", str(raw_years))
+    years = int(m.group()) if m else 0
     if years >= 10:
         base = max(base, 4)
     elif years >= 6:
@@ -513,8 +536,9 @@ def _generic_question(difficulty: int, used: set[str], rng: random.Random) -> st
         q = _pick(_GENERIC_TECH_QUESTIONS.get(b, []), used, rng)
         if q:
             return q
-    # absolute last resort
-    return _pick([x for xs in _GENERIC_TECH_QUESTIONS.values() for x in xs], set(), rng)
+    # absolute last resort — still honor `used` so we return None when everything
+    # is genuinely exhausted, letting the caller vary instead of repeating verbatim.
+    return _pick([x for xs in _GENERIC_TECH_QUESTIONS.values() for x in xs], used, rng)
 
 
 def _behavioral_question(round_type: str, difficulty: int, used: set[str], rng: random.Random) -> str | None:
@@ -669,10 +693,19 @@ def generate_question(
                     kind=kind,
                 )
 
-    # --- 5. Generic technical fallback — guaranteed to return something. ---
-    gq = _generic_question(eff_difficulty, used, rng) or (
-        "Walk me through the most interesting technical problem you've solved recently."
-    )
+    # --- 5. Generic technical fallback — guaranteed to return something, and
+    # guaranteed never to repeat a verbatim-identical question within a round. ---
+    gq = _generic_question(eff_difficulty, used, rng)
+    if not gq:
+        # Bank exhausted: pick from a small pool of distinct open-ended prompts.
+        gq = _pick(_OPEN_ENDED_FALLBACKS, used, rng)
+    if not gq:
+        # Even the pool is used this round: build a non-repeating variant by
+        # appending a rotating "angle" suffix, keyed deterministically on how many
+        # questions we've already asked (len(used)) — no Date/random calls.
+        base = _OPEN_ENDED_FALLBACKS[len(used) % len(_OPEN_ENDED_FALLBACKS)]
+        angle = _FALLBACK_ANGLES[len(used) % len(_FALLBACK_ANGLES)]
+        gq = f"{base} {angle}"
     stitch = _maybe_stitch(last_answer_quality, rng)
     return GeneratedQuestion(
         text=f"{stitch} {gq}".strip() if stitch else gq,

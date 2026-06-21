@@ -22,6 +22,18 @@ export const adminApi = {
     return data
   },
 
+  // Lab Provisioning — per-technology re-seed (checkbox UI)
+  async getProvisioningTechnologies() {
+    const { data } = await api.get('/admin/lab-provisioning/')
+    return data
+  },
+
+  async provisionTechnologies(slugs) {
+    // slugs: array of folder slugs OR a comma-separated string
+    const { data } = await api.post('/admin/lab-provisioning/', { technologies: slugs })
+    return data
+  },
+
   async getAnalytics(days = 30, refresh = false) {
     const q = refresh ? '&refresh=1' : ''
     const { data } = await api.get(`/admin/analytics/?days=${days}${q}`)

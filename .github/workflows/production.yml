@@ -91,7 +91,7 @@ on:
         options:
           - "true"
           - "false"
-        default: "true"
+        default: "false"
       run_e2e:
         description: "Run post-deploy health checks + full E2E on server"
         type: boolean

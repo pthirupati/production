@@ -408,6 +408,87 @@ class QuestionGeneratorUnitTest(TestCase):
             seen.add(q.text)
         self.assertGreater(len(seen), 1)
 
+    def test_single_topic_many_empty_answers_never_repeats_verbatim(self):
+        """The brutal case for the fallback path. A single-topic resume plus a long
+        run of short/empty answers means nothing is ever 'substantive', so the
+        cross-question / topic-drill / discussion branches never fire and EVERY turn
+        falls through to the section-5 generic fallback. Across many turns within one
+        round, no two interviewer questions may be verbatim-identical (normalized).
+
+        This locks in FIX 4: (a) the 'absolute last resort' ``_pick`` must honor
+        ``used`` (not an empty set) so it stops handing back already-asked bank
+        questions, and (b) once the generic bank AND the open-ended pool are drained,
+        the fallback must synthesize a rotating, non-repeating variant rather than
+        returning one hardcoded line over and over.
+
+        We empty the topic agenda so the run is driven purely by the generic
+        fallback — the exact code path FIX 4 repairs — and feed back the running
+        ``asked_texts`` the way the engine does. Pre-fix this yields only ~8 distinct
+        questions out of 20 (the hardcoded prompt repeats up to 5x); post-fix all 20
+        are distinct.
+        """
+        from apps.interviews.services.interview_ai import _normalize
+
+        # Single-topic resume; the candidate barely engages, so the bot can never
+        # cross-question or drill and must lean entirely on the generic fallback.
+        snap = {
+            "experience_level": "mid",
+            "primary_technology_name": "Linux",
+            "resume_parsed": {"skills_detected": ["linux"], "years_experience_hint": "4 years"},
+        }
+        # Short / empty answers — never "substantive", so no quotable phrase, no
+        # topic detected from the answer. Mixed skipped/brief to be realistic.
+        thin_answers = ["", "ok", "", "sure", "idk", "", "yes", "no", "", "maybe"]
+        TURNS = 20
+        asked: list[str] = []
+        normalized_seen: list[str] = []
+        for i in range(TURNS):
+            q = generate_question(
+                round_type="technical",
+                profile_snapshot=snap,
+                difficulty=2,
+                questions_asked=i,
+                last_answer=thin_answers[i % len(thin_answers)],
+                last_answer_quality="skipped" if i % 2 == 0 else "brief",
+                asked_texts=asked,
+                # Empty agenda: no topic bank to fall back on, so generation is
+                # forced down the section-5 generic path every single turn.
+                topic_agenda=[],
+                conversation_tail=[
+                    {"role": "candidate", "content": thin_answers[i % len(thin_answers)]}
+                ],
+            )
+            self.assertTrue(q.text.strip(), "fallback must always produce a non-empty question")
+            asked.append(q.text)
+            normalized_seen.append(_normalize(q.text))
+
+        # The core guarantee: ZERO verbatim-duplicate questions across the round.
+        dupes = sorted({t for t in normalized_seen if normalized_seen.count(t) > 1})
+        self.assertEqual(
+            len(set(normalized_seen)),
+            TURNS,
+            f"verbatim-duplicate question(s) asked within one round: {dupes}",
+        )
+        # And it must still be deterministic — re-running the identical sequence
+        # reproduces the identical questions (no Date/random module calls).
+        asked2: list[str] = []
+        for i in range(TURNS):
+            q2 = generate_question(
+                round_type="technical",
+                profile_snapshot=snap,
+                difficulty=2,
+                questions_asked=i,
+                last_answer=thin_answers[i % len(thin_answers)],
+                last_answer_quality="skipped" if i % 2 == 0 else "brief",
+                asked_texts=asked2,
+                topic_agenda=[],
+                conversation_tail=[
+                    {"role": "candidate", "content": thin_answers[i % len(thin_answers)]}
+                ],
+            )
+            asked2.append(q2.text)
+        self.assertEqual(asked, asked2, "fallback variation must be deterministic for the same state")
+
     def test_hr_round_generates_behavioral_not_kubectl(self):
         q = generate_question(
             round_type="hr",

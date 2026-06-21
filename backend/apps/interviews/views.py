@@ -536,7 +536,9 @@ class InterviewRoundStartView(APIView):
             # Resuming an in-progress round (e.g. a page reload): reuse the last
             # unanswered question instead of generating a duplicate.
             first_q = (
-                round_obj.messages.filter(role="interviewer", question__isnull=False)
+                round_obj.messages.filter(
+                    role="interviewer", message_type__in=("question", "practical")
+                )
                 .order_by("-created_at")
                 .first()
             )
