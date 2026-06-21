@@ -650,42 +650,37 @@ class ForgotPasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data["email"]
 
-        # Always return 200 to prevent email enumeration.
-        # Only actually send the email if the account exists and is active.
+        # Product decision: give the user clear feedback when no account matches
+        # (instead of the silent anti-enumeration 200). Only send the email after a
+        # confirmed, active match; surface a precise error otherwise.
+        user = User.objects.filter(email__iexact=email).first()
+        if user is None or not user.is_active:
+            logger.info(f"Password reset requested for unknown/inactive email: {email}")
+            return Response(
+                {"error": "No active account found with this email address. Check the address or sign up."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        PasswordResetToken.objects.filter(user=user, used=False).update(used=True)
+        token_obj, raw_token = PasswordResetToken.generate_token(user, hours=1)
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={raw_token}"
         try:
-            user = User.objects.get(email=email)
-            if user.is_active:
-                # Invalidate any existing tokens for this user
-                PasswordResetToken.objects.filter(user=user, used=False).update(used=True)
+            dispatch_notification_email(
+                subject="Reset your FixitLab password",
+                to_email=user.email,
+                template="emails/password_reset.html",
+                context={"username": user.username, "reset_url": reset_url, "expires_hours": 1},
+                critical=True,
+            )
+            logger.info(f"Password reset email delivered to {email}")
+        except Exception as mail_err:
+            logger.error(f"Password reset email failed for {email}: {mail_err}")
+            return Response(
+                {"error": "Your account was found, but the reset email could not be sent right now. Please try again shortly."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
-                # Generate new token
-                token_obj, raw_token = PasswordResetToken.generate_token(user, hours=1)
-
-                # Send reset email
-                reset_url = f"{settings.FRONTEND_URL}/reset-password?token={raw_token}"
-                try:
-                    dispatch_notification_email(
-                        subject="Reset your FixitLab password",
-                        to_email=user.email,
-                        template="emails/password_reset.html",
-                        context={
-                            "username": user.username,
-                            "reset_url": reset_url,
-                            "expires_hours": 1,
-                        },
-                        critical=True,
-                    )
-                    logger.info(f"Password reset email delivered to {email}")
-                except Exception as mail_err:
-                    logger.error(f"Password reset email failed for {email}: {mail_err}")
-        except User.DoesNotExist:
-            logger.info(f"Password reset requested for nonexistent email: {email}")
-        except Exception as e:
-            logger.error(f"Password reset email failed: {e}")
-
-        return Response({
-            "message": "If an account exists with this email, a password reset link has been sent.",
-        })
+        return Response({"message": "A password reset link has been sent to your email."})
 
 
 class ResetPasswordView(APIView):

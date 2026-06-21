@@ -220,13 +220,13 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "300/hour",
-        "user": "3000/hour",
-        "auth": "10/minute",  # Strict limit on auth endpoints
+        "anon": "2000/hour",  # SPA fires many /api calls per page-load; 300/hr tripped "too many requests" platform-wide
+        "user": "6000/hour",
+        "auth": "20/minute",  # auth endpoints (was 10 — too tight for normal retries)
         "lab_start": "60/hour",  # Limit lab provisioning (DoS protection)
         "login": "10/minute",  # FAILED attempts per (IP+email); successes are never throttled
-        "otp": "3/minute",
-        "password_reset": "3/minute",
+        "otp": "5/minute",
+        "password_reset": "8/minute",  # allow a few retries (mistyped email) without "too many requests"
         "payment": "20/hour",
         "interview": "100/day",
         "strict_anon": "60/minute",  # Public browsing needs headroom
