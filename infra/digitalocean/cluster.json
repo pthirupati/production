@@ -4,7 +4,7 @@
   "size": "s-2vcpu-8gb-160gb-intel",
   "domain": "fixitlab.in",
   "vpc_name": "fixitlab-vpc",
-  "vpc_id": "",
+  "vpc_id": "cd7ddbe4-a6a3-4d94-802b-7c1e4d12396f",
   "ssh_user": "root",
   "droplets": {
     "edge": {
@@ -12,38 +12,58 @@
       "tag": "fixitlab-edge",
       "role": "edge",
       "public": true,
-      "droplet_id": "",
-      "public_ipv4": "",
-      "private_ipv4": "",
-      "services": ["gateway", "certbot", "frontend-prod", "redis", "rabbitmq", "vault"]
+      "droplet_id": "579110328",
+      "public_ipv4": "139.59.38.209",
+      "private_ipv4": "10.122.16.2",
+      "services": [
+        "gateway",
+        "certbot",
+        "frontend-prod",
+        "redis",
+        "rabbitmq",
+        "vault"
+      ]
     },
     "app": {
       "name": "fixitlab-app",
       "tag": "fixitlab-app",
       "role": "app",
       "public": false,
-      "droplet_id": "",
-      "private_ipv4": "",
-      "services": ["backend", "celery_worker", "celery_provisioning", "celery_maintenance", "celery_beat"]
+      "droplet_id": "579110366",
+      "private_ipv4": "10.122.16.3",
+      "services": [
+        "backend",
+        "celery_worker",
+        "celery_provisioning",
+        "celery_maintenance",
+        "celery_beat"
+      ]
     },
     "data": {
       "name": "fixitlab-db",
       "tag": "fixitlab-db",
       "role": "data",
       "public": false,
-      "droplet_id": "",
-      "private_ipv4": "",
-      "services": ["database", "pgbouncer"]
+      "droplet_id": "579110395",
+      "private_ipv4": "10.122.16.4",
+      "services": [
+        "database",
+        "pgbouncer"
+      ]
     },
     "labs": {
       "name": "fixitlab-labs",
       "tag": "fixitlab-labs",
       "role": "labs",
       "public": false,
-      "droplet_id": "",
-      "private_ipv4": "",
-      "services": ["docker-engine", "fixitlab_labs-network", "scenario-images"]
+      "droplet_id": "579110429",
+      "private_ipv4": "10.122.16.5",
+      "services": [
+        "docker-engine",
+        "fixitlab_labs-network",
+        "scenario-images"
+      ]
     }
   },
-  "updated_at": ""
+  "updated_at": "2026-06-21T04:42:53Z"
 }
