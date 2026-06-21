@@ -981,6 +981,7 @@ jobs:
           chmod +x scripts/ci-vault-cluster-bootstrap.sh
           ./scripts/ci-vault-cluster-bootstrap.sh
       - name: Store Vault AppRole as GitHub secrets
+        continue-on-error: true   # best-effort: deploy reads the env already on the nodes, not these secrets
         env:
           CLUSTER_MODE: "1"
           GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN || github.token }}

@@ -33,8 +33,11 @@ if [ "${CLUSTER_MODE:-0}" = "1" ]; then
       echo "DRY_RUN gh secret set ${name} --env ${ENV_NAME} --repo ${REPO}  (value masked)"
       return 0
     fi
-    printf '%s' "$val" | gh secret set "$name" --env "$ENV_NAME" --repo "$REPO"
-    echo "  set ${name}"
+    if printf '%s' "$val" | gh secret set "$name" --env "$ENV_NAME" --repo "$REPO" 2>/dev/null; then
+      echo "  set ${name}"
+    else
+      echo "  WARN: could not set ${name} (token lacks Environment secrets:write) — non-fatal; deploy uses the env on the nodes"
+    fi
   }
 
   echo "=== cluster secret sync (dry_run=${DRY_RUN}) ==="
