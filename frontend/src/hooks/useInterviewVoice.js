@@ -17,10 +17,15 @@ import { interviewsApi } from '../api/interviews'
 // Browser voice picker (used for browser TTS fallback)
 // ---------------------------------------------------------------------------
 
-function pickBrowserVoice(hint, locale) {
+function pickBrowserVoice(hint, locale, preferredURI) {
   if (!window.speechSynthesis) return null
   const voices = window.speechSynthesis.getVoices()
   if (!voices.length) return null
+  // An explicit in-room user choice always wins.
+  if (preferredURI) {
+    const chosen = voices.find(v => v.voiceURI === preferredURI)
+    if (chosen) return chosen
+  }
   if (hint) {
     const match = voices.find(v => v.name.toLowerCase().includes(hint.toLowerCase()))
     if (match) return match
@@ -29,6 +34,23 @@ function pickBrowserVoice(hint, locale) {
     v => v.lang === locale || v.lang?.startsWith(locale?.split('-')[0])
   )
   return localeMatch || voices[0]
+}
+
+const VOICE_STORAGE_KEY = 'fixitlab.interview.voiceURI'
+
+function loadPersistedVoiceURI() {
+  try {
+    return window.localStorage.getItem(VOICE_STORAGE_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
+function persistVoiceURI(uri) {
+  try {
+    if (uri) window.localStorage.setItem(VOICE_STORAGE_KEY, uri)
+    else window.localStorage.removeItem(VOICE_STORAGE_KEY)
+  } catch { /* storage unavailable — non-fatal */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -47,8 +69,13 @@ async function playBase64Audio(base64, mime = 'audio/mpeg') {
   const audio = new Audio(url)
   _currentAudio = audio
   return new Promise((resolve, reject) => {
-    audio.onended = () => { URL.revokeObjectURL(url); resolve() }
-    audio.onerror = (e) => { URL.revokeObjectURL(url); reject(e) }
+    let done = false
+    const finish = () => { if (done) return; done = true; URL.revokeObjectURL(url); resolve() }
+    audio.onended = finish
+    // A barge-in / cancelSpeech pauses the audio — treat that as "finished" so
+    // the awaited speak() promise resolves instead of hanging mid-utterance.
+    audio.onpause = finish
+    audio.onerror = (e) => { if (done) return; done = true; URL.revokeObjectURL(url); reject(e) }
     audio.play().catch(reject)
   })
 }
@@ -167,9 +194,18 @@ export function useInterviewVoice() {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [interimTranscript, setInterimTranscript] = useState('')
+  // Live list of browser TTS voices for the in-room voice switcher.
+  const [browserVoices, setBrowserVoices] = useState([])
+  // User-selected voiceURI (persisted). '' = use the profile/admin default.
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState(loadPersistedVoiceURI)
 
-  const voicesReady = useRef(false)
   const audioRecorder = useRef(new AudioRecorder())
+  // Active browser SpeechRecognition instance (so stopListening can finalize it).
+  const recognizerRef = useRef(null)
+  // Keep the latest selection in a ref so speak() always reads the current
+  // value without needing to be re-created (and without stale closures).
+  const selectedVoiceRef = useRef(selectedVoiceURI)
+  useEffect(() => { selectedVoiceRef.current = selectedVoiceURI }, [selectedVoiceURI])
 
   // Load voice + capability config from server
   useEffect(() => {
@@ -186,11 +222,23 @@ export function useInterviewVoice() {
       }))
     })
 
-    const loadVoices = () => { voicesReady.current = true }
+    // SpeechSynthesis populates voices asynchronously; refresh on the event and
+    // also poll once shortly after mount (some browsers never fire the event).
     if (window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = loadVoices
-      if (window.speechSynthesis.getVoices().length) loadVoices()
+      const refresh = () => {
+        const v = window.speechSynthesis.getVoices() || []
+        if (v.length) setBrowserVoices(v)
+      }
+      window.speechSynthesis.onvoiceschanged = refresh
+      refresh()
+      const t = setTimeout(refresh, 400)
+      return () => { clearTimeout(t) }
     }
+  }, [])
+
+  const selectVoice = useCallback((voiceURI) => {
+    setSelectedVoiceURI(voiceURI || '')
+    persistVoiceURI(voiceURI || '')
   }, [])
 
   const resolveVoiceProfile = useCallback((voiceCode) => {
@@ -234,8 +282,14 @@ export function useInterviewVoice() {
       u.lang = profile.locale || 'en-US'
       u.rate = profile.rate ?? 0.95
       u.pitch = profile.pitch ?? 1
-      const voice = pickBrowserVoice(profile.browser_voice_hint, profile.locale)
-      if (voice) u.voice = voice
+      // Honor the user's in-room voice choice over the admin hint.
+      const voice = pickBrowserVoice(
+        profile.browser_voice_hint, profile.locale, selectedVoiceRef.current,
+      )
+      if (voice) {
+        u.voice = voice
+        if (voice.lang) u.lang = voice.lang
+      }
 
       await new Promise((resolve) => {
         u.onend = resolve
@@ -315,43 +369,64 @@ export function useInterviewVoice() {
 
       // --- Browser SpeechRecognition fallback ---
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-      if (!SR) return { transcript: '', filteredText: '', confidence: 0, provider: 'none' }
+      if (!SR) return { transcript: '', filtered_text: '', confidence: 0, provider: 'none' }
 
       return new Promise((resolve) => {
         const r = new SR()
         r.lang = locale
-        r.continuous = false
+        // Continuous so a multi-sentence answer (with natural pauses) is captured
+        // as one turn. The room decides when to finalize — on the explicit Stop
+        // button, on skip-on-silence, or on the maxDuration safety timeout.
+        r.continuous = true
         r.interimResults = true
 
-        r.onresult = (e) => {
-          const results = Array.from(e.results)
-          const interimText = results.map(res => res[0].transcript).join(' ')
-          setInterimTranscript(interimText)
-          if (onInterim) onInterim(interimText)
+        let finalText = ''           // accumulated finalized speech
+        let lastConfidence = 0.8
+        let settled = false
+        recognizerRef.current = r
 
-          if (e.results[e.results.length - 1].isFinal) {
-            const finalText = results
-              .filter(res => res.isFinal)
-              .map(res => res[0].transcript)
-              .join(' ')
-            const confidence = e.results[e.results.length - 1][0].confidence || 0.8
-            setInterimTranscript('')
-            resolve({
-              transcript: finalText,
-              filtered_text: finalText,
-              confidence,
-              provider: 'browser',
-              is_final: true,
-              word_count: finalText.split(' ').length,
-            })
-          }
+        const finish = () => {
+          if (settled) return
+          settled = true
+          recognizerRef.current = null
+          clearTimeout(timer)
+          setInterimTranscript('')
+          const text = finalText.trim()
+          resolve({
+            transcript: text,
+            filtered_text: text,
+            confidence: lastConfidence,
+            provider: 'browser',
+            is_final: true,
+            word_count: text ? text.split(/\s+/).length : 0,
+          })
         }
 
-        r.onerror = () => resolve({ transcript: '', filtered_text: '', confidence: 0, provider: 'browser' })
-        r.onend = () => resolve({ transcript: '', filtered_text: '', confidence: 0, provider: 'browser' })
+        r.onresult = (e) => {
+          let interim = ''
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const res = e.results[i]
+            const chunk = res[0].transcript
+            if (res.isFinal) {
+              finalText += (finalText ? ' ' : '') + chunk.trim()
+              lastConfidence = res[0].confidence || lastConfidence
+            } else {
+              interim += chunk
+            }
+          }
+          const display = (finalText + ' ' + interim).trim()
+          setInterimTranscript(display)
+          if (onInterim) onInterim(display)
+        }
 
-        r.start()
-        setTimeout(() => { try { r.stop() } catch { /* */ } }, maxDuration)
+        // A transient no-speech / aborted error shouldn't throw away what we
+        // already captured — just finalize with whatever we have.
+        r.onerror = finish
+        r.onend = finish
+
+        try { r.start() } catch { finish() }
+        // Safety cap so a stuck recognizer can never listen forever.
+        const timer = setTimeout(() => { try { r.stop() } catch { finish() } }, maxDuration)
       })
     } finally {
       setIsListening(false)
@@ -359,11 +434,17 @@ export function useInterviewVoice() {
     }
   }, [config.uses_server_stt])
 
-  // Called by UI "stop recording" button to finalize Whisper capture
+  // Stop the active capture and finalize it. Works for BOTH the server-Whisper
+  // path (resolves the recorder) and the browser path (stops the recognizer so
+  // its onend resolves with the accumulated transcript). Called by the Stop
+  // button, by skip-on-silence, and by barge-in handling.
   const stopListening = useCallback(() => {
     if (audioRecorder.current._resolve) {
       audioRecorder.current._resolve()
       audioRecorder.current._resolve = null
+    }
+    if (recognizerRef.current) {
+      try { recognizerRef.current.stop() } catch { /* already stopped */ }
     }
   }, [])
 
@@ -377,5 +458,9 @@ export function useInterviewVoice() {
     listen,
     stopListening,
     resolveVoiceProfile,
+    // In-room voice switching (P2.1)
+    browserVoices,
+    selectedVoiceURI,
+    selectVoice,
   }
 }

@@ -12,6 +12,7 @@ from .voice_views import InterviewVoiceConfigView
 from . import tts_views, stt_views
 from .views import (
     CandidateProfileView,
+    CandidateResumeScoreView,
     InterviewCampaignDetailView,
     InterviewCampaignListView,
     InterviewCertificateVerifyView,
@@ -37,6 +38,7 @@ urlpatterns = [
     path("plans/", InterviewPlansView.as_view()),
     path("entitlement/", InterviewEntitlementView.as_view()),
     path("profile/", CandidateProfileView.as_view()),
+    path("profile/resume-score/", CandidateResumeScoreView.as_view()),
     path("voices/", InterviewVoicesView.as_view()),
     path("campaigns/", InterviewCampaignListView.as_view()),
     path("campaigns/<uuid:campaign_id>/", InterviewCampaignDetailView.as_view()),

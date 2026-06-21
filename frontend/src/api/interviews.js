@@ -42,6 +42,13 @@ export const interviewsApi = {
 
     return api.put('/interviews/profile/', payload).then(r => r.data)
   },
+  // Deterministic, local resume score + tips (no paid API). Pass the chosen
+  // technology id / role / level so the score reflects the target. Backend:
+  // POST /interviews/profile/resume-score/. Returns
+  // { overall_score, subscores, matched_keywords, missing_keywords, tips, has_resume }.
+  scoreResume(payload = {}) {
+    return api.post('/interviews/profile/resume-score/', payload, { silentError: true }).then(r => r.data)
+  },
   listCampaigns() {
     return api.get('/interviews/campaigns/').then(r => r.data)
   },

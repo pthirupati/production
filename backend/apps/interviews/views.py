@@ -38,8 +38,32 @@ from apps.interviews.services.entitlements import (
     user_has_interview_access,
 )
 from apps.interviews.services import engine
-from apps.interviews.services.resume_parser import extract_text_from_upload, parse_resume_text, build_profile_from_inputs
+from apps.interviews.services.resume_parser import (
+    build_profile_from_inputs,
+    extract_text_from_upload,
+    parse_resume_text,
+    score_resume,
+)
 from common.throttles import InterviewRateThrottle, StrictAnonRateThrottle
+
+
+def _profile_resume_score(profile, *, target_technology="", target_role="", experience_level=""):
+    """Score a candidate profile's resume against its (or override) targets.
+
+    Deterministic + local (no paid API). Used by the profile PUT response and
+    the dedicated resume-score endpoint so the setup UI can show score + tips.
+    """
+    tech_name = target_technology
+    if not tech_name and getattr(profile, "primary_technology_id", None):
+        tech_name = getattr(profile.primary_technology, "name", "") or ""
+    return score_resume(
+        profile.resume_parsed or {},
+        resume_text=profile.resume_text or "",
+        target_technology=tech_name,
+        target_role=target_role or profile.target_role or "",
+        experience_level=experience_level or profile.experience_level or "mid",
+        years_experience=profile.years_experience or 0,
+    )
 
 
 class InterviewPlansView(APIView):
@@ -170,7 +194,62 @@ class CandidateProfileView(APIView):
                 primary_technology_name=tech_name,
             )
             profile.save(update_fields=["resume_parsed"])
-        return Response(CandidateProfileSerializer(profile).data)
+        payload = CandidateProfileSerializer(profile).data
+        # Surface a deterministic, local resume score + tips so the setup UI
+        # can show the candidate how their resume aligns with the chosen role.
+        try:
+            payload["resume_score"] = _profile_resume_score(profile)
+        except Exception:  # noqa: BLE001 - scoring is best-effort, never 500 a save
+            import logging
+
+            logging.getLogger(__name__).exception("resume scoring failed for user %s", request.user.pk)
+        return Response(payload)
+
+
+class CandidateResumeScoreView(APIView):
+    """Resume score + improvement tips (deterministic, local — no paid API).
+
+    GET  — score the saved profile against its own target role/technology.
+    POST — score against an override technology/role/level (live setup preview),
+           optionally over inline resume_text without persisting it.
+    """
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get(self, request):
+        profile, _ = CandidateProfile.objects.get_or_create(user=request.user)
+        return Response(_profile_resume_score(profile))
+
+    def post(self, request):
+        profile, _ = CandidateProfile.objects.get_or_create(user=request.user)
+        tech_name = (request.data.get("target_technology") or "").strip()
+        # Allow passing a primary_technology id (as the setup form holds) and
+        # resolve it to the technology name for keyword matching.
+        tech_id = request.data.get("primary_technology")
+        if not tech_name and tech_id not in (None, "", "null", "undefined"):
+            try:
+                from apps.question_bank.models import Technology
+
+                tech = Technology.objects.filter(pk=int(tech_id)).first()
+                tech_name = getattr(tech, "name", "") or ""
+            except (TypeError, ValueError):
+                tech_name = ""
+        inline_text = request.data.get("resume_text")
+        parsed = profile.resume_parsed or {}
+        resume_text = profile.resume_text or ""
+        if inline_text:
+            resume_text = str(inline_text)[:20000]
+            parsed = parse_resume_text(resume_text)
+        result = score_resume(
+            parsed,
+            resume_text=resume_text,
+            target_technology=tech_name,
+            target_role=(request.data.get("target_role") or profile.target_role or ""),
+            experience_level=(request.data.get("experience_level") or profile.experience_level or "mid"),
+            years_experience=int(request.data.get("years_experience") or profile.years_experience or 0),
+        )
+        return Response(result)
 
 
 class InterviewSampleView(APIView):

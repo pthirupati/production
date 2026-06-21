@@ -244,6 +244,66 @@ _GENERIC_FOLLOWUPS = [
 
 
 # ---------------------------------------------------------------------------
+# Human-touch banks (P2.3): varied acknowledgements + casual asides + openers
+# that reference the candidate's OWN words. All free/templated — no LLM.
+# ---------------------------------------------------------------------------
+
+# Short acknowledgements rotated so we never repeat "good answer". {phrase}
+# (when present) is filled with a fragment quoted from the candidate's answer.
+_ACK_WITH_PHRASE = [
+    "You touched on “{phrase}” — let's dig into that.",
+    "The bit about “{phrase}” stood out to me.",
+    "You mentioned “{phrase}”, and I want to pull on that thread.",
+    "Okay, so “{phrase}” — that's the part I'm curious about.",
+    "I noticed you said “{phrase}”.",
+    "Picking up on “{phrase}” for a second.",
+    "“{phrase}” — that's interesting.",
+    "Let me zoom in on “{phrase}”.",
+]
+
+# Acknowledgements when we couldn't pull a clean phrase. Deliberately varied so
+# a long round never repeats the same opener twice in a row.
+_ACK_GENERIC = [
+    "Got it.",
+    "Makes sense.",
+    "Okay, I follow.",
+    "Right.",
+    "Fair enough.",
+    "I hear you.",
+    "Understood.",
+    "Noted.",
+    "That tracks.",
+    "Mm-hm.",
+]
+
+# Light, human asides occasionally prepended/appended (kept professional, low
+# frequency) so the bot doesn't feel like a survey form.
+_CASUAL_ASIDES = [
+    "No rush —",
+    "Just thinking out loud here —",
+    "Between us,",
+    "Honestly,",
+    "Quick one —",
+    "Real-world question —",
+    "Curveball —",
+]
+
+# Words too generic to be worth quoting back ("you mentioned 'the'…" is silly).
+_PHRASE_STOPWORDS = {
+    "the", "a", "an", "and", "or", "but", "so", "if", "of", "to", "in", "on",
+    "for", "with", "as", "at", "by", "is", "was", "were", "be", "been", "are",
+    "it", "that", "this", "these", "those", "i", "we", "you", "they", "he",
+    "she", "my", "our", "your", "their", "me", "us", "them", "do", "did",
+    "does", "have", "has", "had", "will", "would", "can", "could", "should",
+    "just", "really", "very", "kind", "sort", "like", "well", "okay", "um",
+    "uh", "yeah", "yes", "no", "not", "then", "than", "when", "what", "how",
+    "why", "where", "which", "who", "about", "into", "from", "out", "up",
+    "down", "over", "after", "before", "because", "thing", "things", "stuff",
+    "lot", "bit", "way", "get", "got", "make", "made", "use", "used", "using",
+}
+
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
@@ -304,6 +364,124 @@ def _assess_quality(answer: str, question: str = "") -> str:
 
 
 # ---------------------------------------------------------------------------
+# Human-touch helpers (P2.3)
+# ---------------------------------------------------------------------------
+
+# Technical multi-word phrases worth quoting verbatim if the candidate used them.
+_NOTABLE_BIGRAMS = (
+    "cache ttl", "circuit breaker", "blast radius", "rolling deploy",
+    "blue green", "feature flag", "root cause", "race condition",
+    "connection pool", "rate limit", "load balancer", "message queue",
+    "read replica", "write path", "hot path", "cold start", "back pressure",
+    "graceful shutdown", "health check", "liveness probe", "readiness probe",
+    "node eviction", "memory leak", "disk io", "exponential backoff",
+    "eventual consistency", "two phase commit", "schema migration",
+    "secret rotation", "least privilege", "incident response", "error budget",
+    "tail latency", "p99 latency", "garbage collection", "thread pool",
+)
+
+
+def _extract_quote_phrase(answer: str) -> str | None:
+    """Pull a short, meaningful phrase from the candidate's OWN answer so the
+    follow-up can reference it (e.g. 'You touched on "the cache TTL"…').
+
+    Strategy, all deterministic & free:
+      1. Prefer a known technical bigram the candidate actually used.
+      2. Otherwise take the first run of >=2 consecutive 'content' words
+         (non-stopword, alphabetic) — that reads like a natural noun phrase.
+      3. Otherwise fall back to the single longest content word.
+    Returns None if nothing worth quoting (so the caller uses a generic ack).
+    """
+    if not answer:
+        return None
+    low = answer.lower()
+
+    for bigram in _NOTABLE_BIGRAMS:
+        if bigram in low:
+            return bigram
+
+    # Tokenize into alphabetic words, preserving order.
+    words = re.findall(r"[a-zA-Z][a-zA-Z\-]+", answer)
+    if not words:
+        return None
+
+    def is_content(w: str) -> bool:
+        return len(w) >= 3 and w.lower() not in _PHRASE_STOPWORDS
+
+    # First run of 2–4 consecutive content words.
+    run: list[str] = []
+    best_run: list[str] = []
+    for w in words:
+        if is_content(w):
+            run.append(w)
+            if len(run) > len(best_run):
+                best_run = run[:4]
+        else:
+            run = []
+    if len(best_run) >= 2:
+        return " ".join(best_run).lower()
+
+    # Single longest content word as a last resort.
+    content_words = [w for w in words if is_content(w)]
+    if content_words:
+        longest = max(content_words, key=len)
+        if len(longest) >= 5:
+            return longest.lower()
+    return None
+
+
+def _prior_interviewer_lines(conversation_tail: list[dict]) -> set[str]:
+    """Normalized set of interviewer lines already spoken this session (from the
+    tail the engine passes) so we don't repeat the exact same question/opener."""
+    seen: set[str] = set()
+    for m in conversation_tail or []:
+        if m.get("role") == "interviewer":
+            seen.add(_normalize(m.get("content", "")))
+    return seen
+
+
+def _last_interviewer_line(conversation_tail: list[dict]) -> str:
+    """Normalized text of the most recent interviewer line, so we can guarantee
+    we never say the exact same thing twice in a row. ``conversation_tail`` is
+    ordered oldest→newest, so we scan from the end."""
+    for m in reversed(conversation_tail or []):
+        if m.get("role") == "interviewer":
+            return _normalize(m.get("content", ""))
+    return ""
+
+
+def _normalize(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip().lower())
+
+
+def _pick_unused(options: list[str], used: set[str], rng: random.Random) -> str:
+    """Choose an option whose normalized form isn't already in `used`. Falls back
+    to any option if all have been used (very long rounds). Records the choice."""
+    if not options:
+        return ""
+    shuffled = options[:]
+    rng.shuffle(shuffled)
+    for opt in shuffled:
+        if _normalize(opt) not in used:
+            used.add(_normalize(opt))
+            return opt
+    choice = shuffled[0]
+    used.add(_normalize(choice))
+    return choice
+
+
+def _compose_ack(phrase: str | None, used: set[str], rng: random.Random) -> str:
+    """Build a varied acknowledgement, quoting the candidate's phrase when we
+    have one. Never reuses an acknowledgement already used this round."""
+    if phrase:
+        templates = [t.format(phrase=phrase) for t in _ACK_WITH_PHRASE]
+        ack = _pick_unused(templates, used, rng)
+        if ack:
+            return ack
+    return _pick_unused(_ACK_GENERIC, used, rng)
+
+
+# ---------------------------------------------------------------------------
 # Main public API
 # ---------------------------------------------------------------------------
 
@@ -321,10 +499,37 @@ def generate_interviewer_reply(
     """
     Generate a natural, context-aware interviewer follow-up.
     100% free — no external LLM or paid API required.
+
+    P2.3 — sounds more human, less robotic:
+      * The opener references the candidate's OWN words (a phrase pulled from
+        their last answer) instead of a canned "good answer".
+      * Acknowledgements + follow-ups are de-duplicated against what's already
+        been said this session (we read the interviewer lines the engine passes
+        in ``conversation_tail``), so long rounds don't repeat themselves.
+      * An occasional light/casual aside is mixed in.
     """
     quality = score_hint.get("quality") or _assess_quality(candidate_answer, question_text)
     company = profile_snapshot.get("current_company") or "your current org"
     role = profile_snapshot.get("target_role") or profile_snapshot.get("experience_level", "mid")
+
+    # Lines already spoken this round → don't repeat openers / questions.
+    used = _prior_interviewer_lines(conversation_tail)
+    last_line = _last_interviewer_line(conversation_tail)
+    # Seed RNG off what's been said so picks vary turn-to-turn but stay free.
+    rng = random.Random()
+    phrase = _extract_quote_phrase(candidate_answer) if quality not in ("skipped",) else None
+
+    def finish(reply: str) -> str:
+        """Guarantee we never (a) return an empty line, or (b) say the exact
+        same thing as the immediately-previous interviewer turn."""
+        text = (reply or "").strip()
+        if not _normalize(text):
+            text = _pick_unused(_GENERIC_FOLLOWUPS, used, rng) or "Got it — let's keep going."
+        if last_line and _normalize(text) == last_line:
+            # Collided with the previous line — append a distinct, unused tail.
+            extra = _pick_unused(_GENERIC_FOLLOWUPS, used, rng)
+            text = f"{text} {extra}".strip() if extra else f"{text} Tell me more."
+        return text
 
     # STAR gap detection for behavioral/HR rounds
     if round_type in ("behavioral", "hr") and candidate_answer and len(candidate_answer) > 40:
@@ -332,55 +537,80 @@ def generate_interviewer_reply(
         missing = [k for k, v in star.items() if not v]
         if quality != "skipped" and len(missing) >= 2:
             if "situation" in missing:
-                return random.choice(_REACTIONS["missing_star_s"])
+                return finish(_pick_unused(_REACTIONS["missing_star_s"], used, rng))
             if "action" in missing:
-                return random.choice(_REACTIONS["missing_star_a"])
+                return finish(_pick_unused(_REACTIONS["missing_star_a"], used, rng))
             if "result" in missing:
-                return random.choice(_REACTIONS["missing_star_r"])
+                return finish(_pick_unused(_REACTIONS["missing_star_r"], used, rng))
 
-    # Base reaction selection
+    # Skipped: short, varied, no quoting.
     if quality == "skipped":
-        return random.choice(_REACTIONS["skipped"])
-    if quality == "strong":
-        base = random.choice(_REACTIONS["strong_streak"] if strong_streak >= 4 else _REACTIONS["strong"])
-    elif quality == "weak":
-        base = random.choice(_REACTIONS["weak"])
-    elif quality == "brief":
-        base = random.choice(_REACTIONS["brief"])
-    else:
-        base = score_hint.get("feedback") or random.choice(_REACTIONS["strong"])
+        return finish(_pick_unused(_REACTIONS["skipped"], used, rng))
 
-    # Topic-specific follow-up (40% chance)
+    # Human acknowledgement that quotes the candidate when possible.
+    ack = _compose_ack(phrase, used, rng)
+
+    # The "push" reaction (deduped) carries the substance of the follow-up.
+    if quality == "strong":
+        reaction = _pick_unused(
+            _REACTIONS["strong_streak"] if strong_streak >= 4 else _REACTIONS["strong"],
+            used, rng,
+        )
+    elif quality == "weak":
+        reaction = _pick_unused(_REACTIONS["weak"], used, rng)
+    elif quality == "brief":
+        reaction = _pick_unused(_REACTIONS["brief"], used, rng)
+    else:
+        reaction = _pick_unused(_REACTIONS["strong"], used, rng)
+
+    # Topic-specific follow-up (40% chance) — replaces the generic reaction tail.
     combined = f"{question_text} {candidate_answer}"
     topic = _detect_topic(combined)
-    if topic and random.random() < 0.40:
-        followup = random.choice(_TOPIC_FOLLOWUPS.get(topic, _GENERIC_FOLLOWUPS))
-        return f"{base} {followup}"
-
-    # Round-type nudges (35% chance)
-    nudges = _ROUND_NUDGES.get(round_type, [])
-    if nudges and random.random() < 0.35:
-        return f"{base} {random.choice(nudges)}"
-
-    # Resume/experience reference
-    if candidate_answer and re.search(r"\b(resume|cv|previous|my experience|i worked at)\b", candidate_answer, re.I):
-        return (
-            f"{base} Your {role} background sounds relevant — "
-            f"how would you apply that on a new team where everything is set up differently?"
+    tail_followup = None
+    if topic and rng.random() < 0.40:
+        tail_followup = _pick_unused(
+            _TOPIC_FOLLOWUPS.get(topic, _GENERIC_FOLLOWUPS), used, rng
         )
+    else:
+        nudges = _ROUND_NUDGES.get(round_type, [])
+        if nudges and rng.random() < 0.35:
+            tail_followup = _pick_unused(nudges, used, rng)
 
-    # Candidate asked a question back
+    # Candidate asked a question back — answer it, then redirect (still human).
     if candidate_answer and candidate_answer.rstrip().endswith("?"):
-        return (
-            "Good question. The short answer is it depends on blast radius and rollback strategy. "
+        flip = (
+            "Good question — it depends on blast radius and rollback strategy. "
             "But let me flip it back: how have you actually made that call before?"
         )
+        return finish(f"{ack} {flip}" if phrase else flip)
 
-    # Company-personalized follow-up (15% chance)
-    if random.random() < 0.15 and company != "your current org":
-        return f"{base} At a company like {company}, what constraints would change your approach?"
+    # Resume/experience reference.
+    if candidate_answer and re.search(r"\b(resume|cv|previous|my experience|i worked at)\b", candidate_answer, re.I):
+        body = (
+            f"Your {role} background sounds relevant — "
+            f"how would you apply that on a new team where everything is set up differently?"
+        )
+        return finish(f"{ack} {body}")
 
-    return f"{base} {random.choice(_GENERIC_FOLLOWUPS)}"
+    # Company-personalized follow-up (15% chance).
+    if rng.random() < 0.15 and company != "your current org":
+        return finish(f"{ack} At a company like {company}, what constraints would change your approach?")
+
+    body = tail_followup or reaction
+    # Occasional casual aside (~18%), but never on a weak answer (stay focused).
+    parts = [ack]
+    aside = ""
+    if quality != "weak" and rng.random() < 0.18:
+        aside = _pick_unused(_CASUAL_ASIDES, used, rng)
+    if aside:
+        # Asides end in a comma/dash, so lowercase the body's first letter for
+        # smoother prose ("Honestly, what breaks first…" not "Honestly, What…").
+        parts.append(aside)
+        if body and body[:1].isupper() and not body.startswith("I "):
+            body = body[:1].lower() + body[1:]
+    parts.append(body)
+    reply = " ".join(p for p in parts if p).strip()
+    return finish(reply)
 
 
 # ---------------------------------------------------------------------------

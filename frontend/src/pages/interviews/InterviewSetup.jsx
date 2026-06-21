@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import api from '../../api/client'
-import { Upload, ChevronRight, ChevronLeft, User, Briefcase, Plus, X } from 'lucide-react'
+import { Upload, ChevronRight, ChevronLeft, User, Briefcase, Plus, X, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { LabelWithHint } from '../../components/FieldHint'
 import { PageHeader } from '../../components/design'
+import ResumeScoreCard from '../../components/interviews/ResumeScoreCard'
 
 const LEVELS = [
   { id: 'junior', label: 'Junior (0–2 yrs)' },
@@ -35,6 +36,8 @@ export default function InterviewSetup() {
   const [voices, setVoices] = useState([])
   const [saving, setSaving] = useState(false)
   const [customTechInput, setCustomTechInput] = useState('')
+  const [resumeScore, setResumeScore] = useState(null)
+  const [scoringResume, setScoringResume] = useState(false)
 
   useEffect(() => {
     api.get('/technologies/').then(r => setTechnologies(r.data || [])).catch(() => {})
@@ -55,8 +58,21 @@ export default function InterviewSetup() {
         voice_id: p.voice_id || f.voice_id,
         round_count: f.round_count,
       }))
+      // Returning users with a saved resume see their score immediately.
+      if (p.has_resume) {
+        interviewsApi.scoreResume({}).then(r => { if (r) setResumeScore(r) }).catch(() => {})
+      }
     }).catch(() => {})
   }, [])
+
+  // Re-score on the final step so the card reflects the chosen technology,
+  // role, and level (all known by then). Cheap, deterministic, no paid API.
+  useEffect(() => {
+    if (step === 2 && (resumeScore || resumeFile || form.target_role || form.primary_technology)) {
+      runResumeScore()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -95,10 +111,31 @@ export default function InterviewSetup() {
     voice_id: form.voice_id || 'indian-female',
   })
 
+  // Score the resume against the chosen technology/role/level. The profile PUT
+  // already returns a fresh resume_score; this is for an explicit re-score
+  // (e.g. the "Score my resume" button) using the latest career inputs.
+  const runResumeScore = async () => {
+    setScoringResume(true)
+    try {
+      const result = await interviewsApi.scoreResume({
+        primary_technology: form.primary_technology || '',
+        target_role: form.target_role || '',
+        experience_level: form.experience_level || 'mid',
+        years_experience: Number(form.years_experience) || 0,
+      })
+      if (result) setResumeScore(result)
+    } catch {
+      /* silentError on the client; leave any prior score in place */
+    } finally {
+      setScoringResume(false)
+    }
+  }
+
   const saveProfile = async () => {
     setSaving(true)
     try {
-      await interviewsApi.updateProfile(profilePayload(), resumeFile)
+      const saved = await interviewsApi.updateProfile(profilePayload(), resumeFile)
+      if (saved && saved.resume_score) setResumeScore(saved.resume_score)
       toast.success('Profile saved')
       return true
     } catch (err) {
@@ -163,7 +200,7 @@ export default function InterviewSetup() {
             <input
               type="file"
               accept=".pdf,.doc,.docx,.txt"
-              onChange={e => setResumeFile(e.target.files?.[0] || null)}
+              onChange={e => { setResumeFile(e.target.files?.[0] || null); setResumeScore(null) }}
               className="text-sm text-surface-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:text-indigo-300"
             />
           </div>
@@ -171,6 +208,20 @@ export default function InterviewSetup() {
             Without a resume we analyze your role, experience level, and technology picks to tailor questions.{' '}
             <a href="/privacy" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">Privacy policy</a>
           </p>
+
+          {(resumeFile || resumeScore) && (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={async () => { if (resumeFile) { await saveProfile() } else { await runResumeScore() } }}
+                disabled={scoringResume || saving}
+                className="btn-secondary text-xs inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Sparkles size={13} /> {resumeScore ? 'Re-score resume' : 'Score my resume'}
+              </button>
+              <ResumeScoreCard score={resumeScore} loading={scoringResume} />
+            </div>
+          )}
           {voices.length > 0 && (
             <label className="block">
               <LabelWithHint
@@ -369,6 +420,15 @@ export default function InterviewSetup() {
             <User size={14} className="inline mr-1" />
             Before each round: enable microphone and camera. Interview exits after 5 minutes if either stays off.
           </div>
+
+          {(resumeScore || scoringResume) && (
+            <div className="pt-2 border-t border-surface-800">
+              <p className="text-xs text-surface-400 mb-2">
+                Resume fit for {form.target_role || 'this role'} — questions and difficulty adapt to your profile.
+              </p>
+              <ResumeScoreCard score={resumeScore} loading={scoringResume} />
+            </div>
+          )}
         </div>
       )}
 

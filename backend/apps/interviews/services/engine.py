@@ -246,7 +246,7 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     )
 
     next_q = None
-    if round_obj.questions_asked < _target_question_count(round_obj):
+    if _should_ask_another(round_obj):
         try:
             next_q = ask_next_question(round_obj)
         except Exception:  # noqa: BLE001
@@ -257,6 +257,7 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         "interviewer_reply": interviewer_msg,
         "score": score_result,
         "next_question": next_q,
+        "skipped": score_result.get("quality") == "skipped",
     }
 
 
@@ -267,6 +268,38 @@ def _target_question_count(round_obj: InterviewRound) -> int:
     if round_obj.round_type == "technical":
         return min(12, base + 2)
     return min(10, base)
+
+
+def _should_ask_another(round_obj: InterviewRound) -> bool:
+    """Skip-on-silence pacing (P2.2).
+
+    The fixed-count cap (`_target_question_count`) is the *baseline* — enough
+    questions to fill a round where the candidate answers fully. But when the
+    candidate keeps skipping (silence → empty answers posted by the client),
+    each question is consumed in seconds, so the baseline count would run out
+    while plenty of clock remains and the round would end early.
+
+    To "use the fixed round time", keep asking past the baseline *as long as
+    there's still meaningful time left on the clock* — capped at a hard ceiling
+    so a runaway can never ask forever. When the round has no ``ends_at`` (e.g.
+    legacy rows), fall back to the static baseline.
+    """
+    baseline = _target_question_count(round_obj)
+    asked = round_obj.questions_asked
+    if asked < baseline:
+        return True
+
+    ends_at = round_obj.ends_at
+    if not ends_at:
+        return False
+
+    seconds_left = (ends_at - timezone.now()).total_seconds()
+    # Stop padding once under a minute remains — no time for another exchange.
+    if seconds_left < 60:
+        return False
+
+    # Hard ceiling: never exceed ~2x the baseline regardless of skips.
+    return asked < baseline * 2
 
 
 def extend_round(round_obj: InterviewRound, minutes: int = 10) -> bool:

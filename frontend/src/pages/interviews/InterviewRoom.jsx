@@ -15,9 +15,16 @@ import InterviewVideoPreview from '../../components/interviews/InterviewVideoPre
 import { PageHeader } from '../../components/design'
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Clock, MessageSquare, Terminal,
-  Volume2, Plus, ExternalLink, Loader2, ArrowLeft, Calendar, X,
+  Volume2, Plus, ExternalLink, Loader2, ArrowLeft, Calendar, X, SkipForward,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+// How long (ms) of continuous silence on an open question before the bot moves
+// on, so the fixed round time covers the planned material (skip-on-silence).
+const SILENCE_SKIP_MS = 20000
+// Mic energy (0–1, same scale as the preflight meter) that counts as "speaking"
+// for barge-in. Above this while the bot is talking → interrupt the bot.
+const BARGE_IN_LEVEL = 0.18
 
 export default function InterviewRoom() {
   const { roundId } = useParams()
@@ -43,17 +50,34 @@ export default function InterviewRoom() {
   const mediaInFlightRef = useRef(null)
   const recorderRef = useRef(null)
   const recChunksRef = useRef([])
+  // Live VAD (barge-in + skip-on-silence) — its own AudioContext so it runs
+  // during the interview, independent of the preflight mic meter.
+  const vadCtxRef = useRef(null)
+  const vadRafRef = useRef(null)
+  // Mutable mirrors of speaking/listening so the VAD rAF loop reads fresh values
+  // without re-subscribing every frame.
+  const isSpeakingRef = useRef(false)
+  const isListeningRef = useRef(false)
+  const bargedInRef = useRef(false)        // guard: only barge in once per utterance
+  const silenceTimerRef = useRef(null)     // skip-on-silence countdown
+  const awaitingAnswerRef = useRef(false)  // true while a question is open
+  const answerRef = useRef('')             // live mirror of the answer box
+  const bargeInHandlerRef = useRef(null)   // latest barge-in action (set below)
   const [mediaStream, setMediaStream] = useState(null)
   const [recordingReady, setRecordingReady] = useState(false)
   const [micLevel, setMicLevel] = useState(0)
-  const { speak, listen, config: voiceConfig, resolveVoiceProfile } = useInterviewVoice()
+  const {
+    speak, listen, stopListening, cancelSpeech,
+    resolveVoiceProfile,
+    isSpeaking, isListening, interimTranscript,
+    browserVoices, selectedVoiceURI, selectVoice,
+  } = useInterviewVoice()
 
   const [round, setRound] = useState(null)
   const [messages, setMessages] = useState([])
   const [answer, setAnswer] = useState('')
   const [micOn, setMicOn] = useState(false)
   const [cameraOn, setCameraOn] = useState(false)
-  const [listening, setListening] = useState(false)
   const [timeLeft, setTimeLeft] = useState(null)
   const [started, setStarted] = useState(false)
   const [practicalMode, setPracticalMode] = useState(false)
@@ -68,6 +92,11 @@ export default function InterviewRoom() {
   const [mediaError, setMediaError] = useState('')
   const [mediaLoading, setMediaLoading] = useState(false)
   const [backgroundId, setBackgroundId] = useState('none')
+
+  // Keep refs in sync so the VAD loop and timers see current speaking/listening.
+  useEffect(() => { isSpeakingRef.current = isSpeaking }, [isSpeaking])
+  useEffect(() => { isListeningRef.current = isListening }, [isListening])
+  useEffect(() => { answerRef.current = answer }, [answer])
 
   const endsAt = round?.ends_at ? new Date(round.ends_at).getTime() : null
 
@@ -99,12 +128,21 @@ export default function InterviewRoom() {
       streamRef.current = null
       setMediaStream(null)
       cancelAnimationFrame(rafRef.current)
+      cancelAnimationFrame(vadRafRef.current)
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
       if (audioCtxRef.current) {
         audioCtxRef.current.close()
         audioCtxRef.current = null
       }
+      if (vadCtxRef.current) {
+        vadCtxRef.current.close()
+        vadCtxRef.current = null
+      }
+      // Stop any in-flight TTS/STT so it doesn't keep running after we leave.
+      cancelSpeech()
+      stopListening()
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!preflight || !micOn || !mediaStream) {
@@ -136,6 +174,53 @@ export default function InterviewRoom() {
       if (ctx) ctx.close()
     }
   }, [preflight, micOn, mediaStream])
+
+  // Live VAD for barge-in: while the interview is running, watch mic energy.
+  // If the candidate starts talking while the bot is speaking, cancel the bot
+  // and start listening (the loop's auto-listen then captures the answer).
+  // Reuses the same AudioContext-analyser technique as the preflight meter.
+  useEffect(() => {
+    if (preflight || !started || observerMode || !micOn || !mediaStream) {
+      cancelAnimationFrame(vadRafRef.current)
+      return
+    }
+    let ctx
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)()
+      vadCtxRef.current = ctx
+      const source = ctx.createMediaStreamSource(mediaStream)
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 256
+      source.connect(analyser)
+      const data = new Uint8Array(analyser.frequencyBinCount)
+      let loudFrames = 0
+      const tick = () => {
+        analyser.getByteFrequencyData(data)
+        const avg = data.reduce((s, v) => s + v, 0) / data.length
+        const level = Math.min(1, avg / 80)
+        // Barge-in: require a few consecutive loud frames to avoid a single
+        // pop/echo cancelling the bot mid-sentence.
+        if (isSpeakingRef.current && !bargedInRef.current && level > BARGE_IN_LEVEL) {
+          loudFrames += 1
+          if (loudFrames >= 3) {
+            bargedInRef.current = true
+            bargeInHandlerRef.current?.()
+          }
+        } else if (level <= BARGE_IN_LEVEL) {
+          loudFrames = 0
+        }
+        vadRafRef.current = requestAnimationFrame(tick)
+      }
+      vadRafRef.current = requestAnimationFrame(tick)
+    } catch {
+      // AudioContext not available — barge-in simply disabled.
+    }
+    return () => {
+      cancelAnimationFrame(vadRafRef.current)
+      if (ctx) ctx.close()
+      vadCtxRef.current = null
+    }
+  }, [preflight, started, observerMode, micOn, mediaStream])
 
   const syncMediaState = (stream) => {
     streamRef.current = stream
@@ -342,29 +427,43 @@ export default function InterviewRoom() {
       setStarted(true)
       // Start recording once the interview is live
       if (streamRef.current) startRecording(streamRef.current)
+      const voiceId = data.persona_voice_id
       const introText = data.intro?.content || ''
-      if (introText) speak(introText, data.persona_voice_id)
-      setTimeout(() => {
-        if (data.first_question?.content) speak(data.first_question.content, data.persona_voice_id)
-        if (data.first_question?.message_type === 'practical') {
-          setPracticalMode(true)
-          if (data.practical_lab_session_id) {
-            setPracticalLab({ session_id: data.practical_lab_session_id, lab_url: `/lab/${data.practical_lab_session_id}` })
-          }
+      const firstQ = data.first_question
+      if (firstQ?.message_type === 'practical') {
+        setPracticalMode(true)
+        if (data.practical_lab_session_id) {
+          setPracticalLab({ session_id: data.practical_lab_session_id, lab_url: `/lab/${data.practical_lab_session_id}` })
         }
-      }, introText.length * 40)
+      }
+      // Speak the intro (no listen), then the first question and auto-open the
+      // mic. speakThenListen awaits TTS completion, so the mic opens exactly
+      // when the bot stops talking — no brittle length*40ms guess.
+      if (introText) await speakThenListen(introText, { autoListen: false, voiceId })
+      if (firstQ?.content) {
+        await speakThenListen(firstQ.content, {
+          autoListen: firstQ.message_type !== 'practical', voiceId,
+        })
+      }
     } catch (e) {
       toast.error(e.response?.data?.error || 'Could not start')
     }
   }
 
+  // text === '' (explicit, e.g. skip-on-silence) submits an empty answer the
+  // engine scores as "skipped" and advances. A null/undefined text falls back
+  // to the typed box and must be non-empty.
   const submitAnswer = async (text) => {
-    const ans = (text || answer).trim()
-    if (!ans) return
+    const isSkip = text === ''
+    const ans = isSkip ? '' : (text ?? answer).trim()
+    if (!isSkip && !ans) return
+    // An answer (or skip) arrived — stop the silence countdown for this turn.
+    clearSilenceTimer()
+    awaitingAnswerRef.current = false
     setAnswer('')
     try {
       const res = await interviewsApi.sendMessage(roundId, ans, {
-        input_type: listening ? 'voice' : 'text',
+        input_type: isListeningRef.current ? 'voice' : 'text',
       })
       setMessages(m => [
         ...m,
@@ -372,29 +471,130 @@ export default function InterviewRoom() {
         res.interviewer_reply,
         ...(res.next_question ? [res.next_question] : []),
       ])
-      speak(res.interviewer_reply.content, round?.persona_voice_id)
-      if (res.next_question?.message_type === 'practical') {
-        setPracticalMode(true)
-        setPracticalLab(null)
-      } else {
-        setPracticalMode(false)
-        setPracticalLab(null)
+      const nextIsPractical = res.next_question?.message_type === 'practical'
+      setPracticalMode(nextIsPractical)
+      setPracticalLab(null)
+      // Speak the interviewer reply, then the next question, then re-open the
+      // mic so the candidate can answer — continuing the hands-free loop.
+      // Practical questions don't auto-listen (the candidate works in the lab).
+      await speakThenListen(res.interviewer_reply?.content, { autoListen: false })
+      if (res.next_question?.content) {
+        await speakThenListen(res.next_question.content, { autoListen: !nextIsPractical })
       }
     } catch {
       toast.error('Could not send answer')
     }
   }
 
+  // Start STT and capture one answer. Passes the live mic stream + correct
+  // options so the recognizer actually receives audio (this was the bug:
+  // listen(profile.locale) sent a string where the hook expects a MediaStream).
+  // listen() resolves with { transcript, filtered_text, ... } — not a string.
   const voiceAnswer = async () => {
-    setListening(true)
+    if (isListening) {
+      // Second click acts as "done" — finalize the current capture.
+      stopListening()
+      return
+    }
+    // If the bot is mid-sentence, stop it first so STT doesn't transcribe TTS.
+    cancelSpeech()
     const profile = resolveVoiceProfile(round?.persona_voice_id)
-    const text = await listen(profile.locale || 'en-IN')
-    setListening(false)
+    // Arm skip-on-silence for THIS listening turn: if no speech arrives within
+    // the window, the timer stops the recognizer and posts an empty (skipped)
+    // answer so the round keeps moving and uses the fixed time.
+    armSilenceSkip()
+    // listen() flips the hook's isListening flag itself; no local state needed.
+    const result = await listen(streamRef.current, {
+      locale: profile.locale || 'en-IN',
+      techPrompt: round?.technology_name || '',
+      onInterim: (txt) => setAnswer(txt),
+    })
+    const text = (result?.transcript || result?.filtered_text || '').trim()
+    // If the silence-skip timer (or a manual skip) already resolved this turn,
+    // awaitingAnswerRef is false — don't submit again, even if late STT text
+    // arrives. This closes the double-submit race.
+    if (!awaitingAnswerRef.current) {
+      setAnswer('')
+      return
+    }
     if (text) {
-      setAnswer(text)
       await submitAnswer(text)
+    } else {
+      // Stopped with nothing captured — clear and wait (no skip was triggered).
+      clearSilenceTimer()
+      setAnswer('')
     }
   }
+
+  // Speak a bot line, then automatically open the mic for the candidate's reply.
+  // This is the heart of the hands-free voice loop.
+  const speakThenListen = async (text, { autoListen = true, voiceId } = {}) => {
+    if (!text) return
+    bargedInRef.current = false
+    await speak(text, voiceId ?? round?.persona_voice_id)
+    // speak() resolves when TTS finishes (or was cancelled). If the candidate
+    // barged in, voiceAnswer() is already listening — don't double-start.
+    if (autoListen && !observerMode && !isListeningRef.current && !bargedInRef.current) {
+      voiceAnswer()
+    }
+  }
+
+  // ---- skip-on-silence -------------------------------------------------
+  const clearSilenceTimer = () => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
+  }
+
+  // Arm a timer: if the candidate produces no speech within the window, submit
+  // an empty answer so the engine marks it "skipped" and moves on, keeping the
+  // round on pace to use the fixed time.
+  const armSilenceSkip = () => {
+    clearSilenceTimer()
+    awaitingAnswerRef.current = true
+    silenceTimerRef.current = setTimeout(() => {
+      // Only skip if they truly stayed silent (no interim text captured yet).
+      if (!awaitingAnswerRef.current) return
+      const captured = (answerRef.current || '').trim()
+      if (captured) return // they're mid-answer — let it finish naturally
+      stopListening()
+      toast('No response — moving on', { icon: '⏭️' })
+      submitAnswer('') // engine treats empty as skipped and advances
+    }, SILENCE_SKIP_MS)
+  }
+
+  const skipQuestion = () => {
+    clearSilenceTimer()
+    stopListening()
+    cancelSpeech()
+    submitAnswer('')
+  }
+
+  // In-room voice switch: persist the choice (handled by the hook) and give a
+  // short spoken preview so the candidate hears the new voice immediately.
+  const changeVoice = (voiceURI) => {
+    cancelSpeech()
+    selectVoice(voiceURI)
+    // Preview only when idle so we don't talk over an open question/answer.
+    if (!isListeningRef.current && !awaitingAnswerRef.current) {
+      // speak() reads the latest selection via a ref, so the preview already
+      // uses the just-picked voice.
+      setTimeout(() => speak("Okay, I'll use this voice from now on.", round?.persona_voice_id), 0)
+    }
+  }
+
+  // Keep the barge-in action pointing at the latest closure. When the VAD
+  // detects the candidate talking over the bot, stop the bot and start
+  // capturing their answer immediately.
+  useEffect(() => {
+    bargeInHandlerRef.current = () => {
+      cancelSpeech()
+      if (!isListeningRef.current) {
+        voiceAnswer() // self-arms skip-on-silence
+      }
+    }
+  }) // eslint-disable-line react-hooks/exhaustive-deps
 
   const startRecording = (stream) => {
     if (!stream || !window.MediaRecorder) return
@@ -431,6 +631,10 @@ export default function InterviewRoom() {
   }
 
   const endInterview = async () => {
+    clearSilenceTimer()
+    awaitingAnswerRef.current = false
+    stopListening()
+    cancelSpeech()
     stopRecording()
     stopMediaStream(streamRef.current)
     streamRef.current = null
@@ -612,6 +816,34 @@ export default function InterviewRoom() {
             </button>
           </div>
         )}
+        {browserVoices.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-surface-400 flex items-center gap-1.5">
+              <Volume2 size={12} className="text-indigo-400" />
+              Interviewer voice — you can also change this during the interview
+            </p>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedVoiceURI}
+                onChange={e => selectVoice(e.target.value)}
+                className="input-field text-xs flex-1"
+              >
+                <option value="">Default ({round.persona_name}'s accent)</option>
+                {browserVoices.map(v => (
+                  <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => speak('Hi, this is how I will sound during your interview.', round.persona_voice_id)}
+                className="btn-secondary text-xs whitespace-nowrap inline-flex items-center gap-1"
+                title="Preview voice"
+              >
+                <Volume2 size={12} /> Test
+              </button>
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
@@ -688,6 +920,23 @@ export default function InterviewRoom() {
           <p className="text-sm font-medium text-white truncate">{round.title}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {browserVoices.length > 0 && (
+            <label className="flex items-center gap-1 text-[10px] text-surface-400" title="Change interviewer voice">
+              <Volume2 size={12} className="text-indigo-400" />
+              <select
+                value={selectedVoiceURI}
+                onChange={e => changeVoice(e.target.value)}
+                className="bg-surface-800 border border-surface-700 rounded text-[11px] text-surface-200 py-1 px-1.5 max-w-[140px]"
+              >
+                <option value="">Default voice</option>
+                {browserVoices.map(v => (
+                  <option key={v.voiceURI} value={v.voiceURI}>
+                    {v.name} ({v.lang})
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <span className="text-sm font-mono text-amber-400 flex items-center gap-1">
             <Clock size={14} /> {fmt(timeLeft)}
           </span>
@@ -805,6 +1054,17 @@ export default function InterviewRoom() {
             </div>
           )}
 
+          {(isListening || isSpeaking) && (
+            <div className="px-3 pt-2 -mb-1">
+              <p className={`text-[10px] flex items-center gap-1.5 ${isSpeaking ? 'text-indigo-300' : 'text-emerald-300'}`}>
+                {isSpeaking ? (
+                  <><Volume2 size={11} /> Interviewer speaking — start talking any time to interrupt</>
+                ) : (
+                  <><span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Listening… {interimTranscript ? `“${interimTranscript.slice(0, 60)}”` : 'speak your answer'}</>
+                )}
+              </p>
+            </div>
+          )}
           <div className="p-3 border-t border-surface-800 flex gap-2">
             <input
               value={answer}
@@ -816,11 +1076,22 @@ export default function InterviewRoom() {
             <button
               type="button"
               onClick={voiceAnswer}
-              disabled={listening}
-              className="btn-secondary px-3"
-              title="Voice answer"
+              className={`px-3 rounded-lg transition-colors ${
+                isListening
+                  ? 'bg-emerald-500/30 text-emerald-200 ring-1 ring-emerald-400 animate-pulse'
+                  : 'btn-secondary'
+              }`}
+              title={isListening ? 'Stop & send (or just stop talking)' : 'Voice answer'}
             >
-              <Mic size={16} />
+              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
+            <button
+              type="button"
+              onClick={skipQuestion}
+              className="btn-secondary px-3"
+              title="Skip this question"
+            >
+              <SkipForward size={16} />
             </button>
             <button type="button" onClick={() => submitAnswer()} className="btn-primary px-4 text-sm">
               Send
