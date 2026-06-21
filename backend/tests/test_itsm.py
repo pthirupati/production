@@ -15,6 +15,7 @@ from django.test import TestCase, override_settings
 from apps.itsm import constants as C
 from apps.itsm.models import ItsmTicket, ItsmWorkNote
 from apps.itsm.services import (
+    ask_assignment_group,
     ensure_scenario_ticket,
     fulfil_sub_ticket,
     open_ticket,
@@ -267,3 +268,135 @@ class ItsmApiTests(TestCase):
         oc = APIClient()
         oc.force_authenticate(other)
         self.assertEqual(oc.get(f"/api/itsm/tickets/{ticket_id}/").status_code, 404)
+
+
+@override_settings(CACHES=_LOCMEM_CACHE)
+class ItsmBotEventNoteTests(TestCase):
+    """The assignment-group bot posts realistic work notes on ticket events."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(username="botuser", email="bot@t.com", password="pass12345")
+        self.tech = Technology.objects.create(name="Linux Bot", icon="terminal")
+        self.scenario = Scenario.objects.create(
+            title="Disk full on /var", slug="itsm-bot-disk", technology=self.tech,
+            description="Extend the LVM volume.", is_active=True, is_free=True,
+            itsm_enabled=True, itsm_ticket_type="incident",
+            itsm_config={"assignment_group": C.TEAM_SERVICE_DESK},
+        )
+        self.session = LabSession.objects.create(user=self.user, scenario=self.scenario, status="RUNNING")
+
+    def _system_notes(self, ticket):
+        return ItsmWorkNote.objects.filter(ticket=ticket, kind=ItsmWorkNote.KIND_SYSTEM)
+
+    def test_bot_acknowledges_on_open(self):
+        ticket, _ = ensure_scenario_ticket(self.user, self.scenario, session=self.session)
+        # A SYSTEM note authored by the assignment group references the ticket number.
+        notes = self._system_notes(ticket)
+        self.assertTrue(notes.exists())
+        ack = notes.first()
+        self.assertEqual(ack.author, "Service Desk")
+        self.assertIn(ticket.number, ack.body)
+        # Author is a bot (no real user) — distinguishes it from operator notes.
+        self.assertIsNone(ack.author_user_id)
+
+    def test_bot_acknowledges_on_transfer(self):
+        ticket, _ = ensure_scenario_ticket(self.user, self.scenario, session=self.session)
+        transfer_ticket(ticket, C.TEAM_STORAGE, user=self.user, reason="needs a disk")
+        ack = self._system_notes(ticket).filter(author="Storage Team").first()
+        self.assertIsNotNone(ack)
+        self.assertIn("received from", ack.body.lower())
+        self.assertIn(ticket.number, ack.body)
+
+    def test_bot_acknowledges_and_signs_off_on_subticket(self):
+        parent, _ = ensure_scenario_ticket(self.user, self.scenario, session=self.session)
+        sub = raise_sub_ticket(parent, user=self.user, action_kind="add_disk", action_params={"size_gb": 50})
+        # The assisting (Storage) team acknowledged the new request on the sub-ticket.
+        ack = self._system_notes(sub).filter(author="Storage Team").first()
+        self.assertIsNotNone(ack)
+        self.assertIn(sub.number, ack.body)
+        # After fulfilment there is a closing sign-off note from the team too.
+        fulfil_sub_ticket(sub)
+        signoffs = self._system_notes(sub).filter(author="Storage Team", body__icontains="work complete")
+        self.assertTrue(signoffs.exists())
+
+    def test_bot_open_note_only_on_parent_not_child(self):
+        # A sub-ticket must NOT get the generic "opened" acknowledgement (it gets the
+        # assisting-team raise acknowledgement instead) — verify exactly one ack body.
+        parent, _ = ensure_scenario_ticket(self.user, self.scenario, session=self.session)
+        sub = raise_sub_ticket(parent, user=self.user, team=C.TEAM_NETWORK, short_description="open a port")
+        opened_acks = self._system_notes(sub).filter(body__icontains="reviewed")
+        self.assertFalse(opened_acks.exists())
+
+
+@override_settings(CACHES=_LOCMEM_CACHE)
+class ItsmAskBotTests(TestCase):
+    """The ask-the-assignment-group flow: comment in → context-aware bot reply out."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(username="askuser", email="ask@t.com", password="pass12345")
+        self.tech = Technology.objects.create(name="Linux Ask", icon="terminal")
+        self.scenario = Scenario.objects.create(
+            title="SSH refused on web-prod", slug="itsm-ssh-refused", technology=self.tech,
+            description="Restore SSH access.", is_active=True, is_free=True, itsm_enabled=True,
+        )
+        self.session = LabSession.objects.create(user=self.user, scenario=self.scenario, status="RUNNING")
+
+    def test_ask_records_comment_and_bot_reply(self):
+        ticket, _ = ensure_scenario_ticket(self.user, self.scenario, session=self.session)
+        out = ask_assignment_group(ticket, "ssh connection refused, what do I check?", user=self.user)
+        # The user's comment landed as a COMMENT authored by the real user.
+        self.assertEqual(out["comment"].kind, ItsmWorkNote.KIND_COMMENT)
+        self.assertEqual(out["comment"].author_user_id, self.user.id)
+        # The bot reply is a SYSTEM note authored by the assignment group, no user.
+        reply = out["reply"]
+        self.assertEqual(reply.kind, ItsmWorkNote.KIND_SYSTEM)
+        self.assertIsNone(reply.author_user_id)
+        # It's scoped to the right intent (SSH) and fronted with the team voice.
+        self.assertEqual(out["intent"], "ssh_refused")
+        self.assertIn(ticket.number, reply.body)
+        self.assertIn("sshd", reply.body.lower())
+
+    def test_ask_bias_uses_team_domain_for_thin_question(self):
+        # A bare question on a Storage ticket should lean toward storage guidance via
+        # the team-domain bias, not a generic fallback.
+        ticket, _ = ensure_scenario_ticket(self.user, self.scenario, session=self.session)
+        transfer_ticket(ticket, C.TEAM_STORAGE, user=self.user)
+        out = ask_assignment_group(ticket, "the disk is full, help", user=self.user)
+        self.assertEqual(out["intent"], "linux_disk_full")
+
+    def test_empty_question_returns_safe_ack(self):
+        ticket, _ = ensure_scenario_ticket(self.user, self.scenario, session=self.session)
+        out = ask_assignment_group(ticket, "   ", user=self.user)
+        self.assertEqual(out["intent"], "empty")
+        self.assertTrue(out["reply"].body.strip())  # never an empty bot note
+
+    def test_ask_endpoint_over_http(self):
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        client.force_authenticate(self.user)
+        res = client.post(f"/api/itsm/scenario/{self.scenario.id}/", {"session_id": str(self.session.id)}, format="json")
+        ticket_id = res.data["ticket"]["id"]
+        ask = client.post(
+            f"/api/itsm/tickets/{ticket_id}/ask/",
+            {"message": "ssh connection refused"}, format="json",
+        )
+        self.assertEqual(ask.status_code, 201)
+        self.assertEqual(ask.data["comment"]["kind"], ItsmWorkNote.KIND_COMMENT)
+        self.assertEqual(ask.data["reply"]["kind"], ItsmWorkNote.KIND_SYSTEM)
+        # The refreshed ticket carries both new notes in its activity stream.
+        bodies = [n["body"] for n in ask.data["ticket"]["notes"]]
+        self.assertIn("ssh connection refused", bodies)
+        self.assertTrue(any("sshd" in b.lower() for b in bodies))
+
+    def test_ask_empty_message_rejected_over_http(self):
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        client.force_authenticate(self.user)
+        res = client.post(f"/api/itsm/scenario/{self.scenario.id}/", {"session_id": str(self.session.id)}, format="json")
+        ticket_id = res.data["ticket"]["id"]
+        bad = client.post(f"/api/itsm/tickets/{ticket_id}/ask/", {"message": "  "}, format="json")
+        self.assertEqual(bad.status_code, 400)

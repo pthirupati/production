@@ -21,8 +21,9 @@ from apps.question_bank.models import Scenario
 
 from . import constants as C
 from .models import ItsmTicket
-from .serializers import meta_payload, serialize_ticket
+from .serializers import meta_payload, serialize_note, serialize_ticket
 from .services import (
+    ask_assignment_group,
     ensure_scenario_ticket,
     fulfil_sub_ticket,
     raise_sub_ticket,
@@ -247,3 +248,34 @@ class ItsmFulfilView(APIView):
         if sub.parent_id:
             payload["parent"] = serialize_ticket(sub.parent, include_notes=True, include_children=True)
         return Response(payload)
+
+
+class ItsmAskBotView(APIView):
+    """POST /api/itsm/tickets/<id>/ask/ — ask the assignment group a question.
+
+    Records the user's message as a comment on the ticket and posts the assigned
+    team's bot reply (free intent engine, scoped to the ticket's team/scenario) to
+    the same activity stream. Returns the refreshed ticket plus the two new notes.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, ticket_id):
+        ticket = _get_user_ticket(request.user, ticket_id)
+        if not ticket:
+            return Response({"error": "Ticket not found"}, status=404)
+        question = (request.data.get("message") or request.data.get("question") or "").strip()
+        if not question:
+            return Response({"error": "message is required"}, status=400)
+        if len(question) > 2000:
+            question = question[:2000]
+        result = ask_assignment_group(ticket, question, user=request.user)
+        ticket.refresh_from_db()
+        return Response(
+            {
+                "comment": serialize_note(result["comment"]),
+                "reply": serialize_note(result["reply"]),
+                "ticket": serialize_ticket(ticket, include_notes=True, include_children=True),
+            },
+            status=201,
+        )

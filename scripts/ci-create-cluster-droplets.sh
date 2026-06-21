@@ -19,7 +19,14 @@
 #   edge_id app_id db_id labs_id
 #   edge_public_ip edge_private_ip app_private_ip db_private_ip labs_private_ip
 #   vpc_id
+#   created_any  — "true" if ANY droplet was freshly created this run, else "false".
+#                  Consumed by the workflow to AUTO-ROTATE secrets on a brand-new
+#                  server (a fresh droplet has no prior secrets to preserve) while
+#                  leaving existing clusters untouched unless rotate_secrets=true.
 set -euo pipefail
+
+# Tracks whether create_droplet() provisioned a brand-new droplet (vs reused one).
+CREATED_ANY="false"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -165,6 +172,9 @@ create_droplet() {
     echo "<${name}_ID>"; return
   fi
   echo "Creating droplet $name ($tag)..." >&2
+  # A freshly created droplet has no pre-existing secrets to preserve — flag it so
+  # the workflow can auto-rotate even when rotate_secrets is left unchecked.
+  CREATED_ANY="true"
   doctl "${args[@]}" >/dev/null
   droplet_id_by_name "$name"
 }
@@ -260,6 +270,9 @@ main() {
   emit_output app_private_ip "$app_private"
   emit_output db_private_ip "$db_private"
   emit_output labs_private_ip "$labs_private"
+  # WIRE_EXISTING discovers droplets and never creates — treat as "not fresh".
+  if _is_true "$WIRE_EXISTING"; then CREATED_ANY="false"; fi
+  emit_output created_any "$CREATED_ANY"
 
   echo "=== cluster create done ==="
 }

@@ -1,0 +1,44 @@
+# FixitLab — Ingress (nginx-ingress). WebSocket-ready (long read/send timeouts +
+# cookie affinity so a WS connection sticks to one backend pod). TLS is issued by
+# cert-manager (letsencrypt-prod ClusterIssuer) — install cert-manager first.
+#
+# The ingress class + some annotations differ between DOKS (nginx-ingress via
+# Helm) and EKS (AWS Load Balancer Controller / nginx). The base uses the
+# portable nginx-ingress annotations; overlays may patch class/annotations.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fixitlab
+  namespace: fixitlab
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "25m"
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "fixitlab-affinity"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["fixitlab.in"]
+      secretName: fixitlab-tls
+  rules:
+    - host: fixitlab.in
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend: { service: { name: backend, port: { number: 8000 } } }
+          - path: /ws
+            pathType: Prefix
+            backend: { service: { name: backend, port: { number: 8000 } } }
+          - path: /admin
+            pathType: Prefix
+            backend: { service: { name: backend, port: { number: 8000 } } }
+          - path: /health
+            pathType: Prefix
+            backend: { service: { name: backend, port: { number: 8000 } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: frontend, port: { number: 80 } } }

@@ -1,0 +1,11 @@
+# FixitLab — Kubernetes namespace (shared by DOKS + EKS).
+# Part of the modular-monolith manifests under infra/k8s. These are SCAFFOLD
+# manifests: nothing in the green four-droplet pipeline applies them. They are
+# applied only by the gated deploy-doks / deploy-eks jobs once cluster
+# credentials exist (see docs/KUBERNETES.md and docs/AWS.md).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fixitlab
+  labels:
+    app.kubernetes.io/part-of: fixitlab

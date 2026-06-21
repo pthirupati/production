@@ -24,6 +24,13 @@
 # Optional    : SENDGRID_API_KEY, CRED_FROM (default no-reply@fixitlab.in),
 #               EDGE_PUBLIC_IP APP_PRIVATE_IP DATA_PRIVATE_IP LABS_PRIVATE_IP,
 #               UPDATED_SECRETS (comma list), CREDENTIALS_EMAIL_REQUIRED
+#               SECRETS_ROTATED   (1/0)   — did this run rotate infra secrets?
+#               GH_SYNC_STATUS    (ok|failed|skipped) — were the rotated secrets
+#                                  written back to GitHub Environment secrets?
+#               VAULT_SYNC_STATUS (ok|failed|skipped) — were the Vault AppRole/
+#                                  unseal secrets synced to GitHub?
+# When secrets were rotated, the body STATES whether the GitHub/Vault sync
+# succeeded so the operator knows if a MANUAL GitHub-secret update is needed.
 set -euo pipefail
 
 DRY_RUN="${DRY_RUN:-0}"
@@ -76,6 +83,43 @@ RABBIT_USER="$(env_val RABBITMQ_USER)"
 RABBIT_PASS="$(env_val RABBITMQ_PASS)"
 VAULT_ADDR_V="$(env_val VAULT_ADDR)"
 
+# ── Build the secret-sync status block ──
+# Tells the operator, in plain language, whether the rotated credentials were
+# persisted back to the GitHub Environment secrets + Vault. If a sync FAILED, the
+# operator must manually update the corresponding GitHub secret (otherwise the
+# next run reuses a stale PRODUCTION_ENV_B64 and admin/login would break).
+SECRETS_ROTATED="${SECRETS_ROTATED:-0}"
+GH_SYNC_STATUS="${GH_SYNC_STATUS:-skipped}"
+VAULT_SYNC_STATUS="${VAULT_SYNC_STATUS:-skipped}"
+
+_sync_line() {  # $1=label $2=status
+  case "$2" in
+    ok|OK|1|true)       echo "  ${1}: SYNCED — GitHub secret updated, no action needed." ;;
+    failed|FAILED|0)    echo "  ${1}: FAILED — UPDATE THIS GITHUB SECRET MANUALLY (value below / attached)." ;;
+    *)                  echo "  ${1}: not applicable this run." ;;
+  esac
+}
+
+SYNC_BLOCK="$(mktemp)"
+{
+  if _is_true "$SECRETS_ROTATED"; then
+    echo "Secret rotation: YES — infra secrets were rotated this run."
+    echo "GitHub / Vault secret sync status:"
+    _sync_line "GitHub Environment secrets (PRODUCTION_ENV_B64 + PROD_*_HOST)" "$GH_SYNC_STATUS"
+    _sync_line "Vault AppRole / unseal secrets" "$VAULT_SYNC_STATUS"
+    if [ "$GH_SYNC_STATUS" = "failed" ] || [ "$VAULT_SYNC_STATUS" = "failed" ]; then
+      echo "  ACTION REQUIRED: a sync failed (usually GH_ADMIN_TOKEN lacks the 'repo'"
+      echo "  scope, HTTP 403). The cluster is running fine on the rotated values, but"
+      echo "  you MUST copy the values from the attached env into the GitHub secrets"
+      echo "  so the NEXT deploy does not reuse stale credentials."
+    fi
+  else
+    echo "Secret rotation: NO — existing secrets were preserved (nothing to sync)."
+  fi
+} > "$SYNC_BLOCK"
+SYNC_STATUS_TEXT="$(cat "$SYNC_BLOCK")"
+rm -f "$SYNC_BLOCK"
+
 # ── Compose the plaintext body ──
 BODY_FILE="$(mktemp)"
 cat > "$BODY_FILE" <<EOF
@@ -101,6 +145,8 @@ Datastores
 
 GitHub secrets updated this run:
   ${UPDATED_SECRETS:-<none reported>}
+
+${SYNC_STATUS_TEXT}
 
 The full .env.production is attached (DO_API_TOKEN and SSH private keys redacted).
 Store this email securely and delete after transferring to your password manager.

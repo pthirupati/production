@@ -122,3 +122,75 @@ class ValidationIntegrityTests(TestCase):
         self.assertTrue(rst.myapp_working)
         self.assertTrue(rst.terraform_fixed)
         self.assertTrue(rst.windows_fixed)
+
+
+class MonitoringScenarioIntegrityTests(TestCase):
+    """Grafana + Prometheus marker scenarios must fail-closed until the config
+    is rewritten with the FIXED-OK sentinel (and never auto-pass)."""
+
+    SAMPLES = [
+        "grafana-datasource-misconfigured-no-data",
+        "grafana-alert-rule-for-too-short",
+        "grafana-contact-point-missing",
+        "grafana-notification-policy-misrouted",
+        "prometheus-target-down-scrape-refused",
+        "prometheus-alertmanager-route-misrouted",
+        "prometheus-high-cardinality-label",
+        "prometheus-recording-rule-parse-error",
+        "prometheus-remote-write-unreachable",
+    ]
+
+    def test_monitoring_presets_break_state_without_marker(self):
+        from apps.labs.provisioner.simulation.scenario_presets import apply_scenario_preset
+        for slug in self.SAMPLES:
+            state = RHELOSState(scenario_slug=slug)
+            state.scenario_slug = slug
+            apply_scenario_preset(slug, state)
+            # The preset must have written *some* broken config that does NOT
+            # already contain the success marker (else Check Solution fail-opens).
+            wrote_marker_free = False
+            for path, node in state.vfs.items():
+                if isinstance(node, dict) and node.get("type") == "file":
+                    content = node.get("content", "")
+                    if "broken configuration" in content:
+                        self.assertNotIn("FIXED-OK", content,
+                                         f"{slug}: broken preset must not contain FIXED-OK")
+                        wrote_marker_free = True
+            self.assertTrue(wrote_marker_free, f"{slug}: preset wrote no broken config file")
+
+    def test_monitoring_fail_closed_then_pass_after_fix(self):
+        """Read each scenario's real check.sh, confirm it fails before the fix
+        and passes once the config carries FIXED-OK."""
+        import os
+        from apps.labs.provisioner.simulation.scenario_presets import apply_scenario_preset
+
+        repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        scen_root = os.path.join(repo_root, "scenarios")
+        for slug in self.SAMPLES:
+            tech = "grafana" if slug.startswith("grafana") else "prometheus"
+            check_path = os.path.join(scen_root, tech, slug, "check.sh")
+            if not os.path.isfile(check_path):
+                self.skipTest(f"scenario file missing: {check_path}")
+            with open(check_path) as fh:
+                script = resolve_simulation_validation_script(slug, fh.read())
+
+            state = RHELOSState(scenario_slug=slug)
+            state.scenario_slug = slug
+            apply_scenario_preset(slug, state)
+
+            ok_before, _ = validate_simulation_state(state, script)
+            self.assertFalse(ok_before, f"{slug}: passed BEFORE the fix (fail-open)")
+
+            # The target file is the one the check.sh greps for FIXED-OK.
+            target = None
+            for line in script.splitlines():
+                s = line.strip()
+                if "grep" in s and "FIXED-OK" in s and not s.startswith("#"):
+                    target = next((p for p in s.split() if p.startswith("/")), None)
+                    break
+            self.assertIsNotNone(target, f"{slug}: could not find FIXED-OK target in check.sh")
+            existing = state.read_file(target) or ""
+            state.write_file(target, existing + "\n# FIXED-OK: corrected per the documented remediation\n")
+
+            ok_after, msg = validate_simulation_state(state, script)
+            self.assertTrue(ok_after, f"{slug}: failed AFTER the fix: {msg}")

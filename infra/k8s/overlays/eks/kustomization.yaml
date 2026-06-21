@@ -1,0 +1,21 @@
+# FixitLab — EKS (AWS) overlay.
+#
+# EKS specifics:
+#   - Ingress: either ingress-nginx (NLB) or the AWS Load Balancer Controller
+#     (ALB). The base uses nginx annotations; if you adopt ALB, patch the
+#     ingressClassName to `alb` and swap annotations here.
+#   - Storage: the EBS CSI driver provides `gp3` StorageClass for PVCs.
+#   - Datastores: prefer RDS (Aurora PostgreSQL) + ElastiCache Redis — point the
+#     ConfigMap hosts at their endpoints (see infra/aws + docs/AWS.md).
+#   - Images: Amazon ECR OR Docker Hub. This scaffold uses Docker Hub to match
+#     the compose pipeline; switch to ECR by re-tagging in the deploy job.
+#
+# Apply:  kubectl apply -k infra/k8s/overlays/eks
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# EKS LoadBalancer/ALB annotations belong on the ingress controller install or a
+# strategic-merge patch here. Base is portable nginx-ingress by default.

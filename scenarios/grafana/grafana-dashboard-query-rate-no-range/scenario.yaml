@@ -1,0 +1,35 @@
+title: Panel rate() without range vector
+slug: grafana-dashboard-query-rate-no-range
+category: Grafana Observability
+description: rate() is used without a [range], producing errors. Use the in-app Grafana simulator to investigate,
+  then apply the documented fix to /etc/grafana/provisioning/dashboards/api-slo.json from the terminal
+  and verify with Check Solution.
+difficulty: medium
+lab_mode: simulation
+simulation_type: grafana
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Open the Grafana simulator from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
+- Diagnose the fault — rate() is used without a [range], producing errors.
+- Edit /etc/grafana/provisioning/dashboards/api-slo.json in the terminal to apply the documented remediation
+- Run Check Solution to confirm the configuration is corrected
+initial_state: rate() is used without a [range], producing errors. The Grafana simulator renders the broken
+  state; the configuration file /etc/grafana/provisioning/dashboards/api-slo.json must be corrected.
+hints:
+- order: 1
+  cost: 10
+  content: Open the Grafana simulator (toolbar -> Open Grafana). Inspect the affected area. rate() is
+    used without a [range], producing errors.
+- order: 2
+  cost: 15
+  content: The root cause is in /etc/grafana/provisioning/dashboards/api-slo.json. Compare it against
+    a known-good Grafana configuration.
+- order: 3
+  cost: 20
+  content: Correct /etc/grafana/provisioning/dashboards/api-slo.json and append the success remediation
+    marker, then run Check Solution. In a real cluster you would reload Grafana (SIGHUP / restart) after
+    editing.

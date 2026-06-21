@@ -18,6 +18,8 @@ UNIFIED_SIM_TYPES = {
     "windows": "Windows Server Simulation",
     "devops": "DevOps / CI-CD Simulation",
     "networking": "Networking / BGP Simulation",
+    "grafana": "Grafana Observability Simulation",
+    "prometheus": "Prometheus Monitoring Simulation",
 }
 
 _LEGACY_MAP = {
@@ -29,6 +31,10 @@ _LEGACY_MAP = {
     "shell_script": "rhel",
     "docker": "generic",
     "k8s": "kubernetes",
+    "monitoring": "grafana",
+    "loki": "grafana",
+    "alertmanager": "prometheus",
+    "promql": "prometheus",
 }
 
 
@@ -56,6 +62,8 @@ def hostname_for_type(sim_type: str, slug: str = "") -> str:
         "windows": "WIN-SRV-SIM",
         "devops": "gitlab-runner",
         "networking": "core-router",
+        "grafana": "grafana-sim",
+        "prometheus": "prometheus-sim",
     }
     if "ansible" in slug:
         return "ansible-control"

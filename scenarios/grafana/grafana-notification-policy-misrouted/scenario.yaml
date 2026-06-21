@@ -1,0 +1,35 @@
+title: Notification policy routes to wrong receiver
+slug: grafana-notification-policy-misrouted
+category: Grafana Observability
+description: Critical alerts route to email instead of the pager. Use the in-app Grafana simulator to
+  investigate, then apply the documented fix to /etc/grafana/provisioning/alerting/policies.yaml from
+  the terminal and verify with Check Solution.
+difficulty: hard
+lab_mode: simulation
+simulation_type: grafana
+jira_priority: High
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Open the Grafana simulator from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
+- Diagnose the fault — Critical alerts route to email instead of the pager.
+- Edit /etc/grafana/provisioning/alerting/policies.yaml in the terminal to apply the documented remediation
+- Run Check Solution to confirm the configuration is corrected
+initial_state: Critical alerts route to email instead of the pager. The Grafana simulator renders the
+  broken state; the configuration file /etc/grafana/provisioning/alerting/policies.yaml must be corrected.
+hints:
+- order: 1
+  cost: 10
+  content: Open the Grafana simulator (toolbar -> Open Grafana). Inspect the affected area. Critical alerts
+    route to email instead of the pager.
+- order: 2
+  cost: 15
+  content: The root cause is in /etc/grafana/provisioning/alerting/policies.yaml. Compare it against a
+    known-good Grafana configuration.
+- order: 3
+  cost: 20
+  content: Correct /etc/grafana/provisioning/alerting/policies.yaml and append the success remediation
+    marker, then run Check Solution. In a real cluster you would reload Grafana (SIGHUP / restart) after
+    editing.

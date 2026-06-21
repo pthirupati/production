@@ -1,0 +1,30 @@
+# FixitLab — non-secret runtime configuration.
+#
+# Datastore HOSTS are intentionally configurable: on DOKS/EKS you typically point
+# these at MANAGED services (DO Managed PostgreSQL / RDS, DO Managed Redis /
+# ElastiCache, CloudAMQP or in-cluster RabbitMQ) rather than in-cluster pods, the
+# same way the four-droplet topology points the app at D3. Override per-cloud via
+# the kustomize overlays in infra/k8s/overlays/{doks,eks}.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fixitlab-config
+  namespace: fixitlab
+data:
+  DJANGO_DEBUG: "false"
+  DJANGO_SETTINGS_MODULE: "config.settings"
+  DJANGO_ALLOWED_HOSTS: "*"
+  # Point at managed services or in-cluster Services as appropriate.
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  # Celery broker/result backend are assembled from these + the secret passwords
+  # by the app entrypoint, mirroring the compose deployment.
+  CELERY_BROKER_HOST: "rabbitmq"
+  CELERY_RESULT_HOST: "redis"
+  # Lab sandboxing: in k8s, labs run as short-lived Jobs/Pods on tainted
+  # lab-runner nodes (NOT docker.sock on the host). LAB_PROVIDER selects the
+  # backend; the kubernetes provider is wired separately (out of scope for this
+  # scaffold — the simulation provider works unchanged in-cluster).
+  LAB_PROVIDER: "simulation"

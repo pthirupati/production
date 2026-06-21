@@ -1,0 +1,36 @@
+title: Dashboard provisioning folder missing
+slug: grafana-dashboard-folder-missing
+category: Grafana Observability
+description: Provisioning points at a folder path that does not exist. Use the in-app Grafana simulator
+  to investigate, then apply the documented fix to /etc/grafana/provisioning/dashboards/dashboards.yaml
+  from the terminal and verify with Check Solution.
+difficulty: easy
+lab_mode: simulation
+simulation_type: grafana
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Open the Grafana simulator from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
+- Diagnose the fault — Provisioning points at a folder path that does not exist.
+- Edit /etc/grafana/provisioning/dashboards/dashboards.yaml in the terminal to apply the documented remediation
+- Run Check Solution to confirm the configuration is corrected
+initial_state: Provisioning points at a folder path that does not exist. The Grafana simulator renders
+  the broken state; the configuration file /etc/grafana/provisioning/dashboards/dashboards.yaml must be
+  corrected.
+hints:
+- order: 1
+  cost: 10
+  content: Open the Grafana simulator (toolbar -> Open Grafana). Inspect the affected area. Provisioning
+    points at a folder path that does not exist.
+- order: 2
+  cost: 15
+  content: The root cause is in /etc/grafana/provisioning/dashboards/dashboards.yaml. Compare it against
+    a known-good Grafana configuration.
+- order: 3
+  cost: 20
+  content: Correct /etc/grafana/provisioning/dashboards/dashboards.yaml and append the success remediation
+    marker, then run Check Solution. In a real cluster you would reload Grafana (SIGHUP / restart) after
+    editing.

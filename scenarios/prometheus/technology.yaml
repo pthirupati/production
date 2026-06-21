@@ -1,0 +1,9 @@
+name: Prometheus Monitoring
+slug: prometheus
+description: Learn Prometheus with an interactive PromQL + targets simulator — scrape configs, exporters (node_exporter/blackbox), recording rules, alerting rules, Alertmanager routing, federation, and remote-write. Troubleshoot "no data", high cardinality, and alert flapping.
+icon: activity
+color: red
+order: 23
+price: 499
+is_active: true
+coming_soon: false

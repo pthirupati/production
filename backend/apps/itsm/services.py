@@ -10,9 +10,24 @@ import random
 from django.db import transaction
 from django.utils import timezone
 
+from . import bot
 from . import constants as C
 from .engine import default_team_for_action, run_team_action
 from .models import ItsmTicket, ItsmWorkNote
+
+
+def _post_bot_note(ticket: ItsmTicket, built: tuple[str, str]) -> None:
+    """Post an assignment-group bot note (author, body) as a SYSTEM work note.
+
+    Fail-safe: the bot is a flourish on top of the real lifecycle note, so a
+    hiccup building it must never break the ticket operation.
+    """
+    try:
+        author, body = built
+        if body:
+            add_note(ticket, body, kind=ItsmWorkNote.KIND_SYSTEM, author=author)
+    except Exception:  # pragma: no cover - bot notes are best-effort
+        pass
 
 
 def _gen_number(ticket_type: str) -> str:
@@ -85,6 +100,11 @@ def open_ticket(
         author=author_user.get_username() if author_user else "System",
         author_user=author_user,
     )
+    # The assigned team's bot acknowledges the new ticket like a real fulfiller.
+    # Skip for sub-tickets — they get their own assisting-team acknowledgement in
+    # raise_sub_ticket so we don't double-post on the child.
+    if parent is None:
+        _post_bot_note(ticket, bot.note_on_open(ticket))
     return ticket
 
 
@@ -205,6 +225,8 @@ def transfer_ticket(ticket: ItsmTicket, new_team: str, *, user=None, reason: str
         ticket, body, kind=ItsmWorkNote.KIND_STATE,
         author=user.get_username() if user else "System", author_user=user,
     )
+    # The receiving team's bot acknowledges the hand-off.
+    _post_bot_note(ticket, bot.note_on_transfer(ticket, prev))
     return ticket
 
 
@@ -253,6 +275,8 @@ def raise_sub_ticket(
         author=user.get_username() if user else "System",
         author_user=user,
     )
+    # The assisting team's bot acknowledges the request it just received.
+    _post_bot_note(sub, bot.note_on_subticket_raised(sub))
     # The parent waits on the assisting team.
     if parent.state in (C.STATE_NEW, C.STATE_IN_PROGRESS):
         parent.state = C.STATE_ON_HOLD
@@ -295,6 +319,8 @@ def fulfil_sub_ticket(sub: ItsmTicket) -> ItsmTicket:
             sub, "Request completed and resolved by the assisting team.",
             kind=ItsmWorkNote.KIND_STATE, author=team,
         )
+        # The assisting team's bot signs off on the resolved request.
+        _post_bot_note(sub, bot.note_on_fulfilled(sub))
         # Notify the parent and bring it back off hold.
         if sub.parent_id:
             parent = sub.parent
@@ -309,3 +335,23 @@ def fulfil_sub_ticket(sub: ItsmTicket) -> ItsmTicket:
                     kind=ItsmWorkNote.KIND_STATE,
                 )
     return sub
+
+
+@transaction.atomic
+def ask_assignment_group(ticket: ItsmTicket, question: str, *, user=None) -> dict:
+    """Record a user's comment on a ticket and post the assignment group's reply.
+
+    The "comment + bot reply" flow: the user's question lands as a COMMENT note and
+    the assigned team's bot answers via the free intent engine (scoped to the
+    ticket's session/scenario/team). Returns {"comment", "reply"} work-note dicts.
+    """
+    text = (question or "").strip()
+    comment = add_note(
+        ticket, text, kind=ItsmWorkNote.KIND_COMMENT,
+        author=user.get_username() if user else "Caller", author_user=user,
+    )
+    answer = bot.answer_question(ticket, text)
+    reply = add_note(
+        ticket, answer["reply"], kind=ItsmWorkNote.KIND_SYSTEM, author=answer["author"],
+    )
+    return {"comment": comment, "reply": reply, "intent": answer.get("intent")}

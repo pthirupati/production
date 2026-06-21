@@ -13,6 +13,9 @@ from .k8s_engine import get_state as k8s_get_state
 from .docker_engine import apply_action as docker_apply_action
 from .docker_engine import drop_session as docker_drop_session
 from .docker_engine import get_state as docker_get_state
+from .monitoring_engine import apply_action as monitoring_apply_action
+from .monitoring_engine import drop_session as monitoring_drop_session
+from .monitoring_engine import get_state as monitoring_get_state
 
 
 def _demo_session_id(user) -> str:
@@ -179,4 +182,78 @@ class DockerSimReleaseView(APIView):
         if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
             return Response({"error": "Session not found"}, status=404)
         docker_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ---------------------------------------------------------------------------
+# Monitoring views (Grafana + Prometheus simulator)
+# ---------------------------------------------------------------------------
+
+def _monitoring_demo_session_id(user) -> str:
+    """Stable sandbox key for the standalone monitoring simulator (no lab session)."""
+    return f"mon-demo-{user.pk}"
+
+
+class MonitoringSimDemoStateView(APIView):
+    """Standalone monitoring sandbox — no LabSession required."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        slug = request.query_params.get("scenario", "") or ""
+        sid = _monitoring_demo_session_id(request.user)
+        return Response(monitoring_get_state(sid, slug))
+
+
+class MonitoringSimDemoActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        sid = _monitoring_demo_session_id(request.user)
+        slug = request.data.get("scenario", "") or request.query_params.get("scenario", "") or ""
+        monitoring_get_state(sid, slug)
+        result = monitoring_apply_action(sid, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": monitoring_get_state(sid, slug)})
+
+
+class MonitoringSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario", "scenario__technology").filter(
+            pk=session_id, user=request.user,
+        ).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(monitoring_get_state(session_id, slug))
+
+
+class MonitoringSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        monitoring_get_state(session_id, slug)
+        result = monitoring_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": monitoring_get_state(session_id, slug)})
+
+
+class MonitoringSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        monitoring_drop_session(session_id)
         return Response({"released": True})

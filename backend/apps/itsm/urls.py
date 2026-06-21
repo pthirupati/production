@@ -3,6 +3,7 @@
 from django.urls import path
 
 from .views import (
+    ItsmAskBotView,
     ItsmFulfilView,
     ItsmMetaView,
     ItsmSubTicketView,
@@ -20,4 +21,5 @@ urlpatterns = [
     path("tickets/<uuid:ticket_id>/transfer/", ItsmTransferView.as_view(), name="itsm-ticket-transfer"),
     path("tickets/<uuid:ticket_id>/sub-tickets/", ItsmSubTicketView.as_view(), name="itsm-sub-ticket"),
     path("tickets/<uuid:ticket_id>/fulfil/", ItsmFulfilView.as_view(), name="itsm-ticket-fulfil"),
+    path("tickets/<uuid:ticket_id>/ask/", ItsmAskBotView.as_view(), name="itsm-ticket-ask"),
 ]

@@ -1,0 +1,58 @@
+# FixitLab — eksctl cluster config (SCAFFOLD; used only by provision-eks.sh when
+# AWS creds + APPLY=1 are present). Mirrors the node-group sizing in
+# infra/terraform/main.tf so either provisioner yields an equivalent cluster.
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: fixitlab-eks
+  region: us-east-1
+  version: "1.29"
+  tags:
+    Project: fixitlab
+    Environment: production
+
+# Dedicated VPC with private + public subnets across 3 AZs (true private nodes).
+vpc:
+  cidr: "10.0.0.0/16"
+  nat:
+    gateway: HighlyAvailable
+  clusterEndpoints:
+    publicAccess: true
+    privateAccess: true
+
+managedNodeGroups:
+  # Application nodes — API, WebSocket, frontend, celery.
+  - name: app
+    instanceType: m5.xlarge
+    minSize: 2
+    maxSize: 50
+    desiredCapacity: 3
+    privateNetworking: true
+    labels: { role: app }
+    volumeSize: 80
+
+  # Lab-runner nodes — larger, spot, tainted so only lab workloads schedule here.
+  - name: lab-runners
+    instanceTypes: ["m5.2xlarge", "m5.xlarge"]
+    spot: true
+    minSize: 2
+    maxSize: 200
+    desiredCapacity: 4
+    privateNetworking: true
+    labels: { role: lab-runner }
+    volumeSize: 120
+    taints:
+      - key: workload
+        value: lab
+        effect: NoSchedule
+
+# Managed add-ons (EBS CSI for PVCs; cluster-autoscaler/HPA installed separately).
+addons:
+  - name: vpc-cni
+  - name: coredns
+  - name: kube-proxy
+  - name: aws-ebs-csi-driver
+
+iam:
+  withOIDC: true

@@ -25,6 +25,8 @@ export const TECH_CATALOG = [
   { name: 'Prompt Engineering', slug: 'prompt-engineering', color: '#9a7bff', tag: 'Free AI course', price: 0, description: 'Master prompting and AI workflows — free course plus a practical terminal.' },
   { name: 'Bare Metal & IPMI', slug: 'baremetal', color: '#feb155', tag: 'Hands-on labs', description: 'Drive servers over IPMI/BMC — power, sensors, boot order, and remote console.' },
   { name: 'GPU & NVIDIA', slug: 'gpu', color: '#b266e0', tag: 'Hands-on labs', description: 'Troubleshoot GPU drivers, CUDA, and accelerated compute environments.' },
+  { name: 'Grafana', slug: 'grafana', color: '#f7913b', tag: 'Hands-on labs', description: 'Operate a Grafana simulator — dashboards, panels, variables, alerting, and contact points.' },
+  { name: 'Prometheus', slug: 'prometheus', color: '#e6522c', tag: 'Hands-on labs', description: 'Query PromQL, debug exporters, recording/alerting rules, and Alertmanager routing.' },
 ]
 
 export function catalogEntryForTech(tech) {

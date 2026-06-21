@@ -15,6 +15,11 @@ from apps.interviews.models import (
 from apps.interviews.services.campaign_builder import unlock_next_round
 from apps.interviews.services.certificate import issue_certificate
 from apps.interviews.services.interview_ai import generate_interviewer_reply
+from apps.interviews.services.question_generator import (
+    generate_question,
+    plan_round_topics,
+    starting_difficulty,
+)
 from apps.interviews.services.question_selector import round_category_mix, select_next_question
 from apps.interviews.services.scoring import aggregate_round_scores, build_strengths_and_improvements, score_answer
 
@@ -43,14 +48,6 @@ INTRO_TEMPLATES = {
         "Tell me about a time you had to push back on a deadline."
     ),
 }
-
-FOLLOWUP_TEMPLATES = [
-    "Interesting — what would you do if that failed at 2 AM and the on-call handbook was outdated?",
-    "Walk me through how you'd validate that in production without causing customer impact.",
-    "What metrics would you watch for the next 24 hours after that change?",
-    "If a junior engineer pushed back on your approach, how would you handle it?",
-    "Where does that sit with your SLA — say 99.9% monthly uptime?",
-]
 
 
 def _profile_for_round(round_obj: InterviewRound) -> dict:
@@ -106,6 +103,24 @@ def start_round(round_obj: InterviewRound) -> dict:
         mark_sample_used(campaign.user)
 
     snap = _profile_for_round(round_obj)
+
+    # Resume/JD analysis drives this round: seed a topic agenda from the resume +
+    # chosen tech, and set a seniority/years-aware starting difficulty. Stored on
+    # the round so every generated question this round pulls from the same plan.
+    # Guarded so a malformed snapshot can never block the start.
+    try:
+        meta = dict(round_obj.metadata or {})
+        if "topic_agenda" not in meta:
+            meta["topic_agenda"] = plan_round_topics(round_obj.round_type, snap)
+        round_obj.metadata = meta
+        seed_difficulty = starting_difficulty(snap)
+        # Deep-dive / leadership push one notch harder than the baseline level.
+        if round_obj.round_type in ("deep_dive", "leadership"):
+            seed_difficulty = min(5, seed_difficulty + 1)
+        round_obj.difficulty_level = seed_difficulty
+        round_obj.save(update_fields=["metadata", "difficulty_level"])
+    except Exception:  # noqa: BLE001 - planning is best-effort, never fatal
+        pass
     # Resolve these defensively: snapshot values can be explicitly None (not just
     # missing), and "None + ' role'" would raise TypeError and 500 the start.
     level = snap.get("experience_level") or "mid"
@@ -135,50 +150,140 @@ def start_round(round_obj: InterviewRound) -> dict:
     return {"message": msg, "ends_at": round_obj.ends_at.isoformat()}
 
 
-def _template_followup(round_obj: InterviewRound, question, score_result: dict) -> str:
-    if score_result.get("quality") == "strong" and round_obj.strong_answers_streak >= 3:
-        return (
-            "Let me push harder — "
-            + (question.follow_ups[0] if question and question.follow_ups else FOLLOWUP_TEMPLATES[0])
+def _last_candidate_answer(round_obj: InterviewRound):
+    """Most recent candidate message + its stored quality (for probing)."""
+    cand = (
+        round_obj.messages.filter(role="candidate")
+        .order_by("-created_at")
+        .first()
+    )
+    if not cand:
+        return "", ""
+    quality = (cand.metadata or {}).get("quality", "") if isinstance(cand.metadata, dict) else ""
+    return cand.content or "", quality
+
+
+def _asked_question_texts(round_obj: InterviewRound) -> list[str]:
+    """Texts the generated question must NOT duplicate. Covers every interviewer
+    question/practical turn already asked this round (both generated and banked),
+    plus the recent conversational follow-up replies — so the next *question*
+    never simply echoes the acknowledgement the engine just spoke."""
+    questions = list(
+        round_obj.messages.filter(
+            role="interviewer", message_type__in=("question", "practical")
+        ).values_list("content", flat=True)
+    )
+    recent_replies = list(
+        round_obj.messages.filter(role="interviewer", message_type="follow_up")
+        .order_by("-created_at")
+        .values_list("content", flat=True)[:3]
+    )
+    return questions + recent_replies
+
+
+def _maybe_supplemental_practical(round_obj, snap, asked_ids, category):
+    """The DB bank is now a SUPPLEMENT, not the driver. Its highest-value use is
+    seeding *practical* (hands-on) questions, because those carry a real
+    ``practical_config`` that powers inline command/code validation (P2.4) — the
+    generator only produces prose questions. So when the round's rotation lands
+    on a practical slot AND the admin has seeded a matching practical question,
+    surface it. If the bank is empty this simply returns None and generation
+    takes over — the interview still runs fully.
+    """
+    if category != "practical":
+        return None
+    try:
+        return select_next_question(
+            round_type=round_obj.round_type,
+            experience_level=snap.get("experience_level", round_obj.campaign.experience_level),
+            technology_id=round_obj.campaign.primary_technology_id,
+            technology_tags=snap.get("secondary_technologies"),
+            difficulty=round_obj.difficulty_level,
+            exclude_ids=asked_ids,
+            category_preference="practical",
+            strong_streak=round_obj.strong_answers_streak,
         )
-    if score_result.get("quality") == "skipped":
-        return "No worries, let's keep moving — " + FOLLOWUP_TEMPLATES[round_obj.questions_asked % len(FOLLOWUP_TEMPLATES)]
-    if question and question.follow_ups:
-        return question.follow_ups[round_obj.questions_asked % len(question.follow_ups)]
-    return FOLLOWUP_TEMPLATES[round_obj.questions_asked % len(FOLLOWUP_TEMPLATES)]
+    except Exception:  # noqa: BLE001 - bank lookup must never break generation
+        return None
 
 
 def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
+    """Ask the next question — DYNAMIC GENERATION FIRST, bank as a supplement.
+
+    The interview is now driven by ``question_generator.generate_question``,
+    which builds the next question from the candidate's last answer (quoting /
+    cross-questioning it), the resume-derived topic agenda, the chosen
+    tech/level, and the running conversation. The curated ``InterviewQuestion``
+    bank is used only as a *seed/supplement* — specifically to surface
+    admin-authored *practical* questions (which carry hands-on validation
+    config). With an empty bank the round still runs entirely on generation.
+    """
     campaign = round_obj.campaign
     snap = _profile_for_round(round_obj)
+    category = round_category_mix(round_obj.round_type, round_obj.questions_asked)
+
+    # SUPPLEMENT: only practical slots may borrow a curated banked question,
+    # because those carry the practical_config the generator can't synthesize.
     asked_ids = list(
         round_obj.messages.filter(question__isnull=False).values_list("question_id", flat=True)
     )
-    category = round_category_mix(round_obj.round_type, round_obj.questions_asked)
-    q = select_next_question(
-        round_type=round_obj.round_type,
-        experience_level=snap.get("experience_level", campaign.experience_level),
-        technology_id=campaign.primary_technology_id,
-        technology_tags=snap.get("secondary_technologies"),
-        difficulty=round_obj.difficulty_level,
-        exclude_ids=asked_ids,
-        category_preference=category,
-        strong_streak=round_obj.strong_answers_streak,
-    )
-    if not q:
-        return None
+    banked = _maybe_supplemental_practical(round_obj, snap, asked_ids, category)
+    if banked is not None and getattr(banked, "category", "") == "practical":
+        content = banked.question_text
+        if banked.practical_config.get("setup"):
+            content = f"{banked.question_text}\n\n{banked.practical_config['setup']}"
+        msg = InterviewMessage.objects.create(
+            round=round_obj,
+            role="interviewer",
+            content=content,
+            message_type="practical",
+            question=banked,
+            metadata={
+                "category": "practical",
+                "practical_config": banked.practical_config,
+                "source": "bank_supplement",
+            },
+        )
+        round_obj.questions_asked += 1
+        round_obj.save(update_fields=["questions_asked"])
+        return msg
 
-    content = q.question_text
-    if q.category == "practical" and q.practical_config.get("setup"):
-        content = f"{q.question_text}\n\n{q.practical_config['setup']}"
+    # PRIMARY: generate the next question dynamically (never returns None).
+    last_answer, last_quality = _last_candidate_answer(round_obj)
+    tail = [
+        {"role": m.role, "content": (m.content or "")[:200]}
+        for m in reversed(list(round_obj.messages.order_by("-created_at")[:8]))
+    ]
+    agenda = (round_obj.metadata or {}).get("topic_agenda") if isinstance(round_obj.metadata, dict) else None
+
+    gen = generate_question(
+        round_type=round_obj.round_type,
+        profile_snapshot=snap,
+        difficulty=round_obj.difficulty_level,
+        questions_asked=round_obj.questions_asked,
+        last_answer=last_answer,
+        last_answer_quality=last_quality,
+        topic_agenda=agenda,
+        asked_texts=_asked_question_texts(round_obj),
+        conversation_tail=tail,
+        strong_streak=round_obj.strong_answers_streak,
+        category_preference=category,
+    )
 
     msg = InterviewMessage.objects.create(
         round=round_obj,
         role="interviewer",
-        content=content,
-        message_type="practical" if q.category == "practical" else "question",
-        question=q,
-        metadata={"category": q.category, "practical_config": q.practical_config},
+        content=gen.text,
+        message_type=gen.message_type,
+        question=None,  # dynamically generated — not a DB bank row
+        metadata={
+            "category": gen.category,
+            "practical_config": gen.practical_config,
+            "topic": gen.topic,
+            "difficulty": gen.difficulty,
+            "kind": gen.kind,
+            "source": "generated",
+        },
     )
     round_obj.questions_asked += 1
     round_obj.save(update_fields=["questions_asked"])
@@ -190,8 +295,14 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     # Tell the scorer which round type this is so behavioral/HR answers are
     # weighted on STAR coverage rather than always defaulting to "technical".
     meta.setdefault("round_type", round_obj.round_type)
+    # The last question asked is now usually a DYNAMICALLY GENERATED message with
+    # no DB ``question`` FK, so match on message_type (question/practical) rather
+    # than on a non-null FK — otherwise we'd score against a stale banked row (or
+    # nothing) and the reply wouldn't reference what was actually just asked.
     last_q_msg = (
-        round_obj.messages.filter(role="interviewer", question__isnull=False)
+        round_obj.messages.filter(
+            role="interviewer", message_type__in=("question", "practical")
+        )
         .order_by("-created_at")
         .first()
     )

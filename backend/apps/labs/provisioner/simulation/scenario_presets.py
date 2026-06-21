@@ -4431,3 +4431,13 @@ _JSM_PRESETS = {
 
 _PRESETS.update(_JSM_PRESETS)
 _PRESETS.update(_XTECH_PRESETS)
+
+# ── Monitoring (Grafana + Prometheus) marker presets (generated) ──
+# Each writes the scenario's config file in a BROKEN state (no FIXED-OK). The
+# e2e fix rewrites it WITH the marker; validation.py's generic `grep -q FIXED-OK`
+# branch reads the real file → fail-closed until the documented fix is applied.
+try:
+    from .monitoring_presets import MONITORING_PRESETS as _MONITORING_PRESETS
+    _PRESETS.update(_MONITORING_PRESETS)
+except Exception:  # pragma: no cover - defensive: never break preset loading
+    pass

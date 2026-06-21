@@ -52,6 +52,23 @@ on:
         options:
           - single
           - four-droplet
+      cloud_provider:
+        description: "Cloud provider (digitalocean = default droplet/DOKS path; aws = SCAFFOLD ONLY, no-op until AWS keys exist)"
+        type: choice
+        required: true
+        default: digitalocean
+        options:
+          - digitalocean
+          - aws
+      hosting_target:
+        description: "Hosting target (droplets = default green path; doks/eks = SCAFFOLD ONLY managed-k8s jobs, no-op until cluster keys exist)"
+        type: choice
+        required: true
+        default: droplets
+        options:
+          - droplets
+          - doks
+          - eks
       wire_existing:
         description: "Four-droplet only: discover existing droplets by tag (fixitlab-edge/app/db/labs) and skip creation"
         type: boolean
@@ -893,6 +910,9 @@ jobs:
       db_private_ip: ${{ steps.create.outputs.db_private_ip }}
       labs_private_ip: ${{ steps.create.outputs.labs_private_ip }}
       updated_secrets: ${{ steps.synced.outputs.updated_secrets }}
+      # Surfaced to the credentials email so it can STATE the sync outcome.
+      secrets_rotated: ${{ steps.secrets.outputs.rotated == 'true' && 'true' || 'false' }}
+      gh_sync_status: ${{ steps.synced.outputs.gh_sync || 'failed' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -933,16 +953,10 @@ jobs:
             echo "::warning::GH_ADMIN_TOKEN cannot write Environment secrets (HTTP 403). The cluster will still deploy with the existing PRODUCTION_ENV_B64, but rotated secrets will NOT be persisted to GitHub. To enable rotation persistence, set GH_ADMIN_TOKEN to a classic PAT with the 'repo' scope."
           fi
 
-      - name: Generate / rotate cluster secrets
-        id: secrets
-        env:
-          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
-          ROTATE_SECRETS: ${{ inputs.rotate_secrets && '1' || '0' }}
-          OUT_FILE: .env.cluster
-        run: |
-          chmod +x scripts/ci-generate-secrets.py
-          python3 scripts/ci-generate-secrets.py --out .env.cluster
-
+      # Droplets are created/discovered FIRST so the secret step below can decide
+      # whether this is a brand-new server. Order is safe: the create script never
+      # reads .env.cluster, and the secrets step never reads droplet IPs (those are
+      # wired in separately by ci-wire-cluster-env.py). Default path is unchanged.
       - name: Create or discover droplets (one VPC + 4 tagged)
         id: create
         env:
@@ -955,6 +969,30 @@ jobs:
         run: |
           chmod +x scripts/ci-create-cluster-droplets.sh
           ./scripts/ci-create-cluster-droplets.sh
+
+      # SECRET ROTATION POLICY (additive, default-safe):
+      #   rotate IFF the operator checked rotate_secrets  OR  a droplet was freshly
+      #   created this run (created_any=true → no prior secrets to preserve).
+      #   Otherwise ROTATE_SECRETS=0 → ci-generate-secrets.py only fills missing /
+      #   placeholder values and PRESERVES every existing secret. The default
+      #   four-droplet relaunch against existing droplets keeps ROTATE_SECRETS=0,
+      #   exactly as today.
+      - name: Generate / rotate cluster secrets
+        id: secrets
+        env:
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+          ROTATE_SECRETS: ${{ (inputs.rotate_secrets || steps.create.outputs.created_any == 'true') && '1' || '0' }}
+          OUT_FILE: .env.cluster
+        run: |
+          if [ "${{ inputs.rotate_secrets }}" = "true" ]; then
+            echo "Rotation reason: rotate_secrets checkbox is ON"
+          elif [ "${{ steps.create.outputs.created_any }}" = "true" ]; then
+            echo "Rotation reason: a droplet was freshly created this run (auto-rotate)"
+          else
+            echo "No rotation: existing droplets + rotate_secrets off — secrets preserved"
+          fi
+          chmod +x scripts/ci-generate-secrets.py
+          python3 scripts/ci-generate-secrets.py --out .env.cluster
 
       - name: Publish edge host + private IPs artifact
         run: |
@@ -1065,7 +1103,14 @@ jobs:
         run: |
           export EDGE_PUBLIC_IP="$(printf '%s' "$EDGE_PUBLIC_IP_B64" | base64 -d)"
           chmod +x scripts/ci-sync-droplet-secrets.sh
-          ./scripts/ci-sync-droplet-secrets.sh
+          # Capture the sync outcome (this step is continue-on-error, but we still
+          # want a precise ok/failed flag for the credentials email sync-status note).
+          if ./scripts/ci-sync-droplet-secrets.sh; then
+            echo "gh_sync=ok" >> "$GITHUB_OUTPUT"
+          else
+            echo "gh_sync=failed" >> "$GITHUB_OUTPUT"
+            echo "::warning::GitHub secret sync failed — rotated secrets NOT persisted. The credentials email will flag a manual update."
+          fi
           echo "updated_secrets=PROD_HOST,PROD_APP_HOST,PROD_DB_HOST,PROD_LABS_HOST,PRODUCTION_ENV_B64,VAULT_ROLE_ID,VAULT_SECRET_ID,VAULT_UNSEAL_KEY,VAULT_ENABLED" >> "$GITHUB_OUTPUT"
 
       - name: Commit cluster.json metadata
@@ -1228,6 +1273,13 @@ jobs:
           # APP/DATA/LABS_PRIVATE_IP come from cluster_ips.env via $GITHUB_ENV.
           UPDATED_SECRETS: ${{ needs.create-cluster.outputs.updated_secrets }}
           CREDENTIALS_EMAIL_REQUIRED: ${{ vars.CREDENTIALS_EMAIL_REQUIRED || '0' }}
+          # Secret rotation + sync status → stated in the email body so the operator
+          # knows whether a manual GitHub-secret update is needed. GH and Vault
+          # AppRole secrets are written by the SAME token via ci-sync-droplet-secrets.sh,
+          # so their persistence succeeds/fails together → both mirror gh_sync_status.
+          SECRETS_ROTATED: ${{ needs.create-cluster.outputs.secrets_rotated == 'true' && '1' || '0' }}
+          GH_SYNC_STATUS: ${{ needs.create-cluster.outputs.secrets_rotated == 'true' && needs.create-cluster.outputs.gh_sync_status || 'skipped' }}
+          VAULT_SYNC_STATUS: ${{ needs.create-cluster.outputs.secrets_rotated == 'true' && needs.create-cluster.outputs.gh_sync_status || 'skipped' }}
         run: |
           # Pull the (DO-token-free) .env.production from the edge node so the
           # attachment matches what is actually deployed; the script strips the
@@ -1412,6 +1464,25 @@ jobs:
         run: |
           echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
           [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
+      # PER-TECHNOLOGY E2E (additive):
+      #   technologies EMPTY (default) → full all-tech sweep, sampled at
+      #     E2E_MAX_PER_TECH=3 per tech so the suite fits the 40m ssh timeout
+      #     (byte-for-byte the current green behaviour).
+      #   technologies SET (e.g. "vmware") → scope to those techs AND remove the
+      #     per-tech cap (E2E_MAX_PER_TECH=0) so EVERY scenario in the selected
+      #     tech is exercised — the fast path for validating one freshly-added
+      #     scenario without running all ~1100. E2E_TECH_FILTER makes the script
+      #     skip every other tech immediately, so this is also much faster.
+      - name: Resolve per-tech E2E scope
+        id: labscope
+        run: |
+          if [ -n "${{ inputs.technologies }}" ]; then
+            echo "max_per_tech=0" >> "$GITHUB_OUTPUT"
+            echo "Per-tech mode: scoping labs E2E to '${{ inputs.technologies }}' (no cap — all scenarios in those techs run; others skipped fast)"
+          else
+            echo "max_per_tech=3" >> "$GITHUB_OUTPUT"
+            echo "All-tech mode: sampling 3 deployable labs per technology"
+          fi
       - name: All-scenarios lab E2E on D2 (labs run on D4 via remote docker)
         uses: appleboy/ssh-action@v1
         with:
@@ -1423,9 +1494,16 @@ jobs:
             set -e
             ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
               cd /opt/fixitlab
+              # When technologies are selected, reseed ONLY those tech folders first
+              # (merge-only, fast — seed_scenarios skips non-matching tech dirs) so a
+              # freshly-added scenario.yaml is present before the lab E2E runs.
+              if [ -n "${{ inputs.technologies }}" ]; then
+                docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
+                  python manage.py seed_scenarios --dir /scenarios --merge-only --technologies "${{ inputs.technologies }}" || true
+              fi
               docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
                 env E2E_SKIP_LAB=0 E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 E2E_PRESERVE_LAB_USERS=1 \
-                E2E_MAX_PER_TECH=3 \
+                E2E_MAX_PER_TECH=${{ steps.labscope.outputs.max_per_tech }} \
                 E2E_TECH_FILTER="${{ inputs.technologies }}" TERMINAL_MAX_WS_PER_USER=64 \
                 python /scripts/e2e_all_scenarios_labs.py
             '
@@ -1513,4 +1591,134 @@ jobs:
             echo "| e2e-api-cluster | \`${{ needs.e2e-api-cluster.result }}\` |"
             echo "| e2e-labs-cluster | \`${{ needs.e2e-labs-cluster.result }}\` |"
             echo "| cleanup-cluster | \`${{ needs.cleanup-cluster.result }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ════════════════════════════════════════════════════════════════════════
+  # MANAGED-KUBERNETES + AWS SCAFFOLD — STANDALONE, GATED, NO-OP WITHOUT KEYS
+  #
+  # These jobs exist so DOKS/EKS can be enabled later WITHOUT touching the green
+  # droplet pipeline. Critical-path safety:
+  #   * They are STANDALONE — NOTHING in the droplets chain `needs` them, and they
+  #     `needs` nothing on the droplets chain. A skipped scaffold job therefore
+  #     cannot transitively skip create-cluster/bootstrap/deploy (the transitive-
+  #     skip trap that bit build-push-images). Gating is purely via `if:`.
+  #   * With the defaults (cloud_provider=digitalocean, hosting_target=droplets)
+  #     every job below is SKIPPED — the pipeline is byte-for-byte unchanged.
+  #   * Even when selected, each job is a no-op until the needed secrets exist:
+  #     it prints what it WOULD do, checks for creds, and exits 0 cleanly.
+  #
+  # Enable: docs/KUBERNETES.md (DOKS) and docs/AWS.md (EKS).
+  # ════════════════════════════════════════════════════════════════════════
+
+  # DOKS — gated on hosting_target == 'doks' (provider stays digitalocean).
+  deploy-doks:
+    name: "[DOKS] Deploy (scaffold)"
+    if: |
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      inputs.hosting_target == 'doks' &&
+      inputs.cloud_provider == 'digitalocean'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Provision DOKS cluster (no-op until DO token + APPLY=1)
+        env:
+          # A DO token is usually available; cluster creation still requires the
+          # explicit APPLY=1 inside the script (left unset here = scaffold/dry).
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+          DO_REGION: ${{ vars.DO_REGION || 'blr1' }}
+        run: |
+          chmod +x infra/k8s/provision-doks.sh
+          infra/k8s/provision-doks.sh
+      - name: Show k8s manifests that WOULD be applied
+        env:
+          # Reuse the Docker Hub image pipeline coordinates when present.
+          IMAGE_TAG: ${{ vars.USE_DOCKERHUB == 'true' && github.sha || 'latest' }}
+          FIXITLAB_IMAGE_NS: ${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME || 'fixitlab' }}
+        run: |
+          echo "Would deploy modular-monolith manifests:"
+          echo "  kustomize image: ${FIXITLAB_IMAGE_NS}/fixitlab-backend:${IMAGE_TAG}"
+          echo "  kustomize image: ${FIXITLAB_IMAGE_NS}/fixitlab-frontend:${IMAGE_TAG}"
+          echo "  kubectl apply -k infra/k8s/overlays/doks"
+          ls -R infra/k8s | sed 's/^/  /'
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## [DOKS] scaffold"
+            echo "Managed-Kubernetes scaffold ran in NO-OP mode (no cluster created without APPLY=1)."
+            echo "Manifests live under \`infra/k8s/\`. See docs/KUBERNETES.md to enable."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # AWS provisioning — gated on cloud_provider == 'aws'. VPC/subnets/EKS via
+  # eksctl or terraform; no-op until AWS creds + APPLY=1.
+  provision-aws:
+    name: "[AWS] Provision VPC/EKS (scaffold)"
+    if: |
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      inputs.cloud_provider == 'aws'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Provision AWS/EKS (no-op until AWS creds + APPLY=1)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          EKS_PROVISIONER: ${{ vars.EKS_PROVISIONER || 'eksctl' }}
+        run: |
+          chmod +x infra/aws/provision-eks.sh
+          infra/aws/provision-eks.sh
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## [AWS] scaffold"
+            echo "AWS provisioning scaffold ran in NO-OP mode (no infra created without AWS creds + APPLY=1)."
+            echo "Stubs live under \`infra/aws/\` + \`infra/terraform/\`. See docs/AWS.md to enable."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # EKS deploy — gated on hosting_target == 'eks' AND cloud_provider == 'aws'.
+  # Deploys the SAME modular-monolith manifests (eks overlay) once the cluster
+  # exists. No-op until AWS creds are present.
+  deploy-eks:
+    name: "[EKS] Deploy (scaffold)"
+    if: |
+      (inputs.action == 'launch' || inputs.action == 'deploy') &&
+      inputs.hosting_target == 'eks' &&
+      inputs.cloud_provider == 'aws'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check AWS creds + show what WOULD deploy
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          IMAGE_TAG: ${{ vars.USE_DOCKERHUB == 'true' && github.sha || 'latest' }}
+          FIXITLAB_IMAGE_NS: ${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME || 'fixitlab' }}
+        run: |
+          if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+            echo "::notice::No AWS credentials — EKS deploy scaffold is a no-op."
+            echo "Would, once the EKS cluster exists:"
+          else
+            echo "AWS credentials present. Would, against the live EKS cluster:"
+          fi
+          echo "  aws eks update-kubeconfig --name fixitlab-eks --region \${AWS_REGION:-us-east-1}"
+          echo "  kustomize image: ${FIXITLAB_IMAGE_NS}/fixitlab-backend:${IMAGE_TAG}"
+          echo "  kustomize image: ${FIXITLAB_IMAGE_NS}/fixitlab-frontend:${IMAGE_TAG}"
+          echo "  kubectl apply -k infra/k8s/overlays/eks"
+          ls -R infra/k8s | sed 's/^/  /'
+          # Intentionally NOT applying — scaffold only. Provision the cluster via
+          # the provision-aws job (cloud_provider=aws) first; real apply lands when
+          # keys exist + the deploy step is wired (see docs/AWS.md).
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## [EKS] scaffold"
+            echo "EKS deploy scaffold ran in NO-OP mode (manifests not applied without keys)."
+            echo "Manifests live under \`infra/k8s/\` (eks overlay). See docs/AWS.md to enable."
           } >> "$GITHUB_STEP_SUMMARY"

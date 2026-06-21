@@ -7,6 +7,11 @@ from .views import (
     K8sSimActionView,
     K8sSimReleaseView,
     K8sSimStateView,
+    MonitoringSimActionView,
+    MonitoringSimDemoActionView,
+    MonitoringSimDemoStateView,
+    MonitoringSimReleaseView,
+    MonitoringSimStateView,
     VMwareSimActionView,
     VMwareSimDemoActionView,
     VMwareSimDemoStateView,
@@ -31,4 +36,11 @@ urlpatterns = [
     path("docker/sessions/<uuid:session_id>/", DockerSimStateView.as_view(), name="docker-sim-state"),
     path("docker/sessions/<uuid:session_id>/action/", DockerSimActionView.as_view(), name="docker-sim-action"),
     path("docker/sessions/<uuid:session_id>/release/", DockerSimReleaseView.as_view(), name="docker-sim-release"),
+
+    # Monitoring simulation (Grafana + Prometheus)
+    path("monitoring/demo/", MonitoringSimDemoStateView.as_view(), name="monitoring-sim-demo-state"),
+    path("monitoring/demo/action/", MonitoringSimDemoActionView.as_view(), name="monitoring-sim-demo-action"),
+    path("monitoring/sessions/<uuid:session_id>/", MonitoringSimStateView.as_view(), name="monitoring-sim-state"),
+    path("monitoring/sessions/<uuid:session_id>/action/", MonitoringSimActionView.as_view(), name="monitoring-sim-action"),
+    path("monitoring/sessions/<uuid:session_id>/release/", MonitoringSimReleaseView.as_view(), name="monitoring-sim-release"),
 ]

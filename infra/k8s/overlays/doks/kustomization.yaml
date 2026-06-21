@@ -1,0 +1,22 @@
+# FixitLab — DOKS (DigitalOcean Kubernetes) overlay.
+#
+# DOKS specifics:
+#   - Ingress: install ingress-nginx via Helm; DO provisions a LoadBalancer.
+#   - Storage: use the `do-block-storage` StorageClass for any PVCs.
+#   - Datastores: prefer DO Managed PostgreSQL + DO Managed Redis (point the
+#     ConfigMap hosts at the managed cluster's private hostnames). RabbitMQ can
+#     run in-cluster or via CloudAMQP.
+#   - Images: DigitalOcean Container Registry OR Docker Hub (this scaffold uses
+#     Docker Hub, matching the compose pipeline).
+#
+# Apply:  kubectl apply -k infra/k8s/overlays/doks
+# (Set images first via the deploy job or `kustomize edit set image ...`.)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# Example: pin the DOKS LoadBalancer annotations on the ingress controller via
+# Helm values, not here. This overlay is intentionally thin — the base is
+# already DOKS-compatible.

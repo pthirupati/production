@@ -24,12 +24,36 @@ GitHub → Actions → **FixitLab Production** → Run workflow:
 - **topology**: `four-droplet`.
 - **create_server**: ignored by the four-droplet path (cluster always creates/discovers its own droplets).
 - **wire_existing**: `true` to reuse droplets already tagged `fixitlab-edge/app/db/labs` (skips creation).
-- **rotate_secrets**: `true` to rotate infra secrets this run (Django/DB/Redis/Rabbit/JWT/admin/webhooks). Never rotates the DO API token or SSH key.
-- **credentials_email**: recipient for the post-deploy credential bundle (default `thirupathi.samu2018@gmail.com`).
+- **rotate_secrets**: `true` to rotate infra secrets this run (Django/DB/Redis/Rabbit/JWT/admin/webhooks). Never rotates the DO API token or SSH key. **Auto-applies on a freshly-created droplet** even when left `false` (a brand-new server has no prior secrets to preserve); existing clusters are preserved unless you check this.
+- **credentials_email**: recipient for the post-deploy credential bundle (default `thirupathi.samu2018@gmail.com`). When secrets were rotated, the email **states whether the GitHub/Vault secret sync succeeded or failed**, so you know if a manual GitHub-secret update is needed.
+- **cloud_provider** / **hosting_target**: default `digitalocean` / `droplets` (this runbook). `doks`/`eks`/`aws` enable the managed-Kubernetes **scaffold** — see [KUBERNETES.md](./KUBERNETES.md) and [AWS.md](./AWS.md). They are no-ops until cluster credentials exist and never affect the droplet path.
 - **build_scenarios**, **run_e2e**, **git_ref**, **technologies**, **skip_email**: same meaning as single-host.
 
 When **topology = single** (the default) the pipeline behaves exactly as before —
 the four-droplet jobs are skipped.
+
+### Testing a single technology's labs (fast path)
+
+After adding or editing a scenario in one technology, you don't need to re-run
+the whole ~1100-scenario lab sweep. Set the **technologies** input to the
+comma-separated tech slug(s), e.g. `vmware` (or `vmware,linux-administration`):
+
+- The labs E2E (`e2e-labs-cluster` / single-host `e2e-labs`) **scopes to those
+  techs** — `E2E_TECH_FILTER` makes it skip every other technology immediately.
+- For the selected tech(s) the per-tech sample cap is **removed**
+  (`E2E_MAX_PER_TECH=0`), so **every** scenario in that tech is exercised — your
+  newly-added scenario actually runs, instead of being one of a 3-scenario
+  sample.
+- The selected tech is also **reseeded first** (`seed_scenarios --merge-only
+  --technologies <slugs>`) so a freshly-added `scenario.yaml` is present before
+  the run.
+
+Leave **technologies** empty for the full all-tech sweep (sampled 3/tech on the
+four-droplet path to fit the SSH timeout) — the default, unchanged behaviour.
+
+> A real checkbox-style multi-select for technologies belongs in the **admin
+> panel**, not here: GitHub `workflow_dispatch` inputs cannot render checkboxes,
+> so the comma-separated string input is the supported mechanism.
 
 ## Job graph (four-droplet)
 

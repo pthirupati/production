@@ -262,6 +262,9 @@ def main() -> int:
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
             fh.write(f"out_file={out_path}\n")
             fh.write(f"rotated_keys={','.join(rotated)}\n")
+            # Boolean flag (true iff any secret was actually rotated) so the
+            # workflow can drive the credentials-email sync-status note.
+            fh.write(f"rotated={'true' if rotated else 'false'}\n")
 
     return 0
 

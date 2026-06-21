@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Ticket, ArrowRightLeft, GitBranch, Clock, AlertTriangle,
-  CheckCircle2, ChevronRight, Plus, Loader2, Send,
+  CheckCircle2, ChevronRight, Plus, Loader2, Send, MessageSquare,
 } from 'lucide-react'
+import api from '../../api/client'
 
 // ── ServiceNow-style helpers ──────────────────────────────────────────────────
 const STATE_STYLE = {
@@ -137,12 +138,34 @@ export default function ItsmTicketPanel({
 }) {
   const [showRaise, setShowRaise] = useState(false)
   const [showTransfer, setShowTransfer] = useState(false)
+  // The "ask the assignment group" flow posts a comment + bot reply and gets the
+  // refreshed ticket back. The parent (LabRunner) owns ticket state for state/
+  // transfer/sub-ticket actions, but the ask endpoint isn't wired through it — so
+  // we hold the asked-refreshed ticket locally and let any parent-driven refresh
+  // (new updated_at / id) supersede it.
+  const [askedTicket, setAskedTicket] = useState(null)
+  const [asking, setAsking] = useState(false)
+  useEffect(() => {
+    setAskedTicket(null) // a fresh ticket from the parent wins over a local ask refresh
+  }, [ticket?.id, ticket?.updated_at])
 
   if (!ticket) return null
 
+  const view = askedTicket && askedTicket.id === ticket.id ? askedTicket : ticket
   const actions = meta?.actions || []
   const teams = meta?.teams || []
   const closeCodes = meta?.close_codes || []
+
+  const handleAsk = async (message) => {
+    if (!ticket?.id || !message.trim()) return
+    setAsking(true)
+    try {
+      const res = await api.post(`/itsm/tickets/${ticket.id}/ask/`, { message })
+      if (res.data?.ticket) setAskedTicket(res.data.ticket)
+    } finally {
+      setAsking(false)
+    }
+  }
 
   return (
     <div id="itsm-ticket-panel" className="fx-panel border-accent-cyan/20 p-3 space-y-3">
@@ -151,37 +174,37 @@ export default function ItsmTicketPanel({
         <Ticket size={16} className="text-accent-cyan mt-0.5 shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-semibold ${TYPE_BADGE[ticket.ticket_type] || TYPE_BADGE.incident}`}>
-              {ticket.ticket_type_label}
+            <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-semibold ${TYPE_BADGE[view.ticket_type] || TYPE_BADGE.incident}`}>
+              {view.ticket_type_label}
             </span>
-            <span className="font-mono text-xs text-surface-200">{ticket.number}</span>
+            <span className="font-mono text-xs text-surface-200">{view.number}</span>
           </div>
-          <p className="text-sm text-surface-100 font-medium mt-1 leading-snug">{ticket.short_description}</p>
+          <p className="text-sm text-surface-100 font-medium mt-1 leading-snug">{view.short_description}</p>
         </div>
       </div>
 
       {/* Meta row */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <StateLozenge state={ticket.state} label={ticket.state_label} />
-        <span className={`text-[11px] font-semibold ${PRIORITY_STYLE[ticket.priority] || PRIORITY_STYLE['3']}`}>
-          {ticket.priority_label}
+        <StateLozenge state={view.state} label={view.state_label} />
+        <span className={`text-[11px] font-semibold ${PRIORITY_STYLE[view.priority] || PRIORITY_STYLE['3']}`}>
+          {view.priority_label}
         </span>
-        <SlaBadge ticket={ticket} />
+        <SlaBadge ticket={view} />
       </div>
       <div className="text-[11px] text-surface-400">
-        Assignment group: <span className="text-surface-200 font-medium">{ticket.assignment_group_label}</span>
+        Assignment group: <span className="text-surface-200 font-medium">{view.assignment_group_label}</span>
       </div>
 
-      {ticket.description && (
+      {view.description && (
         <div className="text-[11px] text-surface-400 bg-surface-950 border border-surface-800 rounded p-2.5 max-h-32 overflow-y-auto leading-relaxed whitespace-pre-wrap">
-          {renderInline(ticket.description)}
+          {renderInline(view.description)}
         </div>
       )}
 
       {/* State transitions */}
-      {!ticket.is_closed && ticket.allowed_transitions?.length > 0 && (
+      {!view.is_closed && view.allowed_transitions?.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {ticket.allowed_transitions.map((st) => {
+          {view.allowed_transitions.map((st) => {
             const label = (meta?.states || []).find((s) => s.value === st)?.label || st
             const isResolve = st === 'resolved' || st === 'closed'
             return (
@@ -208,17 +231,17 @@ export default function ItsmTicketPanel({
       )}
 
       {/* Sub-tickets */}
-      {ticket.children?.length > 0 && (
+      {view.children?.length > 0 && (
         <div className="space-y-2">
           <p className="text-[10px] uppercase tracking-wide text-surface-500 flex items-center gap-1">
-            <GitBranch size={11} /> Sub-tickets ({ticket.children.length})
+            <GitBranch size={11} /> Sub-tickets ({view.children.length})
           </p>
-          {ticket.children.map((sub) => <SubTicketRow key={sub.id} sub={sub} />)}
+          {view.children.map((sub) => <SubTicketRow key={sub.id} sub={sub} />)}
         </div>
       )}
 
       {/* Action buttons */}
-      {!ticket.is_closed && (
+      {!view.is_closed && (
         <div className="flex flex-wrap gap-2 pt-1">
           <button
             type="button"
@@ -253,7 +276,7 @@ export default function ItsmTicketPanel({
       {showTransfer && (
         <TransferForm
           teams={teams}
-          current={ticket.assignment_group}
+          current={view.assignment_group}
           busy={busy}
           onSubmit={async (team, reason) => {
             await onTransfer?.(team, reason)
@@ -263,13 +286,57 @@ export default function ItsmTicketPanel({
       )}
 
       {/* Activity stream */}
-      {ticket.notes?.length > 0 && (
+      {view.notes?.length > 0 && (
         <div className="pt-2 border-t border-white/[0.06]">
           <p className="text-[10px] uppercase tracking-wide text-surface-500 mb-2">Activity</p>
-          <ActivityStream notes={ticket.notes} />
+          <ActivityStream notes={view.notes} />
         </div>
       )}
+
+      {/* Ask the assignment group — comment + bot reply on the ticket */}
+      <AskAssignmentGroup
+        teamLabel={view.assignment_group_label}
+        busy={asking}
+        onAsk={handleAsk}
+      />
     </div>
+  )
+}
+
+function AskAssignmentGroup({ teamLabel, busy, onAsk }) {
+  const [message, setMessage] = useState('')
+  const submit = async (e) => {
+    e.preventDefault()
+    const text = message.trim()
+    if (!text) return
+    await onAsk?.(text)
+    setMessage('') // the reply lands in the activity stream above
+  }
+  return (
+    <form onSubmit={submit} className="pt-2 border-t border-white/[0.06] space-y-1.5">
+      <p className="text-[10px] uppercase tracking-wide text-surface-500 flex items-center gap-1">
+        <MessageSquare size={11} /> Ask {teamLabel || 'the assignment group'}
+      </p>
+      <div className="flex items-start gap-1.5">
+        <textarea
+          rows={2}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(e) }
+          }}
+          placeholder="Add a comment or ask a question on this ticket…"
+          className="input-field flex-1 text-xs py-1.5 resize-none"
+        />
+        <button
+          type="submit"
+          disabled={busy || !message.trim()}
+          className="btn-primary px-2.5 py-1.5 text-xs disabled:opacity-50 inline-flex items-center gap-1 shrink-0"
+        >
+          {busy ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+        </button>
+      </div>
+    </form>
   )
 }
 

@@ -19,6 +19,7 @@ import JiraTicketLink from '../components/JiraTicketLink'
 import LabTerminal from '../components/LabTerminal'
 import CodingIDE from '../components/ide/CodingIDE'
 import PromptPlayground from '../components/promptlab/PromptPlayground'
+import MonitoringSimulator from '../components/monitoring/MonitoringSimulator'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
@@ -114,6 +115,8 @@ export default function LabRunner() {
   const [closingIn, setClosingIn] = useState(null)
   const [terminalHost, setTerminalHost] = useState('primary')
   const [showSimWizard, setShowSimWizard] = useState(false)
+  // Grafana/Prometheus simulator overlay (opened from the lab toolbar button).
+  const [showMonitoringSim, setShowMonitoringSim] = useState(false)
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
@@ -887,6 +890,14 @@ export default function LabRunner() {
     scenario?.technology?.slug === 'vmware'
     || scenario?.simulation_type === 'vmware'
   )
+  // Monitoring labs (Grafana + Prometheus) open the in-app observability
+  // simulator inline (login gate → dashboards/panels/alerts + PromQL), the same
+  // way prompt/coding labs open their own surface. No dedicated route needed.
+  const monitoringSimType = ['grafana', 'prometheus', 'monitoring'].includes(scenario?.simulation_type)
+  const monitoringTech = ['grafana', 'prometheus'].includes(scenario?.technology?.slug)
+  const isMonitoringLab = !isCrossTech && (monitoringSimType || monitoringTech)
+  const monitoringFlavor = (scenario?.simulation_type === 'prometheus' || scenario?.technology?.slug === 'prometheus')
+    ? 'prometheus' : 'grafana'
   // coding_mode scenarios open a browser surface instead of a terminal. Prompt
   // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
   // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
@@ -1500,6 +1511,19 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open VMware (same server)
             </Link>
           )}
+          {isMonitoringLab && (
+            <button
+              type="button"
+              onClick={() => setShowMonitoringSim(true)}
+              title="Open the in-app Grafana + Prometheus simulator to investigate dashboards, panels, targets, alert rules, and run PromQL. Apply the fix in the terminal, then Check Solution."
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: `${monitoringFlavor === 'prometheus' ? '#e6522c' : '#f7913b'}66`,
+                       color: monitoringFlavor === 'prometheus' ? '#e6522c' : '#f7913b',
+                       background: `${monitoringFlavor === 'prometheus' ? '#e6522c' : '#f7913b'}1a` }}
+            >
+              <ExternalLink size={12} /> Open {monitoringFlavor === 'prometheus' ? 'Prometheus' : 'Grafana'}
+            </button>
+          )}
           {isSimulationLab && (
             <>
               <SimLabQuickActions
@@ -1757,6 +1781,25 @@ export default function LabRunner() {
           labHosts={labHosts}
           onSendCommand={sendSimCommand}
         />
+      )}
+
+      {/* Grafana / Prometheus simulator — full-screen overlay opened from the
+          toolbar. The learner inspects dashboards/panels/targets/alerts + runs
+          PromQL here, applies the documented config fix in the terminal, then
+          runs Check Solution (which grades via check.sh, never auto-passes). */}
+      {isMonitoringLab && showMonitoringSim && (
+        <div className="fixed inset-0 z-[60] bg-surface-950">
+          <button
+            type="button"
+            onClick={() => setShowMonitoringSim(false)}
+            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
+          >
+            <XCircle size={14} /> Close simulator
+          </button>
+          <div className="h-full overflow-auto">
+            <MonitoringSimulator sessionId={sessionId} scenario={scenario} flavor={monitoringFlavor} />
+          </div>
+        </div>
       )}
 
       {/* Keyboard shortcuts help */}

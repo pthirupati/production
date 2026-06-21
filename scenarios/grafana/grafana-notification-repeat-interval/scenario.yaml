@@ -1,0 +1,35 @@
+title: Repeat interval too long
+slug: grafana-notification-repeat-interval
+category: Grafana Observability
+description: repeat_interval of 30d means ongoing incidents stop re-paging. Use the in-app Grafana simulator
+  to investigate, then apply the documented fix to /etc/grafana/provisioning/alerting/policies.yaml from
+  the terminal and verify with Check Solution.
+difficulty: easy
+lab_mode: simulation
+simulation_type: grafana
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Open the Grafana simulator from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
+- Diagnose the fault — repeat_interval of 30d means ongoing incidents stop re-paging.
+- Edit /etc/grafana/provisioning/alerting/policies.yaml in the terminal to apply the documented remediation
+- Run Check Solution to confirm the configuration is corrected
+initial_state: repeat_interval of 30d means ongoing incidents stop re-paging. The Grafana simulator renders
+  the broken state; the configuration file /etc/grafana/provisioning/alerting/policies.yaml must be corrected.
+hints:
+- order: 1
+  cost: 10
+  content: Open the Grafana simulator (toolbar -> Open Grafana). Inspect the affected area. repeat_interval
+    of 30d means ongoing incidents stop re-paging.
+- order: 2
+  cost: 15
+  content: The root cause is in /etc/grafana/provisioning/alerting/policies.yaml. Compare it against a
+    known-good Grafana configuration.
+- order: 3
+  cost: 20
+  content: Correct /etc/grafana/provisioning/alerting/policies.yaml and append the success remediation
+    marker, then run Check Solution. In a real cluster you would reload Grafana (SIGHUP / restart) after
+    editing.

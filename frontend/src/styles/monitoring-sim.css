@@ -1,0 +1,98 @@
+/* Grafana + Prometheus simulator chrome. Dark, dense, observability-tool look.
+   Scoped under .mon-sim so it never leaks into the rest of the app. */
+
+.mon-sim {
+  --mon-bg: #0b0c1e;
+  --mon-panel: #141729;
+  --mon-panel-2: #181b30;
+  --mon-border: #262a45;
+  --mon-text: #d8def0;
+  --mon-muted: #8a93b2;
+  --mon-grafana: #f7913b;
+  --mon-prom: #e6522c;
+  --mon-green: #56e0b0;
+  --mon-red: #ff6b6b;
+  --mon-yellow: #f5c451;
+  color: var(--mon-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.mon-input {
+  background: #0d1024;
+  border: 1px solid var(--mon-border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  color: var(--mon-text);
+  font-size: 0.85rem;
+  outline: none;
+}
+.mon-input:focus { border-color: #4c6fff; box-shadow: 0 0 0 2px #4c6fff33; }
+
+.mon-btn, .mon-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 6px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s, background 0.12s;
+  border: 1px solid var(--mon-border);
+  background: #1c2138;
+  color: var(--mon-text);
+}
+.mon-btn:hover { background: #232a46; }
+.mon-btn-primary { border: none; color: #1a1206; }
+.mon-btn-primary:hover { filter: brightness(1.08); }
+.mon-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.mon-shell { background: var(--mon-bg); min-height: 100%; }
+.mon-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.55rem 1rem; background: #0d1024; border-bottom: 1px solid var(--mon-border);
+}
+.mon-tab {
+  padding: 0.4rem 0.85rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer;
+  color: var(--mon-muted); border: 1px solid transparent; white-space: nowrap;
+}
+.mon-tab:hover { color: var(--mon-text); background: #161a30; }
+.mon-tab-active { color: var(--mon-text); background: #1c2138; border-color: var(--mon-border); }
+
+.mon-card {
+  background: var(--mon-panel); border: 1px solid var(--mon-border);
+  border-radius: 8px; padding: 0.85rem 1rem;
+}
+.mon-panel-title { font-size: 0.8rem; font-weight: 600; color: var(--mon-text); }
+.mon-panel-sub { font-size: 0.7rem; color: var(--mon-muted); }
+
+.mon-stat { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; }
+
+.mon-badge {
+  display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.68rem;
+  font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 999px;
+}
+.mon-badge-up { background: rgba(86,224,176,.15); color: var(--mon-green); }
+.mon-badge-down { background: rgba(255,107,107,.15); color: var(--mon-red); }
+.mon-badge-warn { background: rgba(245,196,81,.15); color: var(--mon-yellow); }
+
+.mon-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.mon-table th {
+  text-align: left; color: var(--mon-muted); font-weight: 600; padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--mon-border); position: sticky; top: 0; background: var(--mon-panel);
+}
+.mon-table td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #1c2038; }
+.mon-table tr:hover td { background: #161a30; }
+
+.mon-code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.78rem;
+  background: #0d1024; border: 1px solid var(--mon-border); border-radius: 6px;
+  padding: 0.55rem 0.7rem; color: #c9d4f0; white-space: pre-wrap; word-break: break-word;
+}
+
+.mon-banner {
+  display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8rem;
+  padding: 0.6rem 0.85rem; border-radius: 8px; margin-bottom: 0.85rem;
+  background: rgba(245,196,81,.1); border: 1px solid rgba(245,196,81,.3); color: #f5d98a;
+}
+.mon-banner-err { background: rgba(255,107,107,.1); border-color: rgba(255,107,107,.3); color: #ffb4b4; }

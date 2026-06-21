@@ -1,0 +1,9 @@
+name: Grafana Observability
+slug: grafana
+description: Master Grafana with a full in-app simulator — dashboards, panels, template variables, alert rules, contact points, notification policies, and datasources. Diagnose "No data" panels, broken queries, misrouted alerts, and provisioning drift.
+icon: activity
+color: orange
+order: 22
+price: 499
+is_active: true
+coming_soon: false

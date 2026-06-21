@@ -1,0 +1,34 @@
+title: Alert flapping — for clause missing
+slug: prometheus-alert-for-flapping
+category: Prometheus Observability
+description: Alert has no 'for', so it flaps on transient spikes. Use the in-app Prometheus simulator
+  to investigate, then apply the documented fix to /etc/prometheus/rules/alerts.yml from the terminal
+  and verify with Check Solution.
+difficulty: medium
+lab_mode: simulation
+simulation_type: prometheus
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Open the Prometheus simulator from the lab toolbar and sign in (lab_prometheus / lab_prometheus@123)
+- Diagnose the fault — Alert has no 'for', so it flaps on transient spikes.
+- Edit /etc/prometheus/rules/alerts.yml in the terminal to apply the documented remediation
+- Run Check Solution to confirm the configuration is corrected
+initial_state: Alert has no 'for', so it flaps on transient spikes. The Prometheus simulator renders the
+  broken state; the configuration file /etc/prometheus/rules/alerts.yml must be corrected.
+hints:
+- order: 1
+  cost: 10
+  content: Open the Prometheus simulator (toolbar -> Open Prometheus). Inspect the affected area. Alert
+    has no 'for', so it flaps on transient spikes.
+- order: 2
+  cost: 15
+  content: The root cause is in /etc/prometheus/rules/alerts.yml. Compare it against a known-good Prometheus
+    configuration.
+- order: 3
+  cost: 20
+  content: Correct /etc/prometheus/rules/alerts.yml and append the success remediation marker, then run
+    Check Solution. In a real cluster you would reload Prometheus (SIGHUP / restart) after editing.

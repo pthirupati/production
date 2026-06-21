@@ -1,0 +1,32 @@
+title: New users get Admin by default
+slug: grafana-org-default-role-wrong
+category: Grafana Observability
+description: auto_assign_org_role=Admin grants everyone admin. Use the in-app Grafana simulator to investigate,
+  then apply the documented fix to /etc/grafana/grafana.ini from the terminal and verify with Check Solution.
+difficulty: medium
+lab_mode: simulation
+simulation_type: grafana
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Open the Grafana simulator from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
+- Diagnose the fault — auto_assign_org_role=Admin grants everyone admin.
+- Edit /etc/grafana/grafana.ini in the terminal to apply the documented remediation
+- Run Check Solution to confirm the configuration is corrected
+initial_state: auto_assign_org_role=Admin grants everyone admin. The Grafana simulator renders the broken
+  state; the configuration file /etc/grafana/grafana.ini must be corrected.
+hints:
+- order: 1
+  cost: 10
+  content: Open the Grafana simulator (toolbar -> Open Grafana). Inspect the affected area. auto_assign_org_role=Admin
+    grants everyone admin.
+- order: 2
+  cost: 15
+  content: The root cause is in /etc/grafana/grafana.ini. Compare it against a known-good Grafana configuration.
+- order: 3
+  cost: 20
+  content: Correct /etc/grafana/grafana.ini and append the success remediation marker, then run Check
+    Solution. In a real cluster you would reload Grafana (SIGHUP / restart) after editing.
