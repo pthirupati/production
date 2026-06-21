@@ -144,8 +144,9 @@ jobs:
           DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
           HAVE_TOKEN: ${{ secrets.DOCKERHUB_TOKEN != '' && '1' || '0' }}
         run: |
-          # Short, stable, lowercase tag derived from the commit SHA.
-          TAG="${GITHUB_SHA::12}"
+          # Tag = full commit SHA (matches IMAGE_TAG=github.sha used by the deploy
+          # jobs, which derive it without depending on this job).
+          TAG="${GITHUB_SHA}"
           NS="${DOCKERHUB_NAMESPACE:-$DOCKERHUB_USERNAME}"
           echo "image_tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "namespace=${NS}" >> "$GITHUB_OUTPUT"
@@ -391,15 +392,14 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   deploy:
     name: Deploy and start application
-    needs: [create-server, test-backend, test-frontend, build-push-images]
+    needs: [create-server, test-backend, test-frontend]
     if: |
       inputs.topology != 'four-droplet' &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       always() &&
       (needs.create-server.result == 'skipped' || needs.create-server.result == 'success') &&
       (needs.test-backend.result == 'skipped' || needs.test-backend.result == 'success') &&
-      (needs.test-frontend.result == 'skipped' || needs.test-frontend.result == 'success') &&
-      (needs.build-push-images.result == 'skipped' || needs.build-push-images.result == 'success')
+      (needs.test-frontend.result == 'skipped' || needs.test-frontend.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 55
     environment: production
@@ -427,12 +427,13 @@ jobs:
           VAULT_UNSEAL_KEY: ${{ secrets.VAULT_UNSEAL_KEY }}
           VAULT_ROLE_ID: ${{ secrets.VAULT_ROLE_ID }}
           VAULT_SECRET_ID: ${{ secrets.VAULT_SECRET_ID }}
-          # Docker Hub image pipeline (GATED). All empty unless build-push-images ran
-          # AND pushed (vars.USE_DOCKERHUB == 'true' + creds present). When empty,
-          # ci-remote-platform.sh does NOT export them and the node builds on-node.
-          IMAGE_TAG: ${{ needs.build-push-images.outputs.pushed == 'true' && needs.build-push-images.outputs.image_tag || '' }}
-          FIXITLAB_IMAGE_NS: ${{ needs.build-push-images.outputs.pushed == 'true' && needs.build-push-images.outputs.namespace || '' }}
-          PULL_IMAGES: ${{ needs.build-push-images.outputs.pushed == 'true' && '1' || '' }}
+          # Docker Hub image pipeline (GATED), decoupled from the build-push-images
+          # job (no `needs` — avoids transitive skip). Derived from the repo Variable
+          # + commit SHA; all empty when USE_DOCKERHUB unset, so ci-remote-platform.sh
+          # does NOT export them and the node builds on-node exactly as before.
+          IMAGE_TAG: ${{ vars.USE_DOCKERHUB == 'true' && github.sha || '' }}
+          FIXITLAB_IMAGE_NS: ${{ vars.USE_DOCKERHUB == 'true' && (vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME) || '' }}
+          PULL_IMAGES: ${{ vars.USE_DOCKERHUB == 'true' && '1' || '' }}
         with:
           host: ${{ steps.host.outputs.host }}
           username: ${{ secrets.PROD_USER }}
@@ -865,16 +866,14 @@ jobs:
 
   create-cluster:
     name: "[4D] Create cluster"
-    # Depends on build-push-images ONLY so the pinned tag exists before deploy when
-    # the Docker Hub pipeline is on. always() + the skipped/success check keep this
-    # job's gate IDENTICAL to before when build-push-images is skipped (USE_DOCKERHUB
-    # unset): the original topology/action conditions still fully gate it.
-    needs: [build-push-images]
+    # NOTE: build-push-images is a standalone job (gated on USE_DOCKERHUB) that
+    # NOTHING in the critical chain `needs` — a skipped job propagates its skip
+    # transitively to dependents that lack always() (it cascaded to bootstrap),
+    # so the deploy reads the pushed tag opportunistically (IMAGE_TAG=github.sha)
+    # instead of depending on the build job. Original gating restored.
     if: |
-      always() &&
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
-      inputs.topology == 'four-droplet' &&
-      (needs.build-push-images.result == 'skipped' || needs.build-push-images.result == 'success')
+      inputs.topology == 'four-droplet'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
@@ -973,18 +972,19 @@ jobs:
             echo "DATA_PRIVATE_IP=${{ steps.create.outputs.db_private_ip }}"
             echo "LABS_PRIVATE_IP=${{ steps.create.outputs.labs_private_ip }}"
           } > _cluster/cluster_ips.env
-          # Docker Hub image pipeline (GATED, additive). Only emit these when
-          # build-push-images actually pushed (vars.USE_DOCKERHUB == 'true' + creds).
-          # deploy-cluster's "Load edge host" step sources cluster_ips.env into
-          # $GITHUB_ENV, so USE_DOCKERHUB/IMAGE_TAG/FIXITLAB_IMAGE_NS reach
-          # ci-cluster-deploy.sh. When absent (default), the cluster builds on-node.
-          if [ "${{ needs.build-push-images.outputs.pushed }}" = "true" ]; then
+          # Docker Hub image pipeline (GATED, additive) — decoupled from the
+          # build-push-images job (no `needs`, so no transitive-skip cascade). The
+          # pull config is derived from the repo Variable + the commit SHA, both
+          # available everywhere. build-push-images runs in parallel from t=0 and
+          # finishes well before deploy. When USE_DOCKERHUB is unset, nothing is
+          # emitted and the cluster builds on-node exactly as before.
+          if [ "${{ vars.USE_DOCKERHUB }}" = "true" ]; then
             {
               echo "USE_DOCKERHUB=true"
-              echo "IMAGE_TAG=${{ needs.build-push-images.outputs.image_tag }}"
-              echo "FIXITLAB_IMAGE_NS=${{ needs.build-push-images.outputs.namespace }}"
+              echo "IMAGE_TAG=${{ github.sha }}"
+              echo "FIXITLAB_IMAGE_NS=${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}"
             } >> _cluster/cluster_ips.env
-            echo "Docker Hub pipeline ON — cluster will pull ${{ needs.build-push-images.outputs.namespace }}/fixitlab-*:${{ needs.build-push-images.outputs.image_tag }}"
+            echo "Docker Hub pipeline ON — cluster will pull pinned images"
           fi
           echo "wrote _cluster/cluster_ips.env ($(wc -l < _cluster/cluster_ips.env) lines)"
       - uses: actions/upload-artifact@v4
