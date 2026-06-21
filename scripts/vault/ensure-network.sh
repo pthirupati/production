@@ -9,6 +9,16 @@ source "$ROOT/scripts/vault/lib.sh"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-.env.production}"
 
+# Re-entry guard. ensure-network.sh can recreate Vault and call unseal.sh, which
+# calls start.sh, which calls ensure-network.sh again. In a healthy single-host
+# setup the backend resolves vault and we exit early before that chain — but if
+# it doesn't (e.g. no local backend), the chain recurses forever. The exported
+# flag makes any nested invocation a no-op.
+if [ "${_VAULT_ENSURE_NET_ACTIVE:-0}" = "1" ]; then
+  exit 0
+fi
+export _VAULT_ENSURE_NET_ACTIVE=1
+
 vault_ensure_networks
 
 VAULT_NAME="$(vault_container_name)"
@@ -66,6 +76,15 @@ while read -r net; do
 done < <(docker inspect "$VAULT_NAME" --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' 2>/dev/null)
 
 _connect_vault_to_net fixitlab_net || true
+
+# Four-droplet edge node: Vault runs here, but the backend lives on a different
+# host and reaches Vault over the network (EDGE_PRIVATE_IP:8200), not docker DNS.
+# With no local backend container there is nothing to wire — Vault is up on
+# fixitlab_net, so this is success (bootstrap.sh will init/unseal/seed next).
+if [ -z "$BACKEND" ]; then
+  echo "[vault] No local backend container (cross-host topology) — Vault on fixitlab_net. OK"
+  exit 0
+fi
 
 if [ -n "$BACKEND" ]; then
   BACKEND_NET="$(docker inspect "$BACKEND" --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' 2>/dev/null \
