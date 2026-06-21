@@ -1,0 +1,59 @@
+title: Extend a Full Filesystem via a ServiceNow Storage Ticket
+slug: linux-disk-extend-itsm-ticket
+difficulty: medium
+category: Linux Administration
+description: |
+  The root volume on web-prod-01 is almost full and you have NO spare disk to extend
+  the LVM volume group with. This is an ITSM (ServiceNow) workflow task: you own the
+  Incident, but adding hardware is the Storage team's job. From the ticket panel, raise
+  a SUB-TICKET to the Storage team requesting a 50 GiB disk. The (simulated) Storage
+  team provisions and attaches it, then resolves the sub-ticket. Back on the server,
+  run a SCSI rescan so the kernel sees the new disk, then pvcreate / vgextend / lvextend
+  to grow the volume — exactly as you would in a real change. The disk does NOT exist on
+  the server until the Storage team actions your sub-ticket.
+initial_state: |
+  Simulated RHEL 9 server (web-prod-01). The volume group `rhel` has no free extents and
+  there is no spare disk attached. A ServiceNow Incident is open and assigned to the
+  Service Desk; the Storage team must add a disk before the LV can be extended.
+objectives:
+  - Open the Ticket panel and review the Incident assigned to you
+  - Raise a sub-ticket to the Storage team for a 50 GiB disk
+  - After the Storage team resolves it, run a SCSI rescan so the new disk (/dev/sdc) appears
+  - pvcreate the new disk, vgextend the rhel VG, and lvextend the root LV to use the space
+  - Resolve the Incident with a close code once the filesystem is extended
+lab_mode: simulation
+simulation_type: rhel
+itsm_enabled: true
+itsm_ticket_type: incident
+itsm_config:
+  short_description: "/ filesystem nearly full on web-prod-01 — need to extend"
+  description: |
+    Monitoring alerted that / on web-prod-01 is at 98%. The LVM volume group has no
+    free space. Raise a request to the Storage team for additional disk, attach it,
+    and extend the root logical volume. Resolve this Incident once / has free space.
+  priority: "2"
+  assignment_group: service_desk
+  allowed_actions:
+    - add_disk
+  teams:
+    - service_desk
+    - storage
+cross_technology: false
+vmware_link: false
+docker_privileged: false
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+hints:
+  - content: 'Open the Ticket tab. Click "Raise sub-ticket", choose "Add a disk — Storage Team", set 50 GiB, and submit. The parent Incident moves to On Hold while Storage works.'
+    cost: 10
+    order: 1
+  - content: 'When the sub-ticket resolves, the disk is attached but the kernel cannot see it yet. Run a SCSI rescan: echo "- - -" > /sys/class/scsi_host/host0/scan (or rescan-scsi-bus.sh), then lsblk to confirm /dev/sdc.'
+    cost: 15
+    order: 2
+  - content: 'Extend the volume: pvcreate /dev/sdc; vgextend rhel /dev/sdc; lvextend -l +100%FREE /dev/mapper/rhel-root; then xfs_growfs / (or resize2fs). Verify with df -h /.'
+    cost: 20
+    order: 3
+objectives_validation: |
+  Pass when /dev/sdc is a PV in the rhel VG and the root LV has been extended.

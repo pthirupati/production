@@ -92,6 +92,9 @@ urlpatterns = [
     # VMware vCenter Simulator
     path("api/vmware/", include("apps.vmware_sim.urls")),
 
+    # ITSM (ServiceNow-style ticketing simulation)
+    path("api/itsm/", include("apps.itsm.urls")),
+
     # OpenAPI schema + Swagger UI
     path("api/schema/", SpectacularAPIView.as_view(permission_classes=[IsAdminUser]), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema", permission_classes=[IsAdminUser]), name="swagger-ui"),

@@ -8,11 +8,13 @@ import { useAuthStore } from '../store/authStore'
 import {
   Clock, CheckCircle2, XCircle, Lightbulb, StopCircle,
   ChevronRight, Trophy, Target, Eye, FileText,
-  PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard, ExternalLink, Terminal, Wand2
+  PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard, ExternalLink, Terminal, Wand2, Ticket as TicketIcon
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ConfirmDialog } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
+import ItsmTicketPanel from '../components/itsm/ItsmTicketPanel'
+import { itsmApi } from '../api/itsm'
 import JiraTicketLink from '../components/JiraTicketLink'
 import LabTerminal from '../components/LabTerminal'
 import CodingIDE from '../components/ide/CodingIDE'
@@ -104,6 +106,11 @@ export default function LabRunner() {
   const [jiraActivity, setJiraActivity] = useState([])
   const [jiraTicket, setJiraTicket] = useState(null)
   const [jiraTransitioning, setJiraTransitioning] = useState(false)
+  // ── ITSM (ServiceNow-style) ticket state ──
+  const [itsmTicket, setItsmTicket] = useState(null)
+  const [itsmMeta, setItsmMeta] = useState(null)
+  const [itsmConfig, setItsmConfig] = useState(null)
+  const [itsmBusy, setItsmBusy] = useState(false)
   const [closingIn, setClosingIn] = useState(null)
   const [terminalHost, setTerminalHost] = useState('primary')
   const [showSimWizard, setShowSimWizard] = useState(false)
@@ -377,6 +384,19 @@ export default function LabRunner() {
             )
           }
 
+          // ── ITSM (ServiceNow-style) ticket — open it on first load so the
+          // panel has a parent ticket to raise sub-tickets from. Bound to this
+          // session so a Storage sub-ticket's disk hot-add hits the right sim.
+          if (lab.scenario?.itsm_enabled && lab.scenario?.id) {
+            itsmApi.getMeta().then(r => setItsmMeta(r.data)).catch(() => {})
+            itsmApi.ensureScenarioTicket(lab.scenario.id, sessionId)
+              .then(res => { setItsmTicket(res.data?.ticket || null); setItsmConfig(res.data?.config || null) })
+              .catch(() => {
+                // Subscription-gated or disabled — leave the panel empty.
+                setItsmTicket(null)
+              })
+          }
+
           if (lab.time_remaining > 0) {
             startTimer(lab.time_remaining, async () => {
               toast('Lab time completed! The environment is being terminated.', { icon: '⏰', duration: 6000, ...TOAST })
@@ -546,6 +566,57 @@ export default function LabRunner() {
       }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to post comment')
+    }
+  }
+
+  // ── ITSM ticket handlers ──
+  const handleItsmTransition = async (state, extra = {}) => {
+    if (!itsmTicket?.id) return
+    setItsmBusy(true)
+    try {
+      const res = await itsmApi.transition(itsmTicket.id, state, extra)
+      setItsmTicket(res.data)
+      if (state === 'resolved' || state === 'closed') {
+        toast.success(`Ticket ${res.data?.number} ${res.data?.state_label?.toLowerCase()}`)
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not change ticket state')
+    } finally {
+      setItsmBusy(false)
+    }
+  }
+
+  const handleItsmTransfer = async (team, reason) => {
+    if (!itsmTicket?.id) return
+    setItsmBusy(true)
+    try {
+      const res = await itsmApi.transfer(itsmTicket.id, team, reason)
+      setItsmTicket(res.data)
+      toast.success(`Transferred to ${res.data?.assignment_group_label}`)
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Transfer failed')
+    } finally {
+      setItsmBusy(false)
+    }
+  }
+
+  const handleItsmRaiseSubTicket = async (payload) => {
+    if (!itsmTicket?.id) return
+    setItsmBusy(true)
+    try {
+      const res = await itsmApi.raiseSubTicket(itsmTicket.id, payload)
+      // The response carries the refreshed parent (with the new sub-ticket + notes).
+      if (res.data?.parent) setItsmTicket(res.data.parent)
+      const dev = res.data?.sub_ticket?.action_result?.device
+      if (dev) {
+        toast.success(`Storage attached ${dev}. Run a SCSI rescan (or reboot) on the server to see it.`, { duration: 7000 })
+      } else {
+        toast.success(`Sub-ticket ${res.data?.sub_ticket?.number} raised to the team`)
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not raise sub-ticket')
+    } finally {
+      setItsmBusy(false)
     }
   }
 
@@ -1051,6 +1122,7 @@ export default function LabRunner() {
             <div className="flex border-b border-surface-800">
               {[
                 { key: 'instructions', label: 'Info', icon: FileText },
+                ...(scenario?.itsm_enabled ? [{ key: 'ticket', label: 'Ticket', icon: TicketIcon }] : []),
                 { key: 'hints', label: 'Hints', icon: Lightbulb },
                 { key: 'result', label: 'Result', icon: Target },
               ].map(({ key, label, icon: Icon }) => (
@@ -1130,6 +1202,37 @@ export default function LabRunner() {
                         <p className="text-[11px] text-surface-500 mt-0.5">Click the "Stop" button when finished to free up resources. Labs auto-terminate after the time limit expires.</p>
                       </div>
                     </div>
+                  </div>
+                </>
+              )}
+
+              {/* ITSM (ServiceNow-style) ticket tab */}
+              {sidebarTab === 'ticket' && (
+                <>
+                  {itsmTicket ? (
+                    <ItsmTicketPanel
+                      ticket={itsmTicket}
+                      meta={itsmMeta}
+                      config={itsmConfig}
+                      busy={itsmBusy}
+                      onTransition={handleItsmTransition}
+                      onTransfer={handleItsmTransfer}
+                      onRaiseSubTicket={handleItsmRaiseSubTicket}
+                    />
+                  ) : (
+                    <div className="text-center py-8 text-surface-500">
+                      <TicketIcon size={28} className="mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Opening your ServiceNow ticket…</p>
+                      <p className="text-[11px] mt-1">If this persists, a subscription to this technology may be required.</p>
+                    </div>
+                  )}
+                  <div className="mt-3 bg-accent-cyan/5 border border-accent-cyan/20 rounded-lg p-3">
+                    <p className="text-[11px] text-surface-400 leading-relaxed">
+                      <span className="font-medium text-surface-300">How this works:</span> raise a sub-ticket to an
+                      assisting team (e.g. Storage for a disk). The team actions it and the change lands on this
+                      server — for a disk, run a SCSI rescan (<code className="text-accent-cyan">echo "- - -" &gt; /sys/class/scsi_host/host0/scan</code>)
+                      or reboot to see the new <code className="text-accent-cyan">/dev/sdX</code>, then continue your fix.
+                    </p>
                   </div>
                 </>
               )}

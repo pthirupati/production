@@ -1357,6 +1357,11 @@ class LabSessionStatusView(APIView):
                 # then appears in this terminal after a rescan/reboot).
                 "cross_technology": bool(getattr(session.scenario, "cross_technology", False)),
                 "vmware_link": bool(getattr(session.scenario, "vmware_link", False)),
+                # ITSM (ServiceNow-style) ticket flow — tells the LabRunner to
+                # mount the ITSM ticket panel (open ticket + raise sub-tickets to
+                # other teams) for this scenario.
+                "itsm_enabled": bool(getattr(session.scenario, "itsm_enabled", False)),
+                "itsm_ticket_type": getattr(session.scenario, "itsm_ticket_type", "") or "incident",
                 # coding_kind lets the frontend route coding_mode scenarios to the
                 # right surface without fetching the full spec — "prompt" opens the
                 # PromptPlayground, anything else opens the code IDE.

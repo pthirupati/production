@@ -201,6 +201,40 @@ class Scenario(models.Model):
         ),
     )
 
+    # ── ITSM (ServiceNow-style ticketing) flow ──
+    # When itsm_enabled is True the lab opens a ServiceNow-style ticket for the
+    # user+scenario (apps.itsm). From that parent ticket the user can raise
+    # sub-tickets to other teams (Storage/Network/Backup); a simulated team
+    # fulfils them and mutates the lab sim — e.g. the Storage team adds a disk via
+    # the vmware_bridge so it appears in the terminal after a rescan. itsm_config
+    # tunes the opened ticket and which sub-ticket actions the scenario expects.
+    itsm_enabled = models.BooleanField(
+        default=False,
+        help_text="Open a ServiceNow-style ITSM ticket for this scenario in the lab runner",
+    )
+    ITSM_TYPE_CHOICES = [
+        ("incident", "Incident"),
+        ("request", "Service Request"),
+        ("change", "Change"),
+        ("problem", "Problem"),
+    ]
+    itsm_ticket_type = models.CharField(
+        max_length=20,
+        choices=ITSM_TYPE_CHOICES,
+        default="incident",
+        blank=True,
+        help_text="ServiceNow ticket type opened for this scenario",
+    )
+    itsm_config = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "ITSM tuning: {ticket_type, short_description, description, priority, "
+            "assignment_group, teams:[...], allowed_actions:[add_disk,add_nic,...]}. "
+            "Drives the opened ticket and the sub-ticket actions surfaced in the panel."
+        ),
+    )
+
     time_limit = models.PositiveIntegerField(default=600, help_text="Time limit in seconds (default 10 min)")
     max_score = models.PositiveIntegerField(default=100)
     definition_path = models.CharField(max_length=255, blank=True)

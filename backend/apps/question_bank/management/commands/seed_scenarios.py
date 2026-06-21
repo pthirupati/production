@@ -207,6 +207,10 @@ class Command(BaseCommand):
                         "coding_spec": data.get("coding_spec", {}) or {},
                         "cross_technology": data.get("cross_technology", False),
                         "vmware_link": data.get("vmware_link", False),
+                        # ITSM (ServiceNow-style) ticket flow.
+                        "itsm_enabled": data.get("itsm_enabled", False),
+                        "itsm_ticket_type": data.get("itsm_ticket_type", "incident"),
+                        "itsm_config": data.get("itsm_config", {}) or {},
                     },
                 )
 
