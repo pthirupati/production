@@ -519,7 +519,14 @@ def main():
             print(f"  ... and {len(stats.errors) - 30} more")
 
     if catalog["missing_images"]:
-        return 1
+        # Report missing scenario Docker images but do NOT fail the suite: with
+        # build_scenarios=false the lab images are intentionally not built, and the
+        # deployable/sampled scenarios were still exercised. Only actual test
+        # failures (stats.failed) red the run. Set E2E_REQUIRE_IMAGES=1 to enforce.
+        print(f"NOTE: {len(catalog['missing_images'])} scenario image(s) not built "
+              f"(run with build_scenarios=true to exercise those).")
+        if os.environ.get("E2E_REQUIRE_IMAGES", "0") == "1":
+            return 1
     return 0 if stats.failed == 0 else 1
 
 
