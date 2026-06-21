@@ -33,6 +33,9 @@ services:
     build:
       context: ./gateway
       dockerfile: Dockerfile.prod
+    # Pinned image name: the local build tag AND (when IMAGE_TAG is a pushed Docker Hub
+    # SHA + the deploy passes --pull) the image pulled instead of rebuilt on D1.
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-gateway:${IMAGE_TAG:-latest}
     environment:
       - SSL_DOMAIN=${SSL_DOMAIN:-fixitlab.in}
       # When set, entrypoint renders the cluster template pointing at the App droplet.
@@ -70,6 +73,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-frontend:${IMAGE_TAG:-latest}
     networks:
       - fixitlab_net
     restart: unless-stopped

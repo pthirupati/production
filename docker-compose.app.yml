@@ -21,6 +21,9 @@ services:
 
   backend:
     build: ./backend
+    # Pinned image name: the local build tag AND (when IMAGE_TAG is a pushed Docker Hub
+    # SHA + the deploy passes --pull) the image pulled instead of rebuilt on D2.
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-backend:${IMAGE_TAG:-latest}
     container_name: fixitlab-backend-1
     env_file:
       - .env.production
@@ -58,6 +61,7 @@ services:
 
   celery_worker:
     build: ./backend
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-backend:${IMAGE_TAG:-latest}
     command: celery -A config worker -l info --concurrency=8 -Q default,notifications -n default@%h
     env_file:
       - .env.production
@@ -88,6 +92,7 @@ services:
 
   celery_provisioning:
     build: ./backend
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-backend:${IMAGE_TAG:-latest}
     command: celery -A config worker -l info --concurrency=10 -Q provisioning -n provisioning@%h
     env_file:
       - .env.production
@@ -118,6 +123,7 @@ services:
 
   celery_maintenance:
     build: ./backend
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-backend:${IMAGE_TAG:-latest}
     command: celery -A config worker -l info --concurrency=2 -Q maintenance -n maintenance@%h
     env_file:
       - .env.production
@@ -148,6 +154,7 @@ services:
 
   celery_beat:
     build: ./backend
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-backend:${IMAGE_TAG:-latest}
     command: celery -A config beat -l info --pidfile=/tmp/celerybeat.pid
     env_file:
       - .env.production

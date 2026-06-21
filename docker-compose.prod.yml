@@ -18,6 +18,10 @@ services:
     build:
       context: ./gateway
       dockerfile: Dockerfile.prod
+    # Pinned image name: used as the local build tag AND, when IMAGE_TAG points at a
+    # pushed Docker Hub SHA and the deploy passes --pull, pulled instead of rebuilt.
+    # Defaults (fixitlab/...:latest) are an inert local tag when building on-node.
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-gateway:${IMAGE_TAG:-latest}
     environment:
       - SSL_DOMAIN=${SSL_DOMAIN:-fixitlab.in}
     ports:
@@ -58,12 +62,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-frontend:${IMAGE_TAG:-latest}
     networks:
       - fixitlab_net
     restart: unless-stopped
 
   backend:
     build: ./backend
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-backend:${IMAGE_TAG:-latest}
     env_file:
       - .env.production
     environment:
@@ -141,6 +147,8 @@ services:
 
   celery_worker:
     build: ./backend
+    # Same image as backend (shared ./backend build) — pulled/built once, reused here.
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-backend:${IMAGE_TAG:-latest}
     command: celery -A config worker -l info --concurrency=8 -Q default,notifications -n default@%h
     env_file:
       - .env.production
@@ -176,6 +184,7 @@ services:
 
   celery_provisioning:
     build: ./backend
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-backend:${IMAGE_TAG:-latest}
     command: celery -A config worker -l info --concurrency=10 -Q provisioning -n provisioning@%h
     env_file:
       - .env.production
@@ -211,6 +220,7 @@ services:
 
   celery_maintenance:
     build: ./backend
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-backend:${IMAGE_TAG:-latest}
     command: celery -A config worker -l info --concurrency=2 -Q maintenance -n maintenance@%h
     env_file:
       - .env.production
@@ -246,6 +256,7 @@ services:
 
   celery_beat:
     build: ./backend
+    image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-backend:${IMAGE_TAG:-latest}
     command: celery -A config beat -l info --pidfile=/tmp/celerybeat.pid
     env_file:
       - .env.production

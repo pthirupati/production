@@ -30,6 +30,13 @@ case "$ACTION" in
     export BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
     # Edge gateway needs APP_PRIVATE_IP to render the cluster nginx upstream.
     [ -n "${APP_PRIVATE_IP:-}" ] && export APP_PRIVATE_IP
+    # Docker Hub image pipeline (gated). When the workflow has USE_DOCKERHUB on it
+    # passes IMAGE_TAG=<git-sha> (+ optional FIXITLAB_IMAGE_NS) and PULL_IMAGES=1 in
+    # the environment; export them so compose `image:` resolves to the pushed tag and
+    # platform-start.sh pulls instead of builds. Unset = current on-node build path.
+    [ -n "${IMAGE_TAG:-}" ] && export IMAGE_TAG
+    [ -n "${FIXITLAB_IMAGE_NS:-}" ] && export FIXITLAB_IMAGE_NS
+    [ -n "${PULL_IMAGES:-}" ] && export PULL_IMAGES
     bash scripts/sync-production-env.sh "$ROOT/.env.production"
     ./scripts/platform-start.sh
     ;;

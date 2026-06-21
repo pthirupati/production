@@ -21,6 +21,26 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DRY_RUN="${DRY_RUN:-0}"
 BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
 
+# Docker Hub image pipeline (gated, additive). When the workflow has USE_DOCKERHUB
+# on, deploy-cluster passes USE_DOCKERHUB=true + IMAGE_TAG=<git-sha> (+ optional
+# FIXITLAB_IMAGE_NS) in the environment. We then tell the edge (D1) and app (D2)
+# nodes — the only ones running pushed images — to PULL the pinned tag instead of
+# rebuilding. When USE_DOCKERHUB is unset/false, IMG_ENV stays empty and every node
+# deploys exactly as today (on-node `docker compose up --build`).
+USE_DOCKERHUB="${USE_DOCKERHUB:-}"
+IMG_ENV=""
+case "${USE_DOCKERHUB}" in
+  1|true|TRUE|yes|on)
+    if [ -n "${IMAGE_TAG:-}" ]; then
+      IMG_ENV="PULL_IMAGES=1 IMAGE_TAG=${IMAGE_TAG}"
+      [ -n "${FIXITLAB_IMAGE_NS:-}" ] && IMG_ENV="${IMG_ENV} FIXITLAB_IMAGE_NS=${FIXITLAB_IMAGE_NS}"
+      echo "Docker Hub pipeline ON — D1/D2 will pull ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-*:${IMAGE_TAG}"
+    else
+      echo "WARN: USE_DOCKERHUB set but IMAGE_TAG empty — falling back to on-node build"
+    fi
+    ;;
+esac
+
 EDGE_PUBLIC_IP="${EDGE_PUBLIC_IP:?EDGE_PUBLIC_IP required}"
 APP_PRIVATE_IP="${APP_PRIVATE_IP:?APP_PRIVATE_IP required}"
 DATA_PRIVATE_IP="${DATA_PRIVATE_IP:?DATA_PRIVATE_IP required}"
@@ -68,13 +88,13 @@ deploy_data() {
 deploy_edge() {
   echo "[2/4] Deploy D1 Edge (gateway/redis/rabbitmq/vault)"
   remote "$EDGE_PUBLIC_IP" direct \
-    "CLUSTER_ROLE=edge APP_PRIVATE_IP=${APP_PRIVATE_IP} BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"
+    "${IMG_ENV} CLUSTER_ROLE=edge APP_PRIVATE_IP=${APP_PRIVATE_IP} BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"
 }
 
 deploy_app() {
   echo "[3/4] Deploy D2 App (backend + celery + migrate)"
   if ! remote "$APP_PRIVATE_IP" via-edge \
-    "CLUSTER_ROLE=app BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"; then
+    "${IMG_ENV} CLUSTER_ROLE=app BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"; then
     echo "===== [diagnostic] D2 backend startup logs (last 120 lines) ====="
     remote "$APP_PRIVATE_IP" via-edge \
       "docker logs fixitlab-backend-1 --tail 120 2>&1 || (cd /opt/fixitlab && docker compose -f docker-compose.app.yml logs --tail 120 backend 2>&1) || true" || true

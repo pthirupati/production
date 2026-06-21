@@ -62,7 +62,21 @@ ENV_FILE=".env.production"
 echo "=== FixitLab Platform START ==="
 echo "Compose: $COMPOSE_FILE | Env: $ENV_FILE"
 
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
+# Image source — DEFAULT (PULL_IMAGES unset/false) is the current behavior: build
+# every service from its local ./backend|./frontend|./gateway context with
+# `up -d --build`. When the Docker Hub pipeline is enabled the gated deploy sets
+# PULL_IMAGES=1 (and IMAGE_TAG=<git-sha>), so instead we PULL the pinned images
+# (compose `image:` now resolves to <ns>/fixitlab-*:<sha>) and bring the stack up
+# WITHOUT --build, getting the exact CI-built, versioned image on every node.
+# Services without a registry image (postgres, redis, rabbitmq, pgbouncer, vault,
+# certbot) are unaffected; `pull` only fetches what each role's compose declares.
+if _env_true "${PULL_IMAGES:-}"; then
+  echo "PULL_IMAGES set — pulling pinned images (IMAGE_TAG=${IMAGE_TAG:-latest}, ns=${FIXITLAB_IMAGE_NS:-fixitlab}) instead of building"
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build
+else
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
+fi
 
 # Sync the Postgres role password to the current env. The fixitlab_db_data volume
 # persists across deploys and keeps the password it was FIRST initialized with, so
