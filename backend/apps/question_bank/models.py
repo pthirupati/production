@@ -5,7 +5,7 @@ from django.conf import settings
 
 class Technology(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(unique=True, blank=True)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
     icon = models.CharField(max_length=255, blank=True, help_text="Icon name (lucide icon) or URL")
     color = models.CharField(max_length=20, blank=True, default="cyan", help_text="Theme color key")
     description = models.TextField(blank=True)
@@ -46,7 +46,7 @@ class Technology(models.Model):
 class Tag(models.Model):
     """Granular tags for scenario filtering (e.g., nginx, dns, bash, docker, systemd)"""
     name = models.CharField(max_length=50, unique=True)
-    slug = models.SlugField(unique=True, blank=True)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
 
     class Meta:
         ordering = ["name"]
@@ -81,7 +81,7 @@ class Scenario(models.Model):
     ]
 
     technology = models.ForeignKey(Technology, on_delete=models.CASCADE, related_name="scenarios")
-    slug = models.SlugField(unique=True)
+    slug = models.SlugField(max_length=255, unique=True)
     title = models.CharField(max_length=255)
     subtitle = models.CharField(max_length=255, blank=True, help_text="Short tagline like SadServers city names")
     category = models.CharField(max_length=100)
@@ -267,7 +267,7 @@ class Project(models.Model):
 
     technology = models.ForeignKey(Technology, on_delete=models.CASCADE, related_name="projects")
     title = models.CharField(max_length=200)
-    slug = models.SlugField(unique=True, blank=True)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
     architecture_type = models.CharField(max_length=20, choices=ARCHITECTURE_CHOICES, default="custom")
     description = models.TextField()
     objectives = models.JSONField(default=list, blank=True)
