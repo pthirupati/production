@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
+import { useRevealOnScroll } from '../hooks/useRevealOnScroll'
 import {
   HelpCircle, ChevronDown, Search, X,
   Rocket, CreditCard, Terminal, Brain, Award, UserCircle
@@ -174,6 +175,10 @@ export default function FAQ() {
   }, [search])
 
   const totalResults = filtered.reduce((n, c) => n + c.items.length, 0)
+
+  // FAQ category/question cards use `.reveal` (opacity:0 until `.visible`).
+  // Re-scan when the filtered results change so search hits are revealed too.
+  useRevealOnScroll([filtered])
 
   return (
     <PublicLayout>

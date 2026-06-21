@@ -86,8 +86,11 @@ def gen_token(length: int = 48, punct: bool = False) -> str:
 
 
 def gen_django_secret_key() -> str:
-    # Mirrors Django's get_random_secret_key (50 chars, url-safe punctuation).
-    chars = string.ascii_lowercase + string.digits + "!@#$%^&*(-_=+)"
+    # 50 chars of entropy. Use ONLY env/compose-safe characters — a '$' (or '{')
+    # in the value makes `docker compose --env-file` try to interpolate it
+    # ("variable eg6 is not set"), corrupting the secret. Charset doesn't affect
+    # key strength.
+    chars = _ALNUM + _SAFE_PUNCT
     return "".join(secrets.choice(chars) for _ in range(50))
 
 

@@ -6,7 +6,7 @@ import {
   Activity, Container, Terminal, Cpu, HardDrive,
   Filter, CheckCircle2, XCircle, AlertCircle, RotateCcw,
   Server, Database, Wifi, MessageSquare, ShieldCheck, Globe,
-  Zap,
+  Zap, Info,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -158,6 +158,9 @@ export default function AdminMonitoring() {
         running: data.running || 0,
         lab_count: data.lab_count,
         system_count: data.system_count,
+        is_cluster: data.is_cluster,
+        local_node: data.local_node,
+        nodes: data.nodes || [],
       })
     } catch {
       toast.error('Could not load containers')
@@ -280,6 +283,41 @@ export default function AdminMonitoring() {
 
       {/* ── Server Monitoring (per-node host metrics) ── */}
       <ServerMonitoring refreshMs={10000} />
+
+      {/* ── Cluster container scope note ── */}
+      {summary.is_cluster && summary.nodes?.length > 0 && (
+        <div className="glass-card p-4 border border-surface-700/40">
+          <div className="flex items-start gap-2 mb-3">
+            <Info size={15} className="text-accent-cyan shrink-0 mt-0.5" />
+            <p className="text-[12px] text-surface-400 leading-relaxed">
+              Containers below are enumerated on the
+              <span className="text-surface-200 font-medium"> {summary.local_node || 'local'} </span>
+              node's Docker engine. Other cluster nodes are shown for context;
+              their container lists require a Docker API/agent on each host.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {summary.nodes.map((n) => (
+              <span
+                key={n.key}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border ${
+                  n.containers_available
+                    ? 'bg-accent-green/10 text-accent-green border-accent-green/25'
+                    : 'bg-surface-800/40 text-surface-400 border-surface-700/40'
+                }`}
+                title={`${n.role} · ${n.ip || 'n/a'}`}
+              >
+                <Server size={11} />
+                {n.name}
+                <span className="opacity-60">· {n.role}</span>
+                {n.containers_available
+                  ? <CheckCircle2 size={11} />
+                  : <span className="text-[9px] uppercase opacity-70">metrics pending</span>}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Alerts: unhealthy containers callout ── */}
       {unhealthyContainers.length > 0 && (

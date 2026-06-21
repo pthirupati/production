@@ -36,10 +36,14 @@ class Command(BaseCommand):
         )
         from apps.interviews.models import InterviewEntitlement
 
-        tech, _ = Technology.objects.get_or_create(
-            slug="linux-administration",
-            defaults={"name": "Linux Administration", "is_active": True, "price": 499},
-        )
+        # Look up by name (the UNIQUE column) so a pre-seeded technology with a
+        # different slug doesn't cause a duplicate-key IntegrityError.
+        tech = Technology.objects.filter(name="Linux Administration").first()
+        if not tech:
+            tech, _ = Technology.objects.get_or_create(
+                slug="linux-administration",
+                defaults={"name": "Linux Administration", "is_active": True, "price": 499},
+            )
 
         cert_id = "FIXIT-INT-ADMIN-DEMO-2026"
         campaign, created = InterviewCampaign.objects.get_or_create(

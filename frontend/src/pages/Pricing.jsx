@@ -17,6 +17,7 @@ import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_LINKS } from '../constants/publicNav'
 import MarketingFooter from './home/components/MarketingFooter'
 import { mergeTechnologies } from '../constants/techCatalog'
 import { PageHeader, FixitPanel } from '../components/design'
+import { useRevealOnScroll } from '../hooks/useRevealOnScroll'
 import toast from 'react-hot-toast'
 
 const techIcons = {
@@ -160,6 +161,13 @@ export default function Pricing() {
   useEffect(() => {
     api.get('/config/', { silentError: true }).then(res => setPlatformConfig(res.data)).catch(() => {})
   }, [])
+
+  // Reveal-on-scroll: elements tagged `.reveal` start at opacity:0 (see
+  // index.css) and only become visible once `.visible` is added. Without a
+  // global observer the pricing cards stayed permanently hidden, so the page
+  // looked empty even though data loaded. Re-runs when the dynamic
+  // technology/interview lists change so late-loaded cards get observed too.
+  useRevealOnScroll([technologies, interviewPlans])
 
   useEffect(() => {
     const fetchRate = async () => {

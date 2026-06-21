@@ -99,6 +99,15 @@ if ! command -v docker >/dev/null 2>&1; then
   curl -fsSL https://get.docker.com | sh
 fi
 mkdir -p /opt/fixitlab
+# 4GB swap so the 8GB nodes do not OOM-kill (status 137) when the backend + 4
+# celery containers + a test/migration process run together (seen in unit tests).
+if [ ! -f /swapfile ]; then
+  fallocate -l 4G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=4096 2>/dev/null || true
+  if [ -f /swapfile ]; then
+    chmod 600 /swapfile; mkswap /swapfile >/dev/null 2>&1 || true; swapon /swapfile 2>/dev/null || true
+    grep -q "^/swapfile" /etc/fstab || echo "/swapfile none swap sw 0 0" >> /etc/fstab
+  fi
+fi
 '
 
 clone_repo='

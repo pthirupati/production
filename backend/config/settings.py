@@ -223,7 +223,7 @@ REST_FRAMEWORK = {
         "user": "3000/hour",
         "auth": "10/minute",  # Strict limit on auth endpoints
         "lab_start": "60/hour",  # Limit lab provisioning (DoS protection)
-        "login": "5/minute",
+        "login": "10/minute",  # FAILED attempts per (IP+email); successes are never throttled
         "otp": "3/minute",
         "password_reset": "3/minute",
         "payment": "20/hour",

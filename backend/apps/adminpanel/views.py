@@ -117,6 +117,8 @@ class AdminOverviewView(APIView):
                 "threads": Thread.objects.filter(is_deleted=False).count(),
                 "replies": Reply.objects.filter(is_deleted=False).count(),
             },
+            "cluster": self._get_cluster_summary(),
+            "containers": self._get_container_summary(),
             "completion_rate": self._get_completion_rate(),
             "maintenance_mode": __import__(
                 "apps.adminpanel.platform_config", fromlist=["is_maintenance_active"]
@@ -132,6 +134,76 @@ class AdminOverviewView(APIView):
         ).count()
         completed = LabSession.objects.filter(status="COMPLETED").count()
         return round(completed / total * 100, 1) if total else 0
+
+    def _get_cluster_summary(self):
+        """Lightweight cluster topology summary for the overview header.
+
+        Surfaces the configured fleet (e.g. the 4-droplet cluster) so the
+        Overview reflects the systems running the platform, not just the DB
+        counts. Live metrics live behind /monitoring/fleet/.
+        """
+        try:
+            from . import cluster_topology
+
+            topo = cluster_topology.load_topology()
+            nodes = topo.get("nodes", [])
+            return {
+                "topology": topo.get("topology"),
+                "is_cluster": bool(topo.get("is_cluster")),
+                "node_count": len(nodes),
+                "nodes": [
+                    {
+                        "key": n.get("key"),
+                        "name": n.get("name"),
+                        "role": n.get("role"),
+                        "ip": n.get("ip"),
+                        "services": n.get("services", []),
+                    }
+                    for n in nodes
+                ],
+            }
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Cluster summary failed: %s", exc)
+            return {"topology": "unknown", "is_cluster": False, "node_count": 0, "nodes": []}
+
+    def _get_container_summary(self):
+        """Cheap container roll-up (local Docker engine) for the overview.
+
+        Counts running/total/system/lab containers without per-container stats
+        so the cached overview stays fast. The full per-container detail lives
+        on the Monitoring page.
+        """
+        try:
+            client = DockerProvisioner().client
+        except Exception as exc:
+            return {"available": False, "error": str(exc)[:160]}
+
+        try:
+            running = total = system = lab = 0
+            hints = AdminMonitoringContainersView.SYSTEM_NAME_HINTS
+            for c in client.containers.list(all=True):
+                labels = c.labels or {}
+                name = (c.name or "").lower()
+                is_lab = bool(labels.get("fixitlab.session_id"))
+                is_system = any(h in name for h in hints)
+                if not (is_lab or is_system):
+                    continue
+                total += 1
+                if c.status == "running":
+                    running += 1
+                if is_lab:
+                    lab += 1
+                elif is_system:
+                    system += 1
+            return {
+                "available": True,
+                "total": total,
+                "running": running,
+                "system": system,
+                "lab": lab,
+            }
+        except Exception as exc:  # pragma: no cover - defensive
+            return {"available": False, "error": str(exc)[:160]}
 
 
 # ─── Technology Management ───────────────────────────────────────────
@@ -2638,6 +2710,37 @@ class AdminMonitoringContainersView(APIView):
             if is_system:
                 add_container(c, "system")
 
+        # Attribute the locally-visible containers to the node serving this
+        # request, and (when clustered) describe the nodes whose Docker engines
+        # we cannot yet reach — so the UI shows the full picture rather than
+        # implying these are the only containers in the fleet.
+        from . import cluster_topology
+
+        topology = cluster_topology.load_topology()
+        local_node = cluster_topology.local_node_identity() if topology.get("is_cluster") else {}
+        local_node_key = local_node.get("key") or (
+            getattr(settings, "MONITORING_NODE_NAME", "") or None
+        )
+        local_node_name = local_node.get("name") or local_node_key
+        for c in containers:
+            c["node"] = local_node_key
+            c["node_name"] = local_node_name
+
+        nodes_meta = []
+        if topology.get("is_cluster"):
+            for cnode in topology.get("nodes", []):
+                is_local = bool(local_node_key) and cnode.get("key") == local_node.get("key")
+                nodes_meta.append({
+                    "key": cnode.get("key"),
+                    "name": cnode.get("name"),
+                    "role": cnode.get("role"),
+                    "ip": cnode.get("ip"),
+                    "services": cnode.get("services", []),
+                    "is_local": is_local,
+                    # We can only enumerate containers on the local Docker socket.
+                    "containers_available": is_local,
+                })
+
         if kind_filter != "all":
             containers = [x for x in containers if x["kind"] == kind_filter]
 
@@ -2648,6 +2751,10 @@ class AdminMonitoringContainersView(APIView):
             "running": running,
             "lab_count": sum(1 for x in containers if x["kind"] == "lab"),
             "system_count": sum(1 for x in containers if x["kind"] == "system"),
+            "is_cluster": bool(topology.get("is_cluster")),
+            "local_node": local_node_name,
+            "local_node_key": local_node_key,
+            "nodes": nodes_meta,
         })
 
 
@@ -2788,29 +2895,57 @@ class AdminNodeMetricsView(APIView):
 
 
 class AdminFleetMonitoringView(APIView):
-    """GET /api/admin/monitoring/fleet/ — metrics for EVERY configured node.
+    """GET /api/admin/monitoring/fleet/ — metrics for EVERY node in the fleet.
 
-    Always includes the local node, then fetches each peer listed in
-    ``settings.MONITORING_SERVERS`` by calling its own metrics endpoint
-    (best-effort, short timeout). Unreachable peers are returned with
-    ``status: "offline"`` and an ``error`` — this view NEVER 500s.
+    Topology-aware:
+
+    * **four-droplet cluster** (``infra/digitalocean/cluster.json``): returns a
+      card for ALL configured nodes (edge / app / data / labs) with their role,
+      private/public IP and service list. Live CPU/mem/disk metrics are attached
+      to the node serving the request; peers are enriched from
+      ``settings.MONITORING_SERVERS`` when a metrics agent is wired, and
+      TCP-probed for reachability otherwise. No node is ever silently dropped.
+    * **single host**: local node plus any ``MONITORING_SERVERS`` peers
+      (previous behaviour).
+
+    Per-node ``status``:
+      ``online``     — live host metrics available
+      ``reachable``  — host answers on a service port but no metrics agent yet
+      ``unknown``    — listed in topology, reachability could not be confirmed
+      ``offline``    — peer that should expose metrics but is unreachable
+
+    This view NEVER 500s.
     """
 
     permission_classes = [IsPlatformAdmin]
-    CACHE_KEY = "admin_fleet_metrics_v1"
+    CACHE_KEY = "admin_fleet_metrics_v2"
     CACHE_TTL = 8
 
     def get(self, request):
-        from .server_metrics import collect_local_metrics
+        from . import cluster_topology
 
         if request.query_params.get("refresh") != "1":
             cached = cache.get(self.CACHE_KEY)
             if cached is not None:
                 return Response(cached)
 
-        nodes = []
+        topology = cluster_topology.load_topology()
+        if topology.get("is_cluster"):
+            payload = self._build_cluster(topology)
+        else:
+            payload = self._build_single_host()
 
-        # 1) Local node — always present.
+        payload["topology"] = topology.get("topology")
+        payload["is_cluster"] = bool(topology.get("is_cluster"))
+        payload["collected_at"] = timezone.now().isoformat()
+        cache.set(self.CACHE_KEY, payload, self.CACHE_TTL)
+        return Response(payload)
+
+    # ── single-host fleet (unchanged behaviour) ──────────────────────────────
+    def _build_single_host(self):
+        from .server_metrics import collect_local_metrics
+
+        nodes = []
         try:
             local = collect_local_metrics(
                 node_name=getattr(settings, "MONITORING_NODE_NAME", "") or None
@@ -2819,20 +2954,146 @@ class AdminFleetMonitoringView(APIView):
             local = {"name": "local", "status": "online", "error": str(exc), "is_local": True}
         nodes.append(local)
 
-        # 2) Remote peers (best-effort).
         for spec in getattr(settings, "MONITORING_SERVERS", []) or []:
             nodes.append(self._fetch_peer(spec))
 
+        return self._summarise(nodes)
+
+    # ── 4-droplet cluster fleet ───────────────────────────────────────────────
+    def _build_cluster(self, topology):
+        from . import cluster_topology
+        from .server_metrics import collect_local_metrics
+
+        local_identity = cluster_topology.local_node_identity()
+        local_key = local_identity.get("key")
+
+        # Index peer specs from MONITORING_SERVERS by host so a node can pull its
+        # own live metrics from a wired sibling agent (matched on IP or name).
+        peer_specs = {}
+        for spec in getattr(settings, "MONITORING_SERVERS", []) or []:
+            name, base_url = self._parse_spec(spec)
+            if base_url:
+                peer_specs[self._host_of(base_url)] = (name, base_url)
+
+        nodes = []
+        for cnode in topology.get("nodes", []):
+            card = self._base_card(cnode)
+
+            if cnode.get("key") and cnode.get("key") == local_key:
+                # This is the host serving the request → attach live metrics.
+                try:
+                    live = collect_local_metrics(node_name=cnode["name"])
+                except Exception as exc:
+                    live = {"status": "online", "error": str(exc)}
+                card.update(live)
+                card.update(self._base_card(cnode))  # keep topology fields authoritative
+                card["is_local"] = True
+                card["status"] = "online"
+                card["metrics_source"] = "local"
+                nodes.append(card)
+                continue
+
+            # Remote node: try a wired metrics agent first (by IP / name).
+            spec = self._match_peer_spec(cnode, peer_specs)
+            if spec:
+                fetched = self._fetch_peer(f"{spec[0]}={spec[1]}")
+                if fetched.get("status") == "online":
+                    # Live metrics — keep topology metadata authoritative.
+                    fetched.update(self._base_card(cnode))
+                    fetched["status"] = "online"
+                    fetched["metrics_source"] = "agent"
+                    fetched["is_local"] = False
+                    nodes.append(fetched)
+                    continue
+                card["error"] = fetched.get("error")
+
+            # No agent (or agent unreachable): TCP-probe for reachability so the
+            # operator still sees the node up, just without host metrics.
+            reachable, probe_err = self._probe(cnode)
+            card["status"] = "reachable" if reachable else "unknown"
+            card["metrics_source"] = "none"
+            card["metrics_available"] = False
+            if not reachable and not card.get("error"):
+                card["error"] = probe_err or "no metrics agent wired; reachability unconfirmed"
+            elif reachable and not card.get("error"):
+                card["error"] = "host reachable — host metrics need a monitoring agent"
+            nodes.append(card)
+
+        payload = self._summarise(nodes)
+        payload["cluster"] = topology.get("meta", {})
+        return payload
+
+    @staticmethod
+    def _base_card(cnode):
+        """Topology-derived fields shown on every cluster node card."""
+        return {
+            "name": cnode.get("name"),
+            "node_key": cnode.get("key"),
+            "role": cnode.get("role"),
+            "ip": cnode.get("ip"),
+            "private_ipv4": cnode.get("private_ipv4"),
+            "public_ipv4": cnode.get("public_ipv4"),
+            "public": cnode.get("public"),
+            "services": cnode.get("services", []),
+            "droplet_id": cnode.get("droplet_id"),
+            "is_local": False,
+        }
+
+    @staticmethod
+    def _summarise(nodes):
         online = sum(1 for n in nodes if n.get("status") == "online")
-        payload = {
+        reachable = sum(1 for n in nodes if n.get("status") == "reachable")
+        unknown = sum(1 for n in nodes if n.get("status") == "unknown")
+        return {
             "nodes": nodes,
             "total": len(nodes),
             "online": online,
-            "offline": len(nodes) - online,
-            "collected_at": timezone.now().isoformat(),
+            "reachable": reachable,
+            "unknown": unknown,
+            "offline": len(nodes) - online - reachable - unknown,
         }
-        cache.set(self.CACHE_KEY, payload, self.CACHE_TTL)
-        return Response(payload)
+
+    @staticmethod
+    def _host_of(base_url):
+        from urllib.parse import urlparse
+
+        try:
+            return (urlparse(base_url).hostname or "").lower()
+        except Exception:
+            return ""
+
+    def _match_peer_spec(self, cnode, peer_specs):
+        """Find a MONITORING_SERVERS entry whose host matches this node's IPs/name."""
+        keys = {
+            (cnode.get("private_ipv4") or "").lower(),
+            (cnode.get("public_ipv4") or "").lower(),
+            (cnode.get("ip") or "").lower(),
+            (cnode.get("name") or "").lower(),
+            (cnode.get("key") or "").lower(),
+        }
+        for host, spec in peer_specs.items():
+            if host in keys and host:
+                return spec
+        return None
+
+    @staticmethod
+    def _probe(cnode):
+        """Best-effort TCP reachability probe against a node's likely service ports."""
+        import socket
+
+        host = cnode.get("private_ipv4") or cnode.get("public_ipv4") or cnode.get("ip")
+        if not host:
+            return False, "no address in topology"
+        # Ports we might plausibly reach per role; first success wins.
+        ports = [80, 443, 8000, 22]
+        last_err = None
+        for port in ports:
+            try:
+                with socket.create_connection((host, port), timeout=1.5):
+                    return True, None
+            except Exception as exc:  # noqa: BLE001
+                last_err = exc
+        return False, (str(last_err)[:120] if last_err else "unreachable")
 
     @staticmethod
     def _parse_spec(spec):

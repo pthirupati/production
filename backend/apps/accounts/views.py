@@ -322,6 +322,17 @@ class LoginView(APIView):
         except Exception:
             pass
 
+        def _record_login_failure():
+            # Count this as a brute-force attempt against (IP + email). Only
+            # failures consume the login throttle quota; successful logins do
+            # not, so legitimate / concurrent sign-ins are never locked out.
+            try:
+                throttle = LoginRateThrottle()
+                throttle.allow_request(request, self)  # primes throttle.key/now
+                throttle.record_failure(request, self)
+            except Exception:
+                pass
+
         # Look up user by email, then authenticate by username
         user_obj = User.objects.filter(email=email).first()
         if not user_obj:
@@ -342,6 +353,7 @@ class LoginView(APIView):
                 )
             except Exception:
                 pass
+            _record_login_failure()
             return Response({"error": "Invalid credentials"}, status=401)
 
         user = authenticate(username=user_obj.username, password=password)
@@ -366,6 +378,7 @@ class LoginView(APIView):
                 )
             except Exception:
                 pass
+            _record_login_failure()
             return Response({"error": "Invalid credentials"}, status=401)
 
         if not user.is_active:

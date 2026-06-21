@@ -2,6 +2,7 @@ import { useState } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
+import { useRevealOnScroll } from '../hooks/useRevealOnScroll'
 import {
   Building2, Send, CheckCircle2, Users, ShieldCheck, Sparkles,
   Mail, ArrowRight,
@@ -39,6 +40,10 @@ export default function ContactSales() {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [errors, setErrors] = useState({})
+
+  // `.reveal` blocks start hidden until `.visible` is added — reveal on scroll
+  // so the form and value props aren't permanently invisible.
+  useRevealOnScroll([sent])
 
   const validate = () => {
     const e = {}

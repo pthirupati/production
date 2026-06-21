@@ -2,6 +2,7 @@ import { useState } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
+import { useRevealOnScroll } from '../hooks/useRevealOnScroll'
 import { Mail, Phone, MapPin, Send, Mic, Clock, Twitter, Github, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -59,6 +60,10 @@ export default function Contact() {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [errors, setErrors] = useState({})
+
+  // `.reveal` blocks start hidden until `.visible` is added — reveal on scroll
+  // so the form and contact info aren't permanently invisible.
+  useRevealOnScroll([sent])
 
   const validate = () => {
     const e = {}

@@ -1,11 +1,80 @@
 """
 Custom DRF throttles for resource-intensive operations.
 """
-from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle, SimpleRateThrottle
 
 
-class LoginRateThrottle(AnonRateThrottle):
+class LoginRateThrottle(SimpleRateThrottle):
+    """
+    Brute-force protection for the login endpoint.
+
+    Unlike a plain AnonRateThrottle (which counts *every* request keyed on IP
+    alone), this throttle:
+
+      * Keys on (client IP + target email), so it caps guesses against a single
+        account from a single source — the actual brute-force vector — instead
+        of collectively rate-limiting every user behind a shared egress IP
+        (corporate NAT, VPN, or a CI/E2E container firing many logins).
+      * Only counts *failed* attempts. A correct-credential login never consumes
+        quota, so legitimate users (and reasonable concurrent logins) are never
+        locked out no matter how often they sign in. The view calls
+        ``record_failure`` only on an authentication failure.
+
+    The ``login`` rate in DEFAULT_THROTTLE_RATES is therefore a ceiling on
+    *wrong-password attempts per account per IP per minute*, not on total logins.
+    """
     scope = 'login'
+
+    def get_cache_key(self, request, view):
+        ident = self.get_ident(request)
+        # Email is the account being targeted; fall back to ident-only if absent.
+        email = ""
+        data = getattr(request, "data", None)
+        if isinstance(data, dict):
+            email = (data.get("email") or "").strip().lower()
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": f"{ident}:{email}" if email else ident,
+        }
+
+    def allow_request(self, request, view):
+        """
+        Check the recorded *failure* history without recording this request.
+
+        Successful logins go through here too but never add to the history, so
+        they cannot exhaust the bucket. Recording happens explicitly via
+        ``record_failure`` from the view on a failed authentication.
+        """
+        if self.rate is None:
+            return True
+
+        self.key = self.get_cache_key(request, view)
+        if self.key is None:
+            return True
+
+        self.history = self.cache.get(self.key, [])
+        self.now = self.timer()
+
+        # Drop attempts that have aged out of the throttle window.
+        while self.history and self.history[-1] <= self.now - self.duration:
+            self.history.pop()
+
+        # Block only once too many *failures* have accumulated.
+        if len(self.history) >= self.num_requests:
+            return self.throttle_failure()
+        return True
+
+    def record_failure(self, request, view=None):
+        """Record one failed login attempt against (IP + email)."""
+        if self.rate is None:
+            return
+        key = getattr(self, "key", None) or self.get_cache_key(request, view)
+        if key is None:
+            return
+        now = getattr(self, "now", None) or self.timer()
+        history = self.cache.get(key, [])
+        history.insert(0, now)
+        self.cache.set(key, history, self.duration)
 
 
 class OTPRateThrottle(AnonRateThrottle):

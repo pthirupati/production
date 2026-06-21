@@ -3,7 +3,30 @@ import { adminApi } from '../../api/admin'
 import {
   Server, Cpu, MemoryStick, HardDrive, Activity,
   Clock, Network, Wifi, WifiOff, AlertTriangle, ListTree,
+  Globe, Lock, HelpCircle, Boxes,
 } from 'lucide-react'
+
+// ─── Role / status presentation ────────────────────────────────────────────────
+
+const ROLE_LABEL = { edge: 'Edge', app: 'App', data: 'Database', db: 'Database', labs: 'Labs' }
+
+// Per-node status → badge style. The fleet API can now return four states:
+//   online    — live host metrics available
+//   reachable — host answers on a port but no metrics agent wired yet
+//   unknown   — listed in topology, reachability unconfirmed
+//   offline   — peer that should expose metrics but is unreachable
+function statusStyle(status) {
+  switch (status) {
+    case 'online':
+      return { label: 'ONLINE', icon: Wifi, cls: 'bg-accent-green/10 text-accent-green border-accent-green/25' }
+    case 'reachable':
+      return { label: 'REACHABLE', icon: Wifi, cls: 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/25' }
+    case 'unknown':
+      return { label: 'UNKNOWN', icon: HelpCircle, cls: 'bg-surface-700/40 text-surface-300 border-surface-600/40' }
+    default:
+      return { label: 'OFFLINE', icon: WifiOff, cls: 'bg-accent-red/10 text-accent-red border-accent-red/25' }
+  }
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -96,54 +119,110 @@ function MetricBar({ icon: Icon, label, value, detail }) {
   )
 }
 
+// ─── Service chips ───────────────────────────────────────────────────────────--
+
+function ServiceList({ services }) {
+  return (
+    <div>
+      <p className="flex items-center gap-1 text-[10px] text-surface-500 mb-1.5">
+        <Boxes size={11} /> Services ({services.length})
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {services.map((s) => (
+          <span
+            key={s}
+            className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-surface-800/60 text-surface-300 border border-surface-700/40"
+          >
+            {s}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── Server card ───────────────────────────────────────────────────────────────
 
 function ServerCard({ node }) {
   const online = node.status === 'online'
   const cpu = pctClass(node.cpu_percent)
+  const st = statusStyle(node.status)
+  const StatusIcon = st.icon
+  const role = node.role
+  const roleLabel = role ? (ROLE_LABEL[role] || role) : null
+  const services = node.services || []
 
-  const cardClass = !online
+  const cardClass = node.status === 'offline'
     ? 'border-accent-red/25 bg-accent-red/5'
-    : (node.cpu_percent >= 90 || node.mem_percent >= 90 || node.disk_percent >= 90)
-      ? 'border-accent-amber/25 bg-accent-amber/[0.04]'
-      : 'border-surface-700/50 bg-surface-900/40'
+    : !online
+      ? 'border-surface-700/50 bg-surface-900/30'
+      : (node.cpu_percent >= 90 || node.mem_percent >= 90 || node.disk_percent >= 90)
+        ? 'border-accent-amber/25 bg-accent-amber/[0.04]'
+        : 'border-surface-700/50 bg-surface-900/40'
+
+  const iconWrap = node.status === 'offline'
+    ? 'bg-accent-red/10' : online ? 'bg-accent-cyan/10' : 'bg-surface-700/30'
+  const iconColor = node.status === 'offline'
+    ? 'text-accent-red' : online ? 'text-accent-cyan' : 'text-surface-300'
 
   return (
     <div className={`rounded-2xl border p-5 transition-all ${cardClass}`}>
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-4">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className={`p-2 rounded-xl shrink-0 ${online ? 'bg-accent-cyan/10' : 'bg-accent-red/10'}`}>
-            <Server size={16} className={online ? 'text-accent-cyan' : 'text-accent-red'} />
+          <div className={`p-2 rounded-xl shrink-0 ${iconWrap}`}>
+            <Server size={16} className={iconColor} />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-sm font-semibold text-white truncate">{node.name || node.hostname || 'node'}</p>
+              {roleLabel && (
+                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-accent-cyan/12 text-accent-cyan shrink-0">
+                  {roleLabel}
+                </span>
+              )}
               {node.is_local && (
                 <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-accent-purple/15 text-accent-purple shrink-0">
                   local
                 </span>
               )}
+              {node.public != null && (
+                node.public
+                  ? <Globe size={11} className="text-surface-500 shrink-0" title="Public node" />
+                  : <Lock size={11} className="text-surface-500 shrink-0" title="Private (VPC only)" />
+              )}
             </div>
             <p className="text-[11px] text-surface-500 font-mono flex items-center gap-1 truncate">
-              <Network size={10} /> {node.ip || 'n/a'}
+              <Network size={10} /> {node.ip || node.private_ipv4 || 'n/a'}
+              {node.public_ipv4 && node.public_ipv4 !== node.ip && (
+                <span className="text-surface-600"> · {node.public_ipv4}</span>
+              )}
             </p>
           </div>
         </div>
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${
-          online
-            ? 'bg-accent-green/10 text-accent-green border-accent-green/25'
-            : 'bg-accent-red/10 text-accent-red border-accent-red/25'
-        }`}>
-          {online ? <Wifi size={10} /> : <WifiOff size={10} />}
-          {online ? 'ONLINE' : 'OFFLINE'}
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${st.cls}`}>
+          <StatusIcon size={10} />
+          {st.label}
         </span>
       </div>
 
       {!online ? (
-        <div className="flex items-center gap-2 text-[12px] text-accent-red/80 bg-accent-red/5 rounded-lg px-3 py-2.5">
-          <AlertTriangle size={14} className="shrink-0" />
-          <span className="truncate" title={node.error}>{node.error || 'Node unreachable'}</span>
+        <div className="space-y-3">
+          <div className={`flex items-start gap-2 text-[12px] rounded-lg px-3 py-2.5 ${
+            node.status === 'offline'
+              ? 'text-accent-red/80 bg-accent-red/5'
+              : 'text-surface-400 bg-surface-800/30'
+          }`}>
+            {node.status === 'offline'
+              ? <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+              : <HelpCircle size={14} className="shrink-0 mt-0.5" />}
+            <span title={node.error}>
+              {node.error || (node.status === 'reachable'
+                ? 'Host reachable — host metrics need a monitoring agent'
+                : 'Host metrics unavailable')}
+            </span>
+          </div>
+          {services.length > 0 && <ServiceList services={services} />}
         </div>
       ) : (
         <>
@@ -193,6 +272,12 @@ function ServerCard({ node }) {
               </p>
             </div>
           </div>
+
+          {services.length > 0 && (
+            <div className="pt-3 mt-3 border-t border-surface-800/60">
+              <ServiceList services={services} />
+            </div>
+          )}
         </>
       )}
     </div>
@@ -226,16 +311,29 @@ export default function ServerMonitoring({ refreshMs = 10000, className = '' }) 
   }, [load, refreshMs])
 
   const nodes = fleet?.nodes || []
+  // "live" = nodes reporting host metrics; "up" = live + reachable hosts.
+  const liveCount = fleet?.online ?? 0
+  const upCount = liveCount + (fleet?.reachable ?? 0)
+  const clusterMeta = fleet?.cluster || {}
+  const topologyLabel = fleet?.is_cluster
+    ? `${fleet.total}-node cluster${clusterMeta.region ? ` · ${clusterMeta.region}` : ''}`
+    : 'single host'
 
   return (
     <div className={`glass-card p-6 ${className}`}>
       <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-white flex items-center gap-2 flex-wrap">
           <Server size={18} className="text-accent-cyan" />
           Server Monitoring
           {fleet && (
             <span className="text-xs font-normal text-surface-500 ml-1">
-              ({fleet.online}/{fleet.total} online)
+              ({upCount}/{fleet.total} up
+              {liveCount < upCount ? ` · ${liveCount} reporting metrics` : ''})
+            </span>
+          )}
+          {fleet && (
+            <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-800/60 text-surface-400 border border-surface-700/50">
+              {topologyLabel}
             </span>
           )}
         </h2>
@@ -248,6 +346,18 @@ export default function ServerMonitoring({ refreshMs = 10000, className = '' }) 
           )}
         </div>
       </div>
+
+      {/* Cluster note: clarify when nodes are listed without live host metrics */}
+      {fleet?.is_cluster && (fleet.reachable > 0 || fleet.unknown > 0) && (
+        <div className="mb-4 flex items-start gap-2 text-[11px] text-surface-400 bg-surface-800/30 border border-surface-700/40 rounded-lg px-3 py-2">
+          <HelpCircle size={13} className="shrink-0 mt-0.5 text-surface-500" />
+          <span>
+            Showing all {fleet.total} cluster nodes from topology. Host metrics
+            (CPU/memory/disk) are live on the local node; remote nodes need a
+            monitoring agent — until then they show role, IP and reachability.
+          </span>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">

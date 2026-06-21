@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
 import { FixitPanel } from '../components/design'
+import { useRevealOnScroll } from '../hooks/useRevealOnScroll'
 import api from '../api/client'
 import {
   Terminal, Shield, Cloud, Server, Users, Award, Target,
@@ -206,6 +207,10 @@ export default function About() {
       .then(res => setStats(prev => ({ ...prev, ...res.data })))
       .catch(() => {})
   }, [])
+
+  // Values, milestones, and team cards use `.reveal` (opacity:0 until
+  // `.visible` is added). Reveal them on scroll so the page isn't blank.
+  useRevealOnScroll()
 
   const fmtNum = (n) => {
     const v = Number(n) || 0

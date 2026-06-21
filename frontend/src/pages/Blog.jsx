@@ -8,6 +8,7 @@ import api from '../api/client'
 import { BLOG_FALLBACK_POSTS, BLOG_CATEGORIES, getCategoryClass } from '../data/blogFallback'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
+import { useRevealOnScroll } from '../hooks/useRevealOnScroll'
 
 function mergePosts(apiPosts) {
   const bySlug = new Map()
@@ -92,6 +93,11 @@ export default function Blog() {
 
   const featured = filtered.find(p => p.featured) || filtered[0]
   const rest = filtered.filter(p => p.slug !== featured?.slug)
+
+  // `.reveal` cards start hidden (opacity:0) until `.visible` is added; without
+  // this they stayed invisible and the article grid looked empty. Re-scan when
+  // loading finishes or the filtered list changes so new cards get observed.
+  useRevealOnScroll([loading, filtered])
 
   return (
     <MarketingPageShell
