@@ -49,7 +49,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3G
+          # 5G so the unit-test process (run via exec, with celery paused by the CI
+          # job to free host RAM) doesn't hit the cgroup limit and OOM (status 137).
+          memory: 5G
         reservations:
           memory: 512M
     restart: unless-stopped

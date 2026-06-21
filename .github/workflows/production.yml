@@ -560,10 +560,10 @@ jobs:
           script: |
             set -e
             cd /opt/fixitlab
-            EMAIL="${{ secrets.PROD_SUPERUSER_EMAIL }}"
-            PASS="${{ secrets.PROD_SUPERUSER_PASSWORD }}"
-            if [ -z "$EMAIL" ]; then EMAIL="${{ secrets.STAGING_SUPERUSER_EMAIL }}"; fi
-            if [ -z "$PASS" ]; then PASS="${{ secrets.STAGING_SUPERUSER_PASSWORD }}"; fi
+            # Read the deployed (rotated) admin creds from .env.production — the
+            # GitHub secret can't be written (403) so it would be stale → admin 401.
+            EMAIL="$(grep '^SUPERUSER_EMAIL=' .env.production | head -1 | cut -d= -f2- | tr -d '\r')"
+            PASS="$(grep '^SUPERUSER_PASSWORD=' .env.production | head -1 | cut -d= -f2- | tr -d '\r')"
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
               env SUPERUSER_EMAIL="$EMAIL" SUPERUSER_PASSWORD="$PASS" \
               JWT_SESSION_ENFORCEMENT=0 E2E_SKIP_EMAIL=1 \
@@ -612,10 +612,10 @@ jobs:
           script: |
             set -e
             cd /opt/fixitlab
-            EMAIL="${{ secrets.PROD_SUPERUSER_EMAIL }}"
-            PASS="${{ secrets.PROD_SUPERUSER_PASSWORD }}"
-            if [ -z "$EMAIL" ]; then EMAIL="${{ secrets.STAGING_SUPERUSER_EMAIL }}"; fi
-            if [ -z "$PASS" ]; then PASS="${{ secrets.STAGING_SUPERUSER_PASSWORD }}"; fi
+            # Read the deployed (rotated) admin creds from .env.production — the
+            # GitHub secret can't be written (403) so it would be stale → admin 401.
+            EMAIL="$(grep '^SUPERUSER_EMAIL=' .env.production | head -1 | cut -d= -f2- | tr -d '\r')"
+            PASS="$(grep '^SUPERUSER_PASSWORD=' .env.production | head -1 | cut -d= -f2- | tr -d '\r')"
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
               env SUPERUSER_EMAIL="$EMAIL" SUPERUSER_PASSWORD="$PASS" \
               JWT_SESSION_ENFORCEMENT=0 E2E_SKIP_EMAIL=1 \
@@ -1153,14 +1153,20 @@ jobs:
             set -e
             ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
               cd /opt/fixitlab
-              # Run in a fresh one-off container (NOT exec into the live backend):
-              # exec shares the running uvicorn's 3G cgroup limit and the test
-              # process OOM-killed (status 137). run --rm --no-deps gives the test
-              # the full memory budget with no uvicorn/celery competing.
-              docker compose -f docker-compose.app.yml --env-file .env.production run --rm --no-deps -T backend \
+              # Free RAM during the test: the 4 celery workers idle ~2-4GB and the
+              # test process OOM-killed (status 137) sharing the backend 3G cgroup.
+              # Pause celery, run the test via exec (proven to find the env), restore.
+              dc="docker compose -f docker-compose.app.yml --env-file .env.production"
+              $dc stop celery_worker celery_provisioning celery_maintenance celery_beat || true
+              set +e
+              $dc exec -T backend \
                 env SKIP_EMAIL_TESTS="${{ inputs.skip_email && 'true' || 'false' }}" \
                 python manage.py test tests.test_jira_webhooks tests.test_api_security tests.test_billing_webhooks \
                 --settings=config.test_settings --verbosity=2
+              rc=$?
+              set -e
+              $dc up -d celery_worker celery_provisioning celery_maintenance celery_beat || true
+              exit $rc
             '
 
   prepare-e2e-cluster:
@@ -1226,7 +1232,10 @@ jobs:
             set -e
             ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
               cd /opt/fixitlab
-              EMAIL="${{ secrets.PROD_SUPERUSER_EMAIL }}"; PASS="${{ secrets.PROD_SUPERUSER_PASSWORD }}"
+              # Admin creds come from the deployed .env.production (rotated each run),
+              # NOT a GitHub secret — the secret cannot be written (403) so it would be
+              # stale and admin login would 401. create_superuser syncs the DB to this.
+              EMAIL="$(grep "^SUPERUSER_EMAIL=" .env.production | head -1 | cut -d= -f2- | tr -d "\r")"; PASS="$(grep "^SUPERUSER_PASSWORD=" .env.production | head -1 | cut -d= -f2- | tr -d "\r")"
               docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
                 env SUPERUSER_EMAIL="$EMAIL" SUPERUSER_PASSWORD="$PASS" \
                 JWT_SESSION_ENFORCEMENT=0 E2E_SKIP_EMAIL=1 RUN_FULL_E2E=1 E2E_SKIP_LAB=0 \
