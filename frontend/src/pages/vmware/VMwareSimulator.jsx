@@ -792,7 +792,7 @@ export default function VMwareSimulator() {
   }
 
   const handleGuestAction = (sideEffect) => {
-    if (sideEffect?.action) runAction(sideEffect.action, sideEffect)
+    if (sideEffect?.action) runAction(sideEffect.action, sideEffect, { silent: !!sideEffect.silent })
   }
 
   const handleCtxAction = (action, payload) => {

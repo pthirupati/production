@@ -1207,27 +1207,74 @@ class RHELShell:
                 engine.boot.patching_done = True
             from .boot_sequence import PATCHING_OUTPUT, NEW_KERNEL, OLD_KERNEL
             return PATCHING_OUTPUT.format(old_kernel=OLD_KERNEL, new_kernel=NEW_KERNEL)
+        if "list" in line and "installed" in line:
+            return "Installed Packages\n" + "\n".join(
+                f"{n}.x86_64    {self._pkg_ver(n)}    @System"
+                for n in sorted(self.state.installed_packages))
         if "install" in line:
-            pkg = p[-1] if len(p) > 2 else "package"
-            return f"Last metadata expiration check: 0:00:01 ago\nInstalling:\n {pkg}    x86_64    simulated    rhel-9-base\nComplete!"
-        if "remove" in line:
-            return "Removed (simulated)."
+            names = [a for a in p[p.index("install") + 1:] if not a.startswith("-")] if "install" in p else []
+            if not names:
+                return "Error: Need to pass a list of pkgs to install"
+            db = self.state.installed_packages
+            already = [n for n in names if n in db]
+            todo = [n for n in names if n not in db]
+            if not todo:
+                msg = "\n".join(f"Package {db[n]} is already installed." for n in already)
+                return f"Last metadata expiration check: 0:00:01 ago\n{msg}\nDependencies resolved.\nNothing to do.\nComplete!"
+            for n in todo:
+                db[n] = self._rpm_nvra(n)
+            rows = "\n".join(f" {n}    x86_64    {self._pkg_ver(n)}    rhel-9-appstream" for n in todo)
+            return (f"Last metadata expiration check: 0:00:01 ago\nDependencies resolved.\nInstalling:\n{rows}\n"
+                    f"Transaction Summary\nInstall  {len(todo)} Package(s)\n"
+                    f"Installed:\n  " + "\n  ".join(db[n] for n in todo) + "\nComplete!")
+        if "remove" in line or "erase" in line:
+            verb = "remove" if "remove" in p else "erase"
+            names = [a for a in p[p.index(verb) + 1:] if not a.startswith("-")] if verb in p else []
+            db = self.state.installed_packages
+            removed = [n for n in names if db.pop(n, None) is not None]
+            if not removed:
+                return "No match for argument: " + " ".join(names) + "\nNo packages marked for removal."
+            return ("Dependencies resolved.\nRemoving:\n" + "\n".join(f" {n}" for n in removed)
+                    + f"\nRemove  {len(removed)} Package(s)\nRemoved:\n  "
+                    + "\n  ".join(removed) + "\nComplete!")
         if "repolist" in line:
             return "repo id                    status\nrhel-9-base                enabled"
         return "dnf: command completed (simulation)"
 
+    def _pkg_ver(self, name: str) -> str:
+        """version-release for a package (from the DB if installed, else a stub)."""
+        nvra = self.state.installed_packages.get(name) or self._rpm_nvra(name)
+        # strip leading "name-" and trailing ".arch"
+        body = nvra[len(name) + 1:] if nvra.startswith(name + "-") else nvra
+        return body.rsplit(".", 1)[0] if "." in body else body
+
+    def _rpm_nvra(self, name: str) -> str:
+        return f"{name}-1.0.0-1.el9.x86_64"
+
     def _cmd_rpm(self, p: list[str]) -> str:
-        line = " ".join(p)
+        db = self.state.installed_packages
         if "-i" in p or "--install" in p or "-U" in p or "--upgrade" in p:
-            pkg = p[-1] if p[-1] not in ("-i", "-U", "--install", "--upgrade") else "package"
-            return f"Preparing...\n   1:{pkg}\n   2:Complete!"
+            target = p[-1] if p[-1] not in ("-i", "-U", "--install", "--upgrade") else "package"
+            name = target.split("/")[-1]
+            if name.endswith(".rpm"):
+                name = name[:-4]
+            name = name.split("-")[0] or "package"
+            db.setdefault(name, self._rpm_nvra(name))
+            return f"Preparing...\n   1:{name}\nComplete!"
         if "-e" in p or "--erase" in p:
-            return "Removed (simulated)."
-        if "-qa" in p or "-q" in p:
-            k = self.state.kernel
-            if "kernel" in line:
-                return f"kernel-{k}"
-            return f"kernel-{k}\nglibc-2.34-100.el9.x86_64\nsystemd-252-13.el9.x86_64"
+            names = [a for a in p[1:] if not a.startswith("-")]
+            removed = [n for n in names if db.pop(n, None) is not None]
+            if not removed and names:
+                return f"error: package {names[0]} is not installed"
+            return ""
+        # -qa : list everything; -q <pkg> : query one (real wording on miss)
+        if "-qa" in p or ("-q" in p and "-a" in p):
+            return "\n".join(sorted(db.values()))
+        if "-q" in p or "--query" in p:
+            names = [a for a in p[1:] if not a.startswith("-")]
+            if not names:
+                return "no arguments given for query"
+            return "\n".join(db.get(n, f"package {n} is not installed") for n in names)
         return "rpm: OK"
 
     def _cmd_docker(self, p: list[str]) -> str:

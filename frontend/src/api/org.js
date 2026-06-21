@@ -5,6 +5,11 @@ export const orgApi = {
     const { data } = await api.get('/org/')
     return data
   },
+  async create(payload) {
+    // payload: { name, billing_email?, seat_limit? }
+    const { data } = await api.post('/org/create/', payload)
+    return data
+  },
   async get(slug) {
     const { data } = await api.get(`/org/${slug}/`)
     return data

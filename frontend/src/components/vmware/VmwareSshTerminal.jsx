@@ -7,6 +7,10 @@ import { ViNanoEditor } from './VmwareConsole'
  * (root / root13) over a simulated SSH session and runs the SAME shell as the
  * web console — including vi/nano editing, yum/apt y/N prompts, and reboot
  * (which closes the session like a real `ssh` does when the host reboots).
+ *
+ * It renders as a full console-style window (matching VmwareConsole): a modal
+ * overlay that can be minimized to a taskbar pill or maximized to fill the
+ * viewport — not a cramped inline box.
  */
 export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
   const shell = useMemo(() => createLinuxShell(vm), [vm?.id, vm?.hostname, vm?.ip, vm?.disk_gb, vm?.memory_mb, vm?.cpu])
@@ -30,6 +34,11 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
   const [confirm, setConfirm] = useState(null)
   const [confirmInput, setConfirmInput] = useState('')
   const [busy, setBusy] = useState(false)
+  // Window chrome: a full console-style terminal that can be minimized to a
+  // taskbar pill or maximized to (nearly) fill the viewport — same UX as the VM
+  // web console, not a tiny inline box.
+  const [minimized, setMinimized] = useState(false)
+  const [maximized, setMaximized] = useState(false)
 
   const inputRef = useRef(null)
   const scrollRef = useRef(null)
@@ -45,11 +54,11 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-  }, [lines, phase, confirm])
+  }, [lines, phase, confirm, minimized, maximized])
 
   useEffect(() => {
-    if (!editor && (phase === 'shell' || phase === 'password')) inputRef.current?.focus()
-  }, [phase, editor, confirm, busy])
+    if (!minimized && !editor && (phase === 'shell' || phase === 'password')) inputRef.current?.focus()
+  }, [phase, editor, confirm, busy, minimized])
 
   const streamChunks = useCallback((chunks, doneLines) => {
     setBusy(true)
@@ -79,7 +88,7 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
     append(`${c.promptText}${answerRaw}`)
     setConfirm(null)
     setConfirmInput('')
-    if (yes) streamChunks(c.onYesStream.chunks, c.onYesStream.doneLines)
+    if (yes) { c.onYesStream.commit?.(); streamChunks(c.onYesStream.chunks, c.onYesStream.doneLines) }
     else append(c.onNoLines)
   }, [append, confirm, streamChunks])
 
@@ -96,11 +105,21 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
       return
     }
     if (result.confirm) { append(result.lines); setConfirm(result.confirm); setConfirmInput(''); return }
-    if (result.stream) { append(result.lines); streamChunks(result.stream.chunks, result.stream.doneLines); return }
+    if (result.stream) {
+      append(result.lines)
+      // Commit the package transaction now (implied by -y) so a later rpm -q /
+      // dnf list installed reflects the install/removal.
+      result.stream.commit?.()
+      streamChunks(result.stream.chunks, result.stream.doneLines)
+      return
+    }
     append(result.lines)
   }, [append, ip, streamChunks])
 
   const onKeyDown = (e) => {
+    // Own the keyboard while focused (esp. Escape) so the simulator's document
+    // listener doesn't close this terminal mid-session.
+    e.stopPropagation()
     if (phase === 'failed' || phase === 'closed') return
     if (phase === 'password') {
       if (e.key === 'Enter') {
@@ -143,59 +162,138 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
     }
   }
 
+  // Minimized -> a small taskbar pill at the bottom of the screen (like a window
+  // you've collapsed); click to restore. Lives in a fixed overlay so it is not
+  // clipped by the SSH drawer that mounts it.
+  if (minimized) {
+    return (
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[120]">
+        <button
+          type="button"
+          onClick={() => setMinimized(false)}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#1b2a3b] border border-[#2d3a4a] shadow-xl text-[#8fa5b8] hover:text-white font-mono text-xs"
+        >
+          <span className="text-[#5DB85D]">{'▣'}</span>
+          SSH - root@{vm?.hostname || vm?.name}
+          <span className="text-[10px] text-[#5b9bf5]">(restore)</span>
+        </button>
+      </div>
+    )
+  }
+
+  const footerHint = editor
+    ? (editor.tool === 'nano' ? 'nano - ^O save / ^X exit / ^C cancel' : 'vi - i/a/o insert / Esc command mode / :wq save / :q! quit')
+    : confirm ? 'Type y to proceed or n to abort, then Enter'
+    : phase === 'password' ? 'Hint: password root13'
+    : phase === 'shell' ? 'Connected over SSH / same shell as the console / vi & nano edit & save / arrow keys for history'
+    : phase === 'closed' ? 'Session closed - close this window or reconnect from the SSH panel'
+    : phase === 'failed' ? 'Connection failed - verify the guest is up and the IP/VLAN is correct'
+    : 'Establishing SSH session...'
+
+  // Same full-screen modal chrome as the VM web console.
+  const shellSize = maximized
+    ? 'w-[98vw] h-[94vh] max-w-none'
+    : 'w-full max-w-[900px] h-[580px] max-h-[90vh]'
+
   return (
-    <div className="relative rounded-lg border border-[#2d3a4a] bg-[#05090f] font-mono text-[11px] leading-relaxed min-h-[280px] flex flex-col">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#2d3a4a] bg-[#1b2a3b]">
-        <span className="text-[#8fa5b8]">SSH — root@{vm?.hostname || vm?.name} ({ip})</span>
-        {onClose && <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-[#2d3a4a]">Close</button>}
-      </div>
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 max-h-[420px]" onClick={() => !editor && inputRef.current?.focus()}>
-        {lines.map((l, i) => (
-          <div key={i} className={l.startsWith('$') || l.includes('password') || l.startsWith('[  OK  ]') ? 'text-[#5DB85D]' : l.startsWith('[') ? 'text-[#8fa5b8]' : 'text-[#E8EDF2]'}>{l || ' '}</div>
-        ))}
-
-        {phase === 'password' && (
-          <div className="flex items-center gap-1 text-[#5DB85D] mt-1">
-            <span>Password:</span>
-            <input ref={inputRef} autoFocus type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={onKeyDown} className="flex-1 bg-transparent border-none outline-none text-[#E8EDF2] font-mono" />
+    <div className="vm-modal-overlay" onMouseDown={e => e.target === e.currentTarget && onClose?.()}>
+      <div
+        className={`vm-modal relative ${shellSize} flex flex-col p-0 overflow-hidden`}
+        onMouseDown={e => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-[#1B2A3B] border-b border-[#2D3A4A] shrink-0">
+          <div className="flex gap-1.5">
+            <span className="w-[11px] h-[11px] rounded-full bg-[#D9534F]" />
+            <span className="w-[11px] h-[11px] rounded-full bg-[#F5A623]" />
+            <span className="w-[11px] h-[11px] rounded-full bg-[#5DB85D]" />
           </div>
+          <span className="font-mono text-xs text-[#8FA5B8]">SSH - root@{vm?.hostname || vm?.name} ({ip})</span>
+          <span className="text-[10px] text-[#8FA5B8] ml-2 hidden sm:inline">Hint: password root13</span>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={() => setMinimized(true)}
+            title="Minimize"
+            aria-label="Minimize SSH window"
+            className="flex items-center justify-center w-7 h-6 rounded text-[#8FA5B8] hover:text-white hover:bg-[#2D3A4A] text-sm leading-none"
+          >
+            {'–'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMaximized(m => !m)}
+            title={maximized ? 'Restore' : 'Maximize'}
+            aria-label={maximized ? 'Restore SSH window' : 'Maximize SSH window'}
+            className="flex items-center justify-center w-7 h-6 rounded text-[#8FA5B8] hover:text-white hover:bg-[#2D3A4A] text-[11px] leading-none"
+          >
+            {maximized ? '❐' : '▢'}
+          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              title="Close SSH window"
+              aria-label="Close SSH window"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[#8FA5B8] hover:text-white hover:bg-[#2D3A4A] text-xs"
+            >
+              <span className="text-[13px] leading-none">{'✕'}</span>
+              <span className="hidden sm:inline">Close</span>
+            </button>
+          )}
+        </div>
+
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto p-4 font-mono text-[12.5px] leading-relaxed bg-[#05090f] cursor-text"
+          onClick={() => !editor && inputRef.current?.focus()}
+        >
+          {lines.map((l, i) => (
+            <div key={i} className={l.startsWith('$') || l.includes('password') || l.startsWith('[  OK  ]') ? 'text-[#5DB85D]' : l.startsWith('[') ? 'text-[#8fa5b8]' : 'text-[#E8EDF2]'}>{l || ' '}</div>
+          ))}
+
+          {phase === 'password' && (
+            <div className="flex items-center gap-1 text-[#5DB85D] mt-1">
+              <span>Password:</span>
+              <input ref={inputRef} autoFocus type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={onKeyDown} className="flex-1 bg-transparent border-none outline-none text-[#E8EDF2] font-mono caret-[#5DB85D]" />
+            </div>
+          )}
+
+          {phase === 'shell' && confirm && !busy && (
+            <div className="flex items-center mt-1 text-[#E8EDF2]">
+              <span className="whitespace-nowrap">{confirm.promptText}</span>
+              <input ref={inputRef} autoFocus value={confirmInput} onChange={e => setConfirmInput(e.target.value)} onKeyDown={onKeyDown} maxLength={3} spellCheck={false} className="w-16 bg-transparent border-none outline-none text-[#E8EDF2] font-mono caret-[#5DB85D] ml-1" />
+            </div>
+          )}
+
+          {phase === 'shell' && !editor && !confirm && !busy && (
+            <div className="flex items-center mt-1">
+              <span className="text-[#5DB85D] whitespace-nowrap">{shell.prompt()}</span>
+              <input ref={inputRef} autoFocus value={cmd} onChange={e => setCmd(e.target.value)} onKeyDown={onKeyDown} className="flex-1 bg-transparent border-none outline-none text-[#E8EDF2] font-mono text-[12.5px] caret-[#5DB85D] ml-1" spellCheck={false} autoComplete="off" />
+            </div>
+          )}
+
+          {busy && phase === 'shell' && <div className="text-[#8fa5b8] animate-pulse mt-1">...</div>}
+
+          {phase === 'closed' && (
+            <p className="text-[#8fa5b8] mt-2">Session closed. Re-open the SSH panel to reconnect.</p>
+          )}
+          {phase === 'failed' && (
+            <p className="text-[#8fa5b8] mt-2">Guest may be hung or network misconfigured. Use the web console and verify IP/VLAN assignment.</p>
+          )}
+        </div>
+
+        {editor && (
+          <ViNanoEditor
+            tool={editor.tool}
+            path={editor.path}
+            initialContent={editor.content}
+            onFinish={finishEditor}
+          />
         )}
 
-        {phase === 'shell' && confirm && !busy && (
-          <div className="flex items-center mt-1 text-[#E8EDF2]">
-            <span className="whitespace-nowrap">{confirm.promptText}</span>
-            <input ref={inputRef} autoFocus value={confirmInput} onChange={e => setConfirmInput(e.target.value)} onKeyDown={onKeyDown} maxLength={3} spellCheck={false} className="w-16 bg-transparent border-none outline-none text-[#E8EDF2] font-mono caret-[#5DB85D] ml-1" />
-          </div>
-        )}
-
-        {phase === 'shell' && !editor && !confirm && !busy && (
-          <div className="flex items-center mt-1">
-            <span className="text-[#5DB85D]">{shell.prompt()}</span>
-            <input ref={inputRef} autoFocus value={cmd} onChange={e => setCmd(e.target.value)} onKeyDown={onKeyDown} className="flex-1 bg-transparent border-none outline-none text-[#E8EDF2] font-mono ml-1" spellCheck={false} autoComplete="off" />
-          </div>
-        )}
-
-        {busy && phase === 'shell' && <div className="text-[#8fa5b8] animate-pulse mt-1">…</div>}
-
-        {phase === 'closed' && (
-          <p className="text-[#8fa5b8] mt-2 text-[10px]">Session closed. Re-open the SSH panel to reconnect.</p>
-        )}
-        {phase === 'failed' && (
-          <p className="text-[#8fa5b8] mt-2 text-[10px]">Guest may be hung or network misconfigured. Use web console and verify IP/VLAN assignment.</p>
-        )}
-      </div>
-
-      {editor && (
-        <ViNanoEditor
-          tool={editor.tool}
-          path={editor.path}
-          initialContent={editor.content}
-          onFinish={finishEditor}
-        />
-      )}
-
-      <div className="px-3 py-1.5 border-t border-[#2d3a4a] text-[10px] text-[#8fa5b8]">
-        {editor ? (editor.tool === 'nano' ? 'nano — ^O save · ^X exit · ^C cancel' : 'vi — i insert · Esc normal · :wq save · :q! quit') : 'Hint: password root13 · same shell as the console'}
+        <div className="shrink-0 px-3.5 py-2 bg-[#1B2A3B] border-t border-[#2D3A4A] text-[10.5px] text-[#8FA5B8] font-mono">
+          {footerHint}
+        </div>
       </div>
     </div>
   )

@@ -245,6 +245,10 @@ export default function TechnologyDetail() {
   const hasProjects = projects.length > 0
   const hasScenarios = scenarios.length > 0
   const popularScenarios = [...scenarios].slice(0, 8)
+  // "Continue learning" jumps straight into the next scenario IN THIS technology
+  // (first uncompleted, else the first), keeping the user in-context instead of
+  // bouncing out to the global all-scenarios grid.
+  const nextScenario = scenarios.find(s => !s.user_progress?.completed) || scenarios[0]
 
   return (
     <motion.div
@@ -298,7 +302,7 @@ export default function TechnologyDetail() {
             </div>
             <div className="flex flex-col gap-2.5 items-stretch sm:items-end w-full sm:w-auto">
               <Link
-                to={hasScenarios ? `/scenarios?technology=${tech.slug}` : '/pricing'}
+                to={nextScenario ? `/scenarios/${nextScenario.slug}` : hasScenarios ? `/scenarios?technology=${tech.slug}` : '/pricing'}
                 className="inline-flex items-center justify-center gap-2 px-[18px] py-3 rounded-[11px] text-[13.5px] font-bold text-white bg-gradient-to-br from-accent-cyan to-accent-purple shadow-[0_8px_22px_-8px_rgb(var(--a-cyan))] hover:opacity-95 transition-opacity"
               >
                 <PlayCircle size={14} /> Continue learning

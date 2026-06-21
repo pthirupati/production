@@ -1153,7 +1153,11 @@ jobs:
             set -e
             ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
               cd /opt/fixitlab
-              docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
+              # Run in a fresh one-off container (NOT exec into the live backend):
+              # exec shares the running uvicorn's 3G cgroup limit and the test
+              # process OOM-killed (status 137). run --rm --no-deps gives the test
+              # the full memory budget with no uvicorn/celery competing.
+              docker compose -f docker-compose.app.yml --env-file .env.production run --rm --no-deps -T backend \
                 env SKIP_EMAIL_TESTS="${{ inputs.skip_email && 'true' || 'false' }}" \
                 python manage.py test tests.test_jira_webhooks tests.test_api_security tests.test_billing_webhooks \
                 --settings=config.test_settings --verbosity=2

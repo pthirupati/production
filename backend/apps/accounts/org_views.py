@@ -6,8 +6,10 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models import Count, Max
 from django.utils import timezone
+from django.utils.text import slugify
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -23,6 +25,93 @@ from .models import (
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+# Plan codes that include team/organization seats. The seat checkout flow uses
+# the "enterprise" Plan, and Contact-Sales deals are marked "won".
+TEAM_PLAN_CODES = ("enterprise",)
+
+
+def team_eligibility(user) -> dict:
+    """Decide whether ``user`` may create a team and how many seats they get.
+
+    A user qualifies for self-service team creation when ANY of the following
+    holds (most→least privileged):
+
+      * staff / superuser (platform operators);
+      * an admin-granted complimentary access flag;
+      * an active platform Subscription on a team/enterprise plan;
+      * a "won" Contact-Sales inquiry tied to their email (negotiated team deal);
+      * they already own/administer at least one organization (can spin up more).
+
+    Returns a dict ``{eligible, reason, seat_limit, owned_count}`` that both the
+    create endpoint and the "My Teams" listing use, so the gating rule lives in
+    exactly one place.
+    """
+    default_seats = int(getattr(settings, "DEFAULT_TEAM_SEATS", 10) or 10)
+
+    if user.is_staff or user.is_superuser:
+        return {"eligible": True, "reason": "staff", "seat_limit": default_seats}
+
+    # Admin-granted complimentary access (treated as full access elsewhere).
+    try:
+        from apps.billing.subscription_utils import user_has_complimentary_access
+
+        if user_has_complimentary_access(user):
+            return {"eligible": True, "reason": "complimentary", "seat_limit": default_seats}
+    except Exception:
+        pass
+
+    # Already owns/admins an org → allowed to create additional teams.
+    owned = OrganizationMember.objects.filter(
+        user=user, role__in=("owner", "admin"), organization__is_active=True,
+    ).count()
+    if owned:
+        return {"eligible": True, "reason": "existing_owner", "seat_limit": default_seats, "owned_count": owned}
+
+    # Active team/enterprise platform subscription.
+    try:
+        from apps.billing.models import Subscription
+
+        sub = (
+            Subscription.objects.filter(user=user, is_active=True)
+            .select_related("plan")
+            .first()
+        )
+        if sub and sub.plan and sub.plan.code in TEAM_PLAN_CODES:
+            if not sub.expires_at or sub.expires_at > timezone.now():
+                return {"eligible": True, "reason": "team_plan", "seat_limit": default_seats}
+    except Exception:
+        pass
+
+    # Won Contact-Sales deal matching the user's email.
+    try:
+        from apps.billing.models import SalesInquiry
+
+        if user.email and SalesInquiry.objects.filter(
+            work_email__iexact=user.email, status="won",
+        ).exists():
+            return {"eligible": True, "reason": "sales_deal", "seat_limit": default_seats}
+    except Exception:
+        pass
+
+    return {
+        "eligible": False,
+        "reason": "no_team_plan",
+        "seat_limit": 0,
+        "owned_count": owned,
+    }
+
+
+def _unique_org_slug(name: str) -> str:
+    """Slugify ``name`` and guarantee uniqueness against existing orgs."""
+    base = slugify(name)[:60] or f"team-{secrets.token_hex(3)}"
+    slug = base
+    i = 2
+    while Organization.objects.filter(slug=slug).exists():
+        suffix = f"-{i}"
+        slug = f"{base[: 60 - len(suffix)]}{suffix}"
+        i += 1
+    return slug
 
 
 def _org_payload(org, membership=None):
@@ -146,7 +235,90 @@ class MyOrganizationsView(APIView):
             _org_payload(m.organization, m)
             for m in memberships
         ]
-        return Response({"organizations": data})
+        eligibility = team_eligibility(request.user)
+        return Response({
+            "organizations": data,
+            # Frontend gating: whether to surface the "Create a team" flow.
+            "can_create_team": eligibility["eligible"],
+            "create_team_reason": eligibility["reason"],
+            "default_seat_limit": eligibility["seat_limit"],
+        })
+
+
+class CreateOrganizationView(APIView):
+    """POST /api/org/create/ — self-service team creation (subscription-gated).
+
+    The authenticated user becomes the org ``owner``. Only users whose
+    subscription/plan qualifies (see ``team_eligibility``) may create a team;
+    seat limit is derived from their entitlement.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    MAX_NAME_LEN = 200
+
+    def post(self, request):
+        eligibility = team_eligibility(request.user)
+        if not eligibility["eligible"]:
+            return Response(
+                {
+                    "error": "A team or enterprise plan is required to create a team. "
+                    "Upgrade your plan or contact sales to get started.",
+                    "error_code": "team_plan_required",
+                },
+                status=403,
+            )
+
+        name = (request.data.get("name") or "").strip()
+        if not name:
+            return Response({"error": "Team name is required."}, status=400)
+        if len(name) > self.MAX_NAME_LEN:
+            name = name[: self.MAX_NAME_LEN]
+
+        billing_email = (request.data.get("billing_email") or request.user.email or "").strip().lower()
+
+        # Allow caller to request fewer seats than entitled, never more.
+        requested_seats = request.data.get("seat_limit")
+        seat_limit = eligibility["seat_limit"]
+        try:
+            if requested_seats is not None:
+                seat_limit = min(int(requested_seats), eligibility["seat_limit"])
+        except (TypeError, ValueError):
+            pass
+        seat_limit = max(seat_limit, 1)
+
+        with transaction.atomic():
+            org = Organization.objects.create(
+                name=name,
+                slug=_unique_org_slug(name),
+                owner=request.user,
+                seat_limit=seat_limit,
+                billing_email=billing_email,
+            )
+            membership = OrganizationMember.objects.create(
+                organization=org,
+                user=request.user,
+                role="owner",
+                invited_email=request.user.email or "",
+            )
+
+        logger.info(
+            "Organization '%s' (%s) created by %s [reason=%s, seats=%s]",
+            org.name, org.slug, request.user.email, eligibility["reason"], seat_limit,
+        )
+
+        payload = _org_payload(org, membership)
+        payload["members"] = [
+            {
+                "id": request.user.id,
+                "email": request.user.email,
+                "username": request.user.username,
+                "role": "owner",
+                "joined_at": membership.joined_at.isoformat(),
+            }
+        ]
+        payload["pending_invites"] = []
+        return Response(payload, status=201)
 
 
 class OrganizationDetailView(APIView):

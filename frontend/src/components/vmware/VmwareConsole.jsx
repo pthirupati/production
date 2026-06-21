@@ -13,6 +13,20 @@ function guestUser(vm) {
   return isWindowsGuest(vm) ? 'Administrator' : 'root'
 }
 
+// The pre-login banner a real Linux getty prints above the `login:` prompt
+// (the /etc/issue contents) when you attach a console to an already-running box.
+function loginBanner(vm) {
+  const ver = vm?.guest_os_version || vm?.guest_os || 'Linux'
+  const isUbuntu = /ubuntu|debian/i.test(`${vm?.guest_os || ''} ${vm?.guest_os_version || ''}`)
+  const kernel = isUbuntu ? '5.15.0-91-generic' : '5.14.0-362.el9.x86_64'
+  const tty = isUbuntu ? 'tty1' : 'tty1'
+  return [
+    `${ver}`,
+    `Kernel ${kernel} on an x86_64 (${tty})`,
+    '',
+  ]
+}
+
 export default function VmwareConsole({ vm, onClose, onGuestAction }) {
   const isWin = isWindowsGuest(vm)
   const shell = useMemo(() => (
@@ -24,10 +38,17 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
   const [cmd, setCmd] = useState('')
   const [histIdx, setHistIdx] = useState(-1)
   // phases: post | grub | booting | login | shell | hung | rescue | off
+  // A running guest shows the LOGIN prompt by default — exactly like reconnecting
+  // to a server that's been up for days. The full POST/GRUB/boot sequence only
+  // replays when the VM was actually powered on / reset this session, which the
+  // backend signals via `boot_pending`.
   const [phase, setPhase] = useState(() => {
     if (vm?.guest_hung) return 'hung'
     if (vm?.boot_failure) return 'rescue'
-    if (vm?.power === 'poweredOn') return isWindowsGuest(vm) ? 'winboot' : 'login'
+    if (vm?.power === 'poweredOn') {
+      if (isWindowsGuest(vm)) return vm?.boot_pending ? 'winboot' : 'login'
+      return vm?.boot_pending ? 'post' : 'login'
+    }
     return 'off'
   })
   const [grubSel, setGrubSel] = useState(0)
@@ -98,9 +119,14 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
         setLoginUser('')
         setLoginPass('')
         setPhase('login')
+        // Boot finished — tell the backend so a later console open on this still-
+        // running guest goes straight to login instead of replaying the boot.
+        if (vm?.boot_pending && vm?.id && onGuestAction) {
+          onGuestAction({ action: 'console_booted', vm_id: vm.id, silent: true })
+        }
       }
     }, acc + 400)
-  }, [append, clearTimers, later, vm])
+  }, [append, clearTimers, later, onGuestAction, vm])
 
   // Power state changes from the parent (power on/off, reset) restart the console state.
   useEffect(() => {
@@ -120,10 +146,6 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
       ])
       return
     }
-    if (isWin) {
-      setPhase('winboot')
-      return
-    }
     if (vm?.boot_failure) {
       setPhase('rescue')
       setLines([
@@ -135,18 +157,36 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
       ])
       return
     }
-    // Healthy powered-on guest: begin a full BIOS→GRUB→boot run.
+    // A guest that was just powered on / reset this session replays the full
+    // BIOS→GRUB→boot run (Windows: its own boot splash). An already-running guest
+    // goes straight to the login prompt, exactly like reconnecting over the
+    // console to a server that has been up for days.
+    if (!vm?.boot_pending) {
+      if (isWin) { setLoginStep('user'); setPhase('login'); setLines([]) }
+      else { setLoginStep('user'); setPhase('login'); setLines(loginBanner(vm)) }
+      return
+    }
+    if (isWin) {
+      setPhase('winboot')
+      return
+    }
     startPost()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vm?.id, vm?.power, vm?.guest_hung, vm?.boot_failure, isWin])
+  }, [vm?.id, vm?.power, vm?.guest_hung, vm?.boot_failure, vm?.boot_pending, isWin])
 
   // Windows boot (unchanged simple path)
   useEffect(() => {
     if (phase !== 'winboot') return undefined
     setLines(WIN_BOOT_SEQUENCE)
-    const t = setTimeout(() => { setLoginStep('user'); setPhase('login') }, 2500)
+    const t = setTimeout(() => {
+      setLoginStep('user')
+      setPhase('login')
+      if (vm?.boot_pending && vm?.id && onGuestAction) {
+        onGuestAction({ action: 'console_booted', vm_id: vm.id, silent: true })
+      }
+    }, 2500)
     return () => clearTimeout(t)
-  }, [phase])
+  }, [phase, onGuestAction, vm?.boot_pending, vm?.id])
 
   // GRUB auto-boot countdown
   useEffect(() => {
@@ -231,6 +271,9 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
     // -y install / non-interactive: print head then stream progress
     if (result.stream) {
       append(result.lines)
+      // Commit the package transaction now (the "y" was implied by -y) so a later
+      // rpm -q / dnf list installed reflects the install/removal.
+      result.stream.commit?.()
       streamChunks(result.stream.chunks, result.stream.doneLines, undefined)
       return
     }
@@ -302,6 +345,9 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
     setConfirm(null)
     setConfirmInput('')
     if (yes) {
+      // User confirmed — commit the package DB change so rpm/dnf/dpkg queries
+      // reflect the install or removal afterwards.
+      c.onYesStream.commit?.()
       streamChunks(c.onYesStream.chunks, c.onYesStream.doneLines, undefined)
     } else {
       append(c.onNoLines)

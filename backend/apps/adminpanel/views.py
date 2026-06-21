@@ -1570,8 +1570,70 @@ class AdminSystemHealthView(APIView):
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}
 
+    @staticmethod
+    def _probe_vault_api(vault_addr, timeout=3):
+        """Hit Vault's /v1/sys/health over the network.
+
+        Vault may live on a *different* node than the one serving this request
+        (in the 4-droplet topology it runs on the edge/D1 while the backend runs
+        on the app/D2), so a local Docker container will not exist here — the
+        only reliable signal is the network API at ``VAULT_ADDR``.
+
+        Returns ``{"initialized": bool, "sealed": bool}`` on success, or ``None``
+        if Vault could not be reached. Uses ``hvac`` when installed, otherwise a
+        dependency-free ``urllib`` probe so it works in every environment.
+        """
+        vault_addr = (vault_addr or "").rstrip("/")
+        if not vault_addr:
+            return None
+        # Preferred: hvac (present in production images).
+        try:
+            import hvac
+
+            client = hvac.Client(url=vault_addr, timeout=timeout)
+            sys_health = client.sys.read_health_status(method="GET")
+            if isinstance(sys_health, dict):
+                return {
+                    "initialized": bool(sys_health.get("initialized", False)),
+                    "sealed": bool(sys_health.get("sealed", True)),
+                }
+        except ImportError:
+            pass
+        except Exception:
+            # hvac is present but the call failed (sealed/uninitialised Vault can
+            # return non-200 which hvac raises on) — fall through to the raw
+            # probe which tolerates any standby/sealed/uninit status code.
+            pass
+        # Fallback: raw HTTP. Vault's health endpoint returns JSON for *every*
+        # status code (200 active, 429 standby, 472/473 DR, 501 uninit, 503
+        # sealed), so we read the body regardless of HTTP status.
+        try:
+            import json as _json
+            import urllib.error
+            import urllib.request
+
+            url = f"{vault_addr}/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200"
+            try:
+                resp = urllib.request.urlopen(url, timeout=timeout)
+                body = resp.read()
+            except urllib.error.HTTPError as http_err:
+                body = http_err.read()
+            data = _json.loads(body.decode("utf-8") or "{}")
+            return {
+                "initialized": bool(data.get("initialized", False)),
+                "sealed": bool(data.get("sealed", True)),
+            }
+        except Exception:
+            return None
+
     def _check_vault(self):
-        """HashiCorp Vault container + secrets integration status."""
+        """HashiCorp Vault status — network-API first, container-agnostic.
+
+        Vault runs on the edge node in the production cluster, so the backend
+        (app node) reaches it over the VPC rather than as a local container. We
+        therefore probe ``VAULT_ADDR`` directly; a missing local ``fixitlab_vault``
+        container is NOT treated as a failure when Vault is expected elsewhere.
+        """
         vault_enabled = str(getattr(settings, "VAULT_ENABLED", "") or os.environ.get("VAULT_ENABLED", "")).lower() in ("1", "true", "yes", "on")
         secrets_loaded = False
 
@@ -1590,6 +1652,49 @@ class AdminSystemHealthView(APIView):
                 "secrets_loaded": False,
             }
 
+        vault_addr = os.environ.get("VAULT_ADDR") or getattr(settings, "VAULT_ADDR", "") or "http://vault:8200"
+
+        # Does the topology expect Vault on a different node than this one?
+        vault_remote = False
+        try:
+            from . import cluster_topology
+
+            topo = cluster_topology.load_topology()
+            if topo.get("is_cluster"):
+                local = cluster_topology.local_node_identity() or {}
+                local_services = {s.lower() for s in (local.get("services") or [])}
+                # If we positively identified the local node and it does not run
+                # vault, then vault is reachable only over the network here.
+                if local and "vault" not in local_services:
+                    vault_remote = True
+        except Exception:
+            pass
+
+        # ── Primary signal: live network API at VAULT_ADDR ──
+        health = self._probe_vault_api(vault_addr)
+        if health is not None:
+            initialized = health["initialized"]
+            sealed = health["sealed"]
+            if not initialized:
+                status_str = "degraded"
+                detail = "Vault not initialized — run sync-production-env.sh"
+            elif sealed:
+                status_str = "degraded"
+                detail = "Vault is sealed — run: vault operator unseal (or re-deploy to auto-unseal)"
+            else:
+                status_str = "healthy"
+                detail = f"Vault unsealed and ready ({vault_addr})"
+            return {
+                "status": status_str,
+                "details": detail,
+                "secrets_loaded": secrets_loaded,
+                "initialized": initialized,
+                "sealed": sealed,
+                "reachable": True,
+                "address": vault_addr,
+            }
+
+        # ── Network probe failed. Try the local container (single-host dev) ──
         try:
             import subprocess
 
@@ -1597,57 +1702,75 @@ class AdminSystemHealthView(APIView):
                 ["docker", "inspect", "-f", "{{.State.Status}}", "fixitlab_vault"],
                 capture_output=True, text=True, timeout=8,
             )
-            if status.returncode != 0:
-                return {"status": "unhealthy", "error": "Vault container not found", "secrets_loaded": secrets_loaded}
-            state = (status.stdout or "").strip()
-            if state != "running":
-                return {"status": "unhealthy", "error": f"Vault container {state}", "secrets_loaded": secrets_loaded}
+            local_state = (status.stdout or "").strip() if status.returncode == 0 else ""
+        except Exception:
+            local_state = ""
 
-            # Try live Vault API check via hvac
-            try:
-                import hvac
-                vault_addr = os.environ.get("VAULT_ADDR", "http://vault:8200")
-                client = hvac.Client(url=vault_addr, timeout=3)
-                sys_health = client.sys.read_health_status(method="GET")
-                initialized = sys_health.get("initialized", False)
-                sealed = sys_health.get("sealed", False)
-                if not initialized:
-                    status_str = "degraded"
-                    detail = "Vault not initialized — run sync-production-env.sh"
-                elif sealed:
-                    status_str = "degraded"
-                    detail = "Vault is sealed — run: vault operator unseal (or re-deploy to auto-unseal)"
-                else:
-                    status_str = "healthy"
-                    detail = "Vault unsealed and ready"
-                return {
-                    "status": status_str,
-                    "details": detail,
-                    "secrets_loaded": secrets_loaded,
-                    "initialized": initialized,
-                    "sealed": sealed,
-                }
-            except Exception:
-                pass
-
-            # Fallback: container running but API unreachable — if env file has secrets this is non-critical
-            env_file_ok = bool(os.environ.get("DJANGO_SECRET_KEY"))
+        if local_state and local_state != "running":
+            # A local Vault container exists but is not running — that *is* a fault.
             return {
-                "status": "healthy" if env_file_ok else "degraded",
-                "details": "Vault API unreachable — running in env file mode" if env_file_ok else "Vault container running but API unreachable",
-                "secrets_loaded": env_file_ok,
-                "optional": True,
+                "status": "unhealthy",
+                "error": f"Vault container {local_state}",
+                "secrets_loaded": secrets_loaded,
+                "address": vault_addr,
             }
-        except Exception as e:
-            return {"status": "unhealthy", "error": str(e), "secrets_loaded": secrets_loaded}
+
+        # Vault API unreachable and no broken local container. This is expected
+        # when Vault lives on another node (edge) and is just briefly unreachable,
+        # or when secrets were already injected at startup. Treat as degraded
+        # (not a hard failure) so a transient network blip doesn't redden the
+        # whole dashboard — secrets_loaded tells the real story.
+        env_file_ok = bool(os.environ.get("DJANGO_SECRET_KEY"))
+        if vault_remote:
+            detail = f"Vault API unreachable on {vault_addr} (runs on edge node) — secrets {'loaded at startup' if secrets_loaded else 'not loaded'}"
+        else:
+            detail = "Vault API unreachable — running in env file mode" if env_file_ok else "Vault API unreachable"
+        return {
+            "status": "degraded",
+            "details": detail,
+            "secrets_loaded": secrets_loaded or env_file_ok,
+            "reachable": False,
+            "optional": True,
+            "address": vault_addr,
+        }
+
+    # Canonical platform services we always want represented on the System
+    # Containers panel, in display order. ``match`` lists substrings that a
+    # locally-visible container name/image must contain to be attributed to this
+    # service. ``service`` is the cluster.json service key used to figure out
+    # which node the container *should* live on.
+    EXPECTED_CONTAINERS = [
+        {"key": "backend", "label": "backend", "service": "backend", "match": ("backend",)},
+        {"key": "celery_worker", "label": "celery_worker", "service": "celery_worker", "match": ("celery_worker", "celery-worker")},
+        {"key": "celery_beat", "label": "celery_beat", "service": "celery_beat", "match": ("celery_beat", "celery-beat")},
+        {"key": "celery_provisioning", "label": "celery_provisioning", "service": "celery_provisioning", "match": ("celery_provisioning", "celery-provisioning")},
+        {"key": "celery_maintenance", "label": "celery_maintenance", "service": "celery_maintenance", "match": ("celery_maintenance", "celery-maintenance")},
+        {"key": "gateway", "label": "gateway", "service": "gateway", "match": ("gateway", "nginx")},
+        {"key": "frontend-prod", "label": "frontend-prod", "service": "frontend-prod", "match": ("frontend-prod", "frontend_prod", "frontend")},
+        {"key": "redis", "label": "redis", "service": "redis", "match": ("redis",)},
+        {"key": "rabbitmq", "label": "rabbitmq", "service": "rabbitmq", "match": ("rabbitmq",)},
+        {"key": "postgres", "label": "postgres", "service": "database", "match": ("postgres", "fixitlab_db", "database", "_db", "-db")},
+        {"key": "pgbouncer", "label": "pgbouncer", "service": "pgbouncer", "match": ("pgbouncer",)},
+        {"key": "vault", "label": "vault", "service": "vault", "match": ("vault",)},
+    ]
 
     def _check_containers(self):
-        """Get health status of platform Docker containers (not ephemeral lab containers)."""
+        """Health of all platform containers across the cluster.
+
+        Lists every locally-visible platform container AND fills in the canonical
+        set of expected system services (``EXPECTED_CONTAINERS``). When a service
+        is not visible on the local Docker socket but the cluster topology says it
+        lives on another node, it is shown with ``status: "remote"`` and the owning
+        node — rather than being silently omitted — so the dashboard reflects the
+        whole fleet instead of just this node.
+        """
+        local = []
+        seen_local_keys = set()
+        docker_error = None
         try:
             import docker
             client = docker.from_env()
             all_containers = client.containers.list(all=True)
-            result = []
             skip_names = ("mailhog",)
 
             for c in all_containers:
@@ -1659,6 +1782,11 @@ class AdminSystemHealthView(APIView):
                 if any(skip in name_lower for skip in skip_names):
                     continue
 
+                try:
+                    image_str = (c.image.tags[0] if c.image.tags else str(c.image.id)[:20]).lower()
+                except Exception:
+                    image_str = ""
+
                 project = labels.get("com.docker.compose.project", "")
                 # Include containers from any fixitlab compose project (hyphenated or underscore names)
                 is_platform = (
@@ -1666,6 +1794,7 @@ class AdminSystemHealthView(APIView):
                     or c.name.startswith("fixitlab_")
                     or c.name.startswith("fixitlab-")
                     or c.name in ("fixitlab_db", "fixitlab_redis", "fixitlab_rabbitmq", "fixitlab_vault")
+                    or "hashicorp/vault" in image_str
                 )
                 if not is_platform:
                     continue
@@ -1688,8 +1817,18 @@ class AdminSystemHealthView(APIView):
                 except Exception:
                     pass
 
-                result.append({
+                # Attribute this container to a canonical service key when possible.
+                svc_key = None
+                for spec in self.EXPECTED_CONTAINERS:
+                    if any(m in name_lower or m in image_str for m in spec["match"]):
+                        svc_key = spec["key"]
+                        break
+                if svc_key:
+                    seen_local_keys.add(svc_key)
+
+                local.append({
                     "name": c.name,
+                    "service_key": svc_key,
                     "status": c.status,
                     "health": health_status,
                     "image": c.image.tags[0] if c.image.tags else str(c.image.id)[:20],
@@ -1697,10 +1836,88 @@ class AdminSystemHealthView(APIView):
                     "restart_count": restart_count,
                     "exit_code": exit_code if c.status != "running" else None,
                     "mem_mb": mem_mb,
+                    "location": "local",
                 })
-            return sorted(result, key=lambda x: x["name"])
         except Exception as e:
-            return [{"name": "error", "status": "unknown", "error": str(e)}]
+            docker_error = str(e)
+
+        # Figure out the cluster layout so we can place expected services that are
+        # not visible locally on the node that actually runs them.
+        node_for_service = {}
+        local_node_key = None
+        is_cluster = False
+        try:
+            from . import cluster_topology
+
+            topo = cluster_topology.load_topology()
+            is_cluster = bool(topo.get("is_cluster"))
+            if is_cluster:
+                local_node = cluster_topology.local_node_identity() or {}
+                local_node_key = local_node.get("key")
+                for node in topo.get("nodes", []):
+                    for svc in (node.get("services") or []):
+                        node_for_service[svc.lower()] = {
+                            "key": node.get("key"),
+                            "name": node.get("name"),
+                            "role": node.get("role"),
+                        }
+        except Exception:
+            pass
+
+        # Synthesize entries for any expected service we did not see locally.
+        synthesized = []
+        for spec in self.EXPECTED_CONTAINERS:
+            if spec["key"] in seen_local_keys:
+                continue
+            owner = node_for_service.get(spec["service"].lower())
+            if owner and owner.get("key") and owner.get("key") != local_node_key:
+                # Lives on a different node — we cannot reach its Docker socket.
+                synthesized.append({
+                    "name": spec["label"],
+                    "service_key": spec["key"],
+                    "status": "remote",
+                    "health": "remote",
+                    "node": owner.get("key"),
+                    "node_name": owner.get("name"),
+                    "node_role": owner.get("role"),
+                    "location": "remote",
+                    "details": f"Runs on {owner.get('name') or owner.get('key')} node — not reachable from this Docker socket",
+                    "restart_count": 0,
+                })
+            elif docker_error:
+                # Could not query Docker at all — report unknown rather than hide.
+                synthesized.append({
+                    "name": spec["label"],
+                    "service_key": spec["key"],
+                    "status": "unknown",
+                    "health": "unknown",
+                    "location": "unknown",
+                    "details": f"Docker unavailable: {docker_error}",
+                    "restart_count": 0,
+                })
+            else:
+                # Expected on *this* node (or single-host) but not found — missing.
+                synthesized.append({
+                    "name": spec["label"],
+                    "service_key": spec["key"],
+                    "status": "missing",
+                    "health": "missing",
+                    "location": "missing",
+                    "details": "Expected platform container not found",
+                    "restart_count": 0,
+                })
+
+        result = local + synthesized
+        # Stable display order: local containers first (by name), then by the
+        # canonical service order for synthesized/remote entries.
+        order = {spec["key"]: i for i, spec in enumerate(self.EXPECTED_CONTAINERS)}
+
+        def sort_key(item):
+            loc_rank = 0 if item.get("location") == "local" else 1
+            svc_rank = order.get(item.get("service_key"), 99)
+            return (loc_rank, svc_rank, item.get("name", ""))
+
+        return sorted(result, key=sort_key)
 
     def _get_email_stats(self):
         """Get email sending statistics."""

@@ -117,6 +117,9 @@ export default function LabRunner() {
   const labChannelRef = useRef(null)  // BroadcastChannel for cross-tab sync
   const closeTimerRef = useRef(null)
   const closeCountdownRef = useRef(null)
+  // Always-fresh technology slug so cross-tab / async handlers can route back to
+  // the right technology page without re-subscribing on every session change.
+  const techSlugRef = useRef('')
 
   const LAB_CLOSE_SECONDS = 10
 
@@ -140,11 +143,16 @@ export default function LabRunner() {
       if (closeCountdownRef.current) clearInterval(closeCountdownRef.current)
       setClosingIn(null)
       cleanupLabResources()
-      navigate(`/scenarios/${slug || ''}`, {
+      // Return to the SAME technology's page so the user can immediately pick
+      // another scenario in that technology, rather than the global list.
+      const sc = session?.scenario || session?.scenario_detail || {}
+      const techSlug = sc.technology?.slug
+      const dest = techSlug ? `/technologies/${techSlug}` : `/scenarios/${slug || ''}`
+      navigate(dest, {
         state: {
           labCompleted: true,
           score: result?.score,
-          scenarioTitle: session?.scenario?.title || session?.scenario_detail?.title,
+          scenarioTitle: sc.title,
         },
       })
     }, LAB_CLOSE_SECONDS * 1000)
@@ -189,7 +197,11 @@ export default function LabRunner() {
           break
         case 'f':
         case 'F':
-          setTerminalFullscreen(p => !p)
+          setTerminalFullscreen(p => {
+            const next = !p
+            setSidebarOpen(next ? false : true)
+            return next
+          })
           break
         case 'r':
         case 'R':
@@ -223,7 +235,9 @@ export default function LabRunner() {
             : reason === 'expired' ? 'Lab time expired!'
             : 'Lab was stopped in another tab'
           toast(msg, { icon: '🔄', duration: 4000, ...TOAST })
-          navigate('/scenarios')
+          // After completing, drop back to the technology page when known.
+          const techSlug = techSlugRef.current
+          navigate(reason === 'completed' && techSlug ? `/technologies/${techSlug}` : '/scenarios')
         }
         if (reason === 'completed' && closingDelayMs > 0) {
           toast(`Lab completed — closing in ${Math.ceil(closingDelayMs / 1000)}s…`, { icon: '✅', duration: closingDelayMs, ...TOAST })
@@ -256,7 +270,13 @@ export default function LabRunner() {
             : lab.status === 'EXPIRED' ? 'Lab time expired!'
             : 'Lab session ended'
           toast(msg, { icon: lab.status === 'COMPLETED' ? '✅' : '⏰', duration: 4000, ...TOAST })
-          navigate(`/scenarios/${lab.scenario?.slug || ''}`, {
+          // On completion, return to the technology page (continue other
+          // scenarios there); otherwise fall back to the scenario detail page.
+          const techSlug = lab.scenario?.technology?.slug
+          const dest = lab.status === 'COMPLETED' && techSlug
+            ? `/technologies/${techSlug}`
+            : `/scenarios/${lab.scenario?.slug || ''}`
+          navigate(dest, {
             state: lab.status === 'COMPLETED'
               ? { labCompleted: true, scenarioTitle: lab.scenario?.title }
               : undefined,
@@ -682,6 +702,9 @@ export default function LabRunner() {
   }
 
   const scenario = session?.scenario_detail || session?.scenario || {}
+  // Keep the technology slug in a ref so async/cross-tab handlers (which don't
+  // re-subscribe on session changes) can route back to the technology page.
+  techSlugRef.current = scenario?.technology?.slug || techSlugRef.current
   const labHosts = session?.lab_hosts || []
   const blockedCmds = useMemo(
     () => (Array.isArray(scenario.blocked_commands) ? scenario.blocked_commands : []),
@@ -974,8 +997,18 @@ export default function LabRunner() {
       {/* Top bar - hidden on mobile where floating bar is used */}
       <div className="hidden sm:flex items-center justify-between px-4 py-2 bg-surface-900 border-b border-surface-700/50 shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-surface-400 hover:text-white transition-colors">
-            {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          <button
+            onClick={() => {
+              // Opening the panel must also drop fullscreen, otherwise the
+              // fullscreen rule keeps the sidebar collapsed and the toggle
+              // would look dead.
+              const open = !sidebarOpen
+              setSidebarOpen(open)
+              if (open && terminalFullscreen) setTerminalFullscreen(false)
+            }}
+            className="text-surface-400 hover:text-white transition-colors"
+          >
+            {sidebarOpen && !terminalFullscreen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
           </button>
           <h2 className="text-sm font-semibold text-white truncate max-w-[280px]">
             {scenario.title || 'Lab Session'}
@@ -1009,8 +1042,8 @@ export default function LabRunner() {
         )}
         <div className={`${
           isMobile
-            ? `fixed inset-y-0 left-0 z-40 w-80 max-w-[85vw] transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
-            : `${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300`
+            ? `fixed inset-y-0 left-0 z-40 w-80 max-w-[85vw] transform transition-transform ${sidebarOpen && !terminalFullscreen ? 'translate-x-0' : '-translate-x-full'}`
+            : `${sidebarOpen && !terminalFullscreen ? 'w-80' : 'w-0'} transition-all duration-300`
         } overflow-hidden border-r border-surface-700/50 bg-surface-900 shrink-0`}
         >
           <div className="w-80 h-full flex flex-col">
@@ -1324,7 +1357,20 @@ export default function LabRunner() {
           </div>
         </div>
 
-        <div className={`${terminalFullscreen ? 'fixed inset-0 z-50 bg-surface-950' : 'flex-1'} flex flex-col min-h-0 min-w-0 overflow-hidden`}>
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative">
+        {/* Fullscreen restore tab — collapses the side panel and lets the lab
+            fill the width. Click to exit fullscreen and bring the panel back. */}
+        {terminalFullscreen && !isMobile && (
+          <button
+            type="button"
+            onClick={() => { setTerminalFullscreen(false); setSidebarOpen(true) }}
+            title="Exit fullscreen — show side panel"
+            aria-label="Exit fullscreen and show side panel"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-30 flex items-center gap-1 pl-1 pr-2 py-3 rounded-r-lg bg-surface-800/90 border border-l-0 border-surface-600 text-surface-300 hover:text-accent-cyan hover:border-accent-cyan shadow-lg backdrop-blur-sm"
+          >
+            <ChevronRight size={16} />
+          </button>
+        )}
         {/* Terminal action bar — above xterm */}
         <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-2 bg-surface-900 border-b border-surface-800 text-[10px] sm:text-xs">
           {useDualPane && (
@@ -1400,11 +1446,21 @@ export default function LabRunner() {
           ))}
           <div className="w-px h-6 bg-surface-700 mx-0.5 hidden sm:block" />
           <button
-            onClick={() => setTerminalFullscreen(p => !p)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-700 text-surface-300 hover:border-accent-cyan hover:text-accent-cyan"
-            title="Toggle fullscreen terminal (F)"
+            onClick={() => setTerminalFullscreen(p => {
+              const next = !p
+              // Entering fullscreen hides the side panel; exiting restores it.
+              setSidebarOpen(next ? false : true)
+              return next
+            })}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md border ${
+              terminalFullscreen
+                ? 'border-accent-cyan/40 text-accent-cyan bg-accent-cyan/10'
+                : 'border-surface-700 text-surface-300 hover:border-accent-cyan hover:text-accent-cyan'
+            }`}
+            title="Toggle fullscreen — hide side panel (F)"
           >
-            <Terminal size={12} /> {terminalFullscreen ? 'Exit Full' : 'Fullscreen'}
+            {terminalFullscreen ? <PanelLeftOpen size={12} /> : <Terminal size={12} />}
+            {terminalFullscreen ? 'Exit Full' : 'Fullscreen'}
           </button>
           <button
             onClick={() => { setSidebarTab('hints'); setSidebarOpen(true) }}

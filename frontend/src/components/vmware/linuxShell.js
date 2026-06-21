@@ -640,6 +640,117 @@ function pkgInfo(name) {
   return PKG_CATALOG[name] || { ver: '1.0.0', rel: '1.el9', repo: 'rhel-9-appstream', sizeK: 28, deps: [] }
 }
 
+/* ------------------------------------------------------------------ *
+ * Stateful package database (the rpm / dpkg DB)
+ * ------------------------------------------------------------------ *
+ * `yum/dnf install` and `apt install` ADD to it; remove/erase/purge DELETE
+ * from it; and `rpm -q`, `rpm -qa`, `dnf list installed`, `yum list installed`,
+ * and `dpkg -l` all read FROM it. Without this, an install never showed up in a
+ * subsequent rpm query (the original bug). Distribution-aware: RHEL-family hosts
+ * report .rpm packages (arch x86_64/noarch, el9 dist tag), Debian/Ubuntu hosts
+ * report dpkg packages (amd64, ubuntu version suffix).
+ */
+
+// The packages a minimal-but-realistic install ships with, before the learner
+// touches anything. Names line up with what `systemctl`/`which` already imply.
+const RHEL_BASE_PKGS = [
+  ['kernel', '5.14.0', '362.el9', 'x86_64'],
+  ['kernel-core', '5.14.0', '362.el9', 'x86_64'],
+  ['glibc', '2.34', '83.el9', 'x86_64'],
+  ['bash', '5.1.8', '6.el9', 'x86_64'],
+  ['coreutils', '8.32', '34.el9', 'x86_64'],
+  ['systemd', '252', '14.el9', 'x86_64'],
+  ['openssh', '8.7p1', '34.el9', 'x86_64'],
+  ['openssh-server', '8.7p1', '34.el9', 'x86_64'],
+  ['openssh-clients', '8.7p1', '34.el9', 'x86_64'],
+  ['openssl', '3.0.7', '24.el9', 'x86_64'],
+  ['sudo', '1.9.5p2', '9.el9', 'x86_64'],
+  ['python3', '3.9.18', '1.el9', 'x86_64'],
+  ['dnf', '4.14.0', '8.el9', 'noarch'],
+  ['yum', '4.14.0', '8.el9', 'noarch'],
+  ['rpm', '4.16.1.3', '22.el9', 'x86_64'],
+  ['firewalld', '1.2.5', '1.el9', 'noarch'],
+  ['NetworkManager', '1.42.2', '1.el9', 'x86_64'],
+  ['chrony', '4.3', '1.el9', 'x86_64'],
+  ['vim-minimal', '8.2.2637', '20.el9', 'x86_64'],
+  ['curl', '7.76.1', '26.el9', 'x86_64'],
+  ['tar', '1.34', '6.el9', 'x86_64'],
+]
+const DEBIAN_BASE_PKGS = [
+  ['base-files', '12ubuntu4.6', '', 'amd64'],
+  ['bash', '5.1', '6ubuntu1', 'amd64'],
+  ['coreutils', '8.32', '4.1ubuntu1', 'amd64'],
+  ['libc6', '2.35', '0ubuntu3.6', 'amd64'],
+  ['systemd', '249.11', '0ubuntu3.12', 'amd64'],
+  ['openssh-server', '8.9p1', '3ubuntu0.6', 'amd64'],
+  ['openssh-client', '8.9p1', '3ubuntu0.6', 'amd64'],
+  ['openssl', '3.0.2', '0ubuntu1.15', 'amd64'],
+  ['sudo', '1.9.9', '1ubuntu2.4', 'amd64'],
+  ['python3', '3.10.6', '1~22.04', 'amd64'],
+  ['apt', '2.4.11', '', 'amd64'],
+  ['dpkg', '1.21.1', 'ubuntu2.3', 'amd64'],
+  ['ufw', '0.36.1', '4build1', 'all'],
+  ['netplan.io', '0.106.1', '7ubuntu0.22.04.2', 'amd64'],
+  ['chrony', '4.2', '2ubuntu2.2', 'amd64'],
+  ['vim-tiny', '8.2.3995', '1ubuntu2.15', 'amd64'],
+  ['curl', '7.81.0', '1ubuntu1.15', 'amd64'],
+  ['tar', '1.34', '1ubuntu0.1.22.04.2', 'amd64'],
+]
+
+// Map our PKG_CATALOG version into a per-distro {ver, rel, arch} record.
+function pkgRecord(name, isRhel) {
+  const i = pkgInfo(name)
+  if (isRhel) {
+    const arch = /noarch/.test(i.rel) ? 'noarch' : 'x86_64'
+    return { name, ver: i.ver, rel: i.rel, arch, repo: i.repo }
+  }
+  // Debian: strip the rpm-style epoch (e.g. "1:1.20.1" -> "1.20.1") + el tag.
+  return { name, ver: i.ver.replace(/^[0-9]+:/, ''), rel: '1ubuntu1', arch: 'amd64', repo: i.repo }
+}
+
+function createPkgDb(isRhel) {
+  const db = new Map()
+  const base = isRhel ? RHEL_BASE_PKGS : DEBIAN_BASE_PKGS
+  base.forEach(([name, ver, rel, arch]) => db.set(name, { name, ver, rel, arch }))
+
+  const add = (name) => {
+    const rec = db.get(name) || pkgRecord(name, isRhel)
+    db.set(name, rec)
+  }
+  // install a package plus the dependencies the catalog declares for it
+  const install = (names) => {
+    names.forEach((n) => {
+      add(n)
+      pkgInfo(n).deps.forEach((d) => add(d))
+    })
+  }
+  const remove = (names) => {
+    let removed = 0
+    names.forEach((n) => { if (db.delete(n)) removed += 1 })
+    return removed
+  }
+  const has = (name) => db.has(name)
+  const get = (name) => db.get(name) || null
+  // rpm -qa NVRA, sorted like rpm prints them
+  const rpmList = () => [...db.values()]
+    .map((r) => `${r.name}-${r.ver}-${r.rel}.${r.arch}`)
+    .sort()
+  // `name-version-release.arch` for a single installed package, or null
+  const rpmNvra = (name) => {
+    const r = db.get(name)
+    return r ? `${r.name}-${r.ver}-${r.rel}.${r.arch}` : null
+  }
+  // dnf/yum "list installed" rows: "name.arch   version-release   @repo"
+  const dnfRows = () => [...db.values()]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((r) => `${(r.name + '.' + r.arch).padEnd(34)}${(r.ver + '-' + r.rel).padEnd(24)}@${r.repo || 'anaconda'}`)
+  // dpkg -l rows: "ii  name  version  arch  description"
+  const dpkgRows = () => [...db.values()]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((r) => `ii  ${r.name.padEnd(28)} ${(r.ver + (r.rel ? '-' + r.rel : '')).padEnd(24)} ${r.arch.padEnd(12)} ${r.name} package`)
+  return { db, install, remove, has, get, rpmList, rpmNvra, dnfRows, dpkgRows }
+}
+
 // dnf/yum: "Dependencies resolved" + the table + transaction summary (shown BEFORE the y/N prompt).
 function dnfResolveLines(mgr, pkgs, action = 'install') {
   const lines = ['Last metadata expiration check: 0:14:22 ago on ' + new Date().toUTCString().replace('GMT', 'UTC') + '.']
@@ -754,6 +865,7 @@ export function createLinuxShell(vm) {
   const history = []
   const vfs = createVFS((api) => seedFilesystem(vm, api))
   const services = seedServices()
+  const pkgs = createPkgDb(isRhel)  // stateful rpm/dpkg DB (install/remove/query)
   let selinuxMode = isRhel ? 'Enforcing' : 'Disabled'
   let nextPid = 19000
 
@@ -1438,19 +1550,38 @@ export function createLinuxShell(vm) {
     /* =================== packages =================== */
     else if (lc === 'dnf' || lc === 'yum') {
       const sub = positional[0]
-      const pkgs = positional.slice(1).filter(p => !p.startsWith('-'))
-      const pkg = pkgs[0] || 'package'
+      const reqPkgs = positional.slice(1).filter(p => !p.startsWith('-'))
+      const pkg = reqPkgs[0] || 'package'
       if (sub === 'install' || sub === 'reinstall' || sub === 'remove' || sub === 'erase' || sub === 'upgrade' || sub === 'update') {
         const action = (sub === 'remove' || sub === 'erase') ? 'remove' : 'install'
+        const targets = reqPkgs.length ? reqPkgs : [pkg]
+        // remove: only operate on packages that are actually installed
+        if (action === 'remove') {
+          const present = targets.filter(p => pkgs.has(p))
+          if (!present.length) {
+            emit(['No match for argument: ' + targets.join(' '), 'No packages marked for removal.'])
+          } else {
+            const resolve = dnfResolveLines(lc, present, 'remove')
+            const chunks = dnfProgressChunks(present, 'remove')
+            const commit = () => pkgs.remove(present)
+            if (has('-y') || has('--assumeyes')) return { lines: resolve, prompt: prompt(), stream: { chunks, doneLines: [], commit } }
+            return { lines: resolve, prompt: prompt(), confirm: { promptText: 'Is this ok [y/N]: ', defaultYes: false, onYesStream: { chunks, commit }, onNoLines: ['Operation aborted.'] } }
+          }
+        }
         // bare `dnf update` with no package and nothing to do
-        if ((sub === 'update' || sub === 'upgrade') && !pkgs.length) {
+        else if ((sub === 'update' || sub === 'upgrade') && !reqPkgs.length) {
           emit(['Last metadata expiration check: 0:05:01 ago.', 'Dependencies resolved.', 'Nothing to do.', 'Complete!'])
+        }
+        // already-installed (plain install, no upgrade) short-circuits like real dnf
+        else if (sub === 'install' && targets.every(p => pkgs.has(p))) {
+          emit(['Last metadata expiration check: 0:05:01 ago.', ...targets.map(p => `Package ${pkgs.rpmNvra(p)} is already installed.`), 'Dependencies resolved.', 'Nothing to do.', 'Complete!'])
         } else {
-          const resolve = dnfResolveLines(lc, pkgs.length ? pkgs : [pkg], action)
-          const chunks = dnfProgressChunks(pkgs.length ? pkgs : [pkg], action)
+          const resolve = dnfResolveLines(lc, targets, 'install')
+          const chunks = dnfProgressChunks(targets, 'install')
+          const commit = () => pkgs.install(targets)
           if (has('-y') || has('--assumeyes')) {
             // proceed immediately, but still stream the progress
-            return { lines: resolve, prompt: prompt(), stream: { chunks, doneLines: [] } }
+            return { lines: resolve, prompt: prompt(), stream: { chunks, doneLines: [], commit } }
           }
           // ask first; the console renders the prompt and waits for y/N
           return {
@@ -1459,59 +1590,129 @@ export function createLinuxShell(vm) {
             confirm: {
               promptText: 'Is this ok [y/N]: ',
               defaultYes: false,
-              onYesStream: { chunks },
+              onYesStream: { chunks, commit },
               onNoLines: ['Operation aborted.'],
             },
           }
         }
       }
-      else if (sub === 'list') emit(['Installed Packages', 'bash.x86_64          5.1.8-6.el9       @anaconda', `nginx.x86_64         1:1.20.1-14.el9   @epel`])
+      else if (sub === 'list') {
+        const which = positional[1]
+        if (which === 'installed' || !which) emit(['Installed Packages', ...pkgs.dnfRows()])
+        else if (which === 'available') emit(['Available Packages', ...Object.keys(PKG_CATALOG).filter(p => !pkgs.has(p)).sort().map(p => { const r = pkgRecord(p, isRhel); return `${(r.name + '.' + r.arch).padEnd(34)}${(r.ver + '-' + r.rel).padEnd(24)}${r.repo}` })])
+        else emit(['Installed Packages', ...pkgs.dnfRows().filter(r => r.startsWith(which))])
+      }
       else if (sub === 'search') emit([`========== Name Matched: ${pkg} ==========`, `${pkg}.x86_64 : The ${pkg} package`])
-      else if (sub === 'info') emit([`Name         : ${pkg}`, `Version      : 1.20.1`, `Repository   : epel`, `Summary      : ${pkg} package`])
-      else if (sub === 'repolist') emit(['repo id            repo name', 'rhel-9-baseos      RHEL 9 BaseOS', 'epel               Extra Packages for Enterprise Linux 9'])
+      else if (sub === 'info') {
+        const inst = pkgs.has(pkg)
+        const r = pkgs.get(pkg) || pkgRecord(pkg, isRhel)
+        emit([inst ? 'Installed Packages' : 'Available Packages', `Name         : ${r.name}`, `Version      : ${r.ver}`, `Release      : ${r.rel}`, `Architecture : ${r.arch}`, `Repository   : ${inst ? '@' + (r.repo || 'anaconda') : (r.repo || 'rhel-9-appstream')}`, `Summary      : ${r.name} package`])
+      }
+      else if (sub === 'provides' || sub === 'whatprovides') emit([`${pkg}-${pkgInfo(pkg).ver}-${pkgInfo(pkg).rel}.x86_64 : The ${pkg} package`, `Repo        : ${pkgs.has(pkg) ? '@System' : 'rhel-9-appstream'}`])
+      else if (sub === 'repolist') emit(['repo id            repo name', 'rhel-9-baseos      RHEL 9 BaseOS', 'rhel-9-appstream   RHEL 9 AppStream', 'epel               Extra Packages for Enterprise Linux 9'])
       else if (sub === 'clean') emit('0 files removed')
       else if (sub === 'makecache') emit('Metadata cache created.')
+      else if (sub === 'check-update') emit(['Last metadata expiration check: 0:05:01 ago.', ''])
+      else if (sub === 'history') emit(['ID     | Command line             | Date and time    | Action(s)      | Altered', '-------------------------------------------------------------------------------', '     1 | install                  | ' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' | Install        |   ' + pkgs.db.size])
       else emit('Loaded plugins: builddep, changelog, config-manager')
     }
     else if (lc === 'apt' || lc === 'apt-get') {
       const sub = positional[0]
-      const pkgs = positional.slice(1).filter(p => !p.startsWith('-'))
-      const pkg = pkgs[0] || 'package'
+      const reqPkgs = positional.slice(1).filter(p => !p.startsWith('-'))
+      const pkg = reqPkgs[0] || 'package'
       if (sub === 'update') emit(['Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease', 'Get:2 http://security.ubuntu.com/ubuntu jammy-security InRelease', 'Reading package lists... Done'])
       else if (sub === 'install' || sub === 'remove' || sub === 'purge' || sub === 'reinstall') {
         const action = (sub === 'remove' || sub === 'purge') ? 'remove' : 'install'
-        const resolve = aptResolveLines(pkgs.length ? pkgs : [pkg], action)
-        const chunks = aptProgressChunks(pkgs.length ? pkgs : [pkg], action)
-        if (has('-y') || has('--yes') || has('--assume-yes')) {
-          return { lines: resolve, prompt: prompt(), stream: { chunks, doneLines: [] } }
+        const targets = reqPkgs.length ? reqPkgs : [pkg]
+        if (action === 'remove') {
+          const present = targets.filter(p => pkgs.has(p))
+          if (!present.length) {
+            emit(['Reading package lists... Done', 'Building dependency tree... Done', 'Reading state information... Done', ...targets.map(p => `Package '${p}' is not installed, so not removed`), '0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.'])
+          } else {
+            const resolve = aptResolveLines(present, sub === 'purge' ? 'purge' : 'remove')
+            const chunks = aptProgressChunks(present, sub === 'purge' ? 'purge' : 'remove')
+            const commit = () => pkgs.remove(present)
+            if (has('-y') || has('--yes') || has('--assume-yes')) return { lines: resolve, prompt: prompt(), stream: { chunks, doneLines: [], commit } }
+            return { lines: resolve, prompt: prompt(), confirm: { promptText: 'Do you want to continue? [Y/n] ', defaultYes: true, onYesStream: { chunks, commit }, onNoLines: ['Abort.'] } }
+          }
         }
-        return {
-          lines: resolve,
-          prompt: prompt(),
-          confirm: {
-            promptText: 'Do you want to continue? [Y/n] ',
-            defaultYes: true,
-            onYesStream: { chunks },
-            onNoLines: ['Abort.'],
-          },
+        else if (sub === 'install' && targets.every(p => pkgs.has(p))) {
+          emit(['Reading package lists... Done', 'Building dependency tree... Done', 'Reading state information... Done', ...targets.map(p => `${p} is already the newest version (${pkgs.get(p).ver}).`), '0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.'])
+        } else {
+          const resolve = aptResolveLines(targets, 'install')
+          const chunks = aptProgressChunks(targets, 'install')
+          const commit = () => pkgs.install(targets)
+          if (has('-y') || has('--yes') || has('--assume-yes')) {
+            return { lines: resolve, prompt: prompt(), stream: { chunks, doneLines: [], commit } }
+          }
+          return {
+            lines: resolve,
+            prompt: prompt(),
+            confirm: {
+              promptText: 'Do you want to continue? [Y/n] ',
+              defaultYes: true,
+              onYesStream: { chunks, commit },
+              onNoLines: ['Abort.'],
+            },
+          }
         }
       }
       else if (sub === 'upgrade' || sub === 'dist-upgrade' || sub === 'full-upgrade') emit(['Reading package lists... Done', 'Calculating upgrade... Done', '0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.'])
-      else if (sub === 'list') emit(['Listing... Done', `nginx/jammy,now 1.18.0-6ubuntu14 amd64 [installed]`])
+      else if (sub === 'list') {
+        if (has('--installed')) emit(['Listing... Done', ...[...pkgs.db.values()].sort((a, b) => a.name.localeCompare(b.name)).map(r => `${r.name}/jammy,now ${r.ver}${r.rel ? '-' + r.rel : ''} ${r.arch} [installed]`)])
+        else emit(['Listing... Done', `${pkg}/jammy ${pkgInfo(pkg).ver.replace(/^[0-9]+:/, '')} amd64${pkgs.has(pkg) ? ' [installed]' : ''}`])
+      }
       else if (sub === 'search') emit([`${pkg}/jammy 1.20.1 amd64`, `  ${pkg} package`])
-      else if (sub === 'show') emit([`Package: ${pkg}`, `Version: 1.20.1`, `Priority: optional`])
+      else if (sub === 'show') { const r = pkgs.get(pkg) || pkgRecord(pkg, false); emit([`Package: ${r.name}`, `Version: ${r.ver}${r.rel ? '-' + r.rel : ''}`, `Priority: optional`, `Architecture: ${r.arch}`]) }
       else emit('E: Invalid operation ' + (sub || ''))
     }
-    else if (lc === 'apt-cache') emit(`${positional[1] || 'package'} - simulated package description`)
+    else if (lc === 'apt-cache') {
+      if (positional[0] === 'policy') { const r = pkgs.get(positional[1]); emit([`${positional[1] || 'package'}:`, `  Installed: ${r ? r.ver + (r.rel ? '-' + r.rel : '') : '(none)'}`, `  Candidate: ${pkgInfo(positional[1] || '').ver.replace(/^[0-9]+:/, '')}`]) }
+      else emit(`${positional[1] || 'package'} - simulated package description`)
+    }
     else if (lc === 'rpm') {
-      if (has('-qa') || (has('-q') && has('-a'))) emit(['kernel-5.14.0-362.el9.x86_64', 'bash-5.1.8-6.el9.x86_64', 'systemd-252-14.el9.x86_64', 'openssh-server-8.7p1-34.el9.x86_64', 'nginx-1.20.1-14.el9.x86_64', 'firewalld-1.2.5-1.el9.noarch'])
-      else if (has('-q')) emit(`${positional[0] || 'package'}-1.20.1-14.el9.x86_64`)
-      else if (has('-V')) emit('')
+      // -qa / -q -a : list every installed package (reads the live DB)
+      if (has('-qa') || (has('-q') && has('-a'))) {
+        const pat = positional[0]
+        const list = pkgs.rpmList()
+        emit(pat ? list.filter(n => n.toLowerCase().includes(pat.toLowerCase())) : list)
+      }
+      // -q <pkg> [...] : is it installed? (real rpm exit/wording)
+      else if (has('-q') || has('--query')) {
+        const names = positional.length ? positional : ['package']
+        names.forEach(n => { const nvra = pkgs.rpmNvra(n); emit(nvra || `package ${n} is not installed`) })
+      }
+      else if (has('-V') || has('--verify')) emit('')
+      else if (has('-i') || has('-U') || has('--install') || has('--upgrade')) {
+        // rpm -i/-U <file.rpm>: derive the package name from the filename and install it
+        const file = positional.find(a => a.endsWith('.rpm')) || positional[0] || ''
+        const name = basename(file).replace(/\.rpm$/, '').replace(/-[0-9].*$/, '') || 'package'
+        pkgs.install([name])
+        emit('')
+      }
+      else if (has('-e') || has('--erase')) {
+        const names = positional.length ? positional : []
+        const removed = pkgs.remove(names)
+        if (!removed && names.length) emit(`error: package ${names[0]} is not installed`)
+        else emit('')
+      }
       else emit('RPM version 4.16.1.3')
     }
-    else if (lc === 'dpkg') {
-      if (has('-l')) emit(['Desired=Unknown/Install/Remove/Purge/Hold', '||/ Name           Version      Architecture Description', 'ii  bash           5.1-6ubuntu1 amd64        GNU Bourne Again SHell', 'ii  openssh-server 8.9p1-3      amd64        secure shell (SSH) server'])
-      else if (has('-L')) emit('/usr/bin/' + (positional[0] || 'pkg'))
+    else if (lc === 'dpkg' || lc === 'dpkg-query') {
+      if (has('-l') || has('--list')) {
+        const pat = positional[0]
+        let rows = pkgs.dpkgRows()
+        if (pat) rows = rows.filter(r => r.toLowerCase().includes(pat.toLowerCase()))
+        emit(['Desired=Unknown/Install/Remove/Purge/Hold', '| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend', '|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)', '||/ Name                         Version                  Architecture Description', '+++-============================-========================-============-=================================', ...rows])
+      }
+      else if (has('-s') || has('--status')) {
+        const r = pkgs.get(positional[0])
+        if (r) emit([`Package: ${r.name}`, 'Status: install ok installed', `Version: ${r.ver}${r.rel ? '-' + r.rel : ''}`, `Architecture: ${r.arch}`])
+        else emit(`dpkg-query: package '${positional[0] || ''}' is not installed and no information is available`)
+      }
+      else if (has('-L')) emit(pkgs.has(positional[0]) ? ['/.', '/usr', '/usr/bin', '/usr/bin/' + (positional[0] || 'pkg')] : [`dpkg-query: package '${positional[0] || ''}' is not installed`])
+      else if (has('-i') || has('--install')) { const name = basename(positional.find(a => a.endsWith('.deb')) || positional[0] || '').replace(/_.*$/, '') || 'package'; pkgs.install([name]); emit([`Selecting previously unselected package ${name}.`, `Unpacking ${name} ...`, `Setting up ${name} ...`]) }
+      else if (has('-r') || has('-P') || has('--remove') || has('--purge')) { const removed = pkgs.remove(positional); emit(removed ? [`Removing ${positional[0]} ...`] : `dpkg: warning: ignoring request to remove ${positional[0] || 'package'} which isn't installed`) }
       else emit("Debian 'dpkg' package management program version 1.21.1")
     }
     else if (lc === 'snap' || lc === 'flatpak') emit(`${lc}: no ${lc} packages installed`)
@@ -1717,8 +1918,24 @@ export function createLinuxShell(vm) {
     }
     else if (lc === 'source' || lc === '.') emit('')
     else if (lc === 'which' || lc === 'whereis' || lc === 'type' || lc === 'command') {
-      const t = positional[0]
+      // `command -v X` is the portable form; the binary's name is the last arg.
+      const t = lc === 'command' ? positional[positional.length - 1] : positional[0]
+      // Core utilities that always exist even on a minimal box, plus anything in
+      // the installed-package DB. Unknown binaries report "not found" like a real
+      // shell — so `which nginx` only succeeds after `dnf install nginx`.
+      const ALWAYS = new Set(['ls', 'cd', 'cat', 'echo', 'bash', 'sh', 'cp', 'mv', 'rm', 'mkdir',
+        'grep', 'sed', 'awk', 'find', 'ps', 'top', 'kill', 'systemctl', 'ip', 'ping', 'ssh',
+        'vi', 'vim', 'nano', 'tar', 'gzip', 'df', 'du', 'free', 'uname', 'sudo', 'su', 'chmod',
+        'chown', 'ln', 'touch', 'head', 'tail', 'wc', 'sort', 'uniq', 'cut', 'curl', 'python3',
+        isRhel ? 'dnf' : 'apt', isRhel ? 'yum' : 'apt-get', isRhel ? 'rpm' : 'dpkg'])
+      const known = !!t && (ALWAYS.has(t) || pkgs.has(t) || !!vfs.resolveNode(`/usr/bin/${t}`) || !!vfs.resolveNode(`/usr/sbin/${t}`))
       if (!t) emit('')
+      else if (!known) {
+        if (lc === 'which') emit(`/usr/bin/which: no ${t} in (${env.PATH})`)
+        else if (lc === 'type') emit(`bash: type: ${t}: not found`)
+        else if (lc === 'command') emit('')  // `command -v` prints nothing + nonzero exit
+        else emit(`${t}:`)
+      }
       else if (lc === 'whereis') emit(`${t}: /usr/bin/${t} /usr/share/man/man1/${t}.1.gz`)
       else if (lc === 'type') emit(`${t} is /usr/bin/${t}`)
       else emit(`/usr/bin/${t}`)
@@ -1825,6 +2042,9 @@ export function createLinuxShell(vm) {
     saveFile,
     readFile,
     pkgManager: () => pkgManager(vm),
+    // Stateful package DB queries (used by tests + any future programmatic checks).
+    isInstalled: (name) => pkgs.has(name),
+    installedPackages: () => pkgs.rpmList(),
   }
 }
 

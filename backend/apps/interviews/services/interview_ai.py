@@ -408,8 +408,15 @@ def compute_answer_scores(
 
     expected_hit_rate = 0.0
     if expected_keywords:
-        hits = sum(1 for k in expected_keywords if k.lower() in low)
-        expected_hit_rate = hits / len(expected_keywords)
+        # Keywords come from JSONField data that may have been seeded or edited
+        # with non-string entries (None, ints). Coerce defensively so a single
+        # bad keyword can never crash live answer scoring (was a raw 500).
+        clean_keywords = [str(k).lower() for k in expected_keywords if k not in (None, "")]
+        if clean_keywords:
+            hits = sum(1 for k in clean_keywords if k in low)
+            expected_hit_rate = hits / len(clean_keywords)
+        else:
+            expected_keywords = None
 
     if round_type in ("behavioral", "hr"):
         composite = depth_score * 0.20 + concrete_score * 0.15 + star_score * 0.45 + length_score * 0.20

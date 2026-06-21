@@ -226,12 +226,24 @@ class InterviewCampaignListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        qs = (
-            InterviewCampaign.objects.filter(user=request.user, is_archived=False)
-            .exclude(title="Admin Demo Interview")
-            .select_related("primary_technology")
-        )
-        return Response({"campaigns": InterviewCampaignListSerializer(qs, many=True).data})
+        # The Interview hub loads this on mount; a raw 500 here surfaces as
+        # "Could not load interviews". Never let a data edge (bad snapshot,
+        # serialization quirk) turn into a 500 — degrade to an empty list.
+        try:
+            qs = (
+                InterviewCampaign.objects.filter(user=request.user, is_archived=False)
+                .exclude(title="Admin Demo Interview")
+                .select_related("primary_technology")
+            )
+            data = InterviewCampaignListSerializer(qs, many=True).data
+            return Response({"campaigns": data})
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Failed to list interview campaigns for user %s", request.user.pk
+            )
+            return Response({"campaigns": []})
 
     def post(self, request):
         if not user_has_interview_access(request.user):
@@ -485,7 +497,21 @@ class InterviewRoundMessageView(APIView):
             "input_type": request.data.get("input_type", "text"),
             "command_validated": request.data.get("command_validated", False),
         }
-        result = engine.submit_answer(round_obj, answer, meta)
+        # The whole answer/score/reply cycle runs on the free rule-based engine.
+        # A malformed question (e.g. non-string expected_keywords) or any edge in
+        # scoring must never 500 the live interview ("interviewer not working").
+        try:
+            result = engine.submit_answer(round_obj, answer, meta)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "submit_answer failed for round %s", round_id
+            )
+            return Response(
+                {"error": "Could not process that answer. Please try again."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response({
             "candidate_message": InterviewMessageSerializer(result["candidate_message"]).data,
             "interviewer_reply": InterviewMessageSerializer(result["interviewer_reply"]).data,
@@ -509,9 +535,10 @@ class InterviewRoundAvStatusView(APIView):
         camera_on = bool(request.data.get("camera_on"))
         result = engine.record_av_status(round_obj, mic_on, camera_on)
         if result.get("report") or result.get("action") == "end":
+            report = result.get("report") or getattr(round_obj, "report", None)
             return Response({
                 "ended": True,
-                "report": InterviewReportSerializer(result["report"]).data,
+                "report": InterviewReportSerializer(report).data if report else None,
             })
         return Response(result)
 
@@ -543,6 +570,17 @@ class InterviewRoundEndView(APIView):
         )
         reason = request.data.get("reason", "completed")
         result = engine.end_round(round_obj, reason=reason)
+        # Concurrent end (double-click, or AV-timeout racing a manual end) returns
+        # {"already_ended": True} with no report — return the existing report
+        # instead of KeyError-ing into a 500.
+        if result.get("already_ended") or "report" not in result:
+            existing = getattr(round_obj, "report", None)
+            payload = {
+                "passed": round_obj.status == "passed",
+                "reason": "already_ended",
+                "report": InterviewReportSerializer(existing).data if existing else None,
+            }
+            return Response(payload)
         data = {
             "passed": result["passed"],
             "reason": result.get("reason"),

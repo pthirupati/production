@@ -5,8 +5,19 @@ from __future__ import annotations
 import random
 
 from django.db.models import Q
+from django.db.utils import NotSupportedError
 
 from apps.interviews.models import InterviewQuestion
+
+
+def _materialize(qs, limit):
+    """Evaluate a queryset, falling back gracefully when the DB backend does not
+    support JSON ``__contains`` lookups (e.g. sqlite in tests/CI). On Postgres
+    (dev/prod) the lookup is native and this just returns the rows."""
+    try:
+        return list(qs.order_by("?")[:limit])
+    except NotSupportedError:
+        return None
 
 
 def select_next_question(
@@ -44,12 +55,18 @@ def select_next_question(
 
     if category_preference:
         cat_qs = qs.filter(category=category_preference, difficulty__gte=eff_difficulty - 1)
-        if cat_qs.exists():
-            qs = cat_qs
+        try:
+            if cat_qs.exists():
+                qs = cat_qs
+        except NotSupportedError:
+            pass
 
     qs = qs.filter(difficulty__gte=max(1, eff_difficulty - 1), difficulty__lte=min(5, eff_difficulty + 1))
-    candidates = list(qs.order_by("?")[:20])
+    candidates = _materialize(qs, 20)
     if not candidates:
+        # Backend lacks JSON contains support, or the narrow filter matched
+        # nothing — fall back to any active question so the bot always has a
+        # question to ask (never silently returns None on a healthy bank).
         candidates = list(
             InterviewQuestion.objects.filter(is_active=True)
             .exclude(id__in=exclude_ids)

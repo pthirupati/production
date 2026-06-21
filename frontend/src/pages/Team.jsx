@@ -2,12 +2,22 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { orgApi } from '../api/org'
 import { subscriptionApi } from '../api/subscriptions'
+import api from '../api/client'
 import {
   Users, Building2, Mail, Shield, AlertCircle, BarChart3, CreditCard,
-  Clock, Trash2, UserMinus, ChevronRight, X, BookOpen, FlaskConical, Webhook, Paintbrush
+  Clock, Trash2, UserMinus, ChevronRight, X, BookOpen, FlaskConical, Webhook, Paintbrush,
+  Plus, Sparkles
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader } from '../components/design'
+
+// NOTE: api/org.js is owned by another task; once it gains a `create(payload)`
+// method this can switch to `orgApi.create`. Until then we call the endpoint
+// directly through the shared axios client so the create-team flow works.
+async function createTeam(payload) {
+  const { data } = await api.post('/org/create/', payload)
+  return data
+}
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -30,13 +40,45 @@ export default function Team() {
   const [logoUrl, setLogoUrl] = useState('')
   const [primaryColor, setPrimaryColor] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
+  // Team creation
+  const [canCreate, setCanCreate] = useState(false)
+  const [defaultSeats, setDefaultSeats] = useState(10)
+  const [showCreate, setShowCreate] = useState(false)
+  const [newTeamName, setNewTeamName] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const refreshOrgs = (selectSlug) => {
+    return orgApi.list()
+      .then(d => {
+        setOrgs(d.organizations || [])
+        setCanCreate(!!d.can_create_team)
+        setDefaultSeats(d.default_seat_limit || 10)
+        if (selectSlug) loadOrg(selectSlug)
+      })
+      .catch(() => toast.error('Failed to load teams'))
+  }
 
   useEffect(() => {
-    orgApi.list()
-      .then(d => setOrgs(d.organizations || []))
-      .catch(() => toast.error('Failed to load teams'))
-      .finally(() => setLoading(false))
+    refreshOrgs().finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const handleCreateTeam = async (e) => {
+    e.preventDefault()
+    if (!newTeamName.trim()) return
+    setCreating(true)
+    try {
+      const org = await createTeam({ name: newTeamName.trim() })
+      toast.success(`Team "${org.name}" created`)
+      setNewTeamName('')
+      setShowCreate(false)
+      await refreshOrgs(org.slug)
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not create team')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const loadOrg = async (slug) => {
     setMemberDetail(null)
@@ -166,13 +208,52 @@ export default function Team() {
 
   if (!orgs.length) {
     return (
-      <div className="max-w-lg mx-auto text-center py-16">
-        <Building2 size={48} className="mx-auto text-surface-600 mb-4" />
-        <h1 className="text-xl font-bold text-white mb-2">No team membership</h1>
-        <p className="text-surface-400 text-sm mb-6">
-          You are not part of an organization yet. Ask your admin to invite you — they can invite your email before you register.
-        </p>
-        <Link to="/technologies" className="btn-primary">Browse technologies</Link>
+      <div className="max-w-lg mx-auto py-16">
+        {canCreate ? (
+          <div className="glass-card p-8 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-accent-cyan/10 flex items-center justify-center mx-auto mb-4">
+              <Sparkles size={26} className="text-accent-cyan" />
+            </div>
+            <h1 className="text-xl font-bold text-white mb-2">Create your team</h1>
+            <p className="text-surface-400 text-sm mb-6">
+              Your plan includes team seats. Create a team to invite colleagues, share technology
+              access, and track their progress. You'll be the team owner.
+            </p>
+            <form onSubmit={handleCreateTeam} className="space-y-3 text-left">
+              <label className="block text-xs font-medium text-surface-400">Team name</label>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Acme Engineering"
+                value={newTeamName}
+                onChange={e => setNewTeamName(e.target.value)}
+                maxLength={200}
+                required
+                autoFocus
+              />
+              <p className="text-[11px] text-surface-500">
+                Up to {defaultSeats} seats included. You can purchase more seats later.
+              </p>
+              <button type="submit" disabled={creating} className="btn-primary w-full">
+                {creating ? 'Creating…' : 'Create team'}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="text-center">
+            <Building2 size={48} className="mx-auto text-surface-600 mb-4" />
+            <h1 className="text-xl font-bold text-white mb-2">No team yet</h1>
+            <p className="text-surface-400 text-sm mb-6">
+              Creating a team requires a team or enterprise plan. Upgrade your plan or contact sales
+              to get seats for your organization. If a teammate already has a team, ask them to
+              invite your email — they can invite you before you even register.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <Link to="/pricing" className="btn-primary">View plans</Link>
+              <Link to="/contact-sales" className="btn-secondary">Contact sales</Link>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -182,11 +263,43 @@ export default function Team() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <PageHeader
-        eyebrow="Collaboration"
-        title="My Team"
-        subtitle="Organization access, member analytics, invites, and seat billing"
-      />
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <PageHeader
+          eyebrow="Collaboration"
+          title="My Team"
+          subtitle="Organization access, member analytics, invites, and seat billing"
+        />
+        {canCreate && (
+          <button
+            type="button"
+            onClick={() => setShowCreate(v => !v)}
+            className="btn-secondary shrink-0 flex items-center gap-2 mt-1"
+          >
+            <Plus size={16} /> {showCreate ? 'Cancel' : 'Create team'}
+          </button>
+        )}
+      </div>
+
+      {canCreate && showCreate && (
+        <form onSubmit={handleCreateTeam} className="glass-card p-5 flex flex-col sm:flex-row gap-3 sm:items-end">
+          <div className="flex-1">
+            <label className="block text-xs font-medium text-surface-400 mb-1.5">New team name</label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Acme Engineering"
+              value={newTeamName}
+              onChange={e => setNewTeamName(e.target.value)}
+              maxLength={200}
+              required
+              autoFocus
+            />
+          </div>
+          <button type="submit" disabled={creating} className="btn-primary shrink-0">
+            {creating ? 'Creating…' : 'Create team'}
+          </button>
+        </form>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-4">
         {orgs.map(org => (

@@ -956,6 +956,9 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["mem_pct"] = random.randint(40, 70)
         vm["net_mbps"] = random.randint(5, 30)
         vm["disk_io_mbps"] = random.randint(2, 20)
+        # The guest was just powered on this session, so the next console open
+        # should replay the full POST/GRUB/boot sequence (consumed by the UI).
+        vm["boot_pending"] = True
         vm.pop("guest_hung", None)
         vm.pop("question_pending", None)
         vm.pop("network_disconnected", None)
@@ -981,6 +984,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["mem_pct"] = 0
         vm["net_mbps"] = 0
         vm["disk_io_mbps"] = 0
+        # A powered-off guest is not "freshly booted"; the next power-on sets it.
+        vm.pop("boot_pending", None)
         events.append(_event(f"VM {vm['name']} powered off", "info", vm["name"]))
         tasks.insert(0, _task("Power Off Virtual Machine", vm["name"]))
         # Cross-tech k8s: powering off a worker-node VM removes that node.
@@ -1016,6 +1021,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm.pop("guest_hung", None)
         vm["tools"] = "ok"
         vm["cpu_pct"] = random.randint(20, 50)
+        # A reset/restart replays the full boot sequence on the next console open.
+        vm["boot_pending"] = True
         vm.pop("network_disconnected", None)
         if state.get("linux_ssh_ok") is False:
             state["linux_ssh_ok"] = True
@@ -2907,6 +2914,18 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         events.append(_event(f"Storage DRS {label} on {dscl['name']}", "info", dscl["name"]))
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Storage DRS {label} on {dscl['name']}"}
+
+    if action == "console_booted":
+        # UI-state sync: the web console has finished replaying the boot sequence
+        # for this VM, so subsequent console opens should go straight to the login
+        # prompt (like reconnecting to an already-running server). No event/task —
+        # this is not a vSphere operation, just clearing a transient boot flag.
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        vm.pop("boot_pending", None)
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "boot acknowledged"}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

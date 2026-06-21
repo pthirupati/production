@@ -36,6 +36,33 @@ class VMwareValidationTests(TestCase):
         ok, _ = validate_vmware_lab(sid, "vmware-unknown-scenario")
         self.assertFalse(ok)
 
+    # --- Console boot-vs-login state (Bug #1) -------------------------------
+    def _vm(self, sid, name):
+        from apps.vmware_sim.engine import _load_session, _find_vm
+        return _find_vm(_load_session(sid)["state"], vm_name=name)
+
+    def test_running_vm_has_no_boot_pending_on_fresh_session(self):
+        # An already-running guest (powered on in the base inventory) must NOT be
+        # flagged for a boot replay — the console should open straight to login.
+        sid = self._session("vmware-console-demo")
+        self.assertFalse(self._vm(sid, "api-prod-01").get("boot_pending"))
+
+    def test_power_on_sets_boot_pending_and_console_booted_clears_it(self):
+        sid = self._session("vmware-console-demo")
+        apply_action(sid, "power_on", {"vm_name": "web-prod-01"})
+        self.assertTrue(self._vm(sid, "web-prod-01").get("boot_pending"))
+        # The UI signals it has replayed the boot; flag clears -> next open = login.
+        res = apply_action(sid, "console_booted", {"vm_name": "web-prod-01"})
+        self.assertTrue(res["ok"])
+        self.assertFalse(self._vm(sid, "web-prod-01").get("boot_pending"))
+
+    def test_reboot_sets_boot_pending_and_power_off_clears_it(self):
+        sid = self._session("vmware-console-demo")
+        apply_action(sid, "reboot", {"vm_name": "api-prod-01"})
+        self.assertTrue(self._vm(sid, "api-prod-01").get("boot_pending"))
+        apply_action(sid, "power_off", {"vm_name": "api-prod-01"})
+        self.assertFalse(self._vm(sid, "api-prod-01").get("boot_pending"))
+
     def test_hung_guest_requires_jira_and_customer_before_reboot(self):
         sid = self._session("vmware-guest-hung-ssh")
         ok, msg = validate_vmware_lab(sid, "vmware-guest-hung-ssh")

@@ -130,6 +130,24 @@ class RHELOSState:
         from .firewall_state import FirewallState
         self.lvm = LVMState()
         self.firewall = FirewallState()
+        # Stateful rpm DB: name -> "name-version-release.arch". `dnf/yum install`
+        # adds, remove deletes, and `rpm -q`/`rpm -qa` read from it so an install
+        # is reflected in subsequent queries.
+        self.installed_packages: dict[str, str] = {
+            "kernel": f"kernel-{self.kernel}",
+            "glibc": "glibc-2.34-100.el9.x86_64",
+            "bash": "bash-5.1.8-9.el9.x86_64",
+            "systemd": "systemd-252-13.el9.x86_64",
+            "openssh-server": "openssh-server-8.7p1-34.el9.x86_64",
+            "openssh-clients": "openssh-clients-8.7p1-34.el9.x86_64",
+            "sudo": "sudo-1.9.5p2-9.el9.x86_64",
+            "python3": "python3-3.9.18-1.el9.x86_64",
+            "dnf": "dnf-4.14.0-8.el9.noarch",
+            "rpm": "rpm-4.16.1.3-22.el9.x86_64",
+            "firewalld": "firewalld-1.2.5-1.el9.noarch",
+            "chrony": "chrony-4.3-1.el9.x86_64",
+            "coreutils": "coreutils-8.32-34.el9.x86_64",
+        }
         self._init_base_system()
         self._init_block_devices()
 

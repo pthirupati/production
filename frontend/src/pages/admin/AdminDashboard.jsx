@@ -410,9 +410,16 @@ export default function AdminDashboard() {
                       <p className="text-sm font-medium text-white">{name}</p>
                     </div>
                     <p className={`text-[11px] mt-0.5 ${textClass} capitalize`}>{svc.status || 'unknown'}</p>
-                    {key === 'vault' && svc.secrets_loaded != null && (
-                      <p className={`text-[10px] mt-0.5 ${svc.secrets_loaded ? 'text-accent-green/70' : 'text-surface-500'}`}>
-                        {svc.secrets_loaded ? 'secrets loaded' : 'env file mode'}
+                    {key === 'vault' && (svc.reachable != null || svc.secrets_loaded != null) && (
+                      <p className={`text-[10px] mt-0.5 ${
+                        svc.reachable && !svc.sealed && svc.initialized ? 'text-accent-green/70'
+                        : svc.reachable ? 'text-accent-amber/80'
+                        : svc.secrets_loaded ? 'text-accent-green/70'
+                        : 'text-surface-500'
+                      }`}>
+                        {svc.reachable
+                          ? (svc.sealed ? 'reachable · sealed' : !svc.initialized ? 'reachable · uninitialized' : 'reachable · unsealed')
+                          : svc.secrets_loaded ? 'secrets loaded · API offline' : 'env file mode'}
                       </p>
                     )}
                     {svc.details && (
@@ -562,9 +569,14 @@ export default function AdminDashboard() {
           </div>
 
           {(() => {
-            const healthy = containers.filter(c => c.status === 'running' && (c.health === 'healthy' || c.health === 'none' || c.health === 'running' || !c.health)).length
-            const degraded = containers.filter(c => c.status === 'running' && c.health && c.health !== 'healthy' && c.health !== 'none' && c.health !== 'running').length
-            const down = containers.filter(c => c.status !== 'running').length
+            const isRemote = (c) => c.location === 'remote' || c.status === 'remote'
+            const isMissingState = (c) => c.status === 'missing' || c.status === 'unknown'
+            const local = containers.filter(c => !isRemote(c) && !isMissingState(c))
+            const healthy = local.filter(c => c.status === 'running' && (c.health === 'healthy' || c.health === 'none' || c.health === 'running' || !c.health)).length
+            const degraded = local.filter(c => c.status === 'running' && c.health && c.health !== 'healthy' && c.health !== 'none' && c.health !== 'running').length
+            const down = local.filter(c => c.status !== 'running').length
+            const remote = containers.filter(isRemote).length
+            const missing = containers.filter(c => c.status === 'missing').length
             const restarting = containers.reduce((sum, c) => sum + (c.restart_count || 0), 0)
             return (
               <div className="flex flex-wrap gap-4 mb-5 pb-4 border-b border-surface-800/50">
@@ -581,6 +593,16 @@ export default function AdminDashboard() {
                     <XCircle size={14} /> {down} down
                   </span>
                 )}
+                {missing > 0 && (
+                  <span className="flex items-center gap-1.5 text-sm text-accent-red">
+                    <XCircle size={14} /> {missing} missing
+                  </span>
+                )}
+                {remote > 0 && (
+                  <span className="flex items-center gap-1.5 text-sm text-surface-400">
+                    <Server size={14} /> {remote} on other nodes
+                  </span>
+                )}
                 {restarting > 0 && (
                   <span className="flex items-center gap-1.5 text-sm text-accent-amber ml-auto">
                     <RotateCcw size={13} /> {restarting} restarts
@@ -592,24 +614,39 @@ export default function AdminDashboard() {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {containers.map((c, i) => {
+              const isRemote = c.location === 'remote' || c.status === 'remote'
+              const isMissing = c.status === 'missing'
+              const isUnknown = c.status === 'unknown'
               const isUp = c.status === 'running'
-              const isHealthy = !isUp ? false : (c.health === 'healthy' || c.health === 'none' || c.health === 'running' || !c.health)
               const isDegraded = isUp && c.health && c.health !== 'healthy' && c.health !== 'none' && c.health !== 'running'
               const Icon = containerIcon(c.name)
 
-              const cardClass = !isUp
+              // Remote (on another node) and unknown states are neutral, not faults.
+              const cardClass = isRemote || isUnknown
+                ? 'border-surface-700/50 bg-surface-800/30'
+                : isMissing
+                ? 'border-accent-red/20 bg-accent-red/5'
+                : !isUp
                 ? 'border-accent-red/20 bg-accent-red/5'
                 : isDegraded
                 ? 'border-accent-amber/20 bg-accent-amber/5'
                 : 'border-accent-green/10 bg-accent-green/5 shadow-[0_0_14px_rgba(52,211,153,0.06)]'
 
-              const dotColor = !isUp ? 'bg-accent-red'
+              const dotColor = isRemote || isUnknown ? 'bg-surface-500'
+                : isMissing || !isUp ? 'bg-accent-red'
                 : isDegraded ? 'bg-accent-amber animate-pulse'
                 : 'bg-accent-green animate-pulse'
 
-              const textColor = !isUp ? 'text-accent-red'
+              const textColor = isRemote || isUnknown ? 'text-surface-400'
+                : isMissing || !isUp ? 'text-accent-red'
                 : isDegraded ? 'text-accent-amber'
                 : 'text-accent-green'
+
+              const statusLabel = isRemote ? 'on other node'
+                : isMissing ? 'missing'
+                : isUnknown ? 'unknown'
+                : isDegraded ? c.health
+                : c.status
 
               return (
                 <div key={i} className={`rounded-xl border p-3.5 transition-all ${cardClass}`}>
@@ -630,21 +667,30 @@ export default function AdminDashboard() {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-surface-500">Status</span>
-                      <span className={`font-semibold ${textColor}`}>{isDegraded ? c.health : c.status}</span>
+                      <span className={`font-semibold ${textColor}`}>{statusLabel}</span>
                     </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-surface-500">Uptime</span>
-                      <span className="text-surface-300">
-                        {c.up_since && isUp ? formatUptime(c.up_since) : '—'}
-                      </span>
-                    </div>
+                    {isRemote ? (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-surface-500">Node</span>
+                        <span className="text-surface-300 truncate ml-2" title={c.details}>
+                          {(c.node_name || c.node || 'other').replace('fixitlab-', '')}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-surface-500">Uptime</span>
+                        <span className="text-surface-300">
+                          {c.up_since && isUp ? formatUptime(c.up_since) : '—'}
+                        </span>
+                      </div>
+                    )}
                     {c.mem_mb != null && (
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-surface-500">Mem</span>
                         <span className="text-surface-300">{c.mem_mb} MB</span>
                       </div>
                     )}
-                    {!isUp && c.exit_code != null && c.exit_code !== 0 && (
+                    {!isUp && !isRemote && c.exit_code != null && c.exit_code !== 0 && (
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-surface-500">Exit</span>
                         <span className="text-accent-red font-mono">{c.exit_code}</span>

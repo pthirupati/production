@@ -383,25 +383,28 @@ export default function VmwareLabChrome({
         </SidePanel>
       )}
 
-      {/* SSH drawer */}
+      {/* SSH — full console-style window (modal overlay, minimize/maximize),
+          not a cramped drawer panel. */}
       {panel === 'ssh' && (
-        <SidePanel title="SSH console" onClose={() => setPanel(null)}>
-          {vms.length > 1 && (
-            <div className="mb-3">
-              <label className="block text-[10px] text-[#8fa5b8] mb-1 uppercase tracking-wide">Target VM</label>
-              <select value={sshVmId || sshVm?.id || ''} onChange={e => setSshVmId(e.target.value)} className="vm-input !pl-3 w-full text-xs">
-                {vms.map(v => (
-                  <option key={v.id} value={v.id}>{v.name} ({v.ip || 'no IP'})</option>
-                ))}
-              </select>
-            </div>
-          )}
-          {sshVm ? (
-            <VmwareSshTerminal vm={sshVm} sshOk={sshOk} onClose={() => setPanel(null)} />
-          ) : (
+        sshVm ? (
+          <>
+            {vms.length > 1 && (
+              <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1b2a3b] border border-[#2d3a4a] shadow-xl">
+                <label className="text-[10px] text-[#8fa5b8] uppercase tracking-wide">SSH target</label>
+                <select value={sshVmId || sshVm?.id || ''} onChange={e => setSshVmId(e.target.value)} className="vm-input !pl-2 !py-1 text-xs min-w-[180px]">
+                  {vms.map(v => (
+                    <option key={v.id} value={v.id}>{v.name} ({v.ip || 'no IP'})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <VmwareSshTerminal key={sshVm.id} vm={sshVm} sshOk={sshOk} onClose={() => setPanel(null)} />
+          </>
+        ) : (
+          <SidePanel title="SSH console" onClose={() => setPanel(null)}>
             <p className="text-[#8fa5b8] text-sm">No VMs in inventory.</p>
-          )}
-        </SidePanel>
+          </SidePanel>
+        )
       )}
     </>
   )

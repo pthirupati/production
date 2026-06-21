@@ -265,9 +265,27 @@ export default function ScenarioDetail() {
       />
 
       <StickyPageToolbar>
-        <Link to="/scenarios" className="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-white transition-colors">
-          <ArrowLeft size={14} /> All Scenarios
-        </Link>
+        {/* Stay in-context: when the scenario belongs to a technology, the
+            primary back link returns to that technology's page (its own
+            scenario list). The global "All scenarios" list stays reachable as a
+            secondary link so users can still browse/filter across technologies. */}
+        {scenario.technology?.slug ? (
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link
+              to={`/technologies/${scenario.technology.slug}`}
+              className="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={14} /> {scenario.technology.name || 'Technology'}
+            </Link>
+            <Link to="/scenarios" className="text-xs text-surface-500 hover:text-accent-cyan transition-colors">
+              All scenarios
+            </Link>
+          </div>
+        ) : (
+          <Link to="/scenarios" className="inline-flex items-center gap-1.5 text-sm text-surface-400 hover:text-white transition-colors">
+            <ArrowLeft size={14} /> All Scenarios
+          </Link>
+        )}
         <div className="flex items-center gap-2 mt-1.5">
           <span className={`shrink-0 text-xs px-2 py-1 rounded border ${typeInfo.label === 'Fix' ? 'border-accent-cyan/30 text-accent-cyan' : 'border-surface-600 text-surface-400'}`}>
             {typeInfo.label}

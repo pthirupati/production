@@ -1344,6 +1344,11 @@ class LabSessionStatusView(APIView):
                 "difficulty": session.scenario.difficulty,
                 "description": session.scenario.description,
                 "instructions": getattr(session.scenario, "instructions", "") or "",
+                # Expected-outcome objectives drive the right-hand panel in both
+                # the terminal sidebar and the coding IDE. Without them the panel
+                # rendered empty for running labs (the status endpoint omitted
+                # them while the detail serializer included them).
+                "objectives": public_objectives(session.scenario.objectives),
                 "lab_mode": session.scenario.lab_mode,
                 "simulation_type": session.scenario.simulation_type,
                 "coding_mode": bool(getattr(session.scenario, "coding_mode", False)),
@@ -1356,6 +1361,10 @@ class LabSessionStatusView(APIView):
                 # right surface without fetching the full spec — "prompt" opens the
                 # PromptPlayground, anything else opens the code IDE.
                 "coding_kind": (session.scenario.coding_spec or {}).get("kind", ""),
+                # Surfaced so the terminal can warn before sending a disallowed
+                # command (the consumer also enforces this server-side).
+                "blocked_commands": session.scenario.blocked_commands or [],
+                "dual_terminal": bool(getattr(session.scenario, "dual_terminal", False)),
                 "technology": {
                     "name": session.scenario.technology.name,
                     "slug": session.scenario.technology.slug,
@@ -1440,47 +1449,63 @@ class LabHintsView(APIView):
 
 
 class LabAiHintView(APIView):
-    """Coaching-style hints for interview mode (no stored hint spoilers)."""
+    """FREE rule-based AI coaching for ANY lab scenario (and interview mode).
+
+    Powered by apps.labs.ai_hint_service — no paid/OpenAI APIs. Returns
+    progressive coaching hints that never reveal the stored solution. Optionally
+    accepts a typed ``question`` for a context-aware coaching answer instead of
+    the next ladder hint. This is the endpoint the lab "Ask AI" button calls.
+    """
     permission_classes = [IsAuthenticated]
 
     MAX_AI_HINTS = 5
 
     def post(self, request, session_id):
+        from apps.labs.ai_hint_service import answer_lab_question, generate_lab_hint
+
         session = get_object_or_404(
             LabSession, pk=session_id, user=request.user, status="RUNNING"
         )
         scenario = session.scenario
-        if not getattr(scenario, "interview_mode", False):
-            return Response({"error": "AI hints are only available in interview mode."}, status=400)
+        interview_mode = bool(getattr(scenario, "interview_mode", False))
+
+        # Recent commands give the coach context on what the learner already tried.
+        try:
+            recent_commands = list(
+                session.command_history.order_by("-timestamp").values_list("command", flat=True)[:8]
+            )
+            recent_commands.reverse()
+        except Exception:
+            recent_commands = []
+
+        # A typed question returns a coaching answer and does NOT consume a hint
+        # credit (it's conversational), so learners can ask freely.
+        question = (request.data.get("question") or "").strip()
+        if question:
+            result = answer_lab_question(scenario, question, recent_commands)
+            return Response({
+                "answer": result["content"],
+                "ai_generated": True,
+                "hints_used": session.hints_used,
+                "total_hints": self.MAX_AI_HINTS,
+                "interview_mode": interview_mode,
+            })
 
         if session.hints_used >= self.MAX_AI_HINTS:
             return Response({"error": "Maximum AI coaching hints reached for this session."}, status=400)
 
         session.hints_used += 1
         session.save(update_fields=["hints_used"])
-
-        title = scenario.title or "this scenario"
-        category = scenario.category or scenario.technology.name
         order = session.hints_used
-        prompts = [
-            f"Start by checking service status and recent logs related to {category}. What failed last?",
-            f"Validate configuration syntax before restarting services for «{title}».",
-            f"Trace the request path: listeners, upstreams, and DNS resolution for {category}.",
-            f"Compare expected vs actual state — use read-only inspection commands first.",
-            f"Summarize root cause in one sentence, then apply the smallest fix that restores health.",
-        ]
-        content = prompts[min(order - 1, len(prompts) - 1)]
+
+        hint = generate_lab_hint(scenario, order, recent_commands)
+        hint["penalty"] = 15
 
         return Response({
-            "hint": {
-                "order": order,
-                "content": content,
-                "penalty": 15,
-                "ai_generated": True,
-            },
+            "hint": hint,
             "hints_used": session.hints_used,
             "total_hints": self.MAX_AI_HINTS,
-            "interview_mode": True,
+            "interview_mode": interview_mode,
         })
 
 

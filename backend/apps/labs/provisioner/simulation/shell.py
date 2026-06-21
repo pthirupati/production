@@ -10,6 +10,19 @@ from typing import Callable
 from .terminal_input import TerminalLineEditor
 
 
+def _to_crlf(text: str) -> str:
+    """Normalize line endings to CRLF for a raw (no line-discipline) terminal.
+
+    Command handlers and editor renders build their output with bare "\\n".
+    xterm.js, talking to a raw socket, needs "\\r\\n" or every new line keeps the
+    previous line's column (the staircase effect). Collapse any pre-existing
+    "\\r\\n" first so we never emit "\\r\\r\\n".
+    """
+    if not text:
+        return text
+    return text.replace("\r\n", "\n").replace("\n", "\r\n")
+
+
 class SimulationStreamHolder:
     """Mimics ExecStreamHolder for WebSocket terminal consumer."""
 
@@ -56,13 +69,21 @@ class SimulationStreamHolder:
         self._emit(f"\r\n{self.prompt}")
 
     def _redraw_line(self, buffer: str) -> None:
+        # Redraw the current input line robustly: return to column 0, repaint the
+        # prompt + buffer, then erase anything left over from a longer previous
+        # line with "erase to end of line" (\x1b[K). This is independent of the
+        # terminal width and the prompt's printable length, so backspace and
+        # mid-line edits render correctly (the old version hardcoded 80 cols and
+        # an absolute column jump, which misplaced the cursor after a backspace).
         self._emit("\r")
         self._emit(self.prompt + buffer)
-        pad = max(0, 80 - len(self.prompt) - len(buffer))
-        self._emit(" " * pad + "\r")
-        self._emit(self.prompt + buffer)
-        if buffer:
-            self._emit(f"\x1b[{len(self.prompt) + len(buffer)}G")
+        self._emit("\x1b[K")
+        # Place the cursor where the line editor's cursor actually is. When it's
+        # not at the end of the buffer (mid-line editing), step it back left by
+        # the number of trailing characters using a relative CSI move.
+        trailing = len(buffer) - getattr(self._editor, "cursor", len(buffer))
+        if trailing > 0:
+            self._emit(f"\x1b[{trailing}D")
 
     def _handle_editor_input(self, chunk: str) -> None:
         session = self._get_editor() if self._get_editor else None
@@ -154,7 +175,13 @@ class SimulationStreamHolder:
                             self._emit(session.render())
                         continue
                     if out:
-                        self._emit(out if out.endswith("\r\n") else out + "\r\n")
+                        # Command handlers build output with bare "\n" line
+                        # endings. A raw terminal (no line discipline) needs
+                        # CRLF, otherwise each line starts where the previous one
+                        # ended — the "staircase"/out-of-order output users saw.
+                        # Normalize to CRLF and guarantee a trailing newline.
+                        body = _to_crlf(out)
+                        self._emit(body if body.endswith("\r\n") else body + "\r\n")
                     if out and "login:" in out.lower():
                         self.set_prompt("")
                     elif out and "grub rescue" in out.lower():
