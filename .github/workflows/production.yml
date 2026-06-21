@@ -1153,20 +1153,19 @@ jobs:
             set -e
             ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
               cd /opt/fixitlab
-              # Free RAM during the test: the 4 celery workers idle ~2-4GB and the
-              # test process OOM-killed (status 137) sharing the backend 3G cgroup.
-              # Pause celery, run the test via exec (proven to find the env), restore.
-              dc="docker compose -f docker-compose.app.yml --env-file .env.production"
-              $dc stop celery_worker celery_provisioning celery_maintenance celery_beat || true
-              set +e
-              $dc exec -T backend \
-                env SKIP_EMAIL_TESTS="${{ inputs.skip_email && 'true' || 'false' }}" \
+              # Run unit tests in an ISOLATED one-off container (NOT exec/up on the
+              # live backend): test_settings uses in-memory sqlite, so it needs no
+              # running services, doesnt touch the live containers (so it cannot race
+              # the concurrent Prepare-E2E recreate -> no "removal in progress"), and
+              # has no cgroup competition with uvicorn (so no OOM / status 137).
+              IMG="$(docker compose -f docker-compose.app.yml --env-file .env.production images -q backend 2>/dev/null | head -1)"
+              [ -n "$IMG" ] || IMG="fixitlab-backend"
+              docker run --rm --env-file /opt/fixitlab/.env.production \
+                -e SKIP_EMAIL_TESTS="${{ inputs.skip_email && 'true' || 'false' }}" \
+                -e DJANGO_SETTINGS_MODULE=config.test_settings \
+                "$IMG" \
                 python manage.py test tests.test_jira_webhooks tests.test_api_security tests.test_billing_webhooks \
                 --settings=config.test_settings --verbosity=2
-              rc=$?
-              set -e
-              $dc up -d celery_worker celery_provisioning celery_maintenance celery_beat || true
-              exit $rc
             '
 
   prepare-e2e-cluster:
