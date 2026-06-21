@@ -51,8 +51,10 @@ BACKUP_SCRIPT="${BACKUP_SCRIPT//__RETENTION__/$RETENTION}"
 CRON_LINE="${BACKUP_MIN} ${BACKUP_HOUR} * * * root /usr/local/bin/fixitlab-pg-backup.sh >> /var/log/fixitlab-pg-backup.log 2>&1"
 
 install_remote() {
-  local opts=(-o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes -o "ProxyJump=root@${EDGE_PUBLIC_IP}")
-  [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE")
+  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes)
+  local jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10"
+  [ -n "$KEY_FILE" ] && { opts+=(-i "$KEY_FILE" -o IdentitiesOnly=yes); jopts="$jopts -i $KEY_FILE -o IdentitiesOnly=yes"; }
+  opts+=(-o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE_PUBLIC_IP}")
   if _is_true "$DRY_RUN"; then
     echo "DRY_RUN ssh -J root@${EDGE_PUBLIC_IP} root@${DATA_PRIVATE_IP} 'install /usr/local/bin/fixitlab-pg-backup.sh + /etc/cron.d/fixitlab-pg-backup'"
     echo "----- rendered /usr/local/bin/fixitlab-pg-backup.sh -----"

@@ -32,9 +32,14 @@ fi
 
 remote() {
   local target_ip="$1" via_edge="$2"; shift 2
-  local opts=(-o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes)
-  [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE")
-  [ "$via_edge" = "via-edge" ] && opts+=(-o "ProxyJump=root@${EDGE_PUBLIC_IP}")
+  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes)
+  [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE" -o IdentitiesOnly=yes)
+  if [ "$via_edge" = "via-edge" ]; then
+    # Explicit ProxyCommand (ProxyJump does not propagate -i / host-key opts to the jump).
+    local jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10"
+    [ -n "$KEY_FILE" ] && jopts="$jopts -i $KEY_FILE -o IdentitiesOnly=yes"
+    opts+=(-o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE_PUBLIC_IP}")
+  fi
   if _is_true "$DRY_RUN"; then
     local hop=""; [ "$via_edge" = "via-edge" ] && hop=" -J root@${EDGE_PUBLIC_IP}"
     echo "DRY_RUN ssh${hop} root@${target_ip} '$*'"
@@ -70,9 +75,11 @@ remote "$LABS_PRIVATE_IP" via-edge "install -m 700 -d /root/.ssh; \
 # Install the private key + known_hosts on D2 (mounted into containers as /root/.ssh)
 remote "$APP_PRIVATE_IP" via-edge "install -m 700 -d /opt/fixitlab/deploy/labs_ssh"
 # Copy the private key over the edge proxy without printing it.
-scp -o StrictHostKeyChecking=no -o BatchMode=yes \
-  ${KEY_FILE:+-i "$KEY_FILE"} \
-  -o "ProxyJump=root@${EDGE_PUBLIC_IP}" \
+SCP_JOPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10"
+[ -n "$KEY_FILE" ] && SCP_JOPTS="$SCP_JOPTS -i $KEY_FILE -o IdentitiesOnly=yes"
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes \
+  ${KEY_FILE:+-i "$KEY_FILE"} ${KEY_FILE:+-o IdentitiesOnly=yes} \
+  -o "ProxyCommand=ssh $SCP_JOPTS -W %h:%p root@${EDGE_PUBLIC_IP}" \
   "$WORKDIR/labs_ed25519" "root@${APP_PRIVATE_IP}:/opt/fixitlab/deploy/labs_ssh/id_ed25519"
 remote "$APP_PRIVATE_IP" via-edge "chmod 600 /opt/fixitlab/deploy/labs_ssh/id_ed25519; \
   ssh-keyscan -H ${LABS_PRIVATE_IP} > /opt/fixitlab/deploy/labs_ssh/known_hosts 2>/dev/null; \

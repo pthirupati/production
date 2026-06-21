@@ -36,8 +36,8 @@ fi
 
 edge_ssh() {
   local script="$*"
-  local opts=(-o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes)
-  [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE")
+  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes)
+  [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE" -o IdentitiesOnly=yes)
   if _is_true "$DRY_RUN"; then
     echo "DRY_RUN ssh root@${EDGE_PUBLIC_IP} '${script%%$'\n'*} ...'"
     return 0

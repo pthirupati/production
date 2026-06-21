@@ -37,9 +37,15 @@ fi
 remote() {
   local target_ip="$1" via_edge="$2"; shift 2
   local script="$*"
-  local opts=(-o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes)
-  [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE")
-  [ "$via_edge" = "via-edge" ] && opts+=(-o "ProxyJump=root@${EDGE_PUBLIC_IP}")
+  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes)
+  [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE" -o IdentitiesOnly=yes)
+  if [ "$via_edge" = "via-edge" ]; then
+    # Explicit ProxyCommand so the edge jump uses our key + skips host-key checks
+    # (ProxyJump does not propagate -i / StrictHostKeyChecking to the jump host).
+    local jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10"
+    [ -n "$KEY_FILE" ] && jopts="$jopts -i $KEY_FILE -o IdentitiesOnly=yes"
+    opts+=(-o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE_PUBLIC_IP}")
+  fi
   if _is_true "$DRY_RUN"; then
     local hop=""; [ "$via_edge" = "via-edge" ] && hop=" -J root@${EDGE_PUBLIC_IP}"
     echo "DRY_RUN ssh${hop} root@${target_ip} '${script%%$'\n'*} ...'"

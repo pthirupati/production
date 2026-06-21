@@ -48,10 +48,16 @@ trap ssh_cleanup EXIT
 remote() {
   local target_ip="$1" via_edge="$2"; shift 2
   local script="$*"
-  local opts=(-o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes)
-  [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE")
+  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes)
+  [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE" -o IdentitiesOnly=yes)
   if [ "$via_edge" = "via-edge" ]; then
-    opts+=(-o "ProxyJump=root@${EDGE_PUBLIC_IP}")
+    # Explicit ProxyCommand, NOT -o ProxyJump=: ProxyJump does not reliably pass
+    # our -i key / StrictHostKeyChecking to the jump-host (edge) connection, so
+    # the hop fails with "Permission denied (publickey)" / "Host key verification
+    # failed". UserKnownHostsFile=/dev/null also avoids the parallel known_hosts race.
+    local jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10"
+    [ -n "$KEY_FILE" ] && jopts="$jopts -i $KEY_FILE -o IdentitiesOnly=yes"
+    opts+=(-o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE_PUBLIC_IP}")
   fi
   if _is_true "$DRY_RUN"; then
     local hop=""; [ "$via_edge" = "via-edge" ] && hop=" -J root@${EDGE_PUBLIC_IP}"
