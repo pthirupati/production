@@ -64,6 +64,27 @@ echo "Compose: $COMPOSE_FILE | Env: $ENV_FILE"
 
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
 
+# Sync the Postgres role password to the current env. The fixitlab_db_data volume
+# persists across deploys and keeps the password it was FIRST initialized with, so
+# a rotated POSTGRES_PASSWORD won't match until we ALTER it — otherwise the backend
+# fails with "password authentication failed". Local socket connections use trust
+# auth, so no current password is needed. Generated passwords are [A-Za-z0-9._-~]
+# (see ci-generate-secrets.py _SAFE_PUNCT), so inlining is injection-safe.
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx fixitlab_db; then
+  _PGUSER="$(grep -E '^POSTGRES_USER=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r"')"
+  _PGPASS="$(grep -E '^POSTGRES_PASSWORD=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r"')"
+  _PGUSER="${_PGUSER:-fixitlab}"
+  if [ -n "$_PGPASS" ]; then
+    for _i in $(seq 1 30); do docker exec fixitlab_db pg_isready -U "$_PGUSER" >/dev/null 2>&1 && break; sleep 2; done
+    if docker exec fixitlab_db psql -v ON_ERROR_STOP=1 -U "$_PGUSER" -d postgres \
+         -c "ALTER USER \"$_PGUSER\" WITH PASSWORD '$_PGPASS';" >/dev/null 2>&1; then
+      echo "Synced Postgres role password to current env (rotation-safe)"
+    else
+      echo "WARN: could not sync Postgres role password — relying on init value"
+    fi
+  fi
+fi
+
 # Ensure Vault is on the same network as backend (fixes legacy standalone vault compose)
 if _role_runs edge && { _env_true "${VAULT_ENABLED:-}" || [ -f "$ROOT/deploy/vault-approle.env" ]; }; then
   bash "$ROOT/scripts/vault/ensure-network.sh" 2>/dev/null || true
