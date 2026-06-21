@@ -70,5 +70,8 @@ volumes:
 
 networks:
   fixitlab_net:
+    # External — pre-created per node by ci-bootstrap-cluster.sh so Vault can attach
+    # before the app stack comes up. Marking it external avoids the compose
+    # "network exists but has incorrect label" conflict on the shared bridge.
+    external: true
     name: fixitlab_net
-    driver: bridge
