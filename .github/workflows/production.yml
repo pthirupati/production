@@ -1262,6 +1262,7 @@ jobs:
               cd /opt/fixitlab
               docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
                 env E2E_SKIP_LAB=0 E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 E2E_PRESERVE_LAB_USERS=1 \
+                E2E_MAX_PER_TECH=3 \
                 E2E_TECH_FILTER="${{ inputs.technologies }}" TERMINAL_MAX_WS_PER_USER=64 \
                 python /scripts/e2e_all_scenarios_labs.py
             '

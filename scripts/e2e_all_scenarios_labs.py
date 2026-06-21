@@ -450,6 +450,14 @@ def main():
             stats.skip(f"[{tech.slug}] all scenarios", "technology coming soon")
             continue
         deployable = [s for s in tech_scenarios if s in catalog["deployable"]]
+        # Optional per-technology cap (E2E_MAX_PER_TECH). Default 0 = no cap (the
+        # single-host "all scenarios" sweep). The cluster job sets a small value to
+        # sample a representative subset per tech so the suite finishes within the
+        # ssh-action command_timeout instead of running all 1100+ scenarios.
+        _max_per_tech = int(os.environ.get("E2E_MAX_PER_TECH", "0") or "0")
+        if _max_per_tech > 0 and len(deployable) > _max_per_tech:
+            print(f"  (sampling {_max_per_tech}/{len(deployable)} deployable labs — E2E_MAX_PER_TECH)")
+            deployable = deployable[:_max_per_tech]
         print(f"\n### Technology: {tech.name} ({tech.slug}) — {len(deployable)}/{len(tech_scenarios)} labs deployable ###")
         for sc in deployable:
             db_refresh()
