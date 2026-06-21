@@ -99,6 +99,8 @@ class Command(BaseCommand):
                     "status": "scheduled",
                 },
             )
+
+        self.stdout.write(self.style.SUCCESS(
             f"Admin demo ready for {user.email}:\n"
             f"  Certificate: {cert.certificate_id} ({'created' if cert_created else 'updated'})\n"
             f"  Verify: /verify-certificate?certificate_id={cert_id}\n"

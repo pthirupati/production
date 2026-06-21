@@ -967,10 +967,12 @@ jobs:
               echo "WARN: could not decrypt cluster env — nodes may lack .env.production"
             fi
           fi
-          chmod +x scripts/ci-bootstrap-cluster.sh scripts/ci-setup-labs-ssh.sh
+          chmod +x scripts/ci-bootstrap-cluster.sh scripts/ci-setup-labs-ssh.sh scripts/ci-setup-edge-ssh.sh
           ./scripts/ci-bootstrap-cluster.sh
           echo "Provisioning D2->D4 labs SSH key"
           ./scripts/ci-setup-labs-ssh.sh
+          echo "Provisioning edge->internal SSH key (post-deploy jobs hop edge->D2/D3/D4)"
+          ./scripts/ci-setup-edge-ssh.sh
 
   vault-cluster:
     name: "[4D] Vault bootstrap (D1)"
@@ -1149,7 +1151,7 @@ jobs:
           command_timeout: 15m
           script: |
             set -e
-            ssh -o StrictHostKeyChecking=no "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
+            ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
               cd /opt/fixitlab
               docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
                 env SKIP_EMAIL_TESTS="${{ inputs.skip_email && 'true' || 'false' }}" \
@@ -1184,7 +1186,7 @@ jobs:
           command_timeout: 5m
           script: |
             set -e
-            ssh -o StrictHostKeyChecking=no "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
+            ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
               cd /opt/fixitlab
               chmod +x scripts/ci-e2e-session-mode.sh
               COMPOSE_FILE=docker-compose.app.yml ./scripts/ci-e2e-session-mode.sh disable
@@ -1218,7 +1220,7 @@ jobs:
           command_timeout: 20m
           script: |
             set -e
-            ssh -o StrictHostKeyChecking=no "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
+            ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
               cd /opt/fixitlab
               EMAIL="${{ secrets.PROD_SUPERUSER_EMAIL }}"; PASS="${{ secrets.PROD_SUPERUSER_PASSWORD }}"
               docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
@@ -1256,7 +1258,7 @@ jobs:
           command_timeout: 40m
           script: |
             set -e
-            ssh -o StrictHostKeyChecking=no "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
+            ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@${{ needs.create-cluster.outputs.app_private_ip }}" '
               cd /opt/fixitlab
               docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
                 env E2E_SKIP_LAB=0 E2E_MULTI_USERS=3 E2E_SKIP_CLEANUP=1 E2E_PRESERVE_LAB_USERS=1 \
