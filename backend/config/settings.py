@@ -3,6 +3,7 @@ import environ
 import os
 import socket
 from datetime import timedelta
+from decimal import Decimal
 
 # --------------------------------------------------
 # Base paths & env
@@ -476,6 +477,28 @@ BUSINESS_NAME = env("BUSINESS_NAME", default="FixitLab")
 BUSINESS_ADDRESS = env("BUSINESS_ADDRESS", default="")
 BUSINESS_GSTIN = env("BUSINESS_GSTIN", default="")
 BUSINESS_PAN = env("BUSINESS_PAN", default="")
+
+# --------------------------------------------------
+# Indian GST (tax on paid subscriptions / orders)
+# --------------------------------------------------
+# PRODUCTION_AUDIT FIN-01: a registered Indian seller must compute GST
+# server-side and itemise it on the tax invoice. GST is charged (the price the
+# user sees + pays is GST-inclusive) ONLY when:
+#   * GST_ENABLED is true, AND
+#   * BUSINESS_GSTIN is configured (you cannot levy GST without a registration).
+# Until the owner sets a live BUSINESS_GSTIN, gst_should_charge() returns False
+# and orders are priced at the bare catalog price with zero tax — so nothing
+# breaks pre-registration, and the schema/breakup is already in place.
+#
+# GST_RATE is the combined rate for digital services (default 18% = 0.18). The
+# intra-state split is CGST + SGST (each = rate/2); inter-state is a single IGST
+# at the full rate. Place of supply is the seller's state unless the customer
+# provides a different state (B2B with GSTIN).
+GST_ENABLED = env.bool("GST_ENABLED", default=False)
+GST_RATE = Decimal(str(env("GST_RATE", default="0.18")))
+# Seller's state of registration (place of supply for intra-state vs inter-state).
+BUSINESS_STATE = env("BUSINESS_STATE", default="")
+GST_HSN_SAC = env("GST_HSN_SAC", default="998314")  # SAC for IT software/online services
 
 # --------------------------------------------------
 # Default PK

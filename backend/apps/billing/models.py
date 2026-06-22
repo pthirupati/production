@@ -190,7 +190,19 @@ class PaymentTransaction(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="transactions"
     )
+    # ``amount`` is the GST-INCLUSIVE total actually charged (what the customer
+    # paid and what the Razorpay order is created for). The tax breakup below is
+    # extracted from it server-side (PRODUCTION_AUDIT FIN-01).
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    # GST breakup (Indian tax compliance). taxable_amount + gst_amount == amount.
+    # Zero tax when GST is disabled / no GSTIN — see apps.billing.gst.
+    taxable_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    gst_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0)
+    gst_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cgst_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    sgst_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    igst_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    place_of_supply = models.CharField(max_length=100, blank=True, default="")
     currency = models.CharField(max_length=3, default="INR")
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD)
     status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default="pending")
@@ -205,6 +217,10 @@ class PaymentTransaction(models.Model):
     plan = models.ForeignKey(
         Plan, on_delete=models.SET_NULL, null=True, blank=True, related_name="transactions",
     )
+    # Cumulative amount refunded (INR). The refund path enforces that this can
+    # never exceed ``amount`` and is incremented atomically under a row lock
+    # (PRODUCTION_AUDIT FIN-02).
+    refunded_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     verified_at = models.DateTimeField(null=True, blank=True)
@@ -274,7 +290,19 @@ class SubscriptionInvoice(models.Model):
     )
     technology_name = models.CharField(max_length=200)
     subscription_id = models.CharField(max_length=200, blank=True)
+    # ``amount`` is the GST-inclusive total paid. The GST breakup below is
+    # rendered on the tax invoice (PRODUCTION_AUDIT FIN-01); taxable_amount +
+    # gst_amount == amount.
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    taxable_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    gst_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0)
+    gst_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cgst_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    sgst_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    igst_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    place_of_supply = models.CharField(max_length=100, blank=True, default="")
+    gstin = models.CharField(max_length=20, blank=True, default="")
+    hsn_sac = models.CharField(max_length=20, blank=True, default="")
     currency = models.CharField(max_length=3, default="INR")
     payment_method = models.CharField(max_length=50, blank=True)
     gateway_payment_id = models.CharField(max_length=200, blank=True)

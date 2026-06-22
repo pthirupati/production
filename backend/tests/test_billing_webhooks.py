@@ -47,6 +47,12 @@ class BillingWebhookTests(TestCase):
                 self.currency = 'INR'
                 self.status = 'processing'
                 self.gateway_payment_id = None
+                # The capture handler now MERGES the payment entity into the
+                # existing gateway_response (to preserve order/product metadata),
+                # so the mock must expose a dict here.
+                self.gateway_response = {}
+                self.tech_subscription = None
+                self.plan = None
 
             def refresh_from_db(self):
                 return
@@ -58,6 +64,8 @@ class BillingWebhookTests(TestCase):
                 self.status = 'success'
                 if gateway_payment_id:
                     self.gateway_payment_id = gateway_payment_id
+                if gateway_response is not None:
+                    self.gateway_response = gateway_response
 
         self_user = self.user
         fake_tx = FakeTx()

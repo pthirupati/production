@@ -605,6 +605,39 @@ class OrganizationRazorpayVerifyView(APIView):
         if notes.get("checkout_type") != "organization" or notes.get("org_slug") != slug:
             return Response({"error": "Order mismatch"}, status=400)
 
+        # PRODUCTION_AUDIT FIN-03: a valid handshake signature can exist for a
+        # payment that is only `authorized`/`created`/`failed`. Confirm with the
+        # gateway that the payment is actually CAPTURED for this order at the
+        # expected amount BEFORE granting any seats — consistent with the
+        # technology-subscription verify path.
+        from apps.billing.razorpay_fulfillment import verify_razorpay_payment_captured
+
+        try:
+            expected_amount_inr = int(notes.get("amount_inr") or 0)
+        except (TypeError, ValueError):
+            expected_amount_inr = 0
+        if expected_amount_inr <= 0:
+            # Fallback to the order's own amount (paise → INR) so this still works
+            # for any order created before amount_inr was added to notes.
+            try:
+                expected_amount_inr = int(order.get("amount", 0)) // 100
+            except (TypeError, ValueError):
+                expected_amount_inr = 0
+
+        if not verify_razorpay_payment_captured(order_id, payment_id, expected_amount_inr):
+            return Response(
+                {"error": "Payment not captured. Seats were not granted."},
+                status=400,
+            )
+
         from apps.billing.extended_views import fulfill_org_razorpay_order
+        # Idempotent + race-safe under a duplicate verify/double-click. The cache
+        # key is keyed on the captured payment id so a replay can't re-grant.
+        from django.core.cache import cache as dj_cache
+
+        lock_key = f"org_razorpay_fulfilled:{payment_id}"
+        if not dj_cache.add(lock_key, True, timeout=86400):
+            return Response({"verified": True, "organization": org.name, "seats": org.seat_limit, "already_fulfilled": True})
+
         fulfill_org_razorpay_order(notes)
         return Response({"verified": True, "organization": org.name, "seats": org.seat_limit})

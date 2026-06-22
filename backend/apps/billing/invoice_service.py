@@ -39,6 +39,25 @@ def create_invoice_for_transaction(transaction: PaymentTransaction) -> Subscript
 
     period_start = transaction.verified_at or transaction.created_at
 
+    # GST breakup carried from the transaction (computed server-side at order
+    # creation — PRODUCTION_AUDIT FIN-01). For legacy transactions written before
+    # GST fields existed, taxable_amount may be 0; fall back to (re)computing from
+    # the inclusive amount so the invoice always balances.
+    from .gst import compute_gst
+
+    taxable = transaction.taxable_amount
+    gst_rate = transaction.gst_rate
+    gst_amount = transaction.gst_amount
+    cgst = transaction.cgst_amount
+    sgst = transaction.sgst_amount
+    igst = transaction.igst_amount
+    place_of_supply = transaction.place_of_supply
+    if (taxable or 0) <= 0:
+        b = compute_gst(transaction.amount, place_of_supply=place_of_supply)
+        taxable, gst_rate, gst_amount = b.taxable_amount, b.gst_rate, b.gst_amount
+        cgst, sgst, igst = b.cgst_amount, b.sgst_amount, b.igst_amount
+        place_of_supply = b.place_of_supply
+
     invoice = SubscriptionInvoice.objects.create(
         invoice_number=_invoice_number(transaction),
         user=transaction.user,
@@ -47,6 +66,15 @@ def create_invoice_for_transaction(transaction: PaymentTransaction) -> Subscript
         technology_name=tech_name,
         subscription_id=subscription_id,
         amount=transaction.amount,
+        taxable_amount=taxable,
+        gst_rate=gst_rate,
+        gst_amount=gst_amount,
+        cgst_amount=cgst,
+        sgst_amount=sgst,
+        igst_amount=igst,
+        place_of_supply=place_of_supply,
+        gstin=(getattr(settings, "BUSINESS_GSTIN", "") or "").strip(),
+        hsn_sac=(getattr(settings, "GST_HSN_SAC", "") or "").strip(),
         currency=transaction.currency,
         payment_method=transaction.get_payment_method_display(),
         gateway_payment_id=transaction.gateway_payment_id or "",
@@ -90,8 +118,19 @@ def backfill_invoices_for_user(user):
             create_invoice_for_transaction(tx)
 
 
+def _money(value, currency: str) -> str:
+    """Format a Decimal money value for display (₹1,234.00 for INR)."""
+    from decimal import Decimal
+
+    value = value or Decimal("0")
+    if currency == "INR":
+        return f"₹{value:,.2f}"
+    return f"{currency} {value:,.2f}"
+
+
 def invoice_context(invoice: SubscriptionInvoice) -> dict:
     user = invoice.user
+    has_gst = (invoice.gst_amount or 0) > 0
     return {
         "invoice_number": invoice.invoice_number,
         "username": user.get_full_name() or user.username,
@@ -100,14 +139,26 @@ def invoice_context(invoice: SubscriptionInvoice) -> dict:
         "payment_method": invoice.payment_method,
         "technology": invoice.technology_name,
         "plan_name": "1-Year Technology Access",
-        "amount": f"₹{int(invoice.amount)}" if invoice.currency == "INR" else f"{invoice.currency} {invoice.amount}",
+        "amount": _money(invoice.amount, invoice.currency),
+        # GST tax invoice breakup (PRODUCTION_AUDIT FIN-01).
+        "has_gst": has_gst,
+        "is_inter_state": (invoice.igst_amount or 0) > 0,
+        "taxable_amount": _money(invoice.taxable_amount or invoice.amount, invoice.currency),
+        "gst_amount": _money(invoice.gst_amount, invoice.currency),
+        "cgst_amount": _money(invoice.cgst_amount, invoice.currency),
+        "sgst_amount": _money(invoice.sgst_amount, invoice.currency),
+        "igst_amount": _money(invoice.igst_amount, invoice.currency),
+        "gst_rate_pct": f"{(invoice.gst_rate or 0) * 100:.0f}",
+        "gst_half_rate_pct": f"{(invoice.gst_rate or 0) * 100 / 2:.1f}",
+        "place_of_supply": invoice.place_of_supply or "",
+        "hsn_sac": invoice.hsn_sac or "",
         "subscription_id": invoice.subscription_id,
         "billing_period": "1 Year",
         "period_start": invoice.period_start.strftime("%B %d, %Y") if invoice.period_start else "",
         "period_end": invoice.period_end.strftime("%B %d, %Y") if invoice.period_end else "",
         "business_name": getattr(settings, "BUSINESS_NAME", "FixitLab"),
         "business_address": getattr(settings, "BUSINESS_ADDRESS", ""),
-        "business_gstin": getattr(settings, "BUSINESS_GSTIN", ""),
+        "business_gstin": invoice.gstin or getattr(settings, "BUSINESS_GSTIN", ""),
         "gateway_payment_id": invoice.gateway_payment_id,
         "scenarios_url": f"{settings.FRONTEND_URL}/scenarios",
     }
@@ -133,6 +184,14 @@ def invoice_list_payload(invoice: SubscriptionInvoice) -> dict:
         "product_type": product_type,
         "subscription_id": invoice.subscription_id,
         "amount": str(invoice.amount),
+        "taxable_amount": str(invoice.taxable_amount),
+        "gst_rate": str(invoice.gst_rate),
+        "gst_amount": str(invoice.gst_amount),
+        "cgst_amount": str(invoice.cgst_amount),
+        "sgst_amount": str(invoice.sgst_amount),
+        "igst_amount": str(invoice.igst_amount),
+        "place_of_supply": invoice.place_of_supply,
+        "gstin": invoice.gstin,
         "currency": invoice.currency,
         "payment_method": invoice.payment_method,
         "created_at": invoice.created_at.isoformat(),

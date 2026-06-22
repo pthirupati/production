@@ -35,14 +35,28 @@ def technology_id_from_transaction(transaction) -> int | None:
 
 
 def create_technology_payment_transaction(*, user, amount, order, technology_id, coupon_code=""):
-    """Create audit record when Razorpay order is created."""
+    """Create audit record when Razorpay order is created.
+
+    ``amount`` is the GST-inclusive INR total (server-side catalog price, post
+    coupon). The GST breakup is computed + persisted here so the invoice and the
+    Razorpay order are consistent (PRODUCTION_AUDIT FIN-01).
+    """
+    from .gst import compute_gst
     from .models import PaymentTransaction
 
     key_src = f"{user.id}-{technology_id}-{amount}-{order['id']}"
     idempotency_key = hashlib.sha256(key_src.encode()).hexdigest()
+    breakup = compute_gst(amount)
     return PaymentTransaction.objects.create(
         user=user,
-        amount=amount,
+        amount=breakup.total_amount,
+        taxable_amount=breakup.taxable_amount,
+        gst_rate=breakup.gst_rate,
+        gst_amount=breakup.gst_amount,
+        cgst_amount=breakup.cgst_amount,
+        sgst_amount=breakup.sgst_amount,
+        igst_amount=breakup.igst_amount,
+        place_of_supply=breakup.place_of_supply,
         currency="INR",
         payment_method="razorpay",
         status="processing",
@@ -187,13 +201,22 @@ def product_type_from_transaction(transaction) -> str | None:
 
 
 def create_interview_payment_transaction(*, user, amount, order, plan_code: str):
+    from .gst import compute_gst
     from .models import PaymentTransaction
 
     key_src = f"{user.id}-interview-{plan_code}-{amount}-{order['id']}"
     idempotency_key = hashlib.sha256(key_src.encode()).hexdigest()
+    breakup = compute_gst(amount)
     return PaymentTransaction.objects.create(
         user=user,
-        amount=amount,
+        amount=breakup.total_amount,
+        taxable_amount=breakup.taxable_amount,
+        gst_rate=breakup.gst_rate,
+        gst_amount=breakup.gst_amount,
+        cgst_amount=breakup.cgst_amount,
+        sgst_amount=breakup.sgst_amount,
+        igst_amount=breakup.igst_amount,
+        place_of_supply=breakup.place_of_supply,
         currency="INR",
         payment_method="razorpay",
         status="processing",

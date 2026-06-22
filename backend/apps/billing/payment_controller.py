@@ -432,7 +432,13 @@ class RazorpayWebhookView(APIView):
             logger.error(f"Error handling payment.authorized: {e}")
 
     def _handle_payment_failed(self, event):
-        """Handle payment.failed event."""
+        """Handle payment.failed event.
+
+        PRODUCTION_AUDIT REL-06 / idempotency: a late or replayed ``payment.failed``
+        must NOT overwrite a transaction that has already been captured/succeeded
+        or refunded. We lock the row and only fail it when it is still in a
+        non-terminal state.
+        """
         try:
             payment_data = event.get("payload", {}).get("payment", {}).get("entity", {})
             order_id = payment_data.get("order_id", "")
@@ -440,13 +446,24 @@ class RazorpayWebhookView(APIView):
             error_obj = payment_data.get("error_description", "")
             reason = error_obj or payment_data.get("description", "") or "Payment declined"
 
-            transaction = PaymentTransaction.objects.filter(
-                gateway_order_id=order_id
-            ).first()
+            from django.db import transaction as db_transaction
 
-            if transaction:
-                transaction.mark_failed(reason)
-                logger.warning(f"Payment failed for transaction {transaction.id}: {reason}")
+            with db_transaction.atomic():
+                tx = (
+                    PaymentTransaction.objects.select_for_update()
+                    .filter(gateway_order_id=order_id)
+                    .first()
+                )
+                if not tx:
+                    return
+                if tx.status in ("success", "refunded"):
+                    logger.info(
+                        "Ignoring payment.failed for already-%s transaction %s",
+                        tx.status, tx.id,
+                    )
+                    return
+                tx.mark_failed(reason)
+                logger.warning(f"Payment failed for transaction {tx.id}: {reason}")
 
         except Exception as e:
             logger.error(f"Error handling payment.failed: {e}")
@@ -488,7 +505,15 @@ class RazorpayWebhookView(APIView):
                     tx.mark_failed("Webhook amount mismatch")
                     return
 
-                tx.mark_success(gateway_payment_id=payment_id, gateway_response=payment_data)
+                # MERGE the payment entity into the existing gateway_response
+                # rather than replacing it — the original order metadata
+                # (technology_id / product_type / plan_code) lives there and is
+                # required by _activate_subscription to resolve what to fulfil.
+                # Overwriting it would leave a captured payment with no product
+                # to grant (silent paid-but-no-access).
+                merged_response = tx.gateway_response if isinstance(tx.gateway_response, dict) else {}
+                merged_response = {**merged_response, "payment": payment_data}
+                tx.mark_success(gateway_payment_id=payment_id, gateway_response=merged_response)
                 service = PaymentService(
                     user=tx.user,
                     amount=tx.amount,

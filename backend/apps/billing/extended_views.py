@@ -333,10 +333,17 @@ class OrgSeatCheckoutView(APIView):
         if amount_inr <= 0:
             return Response({"error": "Invalid checkout amount"}, status=400)
 
+        # GST is computed server-side on the inclusive total (PRODUCTION_AUDIT
+        # FIN-01). The catalog/seat price is treated as GST-inclusive, so the
+        # Razorpay order amount equals the displayed total. The breakup is stored
+        # in notes so the capture-verify + fulfilment can reconcile it.
+        from .gst import compute_gst
+        breakup = compute_gst(amount_inr)
+
         import razorpay
         client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
         order = client.order.create({
-            "amount": amount_inr * 100,
+            "amount": breakup.total_paise,
             "currency": "INR",
             "receipt": f"org_{org.slug}_{request.user.id}"[:40],
             "notes": {
@@ -346,6 +353,11 @@ class OrgSeatCheckoutView(APIView):
                 "seats": str(seats),
                 "technology_ids": ",".join(str(t.id) for t in technologies),
                 "user_id": str(request.user.id),
+                # Server-side expected amount — the verify path re-checks the
+                # captured payment against this (PRODUCTION_AUDIT FIN-03).
+                "amount_inr": str(amount_inr),
+                "taxable_amount": str(breakup.taxable_amount),
+                "gst_amount": str(breakup.gst_amount),
             },
         })
         return Response({

@@ -67,27 +67,57 @@
           <tr>
             <td style="padding:16px 20px;border-bottom:1px solid #1e293b;">
               <p style="color:#ffffff;font-size:14px;font-weight:600;margin:0;">{{ technology }}</p>
-              <p style="color:#94a3b8;font-size:12px;margin:4px 0 0;">{{ plan_name }}</p>
+              <p style="color:#94a3b8;font-size:12px;margin:4px 0 0;">{{ plan_name }}{% if hsn_sac %} &#183; SAC {{ hsn_sac }}{% endif %}</p>
             </td>
             <td style="padding:16px 20px;color:#8b5cf6;font-size:13px;font-weight:600;text-align:center;border-bottom:1px solid #1e293b;">{{ billing_period }}</td>
             <td style="padding:16px 20px;color:#ffffff;font-size:14px;font-weight:700;text-align:right;border-bottom:1px solid #1e293b;">{{ amount }}</td>
           </tr>
-          <!-- Subtotal -->
+          {% if has_gst %}
+          <!-- Taxable value (GST-exclusive) -->
+          <tr>
+            <td colspan="2" style="padding:14px 20px;color:#94a3b8;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">Taxable value</td>
+            <td style="padding:14px 20px;color:#ffffff;font-size:14px;font-weight:600;text-align:right;border-bottom:1px solid #1e293b;">{{ taxable_amount }}</td>
+          </tr>
+          {% if is_inter_state %}
+          <!-- IGST (inter-state) -->
+          <tr>
+            <td colspan="2" style="padding:14px 20px;color:#94a3b8;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">IGST ({{ gst_rate_pct }}%)</td>
+            <td style="padding:14px 20px;color:#ffffff;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">{{ igst_amount }}</td>
+          </tr>
+          {% else %}
+          <!-- CGST + SGST (intra-state) -->
+          <tr>
+            <td colspan="2" style="padding:14px 20px;color:#94a3b8;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">CGST ({{ gst_half_rate_pct }}%)</td>
+            <td style="padding:14px 20px;color:#ffffff;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">{{ cgst_amount }}</td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:14px 20px;color:#94a3b8;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">SGST ({{ gst_half_rate_pct }}%)</td>
+            <td style="padding:14px 20px;color:#ffffff;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">{{ sgst_amount }}</td>
+          </tr>
+          {% endif %}
+          {% else %}
+          <!-- Subtotal (no GST levied) -->
           <tr>
             <td colspan="2" style="padding:14px 20px;color:#94a3b8;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">Subtotal</td>
             <td style="padding:14px 20px;color:#ffffff;font-size:14px;font-weight:600;text-align:right;border-bottom:1px solid #1e293b;">{{ amount }}</td>
           </tr>
-          <!-- Tax -->
-          <tr>
-            <td colspan="2" style="padding:14px 20px;color:#94a3b8;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">Tax (included)</td>
-            <td style="padding:14px 20px;color:#94a3b8;font-size:13px;text-align:right;border-bottom:1px solid #1e293b;">&#8212;</td>
-          </tr>
+          {% endif %}
           <!-- Total -->
           <tr style="background:rgba(6,182,212,0.05);">
-            <td colspan="2" style="padding:16px 20px;color:#06b6d4;font-size:14px;font-weight:700;text-align:right;">Total Paid</td>
+            <td colspan="2" style="padding:16px 20px;color:#06b6d4;font-size:14px;font-weight:700;text-align:right;">Total Paid{% if has_gst %} (incl. GST){% endif %}</td>
             <td style="padding:16px 20px;color:#10b981;font-size:18px;font-weight:800;text-align:right;">{{ amount }}</td>
           </tr>
         </table>
+        {% if has_gst %}
+        <table width="100%" style="margin-top:10px;">
+          <tr>
+            <td style="color:#64748b;font-size:11px;line-height:1.6;">
+              {% if business_gstin %}GSTIN: <span style="color:#94a3b8;">{{ business_gstin }}</span>{% endif %}
+              {% if place_of_supply %}&#183; Place of supply: <span style="color:#94a3b8;">{{ place_of_supply }}</span>{% endif %}
+            </td>
+          </tr>
+        </table>
+        {% endif %}
       </td></tr>
 
       <!-- Subscription Details -->

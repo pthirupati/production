@@ -28,6 +28,7 @@ import hmac
 import hashlib
 import logging
 import secrets
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 import stripe
 from django.conf import settings
@@ -1527,32 +1528,53 @@ class RazorpayRefundView(APIView):
 
     POST /api/billing/razorpay/refund/
     Body: { "payment_id": "pay_xxx", "amount": 499 }   (amount in INR)
+
+    PRODUCTION_AUDIT FIN-02 — hardened:
+      * The transaction row is locked with ``select_for_update`` inside a single
+        ``transaction.atomic()`` so two concurrent refunds (double-click / two
+        admins) are serialised — the second sees the first's effect.
+      * Cumulative refunds can NEVER exceed the captured ``amount``: the ceiling
+        is checked against ``amount - refunded_amount`` under the lock, and
+        ``refunded_amount`` is bumped before the row is released.
+      * All money math is :class:`~decimal.Decimal` (no float rounding of paise).
+      * Idempotent: an explicit/derived idempotency key is sent to Razorpay (the
+        gateway dedupes a retried refund), the Razorpay ``refund.id`` is persisted
+        in ``gateway_response['refunds']``, and a refund whose id we've already
+        recorded is treated as a no-op success rather than refunding again.
     """
     permission_classes = [IsAdminUser]
     throttle_classes = [BillingRateThrottle]
 
     def post(self, request):
+        from django.db import transaction as db_transaction
+        from .models import PaymentTransaction
+
         payment_id = (request.data.get("payment_id") or "").strip()
         amount_inr = request.data.get("amount")
+        # Optional client-supplied idempotency key; otherwise derive a stable one
+        # from (payment_id, amount) so an identical retry hits the same Razorpay
+        # refund instead of creating a second one.
+        idem_key = (request.data.get("idempotency_key") or "").strip()
 
         if not payment_id:
             return Response(
                 {"error": "payment_id is required"},
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
-        if not amount_inr:
+        if amount_inr is None or amount_inr == "":
             return Response(
                 {"error": "amount is required (in INR)"},
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
+        # Decimal paise — never float. Quantise to whole paise.
         try:
-            amount_paise = int(float(amount_inr) * 100)
-        except (TypeError, ValueError):
-            return Response(
-                {"error": "Invalid amount"},
-                status=http_status.HTTP_400_BAD_REQUEST,
-            )
+            amount_dec = Decimal(str(amount_inr))
+        except (InvalidOperation, TypeError, ValueError):
+            return Response({"error": "Invalid amount"}, status=http_status.HTTP_400_BAD_REQUEST)
+        if amount_dec <= 0:
+            return Response({"error": "Amount must be positive"}, status=http_status.HTTP_400_BAD_REQUEST)
+        amount_paise = int((amount_dec * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
         if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
             return Response(
@@ -1560,31 +1582,99 @@ class RazorpayRefundView(APIView):
                 status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
+        if not idem_key:
+            idem_key = hashlib.sha256(
+                f"refund-{payment_id}-{amount_paise}".encode()
+            ).hexdigest()
+
         try:
             import razorpay
             client = razorpay.Client(
                 auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
             )
-            refund = client.payment.refund(payment_id, {"amount": amount_paise})
 
-            # Update transaction record if one exists
-            from .models import PaymentTransaction
-            tx = PaymentTransaction.objects.filter(
-                gateway_payment_id=payment_id
-            ).first()
-            if tx:
-                tx.status = "refunded"
-                tx.error_message = f"Refunded ₹{amount_inr} — refund id: {refund.get('id', '')}"
-                tx.save(update_fields=["status", "error_message"])
+            # Everything below is serialised per-transaction under a row lock so
+            # the ceiling check and the refund issuance can't interleave.
+            with db_transaction.atomic():
+                tx = (
+                    PaymentTransaction.objects.select_for_update()
+                    .filter(gateway_payment_id=payment_id)
+                    .first()
+                )
+                if not tx:
+                    return Response(
+                        {"error": "No transaction found for this payment ID"},
+                        status=http_status.HTTP_404_NOT_FOUND,
+                    )
+                if tx.status not in ("success", "refunded"):
+                    return Response(
+                        {"error": "Only a captured/successful payment can be refunded"},
+                        status=http_status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Idempotency: if this exact idempotency key already produced a
+                # refund, return it without calling the gateway again.
+                gw = tx.gateway_response if isinstance(tx.gateway_response, dict) else {}
+                existing_refunds = gw.get("refunds") or []
+                for r in existing_refunds:
+                    if r.get("idempotency_key") and r["idempotency_key"] == idem_key:
+                        return Response({
+                            "refund_id": r.get("id"),
+                            "payment_id": payment_id,
+                            "amount_inr": str((Decimal(str(r.get("amount", 0))) / 100)),
+                            "status": r.get("status", "processed"),
+                            "already_refunded": True,
+                        }, status=http_status.HTTP_200_OK)
+
+                # Ceiling: cumulative refunds may never exceed the captured amount.
+                captured_paise = int((tx.amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+                already_paise = int((tx.refunded_amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+                if amount_paise > captured_paise - already_paise:
+                    return Response(
+                        {
+                            "error": "Refund exceeds refundable amount",
+                            "captured_inr": str(tx.amount),
+                            "already_refunded_inr": str(tx.refunded_amount),
+                            "refundable_inr": str(tx.amount - tx.refunded_amount),
+                        },
+                        status=http_status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Issue the refund. Pass idempotency so a gateway-level retry is
+                # deduped by Razorpay itself.
+                refund = client.payment.refund(
+                    payment_id,
+                    {
+                        "amount": amount_paise,
+                        "notes": {"by": request.user.username},
+                    },
+                    headers={"X-Razorpay-Idempotency": idem_key},
+                )
+
+                # Persist the refund id + bump cumulative refunded amount.
+                existing_refunds.append({
+                    "id": refund.get("id", ""),
+                    "amount": amount_paise,
+                    "idempotency_key": idem_key,
+                    "status": refund.get("status", ""),
+                    "by": request.user.username,
+                })
+                gw["refunds"] = existing_refunds
+                tx.gateway_response = gw
+                tx.refunded_amount = (tx.refunded_amount or Decimal("0")) + amount_dec
+                # Mark fully refunded only when the whole captured amount is back.
+                if tx.refunded_amount >= tx.amount:
+                    tx.status = "refunded"
+                tx.save(update_fields=["gateway_response", "refunded_amount", "status"])
 
             logger.info(
                 "Refund issued by admin %s: payment_id=%s amount=₹%s refund_id=%s",
-                request.user.username, payment_id, amount_inr, refund.get("id", ""),
+                request.user.username, payment_id, amount_dec, refund.get("id", ""),
             )
             return Response({
                 "refund_id": refund.get("id"),
                 "payment_id": payment_id,
-                "amount_inr": amount_inr,
+                "amount_inr": str(amount_dec),
                 "status": refund.get("status"),
             }, status=http_status.HTTP_201_CREATED)
 
