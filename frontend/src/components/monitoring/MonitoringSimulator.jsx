@@ -2,9 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity, Database, Bell, Gauge, Search, Server, GitBranch, Radio,
   AlertTriangle, CheckCircle2, XCircle, RefreshCw, Play, BellOff, Layers,
+  Compass, Settings, Plug, ArrowLeft, StopCircle, Lightbulb,
 } from 'lucide-react'
 import { monitoringApi } from '../../api/monitoring'
 import MonitoringLoginGate, { isMonitoringAuthenticated } from './MonitoringLoginGate'
+import GrafanaLoginScreen from './GrafanaLoginScreen'
+import GrafanaExplorePanel from './GrafanaExplorePanel'
+import GrafanaAlertingPanel from './GrafanaAlertingPanel'
+import GrafanaConnectionsPanel from './GrafanaConnectionsPanel'
+import GrafanaAdministrationPanel from './GrafanaAdministrationPanel'
 import '../../styles/monitoring-sim.css'
 
 /* ── tiny inline sparkline driven by a numeric series ── */
@@ -100,8 +106,8 @@ function GrafanaView({ state, sessionId, scenario }) {
     <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4">
       {/* left rail */}
       <div className="space-y-1">
-        {[['dashboards', 'Dashboards', Gauge], ['alerting', 'Alerting', Bell],
-          ['datasources', 'Data sources', Database], ['contactpoints', 'Contact points', Radio]].map(([k, label, Icon]) => (
+        {[['dashboards', 'Dashboards', Gauge], ['explore', 'Explore', Compass], ['alerting', 'Alerting', Bell],
+          ['connections', 'Connections', Plug], ['administration', 'Administration', Settings]].map(([k, label, Icon]) => (
           <button key={k} onClick={() => setSub(k)}
                   className={`mon-tab w-full !justify-start flex items-center gap-2 ${sub === k ? 'mon-tab-active' : ''}`}>
             <Icon size={14} /> {label}
@@ -140,77 +146,15 @@ function GrafanaView({ state, sessionId, scenario }) {
           </>
         )}
 
-        {sub === 'alerting' && (
-          <div className="mon-card !p-0 overflow-hidden">
-            <table className="mon-table">
-              <thead><tr><th>Alert rule</th><th>Folder</th><th>For</th><th>Severity</th><th>Contact point</th><th>State</th></tr></thead>
-              <tbody>
-                {(graf.alert_rules || []).map(r => (
-                  <tr key={r.uid}>
-                    <td className="font-medium text-[#d8def0]">{r.title}</td>
-                    <td>{r.folder}</td>
-                    <td className="font-mono">{r.for}</td>
-                    <td>{r.severity}</td>
-                    <td className="font-mono">{r.contact_point}</td>
-                    <td>
-                      <span className={`mon-badge ${r.state === 'Alerting' ? 'mon-badge-down' : r.state === 'Pending' ? 'mon-badge-warn' : 'mon-badge-up'}`}>
-                        {r.state}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {sub === 'explore' && (
+          <GrafanaExplorePanel sessionId={sessionId} scenarioSlug={scenario} datasources={graf.datasources || []} />
         )}
 
-        {sub === 'datasources' && (
-          <div className="space-y-2">
-            {(graf.datasources || []).map(d => (
-              <div key={d.uid} className="mon-card flex items-center justify-between">
-                <div>
-                  <div className="mon-panel-title flex items-center gap-2">
-                    <Database size={14} /> {d.name} {d.is_default && <span className="mon-badge mon-badge-up">default</span>}
-                  </div>
-                  <div className="mon-panel-sub font-mono">{d.type} · {d.url}</div>
-                  {d.status === 'error' && <div className="text-[#ffb4b4] text-xs mt-1">{d.message}</div>}
-                </div>
-                <span className={`mon-badge ${d.status === 'error' ? 'mon-badge-down' : 'mon-badge-up'}`}>
-                  {d.status === 'error' ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
-                  {d.status === 'error' ? 'Error' : 'Working'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        {sub === 'alerting' && <GrafanaAlertingPanel graf={graf} />}
 
-        {sub === 'contactpoints' && (
-          <div className="mon-card !p-0 overflow-hidden">
-            <table className="mon-table">
-              <thead><tr><th>Name</th><th>Type</th><th>Address</th><th>Status</th></tr></thead>
-              <tbody>
-                {(graf.contact_points || []).map(c => (
-                  <tr key={c.name}>
-                    <td className="font-medium text-[#d8def0]">{c.name}</td>
-                    <td>{c.type}</td>
-                    <td className="font-mono opacity-80">{c.address || '—'}</td>
-                    <td>
-                      <span className={`mon-badge ${c.configured ? 'mon-badge-up' : 'mon-badge-down'}`}>
-                        {c.configured ? 'Configured' : 'Not configured'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {graf.notification_policies?.root && (
-              <div className="p-3 border-t border-[#262a45]">
-                <div className="mon-panel-sub mb-1">Notification policy (root → {graf.notification_policies.root.receiver})</div>
-                <div className="mon-code">{JSON.stringify(graf.notification_policies.root, null, 2)}</div>
-              </div>
-            )}
-          </div>
-        )}
+        {sub === 'connections' && <GrafanaConnectionsPanel datasources={graf.datasources || []} />}
+
+        {sub === 'administration' && <GrafanaAdministrationPanel scenario={scenario} />}
       </div>
     </div>
   )
@@ -406,7 +350,7 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr }) {
  * monitoring labs (simulation_type grafana/prometheus/monitoring) — no new route.
  * `flavor` selects which view is primary; both are always reachable via the tabs.
  */
-export default function MonitoringSimulator({ sessionId, scenario, flavor = 'grafana' }) {
+export default function MonitoringSimulator({ sessionId, scenario, flavor = 'grafana', onExit, onStop, onHints }) {
   const [authed, setAuthed] = useState(isMonitoringAuthenticated())
   const [state, setState] = useState(null)
   const [view, setView] = useState(flavor === 'prometheus' ? 'prometheus' : 'grafana')
@@ -432,7 +376,9 @@ export default function MonitoringSimulator({ sessionId, scenario, flavor = 'gra
   }, [authed, load])
 
   if (!authed) {
-    return <MonitoringLoginGate flavor={flavor} onAuthenticated={() => setAuthed(true)} />
+    return flavor === 'prometheus'
+      ? <MonitoringLoginGate flavor={flavor} onAuthenticated={() => setAuthed(true)} />
+      : <GrafanaLoginScreen onAuthenticated={() => setAuthed(true)} />
   }
 
   const accent = flavor === 'prometheus' ? '#e6522c' : '#f7913b'
@@ -451,6 +397,10 @@ export default function MonitoringSimulator({ sessionId, scenario, flavor = 'gra
           <button className={`mon-tab ${view === 'grafana' ? 'mon-tab-active' : ''}`} onClick={() => setView('grafana')}>Grafana</button>
           <button className={`mon-tab ${view === 'prometheus' ? 'mon-tab-active' : ''}`} onClick={() => setView('prometheus')}>Prometheus</button>
           <button className="mon-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
+          {/* Lab chrome — mirrors the VMware sim (hints / stop / back to lab). */}
+          {onHints && <button className="mon-btn" onClick={onHints}><Lightbulb size={13} className="text-[#F5A623]" /> Hints</button>}
+          {onStop && <button className="mon-btn" onClick={onStop}><StopCircle size={13} className="text-[#ff6b6b]" /> Stop</button>}
+          {onExit && <button className="mon-btn" onClick={onExit}><ArrowLeft size={13} /> Back to lab</button>}
         </div>
       </div>
 

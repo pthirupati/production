@@ -1804,7 +1804,14 @@ export default function LabRunner() {
             <XCircle size={14} /> Close simulator
           </button>
           <div className="h-full overflow-auto">
-            <MonitoringSimulator sessionId={sessionId} scenario={scenario} flavor={monitoringFlavor} />
+            <MonitoringSimulator
+              sessionId={sessionId}
+              scenario={scenario}
+              flavor={monitoringFlavor}
+              onExit={() => setShowMonitoringSim(false)}
+              onHints={() => { setShowMonitoringSim(false); toggleHints() }}
+              onStop={() => { setShowMonitoringSim(false); setShowStopConfirm(true) }}
+            />
           </div>
         </div>
       )}
