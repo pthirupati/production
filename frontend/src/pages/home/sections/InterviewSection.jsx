@@ -81,7 +81,7 @@ export default function InterviewSection({ isAuthenticated }) {
         </motion.div>
       </div>
 
-      <div className="lg:hidden mt-14 px-8">
+      <div className="lg:hidden mt-14">
         <InterviewShowcase />
       </div>
     </section>

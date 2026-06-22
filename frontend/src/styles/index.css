@@ -2938,6 +2938,24 @@ body::after {
   margin: 0;
 }
 
+/* Phone breakpoint. The hero/section type uses clamp() minimums that never
+   relax below ~32-40px, so on a 360-390px screen the H1, stat values, and
+   section titles render oversized and the layout feels broken. The file had
+   no <=480px rules at all; this block scales the type and tightens padding
+   so the marketing page reads correctly on phones. */
+@media (max-width: 480px) {
+  .fx-hero { padding: 72px 20px 80px; }
+  .fx-hero-h1 { font-size: clamp(2rem, 9vw, 2.5rem); }
+  .fx-hero-lead { font-size: 16px; margin-bottom: 28px; }
+  .fx-hero-stats { gap: 20px; flex-wrap: wrap; }
+  .fx-hero-stat-val { font-size: 26px; }
+  .fx-home-title { font-size: clamp(1.6rem, 7vw, 2rem); }
+  .fx-home-sub { font-size: 16px; }
+  .fx-cta-strip { padding: 28px 20px; }
+  .fx-cta-strip h2 { font-size: 22px; }
+  .fx-star-row { gap: 10px; padding: 12px; }
+}
+
 .fx-challenge-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
