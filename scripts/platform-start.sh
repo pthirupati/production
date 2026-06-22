@@ -199,6 +199,9 @@ if _role_runs app; then
   echo "Seeding/updating projects..."
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_projects || true
 
+  echo "Seeding/updating certification tracks..."
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_certifications || true
+
   echo "Seeding/updating interview question bank (free, rule-based)..."
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_interview_data || true
 

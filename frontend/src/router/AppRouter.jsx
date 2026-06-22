@@ -83,6 +83,8 @@ const Unsubscribe = lazyWithRetry(() => import('../pages/Unsubscribe'))
 const Changelog = lazyWithRetry(() => import('../pages/Changelog'))
 const Tutorials = lazyWithRetry(() => import('../pages/tutorials/Tutorials'))
 const TutorialDetail = lazyWithRetry(() => import('../pages/tutorials/TutorialDetail'))
+const Certifications = lazyWithRetry(() => import('../pages/certifications/Certifications'))
+const CertificationDetail = lazyWithRetry(() => import('../pages/certifications/CertificationDetail'))
 const Playgrounds = lazyWithRetry(() => import('../pages/playgrounds/Playgrounds'))
 
 function PageLoader() {
@@ -150,6 +152,8 @@ export default function AppRouter() {
         <Route path="/verify-certificate" element={<CertificateVerify />} />
         <Route path="/tutorials" element={<Tutorials />} />
         <Route path="/tutorials/:slug" element={<TutorialDetail />} />
+        <Route path="/certifications" element={<Certifications />} />
+        <Route path="/certifications/:slug" element={<CertificationDetail />} />
         <Route path="/playgrounds" element={<Playgrounds />} />
         <Route path="/interviews/invite/:token" element={<InterviewInvite />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />

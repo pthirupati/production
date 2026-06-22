@@ -1,0 +1,150 @@
+# RHCSA (Red Hat Certified System Administrator, EX200) track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs by their published exam-objective area. Objective titles are generic,
+# published exam-domain concepts; all referenced scenario content is original
+# FixitLab content. Weights are relative and sum to 100 for readability.
+#
+# Containers currently reuses existing container scenarios as an interim mapping;
+# original rootless-podman scenarios are a planned follow-up increment.
+
+track:
+  slug: rhcsa
+  code: RHCSA
+  name: Red Hat Certified System Administrator (EX200)
+  vendor: Red Hat
+  description: >
+    Hands-on preparation for the RHCSA performance-based exam. Every objective
+    maps to live break-fix and build labs across Linux and RHEL systems —
+    storage, file systems, users, networking, SELinux, services, and containers.
+  technology_slug: linux
+  exam_duration_minutes: 180
+  passing_score: 70
+  validity_months: 36
+  order: 1
+
+objectives:
+  - code: rhcsa.tools
+    title: Understand and use essential tools
+    weight: 10
+    order: 1
+    scenarios:
+      - linux-ssh-key-auth-fail
+      - ssh-key-permissions
+      - ssh-copy-id-remote
+      - linux-sshd-permitroot-hardening
+      - scp-rsync-remote-sync
+      - linux-sftp-chroot
+      - umask-wrong-newfiles
+      - broken-symlink-chain
+      - ssh-allowusers-block
+
+  - code: rhcsa.operate
+    title: Operate running systems
+    weight: 12
+    order: 2
+    scenarios:
+      - systemd-unit-wont-start
+      - sim-rhel-boot-grub
+      - linux-grub-password
+      - rhel-grub-default-target
+      - linux-high-load-no-cpu
+      - linux-zombie-process-kill
+      - linux-renice-runaway-process-priority
+      - journald-var-log-full
+      - linux-journald-storage-volatile
+
+  - code: rhcsa.storage
+    title: Configure local storage
+    weight: 12
+    order: 3
+    scenarios:
+      - linux-lvm-create-mount
+      - lvm-add-pv-extend
+      - linux-lvm-create-extend
+      - linux-lvm-grow-xfs-growfs-mount
+      - linux-fdisk-partition-mkfs-mount
+      - linux-parted-gpt-mkfs-mount
+      - linux-fdisk-swap-partition-mkswap-swapon
+      - linux-swap-create
+
+  - code: rhcsa.filesystems
+    title: Create and configure file systems
+    weight: 12
+    order: 4
+    scenarios:
+      - linux-fstab-mount-by-uuid-mkfs-mount
+      - fstab-bad-uuid
+      - linux-fstab-recovery
+      - linux-autofs-setup
+      - linux-autofs-automount-home
+      - linux-nfs-setup
+      - linux-nfs-permission-denied
+      - acl-permission-denied
+      - xfs-repair-damage
+
+  - code: rhcsa.deploy
+    title: Deploy, configure, and maintain systems
+    weight: 14
+    order: 5
+    scenarios:
+      - sim-rhel-patching
+      - rhel-dnf-gpgcheck-off
+      - rhel-dnf-automatic-misconfig
+      - rhel-needs-restarting
+      - linux-cron-not-running
+      - linux-crontab-syntax-error
+      - linux-systemd-timer-not-firing
+      - linux-at-job-not-scheduled
+      - chrony-not-syncing
+      - rhel-chronyd-down
+
+  - code: rhcsa.networking
+    title: Manage basic networking
+    weight: 12
+    order: 6
+    scenarios:
+      - sim-rhel-network-nic
+      - linux-default-gateway-missing
+      - linux-resolv-conf-wrong
+      - rhel-firewalld-down
+      - rhel-firewalld-zone-wrong
+      - configure-firewalld-service-do
+      - linux-nftables-port-blocked
+      - linux-sysctl-ip-forward
+
+  - code: rhcsa.users
+    title: Manage users and groups
+    weight: 10
+    order: 7
+    scenarios:
+      - broken-useradd
+      - user-invalid-primary-group
+      - user-nologin-shell
+      - broken-sudoers
+      - linux-sudoers-syntax-error
+      - linux-sudo-access
+      - sudo-secure-path-broken
+      - account-locked-faillock
+      - password-change-broken
+
+  - code: rhcsa.selinux
+    title: Manage security (SELinux)
+    weight: 10
+    order: 8
+    scenarios:
+      - rhel-selinux-booleans
+      - rhel-selinux-permissive
+      - linux-selinux-blocking
+      - linux-selinux-httpd-port-denied
+
+  - code: rhcsa.containers
+    title: Manage containers
+    weight: 8
+    order: 9
+    scenarios:
+      - sim-docker-container-exited
+      - sim-docker-image-pull
+      - build-docker-image-do
+      - docker-containerd-down

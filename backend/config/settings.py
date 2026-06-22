@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     "apps.vmware_sim",
     "apps.itsm",
     "apps.tutorials",
+    "apps.certifications",
 ]
 
 # --------------------------------------------------

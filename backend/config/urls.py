@@ -64,6 +64,8 @@ urlpatterns = [
 
     # Public Tutorials (free written content)
     path("api/tutorials/", include("apps.tutorials.urls")),
+    # Certification tracks (objective-mapped views over existing scenarios)
+    path("api/certifications/", include("apps.certifications.urls")),
 
     # Public Playgrounds (free, ephemeral try-instantly sandboxes)
     path("api/playgrounds/", include("apps.labs.playground_urls")),
