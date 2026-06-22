@@ -34,9 +34,38 @@ def _q(value: Decimal) -> Decimal:
     return value.quantize(_CENTS, rounding=ROUND_HALF_UP)
 
 
+def _platform():
+    """Admin-editable PlatformSettings singleton, or None if unavailable.
+
+    Lets the owner enable GST / set the GSTIN from the admin panel without a
+    redeploy. DB values win when present; otherwise we fall back to the env
+    settings (the original behaviour), so nothing breaks pre-migration.
+    """
+    try:
+        from apps.adminpanel.models import PlatformSettings
+        return PlatformSettings.objects.first()
+    except Exception:
+        return None
+
+
+def _gstin() -> str:
+    ps = _platform()
+    if ps is not None and (ps.business_gstin or "").strip():
+        return ps.business_gstin.strip()
+    return (getattr(settings, "BUSINESS_GSTIN", "") or "").strip()
+
+
+def _business_state() -> str:
+    ps = _platform()
+    if ps is not None and (ps.business_state or "").strip():
+        return ps.business_state.strip()
+    return (getattr(settings, "BUSINESS_STATE", "") or "").strip()
+
+
 def gst_rate() -> Decimal:
     """Combined GST rate as a Decimal fraction (e.g. ``Decimal('0.18')``)."""
-    rate = getattr(settings, "GST_RATE", Decimal("0.18"))
+    ps = _platform()
+    rate = ps.gst_rate if (ps is not None and ps.gst_rate is not None) else getattr(settings, "GST_RATE", Decimal("0.18"))
     if not isinstance(rate, Decimal):
         rate = Decimal(str(rate))
     return rate
@@ -45,14 +74,20 @@ def gst_rate() -> Decimal:
 def gst_should_charge() -> bool:
     """Whether GST is actually levied on orders.
 
-    Gated on BOTH ``GST_ENABLED`` and a configured ``BUSINESS_GSTIN`` — you
-    cannot legally levy GST without a registration, so a missing GSTIN means we
-    price at the bare amount with zero tax (safe pre-registration default). The
-    schema + breakup still exist so enabling GST later is a settings flip.
+    Gated on BOTH an enabled flag AND a configured GSTIN — you cannot legally
+    levy GST without a registration, so a missing GSTIN means we price at the
+    bare amount with zero tax (the "skip GST" state: payments still work). Both
+    are admin-editable (PlatformSettings) with an env fallback, so enabling GST
+    later is a one-click save in the admin panel, no redeploy.
     """
-    if not getattr(settings, "GST_ENABLED", False):
-        return False
-    return bool((getattr(settings, "BUSINESS_GSTIN", "") or "").strip())
+    ps = _platform()
+    # Levy GST when EITHER the admin toggle OR the env flag enables it, AND a
+    # GSTIN is configured (from admin or env). Default — both off — is the
+    # "skip GST" state: payments still work at the bare price. A default
+    # PlatformSettings row (gst_enabled=False) therefore never silently disables
+    # an env-configured GST setup.
+    enabled = bool(ps and ps.gst_enabled) or getattr(settings, "GST_ENABLED", False)
+    return bool(enabled and _gstin())
 
 
 @dataclass(frozen=True)
@@ -104,8 +139,8 @@ def compute_gst(total_inclusive_inr, place_of_supply: str = "") -> GstBreakup:
             taxable_amount=total,
             gst_amount=Decimal("0.00"),
             gst_rate=Decimal("0"),
-            place_of_supply=(place_of_supply or getattr(settings, "BUSINESS_STATE", "") or "").strip(),
-            gstin=(getattr(settings, "BUSINESS_GSTIN", "") or "").strip(),
+            place_of_supply=(place_of_supply or _business_state()).strip(),
+            gstin=_gstin(),
         )
 
     rate = gst_rate()
@@ -113,7 +148,7 @@ def compute_gst(total_inclusive_inr, place_of_supply: str = "") -> GstBreakup:
     taxable = _q(total / (Decimal("1") + rate))
     tax = _q(total - taxable)  # keeps taxable + tax == total exactly
 
-    seller_state = (getattr(settings, "BUSINESS_STATE", "") or "").strip()
+    seller_state = _business_state()
     customer_state = (place_of_supply or "").strip()
     pos = customer_state or seller_state
     # Inter-state only when we positively know the customer is in a different
@@ -140,5 +175,5 @@ def compute_gst(total_inclusive_inr, place_of_supply: str = "") -> GstBreakup:
         igst_amount=igst,
         is_inter_state=is_inter_state,
         place_of_supply=pos,
-        gstin=(getattr(settings, "BUSINESS_GSTIN", "") or "").strip(),
+        gstin=_gstin(),
     )

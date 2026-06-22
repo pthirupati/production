@@ -9,6 +9,7 @@ export default function AdminSettings() {
   const [maintenance, setMaintenance] = useState({ maintenance_mode: false, maintenance_message: '' })
   const [config, setConfig] = useState(null)
   const [emailForm, setEmailForm] = useState({ primary_email: '', payment_email: '', support_email: '', admin_display_currency: 'INR' })
+  const [payForm, setPayForm] = useState({ payments_enabled: false, gst_enabled: false, business_gstin: '', business_legal_name: '', business_state: '', gst_rate: '0.18' })
   const [themeColors, setThemeColors] = useState({ cyan: '#06b6d4', purple: '#a855f7', amber: '#f59e0b', green: '#22c55e' })
   const [promoDraft, setPromoDraft] = useState({ title: '', text: '', link: '/pricing', bg_color: 'linear-gradient(90deg,#1e3a5f,#0f766e)', active: true })
   const [inactiveUsers, setInactiveUsers] = useState([])
@@ -47,6 +48,14 @@ export default function AdminSettings() {
         payment_email: configData?.payment_email || '',
         support_email: configData?.support_email || '',
         admin_display_currency: configData?.admin_display_currency || 'INR',
+      })
+      setPayForm({
+        payments_enabled: !!configData?.payments_enabled,
+        gst_enabled: !!configData?.gst_enabled,
+        business_gstin: configData?.business_gstin || '',
+        business_legal_name: configData?.business_legal_name || '',
+        business_state: configData?.business_state || '',
+        gst_rate: configData?.gst_rate || '0.18',
       })
       if (configData?.theme_colors) {
         setThemeColors(prev => ({ ...prev, ...configData.theme_colors }))
@@ -325,6 +334,75 @@ export default function AdminSettings() {
           className="btn-secondary text-sm flex items-center gap-1"
         >
           <Mail size={14} /> Send test email
+        </button>
+      </div>
+
+      {/* Payments & Tax */}
+      <div className="glass-card p-6 space-y-4">
+        <div className="flex items-center gap-3 mb-1">
+          <Save size={20} className="text-accent-green" />
+          <h2 className="font-semibold text-lg">Payments &amp; Tax</h2>
+        </div>
+        <p className="text-xs text-surface-400">
+          Gateway keys (Razorpay) are configured via server env/Vault.{' '}
+          {config?.payment_gateway_configured
+            ? <span className="text-accent-green">Gateway keys detected ✓</span>
+            : <span className="text-accent-amber">No gateway keys configured yet.</span>}
+        </p>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={payForm.payments_enabled}
+            onChange={e => setPayForm({ ...payForm, payments_enabled: e.target.checked })} />
+          Enable payments (turns paid checkout live when keys are present; clears the gateway warning)
+        </label>
+        <div className="border-t border-surface-800 pt-3">
+          <label className="flex items-center gap-2 text-sm mb-2">
+            <input type="checkbox" checked={payForm.gst_enabled}
+              onChange={e => setPayForm({ ...payForm, gst_enabled: e.target.checked })} />
+            Charge GST (leave OFF to skip GST — payments still work at the bare price)
+          </label>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <label className="text-sm">GSTIN
+              <input className="input-field w-full mt-1" value={payForm.business_gstin}
+                onChange={e => setPayForm({ ...payForm, business_gstin: e.target.value.toUpperCase() })}
+                placeholder="29ABCDE1234F1Z5" />
+            </label>
+            <label className="text-sm">Legal business name
+              <input className="input-field w-full mt-1" value={payForm.business_legal_name}
+                onChange={e => setPayForm({ ...payForm, business_legal_name: e.target.value })} />
+            </label>
+            <label className="text-sm">Place of supply (seller state)
+              <input className="input-field w-full mt-1" value={payForm.business_state}
+                onChange={e => setPayForm({ ...payForm, business_state: e.target.value })}
+                placeholder="Karnataka" />
+            </label>
+            <label className="text-sm">GST rate (fraction or %)
+              <input className="input-field w-full mt-1" value={payForm.gst_rate}
+                onChange={e => setPayForm({ ...payForm, gst_rate: e.target.value })}
+                placeholder="0.18" />
+            </label>
+          </div>
+          <p className="text-[11px] text-surface-500 mt-2">
+            GST only applies when both “Charge GST” is on and a GSTIN is set. It’s computed on our
+            side (tax-inclusive) and itemised as CGST/SGST (intra-state) or IGST (inter-state) on the invoice.
+          </p>
+        </div>
+        <button
+          onClick={async () => {
+            setSaving(true)
+            try {
+              const result = await adminApi.updateConfig(payForm)
+              setConfig(result)
+              toast.success('Payment & tax settings saved')
+            } catch (err) {
+              toast.error(err.response?.data?.error || 'Save failed')
+            } finally {
+              setSaving(false)
+            }
+          }}
+          disabled={saving}
+          className="btn-primary text-sm flex items-center gap-1"
+        >
+          <Save size={14} /> Save payments &amp; tax
         </button>
       </div>
 

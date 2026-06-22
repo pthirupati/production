@@ -192,3 +192,38 @@ class GstOrderAndInvoiceTest(TestCase):
         html = render_invoice_html(invoice)
         self.assertNotIn("CGST", html)
         self.assertIn("Subtotal", html)
+
+
+class GstAdminToggleTest(TestCase):
+    """GST is driven by the admin PlatformSettings (DB), overriding env — so the
+    owner enables GST / sets the GSTIN from the admin panel with no redeploy."""
+
+    def _platform(self, **kw):
+        from apps.adminpanel.models import PlatformSettings
+        return PlatformSettings.objects.create(**kw)
+
+    def test_db_enables_gst_without_env(self):
+        # No env GST settings; enable purely via the admin singleton.
+        self._platform(
+            gst_enabled=True, business_gstin="29ABCDE1234F1Z5",
+            business_state="Karnataka", gst_rate=Decimal("0.18"),
+        )
+        self.assertTrue(gst_should_charge())
+        b = compute_gst(1180)
+        self.assertEqual(b.taxable_amount, Decimal("1000.00"))
+        self.assertEqual(b.gst_amount, Decimal("180.00"))
+        self.assertEqual(b.gstin, "29ABCDE1234F1Z5")
+
+    def test_default_admin_row_skips_gst(self):
+        # No env GST and a default admin row (gst_enabled=False) → "skip GST":
+        # payments still work, full amount taxable with zero tax.
+        self._platform(gst_enabled=False, business_gstin="")
+        self.assertFalse(gst_should_charge())
+        b = compute_gst(1180)
+        self.assertEqual(b.gst_amount, Decimal("0.00"))
+        self.assertEqual(b.total_amount, Decimal("1180.00"))
+
+    def test_enabled_without_gstin_skips(self):
+        # Enabled but no GSTIN → cannot legally levy → skip (safe default).
+        self._platform(gst_enabled=True, business_gstin="")
+        self.assertFalse(gst_should_charge())

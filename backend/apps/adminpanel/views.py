@@ -2947,6 +2947,27 @@ class AdminConfigView(APIView):
                 row.support_bot_typing_delay_ms = max(300, min(5000, int(request.data.get("support_bot_typing_delay_ms") or 1200)))
             except (TypeError, ValueError):
                 row.support_bot_typing_delay_ms = 1200
+        # Payments & tax (admin-editable; gst.py + the gateway status read these).
+        if "payments_enabled" in request.data:
+            row.payments_enabled = bool(request.data.get("payments_enabled"))
+        if "gst_enabled" in request.data:
+            row.gst_enabled = bool(request.data.get("gst_enabled"))
+        if "business_gstin" in request.data:
+            row.business_gstin = (request.data.get("business_gstin") or "").strip().upper()[:20]
+        if "business_legal_name" in request.data:
+            row.business_legal_name = (request.data.get("business_legal_name") or "")[:200]
+        if "business_state" in request.data:
+            row.business_state = (request.data.get("business_state") or "")[:64]
+        if "gst_rate" in request.data:
+            try:
+                from decimal import Decimal as _Dec
+                rate = _Dec(str(request.data.get("gst_rate")))
+                # Accept either a fraction (0.18) or a percent (18) — normalise.
+                if rate > 1:
+                    rate = rate / _Dec("100")
+                row.gst_rate = max(_Dec("0"), min(_Dec("0.5"), rate))
+            except Exception:
+                pass
         row.save()
         persist_config_snapshot(row)
         cache.delete("public_platform_stats")

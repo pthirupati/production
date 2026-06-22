@@ -1,6 +1,7 @@
 """Persistent platform configuration (emails, maintenance, promos)."""
 
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
@@ -47,6 +48,34 @@ class PlatformSettings(models.Model):
         help_text='List of {"keywords": ["disk"], "answer": "..."}',
     )
     support_bot_typing_delay_ms = models.PositiveIntegerField(default=1200)
+
+    # ── Payments & tax (admin-editable; override the env defaults at runtime so
+    #    the owner can go live / enable GST without a redeploy). ──
+    payments_enabled = models.BooleanField(
+        default=False,
+        help_text="Master switch: when on AND a gateway is configured, paid "
+        "checkout is live and the 'payment gateway not configured' warning clears.",
+    )
+    gst_enabled = models.BooleanField(
+        default=False,
+        help_text="Levy GST on orders. Requires business_gstin to actually charge "
+        "(you cannot levy GST without a registration). Off = 'skip GST', payments "
+        "still work at the bare price.",
+    )
+    business_gstin = models.CharField(max_length=20, blank=True, default="")
+    business_legal_name = models.CharField(max_length=200, blank=True, default="")
+    business_state = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text="Place of supply (seller state) — decides CGST+SGST vs IGST.",
+    )
+    gst_rate = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal("0.18"),
+        help_text="Combined GST fraction, e.g. 0.18 for 18%.",
+    )
 
     updated_at = models.DateTimeField(auto_now=True)
 

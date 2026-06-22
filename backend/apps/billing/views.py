@@ -279,14 +279,34 @@ class PaymentGatewayStatusView(APIView):
     def get(self, request):
         razorpay_configured = bool(settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET)
         stripe_configured = bool(settings.STRIPE_SECRET_KEY)
-        razorpay_ready = "ready" if razorpay_configured else "down"
-        stripe_ready = "ready" if stripe_configured else "down"
+        gateway_configured = razorpay_configured or stripe_configured
+
+        # Admin master switch: payments only go live when the owner enables them
+        # AND a gateway is configured. Until then the warning shows. This lets the
+        # owner add keys, verify, then flip the switch (the "enable payment" button).
+        payments_enabled = True
+        try:
+            from apps.adminpanel.models import PlatformSettings
+            ps = PlatformSettings.objects.first()
+            if ps is not None:
+                payments_enabled = ps.payments_enabled
+        except Exception:
+            pass
+        available = gateway_configured and payments_enabled
+
+        razorpay_ready = "ready" if (razorpay_configured and payments_enabled) else "down"
+        stripe_ready = "ready" if (stripe_configured and payments_enabled) else "down"
 
         banner_message = None
-        if not razorpay_configured and not stripe_configured:
+        if not gateway_configured:
             banner_message = (
                 "Payment gateway is currently unavailable. "
                 "Free scenarios still work. Paid subscriptions will open once billing is configured."
+            )
+        elif not payments_enabled:
+            banner_message = (
+                "Payments are configured but not yet enabled. "
+                "An admin can turn them on in Admin → Settings → Payments & Tax."
             )
         elif not razorpay_configured:
             banner_message = "Razorpay unavailable — international card payments via Stripe are available."
@@ -294,10 +314,11 @@ class PaymentGatewayStatusView(APIView):
         return Response({
             "razorpay_configured": razorpay_configured,
             "stripe_configured": stripe_configured,
-            "razorpay_key_id": settings.RAZORPAY_KEY_ID if razorpay_configured else None,
-            "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY if stripe_configured else None,
+            "payments_enabled": payments_enabled,
+            "razorpay_key_id": settings.RAZORPAY_KEY_ID if (razorpay_configured and available) else None,
+            "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY if (stripe_configured and available) else None,
             "status": razorpay_ready if razorpay_configured else stripe_ready,
-            "available": razorpay_configured or stripe_configured,
+            "available": available,
             "recommended_gateway": "razorpay" if razorpay_configured else ("stripe" if stripe_configured else None),
             "banner_message": banner_message,
             "banner_type": "warning" if banner_message else None,

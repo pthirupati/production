@@ -190,6 +190,18 @@ def admin_config_payload() -> dict:
         "support_bot_quick_topics": row.support_bot_quick_topics or [],
         "support_bot_custom_faq": row.support_bot_custom_faq or [],
         "support_bot_typing_delay_ms": row.support_bot_typing_delay_ms or 1200,
+        # Payments & tax (admin-editable). Never expose the gateway SECRET —
+        # only whether a key pair is configured, so the UI can show readiness.
+        "payments_enabled": row.payments_enabled,
+        "payment_gateway_configured": bool(
+            getattr(settings, "RAZORPAY_KEY_ID", "") and getattr(settings, "RAZORPAY_KEY_SECRET", "")
+        ),
+        "razorpay_key_id_present": bool(getattr(settings, "RAZORPAY_KEY_ID", "")),
+        "gst_enabled": row.gst_enabled,
+        "business_gstin": row.business_gstin or "",
+        "business_legal_name": row.business_legal_name or "",
+        "business_state": row.business_state or "",
+        "gst_rate": str(row.gst_rate if row.gst_rate is not None else "0.18"),
     }
 
 
