@@ -115,16 +115,16 @@ export default function Tutorials() {
           </div>
         </div>
 
-        {/* Playgrounds cross-link */}
+        {/* Certification cross-link */}
         <FixitPanel className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4" padding="p-5">
           <div className="flex items-start gap-3">
             <Terminal size={20} className="text-accent-purple mt-0.5 shrink-0" />
             <div>
-              <h2 className="font-display font-semibold text-white">Prefer to just start typing?</h2>
-              <p className="text-sm text-surface-400">Open a Playground and run real commands in your browser — no account needed.</p>
+              <h2 className="font-display font-semibold text-white">Preparing for a certification?</h2>
+              <p className="text-sm text-surface-400">Follow an objective-mapped track (RHCSA, CKA, and more) with hands-on labs and a timed mock exam.</p>
             </div>
           </div>
-          <Link to="/playgrounds" className="btn-secondary text-sm shrink-0">Browse Playgrounds</Link>
+          <Link to="/certifications" className="btn-secondary text-sm shrink-0">Browse Certifications</Link>
         </FixitPanel>
 
         {/* Grid */}

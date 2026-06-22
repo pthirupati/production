@@ -85,7 +85,6 @@ const Tutorials = lazyWithRetry(() => import('../pages/tutorials/Tutorials'))
 const TutorialDetail = lazyWithRetry(() => import('../pages/tutorials/TutorialDetail'))
 const Certifications = lazyWithRetry(() => import('../pages/certifications/Certifications'))
 const CertificationDetail = lazyWithRetry(() => import('../pages/certifications/CertificationDetail'))
-const Playgrounds = lazyWithRetry(() => import('../pages/playgrounds/Playgrounds'))
 
 function PageLoader() {
   return (
@@ -154,7 +153,6 @@ export default function AppRouter() {
         <Route path="/tutorials/:slug" element={<TutorialDetail />} />
         <Route path="/certifications" element={<Certifications />} />
         <Route path="/certifications/:slug" element={<CertificationDetail />} />
-        <Route path="/playgrounds" element={<Playgrounds />} />
         <Route path="/interviews/invite/:token" element={<InterviewInvite />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
         <Route path="/jira/:issueKey" element={<ProtectedRoute><JiraTicketPage /></ProtectedRoute>} />
