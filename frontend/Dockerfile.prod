@@ -29,15 +29,27 @@ server {
     gzip_comp_level 6;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript image/svg+xml;
 
-    # Cache static assets aggressively
+    # Hashed, fingerprinted build assets (Vite) — safe to cache forever.
     location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff2?)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
 
-    # SPA fallback — all routes serve index.html
+    # index.html + SPA fallback — NEVER cache. A cached index.html keeps
+    # referencing chunk hashes that a later deploy deletes, which causes
+    # "Failed to fetch dynamically imported module" + a blank app for returning
+    # users. Always revalidate so the browser gets the current entry that points
+    # at the currently-deployed chunks.
     location / {
         try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        expires -1;
+        # add_header in a location overrides inherited ones — re-assert security headers.
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     }
 
     # Security headers
