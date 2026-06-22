@@ -664,18 +664,20 @@ JIRA_SIMULATION_PREFIX = env("JIRA_SIMULATION_PREFIX", default="KAN")
 # Comma-separated IPs allowed to access /django-admin/ and /api/admin/
 # Empty = allow all (set in production to your office/VPN IP)
 ADMIN_ALLOWED_IPS = [ip.strip() for ip in env("ADMIN_ALLOWED_IPS", default="").split(",") if ip.strip()]
-# SECURITY_AUDIT I-04: when this is True and the allowlist is empty in
-# production, the admin surface fails CLOSED (default-deny /api/admin/ +
-# /django-admin/) for remote IPs instead of the legacy fail-open warn-and-allow.
-# It now defaults TRUE in production (DEBUG=False) so admin endpoints are NOT
-# reachable from arbitrary internet IPs out of the box. Loopback / in-container
-# callers (health checks + the server-side E2E that runs via
-# `docker compose exec backend ... e2e`, hitting 127.0.0.1) are always allowed
-# by AdminIPRestrictionMiddleware, so the green deploy pipeline is unaffected.
-# Set ADMIN_ALLOWED_IPS to your office/VPN egress IP to grant browser admin
-# access from those locations. In dev (DEBUG=True) admin stays open.
+# SECURITY_AUDIT I-04 (revised): the admin IP allowlist is an OPTIONAL network
+# layer ON TOP of authentication — every /api/admin/ endpoint already requires a
+# logged-in superuser (IsAdminUser), and /django-admin/ requires staff login.
+#
+# Originally this defaulted TRUE in prod, which fail-CLOSED the entire admin
+# surface whenever ADMIN_ALLOWED_IPS was unset — locking the owner out of all
+# admin panels (you can't populate the allowlist from an admin panel you can't
+# reach). It now defaults FALSE: with no allowlist, admin is reachable but still
+# gated by superuser auth (standard Django posture). Set ADMIN_ALLOWED_IPS to
+# your egress IP(s) AND ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=1 to additionally
+# restrict admin to those networks. Loopback / in-container callers (health
+# checks + server-side E2E) are always allowed.
 ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST = env.bool(
-    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", default=(not DEBUG)
+    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", default=False
 )
 # Number of trusted reverse-proxy hops in front of Django (our nginx gateway).
 # Used to read the un-spoofable client IP from the RIGHT of X-Forwarded-For

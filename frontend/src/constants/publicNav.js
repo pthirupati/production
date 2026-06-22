@@ -9,12 +9,12 @@ export const PUBLIC_NAV_PRIMARY = [
   { to: '/tutorials', label: 'Tutorials' },
   { to: '/certifications', label: 'Certifications' },
   { to: '/mock-interviews', label: 'Mock Interviews' },
+  { to: '/verify-certificate', label: 'Verify Certificate' },
   { to: '/#tech', label: 'Technologies' },
 ]
 
 export const PUBLIC_NAV_SECONDARY = [
   { to: '/about', label: 'About' },
-  { to: '/verify-certificate', label: 'Verify Certificate' },
   { to: '/blog', label: 'Blog' },
   { to: '/changelog', label: 'Changelog' },
   { to: '/faq', label: 'FAQ' },
