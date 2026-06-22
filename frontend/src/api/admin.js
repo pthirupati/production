@@ -8,7 +8,7 @@ export const adminApi = {
   },
 
   async getHealth() {
-    const { data } = await api.get('/admin/health/')
+    const { data } = await api.get('/admin/health/', { silentError: true })
     return data
   },
 
@@ -290,7 +290,7 @@ export const adminApi = {
 
   async getMonitoringContainers(kind = 'all') {
     const qs = kind && kind !== 'all' ? `?kind=${kind}` : ''
-    const { data } = await api.get(`/admin/monitoring/containers/${qs}`)
+    const { data } = await api.get(`/admin/monitoring/containers/${qs}`, { silentError: true })
     return data
   },
 
@@ -317,7 +317,7 @@ export const adminApi = {
   },
 
   async getFleetMetrics() {
-    const { data } = await api.get('/admin/monitoring/fleet/')
+    const { data } = await api.get('/admin/monitoring/fleet/', { silentError: true })
     return data
   },
 

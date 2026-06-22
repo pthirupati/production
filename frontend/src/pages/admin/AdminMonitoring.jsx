@@ -191,9 +191,10 @@ export default function AdminMonitoring() {
         engine_errors: data.engine_errors || null,
       })
     } catch {
-      // Only reached on a genuine request failure (network/timeout/5xx) — the
-      // backend degrades gracefully to a 200 with partial data otherwise.
-      toast.error('Could not load containers')
+      // Degrade quietly on poll failures — keep last container list visible.
+      if (!containers.length) {
+        toast.error('Could not load containers', { id: 'admin-containers' })
+      }
     } finally {
       setLoading(false)
     }

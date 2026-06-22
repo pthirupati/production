@@ -112,6 +112,7 @@ export default function InterviewRoom() {
   // engine returns an instant coaching tip after each answer.
   const [practiceMode, setPracticalCoaching] = useState(false)
   const [coaching, setCoaching] = useState(null)
+  const [typingAnswer, setTypingAnswer] = useState(false)
 
   // Keep refs in sync so the VAD loop and timers see current speaking/listening.
   useEffect(() => { isSpeakingRef.current = isSpeaking }, [isSpeaking])
@@ -643,6 +644,20 @@ export default function InterviewRoom() {
       }
     }
   }) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Hands-free loop: when the interview is live and idle, keep the mic open so
+  // the candidate never needs a Send button — speak, pause, auto-submit.
+  useEffect(() => {
+    if (!started || preflight || observerMode || practicalMode || typingAnswer) return
+    if (isSpeaking || isListening) return
+    if (!awaitingAnswerRef.current || !micOn) return
+    const t = setTimeout(() => {
+      if (!isSpeakingRef.current && !isListeningRef.current && awaitingAnswerRef.current) {
+        voiceAnswer()
+      }
+    }, 400)
+    return () => clearTimeout(t)
+  }, [started, preflight, observerMode, practicalMode, typingAnswer, isSpeaking, isListening, micOn])
 
   const startRecording = (stream) => {
     if (!stream || !window.MediaRecorder) return
@@ -1208,19 +1223,28 @@ export default function InterviewRoom() {
               className={`px-3 py-2 rounded-lg transition-colors shrink-0 ${
                 isListening
                   ? 'bg-emerald-500/30 text-emerald-200 ring-1 ring-emerald-400 animate-pulse'
-                  : 'btn-secondary'
+                  : 'btn-secondary opacity-60'
               }`}
-              title={isListening ? 'Done — submit now (or just stop talking)' : 'Start speaking'}
+              title={isListening ? 'Listening…' : 'Voice (automatic)'}
+              aria-hidden={!typingAnswer}
+              tabIndex={typingAnswer ? 0 : -1}
             >
               {isListening ? <CheckCircle2 size={16} /> : <Mic size={16} />}
             </button>
             <input
               value={answer}
               onChange={e => setAnswer(e.target.value)}
+              onFocus={() => setTypingAnswer(true)}
+              onBlur={() => { if (!answer.trim()) setTypingAnswer(false) }}
               onKeyDown={e => e.key === 'Enter' && submitAnswer()}
-              placeholder={isListening ? 'Listening… or type to override' : 'Speak, or type your answer…'}
+              placeholder={isListening ? 'Listening… speak naturally' : 'Speak, or tap here to type…'}
               className="input-field flex-1 text-sm"
             />
+            {(typingAnswer || answer.trim()) && (
+              <button type="button" onClick={() => submitAnswer()} className="btn-primary px-4 text-sm shrink-0" title="Send typed answer">
+                Send
+              </button>
+            )}
             <button
               type="button"
               onClick={skipQuestion}
@@ -1228,9 +1252,6 @@ export default function InterviewRoom() {
               title="Skip this question"
             >
               <SkipForward size={16} />
-            </button>
-            <button type="button" onClick={() => submitAnswer()} className="btn-primary px-4 text-sm shrink-0" title="Send typed answer">
-              Send
             </button>
           </div>
         </div>

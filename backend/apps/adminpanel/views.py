@@ -4750,6 +4750,41 @@ _MANAGED_ENV_VARS = [
         "rotation_days": 365,
         "description": "OpenAI API key (if used).",
     },
+    {
+        "key": "BACKUP_OFFSITE_ENABLED",
+        "label": "Off-site backup upload",
+        "category": "database",
+        "rotation_days": 3650,
+        "description": "Set to 1 to upload daily pg_dump to S3/Spaces (requires SPACES_* keys).",
+    },
+    {
+        "key": "SPACES_KEY",
+        "label": "Spaces access key",
+        "category": "database",
+        "rotation_days": 365,
+        "description": "DigitalOcean Spaces / S3 access key for off-site backups.",
+    },
+    {
+        "key": "SPACES_SECRET",
+        "label": "Spaces secret key",
+        "category": "database",
+        "rotation_days": 365,
+        "description": "DigitalOcean Spaces / S3 secret for off-site backups.",
+    },
+    {
+        "key": "SPACES_BUCKET",
+        "label": "Spaces bucket",
+        "category": "database",
+        "rotation_days": 3650,
+        "description": "Bucket name for off-site database backups.",
+    },
+    {
+        "key": "SPACES_REGION",
+        "label": "Spaces region",
+        "category": "database",
+        "rotation_days": 3650,
+        "description": "Region slug (e.g. blr1) for off-site backups.",
+    },
 ]
 
 _SUSPECT_VALUE_PATTERNS = (

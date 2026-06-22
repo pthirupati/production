@@ -77,14 +77,18 @@ if ! zcat "$OUT" | head -c 4096 | grep -q "PostgreSQL database dump"; then
   exit 1
 fi
 
-# ── Off-site upload to DigitalOcean Spaces (S3-compatible), GATED on SPACES_* ──
+# ── Off-site upload to DigitalOcean Spaces (S3-compatible), GATED on admin flag ──
+BACKUP_OFFSITE="$(_envval BACKUP_OFFSITE_ENABLED)"
+_is_offsite_enabled() {
+  case "${BACKUP_OFFSITE,,}" in 1|true|yes|on) return 0;; *) return 1;; esac
+}
 SPACES_KEY="$(_envval SPACES_KEY)"
 SPACES_SECRET="$(_envval SPACES_SECRET)"
 SPACES_BUCKET="$(_envval SPACES_BUCKET)"
 SPACES_REGION="$(_envval SPACES_REGION)"
 SPACES_ENDPOINT="$(_envval SPACES_ENDPOINT)"
 SPACES_PREFIX="$(_envval SPACES_PREFIX)"; SPACES_PREFIX="${SPACES_PREFIX:-fixitlab}"
-if [ -n "$SPACES_KEY" ] && [ -n "$SPACES_SECRET" ] && [ -n "$SPACES_BUCKET" ] && [ -n "$SPACES_REGION" ]; then
+if _is_offsite_enabled && [ -n "$SPACES_KEY" ] && [ -n "$SPACES_SECRET" ] && [ -n "$SPACES_BUCKET" ] && [ -n "$SPACES_REGION" ]; then
   ENDPOINT="${SPACES_ENDPOINT:-https://${SPACES_REGION}.digitaloceanspaces.com}"
   HOSTPART="${ENDPOINT#https://}"; HOSTPART="${HOSTPART#http://}"
   KEYPATH="${SPACES_PREFIX}/$(date +%Y/%m/%d)/$(basename "$OUT")"
@@ -132,7 +136,11 @@ PY
     echo "[pg-backup] WARNING: off-site upload FAILED (no s3cmd/aws/boto3 succeeded) — local backup kept" >&2
   fi
 else
-  echo "[pg-backup] SPACES_* not set — skipping off-site upload (local backup only)"
+  if ! _is_offsite_enabled; then
+    echo "[pg-backup] BACKUP_OFFSITE_ENABLED not set — skipping off-site upload (local backup only)"
+  else
+    echo "[pg-backup] SPACES_* not set — skipping off-site upload (local backup only)"
+  fi
 fi
 
 # ── Backup heartbeat (dead-man's-switch). Always write the local file; also push

@@ -1,5 +1,6 @@
 import { Component } from 'react'
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
+import { isChunkLoadError } from '../utils/lazyWithRetry'
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -13,9 +14,20 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('ErrorBoundary caught:', error, errorInfo)
+    if (isChunkLoadError(error)) {
+      const key = 'fixitlab-chunk-reload'
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1')
+        window.location.reload()
+      }
+    }
   }
 
   handleRetry = () => {
+    if (isChunkLoadError(this.state.error)) {
+      window.location.reload()
+      return
+    }
     this.setState({ hasError: false, error: null })
   }
 

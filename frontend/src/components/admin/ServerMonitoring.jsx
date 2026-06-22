@@ -291,14 +291,16 @@ export default function ServerMonitoring({ refreshMs = 10000, className = '' }) 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const timer = useRef(null)
+  const hadData = useRef(false)
 
   const load = useCallback(async () => {
     try {
       const data = await adminApi.getFleetMetrics()
       setFleet(data)
+      hadData.current = true
       setError(false)
     } catch {
-      setError(true)
+      setError(!hadData.current)
     } finally {
       setLoading(false)
     }

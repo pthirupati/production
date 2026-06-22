@@ -80,18 +80,23 @@ SCP_JOPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchM
 scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes \
   ${KEY_FILE:+-i "$KEY_FILE"} ${KEY_FILE:+-o IdentitiesOnly=yes} \
   -o "ProxyCommand=ssh $SCP_JOPTS -W %h:%p root@${EDGE_PUBLIC_IP}" \
-  "$WORKDIR/labs_ed25519" "root@${APP_PRIVATE_IP}:/opt/fixitlab/deploy/labs_ssh/id_ed25519"
-remote "$APP_PRIVATE_IP" via-edge "chmod 600 /opt/fixitlab/deploy/labs_ssh/id_ed25519; \
+  "$WORKDIR/labs_ed25519" "root@${APP_PRIVATE_IP}:/opt/fixitlab/deploy/labs_ssh/id_ed25519" \
+  || echo "  WARN: scp labs key to D2 failed (retry after deploy)"
+remote "$APP_PRIVATE_IP" via-edge "chmod 600 /opt/fixitlab/deploy/labs_ssh/id_ed25519 2>/dev/null || true; \
   ssh-keyscan -H ${LABS_PRIVATE_IP} > /opt/fixitlab/deploy/labs_ssh/known_hosts 2>/dev/null; \
   chmod 644 /opt/fixitlab/deploy/labs_ssh/known_hosts"
 
-# Verify remote docker reachability from D2
-if remote "$APP_PRIVATE_IP" via-edge \
-  "DOCKER_HOST=ssh://root@${LABS_PRIVATE_IP} GIT_SSH_COMMAND='ssh -i /opt/fixitlab/deploy/labs_ssh/id_ed25519' \
-   ssh -i /opt/fixitlab/deploy/labs_ssh/id_ed25519 -o StrictHostKeyChecking=no root@${LABS_PRIVATE_IP} 'docker version --format {{.Server.Version}}'"; then
+# Verify remote docker reachability from D2 (non-fatal — firewall may lag)
+set +e
+remote "$APP_PRIVATE_IP" via-edge \
+  "ssh -i /opt/fixitlab/deploy/labs_ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
+   root@${LABS_PRIVATE_IP} 'docker version >/dev/null 2>&1 && echo ok'"
+VERIFY_RC=$?
+set -e
+if [ "$VERIFY_RC" -eq 0 ]; then
   echo "  Remote docker engine on D4 reachable from D2"
 else
-  echo "  WARN: could not verify remote docker on D4 yet (deploy may retry)"
+  echo "  WARN: could not verify remote docker on D4 (open D2->D4:22 in VPC firewall; deploy may retry)"
 fi
 
 echo "=== labs SSH done ==="

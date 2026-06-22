@@ -95,6 +95,7 @@ api.interceptors.response.use(
 
     // ── 429 Rate limited (skip auth forms — they render their own inline error) ──
     if (error.response.status === 429 && !isAuthRequest) {
+      const isAdminPoll = /^\/admin\//.test(path)
       const isLabStart = /\/labs\/\d+\/start\//.test(path)
       const retryAfter = error.response.headers?.['retry-after']
       const msg = isLabStart
@@ -102,11 +103,18 @@ api.interceptors.response.use(
         : retryAfter
           ? `Too many requests — retry in ${retryAfter}s.`
           : 'Too many requests. Please wait a moment.'
-      toast.error(msg, { id: 'rate-limit', duration: 6000 })
+      // Admin dashboards poll many endpoints — don't spam toasts on burst 429.
+      if (!isSilent && !isAdminPoll) {
+        toast.error(msg, { id: 'rate-limit', duration: 6000 })
+      }
     }
 
     // 500+ Server error (skip auth forms and silent bootstrap requests)
     if (error.response.status >= 500 && !isAuthRequest && !isSilent) {
+      const isAdminPoll = /^\/admin\//.test(path)
+      if (isAdminPoll) {
+        return Promise.reject(error)
+      }
       const data = error.response.data
       const msg = data?.error || data?.detail || data?.message || 'Server error. Please try again later.'
       toast.error(msg.length > 120 ? msg.slice(0, 120) + '…' : msg, { id: 'server-error', duration: 5000 })

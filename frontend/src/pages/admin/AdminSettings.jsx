@@ -588,6 +588,50 @@ export default function AdminSettings() {
           </div>
         )}
       </div>
+      {/* ── Database backups ── */}
+      <div className="glass-card p-5 border border-surface-800 space-y-3">
+        <div className="flex items-center gap-2">
+          <Database size={16} className="text-cyan-400" />
+          <h2 className="text-sm font-semibold text-white">Database backups</h2>
+        </div>
+        <p className="text-xs text-surface-400">
+          Local daily <code className="text-surface-300">pg_dump</code> runs on the database node automatically.
+          Off-site upload to S3/Spaces is <strong className="text-surface-300">disabled by default</strong> — enable only after
+          configuring <code className="text-surface-300">SPACES_*</code> credentials in Vault below.
+        </p>
+        <label className="flex items-center justify-between gap-4 p-3 rounded-lg bg-surface-800/40 border border-surface-700/50 cursor-pointer">
+          <span className="text-sm text-surface-200">Upload backups to S3 / DigitalOcean Spaces</span>
+          <button
+            type="button"
+            disabled={envSyncing}
+            onClick={async () => {
+              const current = envEdits.BACKUP_OFFSITE_ENABLED ?? envSecrets?.secrets?.find(s => s.key === 'BACKUP_OFFSITE_ENABLED')?.value ?? '0'
+              const next = ['1', 'true', 'yes', 'on'].includes(String(current).toLowerCase()) ? '0' : '1'
+              setEnvSyncing(true)
+              try {
+                await adminApi.syncEnvSecrets({ BACKUP_OFFSITE_ENABLED: next })
+                const refreshed = await adminApi.getEnvSecrets()
+                setEnvSecrets(refreshed)
+                setEnvEdits(prev => ({ ...prev, BACKUP_OFFSITE_ENABLED: next }))
+                toast.success(next === '1' ? 'Off-site backup upload enabled' : 'Off-site backup upload disabled')
+              } catch {
+                toast.error('Could not update backup setting')
+              } finally {
+                setEnvSyncing(false)
+              }
+            }}
+            className="shrink-0"
+          >
+            {['1', 'true', 'yes', 'on'].includes(String(
+              envEdits.BACKUP_OFFSITE_ENABLED ?? envSecrets?.secrets?.find(s => s.key === 'BACKUP_OFFSITE_ENABLED')?.value ?? '0'
+            ).toLowerCase()) ? (
+              <ToggleRight size={28} className="text-accent-cyan" />
+            ) : (
+              <ToggleLeft size={28} className="text-surface-500" />
+            )}
+          </button>
+        </label>
+      </div>
       {/* ── Environment Secrets & Vault Sync ── */}
       <div className="glass-card p-5 border border-surface-800 space-y-4">
         <div className="flex items-center justify-between">
