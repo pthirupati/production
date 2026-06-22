@@ -394,6 +394,7 @@ CELERY_TASK_ROUTES = {
     "celery_app.tasks.process_inactive_accounts": {"queue": "maintenance"},
     "billing.fail_stuck_payment_transactions": {"queue": "maintenance"},
     "billing.retry_invoice_creation": {"queue": "default"},
+    "monitoring.check_business_signals": {"queue": "maintenance"},
     "apps.notifications.tasks.*": {"queue": "notifications"},
     "audit.create_log": {"queue": "default"},
 }
@@ -511,6 +512,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LAB_PROVIDER = env("LAB_PROVIDER", default="docker")  # docker recommended — no per-user cloud VM cost
 LAB_MAX_DURATION_MINUTES = env.int("LAB_MAX_DURATION_MINUTES", default=60)
 LAB_CLEANUP_INTERVAL_MINUTES = env.int("LAB_CLEANUP_INTERVAL_MINUTES", default=5)
+
+# Per-user concurrent-lab ceiling (one user can't hold the whole engine).
+MAX_CONCURRENT_LABS_PER_USER = env.int("MAX_CONCURRENT_LABS_PER_USER", default=2)
+# Platform-wide concurrent-lab ceiling (PRODUCTION_AUDIT SCALE-01). There is a
+# single Docker labs engine (D4); once its RAM/CPU saturate, the (N+1)th
+# provision throws and surfaces a 500. This cap is checked atomically in
+# StartLabView BEFORE provisioning so concurrent starts shed gracefully with a
+# friendly 503 instead. Counts containerful sessions in RUNNING/PROVISIONING.
+# Tune to the engine's real capacity (≈ engine RAM / per-container mem_limit).
+MAX_CONCURRENT_LABS = env.int("MAX_CONCURRENT_LABS", default=60)
 DOCKER_SOCKET = env("DOCKER_SOCKET", default="unix:///var/run/docker.sock")
 DOCKER_NETWORK = env("DOCKER_NETWORK", default="fixitlab_labs")
 DOCKER_SCENARIO_IMAGE_PREFIX = env("DOCKER_SCENARIO_IMAGE_PREFIX", default="fixitlab/scenario-")
@@ -713,7 +724,58 @@ if DEMO_PAYMENT_ENABLED and not DEBUG:
     )
     DEMO_PAYMENT_ENABLED = False
 
+# --------------------------------------------------
+# Sentry error tracking (PRODUCTION_AUDIT OBS-01)
+# --------------------------------------------------
+# Fully gated on SENTRY_DSN: when the DSN is empty (the default deploy) NOTHING
+# is initialised and this block is a no-op. The owner sets SENTRY_DSN in
+# Vault/env to turn error+performance tracking on. Init is also wrapped so a
+# missing/incompatible sentry-sdk can never crash startup.
 SENTRY_DSN = env("SENTRY_DSN", default="")
+
+
+def _sentry_before_send(event, hint):
+    """Scrub PII / secrets from every event before it leaves the process.
+
+    send_default_pii is already False, but request bodies, headers, and cookies
+    can still carry auth cookies, bearer tokens, passwords and similar. We
+    redact those defensively so they never reach Sentry. Never raises — on any
+    error we drop the request payload rather than risk shipping secrets.
+    """
+    _SENSITIVE_KEYS = {
+        "password", "passwd", "pwd", "secret", "token", "access_token",
+        "refresh_token", "access", "refresh", "authorization", "auth",
+        "api_key", "apikey", "client_secret", "csrftoken", "csrfmiddlewaretoken",
+        "sessionid", "set-cookie", "cookie", "x-csrftoken", "x-api-key",
+    }
+    _REDACTED = "[redacted]"
+
+    def _scrub(obj):
+        if isinstance(obj, dict):
+            return {
+                k: (_REDACTED if str(k).lower() in _SENSITIVE_KEYS else _scrub(v))
+                for k, v in obj.items()
+            }
+        if isinstance(obj, (list, tuple)):
+            return [_scrub(v) for v in obj]
+        return obj
+
+    try:
+        request = event.get("request")
+        if isinstance(request, dict):
+            # Never ship cookies; redact sensitive headers / query / body fields.
+            request.pop("cookies", None)
+            for field in ("headers", "data", "query_string"):
+                if field in request:
+                    request[field] = _scrub(request[field])
+        # Strip auth cookie/token-bearing extra context if present.
+        if isinstance(event.get("extra"), dict):
+            event["extra"] = _scrub(event["extra"])
+    except Exception:  # noqa: BLE001 — scrubbing must never break event delivery
+        event.pop("request", None)
+    return event
+
+
 if SENTRY_DSN:
     try:
         import sentry_sdk
@@ -723,12 +785,47 @@ if SENTRY_DSN:
         sentry_sdk.init(
             dsn=SENTRY_DSN,
             integrations=[DjangoIntegration(), CeleryIntegration()],
-            traces_sample_rate=0.1,
+            traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),
             send_default_pii=False,
-            environment="production" if not DEBUG else "development",
+            before_send=_sentry_before_send,
+            environment=env("SENTRY_ENVIRONMENT", default=("production" if not DEBUG else "development")),
+            release=env("SENTRY_RELEASE", default=None),
         )
-    except ImportError:
-        pass
+    except Exception:  # noqa: BLE001 — never let observability wiring crash boot
+        import warnings
+
+        warnings.warn(
+            "SENTRY_DSN set but sentry_sdk init failed; continuing without Sentry",
+            stacklevel=1,
+        )
+
+# --------------------------------------------------
+# Operational alerting (PRODUCTION_AUDIT OBS-02)
+# --------------------------------------------------
+# A small alerting utility (common.alerting) posts to a webhook and/or emails
+# when a business-critical signal crosses a threshold. ENTIRELY GATED: when both
+# ALERT_WEBHOOK_URL and ALERT_EMAIL are empty (the default deploy) common.alerting
+# does NO network/email I/O — it only logs. The owner sets ALERT_WEBHOOK_URL
+# (Slack/Discord/generic incoming webhook) and/or ALERT_EMAIL in Vault/env.
+ALERT_WEBHOOK_URL = env("ALERT_WEBHOOK_URL", default="")
+ALERT_EMAIL = env("ALERT_EMAIL", default="")
+# Optional short tag prefixed to every alert (e.g. "prod", "staging").
+ALERT_ENV_PREFIX = env("ALERT_ENV_PREFIX", default=("prod" if not DEBUG else ""))
+
+# Thresholds for the business-signal monitor (celery_app.tasks_monitoring).
+# Sane defaults; all overridable via env. The monitor runs on Celery Beat and
+# is a no-op for alerting until a channel above is configured.
+ALERT_PAYMENT_FAILURE_WINDOW_MINUTES = env.int("ALERT_PAYMENT_FAILURE_WINDOW_MINUTES", default=60)
+ALERT_PAYMENT_FAILURE_THRESHOLD = env.int("ALERT_PAYMENT_FAILURE_THRESHOLD", default=10)
+# Dead-man's-switch: alert if the last successful backup is older than this.
+# Daily backups run at 02:30; 26h leaves headroom for a single missed run.
+ALERT_BACKUP_MAX_AGE_HOURS = env.float("ALERT_BACKUP_MAX_AGE_HOURS", default=26.0)
+ALERT_CELERY_QUEUE_THRESHOLD = env.int("ALERT_CELERY_QUEUE_THRESHOLD", default=200)
+ALERT_LOGIN_FAILURE_WINDOW_MINUTES = env.int("ALERT_LOGIN_FAILURE_WINDOW_MINUTES", default=15)
+ALERT_LOGIN_FAILURE_THRESHOLD = env.int("ALERT_LOGIN_FAILURE_THRESHOLD", default=50)
+# How often the monitor runs (minutes). Kept as a setting so the beat schedule
+# and any docs stay in sync.
+ALERT_MONITOR_INTERVAL_MINUTES = env.int("ALERT_MONITOR_INTERVAL_MINUTES", default=5)
 
 # --------------------------------------------------
 # Currency Settings

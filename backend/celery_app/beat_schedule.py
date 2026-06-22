@@ -45,5 +45,15 @@ CELERY_BEAT_SCHEDULE = {
         "task": "billing.fail_stuck_payment_transactions",
         "schedule": crontab(minute="*/30"),  # every 30 minutes
     },
+    # PRODUCTION_AUDIT OBS-02: business-signal alerting. Evaluates payment-failure
+    # spikes, stale backup heartbeat (dead-man's-switch), deep Celery queues, and
+    # login-failure spikes, alerting via common.alerting. This is a NO-OP for
+    # alerting until ALERT_WEBHOOK_URL / ALERT_EMAIL are configured (it only logs),
+    # so the default deploy is behaviour-unchanged. Interval matches the
+    # ALERT_MONITOR_INTERVAL_MINUTES setting default (5 min).
+    "monitor-business-signals-every-5-mins": {
+        "task": "monitoring.check_business_signals",
+        "schedule": crontab(minute="*/5"),
+    },
 }
 

@@ -719,3 +719,9 @@ def reset_jira_ticket_after_lab_close(session_id: str) -> dict:
         return {"reset": ticket.issue_key}
     return {"skipped": "real_jira"}
 
+
+# PRODUCTION_AUDIT OBS-02: import the business-signal monitor so its @shared_task
+# registers under Celery autodiscovery (which imports each app's tasks.py). The
+# task body lives in tasks_monitoring.py to keep this module focused.
+from celery_app.tasks_monitoring import check_business_signals  # noqa: E402,F401
+

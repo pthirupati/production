@@ -1487,6 +1487,11 @@ class AdminSystemHealthView(APIView):
         # Cloud lab usage
         health["cloud_labs"] = _safe(self._get_cloud_lab_stats, {})
 
+        # Backup heartbeat (PRODUCTION_AUDIT REL-01). Optional — surfaced for
+        # visibility/alerting only; never affects "overall" (backups run on a
+        # different droplet and absence must not turn the dashboard red).
+        health["backup"] = _safe(self._check_backup, {"status": "unknown", "optional": True})
+
         # Overall health — core services only (not cloud providers or lab containers)
         core_services = ["database", "redis", "docker", "email", "rabbitmq", "celery"]
         health["overall"] = all(
@@ -1514,6 +1519,42 @@ class AdminSystemHealthView(APIView):
             return {"status": "unhealthy", "error": "Cache read/write failed"}
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}
+
+    def _check_backup(self):
+        """Surface the off-site backup heartbeat (PRODUCTION_AUDIT REL-01).
+
+        The backup cron records the last successful backup's epoch in Redis
+        (``common.backup_heartbeat``). Report freshness against
+        ``ALERT_BACKUP_MAX_AGE_HOURS`` so a stale/missing backup is visible.
+        Returns ``unknown`` (not unhealthy) when no heartbeat exists yet so a
+        fresh deploy without backups configured does not look broken.
+        """
+        from datetime import datetime, timezone as _dt_tz
+
+        from django.utils import timezone as _tz
+
+        from common.backup_heartbeat import read_last_backup_epoch
+
+        max_age_hours = float(getattr(settings, "ALERT_BACKUP_MAX_AGE_HOURS", 26))
+        epoch = read_last_backup_epoch()
+        if epoch is None:
+            return {
+                "status": "unknown",
+                "optional": True,
+                "detail": "no backup heartbeat recorded yet",
+                "max_age_hours": max_age_hours,
+            }
+        age_seconds = max(0, int(_tz.now().timestamp()) - epoch)
+        age_hours = round(age_seconds / 3600.0, 1)
+        stale = age_seconds > max_age_hours * 3600
+        return {
+            "status": "stale" if stale else "healthy",
+            "optional": True,
+            "last_success_epoch": epoch,
+            "last_success": datetime.fromtimestamp(epoch, tz=_dt_tz.utc).isoformat(),
+            "age_hours": age_hours,
+            "max_age_hours": max_age_hours,
+        }
 
     def _check_docker(self):
         """Health of the Docker engine(s).

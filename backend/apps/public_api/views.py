@@ -6,6 +6,7 @@ Technologies, scenarios, labs, bookmarks, progress, leaderboard.
 """
 import logging
 import os
+from django.conf import settings
 from django.core.cache import cache
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -25,6 +26,7 @@ from apps.question_bank.serializers import (
 )
 from apps.labs.models import LabSession
 from apps.labs.serializers import LabSessionSerializer
+from apps.labs.capacity import at_global_capacity
 from apps.labs.provisioner import get_provisioner, terminate_lab_session, DockerProvisioner
 from apps.labs.completion import finalize_validated_session
 from apps.question_bank.scenario_copy import public_objectives
@@ -46,6 +48,14 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+# Friendly payload returned (with HTTP 503) when the single Docker labs engine
+# is at the global concurrent-lab ceiling. Distinct "code" so the frontend can
+# show a retry-soon message rather than a generic error. (PRODUCTION_AUDIT
+# SCALE-01.)
+LAB_CAPACITY_FULL_RESPONSE = {
+    "error": "All lab capacity is in use right now — please try again in a few minutes.",
+    "code": "CAPACITY_FULL",
+}
 
 
 def _get_subscribed_tech_ids(user):
@@ -641,7 +651,10 @@ class StartLabView(APIView):
             )
 
         # Hard limit on simultaneously RUNNING/PROVISIONING labs per user
-        max_concurrent = int(os.environ.get("MAX_CONCURRENT_LABS_PER_USER", "2"))
+        max_concurrent = int(os.environ.get(
+            "MAX_CONCURRENT_LABS_PER_USER",
+            str(getattr(settings, "MAX_CONCURRENT_LABS_PER_USER", 2)),
+        ))
         active_count = LabSession.objects.filter(
             user=request.user,
             status__in=["RUNNING", "PROVISIONING"],
@@ -656,6 +669,18 @@ class StartLabView(APIView):
                 },
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
+
+        # ── Global lab-capacity pre-check (PRODUCTION_AUDIT SCALE-01) ──
+        # The single Docker engine has finite capacity; once it saturates, the
+        # next provision throws a 500. Shed gracefully with a friendly 503
+        # instead. This is a cheap unlocked pre-check (most over-capacity
+        # requests bail here); it is RE-VERIFIED race-safely under the global
+        # advisory lock just before the session is created (below). Only
+        # engine-backed (docker) starts count — simulation/cloud labs don't
+        # contend for the D4 engine.
+        infra_type = _lab_infra_type(scenario)
+        if at_global_capacity(infra_type):
+            return Response(LAB_CAPACITY_FULL_RESPONSE, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         # ── Cross-tab sync: resume existing active lab for SAME scenario ──
         # If user opens a new tab and clicks "Start Lab" again for a scenario
@@ -723,6 +748,23 @@ class StartLabView(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
+            # ── Re-check global capacity race-safely under the advisory lock ──
+            # (PRODUCTION_AUDIT SCALE-01) The unlocked pre-check above can race:
+            # N concurrent starts could all read "under cap" then all insert,
+            # overshooting the single engine. at_global_capacity() takes a
+            # transaction-scoped advisory lock and re-counts live engine-backed
+            # sessions under it; because we hold that lock through the INSERT
+            # below, "count < cap ⇒ create" is atomic and cannot overshoot.
+            # Done BEFORE terminating the user's other sessions so a rejection
+            # has no destructive side effect (we don't kill their running lab
+            # just to refuse a new one). The user's own swap can transiently sit
+            # one over the global count, which is safe and self-corrects.
+            if at_global_capacity(infra_type):
+                return Response(
+                    LAB_CAPACITY_FULL_RESPONSE,
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
             # Terminate active sessions for OTHER scenarios
             for existing in existing_sessions:
                 try:
@@ -734,9 +776,6 @@ class StartLabView(APIView):
                     logger.warning(f"Failed to terminate existing resource: {e}")
                 existing.mark_terminated()
                 logger.info(f"Auto-terminated session {existing.id} for new lab start")
-
-            # Determine infrastructure type from scenario
-            infra_type = _lab_infra_type(scenario)
 
             # Create a fresh session — always, regardless of prior completion
             session = LabSession.objects.create(
@@ -2233,110 +2272,78 @@ class CertificateVerifyView(APIView):
                 "is_test_certificate": True,
             })
 
-        # Parse certificate ID
-        parts = cert_id.split("-")
-        if len(parts) < 4 or parts[0] != "FIXIT":
+        # ── Look up STRICTLY by the stored opaque certificate id ──
+        # (PRODUCTION_AUDIT PRIV-01) Certificate ids embed a user id
+        # (FIXIT-<tech>-<USERID>-<DATE>), but we must NEVER derive the holder
+        # from client-supplied input — doing so let an attacker enumerate every
+        # user's name/stats by incrementing the id. Instead we resolve the
+        # certificate only via the unique, issued ``UserCertificate.certificate_id``
+        # row and read the holder/technology from that authoritative row. Any id
+        # that does not match a genuinely issued certificate gets a flat
+        # ``valid: false`` with no PII, so enumeration reveals nothing.
+        if not cert_id.startswith("FIXIT-"):
             return Response({
                 "valid": False,
                 "error": "Invalid certificate ID format",
             })
 
-        try:
-            from django.contrib.auth import get_user_model
-            from apps.question_bank.models import Technology as Tech
+        from apps.billing.models import UserCertificate
 
-            # Extract components: FIXIT-TECHSLUG-USERID-DATE
-            tech_slug = "-".join(parts[1:-2]).lower()
-            user_id = int(parts[-2])
-            date_str = parts[-1]
-
-            User = get_user_model()
-            user = User.objects.filter(id=user_id).first()
-            if not user:
-                return Response({"valid": False, "error": "Certificate holder not found"})
-
-            tech = Tech.objects.filter(slug=tech_slug, is_active=True).first()
-            if not tech:
-                return Response({"valid": False, "error": "Technology not found"})
-
-            # Verify completion
-            total_scenarios = tech.scenarios.filter(is_active=True).count()
-            completed = UserScenarioProgress.objects.filter(
-                user=user, scenario__technology=tech, completed=True
-            ).count()
-
-            from apps.billing.models import TechnologySubscription
-            from apps.billing.subscription_utils import is_tech_subscription_active
-
-            sub = TechnologySubscription.objects.filter(
-                user=user, technology=tech, is_active=True
-            ).first()
-            has_sub = sub and is_tech_subscription_active(sub)
-
-            is_valid = completed >= total_scenarios and total_scenarios > 0 and has_sub
-
-            from apps.billing.models import UserCertificate
-            from datetime import timedelta
-
-            cert_record = UserCertificate.objects.filter(
-                user=user, technology=tech, certificate_id=cert_id
-            ).first()
-            issued_date = None
-            expires_date = None
-            if cert_record:
-                issued_date = cert_record.issued_at.strftime("%Y-%m-%d")
-                expires_date = cert_record.expires_at.strftime("%Y-%m-%d")
-                if cert_record.is_expired:
-                    return Response({
-                        "valid": False,
-                        "certificate_id": cert_id,
-                        "holder_name": user.get_full_name() or user.username,
-                        "technology": tech.name,
-                        "error": "Certificate is out of date. Please renew your certification with the latest scenarios and technologies.",
-                        "issued_date": issued_date,
-                        "expires_date": expires_date,
-                        "is_expired": True,
-                    })
-            elif len(date_str) == 8:
-                from datetime import datetime
-                try:
-                    issued_dt = datetime.strptime(date_str, "%Y%m%d")
-                    issued_dt = timezone.make_aware(issued_dt) if timezone.is_naive(issued_dt) else issued_dt
-                    expiry_dt = issued_dt + timedelta(days=365)
-                    issued_date = issued_dt.strftime("%Y-%m-%d")
-                    expires_date = expiry_dt.strftime("%Y-%m-%d")
-                    if timezone.now() > expiry_dt:
-                        return Response({
-                            "valid": False,
-                            "certificate_id": cert_id,
-                            "holder_name": user.get_full_name() or user.username,
-                            "technology": tech.name,
-                            "error": "Certificate is out of date. Please renew your certification with the latest scenarios and technologies.",
-                            "issued_date": issued_date,
-                            "expires_date": expires_date,
-                            "is_expired": True,
-                        })
-                except ValueError:
-                    pass
-
-            total_score = UserScenarioProgress.objects.filter(
-                user=user, scenario__technology=tech, completed=True
-            ).aggregate(total=Sum("best_score"))["total"] or 0
-
+        cert_record = (
+            UserCertificate.objects.select_related("user", "technology")
+            .filter(certificate_id=cert_id)
+            .first()
+        )
+        if not cert_record:
+            # No issued certificate with this id. Return nothing identifying —
+            # this is the response for every non-matching / probed id.
             return Response({
-                "valid": is_valid,
-                "certificate_id": cert_id,
-                "holder_name": user.get_full_name() or user.username,
-                "technology": tech.name,
-                "scenarios_completed": completed,
-                "total_scenarios": total_scenarios,
-                "total_score": total_score,
-                "issued_date": issued_date or (f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}" if len(date_str) == 8 else date_str),
-                "expires_date": expires_date,
+                "valid": False,
+                "error": "Certificate not found. Check the ID and try again.",
             })
 
-        except (ValueError, IndexError):
-            return Response({"valid": False, "error": "Invalid certificate ID format"})
+        user = cert_record.user
+        tech = cert_record.technology
+        holder_name = user.get_full_name() or user.username
+        issued_date = cert_record.issued_at.strftime("%Y-%m-%d")
+        expires_date = cert_record.expires_at.strftime("%Y-%m-%d")
+
+        # Expired certificate: the id genuinely identifies this holder's cert,
+        # so showing their name + the renew prompt is expected (this is the
+        # legitimate "your certificate is out of date" path).
+        if cert_record.is_expired:
+            return Response({
+                "valid": False,
+                "certificate_id": cert_id,
+                "holder_name": holder_name,
+                "technology": tech.name,
+                "error": "Certificate is out of date. Please renew your certification with the latest scenarios and technologies.",
+                "issued_date": issued_date,
+                "expires_date": expires_date,
+                "is_expired": True,
+            })
+
+        # Stats are computed from the certificate's own (DB-derived) holder and
+        # technology — never from client input.
+        total_scenarios = tech.scenarios.filter(is_active=True).count()
+        completed = UserScenarioProgress.objects.filter(
+            user=user, scenario__technology=tech, completed=True
+        ).count()
+        total_score = UserScenarioProgress.objects.filter(
+            user=user, scenario__technology=tech, completed=True
+        ).aggregate(total=Sum("best_score"))["total"] or 0
+
+        return Response({
+            "valid": True,
+            "certificate_id": cert_id,
+            "holder_name": holder_name,
+            "technology": tech.name,
+            "scenarios_completed": completed,
+            "total_scenarios": total_scenarios,
+            "total_score": total_score,
+            "issued_date": issued_date,
+            "expires_date": expires_date,
+        })
 
 
 # ─── Blog (public CMS) ───────────────────────────────────────────────
