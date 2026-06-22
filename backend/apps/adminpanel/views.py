@@ -1934,12 +1934,23 @@ class AdminSystemHealthView(APIView):
                 except Exception:
                     pass
 
-                # Attribute this container to a canonical service key when possible.
+                # Attribute this container to a canonical service key. Prefer a
+                # NAME match first: the celery_* services all share the
+                # fixitlab-backend image, so an image-substring match would
+                # misbucket every celery container as "backend" and then report
+                # celery_worker/beat/provisioning/maintenance as falsely
+                # "missing". Only fall back to the image when the name matches
+                # nothing.
                 svc_key = None
                 for spec in self.EXPECTED_CONTAINERS:
-                    if any(m in name_lower or m in image_str for m in spec["match"]):
+                    if any(m in name_lower for m in spec["match"]):
                         svc_key = spec["key"]
                         break
+                if svc_key is None:
+                    for spec in self.EXPECTED_CONTAINERS:
+                        if any(m in image_str for m in spec["match"]):
+                            svc_key = spec["key"]
+                            break
                 if svc_key:
                     seen_local_keys.add(svc_key)
 

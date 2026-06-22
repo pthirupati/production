@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import api from '../api/client'
 import { labApi } from '../api/labs'
 import { ratingsApi } from '../api/ratings'
@@ -129,7 +129,10 @@ export default function LabRunner() {
   const closeCountdownRef = useRef(null)
   // Always-fresh technology slug so cross-tab / async handlers can route back to
   // the right technology page without re-subscribing on every session change.
-  const techSlugRef = useRef('')
+  // Seed it from the launch-time slug (passed via router state by the launcher)
+  // so completion redirects work even for sessions whose detail payload never
+  // populated technology (simulation / coding / cross-tech labs).
+  const techSlugRef = useRef(useLocation().state?.techSlug || '')
 
   const LAB_CLOSE_SECONDS = 10
 
@@ -708,7 +711,11 @@ export default function LabRunner() {
     setAiHintLoading(true)
     try {
       const res = await api.post(`/labs/${sessionId}/ai-hint/`)
-      setAiHint(res.data.hint)
+      // The endpoint returns a hint OBJECT ({content, ai_generated, order, penalty})
+      // for the no-question path and a string `answer` for typed questions —
+      // normalize to a string so React never tries to render the raw object.
+      const h = res.data.hint
+      setAiHint(typeof h === 'string' ? h : (h?.content ?? h?.answer ?? res.data.answer ?? ''))
       if (res.data.credits_remaining != null) {
         setAiCreditsRemaining(res.data.credits_remaining)
       }

@@ -143,7 +143,7 @@ export default function ScenarioDetail() {
       } else {
         toast.success('Lab environment ready!')
       }
-      navigate(`/lab/${session.id}`)
+      navigate(`/lab/${session.id}`, { state: { techSlug: scenario.technology?.slug || '' } })
     } catch (err) {
       const data = err.response?.data
       if (data?.code === 'LIMIT_REACHED') {

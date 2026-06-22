@@ -219,12 +219,19 @@ class TechnologiesListView(APIView):
         cached = cache.get("technologies_list")
         if cached is not None:
             return Response(cached)
-        techs = Technology.objects.filter(is_active=True).annotate(
-            scenario_count=Count("scenarios", filter=Q(scenarios__is_active=True))
-        ).order_by("order", "name")
-        serializer = TechnologySerializer(techs, many=True)
-        cache.set("technologies_list", serializer.data, 300)  # 5 min
-        return Response(serializer.data)
+        # Public bootstrap endpoint — must never 500 the page. On any DB/serialize
+        # error, log and return an empty list so the frontend falls back to its
+        # static catalog instead of showing "Server error".
+        try:
+            techs = Technology.objects.filter(is_active=True).annotate(
+                scenario_count=Count("scenarios", filter=Q(scenarios__is_active=True))
+            ).order_by("order", "name")
+            data = TechnologySerializer(techs, many=True).data
+            cache.set("technologies_list", data, 300)  # 5 min
+            return Response(data)
+        except Exception:
+            logger.exception("TechnologiesListView failed — returning empty list")
+            return Response([])
 
 
 class TechnologyDetailView(APIView):
