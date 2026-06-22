@@ -62,6 +62,12 @@ urlpatterns = [
     # Public API (scenarios, labs, progress, leaderboard)
     path("api/", include("apps.public_api.urls")),
 
+    # Public Tutorials (free written content)
+    path("api/tutorials/", include("apps.tutorials.urls")),
+
+    # Public Playgrounds (free, ephemeral try-instantly sandboxes)
+    path("api/playgrounds/", include("apps.labs.playground_urls")),
+
     # Notifications API
     path("api/notifications/", include("apps.notifications.urls")),
 

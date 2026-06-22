@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "apps.support",
     "apps.vmware_sim",
     "apps.itsm",
+    "apps.tutorials",
 ]
 
 # --------------------------------------------------
@@ -250,6 +251,12 @@ REST_FRAMEWORK = {
         "payment": "30/hour",  # per user
         "interview": "200/day",  # per user — long practice sessions
         "strict_anon": "240/minute",  # public browsing behind NAT needs real headroom (was 60)
+        # Public, anonymous "Playgrounds" (try-instantly sandboxes). Each POST
+        # runs one simulated command / SQL statement / code snippet, so this is
+        # the per-IP ceiling on playground *actions*. Generous enough for a real
+        # person experimenting behind a shared NAT, tight enough that the
+        # ephemeral sandboxes can't be hammered into a resource problem.
+        "playground": "120/minute",
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "NUM_PROXIES": 1,

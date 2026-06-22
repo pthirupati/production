@@ -112,6 +112,20 @@ class StrictAnonRateThrottle(AnonRateThrottle):
     scope = 'strict_anon'
 
 
+class PlaygroundRateThrottle(AnonRateThrottle):
+    """Per-IP throttle for the public, ephemeral Playgrounds.
+
+    Every playground action (run a command, execute a SQL statement, run a code
+    snippet) is a POST, and each one drives a simulated engine or a sandboxed
+    interpreter. Keying on IP (via AnonRateThrottle) caps how fast an anonymous
+    visitor can fire actions so the free sandboxes can't be abused, while still
+    leaving plenty of headroom for genuine hands-on experimentation. Logged-in
+    users key on IP too here (the playgrounds are deliberately a no-account,
+    no-persistence experience).
+    """
+    scope = 'playground'
+
+
 class LabStartThrottle(UserRateThrottle):
     """
     Limit new lab provisions per user. Staff are exempt; resumed sessions

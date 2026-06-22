@@ -80,6 +80,9 @@ const AsyncVideoRoom = lazy(() => import('../pages/interviews/AsyncVideoRoom'))
 const VMwareSimulator = lazy(() => import('../pages/vmware/VMwareSimulator'))
 const Unsubscribe = lazy(() => import('../pages/Unsubscribe'))
 const Changelog = lazy(() => import('../pages/Changelog'))
+const Tutorials = lazy(() => import('../pages/tutorials/Tutorials'))
+const TutorialDetail = lazy(() => import('../pages/tutorials/TutorialDetail'))
+const Playgrounds = lazy(() => import('../pages/playgrounds/Playgrounds'))
 
 function PageLoader() {
   return (
@@ -144,6 +147,9 @@ export default function AppRouter() {
         <Route path="/faq" element={<FAQ />} />
         <Route path="/mock-interviews" element={<InterviewLanding />} />
         <Route path="/verify-certificate" element={<CertificateVerify />} />
+        <Route path="/tutorials" element={<Tutorials />} />
+        <Route path="/tutorials/:slug" element={<TutorialDetail />} />
+        <Route path="/playgrounds" element={<Playgrounds />} />
         <Route path="/interviews/invite/:token" element={<InterviewInvite />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
         <Route path="/jira/:issueKey" element={<ProtectedRoute><JiraTicketPage /></ProtectedRoute>} />

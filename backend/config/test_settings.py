@@ -92,6 +92,7 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {  # noqa: F405
     "strict_anon": "10000/minute",
     "lab_start": "10000/minute",
     "token_refresh": "10000/minute",
+    "playground": "10000/minute",
 }
 
 # Monkey-patch allow_request so throttle classes always pass in tests

@@ -126,6 +126,26 @@ clone_repo="${clone_repo//__GIT_REF__/$GIT_REF}"
 NET_NET='docker network inspect fixitlab_net >/dev/null 2>&1 || docker network create fixitlab_net'
 NET_LABS='docker network inspect fixitlab_labs >/dev/null 2>&1 || docker network create fixitlab_labs'
 
+# Host-level tooling for the daily pg_dump backup on D3 (PRODUCTION_AUDIT REL-01).
+# ci-pg-backup-cron.sh installs /usr/local/bin/fixitlab-pg-backup.sh which runs ON THE
+# HOST (not in a container), so it needs an S3-compatible uploader (s3cmd) for the
+# off-site copy to DigitalOcean Spaces and redis-cli (redis-tools) for the backup
+# heartbeat. Install both here so the upload + heartbeat work once SPACES_* / REDIS_HOST
+# are set in .env.production. Idempotent (skips apt when both are already present) and
+# non-fatal — the backup script degrades gracefully and logs a WARNING when a tool is
+# absent, so a transient apt hiccup must never block the deploy. apt cache was already
+# refreshed by BOOTSTRAP_COMMON above.
+DATA_BACKUP_TOOLS='
+if ! command -v s3cmd >/dev/null 2>&1 || ! command -v redis-cli >/dev/null 2>&1; then
+  apt-get install -y s3cmd redis-tools >/dev/null 2>&1 || true
+fi
+if command -v s3cmd >/dev/null 2>&1 && command -v redis-cli >/dev/null 2>&1; then
+  echo "[data] off-site backup tooling ready (s3cmd + redis-cli)"
+else
+  echo "[data] WARNING: backup tooling incomplete — off-site upload/heartbeat skipped until s3cmd + redis-tools install" >&2
+fi
+'
+
 bootstrap_edge() {
   echo "[edge] bootstrapping $EDGE_PUBLIC_IP"
   remote "$EDGE_PUBLIC_IP" direct "$BOOTSTRAP_COMMON
@@ -149,6 +169,7 @@ bootstrap_data() {
   remote "$DATA_PRIVATE_IP" via-edge "$BOOTSTRAP_COMMON
 $clone_repo
 $NET_NET
+$DATA_BACKUP_TOOLS
 echo '[data] ready'"
 }
 
