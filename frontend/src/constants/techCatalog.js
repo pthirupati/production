@@ -27,6 +27,9 @@ export const TECH_CATALOG = [
   { name: 'GPU & NVIDIA', slug: 'gpu', color: '#b266e0', tag: 'Hands-on labs', description: 'Troubleshoot GPU drivers, CUDA, and accelerated compute environments.' },
   { name: 'Grafana', slug: 'grafana', color: '#f7913b', tag: 'Hands-on labs', description: 'Operate a Grafana simulator — dashboards, panels, variables, alerting, and contact points.' },
   { name: 'Prometheus', slug: 'prometheus', color: '#e6522c', tag: 'Hands-on labs', description: 'Query PromQL, debug exporters, recording/alerting rules, and Alertmanager routing.' },
+  { name: 'Terraform & IaC', slug: 'terraform', color: '#8a63d2', tag: 'Hands-on labs', description: 'Provision and debug infrastructure as code — providers, state, modules, and drift.' },
+  { name: 'Windows Server', slug: 'windows', color: '#49b5ff', tag: 'Hands-on labs', description: 'Administer Windows Server — Active Directory, services, networking, and PowerShell.' },
+  { name: 'JavaScript', slug: 'javascript', color: '#f7c843', tag: 'Coding IDE', description: 'Solve JavaScript and Node tasks in a browser IDE with instant auto-grading.' },
 ]
 
 export function catalogEntryForTech(tech) {
