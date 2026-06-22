@@ -30,6 +30,15 @@ window.addEventListener('error', (e) => {
     recoverFromStaleChunk(msg)
   }
 })
+// React.lazy() dynamic-import failures surface as REJECTED PROMISES, not window
+// 'error' events — so catch those too. This is the path that fires for the
+// "Failed to fetch dynamically imported module" the admin pages were hitting.
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = String(e?.reason?.message || e?.reason || '')
+  if (/dynamically imported module|Importing a module script failed|ChunkLoadError|Failed to fetch dynamically/i.test(msg)) {
+    recoverFromStaleChunk(msg)
+  }
+})
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
