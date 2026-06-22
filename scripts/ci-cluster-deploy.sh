@@ -117,12 +117,30 @@ bash scripts/build-scenario-images.sh
 bash scripts/validate-scenario-images.sh"
 }
 
+prepull_grader_images() {
+  # Pre-pull the code-exec grader's tiny base images onto the D4 Labs engine.
+  # Runs on EVERY deploy (independent of BUILD_SCENARIOS): the grader launches
+  # short-lived python/node sandbox containers on D4 over ssh://; if the image
+  # isn't already present, the first grade has to pull at request time and the
+  # fail-closed gate reports "code grading temporarily unavailable". Pre-pulling
+  # here makes the first grade succeed. NON-FATAL: if the D2->D4 ssh path is
+  # unreachable this must never red the deploy (grading just stays in its
+  # current saved-for-review state, no regression).
+  echo "[grader] Pre-pull sandbox base images on D4 Labs (non-fatal)"
+  remote "$APP_PRIVATE_IP" via-edge \
+    "export DOCKER_HOST=ssh://root@${LABS_PRIVATE_IP}
+docker pull ${SANDBOX_PYTHON_IMAGE:-python:3.12-alpine} || true
+docker pull ${SANDBOX_NODE_IMAGE:-node:20-alpine} || true
+docker images | grep -E 'python:3.12-alpine|node:20-alpine' || true" || true
+}
+
 main() {
   echo "=== FixitLab cluster deploy (dry_run=$DRY_RUN build_scenarios=$BUILD_SCENARIOS) ==="
   deploy_data
   deploy_edge
   deploy_app
   build_labs_images
+  prepull_grader_images
   echo "=== cluster deploy done ==="
 }
 
