@@ -84,19 +84,30 @@ RABBIT_PASS="$(env_val RABBITMQ_PASS)"
 VAULT_ADDR_V="$(env_val VAULT_ADDR)"
 
 # ── Build the secret-sync status block ──
-# Tells the operator, in plain language, whether the rotated credentials were
-# persisted back to the GitHub Environment secrets + Vault. If a sync FAILED, the
-# operator must manually update the corresponding GitHub secret (otherwise the
-# next run reuses a stale PRODUCTION_ENV_B64 and admin/login would break).
+# Tells the operator, in plain language, where the rotated credentials persisted.
+# These are now TWO INDEPENDENT signals:
+#   VAULT_SYNC_STATUS — rotated env persisted to Vault secret/fixitlab/env? This is
+#                       the REAL login-persistence path: every later deploy overlays
+#                       it, so admin login survives WITHOUT touching GitHub secrets.
+#   GH_SYNC_STATUS    — GitHub Environment secret (PRODUCTION_ENV_B64) write-back?
+#                       OPTIONAL now (a 403 without a classic PAT is expected and is
+#                       NOT login-critical once Vault persisted).
 SECRETS_ROTATED="${SECRETS_ROTATED:-0}"
 GH_SYNC_STATUS="${GH_SYNC_STATUS:-skipped}"
 VAULT_SYNC_STATUS="${VAULT_SYNC_STATUS:-skipped}"
 
-_sync_line() {  # $1=label $2=status
-  case "$2" in
-    ok|OK|1|true)       echo "  ${1}: SYNCED — GitHub secret updated, no action needed." ;;
-    failed|FAILED|0)    echo "  ${1}: FAILED — UPDATE THIS GITHUB SECRET MANUALLY (value below / attached)." ;;
-    *)                  echo "  ${1}: not applicable this run." ;;
+_vault_line() {  # $1=status
+  case "$1" in
+    ok|OK|1|true)    echo "  Vault (secret/fixitlab/env): PERSISTED — rotated secrets are the cross-deploy source of truth; admin login persists automatically. No action needed." ;;
+    failed|FAILED|0) echo "  Vault (secret/fixitlab/env): FAILED — rotated secrets did NOT persist to Vault. Re-run the deploy or update the GitHub secret from the attached env (see below)." ;;
+    *)               echo "  Vault (secret/fixitlab/env): not written this run." ;;
+  esac
+}
+_gh_line() {  # $1=status
+  case "$1" in
+    ok|OK|1|true)    echo "  GitHub secret (PRODUCTION_ENV_B64): synced — kept in step with the rotation." ;;
+    failed|FAILED|0) echo "  GitHub secret (PRODUCTION_ENV_B64): not written (HTTP 403 without a classic 'repo' PAT). OPTIONAL — not login-critical because Vault holds the rotated secrets. Set GH_ADMIN_TOKEN to a classic PAT to also keep this fresh." ;;
+    *)               echo "  GitHub secret (PRODUCTION_ENV_B64): not applicable this run." ;;
   esac
 }
 
@@ -104,17 +115,22 @@ SYNC_BLOCK="$(mktemp)"
 {
   if _is_true "$SECRETS_ROTATED"; then
     echo "Secret rotation: YES — infra secrets were rotated this run."
-    echo "GitHub / Vault secret sync status:"
-    _sync_line "GitHub Environment secrets (PRODUCTION_ENV_B64 + PROD_*_HOST)" "$GH_SYNC_STATUS"
-    _sync_line "Vault AppRole / unseal secrets" "$VAULT_SYNC_STATUS"
-    if [ "$GH_SYNC_STATUS" = "failed" ] || [ "$VAULT_SYNC_STATUS" = "failed" ]; then
-      echo "  ACTION REQUIRED: a sync failed (usually GH_ADMIN_TOKEN lacks the 'repo'"
-      echo "  scope, HTTP 403). The cluster is running fine on the rotated values, but"
-      echo "  you MUST copy the values from the attached env into the GitHub secrets"
-      echo "  so the NEXT deploy does not reuse stale credentials."
-    fi
+    echo "Persistence status:"
+    _vault_line "$VAULT_SYNC_STATUS"
+    _gh_line "$GH_SYNC_STATUS"
+    case "$VAULT_SYNC_STATUS" in
+      ok|OK|1|true)
+        echo "  RESULT: login WILL persist across deploys (Vault is authoritative); the"
+        echo "  GitHub-secret write-back above is optional."
+        ;;
+      *)
+        echo "  ACTION REQUIRED: rotated secrets did NOT persist to Vault. To avoid the"
+        echo "  next deploy reverting to stale credentials, copy the values from the"
+        echo "  attached env into the GitHub PRODUCTION_ENV_B64 secret, or re-run the deploy."
+        ;;
+    esac
   else
-    echo "Secret rotation: NO — existing secrets were preserved (nothing to sync)."
+    echo "Secret rotation: NO — existing secrets were preserved (nothing to persist)."
   fi
 } > "$SYNC_BLOCK"
 SYNC_STATUS_TEXT="$(cat "$SYNC_BLOCK")"

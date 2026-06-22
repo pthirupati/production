@@ -150,6 +150,17 @@ fi
 
 echo "[env] OK — $(grep -c '^[A-Z]' "$OUT" || true) variables loaded"
 
+# ── Vault overlay: rotated-secret source of truth (cross-deploy persistence) ──
+# After .env is built from PRODUCTION_ENV_B64 + ci-generate-secrets, overlay any
+# rotated secrets that a prior (rotating) run persisted to Vault secret/fixitlab/env.
+# Runs BEFORE the VAULT_ADDR=http://vault:8200 rewrite below so overlay-env.sh can
+# derive a host-reachable Vault address. Fully self-guarded + non-fatal: if Vault is
+# disabled, the overlay path is absent (no rotation ever happened), or Vault is
+# unreachable, this is a NO-OP and $OUT stays exactly as built (green path unchanged).
+if [ -x "$ROOT/scripts/vault/overlay-env.sh" ]; then
+  bash "$ROOT/scripts/vault/overlay-env.sh" "$OUT" || true
+fi
+
 # Container runtime overrides (host-side Vault CLI uses 127.0.0.1)
 if grep -q '^VAULT_ENABLED=true' "$OUT" 2>/dev/null; then
   if grep -q '^VAULT_ADDR=' "$OUT"; then

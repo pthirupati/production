@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework import status
-from common.throttles import LoginRateThrottle, OTPRateThrottle, PasswordResetRateThrottle
+from common.throttles import LoginRateThrottle, OTPRateThrottle, PasswordResetRateThrottle, TokenRefreshThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
@@ -281,10 +281,16 @@ class RegisterView(APIView):
         except Exception as e:
             logger.warning(f"Failed to create welcome notification: {e}")
 
-        # Return tokens immediately so user is logged in
-        refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
-        refresh_token = str(refresh)
+        # Return tokens immediately so user is logged in. Use the session-aware
+        # helper so the jti is recorded in SessionTracker — otherwise the brand-new
+        # user's first request is 401'd whenever JWT session enforcement is on.
+        _toks = TokenHelper.create_tokens_with_session(
+            user,
+            getattr(request, "client_ip", "") or "",
+            getattr(request, "user_agent", "") or "",
+        )
+        access_token = _toks["access"]
+        refresh_token = _toks["refresh"]
         response = Response({
             "message": "User registered successfully",
             "access": access_token,
@@ -683,6 +689,26 @@ class ForgotPasswordView(APIView):
         return Response({"message": "A password reset link has been sent to your email."})
 
 
+def _blacklist_all_refresh_tokens(user):
+    """Blacklist every outstanding refresh token for ``user`` (DB-backed).
+
+    Used on password reset (SECURITY_AUDIT A-02) for a hard, durable revocation
+    that does not depend on the volatile session cache. Best-effort: a failure
+    here is logged but never 500s the reset (the SessionTracker invalidation +
+    the user's now-changed password already block credential reuse).
+    """
+    try:
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+    except Exception:  # token_blacklist app not installed
+        return
+    try:
+        outstanding = OutstandingToken.objects.filter(user=user)
+        for ot in outstanding:
+            BlacklistedToken.objects.get_or_create(token=ot)
+    except Exception:
+        logger.warning("Failed to blacklist refresh tokens for user %s", getattr(user, "id", "?"))
+
+
 class ResetPasswordView(APIView):
     """Reset password using a token from the reset email."""
     permission_classes = [AllowAny]
@@ -709,10 +735,53 @@ class ResetPasswordView(APIView):
 
         # Mark token as used
         token_obj.used = True
-        token_obj.save()
+        token_obj.save(update_fields=["used"])
+
+        # SECURITY_AUDIT A-02: a password reset is the "I may be compromised"
+        # recovery action — it MUST evict any attacker who already holds a live
+        # session. Mirror ChangePasswordView: drop all tracked JWT sessions so
+        # any access token fails the session check on its next request, AND
+        # hard-blacklist every outstanding refresh token (DB-backed) so a stolen
+        # refresh token can no longer mint new access tokens.
+        try:
+            SessionTracker.invalidate_all_sessions(user.id)
+        except Exception:
+            logger.warning("Failed to invalidate sessions after password reset for user %s", user.id)
+        _blacklist_all_refresh_tokens(user)
 
         logger.info(f"Password reset successfully for {user.email}")
         return Response({"message": "Password has been reset successfully. You can now sign in."})
+
+
+def _register_refreshed_session(request, access_token):
+    """Record the rotated access token's jti so session enforcement keeps it valid.
+
+    Decodes the new access token (signature already verified by simplejwt when it
+    minted it) to read user_id + jti, then registers it ADDITIVELY in
+    SessionTracker. Best-effort: any failure is swallowed so a refresh never 500s
+    on a cache hiccup — at worst the user falls back to re-login, never an error.
+    """
+    try:
+        import jwt as _jwt
+        jwt_settings = getattr(settings, "SIMPLE_JWT", {})
+        algorithm = jwt_settings.get("ALGORITHM", "HS256")
+        verify_key = jwt_settings.get("VERIFYING_KEY") or jwt_settings.get("SIGNING_KEY")
+        if not verify_key:
+            return
+        decoded = _jwt.decode(
+            access_token, verify_key, algorithms=[algorithm],
+            options={"verify_exp": False},
+        )
+        user_id = decoded.get(jwt_settings.get("USER_ID_CLAIM", "user_id"))
+        jti = decoded.get(jwt_settings.get("JTI_CLAIM", "jti"))
+        if user_id and jti:
+            SessionTracker.record_session(
+                user_id, jti,
+                ip_address=getattr(request, "client_ip", "") or "",
+                user_agent=getattr(request, "user_agent", "") or "",
+            )
+    except Exception:
+        logger.debug("Could not register refreshed session jti", exc_info=True)
 
 
 class CookieTokenRefreshView(TokenRefreshView):
@@ -720,7 +789,13 @@ class CookieTokenRefreshView(TokenRefreshView):
     Extends simplejwt's TokenRefreshView to:
     1. Fall back to 'refresh_token' cookie when no refresh token in request body.
     2. Set the new access_token (and rotated refresh_token) as httpOnly cookies.
+    3. Re-register the rotated jti so session enforcement keeps the token valid.
     """
+
+    # Loose, dedicated throttle (see TokenRefreshThrottle): refresh is per-IP and
+    # high-frequency; the tight default anon bucket could 429 a NAT'd group and
+    # log them out. Refresh-token validity is the real gate here.
+    throttle_classes = [TokenRefreshThrottle]
 
     def post(self, request, *args, **kwargs):
         # If no refresh token in body, inject it from the cookie
@@ -736,6 +811,15 @@ class CookieTokenRefreshView(TokenRefreshView):
             new_access = response.data.get("access")
             new_refresh = response.data.get("refresh")
             if new_access:
+                # CRITICAL (session-enforcement fix): simplejwt mints a BRAND-NEW
+                # jti for the rotated access token (jti is in no_copy_claims and
+                # set_jti() runs on rotation). If we don't re-register it, the very
+                # next request made with this freshly-refreshed token fails
+                # SessionTracker.is_session_valid and the user is 401'd / logged
+                # out — which is exactly what happened sitewide when JWT session
+                # enforcement was flipped back on at the end of a deploy. Record
+                # the new jti against the user so the rotated token stays valid.
+                _register_refreshed_session(request, new_access)
                 set_auth_cookies(response, new_access, new_refresh)
 
         return response
@@ -871,12 +955,17 @@ class GitHubCallbackView(APIView):
             )
             emails = email_resp.json()
             primary_email = None
+            # SECURITY_AUDIT A-03: track whether the chosen email is verified so
+            # an unverified GitHub email cannot auto-link to an existing account.
+            primary_email_verified = False
             for em in emails:
                 if em.get("primary") and em.get("verified"):
                     primary_email = em["email"]
+                    primary_email_verified = True
                     break
             if not primary_email and emails:
                 primary_email = emails[0].get("email")
+                primary_email_verified = bool(emails[0].get("verified"))
             if not primary_email:
                 return Response({"error": "Could not retrieve email from GitHub."}, status=400)
         except Exception as e:
@@ -885,13 +974,20 @@ class GitHubCallbackView(APIView):
 
         allow_registration = request.data.get("intent") == "register"
         user, error = self._resolve_social_login(
-            "github", gh_id, primary_email, gh_name, allow_registration=allow_registration,
+            "github", gh_id, primary_email, gh_name,
+            allow_registration=allow_registration,
+            email_verified=primary_email_verified,
         )
         if error:
             return error
-        refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
-        refresh_token = str(refresh)
+        # Session-aware issuance so the jti is tracked (see RegisterView).
+        _toks = TokenHelper.create_tokens_with_session(
+            user,
+            getattr(request, "client_ip", "") or "",
+            getattr(request, "user_agent", "") or "",
+        )
+        access_token = _toks["access"]
+        refresh_token = _toks["refresh"]
         response = Response({
             "access": access_token,
             "refresh": refresh_token,
@@ -906,13 +1002,21 @@ class GitHubCallbackView(APIView):
         return response
 
     @staticmethod
-    def _resolve_social_login(provider, provider_uid, email, display_name, *, allow_registration=False):
+    def _resolve_social_login(provider, provider_uid, email, display_name, *, allow_registration=False, email_verified=True):
         """
         Social auth:
         - Existing social link → login
-        - Existing email account → link social + login
+        - Existing email account → link social + login (ONLY if email verified)
         - No account + allow_registration → create account + link social
         - No account + login intent → require registration first
+
+        SECURITY_AUDIT A-03: ``email_verified`` MUST be True before we trust the
+        provider-asserted email to auto-link to (or create) a local account. A
+        provider can return an email the user never proved they own (some flows
+        let a user set an arbitrary, unverified email); linking on that would let
+        an attacker take over the existing FixitLab account that owns that email.
+        Callers pass the provider's verified-email flag (GitHub already filters
+        to verified primary emails; Google passes ``email_verified``).
         """
         try:
             sa = SocialAccount.objects.select_related("user").get(
@@ -921,6 +1025,20 @@ class GitHubCallbackView(APIView):
             return sa.user, None
         except SocialAccount.DoesNotExist:
             pass
+
+        # Beyond this point we either LINK to an existing local account or CREATE
+        # one from the provider email. Both require a provider-verified email.
+        if not email_verified:
+            return None, Response(
+                {
+                    "error": (
+                        f"Your {provider.title()} email is not verified. "
+                        "Verify it with the provider, then try again."
+                    ),
+                    "error_code": "email_not_verified",
+                },
+                status=403,
+            )
 
         try:
             user = User.objects.get(email=email)
@@ -1027,6 +1145,10 @@ class GoogleCallbackView(APIView):
             google_id = ginfo.get("sub", "")
             email = ginfo.get("email", "")
             name = ginfo.get("name", "")
+            # SECURITY_AUDIT A-03: Google returns email_verified (bool, or "true"
+            # as a string from some endpoints). Normalise both forms.
+            raw_verified = ginfo.get("email_verified", False)
+            email_verified = raw_verified is True or str(raw_verified).lower() == "true"
             if not email:
                 return Response({"error": "Could not retrieve email from Google."}, status=400)
         except Exception as e:
@@ -1035,13 +1157,20 @@ class GoogleCallbackView(APIView):
 
         allow_registration = request.data.get("intent") == "register"
         user, error = GitHubCallbackView._resolve_social_login(
-            "google", google_id, email, name, allow_registration=allow_registration,
+            "google", google_id, email, name,
+            allow_registration=allow_registration,
+            email_verified=email_verified,
         )
         if error:
             return error
-        refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
-        refresh_token = str(refresh)
+        # Session-aware issuance so the jti is tracked (see RegisterView).
+        _toks = TokenHelper.create_tokens_with_session(
+            user,
+            getattr(request, "client_ip", "") or "",
+            getattr(request, "user_agent", "") or "",
+        )
+        access_token = _toks["access"]
+        refresh_token = _toks["refresh"]
         response = Response({
             "access": access_token,
             "refresh": refresh_token,

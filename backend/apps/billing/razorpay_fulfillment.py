@@ -119,8 +119,14 @@ def fulfill_technology_subscription(
     activate_technology_subscription(sub, renew=True)
 
     if coupon_applied:
-        from .coupon_service import redeem_coupon
-        redeem_coupon(coupon_applied)
+        from .coupon_service import CouponError, redeem_coupon
+        try:
+            # SECURITY_AUDIT P-03: atomic + per-user. A limit-reached / already-
+            # redeemed coupon must not break an already-verified payment — the
+            # subscription is still fulfilled, the discount just isn't re-counted.
+            redeem_coupon(coupon_applied, user=user)
+        except CouponError as exc:
+            logger.info("Coupon %s not redeemed for user %s: %s", coupon_applied.code, user.id, exc)
 
     if transaction:
         transaction.tech_subscription = sub
@@ -284,11 +290,19 @@ def send_interview_subscription_email(user, tier, ent) -> None:
 
 
 def verify_razorpay_payment_captured(order_id: str, payment_id: str, expected_amount_inr: int) -> bool:
-    """Fetch payment from Razorpay — must be captured with matching order + amount."""
+    """Fetch payment from Razorpay — must be captured with matching order + amount.
+
+    SECURITY_AUDIT P-02: FAIL CLOSED. A missing gateway secret must never count
+    as a verified capture in production. The demo pass is permitted ONLY in
+    explicit local-dev/demo mode (``DEBUG and DEMO_PAYMENT_ENABLED``).
+    """
     from django.conf import settings as django_settings
 
     if not django_settings.RAZORPAY_KEY_SECRET or not django_settings.RAZORPAY_KEY_ID:
-        return getattr(django_settings, "DEMO_PAYMENT_ENABLED", False)
+        if getattr(django_settings, "DEBUG", False) and getattr(django_settings, "DEMO_PAYMENT_ENABLED", False):
+            return True
+        logger.error("Razorpay keys not configured — failing capture verification closed")
+        return False
     try:
         import razorpay
 

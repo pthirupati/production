@@ -6,6 +6,35 @@ import toast from 'react-hot-toast'
 import { startOAuth } from '../../utils/oauth'
 import { AuthShell } from '../../components/design'
 
+// Map a login request error to an ACCURATE message. Critically, a 429 (throttle)
+// or 5xx (server busy / mid-deploy) must NOT be shown as "Invalid credentials" —
+// the credentials may be perfectly correct. Only a real 400/401 means bad creds.
+function loginErrorMessage(err) {
+  const res = err?.response
+  if (!res) {
+    return err?.code === 'ECONNABORTED'
+      ? 'The server took too long to respond. Please try again.'
+      : 'Network error — check your connection and try again.'
+  }
+  const status = res.status
+  const data = res.data || {}
+  if (status === 429) {
+    const retryAfter = res.headers?.['retry-after']
+    return retryAfter
+      ? `Too many attempts. Please wait ${retryAfter}s and try again.`
+      : 'Too many attempts. Please wait a moment and try again.'
+  }
+  if (status >= 500) {
+    return 'The server is temporarily unavailable. Please try again in a moment.'
+  }
+  if (status === 403) {
+    return data.error || 'Access denied. Please contact support if this continues.'
+  }
+  // 400 / 401 — genuine credential / validation failure. Prefer the server's
+  // specific message, fall back to the classic phrasing.
+  return data.error || data.detail || 'Invalid credentials'
+}
+
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -36,7 +65,7 @@ export default function Login() {
       toast.success('Welcome back!')
       navigate(data.user?.is_staff ? '/admin' : '/dashboard')
     } catch (err) {
-      setError(err.response?.data?.error || 'Invalid credentials')
+      setError(loginErrorMessage(err))
     } finally {
       setLoading(false)
     }

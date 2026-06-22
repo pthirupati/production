@@ -235,7 +235,7 @@ class CreateStripeTechCheckoutView(APIView):
         coupon_code = (request.data.get("coupon_code") or "").strip()
         if coupon_code:
             try:
-                amount_inr, _coupon = apply_coupon_to_amount(coupon_code, amount_inr)
+                amount_inr, _coupon = apply_coupon_to_amount(coupon_code, amount_inr, user=request.user)
             except CouponError as exc:
                 return Response({"error": str(exc)}, status=400)
 

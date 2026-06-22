@@ -34,15 +34,29 @@ DRY_RUN = os.environ.get("DRY_RUN", "0") == "1"
 PROTECTED_EMAIL = (os.environ.get("SUPERUSER_EMAIL") or "").strip().lower()
 
 
+def protected_reason(user) -> str | None:
+    """Return a human reason this account is PROTECTED from deletion, else None.
+
+    Protection wins over every test-user signal below: a superuser/staff account
+    (or the configured admin email) is NEVER a deletion candidate, even if its
+    username/email otherwise looks like a test account.
+    """
+    email = (user.email or "").lower()
+    if PROTECTED_EMAIL and email == PROTECTED_EMAIL:
+        return f"matches PROTECTED_EMAIL ({PROTECTED_EMAIL})"
+    if user.is_superuser and not email.endswith(f"@{TEST_EMAIL_DOMAIN}"):
+        return "is_superuser"
+    if user.is_staff and not email.endswith(f"@{TEST_EMAIL_DOMAIN}"):
+        return "is_staff"
+    return None
+
+
 def is_test_user(user) -> bool:
     email = (user.email or "").lower()
     username = (user.username or "").lower()
 
-    if PROTECTED_EMAIL and email == PROTECTED_EMAIL:
-        return False
-    if user.is_superuser and not email.endswith(f"@{TEST_EMAIL_DOMAIN}"):
-        return False
-    if user.is_staff and not email.endswith(f"@{TEST_EMAIL_DOMAIN}"):
+    # Protection always wins — never treat a protected account as a test user.
+    if protected_reason(user) is not None:
         return False
 
     if email.endswith(f"@{TEST_EMAIL_DOMAIN}"):
@@ -145,8 +159,20 @@ def cleanup_test_data() -> dict:
         "tags": 0,
     }
 
-    test_users = list(User.objects.filter(is_active=True).iterator())
-    test_users = [u for u in test_users if is_test_user(u)]
+    all_active = list(User.objects.filter(is_active=True).iterator())
+
+    # Loudly list every PROTECTED account we are skipping, so the deploy log shows
+    # exactly which superuser/staff/admin accounts were shielded from deletion.
+    protected = [(u, protected_reason(u)) for u in all_active]
+    protected = [(u, r) for (u, r) in protected if r is not None]
+    print(f"PROTECTED accounts skipped ({len(protected)}):")
+    if protected:
+        for u, reason in protected:
+            print(f"  - PROTECTED {u.username} <{u.email}> (id={u.id}) — {reason}")
+    else:
+        print("  (none)")
+
+    test_users = [u for u in all_active if is_test_user(u)]
 
     if not test_users:
         print("No test users to clean up.")
@@ -160,6 +186,25 @@ def cleanup_test_data() -> dict:
 
     user_ids = [u.id for u in test_users]
     usernames = [u.username for u in test_users]
+
+    # HARD SAFETY GATE: re-query the DB authoritatively and refuse to proceed if ANY
+    # id in the delete set belongs to a superuser or staff account. This is a
+    # belt-and-suspenders check on top of is_test_user() — if a logic change ever let
+    # a privileged account slip through, we ABORT the entire cleanup (delete nothing)
+    # rather than risk removing an admin. cleanup never touches env/secrets/Vault.
+    privileged = list(
+        User.objects.filter(id__in=user_ids)
+        .filter(Q(is_superuser=True) | Q(is_staff=True))
+        .values_list("id", "username", "email")
+    )
+    if privileged:
+        print("FATAL: refusing to delete — privileged (superuser/staff) accounts are in the delete set:")
+        for uid, uname, uemail in privileged:
+            print(f"  - BLOCKED id={uid} {uname} <{uemail}>")
+        raise SystemExit(
+            "Aborting cleanup: delete set contains superuser/staff accounts "
+            "(this should never happen — is_test_user protection failed)."
+        )
 
     print(f"Cleaning {len(test_users)} test user(s)...")
     for u in test_users:

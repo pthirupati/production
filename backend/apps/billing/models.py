@@ -343,6 +343,38 @@ class CouponCode(models.Model):
         return int(result)
 
 
+class CouponRedemption(models.Model):
+    """One row per (coupon, user) redemption.
+
+    SECURITY_AUDIT P-03: enforces a per-user redemption limit. The
+    ``unique_together`` makes a second redemption of the same coupon by the same
+    user impossible at the DB level (a duplicate insert raises IntegrityError),
+    which closes the "same user redeems a single-use coupon repeatedly" hole and
+    makes ``redeem_coupon`` idempotent under concurrency.
+    """
+
+    coupon = models.ForeignKey(
+        CouponCode,
+        on_delete=models.CASCADE,
+        related_name="redemptions",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="coupon_redemptions",
+    )
+    redeemed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("coupon", "user")
+        indexes = [
+            models.Index(fields=["coupon", "user"]),
+        ]
+
+    def __str__(self):
+        return f"{self.coupon_id}:{self.user_id}"
+
+
 class UserCertificate(models.Model):
     """Stored certificate with issue and expiry dates."""
 

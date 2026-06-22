@@ -6,7 +6,7 @@ Tests JWT authentication, session tracking, structured logging, and API security
 import json
 import os
 import unittest
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from rest_framework.test import APIClient, APITestCase
@@ -111,47 +111,87 @@ class JWTSecurityTestCase(APITestCase):
 
 @_extended_test
 class DuplicateLoginPreventionTestCase(APITestCase):
-    """Test duplicate login prevention (single session per user)."""
+    """Session-tracking behaviour under JWT_SESSION_ENFORCEMENT.
+
+    NOTE: the platform intentionally moved AWAY from the legacy single-active-
+    session model (2nd login killed the 1st device). That model was incompatible
+    with refresh-token rotation — the rotated access token carries a NEW jti, so
+    re-registering it would resurrect a "killed" device anyway — and it routinely
+    logged real users out. SessionTracker now keeps a bounded SET of live jtis,
+    so multiple devices/tabs and rotated tokens coexist; revocation is explicit
+    (logout / password change). These tests assert that corrected behaviour.
+    """
 
     def setUp(self):
         self.client_a = APIClient()
         self.client_b = APIClient()
+        cache.clear()
         self.user = User.objects.create_user(
             username='testuser',
             email='test@example.com',
             password='SecurePass123!'
         )
 
-    def test_second_login_invalidates_first_session(self):
-        """Test that 2nd login invalidates 1st device's session."""
-        # Device A: First login
+    @override_settings(JWT_SESSION_ENFORCEMENT=True)
+    def test_concurrent_logins_both_remain_valid(self):
+        """Two devices logging in as the same user both keep working (multi-session)."""
         response_a = self.client_a.post('/api/auth/login/', {
-            'email': 'test@example.com',
-            'password': 'SecurePass123!'
+            'email': 'test@example.com', 'password': 'SecurePass123!'
         }, format='json')
         token_a = response_a.data['access']
-        
-        # Verify Device A token works
         self.client_a.credentials(HTTP_AUTHORIZATION=f'Bearer {token_a}')
-        response = self.client_a.get('/api/auth/profile/')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
-        # Device B: Second login (same user)
+        self.assertEqual(self.client_a.get('/api/auth/profile/').status_code, status.HTTP_200_OK)
+
         response_b = self.client_b.post('/api/auth/login/', {
-            'email': 'test@example.com',
-            'password': 'SecurePass123!'
+            'email': 'test@example.com', 'password': 'SecurePass123!'
         }, format='json')
         token_b = response_b.data['access']
-        
-        # Device B token should work
         self.client_b.credentials(HTTP_AUTHORIZATION=f'Bearer {token_b}')
-        response = self.client_b.get('/api/auth/profile/')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
-        # Device A token should NOW be invalid (session invalidated)
+        self.assertEqual(self.client_b.get('/api/auth/profile/').status_code, status.HTTP_200_OK)
+
+        # Device A is STILL valid — concurrent sessions are allowed now.
         self.client_a.credentials(HTTP_AUTHORIZATION=f'Bearer {token_a}')
-        response = self.client_a.get('/api/auth/profile/')
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(self.client_a.get('/api/auth/profile/').status_code, status.HTTP_200_OK)
+
+    @override_settings(JWT_SESSION_ENFORCEMENT=True)
+    def test_refreshed_token_stays_valid_under_enforcement(self):
+        """A rotated (refreshed) access token must pass the session check.
+
+        This is the regression guard for the deploy-time mass-logout: before the
+        fix, the refreshed jti was never recorded and every refresh 401'd the user.
+        """
+        login = self.client_a.post('/api/auth/login/', {
+            'email': 'test@example.com', 'password': 'SecurePass123!'
+        }, format='json')
+        refresh_token = login.data['refresh']
+
+        refreshed = self.client_a.post('/api/auth/refresh/', {'refresh': refresh_token}, format='json')
+        self.assertEqual(refreshed.status_code, status.HTTP_200_OK)
+        new_access = refreshed.data['access']
+
+        # Use the freshly-refreshed token on a protected endpoint — must be 200,
+        # not 401 session_invalidated.
+        self.client_a.credentials(HTTP_AUTHORIZATION=f'Bearer {new_access}')
+        self.assertEqual(self.client_a.get('/api/auth/profile/').status_code, status.HTTP_200_OK)
+
+    @override_settings(JWT_SESSION_ENFORCEMENT=True)
+    def test_password_change_invalidates_other_sessions(self):
+        """invalidate_all_sessions (password change) revokes existing tokens."""
+        login = self.client_a.post('/api/auth/login/', {
+            'email': 'test@example.com', 'password': 'SecurePass123!'
+        }, format='json')
+        token = login.data['access']
+        self.client_a.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+        self.assertEqual(self.client_a.get('/api/auth/profile/').status_code, status.HTTP_200_OK)
+
+        import jwt as _jwt
+        old_jti = _jwt.decode(token, options={'verify_signature': False}).get('jti')
+
+        SessionTracker.invalidate_all_sessions(self.user.id)
+        # Re-record a DIFFERENT session so the set is non-empty (otherwise the
+        # tracker fails open by design). The old token's jti is absent → rejected.
+        TokenHelper.create_tokens_with_session(self.user, '', '')
+        self.assertFalse(SessionTracker.is_session_valid(self.user.id, old_jti))
 
     def test_session_tracker_records_session(self):
         """Test that SessionTracker properly records sessions."""
@@ -170,17 +210,26 @@ class DuplicateLoginPreventionTestCase(APITestCase):
         self.assertFalse(SessionTracker.is_session_valid(self.user.id, fake_jti))
 
     def test_session_invalidation(self):
-        """Test manual session invalidation."""
+        """Test manual session invalidation of one of several live sessions.
+
+        Keep a second session alive so the tracker set stays NON-empty after the
+        invalidation — an empty set fails open by design (cache-flush resilience),
+        so we assert the more meaningful property: the invalidated jti is dropped
+        from a populated set and rejected, while the other session remains valid.
+        """
         tokens = TokenHelper.create_tokens_with_session(self.user)
         jti = tokens['jti']
-        
+        other = TokenHelper.create_tokens_with_session(self.user)
+        other_jti = other['jti']
+
         self.assertTrue(SessionTracker.is_session_valid(self.user.id, jti))
-        
-        # Invalidate
+
+        # Invalidate just the first session.
         SessionTracker.invalidate_session(self.user.id, jti)
-        
-        # Should now be invalid
+
+        # The invalidated jti is rejected; the other session is untouched.
         self.assertFalse(SessionTracker.is_session_valid(self.user.id, jti))
+        self.assertTrue(SessionTracker.is_session_valid(self.user.id, other_jti))
 
 
 @_extended_test

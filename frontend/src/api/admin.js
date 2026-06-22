@@ -346,6 +346,28 @@ export const adminApi = {
     return data
   },
 
+  // ── ITSM / ServiceNow tickets (cross-user admin management) ──
+  async getItsmTickets(filters = {}) {
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v) })
+    const qs = params.toString()
+    const { data } = await api.get(`/admin/itsm/tickets/${qs ? '?' + qs : ''}`)
+    return data
+  },
+  async getItsmMeta() {
+    const { data } = await api.get('/admin/itsm/meta/')
+    return data
+  },
+  async getItsmTicket(ticketId) {
+    const { data } = await api.get(`/admin/itsm/tickets/${ticketId}/`)
+    return data
+  },
+  // action: 'transition' | 'transfer' | 'comment' | 'sub_ticket' | 'fulfil'
+  async itsmTicketAction(ticketId, payload) {
+    const { data } = await api.post(`/admin/itsm/tickets/${ticketId}/action/`, payload)
+    return data
+  },
+
   async getThreadDetail(threadId) {
     const { data } = await api.get(`/admin/threads/${threadId}/`)
     return data

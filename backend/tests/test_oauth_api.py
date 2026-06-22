@@ -1,11 +1,15 @@
 """OAuth API endpoints — config, start redirect, callback URL consistency."""
 
+from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from apps.accounts.oauth_urls import oauth_callback_url
+
+User = get_user_model()
 
 
 class SocialAuthConfigAPITest(TestCase):
@@ -66,3 +70,68 @@ class SocialOAuthStartAPITest(TestCase):
         params = parse_qs(parsed.query)
         self.assertEqual(params["redirect_uri"], [oauth_callback_url("google")])
         self.assertEqual(params["state"], ["register"])
+
+
+@override_settings(
+    ROOT_URLCONF="config.urls", SECURE_SSL_REDIRECT=False,
+    FRONTEND_URL="https://fixitlab.in",
+    GOOGLE_CLIENT_ID="google-test-id", GOOGLE_CLIENT_SECRET="google-test-secret",
+)
+class GoogleOAuthEmailVerificationTests(TestCase):
+    """SECURITY_AUDIT A-03: Google OAuth must not link to an existing account on
+    an UNVERIFIED provider email (account-takeover prevention)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        # Pre-existing local account owning the victim's email.
+        self.victim = User.objects.create_user(
+            username="victim", email="victim@corp.com", password="Victim123!x"
+        )
+
+    def _mock_google(self, *, email, email_verified):
+        """Patch the token-exchange POST + userinfo GET that the view makes."""
+        token_resp = mock.Mock()
+        token_resp.json.return_value = {"access_token": "ya29.fake", "id_token": "jwt.fake"}
+        info_resp = mock.Mock()
+        info_resp.json.return_value = {
+            "sub": "google-uid-999",
+            "email": email,
+            "name": "Mallory",
+            "email_verified": email_verified,
+        }
+        post_patch = mock.patch("requests.post", return_value=token_resp)
+        get_patch = mock.patch("requests.get", return_value=info_resp)
+        return post_patch, get_patch
+
+    def test_unverified_email_does_not_link_to_existing_account(self):
+        post_patch, get_patch = self._mock_google(email="victim@corp.com", email_verified=False)
+        with post_patch, get_patch:
+            resp = self.client.post(
+                "/api/auth/social/google/",
+                {"code": "auth-code", "intent": "login"},
+                format="json",
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+        # Must be rejected — no token issued, no social link to the victim.
+        self.assertEqual(resp.status_code, 403, getattr(resp, "data", resp.content))
+        self.assertEqual(resp.data.get("error_code"), "email_not_verified")
+        from apps.accounts.models import SocialAccount
+        self.assertFalse(
+            SocialAccount.objects.filter(provider="google", user=self.victim).exists()
+        )
+
+    def test_verified_email_links_to_existing_account(self):
+        post_patch, get_patch = self._mock_google(email="victim@corp.com", email_verified=True)
+        with post_patch, get_patch:
+            resp = self.client.post(
+                "/api/auth/social/google/",
+                {"code": "auth-code", "intent": "login"},
+                format="json",
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+        self.assertEqual(resp.status_code, 200, getattr(resp, "data", resp.content))
+        self.assertEqual(resp.data["user"]["email"], "victim@corp.com")
+        from apps.accounts.models import SocialAccount
+        self.assertTrue(
+            SocialAccount.objects.filter(provider="google", user=self.victim).exists()
+        )

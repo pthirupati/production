@@ -35,6 +35,10 @@ from .views import (
     AdminThreadModerationView,
     AdminJiraTicketsView,
     AdminJiraCreateView,
+    AdminItsmTicketsView,
+    AdminItsmMetaView,
+    AdminItsmTicketDetailView,
+    AdminItsmTicketActionView,
     AdminConfigView,
     AdminUploadView,
     AdminCouponsView,
@@ -165,6 +169,12 @@ urlpatterns = [
     # Jira tickets
     path("jira/tickets/", AdminJiraTicketsView.as_view()),
     path("jira/tickets/create/", AdminJiraCreateView.as_view()),
+
+    # ITSM / ServiceNow tickets
+    path("itsm/meta/", AdminItsmMetaView.as_view()),
+    path("itsm/tickets/", AdminItsmTicketsView.as_view()),
+    path("itsm/tickets/<uuid:ticket_id>/", AdminItsmTicketDetailView.as_view()),
+    path("itsm/tickets/<uuid:ticket_id>/action/", AdminItsmTicketActionView.as_view()),
 
     # Data Exports (CSV)
     path("export/users/", AdminExportUsersView.as_view()),

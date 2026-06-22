@@ -400,3 +400,130 @@ class ItsmAskBotTests(TestCase):
         ticket_id = res.data["ticket"]["id"]
         bad = client.post(f"/api/itsm/tickets/{ticket_id}/ask/", {"message": "  "}, format="json")
         self.assertEqual(bad.status_code, 400)
+
+
+@override_settings(CACHES=_LOCMEM_CACHE)
+class AdminItsmTests(TestCase):
+    """Admin ITSM management surface (mirrors the Jira admin endpoints).
+
+    Covers the two things that distinguish the admin path from the user path:
+      * IsPlatformAdmin gating — a normal authenticated user is forbidden.
+      * Cross-user visibility — an admin lists/opens/acts on tickets they do NOT own.
+    Plus that an admin action reuses the service layer (state transition + note).
+    """
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+
+        cache.clear()
+        self.owner = User.objects.create_user(username="owner", email="owner@t.com", password="pass12345")
+        self.admin = User.objects.create_user(
+            username="admin", email="admin@t.com", password="pass12345", is_staff=True,
+        )
+        self.tech = Technology.objects.create(name="Linux Admin ITSM", icon="terminal")
+        self.scenario = Scenario.objects.create(
+            title="Admin disk full", slug="itsm-admin-disk", technology=self.tech,
+            description="x", is_active=True, is_free=True, itsm_enabled=True,
+        )
+        self.session = LabSession.objects.create(user=self.owner, scenario=self.scenario, status="RUNNING")
+        # A parent ticket owned by `owner` (NOT the admin) to prove cross-user reach.
+        self.ticket, _ = ensure_scenario_ticket(self.owner, self.scenario, session=self.session)
+
+        self.client = APIClient()
+        self.client.force_authenticate(self.admin)
+
+    # ── auth gating ──
+    def test_list_requires_staff(self):
+        from rest_framework.test import APIClient
+
+        anon = APIClient()
+        self.assertEqual(anon.get("/api/admin/itsm/tickets/").status_code, 401)
+
+        non_admin = APIClient()
+        non_admin.force_authenticate(self.owner)
+        self.assertEqual(non_admin.get("/api/admin/itsm/tickets/").status_code, 403)
+
+        # The owning (non-staff) user cannot reach the admin action endpoint either.
+        forbidden = non_admin.post(
+            f"/api/admin/itsm/tickets/{self.ticket.id}/action/",
+            {"action": "transition", "state": "in_progress"}, format="json",
+        )
+        self.assertEqual(forbidden.status_code, 403)
+
+    # ── cross-user visibility ──
+    def test_admin_lists_other_users_tickets(self):
+        res = self.client.get("/api/admin/itsm/tickets/")
+        self.assertEqual(res.status_code, 200)
+        numbers = [t["number"] for t in res.data["tickets"]]
+        self.assertIn(self.ticket.number, numbers)
+        self.assertEqual(res.data["total"], 1)
+        self.assertEqual(res.data["open_count"], 1)
+        # The owning user is surfaced so the admin knows whose ticket it is.
+        row = next(t for t in res.data["tickets"] if t["number"] == self.ticket.number)
+        self.assertEqual(row["user"]["username"], "owner")
+
+    def test_admin_filters_by_state(self):
+        # The seeded ticket is New; filtering to closed yields nothing, open yields it.
+        closed = self.client.get("/api/admin/itsm/tickets/?status=closed")
+        self.assertEqual(len(closed.data["tickets"]), 0)
+        open_only = self.client.get("/api/admin/itsm/tickets/?status=open")
+        self.assertEqual(len(open_only.data["tickets"]), 1)
+
+    def test_admin_opens_other_users_ticket_detail(self):
+        res = self.client.get(f"/api/admin/itsm/tickets/{self.ticket.id}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["number"], self.ticket.number)
+        self.assertIn("notes", res.data)  # full activity stream included
+        self.assertEqual(res.data["user"]["email"], "owner@t.com")
+
+    # ── admin action reuses the service layer ──
+    def test_admin_transition_action_changes_state_and_records_admin_note(self):
+        res = self.client.post(
+            f"/api/admin/itsm/tickets/{self.ticket.id}/action/",
+            {"action": "transition", "state": C.STATE_IN_PROGRESS}, format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["state"], C.STATE_IN_PROGRESS)
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.state, C.STATE_IN_PROGRESS)
+        # The state-change note is attributed to the acting admin (not the owner).
+        note = ItsmWorkNote.objects.filter(
+            ticket=self.ticket, kind=ItsmWorkNote.KIND_STATE, author="admin",
+        ).first()
+        self.assertIsNotNone(note)
+        self.assertEqual(note.author_user_id, self.admin.id)
+
+    def test_admin_illegal_transition_rejected(self):
+        # New → Closed directly is illegal (same matrix the user endpoint enforces).
+        bad = self.client.post(
+            f"/api/admin/itsm/tickets/{self.ticket.id}/action/",
+            {"action": "transition", "state": C.STATE_CLOSED}, format="json",
+        )
+        self.assertEqual(bad.status_code, 400)
+
+    def test_admin_transfer_action(self):
+        res = self.client.post(
+            f"/api/admin/itsm/tickets/{self.ticket.id}/action/",
+            {"action": "transfer", "team": C.TEAM_STORAGE, "reason": "needs a disk"}, format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["assignment_group"], C.TEAM_STORAGE)
+
+    def test_admin_raise_subticket_action(self):
+        from apps.labs.provisioner.simulation import vmware_bridge as br
+
+        res = self.client.post(
+            f"/api/admin/itsm/tickets/{self.ticket.id}/action/",
+            {"action": "sub_ticket", "action_kind": "add_disk", "action_params": {"size_gb": 50}},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data["sub_ticket"]["state"], C.STATE_RESOLVED)
+        self.assertTrue(br.has_pending_disk(str(self.session.id)))
+        self.assertEqual(len(res.data["ticket"]["children"]), 1)
+
+    def test_admin_meta_endpoint(self):
+        res = self.client.get("/api/admin/itsm/meta/")
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(any(t["value"] == "storage" for t in res.data["teams"]))
+        self.assertEqual(res.data["total_tickets"], 1)

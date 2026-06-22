@@ -558,11 +558,25 @@ class _FakeAPI:
         return True
 
 
+class _FakeImages:
+    """Pretend the sandbox base image is already present so _ensure_image() is a no-op."""
+    def __init__(self, holder):
+        self._holder = holder
+
+    def get(self, image):
+        return {"image": image}
+
+    def pull(self, image):  # pragma: no cover - only reached if get() fails
+        self._holder["pulled"] = image
+        return {"image": image}
+
+
 class _FakeDockerClient:
     def __init__(self, holder):
         self._holder = holder
         self.containers = _FakeContainers(holder)
         self.api = _FakeAPI(holder)
+        self.images = _FakeImages(holder)
 
     def ping(self):
         return True
@@ -625,17 +639,18 @@ class DockerSandboxBackendTests(TestCase):
         self.assertFalse(res.all_passed)
         self.assertTrue(res.ran)  # it ran, it just didn't pass
 
-    def test_falls_back_to_in_process_when_engine_unreachable(self):
+    def test_fails_closed_when_engine_unreachable(self):
         from apps.labs import sandbox_runner
         tests = [{"name": "adds", "code": "assert add(2, 3) == 5", "hidden": True}]
-        # Engine enabled but unreachable -> docker_runtime_available() False ->
-        # grade still succeeds via the in-process fallback (no auto-fail on infra).
+        # SECURITY_AUDIT S-01: sandbox ENABLED but unreachable must NOT silently
+        # run user code in-process on the host. It fails closed to needs_review.
         with mock.patch.object(sandbox_runner, "_get_client", return_value=None):
             res = grade_submission("python", "def add(a,b): return a+b", tests)
-        self.assertTrue(res.all_passed)
+        self.assertFalse(res.all_passed)
+        self.assertTrue(res.needs_review)
         self.assertNotIn("container", self.holder)  # never created one
 
-    def test_sandbox_unavailable_mid_run_falls_back(self):
+    def test_fails_closed_when_sandbox_unavailable_mid_run(self):
         from apps.labs import sandbox_runner
         tests = [{"name": "adds", "code": "assert add(2, 3) == 5", "hidden": True}]
 
@@ -648,8 +663,9 @@ class DockerSandboxBackendTests(TestCase):
         client.containers.create = _boom
         with mock.patch.object(sandbox_runner, "_get_client", return_value=client):
             res = grade_submission("python", "def add(a,b): return a+b", tests)
-        # Falls back to in-process and still grades correctly.
-        self.assertTrue(res.all_passed)
+        # SECURITY_AUDIT S-01: must fail closed, NOT fall back to in-process.
+        self.assertFalse(res.all_passed)
+        self.assertTrue(res.needs_review)
 
     @override_settings(SANDBOX_DOCKER=False)
     def test_disabled_never_touches_docker(self):

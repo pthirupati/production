@@ -31,6 +31,12 @@ services:
       TERMINAL_MAX_WS_PER_USER: ${TERMINAL_MAX_WS_PER_USER:-20}
       # Remote lab Docker engine on D4 (set by ci-wire-cluster-env.py)
       DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
+      # Identify this node to the fleet monitor so it attaches its live host
+      # metrics to the right card, and reads its own system containers from the
+      # LOCAL daemon (mounted below) rather than the remote labs engine.
+      CLUSTER_ROLE: ${CLUSTER_ROLE:-app}
+      MONITORING_NODE_NAME: ${MONITORING_NODE_NAME:-app}
+      MONITORING_LOCAL_DOCKER_SOCKET: unix:///var/run/docker.sock
     ports:
       # Gateway on D1 proxies here over the VPC; firewall limits source to D1
       - "8000:8000"
@@ -41,6 +47,10 @@ services:
       - ./deploy/labs_ssh:/root/.ssh:ro
       - ./scripts:/scripts
       - ./scenarios:/scenarios:ro
+      # Local D2 Docker socket — lets admin monitoring enumerate THIS node's own
+      # system containers (backend / celery) even though DOCKER_HOST points at
+      # the remote labs engine. Read-only.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - fixitlab_net
     healthcheck:

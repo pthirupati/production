@@ -42,31 +42,50 @@ function formatUptime(startedAt) {
 // ─── Container card (grid view) ───────────────────────────────────────────────
 
 function ContainerCard({ c, selected, onSelect }) {
+  // A container can live on a different cluster node (status/location "remote"):
+  // its Docker engine is not reachable from here, so it is shown for context but
+  // is NOT clickable for logs/metrics. "missing"/"unknown" are likewise neutral.
+  const isRemote = c.location === 'remote' || c.status === 'remote'
+  const isMissing = c.status === 'missing'
+  const isNeutral = isRemote || isMissing || c.status === 'unknown'
   const isUp = c.status === 'running'
   const isDegraded = isUp && c.health && c.health !== 'healthy' && c.health !== 'none'
-  const isUnhealthy = !isUp
+  const isUnhealthy = !isUp && !isNeutral
   const Icon = containerIcon(c.name)
+  const clickable = !isRemote && !isMissing
 
-  const cardBase = 'relative rounded-xl border p-3.5 cursor-pointer transition-all group'
-  const cardColor = isUnhealthy
+  const cardBase = `relative rounded-xl border p-3.5 transition-all group ${clickable ? 'cursor-pointer' : 'cursor-default'}`
+  const cardColor = isNeutral
+    ? 'border-surface-700/50 bg-surface-800/30'
+    : isUnhealthy
     ? 'border-accent-red/25 bg-accent-red/5 shadow-[0_0_16px_rgba(248,113,113,0.10)]'
     : isDegraded
     ? 'border-accent-amber/25 bg-accent-amber/5'
     : 'border-accent-green/15 bg-accent-green/5 shadow-[0_0_14px_rgba(52,211,153,0.06)]'
   const isSelected = selected?.id === c.id
 
-  const dotColor = isUnhealthy
+  const dotColor = isNeutral
+    ? 'bg-surface-500'
+    : isUnhealthy
     ? 'bg-accent-red animate-pulse'
     : isDegraded
     ? 'bg-accent-amber animate-pulse'
     : 'bg-accent-green animate-pulse'
-  const textColor = isUnhealthy ? 'text-accent-red' : isDegraded ? 'text-accent-amber' : 'text-accent-green'
+  const textColor = isNeutral ? 'text-surface-400' : isUnhealthy ? 'text-accent-red' : isDegraded ? 'text-accent-amber' : 'text-accent-green'
 
   // Status badge
-  const badgeText = isUnhealthy
+  const badgeText = isRemote
+    ? 'on other node'
+    : isMissing
+    ? 'missing'
+    : c.status === 'unknown'
+    ? 'unknown'
+    : isUnhealthy
     ? (c.health === 'unhealthy' ? 'unhealthy' : c.status)
     : isDegraded ? c.health : 'healthy'
-  const badgeClass = isUnhealthy
+  const badgeClass = isNeutral
+    ? 'bg-surface-700/40 text-surface-300 border-surface-600/40'
+    : isUnhealthy
     ? 'bg-accent-red/15 text-accent-red border-accent-red/20'
     : isDegraded
     ? 'bg-accent-amber/15 text-accent-amber border-accent-amber/20'
@@ -75,8 +94,10 @@ function ContainerCard({ c, selected, onSelect }) {
   return (
     <button
       type="button"
-      onClick={() => onSelect(c)}
-      className={`${cardBase} ${cardColor} ${isSelected ? 'ring-2 ring-accent-cyan/50' : 'hover:ring-1 hover:ring-white/10'}`}
+      onClick={clickable ? () => onSelect(c) : undefined}
+      disabled={!clickable}
+      title={isRemote ? `Runs on ${c.node_name || 'another node'} — not reachable from this Docker engine` : undefined}
+      className={`${cardBase} ${cardColor} ${isSelected ? 'ring-2 ring-accent-cyan/50' : clickable ? 'hover:ring-1 hover:ring-white/10' : ''}`}
     >
       {/* Header row */}
       <div className="flex items-start justify-between gap-2 mb-2.5">
@@ -104,6 +125,9 @@ function ContainerCard({ c, selected, onSelect }) {
         <span className={`text-[10px] font-bold uppercase ${c.kind === 'system' ? 'text-accent-purple' : 'text-accent-cyan'}`}>
           {c.kind}
         </span>
+        {isRemote && c.node_name && (
+          <span className="text-[10px] text-surface-500 truncate">· {c.node_name}</span>
+        )}
       </div>
 
       {/* Info rows */}

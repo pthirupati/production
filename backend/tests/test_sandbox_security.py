@@ -143,3 +143,145 @@ class AdminIpFailClosedTests(TestCase):
         resp = self.mw.process_request(self._admin_request("198.51.100.7"))
         self.assertIsNotNone(resp)
         self.assertEqual(resp.status_code, 403)
+
+
+class AdminIpFailClosedDefaultTests(TestCase):
+    """SECURITY_AUDIT I-04: admin fails CLOSED by default in production, but
+    loopback / in-container callers (health checks, server-side E2E) are always
+    allowed so the green pipeline is unaffected."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.mw = AdminIPRestrictionMiddleware(_noop_get_response)
+
+    def _admin_request(self, *, remote_addr, xff=None):
+        extra = {"REMOTE_ADDR": remote_addr}
+        if xff is not None:
+            extra["HTTP_X_FORWARDED_FOR"] = xff
+        request = self.factory.get("/api/admin/overview/", **extra)
+        # Mimic RequestMetadataMiddleware having populated client_ip.
+        from common.middleware_security import client_ip_from_request
+        request.client_ip = client_ip_from_request(request)
+        return request
+
+    @override_settings(DEBUG=False, ADMIN_ALLOWED_IPS=[],
+                       ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=True)
+    def test_remote_ip_denied_by_default_in_prod(self):
+        # External client (through gateway): XFF right-most is the real peer.
+        resp = self.mw.process_request(
+            self._admin_request(remote_addr="172.18.0.5", xff="203.0.113.9")
+        )
+        self.assertIsNotNone(resp)
+        self.assertEqual(resp.status_code, 403)
+
+    @override_settings(DEBUG=False, ADMIN_ALLOWED_IPS=[],
+                       ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=True)
+    def test_loopback_allowed_when_fail_closed(self):
+        # In-container E2E / health check: no XFF, REMOTE_ADDR is loopback.
+        self.assertIsNone(
+            self.mw.process_request(self._admin_request(remote_addr="127.0.0.1"))
+        )
+
+    @override_settings(DEBUG=False, ADMIN_ALLOWED_IPS=["203.0.113.9"])
+    def test_loopback_allowed_even_with_allowlist(self):
+        self.assertIsNone(
+            self.mw.process_request(self._admin_request(remote_addr="127.0.0.1"))
+        )
+
+
+class XffClientIpTests(TestCase):
+    """SECURITY_AUDIT A-01: client IP comes from the right-most trusted-proxy
+    hop, not the spoofable left-most X-Forwarded-For entry."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def _ip(self, *, remote_addr="172.18.0.5", xff=None, hops=1):
+        from common.middleware_security import client_ip_from_request
+        extra = {"REMOTE_ADDR": remote_addr}
+        if xff is not None:
+            extra["HTTP_X_FORWARDED_FOR"] = xff
+        request = self.factory.get("/api/whatever/", **extra)
+        with override_settings(GATEWAY_PROXY_HOPS=hops):
+            return client_ip_from_request(request)
+
+    def test_spoofed_left_xff_is_ignored(self):
+        # Attacker sends "1.2.3.4"; nginx appends the real peer "203.0.113.9".
+        # We must return the REAL peer (right-most), not the spoof.
+        ip = self._ip(xff="1.2.3.4, 203.0.113.9")
+        self.assertEqual(ip, "203.0.113.9")
+        self.assertNotEqual(ip, "1.2.3.4")
+
+    def test_single_hop_takes_only_xff_value(self):
+        ip = self._ip(xff="203.0.113.9")
+        self.assertEqual(ip, "203.0.113.9")
+
+    def test_no_xff_falls_back_to_remote_addr(self):
+        ip = self._ip(remote_addr="127.0.0.1", xff=None)
+        self.assertEqual(ip, "127.0.0.1")
+
+    def test_multiple_trusted_hops(self):
+        # Two trusted proxies: real client is 2 from the right.
+        ip = self._ip(xff="9.9.9.9, 203.0.113.9, 172.18.0.2", hops=2)
+        self.assertEqual(ip, "203.0.113.9")
+
+    def test_request_metadata_middleware_sets_unspoofable_ip(self):
+        from common.middleware_security import RequestMetadataMiddleware
+        mw = RequestMetadataMiddleware(_noop_get_response)
+        request = self.factory.get(
+            "/api/x/", HTTP_X_FORWARDED_FOR="1.2.3.4, 203.0.113.9",
+            REMOTE_ADDR="172.18.0.5",
+        )
+        with override_settings(GATEWAY_PROXY_HOPS=1):
+            mw.process_request(request)
+        self.assertEqual(request.client_ip, "203.0.113.9")
+
+
+class CodeExecFailClosedTests(TestCase):
+    """SECURITY_AUDIT S-01: the grader never runs untrusted user code in-process
+    on the host in production — it fails closed to needs_review when the
+    container sandbox is unavailable."""
+
+    def _python_tests(self):
+        return [{"name": "t", "code": "assert add(2, 3) == 5", "hidden": False}]
+
+    @override_settings(SANDBOX_DOCKER=False)
+    def test_inprocess_allowed_when_sandbox_disabled(self):
+        # Dev/CI (sandbox off): in-process grading works (no Docker engine needed).
+        from apps.labs import code_exec
+        result = code_exec.grade_submission(
+            "python", "def add(a, b):\n    return a + b\n", self._python_tests(),
+        )
+        self.assertTrue(result.ran)
+        self.assertTrue(result.all_passed)
+
+    @override_settings(DEBUG=False, SANDBOX_DOCKER=True)
+    def test_prod_without_container_fails_closed_to_review(self):
+        # Production with no reachable container engine: must NOT execute on the
+        # host. grade_submission returns needs_review, never a pass.
+        from apps.labs import code_exec, sandbox_runner
+        orig = sandbox_runner.docker_runtime_available
+        sandbox_runner.docker_runtime_available = lambda *a, **k: False
+        try:
+            result = code_exec.grade_submission(
+                "python", "def add(a, b):\n    return a + b\n", self._python_tests(),
+            )
+        finally:
+            sandbox_runner.docker_runtime_available = orig
+        self.assertFalse(result.all_passed)
+        self.assertTrue(result.needs_review)
+        self.assertFalse(result.ran)
+
+    @override_settings(DEBUG=False, SANDBOX_DOCKER=True)
+    def test_execute_raises_forbidden_in_prod_without_container(self):
+        from apps.labs import code_exec, sandbox_runner
+        orig = sandbox_runner.docker_runtime_available
+        sandbox_runner.docker_runtime_available = lambda *a, **k: False
+        try:
+            with self.assertRaises(code_exec.InProcessExecutionForbidden):
+                code_exec._execute(
+                    "python", "print('x')", "_runner.py",
+                    ["python3", "-c", "pass"], "/tmp", 5, limit_address_space=True,
+                )
+        finally:
+            sandbox_runner.docker_runtime_available = orig

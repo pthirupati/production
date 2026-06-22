@@ -3,19 +3,31 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# --- Real environment / secret files (NEVER commit) ---
 .env
-.env.production
-.env.local
-.env.test
+.env.*
+*.env
+!*.env.example
+!env.production.example
+# Generated/rotated cluster env produced by ci-generate-secrets.py
+.env.cluster
+env.production
 deploy/production.env
 deploy/vault-init.json
 deploy/vault-approle.env
+deploy/labs_ssh/
+deploy/*.env
 env
 venv/
 .venv/
 node_modules/
 frontend/dist/
 *.pem
+*.key
+
+# --- Private owner/startup documentation (confidential — NEVER commit) ---
+docs/private/
 
 # Claude Code local session data & worktrees
 .claude/

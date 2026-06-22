@@ -43,9 +43,25 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // ── 401 Unauthorized — attempt token refresh ──
     const original = error.config
-    if (error.response.status === 401 && !original._retry) {
+    const path = original?.url || ''
+    const isAuthRequest = /\/auth\//.test(path)
+    // The login/refresh endpoints themselves must never trigger the
+    // refresh-and-retry dance (that would loop) — the page renders its own error.
+    const isAuthEndpoint = /\/auth\/(login|refresh|register|social|verify-otp|send-otp)/.test(path)
+    const isSilent = original?.silentError === true
+
+    const redirectToLogin = (message) => {
+      useAuthStore.getState().logout()
+      if (message) toast.error(message, { id: 'session-expired', duration: 6000 })
+      // Avoid a redirect loop if we're already on an auth page.
+      if (!/^\/(login|register|reset-password|forgot-password)/.test(window.location.pathname)) {
+        window.location.href = '/login'
+      }
+    }
+
+    // ── 401 Unauthorized — attempt token refresh, then surface an accurate message ──
+    if (error.response.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true
       const { refreshToken, isAuthenticated } = useAuthStore.getState()
       // Attempt refresh if we have either a stored refresh token (legacy) or
@@ -69,15 +85,16 @@ api.interceptors.response.use(
           }
           return api(original)
         } catch {
-          useAuthStore.getState().logout()
-          window.location.href = '/login'
+          // Refresh failed — the session is genuinely over (expired or revoked).
+          // Show a clear, non-scary message and send the user to log in again,
+          // rather than a generic "server error" popup.
+          redirectToLogin('Your session has expired. Please sign in again.')
         }
       }
     }
 
-    // ── 429 Rate limited ──
-    if (error.response.status === 429) {
-      const path = original?.url || ''
+    // ── 429 Rate limited (skip auth forms — they render their own inline error) ──
+    if (error.response.status === 429 && !isAuthRequest) {
       const isLabStart = /\/labs\/\d+\/start\//.test(path)
       const retryAfter = error.response.headers?.['retry-after']
       const msg = isLabStart
@@ -89,9 +106,6 @@ api.interceptors.response.use(
     }
 
     // 500+ Server error (skip auth forms and silent bootstrap requests)
-    const path = original?.url || ''
-    const isAuthRequest = /\/auth\//.test(path)
-    const isSilent = original?.silentError === true
     if (error.response.status >= 500 && !isAuthRequest && !isSilent) {
       const data = error.response.data
       const msg = data?.error || data?.detail || data?.message || 'Server error. Please try again later.'

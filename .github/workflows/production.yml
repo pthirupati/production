@@ -122,18 +122,23 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────────────────────
-  # BUILD-PUSH-IMAGES — Docker Hub image pipeline (P5, ADDITIVE + GATED)
+  # BUILD-PUSH-IMAGES — Docker Hub image pipeline (P5/P8, ADDITIVE + GATED)
   #
-  # GATE:  vars.USE_DOCKERHUB == 'true'   (a repo/environment *variable*, not a
-  #        secret — visible in Settings → Variables, matches the existing
-  #        vars.DO_REGION / vars.DO_SIZE pattern). When this variable is unset or
-  #        anything other than 'true', THIS JOB IS SKIPPED and NOTHING downstream
-  #        changes — the pipeline builds images on-node exactly as before.
+  # GATE:  inputs.hosting_target == 'doks' || inputs.hosting_target == 'eks'
+  #        (a managed-Kubernetes target is selected) AND vars.USE_DOCKERHUB == 'true'
+  #        (credentials guard — the repo/environment *variable* that signals Docker
+  #        Hub is configured, matching the existing vars.DO_REGION / vars.DO_SIZE
+  #        pattern). Docker Hub is now ONLY for Kubernetes: k8s pulls images and
+  #        cannot build on-node, so doks/eks need pushed images. The droplet AND the
+  #        four-droplet cluster paths NEVER push or pull Docker Hub — they build
+  #        locally on the server exactly as before. With the default hosting_target
+  #        = droplets, THIS JOB IS SKIPPED and NOTHING downstream changes.
   #
   # When ON, this job builds the three images from the SAME Dockerfiles the compose
   # files use (backend/Dockerfile, frontend/Dockerfile.prod, gateway/Dockerfile.prod),
   # tags each <ns>/fixitlab-{backend,frontend,gateway}:<git-sha> + :latest, and pushes
-  # to Docker Hub. Runs early (no `needs`) so images exist before deploy pulls them.
+  # to Docker Hub. STANDALONE — nothing `needs` it (transitive-skip safety); the
+  # DOKS/EKS scaffold jobs reference the pushed tag opportunistically.
   #
   # Secrets/vars used:
   #   secrets.DOCKERHUB_USERNAME  — Docker Hub user (login)
@@ -144,7 +149,11 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   build-push-images:
     name: Build and push images (Docker Hub)
-    if: vars.USE_DOCKERHUB == 'true'
+    # Docker Hub push is ONLY for managed Kubernetes (doks/eks). Droplet + cluster
+    # paths build on-node, so this job stays skipped for the green droplet default.
+    if: |
+      (inputs.hosting_target == 'doks' || inputs.hosting_target == 'eks') &&
+      vars.USE_DOCKERHUB == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     outputs:
@@ -233,7 +242,7 @@ jobs:
             echo ""
             echo "| | |"
             echo "|---|---|"
-            echo "| Gate (vars.USE_DOCKERHUB) | \`true\` |"
+            echo "| Gate (hosting_target k8s + USE_DOCKERHUB) | \`${{ inputs.hosting_target }}\` |"
             echo "| Pushed | \`${{ steps.meta.outputs.pushed }}\` |"
             echo "| Namespace | \`${{ steps.meta.outputs.namespace }}\` |"
             echo "| Tag | \`${{ steps.meta.outputs.image_tag }}\` |"
@@ -444,13 +453,13 @@ jobs:
           VAULT_UNSEAL_KEY: ${{ secrets.VAULT_UNSEAL_KEY }}
           VAULT_ROLE_ID: ${{ secrets.VAULT_ROLE_ID }}
           VAULT_SECRET_ID: ${{ secrets.VAULT_SECRET_ID }}
-          # Docker Hub image pipeline (GATED), decoupled from the build-push-images
-          # job (no `needs` — avoids transitive skip). Derived from the repo Variable
-          # + commit SHA; all empty when USE_DOCKERHUB unset, so ci-remote-platform.sh
-          # does NOT export them and the node builds on-node exactly as before.
-          IMAGE_TAG: ${{ vars.USE_DOCKERHUB == 'true' && github.sha || '' }}
-          FIXITLAB_IMAGE_NS: ${{ vars.USE_DOCKERHUB == 'true' && (vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME) || '' }}
-          PULL_IMAGES: ${{ vars.USE_DOCKERHUB == 'true' && '1' || '' }}
+          # Docker Hub is ONLY for managed Kubernetes (doks/eks). A DROPLET deploy
+          # NEVER pulls Docker Hub — it builds on-node exactly as before. So these
+          # are always empty here regardless of USE_DOCKERHUB: PULL_IMAGES stays
+          # false → ci-remote-platform.sh does NOT export them → on-node build.
+          IMAGE_TAG: ""
+          FIXITLAB_IMAGE_NS: ""
+          PULL_IMAGES: ""
         with:
           host: ${{ steps.host.outputs.host }}
           username: ${{ secrets.PROD_USER }}
@@ -799,7 +808,12 @@ jobs:
           command_timeout: 10m
           script: |
             cd /opt/fixitlab
+            # Pass SUPERUSER_EMAIL (read from .env.production like the E2E steps) so
+            # cleanup-test-data.py always has PROTECTED_EMAIL set — the admin account
+            # is never a deletion candidate even if its name looks test-like.
+            ADMIN_EMAIL="$(grep '^SUPERUSER_EMAIL=' .env.production | head -1 | cut -d= -f2- | tr -d '\r')"
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              env SUPERUSER_EMAIL="$ADMIN_EMAIL" \
               python /scripts/cleanup-test-data.py || echo "WARN: cleanup completed with warnings"
 
       - name: Restore JWT session enforcement
@@ -883,11 +897,11 @@ jobs:
 
   create-cluster:
     name: "[4D] Create cluster"
-    # NOTE: build-push-images is a standalone job (gated on USE_DOCKERHUB) that
-    # NOTHING in the critical chain `needs` — a skipped job propagates its skip
-    # transitively to dependents that lack always() (it cascaded to bootstrap),
-    # so the deploy reads the pushed tag opportunistically (IMAGE_TAG=github.sha)
-    # instead of depending on the build job. Original gating restored.
+    # NOTE: build-push-images is a standalone job (now gated on a managed-Kubernetes
+    # hosting_target + USE_DOCKERHUB) that NOTHING in the four-droplet chain `needs`
+    # — a skipped job propagates its skip transitively to dependents that lack
+    # always() (it once cascaded to bootstrap). The cluster builds images on-node and
+    # never pulls Docker Hub, so it does not depend on the build job at all.
     if: |
       (inputs.action == 'launch' || inputs.action == 'deploy') &&
       inputs.topology == 'four-droplet'
@@ -940,17 +954,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN || github.token }}
         run: |
           # Cluster jobs read droplet IPs from JOB OUTPUTS (not secrets), so the
-          # deploy does NOT require writing Environment secrets. Writing them only
-          # PERSISTS the rotated secrets for future runs + lets the credentials
-          # email reflect freshly-rotated values. If the token can't write them,
-          # warn and continue — the cluster still deploys using the existing
-          # PRODUCTION_ENV_B64. (Fix: a classic 'repo'-scoped PAT as GH_ADMIN_TOKEN.)
+          # deploy does NOT require writing Environment secrets. And rotated secrets
+          # are now PERSISTED TO VAULT (secret/fixitlab/env, by the vault-cluster job)
+          # as the cross-deploy source of truth — every later deploy overlays them, so
+          # the rotated admin password survives WITHOUT writing the GitHub secret. The
+          # GitHub PRODUCTION_ENV_B64 write-back is therefore OPTIONAL (nice-to-have for
+          # keeping the GitHub secret fresh), not required for login persistence.
           if gh api "repos/${{ github.repository }}/environments/production/secrets/public-key" >/dev/null 2>&1; then
             echo "secret_write=1" >> "$GITHUB_OUTPUT"
-            echo "Environment secret-write OK — rotated secrets will be persisted."
+            echo "Environment secret-write OK — rotated secrets will also be persisted to the GitHub secret."
           else
             echo "secret_write=0" >> "$GITHUB_OUTPUT"
-            echo "::warning::GH_ADMIN_TOKEN cannot write Environment secrets (HTTP 403). The cluster will still deploy with the existing PRODUCTION_ENV_B64, but rotated secrets will NOT be persisted to GitHub. To enable rotation persistence, set GH_ADMIN_TOKEN to a classic PAT with the 'repo' scope."
+            # NOT a ::warning:: — this is expected without a classic PAT and is no
+            # longer login-critical now that Vault persists rotated secrets. Stated
+            # plainly so the run summary stays green/non-alarming.
+            echo "::notice::GH_ADMIN_TOKEN cannot write the GitHub Environment secret (HTTP 403) — expected without a classic 'repo'-scoped PAT. This is NOT login-critical: rotated secrets are persisted to Vault (secret/fixitlab/env) and overlaid on every deploy, so admin login persists. Optionally set GH_ADMIN_TOKEN to a classic PAT to also keep PRODUCTION_ENV_B64 in sync."
           fi
 
       # Droplets are created/discovered FIRST so the secret step below can decide
@@ -1010,20 +1028,11 @@ jobs:
             echo "DATA_PRIVATE_IP=${{ steps.create.outputs.db_private_ip }}"
             echo "LABS_PRIVATE_IP=${{ steps.create.outputs.labs_private_ip }}"
           } > _cluster/cluster_ips.env
-          # Docker Hub image pipeline (GATED, additive) — decoupled from the
-          # build-push-images job (no `needs`, so no transitive-skip cascade). The
-          # pull config is derived from the repo Variable + the commit SHA, both
-          # available everywhere. build-push-images runs in parallel from t=0 and
-          # finishes well before deploy. When USE_DOCKERHUB is unset, nothing is
-          # emitted and the cluster builds on-node exactly as before.
-          if [ "${{ vars.USE_DOCKERHUB }}" = "true" ]; then
-            {
-              echo "USE_DOCKERHUB=true"
-              echo "IMAGE_TAG=${{ github.sha }}"
-              echo "FIXITLAB_IMAGE_NS=${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}"
-            } >> _cluster/cluster_ips.env
-            echo "Docker Hub pipeline ON — cluster will pull pinned images"
-          fi
+          # Docker Hub is ONLY for managed Kubernetes (doks/eks). The four-droplet
+          # cluster is a DROPLET path and NEVER pulls Docker Hub — D1/D2 build their
+          # images on-node exactly as before. So we intentionally emit NO
+          # USE_DOCKERHUB/IMAGE_TAG/FIXITLAB_IMAGE_NS here: cluster_ips.env never
+          # carries pull config, and ci-cluster-deploy.sh leaves IMG_ENV empty.
           echo "wrote _cluster/cluster_ips.env ($(wc -l < _cluster/cluster_ips.env) lines)"
       - uses: actions/upload-artifact@v4
         with:
@@ -1176,6 +1185,10 @@ jobs:
     environment: production
     permissions:
       contents: read
+    outputs:
+      # REAL, independent Vault-persistence signal for the credentials email
+      # (ok|failed|skipped) — distinct from the GitHub-secret sync status.
+      vault_overlay_status: ${{ steps.vault.outputs.vault_overlay_status || 'skipped' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -1188,6 +1201,12 @@ jobs:
         id: vault
         env:
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          # When this run ROTATED secrets, also persist the rotated env into the
+          # stable Vault overlay path (secret/fixitlab/env) so the rotated admin
+          # password survives future deploys WITHOUT a GitHub PAT (the 403 fix).
+          # No rotation → PERSIST_OVERLAY=0 → overlay path untouched → green path
+          # byte-for-byte unchanged.
+          PERSIST_OVERLAY: ${{ needs.create-cluster.outputs.secrets_rotated == 'true' && '1' || '0' }}
         run: |
           chmod +x scripts/ci-vault-cluster-bootstrap.sh
           ./scripts/ci-vault-cluster-bootstrap.sh
@@ -1229,9 +1248,9 @@ jobs:
         env:
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
           # EDGE/APP/DATA/LABS_PRIVATE_IP come from cluster_ips.env via $GITHUB_ENV.
-          # USE_DOCKERHUB/IMAGE_TAG/FIXITLAB_IMAGE_NS ALSO arrive via cluster_ips.env →
-          # $GITHUB_ENV (only when the Docker Hub pipeline pushed); ci-cluster-deploy.sh
-          # reads them to make D1/D2 pull the pinned tag. Absent by default → on-node build.
+          # Docker Hub is ONLY for managed Kubernetes (doks/eks); the four-droplet
+          # cluster NEVER pulls — create-cluster emits no USE_DOCKERHUB/IMAGE_TAG into
+          # cluster_ips.env, so ci-cluster-deploy.sh leaves IMG_ENV empty → on-node build.
           BUILD_SCENARIOS: ${{ inputs.build_scenarios }}
         run: |
           chmod +x scripts/ci-cluster-deploy.sh
@@ -1249,7 +1268,7 @@ jobs:
 
   email-credentials:
     name: "[4D] Email credentials"
-    needs: [create-cluster, deploy-cluster]
+    needs: [create-cluster, vault-cluster, deploy-cluster]
     if: |
       always() &&
       inputs.topology == 'four-droplet' &&
@@ -1274,12 +1293,17 @@ jobs:
           UPDATED_SECRETS: ${{ needs.create-cluster.outputs.updated_secrets }}
           CREDENTIALS_EMAIL_REQUIRED: ${{ vars.CREDENTIALS_EMAIL_REQUIRED || '0' }}
           # Secret rotation + sync status → stated in the email body so the operator
-          # knows whether a manual GitHub-secret update is needed. GH and Vault
-          # AppRole secrets are written by the SAME token via ci-sync-droplet-secrets.sh,
-          # so their persistence succeeds/fails together → both mirror gh_sync_status.
+          # knows where the rotated secrets persisted. These are now TWO INDEPENDENT
+          # signals:
+          #   GH_SYNC_STATUS    — did the GitHub Environment secret write succeed?
+          #                       (optional now; 403 without a classic PAT is fine)
+          #   VAULT_SYNC_STATUS — did the rotated env persist to Vault secret/fixitlab/env?
+          #                       This is the REAL login-persistence signal (the
+          #                       cross-deploy source of truth), from the vault-cluster
+          #                       job's overlay outcome — NOT a mirror of GH anymore.
           SECRETS_ROTATED: ${{ needs.create-cluster.outputs.secrets_rotated == 'true' && '1' || '0' }}
           GH_SYNC_STATUS: ${{ needs.create-cluster.outputs.secrets_rotated == 'true' && needs.create-cluster.outputs.gh_sync_status || 'skipped' }}
-          VAULT_SYNC_STATUS: ${{ needs.create-cluster.outputs.secrets_rotated == 'true' && needs.create-cluster.outputs.gh_sync_status || 'skipped' }}
+          VAULT_SYNC_STATUS: ${{ needs.create-cluster.outputs.secrets_rotated == 'true' && (needs.vault-cluster.outputs.vault_overlay_status || 'failed') || 'skipped' }}
         run: |
           # Pull the (DO-token-free) .env.production from the edge node so the
           # attachment matches what is actually deployed; the script strips the
@@ -1534,7 +1558,12 @@ jobs:
           script: |
             ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@${APP_PRIVATE_IP}" '
               cd /opt/fixitlab
+              # Pass SUPERUSER_EMAIL (read from .env.production like the E2E steps) so
+              # cleanup-test-data.py always has PROTECTED_EMAIL set — the admin account
+              # is never a deletion candidate even if its name looks test-like.
+              ADMIN_EMAIL="$(grep "^SUPERUSER_EMAIL=" .env.production | head -1 | cut -d= -f2- | tr -d "\r")"
               docker compose -f docker-compose.app.yml --env-file .env.production exec -T backend \
+                env SUPERUSER_EMAIL="$ADMIN_EMAIL" \
                 python /scripts/cleanup-test-data.py || echo "WARN: cleanup warnings"
               chmod +x scripts/ci-e2e-session-mode.sh
               COMPOSE_FILE=docker-compose.app.yml ./scripts/ci-e2e-session-mode.sh restore || echo "WARN: could not restore JWT mode"

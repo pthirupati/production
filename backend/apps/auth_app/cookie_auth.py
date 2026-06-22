@@ -21,7 +21,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework.exceptions import AuthenticationFailed
 
-from common.security import SessionTracker
+from common.security import SessionTracker, session_enforcement_enabled
 
 # Methods that don't change state never need the CSRF header.
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
@@ -34,7 +34,10 @@ class CookieJWTAuthentication(JWTAuthentication):
     """Accept JWT from either Authorization header OR access_token cookie."""
 
     def _validate_active_session(self, user, validated_token):
-        if not getattr(settings, "JWT_SESSION_ENFORCEMENT", True):
+        # Runtime-aware: a cache override (set by CI/E2E) wins over the static
+        # setting, so enforcement can be toggled on the live backend WITHOUT a
+        # restart. Falls back to settings.JWT_SESSION_ENFORCEMENT on cache miss.
+        if not session_enforcement_enabled():
             return
         jti = validated_token.get("jti") if hasattr(validated_token, "get") else None
         if jti and not SessionTracker.is_session_valid(user.id, jti):

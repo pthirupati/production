@@ -354,6 +354,38 @@ def _parse_verdict(stdout: str) -> dict | None:
 
 # ── execution backend dispatch ──────────────────────────────────────────────
 
+class InProcessExecutionForbidden(RuntimeError):
+    """Raised when in-process grading is refused (production fail-closed).
+
+    SECURITY_AUDIT S-01: in production we must never execute untrusted user code
+    in the backend process (the container bind-mounts the Docker socket; an
+    in-process escape could reach the daemon → host root). When the container
+    sandbox is enabled but unavailable, we refuse rather than fall back, and
+    ``grade_submission`` turns this into a ``needs_review`` verdict.
+    """
+
+
+def _inprocess_grading_allowed() -> bool:
+    """Whether running user code in THIS process is permitted.
+
+    The signal is ``SANDBOX_DOCKER``: when the operator has turned the container
+    sandbox ON (production default — see settings.SANDBOX_DOCKER, which defaults
+    True when DEBUG is False), in-process grading is a host-isolation hole and is
+    FORBIDDEN — grading must use the container or fail closed. When the sandbox is
+    OFF (dev/CI, and Django's test runner which forces DEBUG=False), the
+    in-process rlimit subprocess is the accepted backend so grading works without
+    a Docker engine.
+
+    We key on SANDBOX_DOCKER rather than DEBUG because Django's test runner sets
+    ``settings.DEBUG = False`` for every test; keying on DEBUG would forbid
+    in-process grading during the test suite (and the green pipeline) even though
+    no container engine is present there. SANDBOX_DOCKER is the operator's
+    explicit "I have a sandbox, use it" switch and stays False in dev/CI/tests.
+    """
+    from django.conf import settings
+    return not bool(getattr(settings, "SANDBOX_DOCKER", False))
+
+
 def _execute(
     language: str,
     harness_source: str,
@@ -367,17 +399,25 @@ def _execute(
     """Run the harness via the best available backend.
 
     Returns (returncode, stdout, stderr, timed_out). Prefers the isolated
-    Docker container (network-less, read-only, non-root — SECURITY_AUDIT C-01)
-    when SANDBOX_DOCKER is on and the engine is reachable; otherwise runs the
-    in-process subprocess fallback. A container failure (SandboxUnavailable)
-    degrades to the in-process path so a transient engine issue never breaks
-    grading. The fail-closed pass logic in grade_submission is unchanged.
+    Docker container (network-less, read-only, non-root — SECURITY_AUDIT C-01/
+    S-01) when SANDBOX_DOCKER is on and the engine is reachable.
+
+    SECURITY_AUDIT S-01 — FAIL CLOSED in production. If the container backend is
+    unavailable we fall back to the in-process subprocess ONLY in dev/CI
+    (DEBUG=True). In production we refuse: running untrusted user code in the
+    backend process — which bind-mounts the Docker socket for trusted monitoring
+    — could let a sandbox escape reach the daemon and root the host. Instead we
+    raise ``InProcessExecutionForbidden`` and ``grade_submission`` returns a safe
+    ``needs_review`` verdict (never a silent on-host execution, never an
+    auto-pass).
     """
     try:
         from apps.labs import sandbox_runner
         use_container = sandbox_runner.docker_runtime_available()
+        sandbox_enabled = sandbox_runner.docker_sandbox_enabled()
     except Exception:  # pragma: no cover - settings/SDK issue
         use_container = False
+        sandbox_enabled = False
 
     if use_container:
         try:
@@ -386,14 +426,24 @@ def _execute(
             )
         except sandbox_runner.SandboxUnavailable as exc:
             logger.warning(
-                "code_exec: container sandbox unavailable (%s); "
-                "falling back to in-process grader.", exc,
+                "code_exec: container sandbox unavailable (%s).", exc,
             )
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning(
-                "code_exec: container sandbox raised %r; "
-                "falling back to in-process grader.", exc,
+                "code_exec: container sandbox raised %r.", exc,
             )
+
+    # Container backend not used or it failed. Decide whether the in-process
+    # fallback is permitted.
+    if not _inprocess_grading_allowed():
+        logger.error(
+            "code_exec: refusing in-process grading in production "
+            "(SANDBOX_DOCKER=%s, container reachable=%s). Failing closed.",
+            sandbox_enabled, use_container,
+        )
+        raise InProcessExecutionForbidden(
+            "container sandbox required in production; in-process grading refused"
+        )
 
     return _run_program(
         argv, workdir, timeout, limit_address_space=limit_address_space,
@@ -469,10 +519,21 @@ def grade_submission(
         # (sized for CPython) would make it abort on Linux. Skip the AS limit for
         # node in the in-process path; --max-old-space-size + RLIMIT_CPU + the
         # timeout still bound it.
-        rc, stdout, stderr, timed_out = _execute(
-            lang, harness, script_name, argv, workdir, timeout,
-            limit_address_space=(lang != "javascript"),
-        )
+        try:
+            rc, stdout, stderr, timed_out = _execute(
+                lang, harness, script_name, argv, workdir, timeout,
+                limit_address_space=(lang != "javascript"),
+            )
+        except InProcessExecutionForbidden as exc:
+            # SECURITY_AUDIT S-01: production has no usable container sandbox and
+            # in-process grading is forbidden. Fail closed: never auto-pass,
+            # never run on the host — route to manual review.
+            logger.error("code_exec: grading deferred to review (fail-closed): %s", exc)
+            return GradeResult(
+                ran=False, all_passed=False, needs_review=True,
+                error="Code grading is temporarily unavailable. Your submission was "
+                      "saved for review — it was not auto-graded.",
+            )
 
         if timed_out:
             return GradeResult(

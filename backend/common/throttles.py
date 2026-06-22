@@ -77,6 +77,20 @@ class LoginRateThrottle(SimpleRateThrottle):
         self.cache.set(key, history, self.duration)
 
 
+class TokenRefreshThrottle(AnonRateThrottle):
+    """Generous per-IP throttle for the token-refresh endpoint.
+
+    Refresh is high-frequency (every access-token lifetime, ~15 min) and critical:
+    a 429 here forces a logout. It is already gated by refresh-token validity
+    (you can't refresh without a valid, non-blacklisted refresh token), so it
+    needs only loose anti-abuse limiting, not the tight default anon/IP buckets
+    that a NAT'd group of users could otherwise exhaust. Keyed by IP via
+    AnonRateThrottle (a refresh request often has no usable access token, so the
+    user is anonymous to DRF).
+    """
+    scope = 'token_refresh'
+
+
 class OTPRateThrottle(AnonRateThrottle):
     scope = 'otp'
 

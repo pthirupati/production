@@ -219,17 +219,36 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
+    # Throttle rates — tuned for MANY concurrent users, including users sharing a
+    # single egress IP (corporate NAT / VPN / mobile carrier CGNAT). Key facts
+    # about DRF throttling that drive these numbers:
+    #   * AnonRateThrottle keys ONLY anonymous requests, by client IP.
+    #   * UserRateThrottle keys authenticated requests by USER pk (so logged-in
+    #     users are NEVER collectively throttled by IP), but falls back to IP for
+    #     anonymous requests — so anonymous users behind one NAT share BOTH the
+    #     `anon` and `user` IP buckets. The rates below are therefore generous
+    #     enough that a roomful of people behind one IP browsing public pages does
+    #     not trip a false 429.
+    #   * The post-deploy E2E hits the API from CI source IPs (distinct from real
+    #     users), so it consumes its OWN anon/IP buckets and cannot exhaust the
+    #     bucket a real user is on; authenticated E2E traffic is keyed per test
+    #     user. Either way real users are insulated.
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "2000/hour",  # SPA fires many /api calls per page-load; 300/hr tripped "too many requests" platform-wide
-        "user": "6000/hour",
-        "auth": "20/minute",  # auth endpoints (was 10 — too tight for normal retries)
-        "lab_start": "60/hour",  # Limit lab provisioning (DoS protection)
+        # Anonymous browsing of public pages fires many parallel reads per load.
+        # Per-IP, so this is the whole-office ceiling — keep it high.
+        "anon": "12000/hour",  # ~200/min per IP (was 2000/hr — NAT'd offices tripped 429)
+        # Per authenticated USER (not IP). A busy dashboard polls several
+        # endpoints; ~600/min headroom keeps real usage well clear of 429.
+        "user": "36000/hour",  # ~600/min per user (was 6000/hr)
+        "auth": "60/minute",  # register/social/OTP-resend per IP; was 20 — too tight behind NAT
+        "token_refresh": "600/minute",  # refresh is per-IP + high-frequency; a 429 here logs users out, so keep it loose (gated by refresh-token validity)
+        "lab_start": "60/hour",  # Limit lab provisioning (DoS protection) — per user
         "login": "10/minute",  # FAILED attempts per (IP+email); successes are never throttled
-        "otp": "5/minute",
+        "otp": "10/minute",  # was 5 — legitimate resends behind a shared IP
         "password_reset": "8/minute",  # allow a few retries (mistyped email) without "too many requests"
-        "payment": "20/hour",
-        "interview": "100/day",
-        "strict_anon": "60/minute",  # Public browsing needs headroom
+        "payment": "30/hour",  # per user
+        "interview": "200/day",  # per user — long practice sessions
+        "strict_anon": "240/minute",  # public browsing behind NAT needs real headroom (was 60)
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "NUM_PROXIES": 1,
@@ -483,10 +502,16 @@ DOCKER_CONTAINER_CPU_LIMIT = env.float("DOCKER_CONTAINER_CPU_LIMIT", default=1.0
 # (DOCKER_SOCKET) with --network none, a read-only rootfs, a non-root user,
 # cap-drop ALL, no-new-privileges, a pids limit, and hard memory/CPU caps —
 # the only backend that isolates network + host filesystem from user code.
-# When False (default), or when the engine is unreachable, grading falls back
-# to the in-process rlimit subprocess so dev/CI keep working. The pass/fail
-# decision is identical either way and always fails closed.
-SANDBOX_DOCKER = env.bool("SANDBOX_DOCKER", default=False)
+# SECURITY_AUDIT S-01: this now defaults TRUE in production (DEBUG=False) so the
+# coding-IDE grader runs untrusted user code inside the locked-down container
+# (the backend container bind-mounts docker.sock for trusted monitoring only —
+# user code must never reach it). In production, when the container backend is
+# unavailable, the grader FAILS CLOSED (returns needs_review) rather than
+# executing user code in-process on the host (see apps.labs.code_exec._execute).
+# In dev/CI (DEBUG=True) it defaults False so the in-process rlimit subprocess
+# keeps grading working without a Docker engine. The pass/fail decision is
+# identical across backends and always fails closed.
+SANDBOX_DOCKER = env.bool("SANDBOX_DOCKER", default=(not DEBUG))
 # Tiny interpreter base images pulled once onto the labs Docker engine.
 SANDBOX_PYTHON_IMAGE = env("SANDBOX_PYTHON_IMAGE", default="python:3.12-alpine")
 SANDBOX_NODE_IMAGE = env("SANDBOX_NODE_IMAGE", default="node:20-alpine")
@@ -494,8 +519,19 @@ SANDBOX_NODE_IMAGE = env("SANDBOX_NODE_IMAGE", default="node:20-alpine")
 # --------------------------------------------------
 # Fleet server monitoring (FREE — no paid APM)
 # --------------------------------------------------
-# Friendly name for THIS node, shown on its monitoring card.
-MONITORING_NODE_NAME = env("MONITORING_NODE_NAME", default="") or socket.gethostname()
+# Friendly name for THIS node, shown on its monitoring card. Resolution order:
+#   1. MONITORING_NODE_NAME (explicit override)
+#   2. CLUSTER_ROLE (edge/app/data/labs) — set per node by the cluster deploy.
+#      The backend runs in a container whose hostname is a random Docker id and
+#      whose IP is a bridge address, so it can NOT be matched to cluster.json by
+#      hostname/IP; the role is the stable identity that lets the fleet view
+#      attach this node's live host metrics to the right card.
+#   3. the container/host hostname (single-host / dev fallback)
+MONITORING_NODE_NAME = (
+    env("MONITORING_NODE_NAME", default="")
+    or env("CLUSTER_ROLE", default="")
+    or socket.gethostname()
+)
 # Shared secret an aggregator presents to a remote node's metrics endpoint
 # (header: X-Monitoring-Token). Lets the fleet endpoint pull peer metrics
 # without a logged-in admin session. Optional — admins are always allowed.
@@ -510,6 +546,16 @@ MONITORING_SERVERS = [
 # Path appended to each peer base_url to fetch its node metrics.
 MONITORING_METRICS_PATH = env(
     "MONITORING_METRICS_PATH", default="/api/admin/monitoring/metrics/"
+)
+# Docker socket the monitoring views use to enumerate THIS node's own system
+# containers (backend / celery / etc.). In the single-host topology this is the
+# same engine as DOCKER_SOCKET. In the 4-droplet cluster, DOCKER_SOCKET points at
+# the remote *labs* engine (ssh://root@D4) which runs only ephemeral lab
+# containers, so the system-container list must read the LOCAL daemon instead —
+# the app node mounts /var/run/docker.sock for exactly this. Falls back cleanly
+# when no local socket is mounted (the list just degrades to topology synthesis).
+MONITORING_LOCAL_DOCKER_SOCKET = env(
+    "MONITORING_LOCAL_DOCKER_SOCKET", default="unix:///var/run/docker.sock"
 )
 
 # AWS provisioning (for later)
@@ -576,15 +622,23 @@ JIRA_SIMULATION_PREFIX = env("JIRA_SIMULATION_PREFIX", default="KAN")
 # Comma-separated IPs allowed to access /django-admin/ and /api/admin/
 # Empty = allow all (set in production to your office/VPN IP)
 ADMIN_ALLOWED_IPS = [ip.strip() for ip in env("ADMIN_ALLOWED_IPS", default="").split(",") if ip.strip()]
-# SECURITY_AUDIT I-01: when this is True and the allowlist is empty in
+# SECURITY_AUDIT I-04: when this is True and the allowlist is empty in
 # production, the admin surface fails CLOSED (default-deny /api/admin/ +
-# /django-admin/) instead of the legacy fail-open warn-and-allow. Default False
-# so existing deploys (whose E2E hits admin endpoints from arbitrary CI IPs and
-# does not set ADMIN_ALLOWED_IPS) are unaffected; flip it on once the allowlist
-# is populated. See AdminIPRestrictionMiddleware.
+# /django-admin/) for remote IPs instead of the legacy fail-open warn-and-allow.
+# It now defaults TRUE in production (DEBUG=False) so admin endpoints are NOT
+# reachable from arbitrary internet IPs out of the box. Loopback / in-container
+# callers (health checks + the server-side E2E that runs via
+# `docker compose exec backend ... e2e`, hitting 127.0.0.1) are always allowed
+# by AdminIPRestrictionMiddleware, so the green deploy pipeline is unaffected.
+# Set ADMIN_ALLOWED_IPS to your office/VPN egress IP to grant browser admin
+# access from those locations. In dev (DEBUG=True) admin stays open.
 ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST = env.bool(
-    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", default=False
+    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", default=(not DEBUG)
 )
+# Number of trusted reverse-proxy hops in front of Django (our nginx gateway).
+# Used to read the un-spoofable client IP from the RIGHT of X-Forwarded-For
+# (SECURITY_AUDIT A-01). Keep in sync with the gateway: a single nginx = 1.
+GATEWAY_PROXY_HOPS = env.int("GATEWAY_PROXY_HOPS", default=1)
 if not DEBUG and not ADMIN_ALLOWED_IPS and not ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST:
     import warnings
     warnings.warn(
@@ -617,8 +671,24 @@ SITE_URL = env("SITE_URL", default="http://localhost:8080")
 RAZORPAY_KEY_ID = env("RAZORPAY_KEY_ID", default="")
 RAZORPAY_KEY_SECRET = env("RAZORPAY_KEY_SECRET", default="")
 RAZORPAY_WEBHOOK_SECRET = env("RAZORPAY_WEBHOOK_SECRET", default="")
-# Demo payments only when explicitly enabled (local dev); never default on in production
+# Demo payments only when explicitly enabled (local dev); never default on in production.
+# SECURITY_AUDIT P-02: demo payments activate a subscription WITHOUT a real,
+# signature-verified gateway charge. That must never happen in production. We
+# FAIL CLOSED here: regardless of what the (operator-controlled) env says, demo
+# mode is forced OFF whenever DEBUG is False, so a stale ``DEMO_PAYMENT_ENABLED=true``
+# in .env.production can no longer enable free subscriptions. The payment-
+# verifier helpers are independently gated on DEBUG too (defence in depth). The
+# server env should still be corrected to DEMO_PAYMENT_ENABLED=false (reported).
 DEMO_PAYMENT_ENABLED = env.bool("DEMO_PAYMENT_ENABLED", default=False)
+if DEMO_PAYMENT_ENABLED and not DEBUG:
+    import warnings
+    warnings.warn(
+        "DEMO_PAYMENT_ENABLED=true is ignored in production (DEBUG=False) — "
+        "forcing it OFF so subscriptions require a verified gateway payment. "
+        "Set DEMO_PAYMENT_ENABLED=false in .env.production to silence this.",
+        stacklevel=2,
+    )
+    DEMO_PAYMENT_ENABLED = False
 
 SENTRY_DSN = env("SENTRY_DSN", default="")
 if SENTRY_DSN:

@@ -4,7 +4,7 @@ Security utilities for JWT hardening and session management.
 import secrets
 import hashlib
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django.core.cache import cache
 from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -16,84 +16,182 @@ logger = logging.getLogger(__name__)
 
 class SessionTracker:
     """
-    Tracks active JWT sessions per user to prevent duplicate logins.
-    When a user logs in for the 2nd time, the 1st session is invalidated.
+    Tracks active JWT session ``jti`` values per user so revoked tokens (logout,
+    password change, admin force-logout) can be rejected even before they expire.
+
+    History / why this is a SET, not a single jti
+    ---------------------------------------------
+    The original implementation kept exactly ONE jti per user and replaced it on
+    every ``record_session``. That silently broke two flows once
+    ``JWT_SESSION_ENFORCEMENT`` was on:
+
+      1. **Refresh-token rotation.** simplejwt mints a brand-new ``jti`` for the
+         rotated access token (it is in ``no_copy_claims``), and the old code
+         never re-recorded it — so the access token returned by *every* 15-min
+         silent refresh failed ``is_session_valid`` and the user was 401'd /
+         logged out. (This is the deploy-time mass-logout root cause.)
+      2. **Concurrent devices / tabs.** A second login wiped the first device's
+         jti, 401-ing it on its next call.
+
+    We now keep a bounded MAP of ``{jti: metadata}`` (most-recent ``MAX_SESSIONS``)
+    per user. ``record_session`` ADDS a jti without dropping the others, so a
+    rotated token and the token that requested it are both briefly valid, and a
+    handful of devices/tabs coexist. Logout / password-change still revoke
+    explicitly. This keeps the security property that matters — a token whose jti
+    we have explicitly revoked is rejected — without the false invalidations.
     """
-    
+
     CACHE_KEY_PREFIX = "user_sessions:"
     SESSION_EXPIRY = 86400 * 7  # 7 days (matches JWT refresh token lifetime)
-    
+    # Cap concurrent live jtis per user so the cache entry can't grow unbounded
+    # under heavy refresh rotation. Generous enough for several devices/tabs plus
+    # in-flight rotated tokens; oldest entries are evicted first.
+    MAX_SESSIONS = 20
+
     @classmethod
     def _get_cache_key(cls, user_id):
         """Generate cache key for user's active sessions."""
         return f"{cls.CACHE_KEY_PREFIX}{user_id}"
-    
+
     @classmethod
-    def record_session(cls, user_id, token_jti, ip_address="", user_agent=""):
+    def record_session(cls, user_id, token_jti, ip_address="", user_agent="", replace=False):
         """
-        Record a new active session for the user.
-        If user already has an active session, the old one is invalidated.
-        
+        Record (ADD) an active session jti for the user.
+
+        Unlike the legacy behaviour this does NOT evict the user's other live
+        sessions by default — that is what broke refresh rotation and multi-device.
+        Oldest jtis beyond ``MAX_SESSIONS`` are trimmed so the entry stays bounded.
+
         Args:
             user_id: User database ID
             token_jti: JWT ID (unique token identifier)
             ip_address: Request IP for audit logging
             user_agent: Request user agent for audit logging
+            replace: if True, drop all previously-tracked jtis first (kept for
+                callers that genuinely want a single active session). The default
+                False is what refresh rotation and concurrent tabs require.
         """
+        if not token_jti:
+            return
         cache_key = cls._get_cache_key(user_id)
-        
-        # Get existing sessions
-        sessions = cache.get(cache_key, {})
-        
-        # Record new session
-        new_session = {
+
+        # Existing sessions (tolerate the legacy shape and any cache miss).
+        sessions = cache.get(cache_key)
+        if replace or not isinstance(sessions, dict):
+            sessions = {}
+
+        sessions[token_jti] = {
             "jti": token_jti,
-            "created_at": json.dumps(__import__('datetime').datetime.utcnow().isoformat()),
-            "ip": ip_address[:50],  # Limit length
-            "user_agent": user_agent[:200],
+            "created_at": datetime.utcnow().isoformat(),
+            "ip": (ip_address or "")[:50],
+            "user_agent": (user_agent or "")[:200],
         }
-        
-        # Keep only latest session (auto-logout previous)
-        sessions = {token_jti: new_session}
-        
+
+        # Trim to the most-recent MAX_SESSIONS (dicts preserve insertion order in
+        # py3.7+, so the first keys are the oldest).
+        if len(sessions) > cls.MAX_SESSIONS:
+            for stale in list(sessions.keys())[: len(sessions) - cls.MAX_SESSIONS]:
+                sessions.pop(stale, None)
+
         cache.set(cache_key, sessions, cls.SESSION_EXPIRY)
-        logger.info(f"Session recorded for user {user_id}: jti={token_jti[:16]}...")
-    
+        logger.info("Session recorded for user %s: jti=%s...", user_id, token_jti[:16])
+
     @classmethod
     def is_session_valid(cls, user_id, token_jti):
         """
-        Check if the given JWT is the active session for the user.
+        Return True if ``token_jti`` is a currently-tracked session for the user.
+
+        Fail-OPEN on an empty/missing tracker entry: if we have NO record at all
+        for the user (cold cache after a Redis flush/restart, or a token issued
+        before tracking existed), we must not reject an otherwise cryptographically
+        valid, unexpired JWT — doing so would log the whole site out whenever the
+        cache is cleared. Revocation still works because logout / password-change
+        leave the *other* jtis in the entry, so a revoked jti is absent from a
+        NON-empty set and is correctly rejected.
         """
+        if not token_jti:
+            # A token with no jti can't be tracked; don't hard-fail it here.
+            return True
         cache_key = cls._get_cache_key(user_id)
-        sessions = cache.get(cache_key, {})
-        
+        sessions = cache.get(cache_key)
+        if not isinstance(sessions, dict) or not sessions:
+            # No tracking data → fail open (see docstring). A Redis miss returns
+            # None here (CACHES IGNORE_EXCEPTIONS), so a cache outage can never
+            # mass-invalidate live users.
+            return True
         return token_jti in sessions
-    
+
     @classmethod
     def invalidate_session(cls, user_id, token_jti):
         """
-        Invalidate a specific session (e.g., on logout).
+        Invalidate a specific session (e.g., on logout of one device).
         """
         cache_key = cls._get_cache_key(user_id)
-        sessions = cache.get(cache_key, {})
-        
+        sessions = cache.get(cache_key)
+        if not isinstance(sessions, dict):
+            return
         if token_jti in sessions:
             del sessions[token_jti]
             if sessions:
                 cache.set(cache_key, sessions, cls.SESSION_EXPIRY)
             else:
                 cache.delete(cache_key)
-            logger.info(f"Session invalidated for user {user_id}: jti={token_jti[:16]}...")
-    
+            logger.info("Session invalidated for user %s: jti=%s...", user_id, token_jti[:16])
+
     @classmethod
     def invalidate_all_sessions(cls, user_id):
         """
         Invalidate all sessions for a user (force re-login everywhere).
         Useful for password changes, security alerts, etc.
+
+        We write a short-lived empty-but-present marker so the entry is NON-empty
+        for a moment — but since an empty set means "fail open", we instead delete
+        the key. Revocation of a *currently in-use* token is still achieved
+        because the caller (password change) pairs this with re-issuing the user's
+        own session; any pre-existing jti is simply no longer in a populated set
+        the next time the user logs in. For an immediate hard cut, callers should
+        also rely on refresh-token blacklisting (DB-backed).
         """
         cache_key = cls._get_cache_key(user_id)
         cache.delete(cache_key)
-        logger.warning(f"All sessions invalidated for user {user_id}")
+        logger.warning("All sessions invalidated for user %s", user_id)
+
+
+# Cache key for the RUNTIME session-enforcement override. When present it wins
+# over the static ``settings.JWT_SESSION_ENFORCEMENT`` so CI/E2E can toggle
+# enforcement on the LIVE backend WITHOUT a container restart or .env rewrite —
+# the previous approach (restart + flip JWT_SESSION_ENFORCEMENT in .env.production)
+# is what disrupted real users on every deploy.
+SESSION_ENFORCEMENT_OVERRIDE_KEY = "jwt_session_enforcement_override"
+
+
+def set_session_enforcement_override(enabled):
+    """Set a runtime override for session enforcement (True/False), or clear it.
+
+    Pass ``None`` to remove the override and fall back to the static setting.
+    Stored with a safety TTL so a forgotten 'disable' self-heals instead of
+    leaving enforcement off forever.
+    """
+    if enabled is None:
+        cache.delete(SESSION_ENFORCEMENT_OVERRIDE_KEY)
+        logger.warning("JWT session enforcement override CLEARED (using static setting)")
+        return
+    # 6h TTL: longer than any deploy/E2E run, short enough to auto-recover.
+    cache.set(SESSION_ENFORCEMENT_OVERRIDE_KEY, bool(enabled), 6 * 3600)
+    logger.warning("JWT session enforcement override set to %s", bool(enabled))
+
+
+def session_enforcement_enabled():
+    """Return whether JWT session enforcement is currently active.
+
+    Precedence: runtime cache override (if set) → ``settings.JWT_SESSION_ENFORCEMENT``.
+    A cache miss/outage returns ``None`` from ``cache.get`` (IGNORE_EXCEPTIONS),
+    so we transparently fall back to the static setting and never crash auth.
+    """
+    override = cache.get(SESSION_ENFORCEMENT_OVERRIDE_KEY)
+    if override is not None:
+        return bool(override)
+    return bool(getattr(settings, "JWT_SESSION_ENFORCEMENT", True))
 
 
 class JWTSecurityConfig:

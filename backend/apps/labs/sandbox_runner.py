@@ -161,6 +161,30 @@ def _close(client) -> None:
         pass
 
 
+def _ensure_image(client, image: str) -> None:
+    """Pull the sandbox base image if the engine doesn't already have it.
+
+    ``containers.create()`` (unlike ``run()``) NEVER pulls, so a freshly
+    provisioned labs engine would raise ImageNotFound on the very first grade —
+    which, under the production fail-closed policy (S-01), becomes a
+    ``needs_review`` instead of a real grade and breaks coding scenarios. Pulling
+    if-missing makes the sandbox self-sufficient (no deploy-time pre-pull
+    dependency). The pull runs on the labs host, which has network; the grading
+    container itself still runs ``network_mode="none"`` so user code never gets
+    network. Raises ``SandboxUnavailable`` (the caller's normal unavailable path)
+    if the pull fails.
+    """
+    try:
+        client.images.get(image)
+        return
+    except Exception:
+        pass  # not present locally — pull it below
+    try:
+        client.images.pull(image)
+    except Exception as exc:
+        raise SandboxUnavailable(f"could not pull sandbox image {image!r}: {exc}") from exc
+
+
 def _harness_tar(script_name: str, source: str) -> bytes:
     """Pack the harness file into an in-memory tar for put_archive()."""
     data = source.encode("utf-8")
@@ -196,6 +220,9 @@ def run_in_container(
     client = _get_client()
     if client is None:
         raise SandboxUnavailable("docker client unavailable")
+
+    # Ensure the base image is present before create() (which never pulls).
+    _ensure_image(client, image)
 
     container = None
     try:

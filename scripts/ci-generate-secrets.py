@@ -54,14 +54,20 @@ from pathlib import Path
 
 # Secrets we generate/rotate. Keys NOT in here are preserved verbatim.
 ROTATE_KEYS = [
-    "DJANGO_SECRET_KEY",
     "POSTGRES_PASSWORD",
     "REDIS_PASSWORD",
     "RABBITMQ_PASS",
     "SUPERUSER_PASSWORD",
-    "JWT_HS256_SECRET",
     "JIRA_WEBHOOK_SECRET",
 ]
+# Signing/identity keys: generated ONCE when missing and NEVER rotated on a
+# routine OR a rotate_secrets deploy. Rotating DJANGO_SECRET_KEY invalidates every
+# Django session + outstanding password-reset token; rotating JWT_HS256_SECRET
+# invalidates every issued JWT — either causes a platform-wide forced logout that
+# looks exactly like the recurring "logged out + invalid credentials" report.
+# Only a deliberate, explicit key-roll (ROTATE_SIGNING_KEYS=1) regenerates them.
+SIGNING_KEYS = ["DJANGO_SECRET_KEY", "JWT_HS256_SECRET"]
+ROTATE_SIGNING_KEYS = os.environ.get("ROTATE_SIGNING_KEYS", "0") == "1"
 # Rotated only if already present (we never introduce a Razorpay secret).
 ROTATE_IF_PRESENT = ["RAZORPAY_WEBHOOK_SECRET"]
 
@@ -193,6 +199,18 @@ def main() -> int:
             # passwords used inside URLs — keep them alnum to avoid URL-encoding
             val = gen_token(40)
         new_secrets[key] = val
+
+    # Signing keys: generate only when genuinely absent (preserve across every
+    # deploy, including rotate_secrets=true) unless an explicit ROTATE_SIGNING_KEYS=1
+    # deliberate roll is requested. This is what keeps users logged in across deploys.
+    for key in SIGNING_KEYS:
+        if key in PROTECTED_KEYS:
+            continue
+        cur = get_val(rows, key)
+        missing = cur is None or cur == "" or bool(PLACEHOLDER_RE.search(cur or ""))
+        if not (missing or ROTATE_SIGNING_KEYS):
+            continue
+        new_secrets[key] = gen_django_secret_key() if key == "DJANGO_SECRET_KEY" else gen_token(64)
 
     for key in ROTATE_IF_PRESENT:
         cur = get_val(rows, key)

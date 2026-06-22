@@ -329,7 +329,7 @@ class ValidateCouponView(APIView):
             return Response({"error": "Price not configured for this technology"}, status=http_status.HTTP_400_BAD_REQUEST)
 
         try:
-            discounted, coupon = apply_coupon_to_amount(code, original_amount)
+            discounted, coupon = apply_coupon_to_amount(code, original_amount, user=request.user)
         except CouponError as exc:
             return Response({"valid": False, "error": str(exc)}, status=http_status.HTTP_400_BAD_REQUEST)
 
@@ -398,7 +398,7 @@ class CreateRazorpayOrderView(APIView):
         if coupon_code:
             from .coupon_service import apply_coupon_to_amount, CouponError
             try:
-                amount, coupon_applied = apply_coupon_to_amount(coupon_code, amount)
+                amount, coupon_applied = apply_coupon_to_amount(coupon_code, amount, user=request.user)
             except CouponError as exc:
                 return Response({"error": str(exc)}, status=http_status.HTTP_400_BAD_REQUEST)
 
@@ -726,6 +726,10 @@ class VerifyRazorpayPaymentView(APIView):
                     if coupon_code:
                         from .coupon_service import validate_coupon
                         try:
+                            # Resolve the coupon for redemption at fulfilment.
+                            # Don't pre-reject on the per-user check here: the
+                            # authoritative per-user guard is the unique row in
+                            # redeem_coupon, and the payment is already verified.
                             coupon_applied = validate_coupon(coupon_code)
                         except Exception:
                             coupon_applied = None
@@ -779,11 +783,19 @@ class VerifyRazorpayPaymentView(APIView):
         }, status=http_status.HTTP_201_CREATED if created else http_status.HTTP_200_OK)
 
     def _verify_signature(self, order_id, payment_id, signature):
-        """Verify Razorpay payment signature using the official Razorpay client utility."""
+        """Verify Razorpay payment signature using the official Razorpay client utility.
+
+        SECURITY_AUDIT P-02: FAIL CLOSED. A missing gateway secret must NEVER
+        pass signature verification. The demo skip is permitted ONLY in an
+        explicit local-dev/demo mode (``DEBUG and DEMO_PAYMENT_ENABLED``); in
+        production a missing ``RAZORPAY_KEY_SECRET`` always returns False so no
+        subscription is ever activated without a real, signed payment.
+        """
         if not settings.RAZORPAY_KEY_SECRET:
-            if getattr(settings, "DEMO_PAYMENT_ENABLED", False):
-                logger.warning("Razorpay key secret not configured — demo skip")
+            if getattr(settings, "DEBUG", False) and getattr(settings, "DEMO_PAYMENT_ENABLED", False):
+                logger.warning("Razorpay key secret not configured — demo skip (DEBUG only)")
                 return True
+            logger.error("Razorpay key secret not configured — failing signature verification closed")
             return False
 
         try:
@@ -809,9 +821,16 @@ class VerifyRazorpayPaymentView(APIView):
         Returns False (never raises) so callers can treat a Razorpay API failure
         as a verification failure — the subscription is NOT activated when this
         returns False.
+
+        SECURITY_AUDIT P-02: FAIL CLOSED on a missing gateway secret. The demo
+        pass is allowed ONLY in explicit local-dev/demo mode
+        (``DEBUG and DEMO_PAYMENT_ENABLED``); production always returns False.
         """
         if not settings.RAZORPAY_KEY_SECRET or not settings.RAZORPAY_KEY_ID:
-            return getattr(settings, "DEMO_PAYMENT_ENABLED", False)
+            if getattr(settings, "DEBUG", False) and getattr(settings, "DEMO_PAYMENT_ENABLED", False):
+                return True
+            logger.error("Razorpay keys not configured — failing payment verification closed")
+            return False
 
         try:
             import razorpay
@@ -847,7 +866,18 @@ class VerifyRazorpayPaymentView(APIView):
 
 
 class TechnologySubscribeView(APIView):
-    """Subscribe to a specific technology (legacy / demo fallback)."""
+    """Activate access to a FREE (price == 0) technology.
+
+    SECURITY_AUDIT P-01: this endpoint must NEVER grant a paid subscription
+    without a gateway-confirmed payment. It used to call
+    ``activate_technology_subscription`` for any technology with no payment
+    check at all, so any logged-in user could obtain a year of paid access for
+    free with a single POST. It is now hard-gated to ``price == 0`` technologies
+    only; paid tracks must go through the Razorpay order → signature-verified
+    confirm flow (``CreateRazorpayOrderView`` + ``VerifyRazorpayPaymentView``),
+    which is the only path that activates a subscription, and only after
+    ``_verify_payment_with_gateway`` confirms a captured payment.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -869,6 +899,22 @@ class TechnologySubscribeView(APIView):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
+        # Determine price from technology (server-side — never trust client)
+        amount = int(getattr(technology, 'price', 0) or 0)
+
+        # SECURITY_AUDIT P-01: refuse to activate a PAID technology here. Paid
+        # access is only ever granted by the signature/gateway-verified Razorpay
+        # path, never by this no-payment endpoint. Only price == 0 ("free") may
+        # be self-activated.
+        if amount > 0:
+            return Response(
+                {
+                    "error": "This technology requires checkout. Please complete payment to subscribe.",
+                    "code": "PAYMENT_REQUIRED",
+                },
+                status=http_status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
         # Check if already subscribed (active and not expired)
         from .subscription_utils import (
             activate_technology_subscription,
@@ -884,9 +930,6 @@ class TechnologySubscribeView(APIView):
                 {"error": "Already subscribed to this technology", "subscription_id": existing.subscription_id},
                 status=http_status.HTTP_409_CONFLICT,
             )
-
-        # Determine price from technology (server-side — never trust client)
-        amount = getattr(technology, 'price', 0) or 0
 
         if existing:
             # Renewal of expired/inactive subscription

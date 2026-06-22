@@ -167,27 +167,39 @@ class AdminOverviewView(APIView):
             return {"topology": "unknown", "is_cluster": False, "node_count": 0, "nodes": []}
 
     def _get_container_summary(self):
-        """Cheap container roll-up (local Docker engine) for the overview.
+        """Cheap container roll-up for the overview, across both engines.
 
-        Counts running/total/system/lab containers without per-container stats
-        so the cached overview stays fast. The full per-container detail lives
-        on the Monitoring page.
+        Counts running/total/system/lab containers (no per-container stats) from
+        the LOCAL daemon (system containers) and the labs engine (lab
+        containers). In the cluster these are two different engines, so reading
+        only one — as this used to — under-counted (it showed lab containers but
+        zero system containers, or vice versa). The full per-container detail
+        lives on the Monitoring page.
         """
-        try:
-            client = DockerProvisioner().client
-        except Exception as exc:
-            return {"available": False, "error": str(exc)[:160]}
+        hints = AdminMonitoringContainersView.SYSTEM_NAME_HINTS
+        seen = set()
+        running = total = system = lab = 0
+        any_engine = False
 
-        try:
-            running = total = system = lab = 0
-            hints = AdminMonitoringContainersView.SYSTEM_NAME_HINTS
+        def tally(client, want_system, want_lab):
+            nonlocal running, total, system, lab, any_engine
+            if client is None:
+                return
+            any_engine = True
             for c in client.containers.list(all=True):
+                if c.id in seen:
+                    continue
                 labels = c.labels or {}
                 name = (c.name or "").lower()
                 is_lab = bool(labels.get("fixitlab.session_id"))
                 is_system = any(h in name for h in hints)
+                if is_lab and not want_lab:
+                    continue
+                if is_system and not is_lab and not want_system:
+                    continue
                 if not (is_lab or is_system):
                     continue
+                seen.add(c.id)
                 total += 1
                 if c.status == "running":
                     running += 1
@@ -195,6 +207,15 @@ class AdminOverviewView(APIView):
                     lab += 1
                 elif is_system:
                     system += 1
+
+        try:
+            local_client = AdminMonitoringContainersView._local_client()
+            labs_client = AdminMonitoringContainersView._labs_client()
+            tally(local_client, want_system=True, want_lab=True)
+            if labs_client is not None and labs_client is not local_client:
+                tally(labs_client, want_system=True, want_lab=True)
+            if not any_engine:
+                return {"available": False, "error": "no reachable Docker engine"}
             return {
                 "available": True,
                 "total": total,
@@ -1483,16 +1504,51 @@ class AdminSystemHealthView(APIView):
             return {"status": "unhealthy", "error": str(e)}
 
     def _check_docker(self):
+        """Health of the Docker engine(s).
+
+        In the 4-droplet cluster there are two engines: the LOCAL daemon (this
+        node's own system containers) and the remote LABS engine
+        (``DOCKER_SOCKET`` → ssh://root@D4) that runs lab containers. Report the
+        local daemon as the primary signal (it is what serves this node) and
+        annotate the labs engine separately so a labs-engine blip does not make
+        the whole platform look unhealthy. Falls back to the single engine in
+        single-host.
+        """
+        import docker
+
+        local_sock = getattr(settings, "MONITORING_LOCAL_DOCKER_SOCKET", "") or "unix:///var/run/docker.sock"
+        labs_sock = getattr(settings, "DOCKER_SOCKET", local_sock)
+
+        def probe(base_url):
+            client = docker.DockerClient(base_url=base_url)
+            client.ping()
+            info = client.info()
+            return f"{info.get('Containers', 0)} containers, {info.get('Images', 0)} images"
+
+        # Primary: local daemon.
         try:
-            provisioner = DockerProvisioner()
-            provisioner.client.ping()
-            info = provisioner.client.info()
-            return {
-                "status": "healthy",
-                "details": f"{info.get('Containers', 0)} containers, {info.get('Images', 0)} images",
-            }
+            details = probe(local_sock)
         except Exception as e:
-            return {"status": "unhealthy", "error": str(e)}
+            # Single-host: local == labs, so a failure here is the real state.
+            if labs_sock == local_sock:
+                return {"status": "unhealthy", "error": str(e)}
+            # Cluster: local daemon unreachable (no socket mounted) — fall back to
+            # reporting the labs engine so Docker health is not falsely red.
+            try:
+                details = probe(labs_sock)
+                return {"status": "healthy", "details": f"labs engine: {details}",
+                        "note": "local daemon not reachable; reporting labs engine"}
+            except Exception as e2:
+                return {"status": "unhealthy", "error": f"local: {e}; labs: {e2}"}
+
+        result = {"status": "healthy", "details": details}
+        # Annotate the labs engine when it is a distinct host.
+        if labs_sock != local_sock:
+            try:
+                result["labs_engine"] = {"status": "healthy", "details": probe(labs_sock)}
+            except Exception as e:
+                result["labs_engine"] = {"status": "unhealthy", "error": str(e)[:160]}
+        return result
 
     def _check_email(self):
         """Check email delivery path (Gmail API in prod, SMTP in dev)."""
@@ -1768,8 +1824,14 @@ class AdminSystemHealthView(APIView):
         seen_local_keys = set()
         docker_error = None
         try:
-            import docker
-            client = docker.from_env()
+            # Read the LOCAL daemon (mounted host socket), NOT docker.from_env():
+            # in the cluster DOCKER_HOST points at the remote labs engine, which
+            # runs no system containers, so from_env() would show none of this
+            # node's own services. _local_client() falls back to the default
+            # socket and is the same engine in single-host.
+            client = AdminMonitoringContainersView._local_client()
+            if client is None:
+                raise RuntimeError("local Docker socket unavailable")
             all_containers = client.containers.list(all=True)
             skip_names = ("mailhog",)
 
@@ -2869,7 +2931,27 @@ class AdminUploadView(APIView):
 # ─── Container Monitoring ─────────────────────────────────────────────
 
 class AdminMonitoringContainersView(APIView):
-    """List FixitLab lab + platform Docker containers with health summary."""
+    """List FixitLab lab + platform Docker containers with health summary.
+
+    Topology-aware engine enumeration:
+
+    * **System containers** (backend / celery / gateway / redis / postgres / …)
+      are read from the LOCAL Docker daemon (``MONITORING_LOCAL_DOCKER_SOCKET``,
+      i.e. the host socket mounted into this container). In the single-host
+      topology that is the only engine and shows everything.
+    * **Lab containers** are read from the labs engine (``settings.DOCKER_SOCKET``).
+      In the 4-droplet cluster that is the remote D4 engine (``ssh://root@D4``)
+      which runs only ephemeral lab containers; in single-host it is the same
+      local socket (deduped by container id).
+    * **Remote system services** that the topology says live on a *different*
+      node (e.g. gateway/redis/vault on the edge node, postgres on the data
+      node) are synthesised as ``status: "remote"`` rows so the operator sees
+      the whole fleet's services instead of only the engines we can reach.
+
+    Previously this view read a single engine (``DockerProvisioner().client`` →
+    the labs engine in the cluster), so in production it showed lab containers
+    but **no system containers** at all. This restores the full system+lab list.
+    """
     permission_classes = [IsPlatformAdmin]
 
     SYSTEM_NAME_HINTS = (
@@ -2878,23 +2960,47 @@ class AdminMonitoringContainersView(APIView):
         "fixitlab_vault", "fixitlab_db", "fixitlab_redis", "fixitlab_rabbitmq",
     )
 
-    def get(self, request):
+    @staticmethod
+    def _local_client():
+        """Docker client for THIS node's own daemon (system containers).
+
+        Uses MONITORING_LOCAL_DOCKER_SOCKET (the mounted host socket) so it works
+        even when DOCKER_SOCKET points at the remote labs engine. Returns None if
+        the local daemon is unreachable (no socket mounted) — callers degrade to
+        topology synthesis rather than failing.
+        """
+        import docker
+
+        sock = getattr(settings, "MONITORING_LOCAL_DOCKER_SOCKET", "") or "unix:///var/run/docker.sock"
+        try:
+            client = docker.DockerClient(base_url=sock)
+            client.ping()
+            return client
+        except Exception:
+            return None
+
+    @staticmethod
+    def _labs_client():
+        """Docker client for the labs engine (ephemeral lab containers)."""
         try:
             client = DockerProvisioner().client
-        except Exception as exc:
-            return Response({"error": str(exc), "containers": []}, status=503)
+            client.ping()
+            return client
+        except Exception:
+            return None
+
+    def get(self, request):
+        from . import cluster_topology
 
         kind_filter = request.query_params.get("kind", "all")
         containers = []
         seen = set()
+        errors = {}
 
-        def add_container(c, kind):
-            if c.id in seen:
-                return
-            seen.add(c.id)
+        def describe(c, kind):
             labels = c.labels or {}
             state = c.attrs.get("State", {})
-            containers.append({
+            return {
                 "id": c.short_id,
                 "full_id": c.id,
                 "name": c.name,
@@ -2909,43 +3015,90 @@ class AdminMonitoringContainersView(APIView):
                 "restart_count": c.attrs.get("RestartCount", 0),
                 "exit_code": state.get("ExitCode", 0) if c.status != "running" else None,
                 "up_since": state.get("StartedAt", ""),
-            })
+            }
 
-        for c in client.containers.list(all=True, filters={"label": "fixitlab.session_id"}):
-            add_container(c, "lab")
+        def add(c, kind):
+            if c.id in seen:
+                return
+            seen.add(c.id)
+            containers.append(describe(c, kind))
 
-        for c in client.containers.list(all=True):
+        def is_system(c):
             name = (c.name or "").lower()
             try:
                 image_str = " ".join(c.image.tags or [str(c.image.id)[:12]]).lower()
             except Exception:
                 image_str = ""
-            is_system = any(h in name for h in self.SYSTEM_NAME_HINTS)
-            # Also catch vault by image (hashicorp/vault)
-            if not is_system and "vault" in image_str:
-                is_system = True
-            if is_system:
-                add_container(c, "system")
+            if any(h in name for h in self.SYSTEM_NAME_HINTS):
+                return True
+            return "vault" in image_str
 
-        # Attribute the locally-visible containers to the node serving this
-        # request, and (when clustered) describe the nodes whose Docker engines
-        # we cannot yet reach — so the UI shows the full picture rather than
-        # implying these are the only containers in the fleet.
-        from . import cluster_topology
+        # 1) Local daemon → system containers (and any lab containers running here).
+        local_client = self._local_client()
+        if local_client is not None:
+            try:
+                for c in local_client.containers.list(all=True):
+                    labels = c.labels or {}
+                    if labels.get("fixitlab.session_id"):
+                        add(c, "lab")
+                    elif is_system(c):
+                        add(c, "system")
+            except Exception as exc:
+                errors["local"] = str(exc)[:160]
+        else:
+            errors["local"] = "local Docker socket unavailable"
 
+        # 2) Labs engine → lab containers (remote D4 in cluster; same socket in
+        #    single-host, deduped by id). Also pick up any system containers that
+        #    happen to run there.
+        labs_client = self._labs_client()
+        if labs_client is not None and labs_client is not local_client:
+            try:
+                for c in labs_client.containers.list(all=True, filters={"label": "fixitlab.session_id"}):
+                    add(c, "lab")
+                for c in labs_client.containers.list(all=True):
+                    if is_system(c):
+                        add(c, "system")
+            except Exception as exc:
+                errors["labs"] = str(exc)[:160]
+        elif labs_client is None and local_client is None:
+            # Nothing reachable at all — surface a 503 like before.
+            return Response(
+                {"error": errors.get("local") or "Docker unavailable", "containers": []},
+                status=503,
+            )
+
+        # Attribute locally-visible containers to the node serving this request.
         topology = cluster_topology.load_topology()
-        local_node = cluster_topology.local_node_identity() if topology.get("is_cluster") else {}
+        is_cluster = bool(topology.get("is_cluster"))
+        local_node = cluster_topology.local_node_identity() if is_cluster else {}
         local_node_key = local_node.get("key") or (
             getattr(settings, "MONITORING_NODE_NAME", "") or None
         )
         local_node_name = local_node.get("name") or local_node_key
         for c in containers:
-            c["node"] = local_node_key
-            c["node_name"] = local_node_name
+            c.setdefault("node", local_node_key)
+            c.setdefault("node_name", local_node_name)
+            c.setdefault("location", "local")
+
+        # 3) Synthesise remote system services that live on other cluster nodes
+        #    so the system list reflects the whole fleet, not just reachable
+        #    engines. Mirrors AdminSystemHealthView._check_containers.
+        seen_system_keys = set()
+        for c in containers:
+            if c["kind"] == "system":
+                nl = (c["name"] or "").lower()
+                for spec in AdminSystemHealthView.EXPECTED_CONTAINERS:
+                    if any(m in nl for m in spec["match"]):
+                        seen_system_keys.add(spec["key"])
+                        break
 
         nodes_meta = []
-        if topology.get("is_cluster"):
+        if is_cluster:
+            node_for_service = {}
             for cnode in topology.get("nodes", []):
+                for svc in (cnode.get("services") or []):
+                    node_for_service[svc.lower()] = cnode
                 is_local = bool(local_node_key) and cnode.get("key") == local_node.get("key")
                 nodes_meta.append({
                     "key": cnode.get("key"),
@@ -2954,25 +3107,73 @@ class AdminMonitoringContainersView(APIView):
                     "ip": cnode.get("ip"),
                     "services": cnode.get("services", []),
                     "is_local": is_local,
-                    # We can only enumerate containers on the local Docker socket.
-                    "containers_available": is_local,
+                    # Local node: enumerated here. Labs node: lab containers reachable.
+                    "containers_available": is_local or cnode.get("role") == "labs",
                 })
+
+            for spec in AdminSystemHealthView.EXPECTED_CONTAINERS:
+                if spec["key"] in seen_system_keys:
+                    continue
+                owner = node_for_service.get(spec["service"].lower())
+                if owner and owner.get("key") and owner.get("key") != local_node_key:
+                    containers.append({
+                        "id": f"remote-{spec['key']}",
+                        "full_id": f"remote-{spec['key']}",
+                        "name": spec["label"],
+                        "kind": "system",
+                        "status": "remote",
+                        "health": "remote",
+                        "node": owner.get("key"),
+                        "node_name": owner.get("name"),
+                        "host_role": owner.get("role"),
+                        "location": "remote",
+                        "restart_count": 0,
+                        "exit_code": None,
+                        "details": f"Runs on {owner.get('name') or owner.get('key')} node — not reachable from this Docker engine",
+                    })
 
         if kind_filter != "all":
             containers = [x for x in containers if x["kind"] == kind_filter]
 
         running = sum(1 for x in containers if x["status"] == "running")
-        return Response({
+        payload = {
             "containers": containers,
             "total": len(containers),
             "running": running,
             "lab_count": sum(1 for x in containers if x["kind"] == "lab"),
             "system_count": sum(1 for x in containers if x["kind"] == "system"),
-            "is_cluster": bool(topology.get("is_cluster")),
+            "remote_count": sum(1 for x in containers if x.get("location") == "remote"),
+            "is_cluster": is_cluster,
             "local_node": local_node_name,
             "local_node_key": local_node_key,
             "nodes": nodes_meta,
-        })
+        }
+        if errors:
+            payload["engine_errors"] = errors
+        return Response(payload)
+
+
+def _find_container_across_engines(container_id):
+    """Locate a container by id/name on the local daemon OR the labs engine.
+
+    The monitoring list spans two Docker engines (local system containers + the
+    remote labs engine), so the per-container drill-in (metrics / logs) must look
+    on both. Returns the container or None. Synthesised ``remote-*`` ids (services
+    on another node) are not reachable here and return None.
+    """
+    if not container_id or str(container_id).startswith("remote-"):
+        return None
+    for client in (
+        AdminMonitoringContainersView._local_client(),
+        AdminMonitoringContainersView._labs_client(),
+    ):
+        if client is None:
+            continue
+        try:
+            return client.containers.get(container_id)
+        except Exception:
+            continue
+    return None
 
 
 class AdminMonitoringContainerDetailView(APIView):
@@ -2980,11 +3181,13 @@ class AdminMonitoringContainerDetailView(APIView):
     permission_classes = [IsPlatformAdmin]
 
     def get(self, request, container_id):
-        try:
-            client = DockerProvisioner().client
-            container = client.containers.get(container_id)
-        except Exception as exc:
-            return Response({"error": str(exc)}, status=404)
+        container = _find_container_across_engines(container_id)
+        if container is None:
+            return Response(
+                {"error": "Container not found on any reachable Docker engine "
+                          "(it may run on a cluster node without a reachable Docker API)."},
+                status=404,
+            )
 
         stats = None
         try:
@@ -3030,9 +3233,15 @@ class AdminMonitoringContainerLogsView(APIView):
         search = request.query_params.get("q", "").strip().lower()
         live = request.query_params.get("live") == "1"
 
+        container = _find_container_across_engines(container_id)
+        if container is None:
+            return Response(
+                {"error": "Container not found on any reachable Docker engine "
+                          "(it may run on a cluster node without a reachable Docker API).",
+                 "lines": []},
+                status=404,
+            )
         try:
-            client = DockerProvisioner().client
-            container = client.containers.get(container_id)
             kwargs = {"timestamps": True, "tail": tail}
             if since:
                 kwargs["since"] = since
@@ -3183,6 +3392,23 @@ class AdminFleetMonitoringView(APIView):
 
         local_identity = cluster_topology.local_node_identity()
         local_key = local_identity.get("key")
+        # Fallback: when the host can't be matched to cluster.json by hostname/IP
+        # (the backend runs in a container with a random hostname + bridge IP),
+        # resolve the local node from MONITORING_NODE_NAME — which the cluster
+        # deploy sets to the role (edge/app/data/labs). Without this the local
+        # node never receives its live host metrics and EVERY node shows as
+        # "unknown" — the 4-droplet monitoring regression.
+        if not local_key:
+            hint = (getattr(settings, "MONITORING_NODE_NAME", "") or "").lower()
+            if hint:
+                for cnode in topology.get("nodes", []):
+                    if hint in {
+                        (cnode.get("key") or "").lower(),
+                        (cnode.get("role") or "").lower(),
+                        (cnode.get("name") or "").lower(),
+                    }:
+                        local_key = cnode.get("key")
+                        break
 
         # Index peer specs from MONITORING_SERVERS by host so a node can pull its
         # own live metrics from a wired sibling agent (matched on IP or name).
@@ -3293,16 +3519,28 @@ class AdminFleetMonitoringView(APIView):
                 return spec
         return None
 
-    @staticmethod
-    def _probe(cnode):
+    # Role → service ports we might plausibly reach for a TCP liveness probe.
+    _ROLE_PROBE_PORTS = {
+        "edge": [80, 443, 8200, 6379, 5672, 22],
+        "app": [8000, 22],
+        "data": [5432, 6432, 22],
+        "db": [5432, 6432, 22],
+        "labs": [2376, 2375, 22],
+    }
+
+    @classmethod
+    def _probe(cls, cnode):
         """Best-effort TCP reachability probe against a node's likely service ports."""
         import socket
 
         host = cnode.get("private_ipv4") or cnode.get("public_ipv4") or cnode.get("ip")
         if not host:
             return False, "no address in topology"
-        # Ports we might plausibly reach per role; first success wins.
-        ports = [80, 443, 8000, 22]
+        # Role-specific ports first (most likely open), then common fallbacks.
+        role = (cnode.get("role") or "").lower()
+        ports = cls._ROLE_PROBE_PORTS.get(role, []) + [80, 443, 8000, 22]
+        # De-dup while preserving order.
+        ports = list(dict.fromkeys(ports))
         last_err = None
         for port in ports:
             try:
@@ -4568,3 +4806,292 @@ class AdminEnvSecretsView(APIView):
             "applied_to_process": True,
             "note": "Changes applied immediately. Workers will use new values on next startup." if not vault_ok else "Changes saved to Vault and applied to all running workers.",
         })
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ITSM / ServiceNow ticket administration
+#
+# Mirrors the Jira admin surface (AdminJiraTicketsView / AdminJiraCreateView) for
+# the ServiceNow-style ITSM ticketing sim (apps.itsm). Where Jira tickets are
+# largely read-only here (they live in a real/external Jira), ITSM tickets are
+# native DB rows we own, so the admin can also DRIVE them: transition state,
+# transfer teams, comment (triggering the assignment-group bot reply), raise a
+# sub-ticket, and fulfil. Every mutating action reuses apps.itsm.services so the
+# admin path shares one code path with the user-facing endpoints and the bot.
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class AdminItsmTicketsView(APIView):
+    """GET /admin/itsm/tickets/ — list ALL users' ITSM parent tickets.
+
+    Cross-user (an admin sees everyone's tickets), with filters mirroring the Jira
+    admin list plus the ITSM-native dimensions (state/type/assignment group). Only
+    parent tickets are listed; sub-tickets are shown nested in the detail view.
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.itsm import constants as C
+        from apps.itsm.models import ItsmTicket
+
+        qs = (
+            ItsmTicket.objects.filter(parent__isnull=True)
+            .select_related("user", "scenario")
+            .annotate(child_count=Count("children"))
+            .order_by("-updated_at")
+        )
+
+        params = request.query_params
+        user_id = params.get("user_id")
+        scenario_id = params.get("scenario_id")
+        state = params.get("state")
+        ticket_type = params.get("ticket_type")
+        team = params.get("team") or params.get("assignment_group")
+        search = (params.get("search") or "").strip()
+        status_filter = (params.get("status") or "").strip()  # open|closed|active
+
+        if user_id:
+            qs = qs.filter(user_id=user_id)
+        if scenario_id:
+            qs = qs.filter(scenario_id=scenario_id)
+        if state:
+            qs = qs.filter(state=state)
+        if ticket_type:
+            qs = qs.filter(ticket_type=ticket_type)
+        if team:
+            qs = qs.filter(assignment_group=team)
+        if status_filter == "open":
+            qs = qs.exclude(state__in=C.TERMINAL_STATES)
+        elif status_filter == "closed":
+            qs = qs.filter(state__in=C.TERMINAL_STATES)
+        elif status_filter == "active":
+            qs = qs.filter(state__in=C.ACTIVE_STATES)
+        if search:
+            qs = qs.filter(
+                Q(number__icontains=search)
+                | Q(short_description__icontains=search)
+                | Q(user__username__icontains=search)
+                | Q(user__email__icontains=search)
+                | Q(scenario__title__icontains=search)
+            )
+
+        tickets = []
+        for t in qs[:300]:
+            tickets.append({
+                "id": str(t.id),
+                "number": t.number,
+                "ticket_type": t.ticket_type,
+                "ticket_type_label": t.get_ticket_type_display(),
+                "short_description": t.short_description,
+                "state": t.state,
+                "state_label": t.get_state_display(),
+                "priority": t.priority,
+                "priority_label": t.get_priority_display(),
+                "assignment_group": t.assignment_group,
+                "assignment_group_label": C.team_label(t.assignment_group),
+                "is_closed": t.is_closed,
+                "is_active": t.is_active,
+                "sla_breached": t.sla_breached,
+                "child_count": t.child_count,
+                "user": {
+                    "id": t.user_id,
+                    "username": t.user.username,
+                    "email": t.user.email,
+                },
+                "scenario": ({
+                    "id": t.scenario_id,
+                    "slug": t.scenario.slug,
+                    "title": t.scenario.title,
+                } if t.scenario_id else None),
+                "opened_at": t.opened_at.isoformat() if t.opened_at else None,
+                "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+            })
+
+        # Counts over the WHOLE parent-ticket population (not just the filtered/limited
+        # page), so the header stats are stable regardless of the active filter.
+        base = ItsmTicket.objects.filter(parent__isnull=True)
+        total = base.count()
+        closed_count = base.filter(state__in=C.TERMINAL_STATES).count()
+        breached = sum(1 for t in base.only("state", "priority", "sla_due_at") if t.sla_breached)
+        by_state = {
+            row["state"]: row["n"]
+            for row in base.values("state").annotate(n=Count("id"))
+        }
+
+        return Response({
+            "tickets": tickets,
+            "count": len(tickets),
+            "total": total,
+            "open_count": total - closed_count,
+            "closed_count": closed_count,
+            "sla_breached_count": breached,
+            "by_state": by_state,
+        })
+
+
+class AdminItsmMetaView(APIView):
+    """GET /admin/itsm/meta/ — vocabulary (types/states/priorities/teams/actions).
+
+    Re-exposes the ITSM meta payload so the admin page can render the same dropdown
+    options the user-facing panel uses, behind the admin gate. ITSM is always-on
+    (DB-backed) so there is no "enabled" flag like Jira; we report ticket totals as
+    the health signal instead.
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.itsm.models import ItsmTicket
+        from apps.itsm.serializers import meta_payload
+
+        payload = meta_payload()
+        payload["itsm_enabled_scenarios"] = Scenario.objects.filter(
+            is_active=True, itsm_enabled=True
+        ).count()
+        payload["total_tickets"] = ItsmTicket.objects.count()
+        return Response(payload)
+
+
+def _admin_get_ticket(ticket_id):
+    """Fetch any user's ITSM ticket for admin ops (cross-user, unlike the user view)."""
+    from apps.itsm.models import ItsmTicket
+
+    return (
+        ItsmTicket.objects.select_related("parent", "scenario", "session", "user")
+        .filter(pk=ticket_id)
+        .first()
+    )
+
+
+class AdminItsmTicketDetailView(APIView):
+    """GET /admin/itsm/tickets/<id>/ — full ticket: activity stream + sub-tickets.
+
+    Returns the same rich serialization the user panel consumes (notes + children +
+    SLA), plus the owning user, so the admin sees exactly what the operator sees.
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request, ticket_id):
+        from apps.itsm.serializers import serialize_ticket
+
+        ticket = _admin_get_ticket(ticket_id)
+        if not ticket:
+            return Response({"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND)
+        data = serialize_ticket(ticket, include_notes=True, include_children=True)
+        data["user"] = {
+            "id": ticket.user_id,
+            "username": ticket.user.username,
+            "email": ticket.user.email,
+        }
+        data["scenario"] = ({
+            "id": ticket.scenario_id,
+            "slug": ticket.scenario.slug,
+            "title": ticket.scenario.title,
+        } if ticket.scenario_id else None)
+        return Response(data)
+
+
+class AdminItsmTicketActionView(APIView):
+    """POST /admin/itsm/tickets/<id>/action/ — admin-drive a ticket.
+
+    One endpoint, many actions (kept in one view so the admin client mirrors the
+    compact Jira admin client). Each action delegates to apps.itsm.services so no
+    lifecycle logic is duplicated here. The acting admin is recorded as the note
+    author (services stamps user.get_username()).
+
+    Body: {"action": <name>, ...action-specific fields}
+      transition   {state, close_code?, close_notes?}
+      transfer     {team, reason?}
+      comment      {message}            → records a comment + assignment-group bot reply
+      sub_ticket   {action_kind|team, short_description?, description?, action_params?, priority?, auto_fulfil?}
+      fulfil       {}                   → (re)run a sub-ticket's team action
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request, ticket_id):
+        from apps.itsm import constants as C
+        from apps.itsm.serializers import serialize_note, serialize_ticket
+        from apps.itsm.services import (
+            ask_assignment_group,
+            fulfil_sub_ticket,
+            raise_sub_ticket,
+            transfer_ticket,
+            transition_ticket,
+        )
+
+        ticket = _admin_get_ticket(ticket_id)
+        if not ticket:
+            return Response({"error": "Ticket not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        action = (request.data.get("action") or "").strip()
+        try:
+            if action == "transition":
+                new_state = (request.data.get("state") or "").strip()
+                if not new_state:
+                    return Response({"error": "state is required"}, status=status.HTTP_400_BAD_REQUEST)
+                transition_ticket(
+                    ticket, new_state, user=request.user,
+                    close_code=(request.data.get("close_code") or "").strip(),
+                    close_notes=(request.data.get("close_notes") or "").strip(),
+                )
+
+            elif action == "transfer":
+                team = (request.data.get("team") or "").strip()
+                if not team:
+                    return Response({"error": "team is required"}, status=status.HTTP_400_BAD_REQUEST)
+                transfer_ticket(ticket, team, user=request.user, reason=(request.data.get("reason") or "").strip())
+
+            elif action == "comment":
+                message = (request.data.get("message") or request.data.get("question") or "").strip()
+                if not message:
+                    return Response({"error": "message is required"}, status=status.HTTP_400_BAD_REQUEST)
+                result = ask_assignment_group(ticket, message[:2000], user=request.user)
+                ticket.refresh_from_db()
+                return Response({
+                    "comment": serialize_note(result["comment"]),
+                    "reply": serialize_note(result["reply"]),
+                    "ticket": serialize_ticket(ticket, include_notes=True, include_children=True),
+                })
+
+            elif action == "sub_ticket":
+                if ticket.is_sub_ticket:
+                    return Response({"error": "Cannot raise a sub-ticket from a sub-ticket."}, status=status.HTTP_400_BAD_REQUEST)
+                action_kind = (request.data.get("action_kind") or "").strip()
+                team = (request.data.get("team") or "").strip()
+                if not action_kind and not team:
+                    return Response({"error": "action_kind or team is required"}, status=status.HTTP_400_BAD_REQUEST)
+                action_params = request.data.get("action_params") or {}
+                if not isinstance(action_params, dict):
+                    return Response({"error": "action_params must be an object"}, status=status.HTTP_400_BAD_REQUEST)
+                sub = raise_sub_ticket(
+                    ticket,
+                    user=request.user,
+                    team=team,
+                    action_kind=action_kind,
+                    short_description=(request.data.get("short_description") or "").strip(),
+                    description=(request.data.get("description") or "").strip(),
+                    action_params=action_params,
+                    priority=(request.data.get("priority") or C.PRIORITY_MODERATE),
+                )
+                if request.data.get("auto_fulfil", True):
+                    fulfil_sub_ticket(sub)
+                ticket.refresh_from_db()
+                return Response({
+                    "sub_ticket": serialize_ticket(sub, include_notes=True),
+                    "ticket": serialize_ticket(ticket, include_notes=True, include_children=True),
+                }, status=status.HTTP_201_CREATED)
+
+            elif action == "fulfil":
+                if not ticket.is_sub_ticket:
+                    return Response({"error": "Only sub-tickets can be fulfilled by a team."}, status=status.HTTP_400_BAD_REQUEST)
+                fulfil_sub_ticket(ticket)
+
+            else:
+                return Response(
+                    {"error": "Unknown action. Use transition, transfer, comment, sub_ticket or fulfil."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        ticket.refresh_from_db()
+        return Response(serialize_ticket(ticket, include_notes=True, include_children=True))
