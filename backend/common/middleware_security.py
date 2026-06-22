@@ -167,6 +167,34 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
         return response
 
 
+def _ip_in_allowlist(client_ip, allowed):
+    """True if client_ip exactly matches an entry OR falls inside a CIDR subnet.
+
+    Entries may be plain IPs (203.0.113.4) or CIDR subnets (10.0.0.0/24,
+    2001:db8::/32). Malformed entries and IPs are ignored safely (deny).
+    """
+    if not client_ip:
+        return False
+    import ipaddress
+    try:
+        ip = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return client_ip in allowed
+    for entry in allowed:
+        entry = (entry or "").strip()
+        if not entry:
+            continue
+        if entry == client_ip:
+            return True
+        if "/" in entry:
+            try:
+                if ip in ipaddress.ip_network(entry, strict=False):
+                    return True
+            except ValueError:
+                continue
+    return False
+
+
 class AdminIPRestrictionMiddleware(MiddlewareMixin):
     """
     Restrict Django admin and admin API to configured IP addresses.
@@ -218,8 +246,8 @@ class AdminIPRestrictionMiddleware(MiddlewareMixin):
                 )
             return None
 
-        # An allowlist is configured: permit listed IPs plus loopback callers.
-        if client_ip in allowed_ips or is_loopback:
+        # An allowlist is configured: permit listed IPs/subnets plus loopback.
+        if is_loopback or _ip_in_allowlist(client_ip, allowed_ips):
             return None
 
         logger.warning("Admin access denied for IP %s on %s", client_ip, path)

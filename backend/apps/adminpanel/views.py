@@ -4769,18 +4769,25 @@ _MANAGED_ENV_VARS = [
         "description": "Email server password.",
     },
     {
-        "key": "ANTHROPIC_API_KEY",
-        "label": "Anthropic API Key",
-        "category": "ai",
+        "key": "RAZORPAY_KEY_ID",
+        "label": "Razorpay Key ID",
+        "category": "payments",
         "rotation_days": 365,
-        "description": "Claude AI API key.",
+        "description": "Razorpay publishable key id (paired with the key secret).",
     },
     {
-        "key": "OPENAI_API_KEY",
-        "label": "OpenAI API Key",
-        "category": "ai",
+        "key": "RAZORPAY_WEBHOOK_SECRET",
+        "label": "Razorpay Webhook Secret",
+        "category": "payments",
         "rotation_days": 365,
-        "description": "OpenAI API key (if used).",
+        "description": "Verifies Razorpay payment webhooks (optional but recommended).",
+    },
+    {
+        "key": "JWT_HS256_SECRET",
+        "label": "JWT Signing Secret",
+        "category": "security",
+        "rotation_days": 180,
+        "description": "Signs auth tokens. Rotating it logs everyone out — rotate deliberately.",
     },
     {
         "key": "BACKUP_OFFSITE_ENABLED",
@@ -4816,6 +4823,27 @@ _MANAGED_ENV_VARS = [
         "category": "database",
         "rotation_days": 3650,
         "description": "Region slug (e.g. blr1) for off-site backups.",
+    },
+    {
+        "key": "ADMIN_ALLOWED_IPS",
+        "label": "Admin allowed IPs / subnets",
+        "category": "access",
+        "rotation_days": 3650,
+        "description": "Comma-separated IPs or CIDR subnets (e.g. 203.0.113.4, 10.0.0.0/24) allowed to reach the admin panel. Empty = any IP (still superuser-gated). Applied live on sync.",
+    },
+    {
+        "key": "SENTRY_DSN",
+        "label": "Sentry DSN",
+        "category": "monitoring",
+        "rotation_days": 3650,
+        "description": "Error-tracking DSN (PII-scrubbed before send). Empty disables Sentry.",
+    },
+    {
+        "key": "ALERT_WEBHOOK_URL",
+        "label": "Alert webhook URL",
+        "category": "monitoring",
+        "rotation_days": 3650,
+        "description": "Slack/Discord/webhook URL for business + health alerts.",
     },
 ]
 
@@ -4986,7 +5014,11 @@ class AdminEnvSecretsView(APIView):
             os.environ[k] = v
         # Update Django settings for values it reads from env
         for k, v in clean.items():
-            if hasattr(settings, k):
+            if k == "ADMIN_ALLOWED_IPS":
+                # settings stores this as a parsed list (see settings.py), not a
+                # raw string, so the IP-allowlist middleware can match entries.
+                settings.ADMIN_ALLOWED_IPS = [ip.strip() for ip in v.split(",") if ip.strip()]
+            elif hasattr(settings, k):
                 setattr(settings, k, v)
         # Clear all caches so components re-read settings
         try:
