@@ -127,11 +127,24 @@ prepull_grader_images() {
   # unreachable this must never red the deploy (grading just stays in its
   # current saved-for-review state, no regression).
   echo "[grader] Pre-pull sandbox base images on D4 Labs (non-fatal)"
+  # docker-over-ssh from the D2 HOST root uses the host's default key, which is
+  # NOT authorized on D4 (that is the "Permission denied (publickey)" seen in
+  # the pre-pull). Point ssh at the dedicated labs key that ci-setup-labs-ssh.sh
+  # installed at /opt/fixitlab/deploy/labs_ssh/id_ed25519 (the same key the
+  # backend container uses) via a host-scoped ssh config block — only for the
+  # labs host, so it can't affect the deploy's other SSH. Fully non-fatal.
   remote "$APP_PRIVATE_IP" via-edge \
-    "export DOCKER_HOST=ssh://root@${LABS_PRIVATE_IP}
+    "set +e
+LK=/opt/fixitlab/deploy/labs_ssh/id_ed25519
+if [ ! -f \"\$LK\" ]; then echo '  labs key missing on D2 — skipping prepull'; exit 0; fi
+install -m 700 -d /root/.ssh
+sed -i '/# fixitlab-labs-docker/,+5d' /root/.ssh/config 2>/dev/null || true
+printf '# fixitlab-labs-docker\nHost ${LABS_PRIVATE_IP}\n  IdentityFile %s\n  IdentitiesOnly yes\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n' \"\$LK\" >> /root/.ssh/config
+chmod 600 /root/.ssh/config
+export DOCKER_HOST=ssh://root@${LABS_PRIVATE_IP}
 docker pull ${SANDBOX_PYTHON_IMAGE:-python:3.12-alpine} || true
 docker pull ${SANDBOX_NODE_IMAGE:-node:20-alpine} || true
-docker images | grep -E 'python:3.12-alpine|node:20-alpine' || true" || true
+docker images | grep -E 'python:3.12-alpine|node:20-alpine' && echo '[grader] sandbox images present on D4' || echo '[grader] WARN: images still absent on D4'" || true
 }
 
 main() {
