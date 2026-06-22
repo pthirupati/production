@@ -165,28 +165,40 @@ def run_auth_token_flow(s, token: str, email: str, password: str, refresh_hint: 
     from e2e_production_test import clear_rate_limit_cache
 
     refresh = refresh_hint or ""
+    # Use a FRESH access token for the mutating auth calls below. A real client
+    # always uses the token returned by its latest login/refresh — never a stale
+    # pre-refresh access token. Reusing the original `token` after a refresh is an
+    # unrealistic pattern that only worked by luck before refresh rotated the
+    # session jti; mint/capture the current token instead.
     if not refresh:
         clear_rate_limit_cache()
-        _, login_data = login(email, password)
+        fresh_token, login_data = login(email, password)
+        if fresh_token:
+            token = fresh_token
         refresh = (login_data or {}).get("refresh", "")
     if not refresh:
         refresh = _mint_refresh_token(email)
     if refresh:
         st, refresh_data = api("POST", "/api/auth/refresh/", data={"refresh": refresh})
         s.record("Auth refresh token", st in (200, 429), st)
-        if st == 200 and isinstance(refresh_data, dict) and refresh_data.get("refresh"):
-            refresh = refresh_data["refresh"]
+        if st == 200 and isinstance(refresh_data, dict):
+            if refresh_data.get("refresh"):
+                refresh = refresh_data["refresh"]
+            if refresh_data.get("access"):
+                token = refresh_data["access"]  # rotated access token (what a client uses next)
     else:
         s.record("Auth refresh token", False, detail="no refresh token available")
 
-    st, _ = api("POST", "/api/auth/change-password/", token=token, data={
+    st, body = api("POST", "/api/auth/change-password/", token=token, data={
         "old_password": password,
         "new_password": password,
     })
-    s.record("Auth change-password", st in (200, 400), st)
+    s.record("Auth change-password", st in (200, 400), st,
+             detail=str(body)[:160] if st not in (200, 400) else "")
 
-    st, _ = api("POST", "/api/auth/logout/", token=token, data={"refresh": refresh})
-    s.record("Auth logout", st in (200, 204, 400), st)
+    st, body = api("POST", "/api/auth/logout/", token=token, data={"refresh": refresh})
+    s.record("Auth logout", st in (200, 204, 400), st,
+             detail=str(body)[:160] if st not in (200, 204, 400) else "")
     # Re-login for remaining tests
     new_token, _ = login(email, password)
     return new_token or token
