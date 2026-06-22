@@ -1,0 +1,102 @@
+# LFCS (Linux Foundation Certified SysAdmin) track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs by their published exam-objective area. Objective titles are generic,
+# published exam-domain concepts; all referenced scenario content is original
+# FixitLab content. Weights are relative and sum to 100 for readability.
+
+track:
+  slug: lfcs
+  code: LFCS
+  name: Linux Foundation Certified SysAdmin
+  vendor: The Linux Foundation
+  description: >
+    Performance-based preparation for the LFCS exam. Every objective maps to
+    live break-fix and build labs covering the essential command line, running
+    systems, users and groups, networking, and storage on Linux hosts.
+  technology_slug: linux
+  exam_duration_minutes: 120
+  passing_score: 67
+  validity_months: 36
+  order: 2
+
+objectives:
+  - code: lfcs.essential-commands
+    title: Essential commands
+    weight: 20
+    order: 1
+    scenarios:
+      - linux-ssh-key-auth-fail
+      - ssh-key-permissions
+      - ssh-copy-id-remote
+      - scp-rsync-remote-sync
+      - linux-sftp-chroot
+      - umask-wrong-newfiles
+      - broken-symlink-chain
+      - acl-permission-denied
+      - chattr-immutable-config
+      - write-backup-script-do
+
+  - code: lfcs.operations
+    title: Operation of running systems
+    weight: 22
+    order: 2
+    scenarios:
+      - systemd-unit-wont-start
+      - linux-high-load-no-cpu
+      - linux-zombie-process-kill
+      - linux-renice-runaway-process-priority
+      - journald-var-log-full
+      - linux-cron-not-running
+      - linux-crontab-syntax-error
+      - linux-systemd-timer-not-firing
+      - linux-at-job-not-scheduled
+      - sim-rhel-patching
+
+  - code: lfcs.users-groups
+    title: Users and groups
+    weight: 18
+    order: 3
+    scenarios:
+      - broken-useradd
+      - user-invalid-primary-group
+      - user-nologin-shell
+      - broken-sudoers
+      - linux-sudoers-syntax-error
+      - linux-sudo-access
+      - sudo-secure-path-broken
+      - account-locked-faillock
+      - password-change-broken
+
+  - code: lfcs.networking
+    title: Networking
+    weight: 20
+    order: 4
+    scenarios:
+      - linux-default-gateway-missing
+      - linux-resolv-conf-wrong
+      - resolv-dead-nameserver
+      - linux-nftables-port-blocked
+      - linux-iptables-allow-port
+      - linux-sysctl-ip-forward
+      - static-route-broken
+      - dns-resolution-broken
+      - ntp-sync-failed
+      - chrony-not-syncing
+
+  - code: lfcs.storage
+    title: Storage management
+    weight: 20
+    order: 5
+    scenarios:
+      - linux-lvm-create-mount
+      - lvm-add-pv-extend
+      - linux-lvm-grow-xfs-growfs-mount
+      - linux-fdisk-partition-mkfs-mount
+      - linux-parted-gpt-mkfs-mount
+      - linux-swap-create
+      - linux-fstab-mount-by-uuid-mkfs-mount
+      - fstab-bad-uuid
+      - mdadm-degraded-array
+      - linux-quota-not-enforced

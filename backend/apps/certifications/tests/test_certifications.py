@@ -84,7 +84,12 @@ class CertificationsTestCase(APITestCase):
     def test_track_list(self):
         resp = self.client.get("/api/certifications/")
         self.assertEqual(resp.status_code, 200)
-        self.assertIn("RHCSA", [t["code"] for t in resp.data["tracks"]])
+        codes = {t["code"] for t in resp.data["tracks"]}
+        # All seven seeded tracks should be active and listed.
+        self.assertEqual(
+            codes,
+            {"RHCSA", "RHCE", "CKA", "CKAD", "CKS", "LFCS", "TF-ASSOCIATE"},
+        )
 
     def test_track_detail_anonymous_zero_progress(self):
         resp = self.client.get("/api/certifications/rhcsa/")

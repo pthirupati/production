@@ -1,0 +1,92 @@
+# Terraform Associate (HashiCorp) track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs grouped by published exam-objective area. Objective titles are generic,
+# published exam-domain concepts; all referenced scenario content is original
+# FixitLab content. Weights are relative and sum to 100 for readability.
+#
+# Objectives draw from the scenarios/terraform/ library, focusing on the
+# Terraform-native CLI, state, module, provider, and configuration scenarios.
+
+track:
+  slug: terraform-associate
+  code: TF-ASSOCIATE
+  name: HashiCorp Certified - Terraform Associate
+  vendor: HashiCorp
+  description: >
+    Hands-on preparation for the Terraform Associate exam. Every objective maps
+    to live break-fix and build labs covering infrastructure as code, the core
+    Terraform workflow, the CLI, modules, providers, state management, and
+    configuration authoring.
+  technology_slug: terraform
+  exam_duration_minutes: 60
+  passing_score: 70
+  validity_months: 24
+  order: 4
+
+objectives:
+  - code: terraform-associate.iac-concepts
+    title: Understand infrastructure as code concepts
+    weight: 8
+    order: 1
+    scenarios:
+      - provision-s3-bucket-do
+      - terraform-import-drift
+
+  - code: terraform-associate.terraform-purpose
+    title: Understand the purpose of Terraform versus other IaC
+    weight: 8
+    order: 2
+    scenarios:
+      - terraform-vmware-vm-clone-from-template
+      - terraform-plan-destroy-protection
+
+  - code: terraform-associate.terraform-basics
+    title: Understand Terraform basics
+    weight: 14
+    order: 3
+    scenarios:
+      - terraform-provider-version-conflict
+      - terraform-provider-auth-expired
+      - terraform-module-version-pinning
+
+  - code: terraform-associate.cli
+    title: Use the Terraform CLI outside the core workflow
+    weight: 14
+    order: 4
+    scenarios:
+      - terraform-workspace-wrong
+      - terraform-partial-apply-target
+      - terraform-count-foreach-drift
+
+  - code: terraform-associate.modules
+    title: Interact with Terraform modules
+    weight: 12
+    order: 5
+    scenarios:
+      - terraform-module-unpinned-broke
+
+  - code: terraform-associate.core-workflow
+    title: Use the core Terraform workflow
+    weight: 14
+    order: 6
+    scenarios:
+      - terraform-plan-unexpected-destroy
+
+  - code: terraform-associate.state
+    title: Implement and maintain state
+    weight: 18
+    order: 7
+    scenarios:
+      - terraform-backend-lock-stuck
+      - terraform-state-backend-corrupt
+      - terraform-remote-state-empty
+
+  - code: terraform-associate.configuration
+    title: Read, generate, and modify configuration
+    weight: 12
+    order: 8
+    scenarios:
+      - terraform-variable-sensitive
+      - terraform-output-sensitive-leak

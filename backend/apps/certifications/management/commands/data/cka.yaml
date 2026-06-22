@@ -1,0 +1,112 @@
+# CKA (Certified Kubernetes Administrator) track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs by their published exam-domain area. Objective titles are generic,
+# published exam-domain concepts (CNCF CKA curriculum); all referenced scenario
+# content is original FixitLab content. Weights are relative and sum to 100 for
+# readability.
+#
+# Cluster architecture currently leans on RBAC plus VMware-backed node-lifecycle
+# labs (drain, scale-out, node recovery) as an interim mapping; native kubeadm
+# install, etcd backup/restore, and cluster-upgrade scenarios are a planned
+# follow-up increment.
+
+track:
+  slug: cka
+  code: CKA
+  name: Certified Kubernetes Administrator
+  vendor: Cloud Native Computing Foundation
+  description: >
+    Hands-on preparation for the performance-based CKA exam. Every objective
+    maps to live break-fix and build labs across a real Kubernetes cluster —
+    cluster architecture and access control, workloads and scheduling, services
+    and networking, storage, and end-to-end troubleshooting.
+  technology_slug: kubernetes
+  exam_duration_minutes: 120
+  passing_score: 66
+  validity_months: 36
+  order: 2
+
+objectives:
+  - code: cka.cluster-architecture
+    title: Cluster architecture, installation and configuration
+    weight: 25
+    order: 1
+    scenarios:
+      - k8s-rbac-sa-forbidden
+      - sim-k8s-rbac
+      - k8s-drain-node-poweroff-vmware
+      - k8s-scale-out-add-vmware-node
+      - sim-k8s-node-uncordon
+      - k8s-node-notready-vmware-reset
+      - k8s-daemonset-needs-node-vmware
+      - k8s-daemonset-taint-toleration
+
+  - code: cka.workloads
+    title: Workloads and scheduling
+    weight: 15
+    order: 2
+    scenarios:
+      - k8s-deployment-replicas-zero
+      - k8s-deployment-rollout-failed
+      - k8s-rollout-stuck-maxunavailable
+      - k8s-pending-nodeselector
+      - k8s-topology-spread-unschedulable
+      - k8s-priorityclass-preemption
+      - k8s-pending-quota-exhausted
+      - sim-k8s-resource-quota
+      - sim-k8s-configmap-missing
+
+  - code: cka.networking
+    title: Services and networking
+    weight: 20
+    order: 3
+    scenarios:
+      - k8s-service-selector-typo
+      - sim-k8s-service-not-ready
+      - sim-k8s-endpoints-fix
+      - k8s-ingress-pathtype-404
+      - sim-k8s-ingress-404
+      - k8s-gateway-api-routing
+      - k8s-coredns-failing
+      - k8s-netpol-block-egress
+      - k8s-network-policy-block
+      - k8s-lb-service-pending
+      - k8s-loadbalancer-pending
+
+  - code: cka.storage
+    title: Storage
+    weight: 10
+    order: 4
+    scenarios:
+      - k8s-pvc-pending
+      - k8s-pvc-missing-storageclass
+      - sim-k8s-pvc-storageclass
+      - k8s-configmap-stale-mount
+
+  - code: cka.troubleshooting
+    title: Troubleshooting
+    weight: 30
+    order: 5
+    scenarios:
+      - k8s-node-notready
+      - k8s-crashloop-bad-liveness
+      - k8s-crashloop-missing-env
+      - k8s-crashloop-readonly-rootfs
+      - sim-k8s-crashloop
+      - k8s-pod-oomkilled-limit
+      - k8s-pod-evicted-disk-pressure
+      - k8s-pod-stuck-terminating
+      - k8s-init-container-blocking
+      - k8s-sidecar-crashloop
+      - k8s-imagepull-wrong-tag
+      - sim-k8s-imagepull-fix
+      - k8s-deployment-imagepull
+      - k8s-deployment-image-digest-stale
+      - k8s-readiness-gate-stuck
+      - k8s-statefulset-stuck-ordered
+      - k8s-job-backofflimit-exceeded
+      - k8s-hpa-no-metrics
+      - k8s-manifest-port-fix
+      - k8s-service-unreachable

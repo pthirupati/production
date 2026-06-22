@@ -1,0 +1,105 @@
+# CKS (Certified Kubernetes Security Specialist) track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs by their published exam-objective area. Objective titles are generic,
+# published exam-domain concepts; all referenced scenario content is original
+# FixitLab content. Weights are relative and sum to 100 for readability.
+#
+# CKS draws from both Kubernetes and Linux/container security scenarios:
+# securing the cluster, the workloads, the supply chain, and the host, plus
+# runtime detection and response. Several objectives reuse existing security
+# scenarios as an interim mapping; native Kubernetes-policy and admission
+# scenarios are a planned follow-up increment.
+
+track:
+  slug: cks
+  code: CKS
+  name: Certified Kubernetes Security Specialist
+  vendor: Cloud Native Computing Foundation
+  description: >
+    Performance-based preparation for securing Kubernetes clusters end to end.
+    Every objective maps to live break-fix labs across cluster and host
+    hardening, workload isolation, supply-chain integrity, and runtime
+    detection — from RBAC and network policy to container escape and audit.
+  technology_slug: kubernetes
+  exam_duration_minutes: 120
+  passing_score: 67
+  validity_months: 24
+  order: 4
+
+objectives:
+  - code: cks.cluster-setup
+    title: Cluster setup
+    weight: 10
+    order: 1
+    scenarios:
+      - k8s-netpol-block-egress
+      - k8s-network-policy-block
+      - k8s-coredns-failing
+      - k8s-ingress-pathtype-404
+      - ssl-cert-expired
+      - openssl-cert-revoked
+
+  - code: cks.cluster-hardening
+    title: Cluster hardening
+    weight: 15
+    order: 2
+    scenarios:
+      - k8s-rbac-sa-forbidden
+      - sim-k8s-rbac
+      - k8s-pending-quota-exhausted
+      - sim-k8s-resource-quota
+      - openssl-heartbleed
+
+  - code: cks.system-hardening
+    title: System hardening
+    weight: 15
+    order: 3
+    scenarios:
+      - kernel-module-unsigned
+      - kernel-exploit-mitigate
+      - suid-bit-unauthorized
+      - suid-privilege-escalation
+      - iptables-default-accept
+      - world-writable-files
+      - security-linux-ssh-cis-hardening
+
+  - code: cks.microservice-vulnerabilities
+    title: Minimize microservice vulnerabilities
+    weight: 20
+    order: 4
+    scenarios:
+      - k8s-crashloop-readonly-rootfs
+      - docker-socket-exposed
+      - docker-escape-attempt
+      - redis-no-auth
+      - mysql-remote-root
+      - ldap-anonymous-bind
+      - crypto-weak-algorithm
+
+  - code: cks.supply-chain-security
+    title: Supply chain security
+    weight: 20
+    order: 5
+    scenarios:
+      - k8s-deployment-image-digest-stale
+      - k8s-imagepull-wrong-tag
+      - k8s-deployment-imagepull
+      - sim-k8s-imagepull-fix
+      - cve-2021-44228-detection
+      - security-java-log4shell-jndi-lookup
+      - file-integrity-tripwire
+
+  - code: cks.runtime-security
+    title: Monitoring, logging and runtime security
+    weight: 20
+    order: 6
+    scenarios:
+      - audit-log-cleared
+      - log-tampering-detect
+      - rootkit-detection
+      - hids-alert-review
+      - ossec-false-positive
+      - snort-ids-alert
+      - buffer-overflow-detect

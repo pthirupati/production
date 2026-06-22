@@ -1,0 +1,99 @@
+# CKAD (Certified Kubernetes Application Developer) track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs by their published exam-objective area. Objective titles are generic,
+# published exam-domain concepts; all referenced scenario content is original
+# FixitLab content. Weights are relative and sum to 100 for readability.
+
+track:
+  slug: ckad
+  code: CKAD
+  name: Certified Kubernetes Application Developer
+  vendor: Cloud Native Computing Foundation
+  description: >
+    Hands-on preparation for the performance-based CKAD exam. Every objective
+    maps to live break-fix and build labs that exercise designing, deploying,
+    observing, configuring, and networking containerized applications on
+    Kubernetes.
+  technology_slug: kubernetes
+  exam_duration_minutes: 120
+  passing_score: 66
+  validity_months: 36
+  order: 3
+
+objectives:
+  - code: ckad.design-build
+    title: Application design and build
+    weight: 20
+    order: 1
+    scenarios:
+      - build-docker-image-do
+      - docker-multistage-bloat
+      - docker-build-arg-undefined
+      - docker-dockerfile-cache-bust
+      - docker-no-dockerignore
+      - k8s-init-container-blocking
+      - k8s-sidecar-crashloop
+      - k8s-job-backofflimit-exceeded
+      - docker-compose-to-k8s-manifest-migration
+
+  - code: ckad.deployment
+    title: Application deployment
+    weight: 20
+    order: 2
+    scenarios:
+      - deploy-nginx-k8s-do
+      - k8s-deployment-rollout-failed
+      - k8s-rollout-stuck-maxunavailable
+      - k8s-deployment-replicas-zero
+      - k8s-deployment-image-digest-stale
+      - k8s-hpa-scaling
+      - k8s-hpa-no-metrics
+      - k8s-statefulset-stuck-ordered
+
+  - code: ckad.observability
+    title: Application observability and maintenance
+    weight: 15
+    order: 3
+    scenarios:
+      - sim-k8s-crashloop
+      - k8s-crashloop-bad-liveness
+      - k8s-readiness-gate-stuck
+      - k8s-pod-oomkilled-limit
+      - docker-healthcheck-wrong
+      - docker-healthcheck-interval-aggressive
+      - docker-logging-unbounded
+
+  - code: ckad.config-security
+    title: Application environment, configuration and security
+    weight: 25
+    order: 4
+    scenarios:
+      - sim-k8s-configmap-missing
+      - k8s-configmap-stale-mount
+      - k8s-crashloop-missing-env
+      - k8s-crashloop-readonly-rootfs
+      - sim-k8s-rbac
+      - k8s-rbac-sa-forbidden
+      - sim-k8s-resource-quota
+      - k8s-pending-quota-exhausted
+      - k8s-pvc-pending
+      - sim-k8s-pvc-storageclass
+      - docker-secrets-in-env
+
+  - code: ckad.services-networking
+    title: Services and networking
+    weight: 20
+    order: 5
+    scenarios:
+      - sim-k8s-service-not-ready
+      - k8s-service-selector-typo
+      - k8s-service-unreachable
+      - sim-k8s-endpoints-fix
+      - sim-k8s-ingress-404
+      - k8s-ingress-pathtype-404
+      - k8s-gateway-api-routing
+      - k8s-network-policy-block
+      - k8s-netpol-block-egress
+      - k8s-loadbalancer-pending

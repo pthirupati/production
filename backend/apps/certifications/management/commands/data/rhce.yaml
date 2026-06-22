@@ -1,0 +1,120 @@
+# RHCE (Red Hat Certified Engineer, EX294 — Ansible automation on RHEL)
+# track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs by their published exam-objective area. Objective titles are generic,
+# published exam-domain concepts; all referenced scenario content is original
+# FixitLab content. Weights are relative and sum to 100 for readability.
+#
+# Every referenced slug is a real scenario under scenarios/ansible/.
+
+track:
+  slug: rhce
+  code: RHCE
+  name: Red Hat Certified Engineer (EX294)
+  vendor: Red Hat
+  description: >
+    Hands-on preparation for the RHCE performance-based exam (EX294), focused on
+    automating Red Hat Enterprise Linux administration with Ansible. Every
+    objective maps to live break-fix labs across inventories, playbooks, roles,
+    task control, variables and templates, vault secrets, and system tasks.
+  technology_slug: ansible
+  exam_duration_minutes: 240
+  passing_score: 70
+  validity_months: 36
+  order: 2
+
+objectives:
+  - code: rhce.core-components
+    title: Understand core components of Ansible
+    weight: 12
+    order: 1
+    scenarios:
+      - ansible-yaml-indentation
+      - ansible-playbook-syntax-error
+      - ansible-connection-local-wrong
+      - ansible-env-var-not-passed
+      - ansible-callback-plugin
+
+  - code: rhce.install-config
+    title: Install and configure an Ansible control node and managed nodes
+    weight: 16
+    order: 2
+    scenarios:
+      - configure-ansible-inventory
+      - ansible-inventory-group-vars
+      - ansible-inventory-unreachable
+      - sim-rhel-ansible-ssh
+      - sim-ansible-ssh-key
+      - ansible-become-password-missing
+      - ansible-become-user-wrong
+      - ansible-delegate-to-wrong
+
+  - code: rhce.playbooks
+    title: Run playbooks and use Ansible modules
+    weight: 14
+    order: 3
+    scenarios:
+      - sim-ansible-playbook-fail
+      - ansible-package-name-wrong
+      - ansible-tags-misused
+      - ansible-serial-too-high
+      - ansible-strategy-free-unsafe
+      - ansible-async-poll-wrong
+      - ansible-uri-validate-certs
+
+  - code: rhce.roles-collections
+    title: Create and use roles and collections
+    weight: 10
+    order: 4
+    scenarios:
+      - ansible-galaxy-role-missing
+      - ansible-import-vs-include
+      - ansible-handler-flush
+
+  - code: rhce.task-control
+    title: Use task control, conditionals, handlers, and error handling
+    weight: 18
+    order: 5
+    scenarios:
+      - ansible-loop-wrong-var
+      - ansible-with-items-deprecated
+      - ansible-register-loop-results
+      - ansible-when-condition-bug
+      - ansible-changed-when-wrong
+      - ansible-failed-when-wrong
+      - ansible-handler-missing
+      - ansible-handler-not-notified
+      - ansible-block-rescue-missing
+      - ansible-retries-until
+
+  - code: rhce.variables-templates
+    title: Manage variables, facts, and Jinja2 templates
+    weight: 16
+    order: 6
+    scenarios:
+      - ansible-variable-undefined
+      - ansible-vars-precedence-bug
+      - ansible-set-fact-scope
+      - ansible-fact-caching-stale
+      - ansible-jinja-template-error
+      - ansible-template-trim-blocks
+      - ansible-template-validate
+      - ansible-copy-vs-template
+      - ansible-lineinfile-regex
+
+  - code: rhce.system-admin
+    title: Automate standard RHEL administration tasks with playbooks
+    weight: 14
+    order: 7
+    scenarios:
+      - ansible-service-enabled-missing
+      - ansible-user-ssh-key
+      - ansible-cron-special-time
+      - ansible-mount-fstab-missing
+      - ansible-firewalld-permanent
+      - ansible-selinux-context
+      - ansible-vault-id-wrong
+      - ansible-no-log-leaking-secret
+      - ansible-deploy-to-k8s-kubeconfig

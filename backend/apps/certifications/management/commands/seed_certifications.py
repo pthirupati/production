@@ -28,7 +28,15 @@ from apps.certifications.models import (
 from apps.question_bank.models import Scenario, Technology
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-TRACK_FILES = ["rhcsa.yaml"]
+TRACK_FILES = [
+    "rhcsa.yaml",
+    "rhce.yaml",
+    "cka.yaml",
+    "ckad.yaml",
+    "cks.yaml",
+    "lfcs.yaml",
+    "terraform-associate.yaml",
+]
 
 
 class Command(BaseCommand):
