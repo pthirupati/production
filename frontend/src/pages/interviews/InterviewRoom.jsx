@@ -13,6 +13,7 @@ import {
 } from '../../utils/mediaDevices'
 import InterviewVideoPreview from '../../components/interviews/InterviewVideoPreview'
 import PracticalAnswerPanel from '../../components/interviews/PracticalAnswerPanel'
+import CoachingTip from '../../components/interviews/CoachingTip'
 import { PageHeader } from '../../components/design'
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Clock, MessageSquare, Terminal,
@@ -93,6 +94,10 @@ export default function InterviewRoom() {
   const [mediaError, setMediaError] = useState('')
   const [mediaLoading, setMediaLoading] = useState(false)
   const [backgroundId, setBackgroundId] = useState('none')
+  // Practice/coaching mode (parity: interviewai.io practice mode): when on, the
+  // engine returns an instant coaching tip after each answer.
+  const [practiceMode, setPracticalCoaching] = useState(false)
+  const [coaching, setCoaching] = useState(null)
 
   // Keep refs in sync so the VAD loop and timers see current speaking/listening.
   useEffect(() => { isSpeakingRef.current = isSpeaking }, [isSpeaking])
@@ -465,7 +470,9 @@ export default function InterviewRoom() {
     try {
       const res = await interviewsApi.sendMessage(roundId, ans, {
         input_type: isListeningRef.current ? 'voice' : 'text',
+        practice: practiceMode,
       })
+      setCoaching(res.coaching || null)
       setMessages(m => [
         ...m,
         res.candidate_message,
@@ -1105,7 +1112,24 @@ export default function InterviewRoom() {
               </p>
             </div>
           )}
-          <div className="p-3 border-t border-surface-800 flex gap-2">
+          {practiceMode && coaching && (
+            <div className="px-3 pt-2">
+              <CoachingTip coaching={coaching} />
+            </div>
+          )}
+          <div className="p-3 border-t border-surface-800 flex gap-2 items-center">
+            <button
+              type="button"
+              onClick={() => setPracticalCoaching(v => !v)}
+              title="Practice mode — instant coaching tips after each answer"
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium shrink-0 transition-colors ${
+                practiceMode
+                  ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/40'
+                  : 'btn-secondary'
+              }`}
+            >
+              Coach {practiceMode ? 'on' : 'off'}
+            </button>
             <input
               value={answer}
               onChange={e => setAnswer(e.target.value)}

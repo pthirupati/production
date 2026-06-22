@@ -1,5 +1,12 @@
 from django.urls import path
 
+from .analytics_views import CandidateAnalyticsView, RecruiterComparisonView
+from .async_video_views import (
+    AsyncRoundFinalizeView,
+    AsyncRoundPromptsView,
+    AsyncRoundResponseView,
+    AsyncRoundReviewView,
+)
 from .billing_views import (
     CreateInterviewRazorpayOrderView,
     CreateInterviewStripeCheckoutView,
@@ -7,7 +14,19 @@ from .billing_views import (
     VerifyInterviewRazorpayPaymentView,
 )
 from .gdpr_views import InterviewDeleteResumeView, InterviewExportTranscriptsView
+from .invitation_views import (
+    AcceptInvitationView,
+    InvitationDetailView,
+    InvitationListCreateView,
+    PublicInvitationView,
+)
 from .join_views import UserPendingJoinRequestsView, UserRespondJoinRequestView
+from .report_views import InterviewRoundTranscriptView
+from .template_views import (
+    InterviewTemplateDetailView,
+    InterviewTemplateLaunchView,
+    InterviewTemplateListView,
+)
 from .voice_views import InterviewVoiceConfigView
 from . import tts_views, stt_views
 from .views import (
@@ -70,4 +89,25 @@ urlpatterns = [
     path("tts/synthesize/", tts_views.TTSSynthesizeView.as_view(), name="tts-synthesize"),
     path("stt/config/", stt_views.STTConfigView.as_view(), name="stt-config"),
     path("stt/transcribe/", stt_views.STTTranscribeView.as_view(), name="stt-transcribe"),
+
+    # --- Parity features (NEW — wire into AppRouter/client) ---
+    # Performance analytics: candidate dashboard + recruiter comparison.
+    path("analytics/me/", CandidateAnalyticsView.as_view(), name="interview-analytics-me"),
+    path("analytics/compare/", RecruiterComparisonView.as_view(), name="interview-analytics-compare"),
+    # Interview templates / job-role library + question-set launch.
+    path("templates/", InterviewTemplateListView.as_view(), name="interview-templates"),
+    path("templates/<uuid:template_id>/", InterviewTemplateDetailView.as_view(), name="interview-template-detail"),
+    path("templates/<uuid:template_id>/launch/", InterviewTemplateLaunchView.as_view(), name="interview-template-launch"),
+    # Candidate invitation flow (shareable links).
+    path("invitations/", InvitationListCreateView.as_view(), name="interview-invitations"),
+    path("invitations/<uuid:invitation_id>/", InvitationDetailView.as_view(), name="interview-invitation-detail"),
+    path("invite/<uuid:token>/", PublicInvitationView.as_view(), name="interview-invite-public"),
+    path("invite/<uuid:token>/accept/", AcceptInvitationView.as_view(), name="interview-invite-accept"),
+    # One-way async video interview.
+    path("rounds/<uuid:round_id>/async/prompts/", AsyncRoundPromptsView.as_view(), name="interview-async-prompts"),
+    path("rounds/<uuid:round_id>/async/response/", AsyncRoundResponseView.as_view(), name="interview-async-response"),
+    path("rounds/<uuid:round_id>/async/finalize/", AsyncRoundFinalizeView.as_view(), name="interview-async-finalize"),
+    path("rounds/<uuid:round_id>/async/review/", AsyncRoundReviewView.as_view(), name="interview-async-review"),
+    # Rich transcript w/ timestamps + résumé highlights mapped to questions.
+    path("rounds/<uuid:round_id>/transcript/", InterviewRoundTranscriptView.as_view(), name="interview-transcript"),
 ]

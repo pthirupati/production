@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
-import { Award, TrendingUp, AlertCircle, Share2, Calendar, Download, Linkedin, Printer } from 'lucide-react'
+import { Award, TrendingUp, AlertCircle, Share2, Calendar, Linkedin, Printer } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader } from '../../components/design'
+import CompetencyScorecard from '../../components/interviews/CompetencyScorecard'
+import ConfidenceAnalysis from '../../components/interviews/ConfidenceAnalysis'
+import TranscriptPlayer from '../../components/interviews/TranscriptPlayer'
 
 export default function InterviewReport() {
   const { roundId } = useParams()
   const location = useLocation()
   const printRef = useRef(null)
   const [round, setRound] = useState(null)
+  const [transcript, setTranscript] = useState(null)
   const report = location.state?.report || round?.report
 
   useEffect(() => {
     interviewsApi.getRound(roundId).then(setRound).catch(() => {})
+    interviewsApi.getRoundTranscript(roundId).then(setTranscript).catch(() => {})
   }, [roundId])
 
   const r = report || round?.report
@@ -43,22 +48,36 @@ export default function InterviewReport() {
   }
 
   const printReport = () => {
-    const html = `<!DOCTYPE html><html><head><title>Interview Report</title>
-<style>body{font-family:system-ui,sans-serif;padding:40px;color:#111}h1{font-size:24px}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0}
+    const comp = (r.competency_ratings || [])
+      .map(c => `<tr><td>${c.name}</td><td style="text-align:right">${Math.round(c.score || 0)}</td><td>${c.rating}</td></tr>`)
+      .join('')
+    const conf = r.confidence_analysis || {}
+    const recLabel = r.recommendation_label || ''
+    const html = `<!DOCTYPE html><html><head><title>Interview Scorecard</title>
+<style>body{font-family:system-ui,sans-serif;padding:40px;color:#111;max-width:760px;margin:auto}
+h1{font-size:24px;margin-bottom:4px}h3{margin-top:24px;border-bottom:1px solid #eee;padding-bottom:4px}
+.rec{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:bold;border:1px solid #999;margin:8px 0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
 .card{border:1px solid #ddd;border-radius:8px;padding:12px;text-align:center}
 .label{font-size:10px;text-transform:uppercase;color:#666}.score{font-size:22px;font-weight:bold}
-ul{padding-left:20px;font-size:14px;line-height:1.6}</style></head><body>
-<h1>FixitLab Interview — Round feedback</h1>
-<p>${r.passed ? 'Passed' : 'Complete'} · Overall ${Math.round(r.overall_score || 0)}/100</p>
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+td,th{padding:6px 8px;border-bottom:1px solid #eee;text-align:left}
+ul{padding-left:20px;font-size:14px;line-height:1.6}.muted{color:#666;font-size:12px}</style></head><body>
+<h1>FixitLab Interview Scorecard</h1>
+<p class="muted">${round?.title || ''} · ${r.passed ? 'Passed' : 'Complete'} · Overall ${Math.round(r.overall_score || 0)}/100</p>
+${recLabel ? `<div class="rec">Recommendation: ${recLabel}</div>` : ''}
 <div class="grid">
 ${[['Overall', r.overall_score], ['Technical', r.technical_score], ['Communication', r.communication_score],
   ['Problem solving', r.problem_solving_score], ['Practical', r.practical_score], ['Presence', r.presence_score]]
   .map(([l, v]) => `<div class="card"><div class="label">${l}</div><div class="score">${Math.round(v || 0)}</div></div>`).join('')}
 </div>
 <p>${r.summary || ''}</p>
+${comp ? `<h3>Competency scorecard</h3><table><tr><th>Competency</th><th style="text-align:right">Score</th><th>Rating</th></tr>${comp}</table>` : ''}
+${conf.confidence_score != null ? `<h3>Communication & confidence (heuristic)</h3><p>${conf.summary || ''}</p>
+<p class="muted">Confidence ${conf.confidence_score}/100 · ${conf.filler_per_100_words ?? 0} fillers/100 words · ${conf.avg_answer_words ?? 0} avg words/answer</p>` : ''}
 <h3>Strengths</h3><ul>${(r.strengths || []).map(s => `<li>${s}</li>`).join('')}</ul>
-<h3>Improve</h3><ul>${(r.improvements || []).map(s => `<li>${s}</li>`).join('')}</ul>
+<h3>Areas to improve</h3><ul>${(r.improvements || []).map(s => `<li>${s}</li>`).join('')}</ul>
+${(transcript?.transcript || []).length ? `<h3>Transcript</h3>${transcript.transcript.filter(m => m.role !== 'system').map(m => `<p style="font-size:13px"><b>${m.role === 'candidate' ? 'You' : 'Interviewer'}:</b> ${m.content}</p>`).join('')}` : ''}
 </body></html>`
     const w = window.open('', '_blank')
     if (!w) { toast.error('Allow pop-ups to print PDF'); return }
@@ -72,7 +91,7 @@ ${[['Overall', r.overall_score], ['Technical', r.technical_score], ['Communicati
     <div ref={printRef} className="max-w-2xl mx-auto space-y-6 animate-fade-in py-4">
       <PageHeader
         eyebrow="AI Interview Studio"
-        title="Round feedback"
+        title="Candidate scorecard"
         subtitle={
           round?.is_sample
             ? 'Sample complete — see your mini feedback below'
@@ -92,8 +111,11 @@ ${[['Overall', r.overall_score], ['Technical', r.technical_score], ['Communicati
           <Linkedin size={12} /> Share on LinkedIn
         </a>
         <button type="button" onClick={printReport} className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
-          <Printer size={12} /> Print / PDF
+          <Printer size={12} /> Download scorecard (PDF)
         </button>
+        <Link to="/interviews/analytics" className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
+          <TrendingUp size={12} /> My progress
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -116,6 +138,16 @@ ${[['Overall', r.overall_score], ['Technical', r.technical_score], ['Communicati
         <p className="text-sm text-surface-300">{r.summary}</p>
       </div>
 
+      {/* Parity: hiring recommendation + per-competency scorecard */}
+      <CompetencyScorecard
+        recommendation={r.recommendation}
+        recommendationLabel={r.recommendation_label}
+        competencies={r.competency_ratings}
+      />
+
+      {/* Parity: heuristic confidence / communication analysis */}
+      <ConfidenceAnalysis analysis={r.confidence_analysis} />
+
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="glass-card p-4 border border-emerald-500/20">
           <p className="text-xs font-semibold text-emerald-400 flex items-center gap-1 mb-2">
@@ -134,6 +166,13 @@ ${[['Overall', r.overall_score], ['Technical', r.technical_score], ['Communicati
           </ul>
         </div>
       </div>
+
+      {/* Parity: timestamped transcript + playback + résumé mapping */}
+      {transcript && (
+        <div className="glass-card p-4 border border-surface-800">
+          <TranscriptPlayer data={transcript} />
+        </div>
+      )}
 
       {(r.study_plan || []).length > 0 && (
         <div className="glass-card p-4 border border-surface-800">

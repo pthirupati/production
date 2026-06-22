@@ -68,7 +68,13 @@ export default function InterviewCampaign() {
   }
 
   const startRound = async (round) => {
-    navigate(`/interviews/room/${round.id}`)
+    // One-way async video rounds use the recording room; live rounds use the
+    // real-time interview room.
+    if (round.mode === 'async_video' || campaign?.mode === 'async_video') {
+      navigate(`/interviews/async/${round.id}`)
+    } else {
+      navigate(`/interviews/room/${round.id}`)
+    }
   }
 
   if (loading) return <p className="text-surface-500 text-sm p-8">Loading…</p>

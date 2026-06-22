@@ -78,6 +78,10 @@ from apps.interviews.admin_views import (
     AdminInterviewSettingsView,
     AdminInterviewVoicesView,
     AdminInterviewVoiceDetailView,
+    AdminInterviewTemplatesView,
+    AdminInterviewTemplateDetailView,
+    AdminInterviewInvitationsView,
+    AdminInterviewComparisonView,
 )
 from apps.interviews.join_views import (
     AdminRequestJoinInterviewView,
@@ -196,6 +200,10 @@ urlpatterns = [
     path("interviews/voices/", AdminInterviewVoicesView.as_view()),
     path("interviews/voices/<int:pk>/", AdminInterviewVoiceDetailView.as_view()),
     path("interviews/entitlements/", AdminInterviewEntitlementsView.as_view()),
+    path("interviews/templates/", AdminInterviewTemplatesView.as_view()),
+    path("interviews/templates/<uuid:pk>/", AdminInterviewTemplateDetailView.as_view()),
+    path("interviews/invitations/", AdminInterviewInvitationsView.as_view()),
+    path("interviews/comparison/", AdminInterviewComparisonView.as_view()),
     path("interviews/maintenance/", AdminInterviewMaintenanceView.as_view()),
     path("certificates/", AdminCertificatesView.as_view()),
 

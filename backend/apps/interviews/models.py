@@ -115,6 +115,18 @@ class InterviewCampaign(models.Model):
         default=False,
         help_text="One-time free trial interview (short duration, no certificate)",
     )
+    template = models.ForeignKey(
+        "interviews.InterviewTemplate",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="campaigns",
+    )
+    mode = models.CharField(
+        max_length=16,
+        default="live",
+        choices=[("live", "Live"), ("async_video", "One-way async video")],
+    )
     is_archived = models.BooleanField(
         default=False,
         db_index=True,
@@ -188,6 +200,13 @@ class InterviewRound(models.Model):
     av_compliant = models.BooleanField(default=False)
     av_warning_started_at = models.DateTimeField(null=True, blank=True)
     practical_lab_session_id = models.UUIDField(null=True, blank=True)
+    # Parity: one-way async video mode runs ALONGSIDE the live interview. Async
+    # rounds present prompts the candidate records answers to (MediaRecorder).
+    mode = models.CharField(
+        max_length=16,
+        default="live",
+        choices=[("live", "Live"), ("async_video", "One-way async video")],
+    )
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -299,6 +318,27 @@ class InterviewReport(models.Model):
     summary = models.TextField(blank=True, default="")
     study_plan = models.JSONField(default=list, blank=True)
     question_breakdown = models.JSONField(default=list, blank=True)
+    # Parity: structured scorecard — hiring recommendation + per-competency
+    # ratings + heuristic confidence/communication signals. All free/derived.
+    RECOMMENDATION_CHOICES = [
+        ("strong_hire", "Strong hire"),
+        ("hire", "Hire"),
+        ("maybe", "Maybe / lean hire"),
+        ("no_hire", "No hire"),
+    ]
+    recommendation = models.CharField(
+        max_length=16, choices=RECOMMENDATION_CHOICES, blank=True, default=""
+    )
+    competency_ratings = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="[{name, score, rating, note}] per-competency scorecard rows",
+    )
+    confidence_analysis = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Heuristic confidence/communication signals (filler words, pace, length)",
+    )
     generated_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -469,3 +509,171 @@ class InterviewAdminJoinRequest(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class InterviewTemplate(models.Model):
+    """Reusable job-role interview template / question-set (parity: TestGorilla
+    job-role library, interviewai.io role templates).
+
+    Defines the round plan, target technology/level, pass threshold, and an
+    optional curated set of ``InterviewQuestion`` ids the question-set builder
+    pins for this role. The live engine still GENERATES questions dynamically;
+    pinned questions seed the round (and carry practical configs). 100% free.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    slug = models.SlugField(max_length=140, unique=True)
+    name = models.CharField(max_length=160)
+    role_title = models.CharField(max_length=160, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    primary_technology = models.ForeignKey(
+        "question_bank.Technology",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="interview_templates",
+    )
+    technology_tags = models.JSONField(default=list, blank=True)
+    experience_level = models.CharField(max_length=16, default="mid")
+    round_count = models.PositiveSmallIntegerField(default=3)
+    round_plan = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of {round_type, duration_minutes, title} — overrides the default plan",
+    )
+    pass_threshold = models.FloatField(default=65.0)
+    competencies = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Named competencies this role is rated on (scorecard)",
+    )
+    pinned_question_ids = models.JSONField(default=list, blank=True)
+    is_public = models.BooleanField(
+        default=True,
+        help_text="Visible to all candidates in the template gallery",
+    )
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="interview_templates_created",
+    )
+    times_used = models.PositiveIntegerField(default=0)
+    order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class InterviewInvitation(models.Model):
+    """Shareable interview invitation (parity: aiinterviews.io / TestGorilla
+    candidate invite links). A recruiter generates a tokenised link; the invitee
+    opens it, (optionally) signs in, and takes the interview. Reuses the existing
+    free email for delivery — no paid email service.
+    """
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("opened", "Opened"),
+        ("accepted", "Accepted"),
+        ("completed", "Completed"),
+        ("expired", "Expired"),
+        ("revoked", "Revoked"),
+    ]
+    MODE_CHOICES = [
+        ("live", "Live interview"),
+        ("async_video", "One-way async video"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="interview_invitations_sent",
+    )
+    template = models.ForeignKey(
+        InterviewTemplate,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invitations",
+    )
+    candidate_email = models.EmailField(blank=True, default="")
+    candidate_name = models.CharField(max_length=160, blank=True, default="")
+    role_title = models.CharField(max_length=160, blank=True, default="")
+    mode = models.CharField(max_length=16, choices=MODE_CHOICES, default="live")
+    message = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
+    # Filled once the invitee starts — links the invite to the resulting work.
+    campaign = models.ForeignKey(
+        InterviewCampaign,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invitations",
+    )
+    accepted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="interview_invitations_accepted",
+    )
+    expires_at = models.DateTimeField(null=True, blank=True)
+    opened_at = models.DateTimeField(null=True, blank=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    email_sent = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["created_by", "status"], name="iv_invite_creator_status_idx")
+        ]
+
+    def __str__(self):
+        return f"Invite {self.token} ({self.status})"
+
+    @property
+    def is_expired(self) -> bool:
+        return bool(self.expires_at and self.expires_at < timezone.now())
+
+
+class AsyncVideoResponse(models.Model):
+    """A candidate's recorded answer to one prompt in a one-way async video
+    interview (parity: TestGorilla / aiinterviews.io one-way video). The browser
+    MediaRecorder captures the clip; it's stored in the existing Django storage —
+    no paid video service. Heuristic confidence/communication signals are derived
+    from the free transcript + duration (no paid vision/NLP).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    round = models.ForeignKey(
+        InterviewRound,
+        on_delete=models.CASCADE,
+        related_name="async_responses",
+    )
+    question_index = models.PositiveSmallIntegerField(default=0)
+    prompt_text = models.TextField(blank=True, default="")
+    video_file = models.FileField(upload_to="interviews/async_video/", blank=True, null=True)
+    transcript = models.TextField(blank=True, default="")
+    duration_seconds = models.FloatField(default=0)
+    score = models.FloatField(null=True, blank=True)
+    analysis = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["question_index", "created_at"]
+        unique_together = ("round", "question_index")
+
+    def __str__(self):
+        return f"AsyncVideo r{self.round_id} q{self.question_index}"

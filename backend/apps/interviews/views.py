@@ -577,6 +577,7 @@ class InterviewRoundMessageView(APIView):
         meta = {
             "input_type": request.data.get("input_type", "text"),
             "command_validated": request.data.get("command_validated", False),
+            "practice": bool(request.data.get("practice", False)),
         }
         # The whole answer/score/reply cycle runs on the free rule-based engine.
         # A malformed question (e.g. non-string expected_keywords) or any edge in
@@ -600,6 +601,7 @@ class InterviewRoundMessageView(APIView):
             "next_question": InterviewMessageSerializer(result["next_question"]).data
             if result.get("next_question")
             else None,
+            "coaching": result.get("coaching"),
         })
 
 

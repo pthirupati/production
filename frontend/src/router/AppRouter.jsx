@@ -72,6 +72,11 @@ const InterviewReport = lazy(() => import('../pages/interviews/InterviewReport')
 const AdminInterviews = lazy(() => import('../pages/admin/AdminInterviews'))
 const AdminCertificates = lazy(() => import('../pages/admin/AdminCertificates'))
 const InterviewLanding = lazy(() => import('../pages/interviews/InterviewLanding'))
+const InterviewAnalytics = lazy(() => import('../pages/interviews/InterviewAnalytics'))
+const InterviewTemplates = lazy(() => import('../pages/interviews/InterviewTemplates'))
+const RecruiterCompare = lazy(() => import('../pages/interviews/RecruiterCompare'))
+const InterviewInvite = lazy(() => import('../pages/interviews/InterviewInvite'))
+const AsyncVideoRoom = lazy(() => import('../pages/interviews/AsyncVideoRoom'))
 const VMwareSimulator = lazy(() => import('../pages/vmware/VMwareSimulator'))
 const Unsubscribe = lazy(() => import('../pages/Unsubscribe'))
 const Changelog = lazy(() => import('../pages/Changelog'))
@@ -139,6 +144,7 @@ export default function AppRouter() {
         <Route path="/faq" element={<FAQ />} />
         <Route path="/mock-interviews" element={<InterviewLanding />} />
         <Route path="/verify-certificate" element={<CertificateVerify />} />
+        <Route path="/interviews/invite/:token" element={<InterviewInvite />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
         <Route path="/jira/:issueKey" element={<ProtectedRoute><JiraTicketPage /></ProtectedRoute>} />
         <Route path="/auth/callback/:provider" element={<OAuthCallback />} />
@@ -167,6 +173,10 @@ export default function AppRouter() {
           <Route path="/interviews/campaign/:campaignId" element={<InterviewCampaign />} />
           <Route path="/interviews/room/:roundId" element={<InterviewRoom />} />
           <Route path="/interviews/round/:roundId/report" element={<InterviewReport />} />
+          <Route path="/interviews/analytics" element={<InterviewAnalytics />} />
+          <Route path="/interviews/templates" element={<InterviewTemplates />} />
+          <Route path="/interviews/compare" element={<RecruiterCompare />} />
+          <Route path="/interviews/async/:roundId" element={<AsyncVideoRoom />} />
         </Route>
 
         {/* Admin routes */}

@@ -147,7 +147,7 @@ def start_round(round_obj: InterviewRound) -> dict:
         content=intro,
         message_type="introduction",
     )
-    return {"message": msg, "ends_at": round_obj.ends_at.isoformat()}
+    return {"message": msg, "ends_at": round_obj.ends_at.isoformat() if round_obj.ends_at else None}
 
 
 def _last_candidate_answer(round_obj: InterviewRound):
@@ -374,11 +374,30 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         except Exception:  # noqa: BLE001
             next_q = None
 
+    # Practice/coaching mode (parity: interviewai.io practice mode): when the
+    # client requests it (or the round/campaign is flagged practice), attach an
+    # instant, actionable coaching tip derived from the same free score
+    # breakdown. Best-effort — never breaks the answer cycle.
+    coaching = None
+    practice = bool(meta.get("practice")) or bool(
+        (round_obj.metadata or {}).get("practice_mode") if isinstance(round_obj.metadata, dict) else False
+    )
+    if practice:
+        try:
+            from apps.interviews.services.coaching import coaching_tip
+
+            coaching = coaching_tip(
+                score_result, round_type=round_obj.round_type, answer_text=answer_text
+            )
+        except Exception:  # noqa: BLE001
+            coaching = None
+
     return {
         "candidate_message": cand_msg,
         "interviewer_reply": interviewer_msg,
         "score": score_result,
         "next_question": next_q,
+        "coaching": coaching,
         "skipped": score_result.get("quality") == "skipped",
     }
 
@@ -494,6 +513,16 @@ def end_round(round_obj: InterviewRound, reason: str = "completed") -> dict:
             round_obj.round_type,
         )
 
+        # Parity scorecard: hiring recommendation, per-competency ratings, and a
+        # heuristic confidence/communication read-out — all free/derived. Guarded
+        # so a malformed transcript can never break round finalization.
+        try:
+            from apps.interviews.services.scorecard import build_scorecard_fields
+
+            scorecard = build_scorecard_fields(round_obj, agg, passed=passed, reason=reason)
+        except Exception:  # noqa: BLE001
+            scorecard = {}
+
         report = InterviewReport.objects.create(
             round=round_obj,
             passed=passed,
@@ -507,6 +536,9 @@ def end_round(round_obj: InterviewRound, reason: str = "completed") -> dict:
                     "content", "score", "metadata"
                 )[:20]
             ),
+            recommendation=scorecard.get("recommendation", ""),
+            competency_ratings=scorecard.get("competency_ratings", []),
+            confidence_analysis=scorecard.get("confidence_analysis", {}),
         )
 
         round_obj.overall_score = agg["overall_score"]

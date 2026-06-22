@@ -6,7 +6,7 @@ import { useAuthStore } from '../../store/authStore'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import {
   Mic, Video, Calendar, Trophy, ChevronRight, Sparkles, Clock, Award, Plus,
-  Play, CheckCircle2, Headphones, AlertCircle, Trash2, X,
+  Play, CheckCircle2, Headphones, AlertCircle, Trash2, X, Briefcase, TrendingUp, Users,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader } from '../../components/design'
@@ -182,6 +182,30 @@ export default function InterviewHub() {
           </Link>
         }
       />
+
+      {/* Quick actions — parity features */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Link to="/interviews/templates" className="glass-card p-4 border border-surface-800 hover:border-indigo-500/30 transition-colors">
+          <Briefcase size={18} className="text-indigo-400 mb-2" />
+          <p className="text-sm font-medium text-white">Job-role templates</p>
+          <p className="text-xs text-surface-500 mt-1">Launch a tailored mock in one click</p>
+        </Link>
+        <Link to="/interviews/setup" className="glass-card p-4 border border-surface-800 hover:border-indigo-500/30 transition-colors">
+          <Plus size={18} className="text-cyan-400 mb-2" />
+          <p className="text-sm font-medium text-white">Custom interview</p>
+          <p className="text-xs text-surface-500 mt-1">Build from your resume & profile</p>
+        </Link>
+        <Link to="/interviews/analytics" className="glass-card p-4 border border-surface-800 hover:border-indigo-500/30 transition-colors">
+          <TrendingUp size={18} className="text-emerald-400 mb-2" />
+          <p className="text-sm font-medium text-white">My analytics</p>
+          <p className="text-xs text-surface-500 mt-1">Score trend & skill radar</p>
+        </Link>
+        <Link to="/interviews/compare" className="glass-card p-4 border border-surface-800 hover:border-indigo-500/30 transition-colors">
+          <Users size={18} className="text-purple-400 mb-2" />
+          <p className="text-sm font-medium text-white">Invite & compare</p>
+          <p className="text-xs text-surface-500 mt-1">Send links, rank candidates</p>
+        </Link>
+      </div>
 
       {/* Free sample interview */}
       {showSample && (

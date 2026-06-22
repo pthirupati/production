@@ -159,4 +159,73 @@ export const interviewsApi = {
   deleteRound(roundId) {
     return api.delete(`/interviews/rounds/${roundId}/`).then(r => r.data)
   },
+
+  // --- Parity features (NEW endpoints) ---
+
+  // Performance analytics: candidate trend + competency radar + headline stats.
+  getMyAnalytics() {
+    return api.get('/interviews/analytics/me/', { silentError: true }).then(r => r.data)
+  },
+  // Recruiter candidate comparison/ranking (403 unless staff or has sent an invite).
+  compareCandidates(params = {}) {
+    return api.get('/interviews/analytics/compare/', { params, silentError: true }).then(r => r.data)
+  },
+
+  // Interview templates / job-role library.
+  listTemplates() {
+    return api.get('/interviews/templates/', { silentError: true }).then(r => r.data)
+  },
+  getTemplate(id) {
+    return api.get(`/interviews/templates/${id}/`).then(r => r.data)
+  },
+  // One-click launch of an interview from a template. mode: 'live' | 'async_video'.
+  launchTemplate(id, mode = 'live') {
+    return api.post(`/interviews/templates/${id}/launch/`, { mode }).then(r => r.data)
+  },
+
+  // Candidate invitation flow (shareable links).
+  listInvitations() {
+    return api.get('/interviews/invitations/', { silentError: true }).then(r => r.data)
+  },
+  createInvitation(payload) {
+    return api.post('/interviews/invitations/', payload).then(r => r.data)
+  },
+  revokeInvitation(id) {
+    return api.delete(`/interviews/invitations/${id}/`).then(r => r.data)
+  },
+  // Public preview of an invite by token (no auth required).
+  getInvitation(token) {
+    return api.get(`/interviews/invite/${token}/`, { silentError: true }).then(r => r.data)
+  },
+  acceptInvitation(token) {
+    return api.post(`/interviews/invite/${token}/accept/`).then(r => r.data)
+  },
+
+  // One-way async video interview.
+  getAsyncPrompts(roundId) {
+    return api.get(`/interviews/rounds/${roundId}/async/prompts/`).then(r => r.data)
+  },
+  startAsyncRound(roundId) {
+    return api.post(`/interviews/rounds/${roundId}/async/prompts/`).then(r => r.data)
+  },
+  // Submit one recorded answer. `blob` is the MediaRecorder Blob (optional).
+  submitAsyncResponse(roundId, { questionIndex, transcript, durationSeconds, blob }) {
+    const form = new FormData()
+    form.append('question_index', String(questionIndex))
+    form.append('transcript', transcript || '')
+    form.append('duration_seconds', String(durationSeconds || 0))
+    if (blob) form.append('video', blob, `answer-${questionIndex}.webm`)
+    return api.post(`/interviews/rounds/${roundId}/async/response/`, form).then(r => r.data)
+  },
+  finalizeAsyncRound(roundId) {
+    return api.post(`/interviews/rounds/${roundId}/async/finalize/`).then(r => r.data)
+  },
+  getAsyncReview(roundId) {
+    return api.get(`/interviews/rounds/${roundId}/async/review/`).then(r => r.data)
+  },
+
+  // Rich transcript w/ timestamps + résumé highlights mapped to questions.
+  getRoundTranscript(roundId) {
+    return api.get(`/interviews/rounds/${roundId}/transcript/`, { silentError: true }).then(r => r.data)
+  },
 }

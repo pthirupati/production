@@ -15,14 +15,21 @@ from apps.interviews.models import (
     InterviewCampaign,
     InterviewCertificate,
     InterviewEntitlement,
+    InterviewInvitation,
     InterviewPlanTier,
     InterviewPlatformSettings,
     InterviewQuestion,
     InterviewReport,
     InterviewRound,
+    InterviewTemplate,
     InterviewVoiceOption,
 )
-from apps.interviews.serializers import InterviewPlanTierSerializer, InterviewQuestionSerializer
+from apps.interviews.serializers import (
+    InterviewInvitationSerializer,
+    InterviewPlanTierSerializer,
+    InterviewQuestionSerializer,
+    InterviewTemplateSerializer,
+)
 from apps.interviews.billing_views import activate_interview_plan
 from apps.interviews.services.interview_settings import get_platform_settings, settings_payload
 from apps.notifications.models import MarketingEmailLog
@@ -367,3 +374,66 @@ class AdminInterviewVoiceDetailView(APIView):
     def delete(self, request, pk):
         InterviewVoiceOption.objects.filter(pk=pk).delete()
         return Response(status=204)
+
+
+# ---------------------------------------------------------------------------
+# Parity admin: interview templates (job-role library + question-set builder),
+# invitations overview, and recruiter candidate comparison.
+# ---------------------------------------------------------------------------
+
+class AdminInterviewTemplatesView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.interviews.services.templates import ensure_default_templates
+
+        ensure_default_templates()
+        qs = InterviewTemplate.objects.all()
+        return Response({"templates": InterviewTemplateSerializer(qs, many=True).data})
+
+    def post(self, request):
+        from django.utils.text import slugify
+
+        data = dict(request.data)
+        if not data.get("slug") and data.get("name"):
+            data["slug"] = slugify(data["name"])[:140]
+        ser = InterviewTemplateSerializer(data=data)
+        ser.is_valid(raise_exception=True)
+        tmpl = ser.save(created_by=request.user)
+        return Response(InterviewTemplateSerializer(tmpl).data, status=201)
+
+
+class AdminInterviewTemplateDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def put(self, request, pk):
+        tmpl = InterviewTemplate.objects.get(pk=pk)
+        ser = InterviewTemplateSerializer(tmpl, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        return Response(ser.data)
+
+    def delete(self, request, pk):
+        InterviewTemplate.objects.filter(pk=pk).delete()
+        return Response(status=204)
+
+
+class AdminInterviewInvitationsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        qs = InterviewInvitation.objects.select_related("template", "created_by").order_by("-created_at")[:300]
+        return Response({"invitations": InterviewInvitationSerializer(qs, many=True).data})
+
+
+class AdminInterviewComparisonView(APIView):
+    """Recruiter candidate comparison/ranking across all completed campaigns."""
+
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.interviews.services.analytics import recruiter_comparison
+
+        template_id = request.query_params.get("template_id") or None
+        technology_id = request.query_params.get("technology_id") or None
+        return Response(recruiter_comparison(template_id=template_id, technology_id=technology_id))

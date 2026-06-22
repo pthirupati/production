@@ -9,17 +9,20 @@ from django.utils import timezone
 from django.utils.html import format_html
 
 from .models import (
+    AsyncVideoResponse,
     CandidateProfile,
     InterviewAdminJoinRequest,
     InterviewCampaign,
     InterviewCertificate,
     InterviewEntitlement,
+    InterviewInvitation,
     InterviewMessage,
     InterviewPlanTier,
     InterviewPlatformSettings,
     InterviewQuestion,
     InterviewReport,
     InterviewRound,
+    InterviewTemplate,
     InterviewVoiceOption,
 )
 
@@ -419,3 +422,39 @@ class InterviewPlatformSettingsAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# ---------------------------------------------------------------------------
+# Templates / invitations / async video (parity features)
+# ---------------------------------------------------------------------------
+
+@admin.register(InterviewTemplate)
+class InterviewTemplateAdmin(admin.ModelAdmin):
+    list_display = (
+        "name", "role_title", "primary_technology", "experience_level",
+        "round_count", "is_public", "is_active", "times_used", "order",
+    )
+    list_filter = ("is_public", "is_active", "experience_level")
+    search_fields = ("name", "slug", "role_title")
+    list_editable = ("is_public", "is_active", "order")
+    prepopulated_fields = {"slug": ("name",)}
+
+
+@admin.register(InterviewInvitation)
+class InterviewInvitationAdmin(admin.ModelAdmin):
+    list_display = (
+        "candidate_email", "role_title", "mode", "status",
+        "created_by", "email_sent", "created_at",
+    )
+    list_filter = ("status", "mode", "email_sent")
+    search_fields = ("candidate_email", "candidate_name", "role_title")
+    readonly_fields = ("token", "campaign", "accepted_by", "created_at")
+    list_select_related = ("created_by", "template")
+
+
+@admin.register(AsyncVideoResponse)
+class AsyncVideoResponseAdmin(admin.ModelAdmin):
+    list_display = ("round", "question_index", "score", "duration_seconds", "created_at")
+    search_fields = ("round__campaign__user__email",)
+    readonly_fields = ("round", "created_at", "analysis")
+    list_select_related = ("round__campaign__user",)
