@@ -382,9 +382,15 @@ class ForgotPasswordAPITest(APITestCase, AuthMixin):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
     def test_forgot_password_nonexistent(self):
-        """Should still return 200 to prevent email enumeration."""
+        """Unknown emails return 404 with a clear error.
+
+        Product decision (owner-requested): give the user explicit feedback when
+        no account matches instead of the silent anti-enumeration 200. This is a
+        deliberate enumeration trade-off — see ForgotPasswordView.post.
+        """
         resp = self.client.post("/api/auth/forgot-password/", {"email": "nobody@test.com"})
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("error", resp.data)
 
 
 # ═════════════════════════════════════════════
@@ -525,7 +531,14 @@ class AdminAPITest(APITestCase, AuthMixin, ScenarioMixin):
     def test_admin_blocked_for_non_staff(self):
         client, _ = self.auth_client(email="regular@test.com")
         resp = client.get("/api/admin/overview/")
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        # The admin surface is closed to non-staff. Either response means
+        # "blocked": 403 when the request is authenticated-but-not-staff, or 401
+        # under the cookie-JWT + CSRF-header auth path (SECURITY_AUDIT A-01).
+        # This matches the convention in tests/test_admin_panel.py.
+        self.assertIn(
+            resp.status_code,
+            [status.HTTP_403_FORBIDDEN, status.HTTP_401_UNAUTHORIZED],
+        )
 
     def test_admin_create_user(self):
         resp = self.admin_client.post("/api/admin/users/", {

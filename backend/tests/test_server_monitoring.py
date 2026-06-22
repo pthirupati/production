@@ -9,10 +9,15 @@ Guarantees:
   * The local metrics collector never raises and returns the documented keys.
 """
 
+import os
+from unittest import mock
+
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
+from apps.adminpanel import cluster_topology
 from apps.adminpanel.server_metrics import collect_local_metrics
 
 User = get_user_model()
@@ -75,8 +80,27 @@ class NodeMetricsEndpointTests(TestCase):
 
 
 class FleetEndpointTests(TestCase):
+    """Exercises the SINGLE-HOST fleet path (local node + MONITORING_SERVERS peers).
+
+    The repo now ships a real four-droplet ``infra/digitalocean/cluster.json``, so
+    without forcing single-host mode the fleet view would enumerate the 4 cluster
+    nodes instead of "local + peers". These tests guard the single-host aggregation
+    and peer-failure handling, so we pin single-host via the documented
+    ``CLUSTER_TOPOLOGY_DISABLE`` flag. The 4-droplet cluster path is covered
+    separately by the topology-aware view logic.
+    """
+
     def setUp(self):
         self.client = APIClient()
+        # Force the single-host topology this suite targets, bypassing the
+        # committed four-droplet cluster.json (and the topology lru_cache).
+        self._env = mock.patch.dict(os.environ, {"CLUSTER_TOPOLOGY_DISABLE": "1"})
+        self._env.start()
+        cluster_topology.reset_cache()
+        cache.clear()  # fleet payload is cached process-wide (LocMemCache)
+        self.addCleanup(self._env.stop)
+        self.addCleanup(cluster_topology.reset_cache)
+        self.addCleanup(cache.clear)
         self.admin = User.objects.create_user(
             username="admin-fleet", email="admin-fleet@test.com",
             password="Pass123!", is_staff=True,

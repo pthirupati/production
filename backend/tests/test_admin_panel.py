@@ -120,22 +120,39 @@ class AdminVaultLogicTests(TestCase):
         self.assertEqual(result['status'], 'healthy')
         self.assertTrue(result.get('optional', False))
 
-    def test_vault_enabled_container_not_found_unhealthy(self):
-        """When vault container is missing, status should be unhealthy."""
+    def test_vault_enabled_no_container_and_unreachable_is_degraded_not_unhealthy(self):
+        """Network-aware (SECURITY_AUDIT B): a MISSING local vault container is
+        NOT a hard failure. Vault runs on the edge node in the cluster, so the
+        backend reaches it over the VPC; when the API is unreachable AND there is
+        no local container, the status is the soft ``degraded`` (optional), never
+        ``unhealthy`` — a missing local container alone must not redden the
+        dashboard. (A local container that EXISTS but is stopped is still
+        unhealthy — see the next test.)
+        """
+        from apps.adminpanel.views import AdminSystemHealthView
         check = self._get_vault_checker()
         with patch.dict('os.environ', {'VAULT_ENABLED': 'true'}, clear=False):
-            with patch('subprocess.run') as mock_run:
-                mock_run.return_value = MagicMock(returncode=1, stdout='')
-                result = check()
-        self.assertEqual(result['status'], 'unhealthy')
+            # Force the network probe to "unreachable" so the result is
+            # deterministic regardless of any Vault reachable from the test host.
+            with patch.object(AdminSystemHealthView, '_probe_vault_api', return_value=None):
+                with patch('subprocess.run') as mock_run:
+                    mock_run.return_value = MagicMock(returncode=1, stdout='')  # container not found
+                    result = check()
+        self.assertNotEqual(result['status'], 'unhealthy',
+            "A missing local vault container must not be reported unhealthy (network-aware mode).")
+        self.assertEqual(result['status'], 'degraded')
+        self.assertTrue(result.get('optional', False))
 
     def test_vault_enabled_container_stopped_unhealthy(self):
-        """When vault container is not running (e.g. exited), status should be unhealthy."""
+        """When a local vault container EXISTS but is not running (e.g. exited)
+        and the network API is unreachable, that *is* a real fault → unhealthy."""
+        from apps.adminpanel.views import AdminSystemHealthView
         check = self._get_vault_checker()
         with patch.dict('os.environ', {'VAULT_ENABLED': 'true'}, clear=False):
-            with patch('subprocess.run') as mock_run:
-                mock_run.return_value = MagicMock(returncode=0, stdout='exited\n')
-                result = check()
+            with patch.object(AdminSystemHealthView, '_probe_vault_api', return_value=None):
+                with patch('subprocess.run') as mock_run:
+                    mock_run.return_value = MagicMock(returncode=0, stdout='exited\n')
+                    result = check()
         self.assertEqual(result['status'], 'unhealthy')
 
     def test_vault_result_has_secrets_loaded_field(self):
