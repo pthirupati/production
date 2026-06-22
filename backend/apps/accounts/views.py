@@ -205,8 +205,18 @@ class RegisterView(APIView):
                 status=400,
             )
 
-        # Check OTP hasn't expired (allow register within 30 min of verification)
-        if otp_obj.is_expired:
+        # The OTP's short ``expires_at`` (2 min) is the window to ENTER the code,
+        # not to finish registration. Once the code is verified, give the user a
+        # generous grace period to fill in the rest of the form and submit — the
+        # tight code-entry window must not invalidate an already-verified email.
+        # (Regression: previously this reused ``is_expired`` (2 min from send), so
+        # any user who took >2 min after requesting the OTP got "Verification has
+        # expired" even though they entered the code correctly.)
+        REGISTRATION_GRACE_MINUTES = 30
+        registration_deadline = otp_obj.created_at + timezone.timedelta(
+            minutes=REGISTRATION_GRACE_MINUTES
+        )
+        if timezone.now() > registration_deadline:
             return Response(
                 {"error": "Verification has expired. Please verify your email again."},
                 status=400,
@@ -284,13 +294,32 @@ class RegisterView(APIView):
         # Return tokens immediately so user is logged in. Use the session-aware
         # helper so the jti is recorded in SessionTracker — otherwise the brand-new
         # user's first request is 401'd whenever JWT session enforcement is on.
-        _toks = TokenHelper.create_tokens_with_session(
-            user,
-            getattr(request, "client_ip", "") or "",
-            getattr(request, "user_agent", "") or "",
-        )
-        access_token = _toks["access"]
-        refresh_token = _toks["refresh"]
+        # If token minting fails (e.g. a JWT-key/cache hiccup), the account was
+        # already created successfully — surface a SPECIFIC, actionable error so
+        # the user is told to just sign in, not a generic "registration failed".
+        try:
+            _toks = TokenHelper.create_tokens_with_session(
+                user,
+                getattr(request, "client_ip", "") or "",
+                getattr(request, "user_agent", "") or "",
+            )
+            access_token = _toks["access"]
+            refresh_token = _toks["refresh"]
+        except Exception as token_err:
+            logger.error(
+                "Token issuance failed after registering user %s (%s): %s",
+                user.id, user.email, token_err, exc_info=True,
+            )
+            return Response(
+                {
+                    "error": (
+                        "Your account was created, but we couldn't sign you in "
+                        "automatically. Please go to the login page and sign in."
+                    ),
+                    "error_code": "token_issue_failed",
+                },
+                status=status.HTTP_201_CREATED,
+            )
         response = Response({
             "message": "User registered successfully",
             "access": access_token,

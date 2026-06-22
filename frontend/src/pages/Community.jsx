@@ -149,8 +149,17 @@ export default function Community() {
       setNewTech('')
       setNewThreadFile(null)
       fetchThreads()
-    } catch {
-      toast.error('Failed to create thread')
+    } catch (err) {
+      // Surface the backend's specific reason (validation, auth, etc.) instead
+      // of a generic, undiagnosable message so the user knows what to fix.
+      const data = err?.response?.data
+      const detail =
+        data?.error ||
+        data?.detail ||
+        (data?.title && `Title: ${data.title}`) ||
+        (data?.body && `Body: ${data.body}`) ||
+        (data?.technology && `Technology: ${data.technology}`)
+      toast.error(detail ? String(detail) : 'Failed to create thread')
     }
   }
 
