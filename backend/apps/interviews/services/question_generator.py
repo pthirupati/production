@@ -345,9 +345,11 @@ _MANAGER_QUESTIONS: dict[int, list[str]] = {
 }
 
 # Light openers that acknowledge the candidate's last answer before the next
-# question, so a generated question doesn't feel like a survey form. Kept
-# distinct from interview_ai's reply acks (the engine uses that for the *reply*;
-# these are short stitches on the *question* turn).
+# question, so a generated question doesn't feel like a survey form (FIX 3:
+# conversational delivery + natural transitions). Kept distinct from
+# interview_ai's reply acks (the engine uses that for the *reply*; these are
+# short spoken stitches on the *question* turn). Varied so a long round of
+# generated questions never reads like reading a quiz aloud.
 _QUESTION_STITCHES = [
     "Okay.",
     "Right.",
@@ -355,6 +357,16 @@ _QUESTION_STITCHES = [
     "Makes sense.",
     "Cool.",
     "Fair.",
+    "Alright.",
+    "Sure.",
+    "Okay, good.",
+    "Right, let's keep going.",
+    "Mm-hm.",
+    "Nice.",
+    "Let's switch gears.",
+    "Okay, next.",
+    "Good — moving on.",
+    "Let me change tack.",
 ]
 
 # Round type -> behavioral/situational bank to use.

@@ -286,3 +286,72 @@ class MonitoringContainersTests(_Base):
         data = resp.json()
         self.assertTrue(all(c["kind"] == "lab" for c in data["containers"]))
         self.assertEqual(data["lab_count"], 1)
+
+
+# ─── Graceful degradation: local socket unreadable must NOT hard-fail ──────────
+
+class MonitoringDegradationTests(_Base):
+    """The container view must return partial data (HTTP 200), never a 500/503,
+    when the LOCAL Docker socket is unreadable — e.g. a non-root backend that is
+    not in the host docker group raises PermissionError opening the socket, or
+    the socket is simply not mounted. The frontend renders "Could not load
+    containers" on ANY non-2xx, so degradation here is what keeps the page alive.
+    """
+
+    def _get_with_local(self, local_client_factory, labs_containers=None):
+        self.client.force_authenticate(self.admin)
+        labs = _FakeClient(labs_containers if labs_containers is not None else _LAB_CONTAINERS)
+        with _patch_topology(), \
+                mock.patch.object(AdminMonitoringContainersView, "_local_client",
+                                  classmethod(lambda cls: local_client_factory(cls))), \
+                mock.patch.object(AdminMonitoringContainersView, "_labs_client",
+                                  staticmethod(lambda: labs)), \
+                mock.patch.object(cluster_topology, "local_node_identity",
+                                  return_value=_FOUR_NODE_TOPOLOGY["nodes"][1]):  # app node
+            return self.client.get("/api/admin/monitoring/containers/?refresh=1")
+
+    def test_permission_error_on_local_socket_returns_partial_200(self):
+        """A PermissionError opening the local socket (the classic non-root
+        backend / `:ro` mount case) degrades to 200 with the labs containers +
+        synthesized system rows — it must never bubble up as a 500."""
+        def boom(cls):
+            cls._last_local_error = "permission denied on unix:///var/run/docker.sock"
+            return None  # _local_client catches PermissionError and returns None
+
+        resp = self._get_with_local(boom)
+        self.assertEqual(resp.status_code, 200, resp.content)
+        data = resp.json()
+        # Labs containers still listed (labs engine reachable).
+        names = {c["name"] for c in data["containers"]}
+        self.assertIn("fixitlab_lab_abc", names)
+        # Per-engine status surfaces the local failure for the UI's small note.
+        self.assertFalse(data["local_engine"]["available"])
+        self.assertIn("permission", data["local_engine"]["error"].lower())
+        # Expected system services are synthesized (so the grid is never blank):
+        # local-node services as "unknown", other-node services as "remote".
+        system = [c for c in data["containers"] if c["kind"] == "system"]
+        self.assertTrue(system, "system rows should be synthesized when local is down")
+        statuses = {c["status"] for c in system}
+        self.assertTrue(statuses & {"unknown", "remote"})
+
+    def test_both_engines_down_still_returns_200_not_503(self):
+        """Even with NO reachable Docker engine, the view returns 200 with
+        synthesized rows + engine errors — previously this was a hard 503 that the
+        UI rendered as "Could not load containers"."""
+        resp = self._get_with_local(lambda cls: None, labs_containers=[])
+        # Patch labs to None as well for the true "nothing reachable" case.
+        self.client.force_authenticate(self.admin)
+        with _patch_topology(), \
+                mock.patch.object(AdminMonitoringContainersView, "_local_client",
+                                  classmethod(lambda cls: None)), \
+                mock.patch.object(AdminMonitoringContainersView, "_labs_client",
+                                  staticmethod(lambda: None)), \
+                mock.patch.object(cluster_topology, "local_node_identity",
+                                  return_value=_FOUR_NODE_TOPOLOGY["nodes"][1]):
+            resp = self.client.get("/api/admin/monitoring/containers/?refresh=1")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        data = resp.json()
+        self.assertFalse(data["local_engine"]["available"])
+        # The expected platform services are still represented for the operator.
+        self.assertGreater(data["system_count"], 0)
+        self.assertIn("engine_errors", data)

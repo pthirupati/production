@@ -185,8 +185,14 @@ export default function AdminMonitoring() {
         is_cluster: data.is_cluster,
         local_node: data.local_node,
         nodes: data.nodes || [],
+        // Per-engine status — the API returns 200 with partial data when an
+        // engine is unreachable, so we show a small note instead of failing.
+        local_engine: data.local_engine || null,
+        engine_errors: data.engine_errors || null,
       })
     } catch {
+      // Only reached on a genuine request failure (network/timeout/5xx) — the
+      // backend degrades gracefully to a 200 with partial data otherwise.
       toast.error('Could not load containers')
     } finally {
       setLoading(false)
@@ -276,6 +282,23 @@ export default function AdminMonitoring() {
           </>
         }
       />
+
+      {/* ── Local engine degraded note (partial data still shown) ── */}
+      {summary.local_engine && summary.local_engine.available === false && (
+        <div className="glass-card p-3.5 border border-accent-amber/25 bg-accent-amber/5 flex items-start gap-2.5">
+          <AlertCircle size={15} className="text-accent-amber shrink-0 mt-0.5" />
+          <p className="text-[12px] text-surface-300 leading-relaxed">
+            <span className="font-semibold text-accent-amber">Local Docker engine unavailable</span>
+            {' '}— showing lab containers and expected system services only. System
+            container live state could not be read on this node.
+            {summary.local_engine.error && (
+              <span className="block text-[11px] text-surface-500 mt-1 font-mono truncate" title={summary.local_engine.error}>
+                {summary.local_engine.error}
+              </span>
+            )}
+          </p>
+        </div>
+      )}
 
       {/* ── Summary KPI row ── */}
       {systemContainers.length > 0 && (

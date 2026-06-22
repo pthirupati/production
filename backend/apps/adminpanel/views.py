@@ -1447,24 +1447,36 @@ class AdminSystemHealthView(APIView):
             if cached:
                 return Response(cached)
 
+        # Each check is individually guarded so one failing probe (e.g. a wedged
+        # Docker daemon while collecting per-container stats) can NEVER turn the
+        # whole /admin/health/ response into a 500 — which the dashboard would
+        # render as a blank "System Health / System Containers" panel.
+        def _safe(fn, fallback):
+            try:
+                return fn()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("System health check %s failed: %s", getattr(fn, "__name__", fn), exc)
+                return fallback
+
         health = {
-            "database": self._check_db(),
-            "redis": self._check_redis(),
-            "docker": self._check_docker(),
-            "email": self._check_email(),
-            "rabbitmq": self._check_rabbitmq(),
-            "celery": self._check_celery(),
-            "vault": self._check_vault(),
+            "database": _safe(self._check_db, {"status": "unhealthy", "error": "check failed"}),
+            "redis": _safe(self._check_redis, {"status": "unhealthy", "error": "check failed"}),
+            "docker": _safe(self._check_docker, {"status": "unhealthy", "error": "check failed"}),
+            "email": _safe(self._check_email, {"status": "unhealthy", "error": "check failed"}),
+            "rabbitmq": _safe(self._check_rabbitmq, {"status": "unhealthy", "error": "check failed"}),
+            "celery": _safe(self._check_celery, {"status": "unhealthy", "error": "check failed"}),
+            "vault": _safe(self._check_vault, {"status": "degraded", "error": "check failed", "optional": True}),
         }
 
         # Cloud provider health (optional — does not affect core overall)
-        health["cloud_providers"] = self._check_cloud_providers()
+        health["cloud_providers"] = _safe(self._check_cloud_providers, {})
 
-        # Container-level health (platform services only)
-        health["containers"] = self._check_containers()
+        # Container-level health (platform services only). Always a list so the
+        # dashboard's "System Containers" panel renders the synthesized fleet rows.
+        health["containers"] = _safe(self._check_containers, [])
 
         # Email statistics
-        health["email_stats"] = self._get_email_stats()
+        health["email_stats"] = _safe(self._get_email_stats, {})
         try:
             from apps.notifications.email_health import email_delivery_health
 
@@ -1473,7 +1485,7 @@ class AdminSystemHealthView(APIView):
             health["email_delivery_alert"] = {"alert": False}
 
         # Cloud lab usage
-        health["cloud_labs"] = self._get_cloud_lab_stats()
+        health["cloud_labs"] = _safe(self._get_cloud_lab_stats, {})
 
         # Overall health — core services only (not cloud providers or lab containers)
         core_services = ["database", "redis", "docker", "email", "rabbitmq", "celery"]
@@ -1520,7 +1532,9 @@ class AdminSystemHealthView(APIView):
         labs_sock = getattr(settings, "DOCKER_SOCKET", local_sock)
 
         def probe(base_url):
-            client = docker.DockerClient(base_url=base_url)
+            # Bound the connection so an unreachable/slow daemon (esp. the labs
+            # SSH engine) can't stall the health request thread.
+            client = docker.DockerClient(base_url=base_url, timeout=8)
             client.ping()
             info = client.info()
             return f"{info.get('Containers', 0)} containers, {info.get('Images', 0)} images"
@@ -2960,30 +2974,58 @@ class AdminMonitoringContainersView(APIView):
         "fixitlab_vault", "fixitlab_db", "fixitlab_redis", "fixitlab_rabbitmq",
     )
 
-    @staticmethod
-    def _local_client():
+    # Why the local Docker socket could not be read, captured by _local_client so
+    # the view can show an accurate per-engine note instead of a blank grid.
+    _last_local_error = None
+
+    @classmethod
+    def _local_client(cls):
         """Docker client for THIS node's own daemon (system containers).
 
         Uses MONITORING_LOCAL_DOCKER_SOCKET (the mounted host socket) so it works
         even when DOCKER_SOCKET points at the remote labs engine. Returns None if
-        the local daemon is unreachable (no socket mounted) — callers degrade to
-        topology synthesis rather than failing.
+        the local daemon is unreachable — callers degrade to topology synthesis
+        rather than failing. NEVER raises (a PermissionError on the socket — e.g.
+        a non-root backend user that is not in the host ``docker`` group, or a
+        missing mount — is caught and recorded in ``_last_local_error`` so the UI
+        can render a clear "local engine unavailable" note).
         """
         import docker
 
         sock = getattr(settings, "MONITORING_LOCAL_DOCKER_SOCKET", "") or "unix:///var/run/docker.sock"
         try:
-            client = docker.DockerClient(base_url=sock)
+            # Short timeout so a wedged daemon can't stall the request thread.
+            client = docker.DockerClient(base_url=sock, timeout=8)
             client.ping()
+            cls._last_local_error = None
             return client
-        except Exception:
+        except PermissionError as exc:
+            cls._last_local_error = (
+                f"permission denied on {sock} — add the backend to the host "
+                f"docker group (DOCKER_GID) ({exc})"
+            )
+            return None
+        except Exception as exc:  # noqa: BLE001 - any socket/daemon failure degrades gracefully
+            cls._last_local_error = f"{type(exc).__name__}: {str(exc)[:140]}"
             return None
 
     @staticmethod
     def _labs_client():
-        """Docker client for the labs engine (ephemeral lab containers)."""
+        """Docker client for the labs engine (ephemeral lab containers).
+
+        In the cluster this is ``ssh://root@D4``; building the client opens an SSH
+        connection, so we bound it with a short timeout and swallow any failure —
+        an unreachable/slow labs engine must never hang or fail the request, it
+        just means lab containers are temporarily unlisted.
+        """
         try:
             client = DockerProvisioner().client
+            # Bound the (possibly SSH) connection so a slow labs host can't stall
+            # the admin request past the frontend's timeout.
+            try:
+                client.api.timeout = 8
+            except Exception:
+                pass
             client.ping()
             return client
         except Exception:
@@ -3034,7 +3076,10 @@ class AdminMonitoringContainersView(APIView):
             return "vault" in image_str
 
         # 1) Local daemon → system containers (and any lab containers running here).
+        #    _local_client never raises; None means the socket is unreadable
+        #    (no mount, or a non-root backend not in the host docker group).
         local_client = self._local_client()
+        local_available = local_client is not None
         if local_client is not None:
             try:
                 for c in local_client.containers.list(all=True):
@@ -3044,13 +3089,15 @@ class AdminMonitoringContainersView(APIView):
                     elif is_system(c):
                         add(c, "system")
             except Exception as exc:
+                local_available = False
                 errors["local"] = str(exc)[:160]
         else:
-            errors["local"] = "local Docker socket unavailable"
+            errors["local"] = self._last_local_error or "local Docker socket unavailable"
 
         # 2) Labs engine → lab containers (remote D4 in cluster; same socket in
         #    single-host, deduped by id). Also pick up any system containers that
-        #    happen to run there.
+        #    happen to run there. A slow/unreachable labs engine degrades to
+        #    "labs temporarily unlisted" — it never fails the whole view.
         labs_client = self._labs_client()
         if labs_client is not None and labs_client is not local_client:
             try:
@@ -3061,17 +3108,22 @@ class AdminMonitoringContainersView(APIView):
                         add(c, "system")
             except Exception as exc:
                 errors["labs"] = str(exc)[:160]
-        elif labs_client is None and local_client is None:
-            # Nothing reachable at all — surface a 503 like before.
-            return Response(
-                {"error": errors.get("local") or "Docker unavailable", "containers": []},
-                status=503,
-            )
+        elif labs_client is None and labs_client is not local_client:
+            errors["labs"] = "labs Docker engine unavailable"
 
         # Attribute locally-visible containers to the node serving this request.
-        topology = cluster_topology.load_topology()
+        # load_topology() is best-effort and never raises, but guard anyway so a
+        # surprise here can't turn the whole response into a 500.
+        try:
+            topology = cluster_topology.load_topology()
+        except Exception as exc:  # pragma: no cover - defensive
+            topology = {"topology": "unknown", "is_cluster": False, "nodes": [], "meta": {}}
+            errors["topology"] = str(exc)[:160]
         is_cluster = bool(topology.get("is_cluster"))
-        local_node = cluster_topology.local_node_identity() if is_cluster else {}
+        try:
+            local_node = cluster_topology.local_node_identity() if is_cluster else {}
+        except Exception:  # pragma: no cover - defensive
+            local_node = {}
         local_node_key = local_node.get("key") or (
             getattr(settings, "MONITORING_NODE_NAME", "") or None
         )
@@ -3132,6 +3184,39 @@ class AdminMonitoringContainersView(APIView):
                         "details": f"Runs on {owner.get('name') or owner.get('key')} node — not reachable from this Docker engine",
                     })
 
+        # 4) If the LOCAL engine is unreadable (no socket mount, or a non-root
+        #    backend not in the host docker group), synthesise the platform
+        #    services that *should* be visible on this node as ``unknown`` rows so
+        #    the operator sees the expected services + a clear reason — instead of
+        #    an empty grid that the UI would render as a blank/"could not load"
+        #    state. (Remote-node services were already synthesised above.)
+        if not local_available:
+            local_reason = errors.get("local") or "local Docker socket unavailable"
+            for spec in AdminSystemHealthView.EXPECTED_CONTAINERS:
+                if spec["key"] in seen_system_keys:
+                    continue
+                # Skip services the topology positively places on another node —
+                # those already have a "remote" row from step 3.
+                if is_cluster:
+                    owner = node_for_service.get(spec["service"].lower())
+                    if owner and owner.get("key") and owner.get("key") != local_node_key:
+                        continue
+                containers.append({
+                    "id": f"unknown-{spec['key']}",
+                    "full_id": f"unknown-{spec['key']}",
+                    "name": spec["label"],
+                    "kind": "system",
+                    "status": "unknown",
+                    "health": "unknown",
+                    "node": local_node_key,
+                    "node_name": local_node_name,
+                    "location": "unknown",
+                    "restart_count": 0,
+                    "exit_code": None,
+                    "details": f"Local Docker engine unavailable: {local_reason}",
+                })
+                seen_system_keys.add(spec["key"])
+
         if kind_filter != "all":
             containers = [x for x in containers if x["kind"] == kind_filter]
 
@@ -3147,6 +3232,13 @@ class AdminMonitoringContainersView(APIView):
             "local_node": local_node_name,
             "local_node_key": local_node_key,
             "nodes": nodes_meta,
+            # Per-engine status so the UI can show a small "local engine
+            # unavailable" note while still rendering whatever it has, rather than
+            # a blanket failure. The view ALWAYS returns 200 now.
+            "local_engine": {
+                "available": local_available,
+                "error": None if local_available else (errors.get("local") or "local Docker socket unavailable"),
+            },
         }
         if errors:
             payload["engine_errors"] = errors

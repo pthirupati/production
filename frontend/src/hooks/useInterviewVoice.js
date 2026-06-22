@@ -15,25 +15,162 @@ import { interviewsApi } from '../api/interviews'
 
 // ---------------------------------------------------------------------------
 // Browser voice picker (used for browser TTS fallback)
+//
+// NATURALNESS (FIX 2): browsers expose a mix of voices of wildly different
+// quality on the same OS — the old robotic eSpeak/"Microsoft David Desktop"
+// engines sit in the same list as modern on-device NEURAL voices (e.g.
+// "Microsoft Aria Online (Natural)", Google's "en-US" WaveNet voices, Apple's
+// "Samantha"/"Ava"/Siri voices). We score the list so we always reach for the
+// most human-sounding LOCAL/neural voice for the right accent instead of
+// whatever the OS picked as #0 (often the worst one). This is the single
+// biggest free win for sounding less robotic.
+//
+// NOTE: truly human-grade TTS needs a paid/local-neural model (ElevenLabs,
+// Azure Neural, Piper, etc.) — that is explicitly out of scope / forbidden
+// here. This gets as close as free in-browser voices allow.
 // ---------------------------------------------------------------------------
+
+// Names that signal a high-quality neural/natural voice, in rough rank order.
+// These substrings appear in the voiceURI/name across Chrome, Edge, Safari.
+const _NATURAL_NAME_HINTS = [
+  'natural', 'neural', 'wavenet', 'premium', 'enhanced', 'siri',
+  // Modern Edge/Windows neural voices.
+  'aria', 'jenny', 'guy', 'libby', 'ryan', 'sonia', 'natasha', 'clara',
+  'neerja', 'prabhat',
+  // Apple's better voices (macOS/iOS) — far smoother than the legacy "Fred".
+  'ava', 'samantha', 'allison', 'zoe', 'evan', 'nathan', 'serena', 'daniel',
+  // Google's voices (Chrome/Android) are decent and usually contain "Google".
+  'google',
+]
+
+// Names that are notably ROBOTIC — actively de-prioritise these even if the OS
+// lists them first or they match the locale.
+const _ROBOTIC_NAME_HINTS = [
+  'espeak', 'pico', 'compact', 'david', 'mark', 'zira', 'hazel', 'fred',
+  'albert', 'bad news', 'good news', 'bahh', 'bells', 'boing', 'bubbles',
+  'cellos', 'deranged', 'eddy', 'flo', 'grandma', 'grandpa', 'jester',
+  'organ', 'reed', 'rocko', 'sandy', 'shelley', 'superstar', 'trinoids',
+  'whisper', 'wobble', 'zarvox', 'junior', 'kathy', 'ralph', 'novelty',
+]
+
+function _voiceNaturalnessScore(voice, locale) {
+  if (!voice) return -Infinity
+  const name = (voice.name || '').toLowerCase()
+  const uri = (voice.voiceURI || '').toLowerCase()
+  const hay = `${name} ${uri}`
+  let score = 0
+
+  // Strongly reward known-natural markers (earlier in the list = higher weight).
+  _NATURAL_NAME_HINTS.forEach((hint, i) => {
+    if (hay.includes(hint)) score += 40 - i
+  })
+  // "(Natural)" / "Neural" in the display name is the clearest signal of all.
+  if (/\bnatural\b|\bneural\b/.test(hay)) score += 60
+
+  // Penalise the legacy robotic engines hard.
+  _ROBOTIC_NAME_HINTS.forEach((hint) => {
+    if (hay.includes(hint)) score -= 50
+  })
+  // eSpeak "compact"/"desktop" variants are the worst.
+  if (hay.includes('desktop') || hay.includes('compact')) score -= 25
+
+  // Locale fit: exact match best, language-family match good, else mild penalty.
+  const base = (locale || 'en-US').split('-')[0]
+  if (voice.lang === locale) score += 30
+  else if (voice.lang?.startsWith(base)) score += 18
+  else score -= 20 // wrong language entirely — avoid unless nothing else.
+
+  // localService voices play instantly & offline; "online" neural voices sound
+  // best but can lag. Give a small nudge to local so the convo stays snappy,
+  // but not enough to override a clearly-natural online voice.
+  if (voice.localService) score += 6
+
+  // Prefer English overall for these interviews.
+  if (voice.lang?.startsWith('en')) score += 8
+
+  return score
+}
+
+// Rank ALL voices for a locale, best-first. Exposed so the in-room voice picker
+// can present the most natural options at the top of the dropdown.
+function rankVoicesByNaturalness(voices, locale) {
+  return [...(voices || [])]
+    .map((v) => ({ v, s: _voiceNaturalnessScore(v, locale) }))
+    .sort((a, b) => b.s - a.s)
+    .map((x) => x.v)
+}
 
 function pickBrowserVoice(hint, locale, preferredURI) {
   if (!window.speechSynthesis) return null
   const voices = window.speechSynthesis.getVoices()
   if (!voices.length) return null
-  // An explicit in-room user choice always wins.
+  // An explicit in-room user choice always wins — the candidate is in control.
   if (preferredURI) {
     const chosen = voices.find(v => v.voiceURI === preferredURI)
     if (chosen) return chosen
   }
+  // An admin/persona hint (e.g. "Neerja", "Samantha") is a strong preference,
+  // but only if that named voice exists; otherwise fall through to ranking.
   if (hint) {
     const match = voices.find(v => v.name.toLowerCase().includes(hint.toLowerCase()))
     if (match) return match
   }
-  const localeMatch = voices.find(
-    v => v.lang === locale || v.lang?.startsWith(locale?.split('-')[0])
-  )
-  return localeMatch || voices[0]
+  // No explicit choice → pick the most natural-sounding voice for this accent.
+  const ranked = rankVoicesByNaturalness(voices, locale)
+  return ranked[0] || voices[0]
+}
+
+// ---------------------------------------------------------------------------
+// Sentence segmentation + natural pauses (FIX 2)
+//
+// Speaking a long paragraph as ONE utterance is what makes Web Speech sound
+// monotone — there's no breath, no beat between thoughts. We split the reply
+// into sentence-ish chunks and speak them as a queue with a short, slightly
+// randomised gap between them. The result is a more conversational cadence
+// (a tiny "thinking" beat after a question mark, a shorter beat after a comma
+// clause) without any paid API.
+// ---------------------------------------------------------------------------
+
+function segmentForSpeech(text) {
+  const clean = (text || '').replace(/\s+/g, ' ').trim()
+  if (!clean) return []
+  // Split on sentence terminators while KEEPING the punctuation, then also
+  // break very long comma-spliced clauses so we still get a breath.
+  const rough = clean.match(/[^.!?]+[.!?]+(?:["')\]]+)?|\S[^.!?]*$/g) || [clean]
+  const out = []
+  for (const seg of rough) {
+    const s = seg.trim()
+    if (!s) continue
+    if (s.length <= 140) {
+      out.push(s)
+    } else {
+      // Long sentence — break on a comma/semicolon/dash boundary near halves so
+      // no single utterance runs on robotically.
+      let buf = ''
+      for (const part of s.split(/(?<=[,;:—-])\s+/)) {
+        if ((buf + ' ' + part).trim().length > 140 && buf) {
+          out.push(buf.trim())
+          buf = part
+        } else {
+          buf = (buf ? buf + ' ' : '') + part
+        }
+      }
+      if (buf.trim()) out.push(buf.trim())
+    }
+  }
+  return out
+}
+
+// Pause (ms) AFTER a segment, derived from its trailing punctuation so the
+// cadence feels human: a real beat after a question, a clear stop after a
+// period, a light lilt after a comma.
+function pauseAfter(segment) {
+  const last = segment.trim().slice(-1)
+  if (last === '?') return 340
+  if (last === '!') return 280
+  if (last === '.') return 240
+  if (last === ',' || last === ';' || last === ':') return 150
+  return 200
 }
 
 const VOICE_STORAGE_KEY = 'fixitlab.interview.voiceURI'
@@ -202,6 +339,11 @@ export function useInterviewVoice() {
   const audioRecorder = useRef(new AudioRecorder())
   // Active browser SpeechRecognition instance (so stopListening can finalize it).
   const recognizerRef = useRef(null)
+  // Monotonic token: bumped on every cancelSpeech() so an in-flight segmented
+  // utterance queue knows to abort mid-paragraph (barge-in / next turn).
+  const speakTokenRef = useRef(0)
+  // Pending inter-sentence pause timer, so cancelSpeech can clear it instantly.
+  const speakPauseTimerRef = useRef(null)
   // Keep the latest selection in a ref so speak() always reads the current
   // value without needing to be re-created (and without stale closures).
   const selectedVoiceRef = useRef(selectedVoiceURI)
@@ -274,34 +416,65 @@ export function useInterviewVoice() {
         // Fall through to browser TTS
       }
 
-      // Browser SpeechSynthesis fallback
+      // Browser SpeechSynthesis fallback — segmented for a natural cadence.
       if (!window.speechSynthesis) return
       const profile = resolveVoiceProfile(voiceCode)
       window.speechSynthesis.cancel()
-      const u = new SpeechSynthesisUtterance(text)
-      u.lang = profile.locale || 'en-US'
-      u.rate = profile.rate ?? 0.95
-      u.pitch = profile.pitch ?? 1
-      // Honor the user's in-room voice choice over the admin hint.
+
+      // Honor the user's in-room voice choice over the admin hint; otherwise
+      // pick the most natural-sounding voice for the accent.
       const voice = pickBrowserVoice(
         profile.browser_voice_hint, profile.locale, selectedVoiceRef.current,
       )
-      if (voice) {
-        u.voice = voice
-        if (voice.lang) u.lang = voice.lang
-      }
+      // Clamp rate/pitch into the conversational range the brief calls for
+      // (~0.95–1.05 rate). Slightly raise the floor so it never drones.
+      const rate = Math.min(1.08, Math.max(0.92, profile.rate ?? 0.98))
+      const pitch = Math.min(1.15, Math.max(0.9, profile.pitch ?? 1))
 
-      await new Promise((resolve) => {
-        u.onend = resolve
-        u.onerror = resolve
-        window.speechSynthesis.speak(u)
-      })
+      const segments = segmentForSpeech(text)
+      // Tag this utterance run; if cancelSpeech bumps the token we bail out.
+      const myToken = ++speakTokenRef.current
+
+      for (let i = 0; i < segments.length; i++) {
+        if (speakTokenRef.current !== myToken) break // cancelled / superseded
+        const seg = segments[i]
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => {
+          const u = new SpeechSynthesisUtterance(seg)
+          u.lang = (voice && voice.lang) || profile.locale || 'en-US'
+          u.rate = rate
+          u.pitch = pitch
+          if (voice) u.voice = voice
+          let settled = false
+          const done = () => { if (settled) return; settled = true; resolve() }
+          u.onend = done
+          u.onerror = done
+          try { window.speechSynthesis.speak(u) } catch { done() }
+        })
+        // Natural beat between sentences (skip the trailing pause on the last).
+        if (i < segments.length - 1 && speakTokenRef.current === myToken) {
+          const gap = pauseAfter(seg)
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((resolve) => {
+            speakPauseTimerRef.current = setTimeout(() => {
+              speakPauseTimerRef.current = null
+              resolve()
+            }, gap)
+          })
+        }
+      }
     } finally {
       setIsSpeaking(false)
     }
   }, [config.uses_server_tts, resolveVoiceProfile])
 
   const cancelSpeech = useCallback(() => {
+    // Invalidate any in-flight segmented queue so it stops between sentences.
+    speakTokenRef.current += 1
+    if (speakPauseTimerRef.current) {
+      clearTimeout(speakPauseTimerRef.current)
+      speakPauseTimerRef.current = null
+    }
     stopAudio()
     setIsSpeaking(false)
   }, [])
@@ -434,19 +607,199 @@ export function useInterviewVoice() {
     }
   }, [config.uses_server_stt])
 
-  // Stop the active capture and finalize it. Works for BOTH the server-Whisper
-  // path (resolves the recorder) and the browser path (stops the recognizer so
-  // its onend resolves with the accumulated transcript). Called by the Stop
-  // button, by skip-on-silence, and by barge-in handling.
+  // ------------------------------------------------------------------
+  // listenLive() — TRUE hands-free turn (FIX 1)
+  //
+  // Continuous browser SpeechRecognition + interim results + a trailing-SILENCE
+  // timer that AUTO-FINALIZES the turn ~1.8s after the candidate stops talking.
+  // This is what removes the send button: the candidate just speaks, stops, and
+  // their answer submits itself.
+  //
+  // Robustness rules baked in (the brief insists on these):
+  //   * The silence timer is RESET on every new token (interim or final), so a
+  //     natural mid-sentence pause never auto-submits — only a real trailing
+  //     window of quiet after speech does.
+  //   * We only auto-finalize-by-silence once REAL speech has been heard AND we
+  //     have a non-empty transcript. An empty/no-speech turn never resolves via
+  //     the silence path (it waits for the caller's stop or the safety cap).
+  //   * Chrome ends continuous recognition itself after a pause; we transparently
+  //     restart it until the caller stops or silence fires, so one long answer
+  //     with pauses is captured as a single turn.
+  //
+  // Resolves with { transcript, filtered_text, confidence, provider, reason,
+  // had_speech }. ``reason`` is 'silence' | 'manual' | 'timeout' | 'error' |
+  // 'unsupported' so the room can decide whether to submit.
+  //
+  // 100% browser-native — no paid STT.
+  // ------------------------------------------------------------------
+  const listenLive = useCallback((mediaStream, options = {}) => {
+    const {
+      locale = 'en-US',
+      maxDuration = 90000,        // hard safety cap
+      silenceMs = 1800,           // trailing quiet after speech → auto-submit
+      onInterim = null,
+    } = options
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) {
+      return Promise.resolve({
+        transcript: '', filtered_text: '', confidence: 0,
+        provider: 'none', reason: 'unsupported', had_speech: false,
+      })
+    }
+
+    setIsListening(true)
+    setInterimTranscript('')
+
+    return new Promise((resolve) => {
+      const r = new SR()
+      r.lang = locale
+      r.continuous = true
+      r.interimResults = true
+
+      let finalText = ''
+      let lastInterim = ''           // most recent interim — Chrome can be slow
+                                     // to promote it to final on a pause.
+      let lastConfidence = 0.8
+      let hadSpeech = false
+      let settled = false
+      let stopRequested = false      // caller asked us to finalize now (manual)
+      let silenceTimer = null
+      let restartGuard = false
+      recognizerRef.current = r
+
+      const clearSilence = () => {
+        if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null }
+      }
+
+      // Best transcript we currently hold: finalized speech, plus any trailing
+      // interim that Chrome hasn't promoted yet (so a short answer ending on a
+      // pause isn't lost just because the engine was slow to finalize).
+      const bestText = () => (finalText + ' ' + (lastInterim || '')).trim()
+
+      const settle = (reason) => {
+        if (settled) return
+        settled = true
+        clearSilence()
+        clearTimeout(capTimer)
+        recognizerRef.current = null
+        // Detach handlers so a late onend/onresult can't fire after we resolve.
+        r.onresult = null
+        r.onend = null
+        r.onerror = null
+        r.onspeechstart = null
+        try { r.stop() } catch { /* already stopping */ }
+        try { r.abort?.() } catch { /* */ }
+        setInterimTranscript('')
+        setIsListening(false)
+        const text = bestText()
+        resolve({
+          transcript: text,
+          filtered_text: text,
+          confidence: lastConfidence,
+          provider: 'browser',
+          reason,
+          had_speech: hadSpeech,
+          is_final: true,
+          word_count: text ? text.split(/\s+/).length : 0,
+        })
+      }
+
+      // Arm the trailing-silence auto-submit. Only meaningful once we've heard
+      // real speech AND captured some text (final or interim) — otherwise it's a
+      // no-op so an idle/empty turn never self-submits on a mid-sentence pause.
+      const armSilence = () => {
+        clearSilence()
+        if (!hadSpeech || !bestText()) return
+        silenceTimer = setTimeout(() => settle('silence'), silenceMs)
+      }
+
+      r.onspeechstart = () => { hadSpeech = true }
+
+      r.onresult = (e) => {
+        hadSpeech = true
+        let interim = ''
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i]
+          const chunk = res[0].transcript
+          if (res.isFinal) {
+            finalText += (finalText ? ' ' : '') + chunk.trim()
+            lastConfidence = res[0].confidence || lastConfidence
+          } else {
+            interim += chunk
+          }
+        }
+        lastInterim = interim.trim()
+        const display = bestText()
+        setInterimTranscript(display)
+        if (onInterim) onInterim(display)
+        // New tokens → reset the trailing-silence countdown. A pause only
+        // counts once tokens STOP arriving for the full silenceMs window.
+        armSilence()
+      }
+
+      r.onerror = (ev) => {
+        // 'no-speech' / 'aborted' are transient — don't trash a captured answer.
+        if (ev?.error === 'no-speech' || ev?.error === 'aborted') {
+          // Let onend handle the restart/settle decision.
+          return
+        }
+        settle('error')
+      }
+
+      // Chrome fires onend whenever it pauses recognition (after silence) or on
+      // stop(). If the caller hasn't asked to stop and we're under the cap,
+      // transparently restart so a long, pause-laden answer is one turn. If the
+      // caller stopped (manual/barge-in), finalize.
+      r.onend = () => {
+        if (settled) return
+        if (stopRequested) { settle('manual'); return }
+        // If silence already captured a real answer, the timer will settle; if
+        // not, keep listening by restarting (guard against tight restart loops).
+        if (!restartGuard) {
+          restartGuard = true
+          setTimeout(() => { restartGuard = false }, 250)
+          try { r.start(); return } catch { /* fall through to settle */ }
+        }
+        // Couldn't restart — finalize with whatever we have (silence if we have
+        // speech+text, else manual so the caller treats it as "nothing said").
+        settle(hadSpeech && bestText() ? 'silence' : 'manual')
+      }
+
+      // Expose a finalize hook for stopListening()/barge-in to end this turn.
+      r._finishLive = () => { stopRequested = true; try { r.stop() } catch { settle('manual') } }
+
+      try { r.start() } catch { settle('error') }
+      const capTimer = setTimeout(() => settle('timeout'), maxDuration)
+    })
+  }, [])
+
+  // Stop the active capture and finalize it. Works for the live hands-free turn
+  // (listenLive), the server-Whisper path (resolves the recorder), and the
+  // explicit browser path (stops the recognizer so its onend resolves with the
+  // accumulated transcript). Called by the Stop button, skip-on-silence, and
+  // barge-in handling.
   const stopListening = useCallback(() => {
     if (audioRecorder.current._resolve) {
       audioRecorder.current._resolve()
       audioRecorder.current._resolve = null
     }
     if (recognizerRef.current) {
-      try { recognizerRef.current.stop() } catch { /* already stopped */ }
+      // listenLive instances carry a finalize hook so we end the turn cleanly
+      // and report it as a manual stop (vs an auto silence-submit).
+      if (recognizerRef.current._finishLive) {
+        recognizerRef.current._finishLive()
+      } else {
+        try { recognizerRef.current.stop() } catch { /* already stopped */ }
+      }
     }
   }, [])
+
+  // Ranked browser voices (most natural first) for the in-room/preflight picker.
+  // Falls back to the raw list if ranking yields nothing.
+  const naturalVoices = useCallback((locale = 'en-US') => {
+    return rankVoicesByNaturalness(browserVoices, locale)
+  }, [browserVoices])
 
   return {
     config,
@@ -456,10 +809,12 @@ export function useInterviewVoice() {
     speak,
     cancelSpeech,
     listen,
+    listenLive,
     stopListening,
     resolveVoiceProfile,
     // In-room voice switching (P2.1)
     browserVoices,
+    naturalVoices,
     selectedVoiceURI,
     selectVoice,
   }

@@ -12,21 +12,30 @@ import {
   streamHasLiveTrack,
 } from '../../utils/mediaDevices'
 import InterviewVideoPreview from '../../components/interviews/InterviewVideoPreview'
+import InterviewerStage from '../../components/interviews/InterviewerStage'
 import PracticalAnswerPanel from '../../components/interviews/PracticalAnswerPanel'
 import CoachingTip from '../../components/interviews/CoachingTip'
 import { PageHeader } from '../../components/design'
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Clock, MessageSquare, Terminal,
   Volume2, Plus, ExternalLink, Loader2, ArrowLeft, Calendar, X, SkipForward,
+  CheckCircle2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // How long (ms) of continuous silence on an open question before the bot moves
 // on, so the fixed round time covers the planned material (skip-on-silence).
 const SILENCE_SKIP_MS = 20000
+// Trailing silence (ms) after the candidate stops talking before we AUTO-SUBMIT
+// their answer (FIX 1 — no send button). Long enough not to fire on a natural
+// mid-sentence pause, short enough to feel live/responsive.
+const TURN_SILENCE_MS = 1900
 // Mic energy (0–1, same scale as the preflight meter) that counts as "speaking"
 // for barge-in. Above this while the bot is talking → interrupt the bot.
 const BARGE_IN_LEVEL = 0.18
+// Mic energy that counts as the candidate actively speaking, used to glow their
+// tile as the active speaker (FIX 4). Lower than barge-in: any clear voice.
+const CANDIDATE_SPEAKING_LEVEL = 0.1
 
 export default function InterviewRoom() {
   const { roundId } = useParams()
@@ -68,11 +77,16 @@ export default function InterviewRoom() {
   const [mediaStream, setMediaStream] = useState(null)
   const [recordingReady, setRecordingReady] = useState(false)
   const [micLevel, setMicLevel] = useState(0)
+  // Active-speaker highlight for the candidate tile (FIX 4): true while the live
+  // mic VAD hears the candidate's voice. Drives the green glow + caption.
+  const [candidateSpeaking, setCandidateSpeaking] = useState(false)
+  // The AI's most recent spoken line, shown as a live caption on its tile.
+  const [aiCaption, setAiCaption] = useState('')
   const {
-    speak, listen, stopListening, cancelSpeech,
+    speak, listenLive, stopListening, cancelSpeech,
     resolveVoiceProfile,
     isSpeaking, isListening, interimTranscript,
-    browserVoices, selectedVoiceURI, selectVoice,
+    browserVoices, naturalVoices, selectedVoiceURI, selectVoice,
   } = useInterviewVoice()
 
   const [round, setRound] = useState(null)
@@ -188,6 +202,7 @@ export default function InterviewRoom() {
   useEffect(() => {
     if (preflight || !started || observerMode || !micOn || !mediaStream) {
       cancelAnimationFrame(vadRafRef.current)
+      setCandidateSpeaking(false)
       return
     }
     let ctx
@@ -200,6 +215,8 @@ export default function InterviewRoom() {
       source.connect(analyser)
       const data = new Uint8Array(analyser.frequencyBinCount)
       let loudFrames = 0
+      let speakingFrames = 0   // hysteresis for the active-speaker glow
+      let quietFrames = 0
       const tick = () => {
         analyser.getByteFrequencyData(data)
         const avg = data.reduce((s, v) => s + v, 0) / data.length
@@ -215,6 +232,21 @@ export default function InterviewRoom() {
         } else if (level <= BARGE_IN_LEVEL) {
           loudFrames = 0
         }
+        // Active-speaker highlight (FIX 4): glow the candidate tile while they
+        // talk. Don't light it for the bot's own audio bleeding into the mic —
+        // only when we're NOT speaking (or they've barged in). Hysteresis
+        // (a few frames each way) keeps the glow steady, not flickery.
+        const candidateVoice =
+          level > CANDIDATE_SPEAKING_LEVEL && (!isSpeakingRef.current || bargedInRef.current)
+        if (candidateVoice) {
+          speakingFrames += 1
+          quietFrames = 0
+          if (speakingFrames >= 2) setCandidateSpeaking(true)
+        } else {
+          quietFrames += 1
+          speakingFrames = 0
+          if (quietFrames >= 8) setCandidateSpeaking(false)
+        }
         vadRafRef.current = requestAnimationFrame(tick)
       }
       vadRafRef.current = requestAnimationFrame(tick)
@@ -223,6 +255,7 @@ export default function InterviewRoom() {
     }
     return () => {
       cancelAnimationFrame(vadRafRef.current)
+      setCandidateSpeaking(false)
       if (ctx) ctx.close()
       vadCtxRef.current = null
     }
@@ -494,42 +527,47 @@ export default function InterviewRoom() {
     }
   }
 
-  // Start STT and capture one answer. Passes the live mic stream + correct
-  // options so the recognizer actually receives audio (this was the bug:
-  // listen(profile.locale) sent a string where the hook expects a MediaStream).
-  // listen() resolves with { transcript, filtered_text, ... } — not a string.
+  // TRUE hands-free turn (FIX 1 — no send button). Opens the mic and lets the
+  // candidate just SPEAK; when they STOP (trailing silence detected by the hook)
+  // the answer AUTO-SUBMITS and the AI responds. A second click of the mic
+  // button (or Enter / the Done button) finalizes early as an accessibility
+  // fallback. Uses browser SpeechRecognition only — zero paid STT.
   const voiceAnswer = async () => {
     if (isListening) {
-      // Second click acts as "done" — finalize the current capture.
+      // Manual "done" affordance — finalize the current capture immediately.
       stopListening()
       return
     }
     // If the bot is mid-sentence, stop it first so STT doesn't transcribe TTS.
     cancelSpeech()
     const profile = resolveVoiceProfile(round?.persona_voice_id)
-    // Arm skip-on-silence for THIS listening turn: if no speech arrives within
-    // the window, the timer stops the recognizer and posts an empty (skipped)
-    // answer so the round keeps moving and uses the fixed time.
+    // Arm the long skip-on-silence safety net for THIS turn: if the candidate
+    // stays totally silent (never speaks at all), submit an empty (skipped)
+    // answer so the round keeps moving. The SHORT trailing-silence window inside
+    // listenLive handles the normal "they finished talking" auto-submit.
     armSilenceSkip()
-    // listen() flips the hook's isListening flag itself; no local state needed.
-    const result = await listen(streamRef.current, {
+    // listenLive flips isListening itself and resolves on trailing silence.
+    const result = await listenLive(streamRef.current, {
       locale: profile.locale || 'en-IN',
-      techPrompt: round?.technology_name || '',
+      silenceMs: TURN_SILENCE_MS,
       onInterim: (txt) => setAnswer(txt),
     })
     const text = (result?.transcript || result?.filtered_text || '').trim()
-    // If the silence-skip timer (or a manual skip) already resolved this turn,
-    // awaitingAnswerRef is false — don't submit again, even if late STT text
-    // arrives. This closes the double-submit race.
+    // If the skip-silence timer (or a manual skip / barge-in) already resolved
+    // this turn, awaitingAnswerRef is false — don't submit again even if late
+    // STT text arrives. Closes the double-submit race.
     if (!awaitingAnswerRef.current) {
       setAnswer('')
       return
     }
     if (text) {
+      // Auto-submit (silence/timeout) OR manual-done — either way we have a real
+      // answer, so send it and the loop continues hands-free.
       await submitAnswer(text)
     } else {
-      // Stopped with nothing captured — clear and wait (no skip was triggered).
-      clearSilenceTimer()
+      // Recognizer ended with nothing captured (e.g. the candidate clicked Done
+      // before speaking). Don't submit an empty answer here — leave the
+      // skip-silence timer running so a truly idle turn still advances the round.
       setAnswer('')
     }
   }
@@ -539,6 +577,8 @@ export default function InterviewRoom() {
   const speakThenListen = async (text, { autoListen = true, voiceId } = {}) => {
     if (!text) return
     bargedInRef.current = false
+    // Surface the bot's line as a live caption on its tile while it speaks.
+    setAiCaption(text)
     await speak(text, voiceId ?? round?.persona_voice_id)
     // speak() resolves when TTS finishes (or was cancelled). If the candidate
     // barged in, voiceAnswer() is already listening — don't double-start.
@@ -857,7 +897,7 @@ export default function InterviewRoom() {
           <div className="space-y-1.5">
             <p className="text-xs text-surface-400 flex items-center gap-1.5">
               <Volume2 size={12} className="text-indigo-400" />
-              Interviewer voice — you can also change this during the interview
+              Interviewer voice — most natural voices first. You can also change this mid-interview.
             </p>
             <div className="flex items-center gap-2">
               <select
@@ -865,8 +905,8 @@ export default function InterviewRoom() {
                 onChange={e => selectVoice(e.target.value)}
                 className="input-field text-xs flex-1"
               >
-                <option value="">Default ({round.persona_name}'s accent)</option>
-                {browserVoices.map(v => (
+                <option value="">Recommended ({round.persona_name}'s accent)</option>
+                {naturalVoices('en-US').map(v => (
                   <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>
                 ))}
               </select>
@@ -879,6 +919,9 @@ export default function InterviewRoom() {
                 <Volume2 size={12} /> Test
               </button>
             </div>
+            <p className="text-[10px] text-surface-600">
+              Voices are free and run in your browser. Pick a “Natural”/“Neural” one if available — they sound the most human.
+            </p>
           </div>
         )}
         <div className="flex flex-wrap gap-3">
@@ -965,8 +1008,8 @@ export default function InterviewRoom() {
                 onChange={e => changeVoice(e.target.value)}
                 className="bg-surface-800 border border-surface-700 rounded text-[11px] text-surface-200 py-1 px-1.5 max-w-[140px]"
               >
-                <option value="">Default voice</option>
-                {browserVoices.map(v => (
+                <option value="">Recommended voice</option>
+                {naturalVoices('en-US').map(v => (
                   <option key={v.voiceURI} value={v.voiceURI}>
                     {v.name} ({v.lang})
                   </option>
@@ -1016,58 +1059,95 @@ export default function InterviewRoom() {
 
       <div className="flex-1 grid lg:grid-cols-3 gap-0 min-h-0">
         <div className="lg:col-span-2 flex flex-col min-h-0 border-r border-surface-800">
-          <div className="relative flex-1 bg-black min-h-[200px]">
-            <InterviewVideoPreview
-              stream={mediaStream}
-              cameraOn={cameraOn}
-              backgroundId={backgroundId}
-              onBackgroundChange={setBackgroundId}
-              className="absolute inset-0 w-full h-full"
-              mirror={false}
-              placeholder=""
-            />
-            <div className="absolute bottom-3 left-3 flex gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  const t = streamRef.current?.getAudioTracks()[0]
-                  if (!t) {
-                    await acquireMedia('audio')
-                    return
-                  }
-                  t.enabled = !t.enabled
-                  setMicOn(t.enabled)
-                }}
-                className={`p-2 rounded-full ${micOn ? 'bg-surface-800/90 text-white' : 'bg-red-500/90 text-white'}`}
-              >
-                {micOn ? <Mic size={18} /> : <MicOff size={18} />}
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  const t = streamRef.current?.getVideoTracks()[0]
-                  if (!t) {
-                    await acquireMedia('video')
-                    return
-                  }
-                  t.enabled = !t.enabled
-                  setCameraOn(t.enabled)
-                }}
-                className={`p-2 rounded-full ${cameraOn ? 'bg-surface-800/90 text-white' : 'bg-red-500/90 text-white'}`}
-              >
-                {cameraOn ? <Video size={18} /> : <VideoOff size={18} />}
-              </button>
+          {/* ── Split-screen: AI interviewer tile + candidate webcam tile ── */}
+          <div className="interview-stage-grid flex-1 p-3 sm:p-4">
+            {/* AI interviewer tile — glows while the AI is speaking */}
+            <div className={`interview-tile ${isSpeaking ? 'interview-tile-active' : ''}`}>
+              <InterviewerStage
+                personaName={round.persona_name}
+                roundTitle={round.title}
+                speaking={isSpeaking}
+                listening={isListening}
+                caption={aiCaption}
+              />
             </div>
-            <div className="absolute top-3 right-3 w-24 h-24 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex flex-col items-center justify-center">
-              <Volume2 className="text-indigo-300 mb-1" size={20} />
-              <span className="text-[10px] text-indigo-200 text-center px-1">
-                Browser voice (free)
-              </span>
+
+            {/* Candidate webcam tile — glows green while they speak */}
+            <div className={`interview-tile ${candidateSpeaking ? 'interview-tile-active-candidate' : ''}`}>
+              <InterviewVideoPreview
+                stream={mediaStream}
+                cameraOn={cameraOn}
+                backgroundId={backgroundId}
+                onBackgroundChange={setBackgroundId}
+                className="absolute inset-0 w-full h-full"
+                mirror
+                placeholder=""
+              />
+              {/* In-tile mic/camera toggles */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const t = streamRef.current?.getAudioTracks()[0]
+                    if (!t) { await acquireMedia('audio'); return }
+                    t.enabled = !t.enabled
+                    setMicOn(t.enabled)
+                  }}
+                  className={`p-2.5 rounded-full transition-colors ${micOn ? 'bg-surface-800/90 text-white hover:bg-surface-700' : 'bg-red-500/90 text-white'}`}
+                  title={micOn ? 'Mute' : 'Unmute'}
+                >
+                  {micOn ? <Mic size={18} /> : <MicOff size={18} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const t = streamRef.current?.getVideoTracks()[0]
+                    if (!t) { await acquireMedia('video'); return }
+                    t.enabled = !t.enabled
+                    setCameraOn(t.enabled)
+                  }}
+                  className={`p-2.5 rounded-full transition-colors ${cameraOn ? 'bg-surface-800/90 text-white hover:bg-surface-700' : 'bg-red-500/90 text-white'}`}
+                  title={cameraOn ? 'Turn camera off' : 'Turn camera on'}
+                >
+                  {cameraOn ? <Video size={18} /> : <VideoOff size={18} />}
+                </button>
+              </div>
+              {/* Candidate name plate */}
+              <div className="interview-nameplate">
+                <span className={`interview-nameplate-dot ${candidateSpeaking ? 'is-on' : ''}`} />
+                You
+              </div>
+              {/* Live candidate caption (interim STT) */}
+              {isListening && interimTranscript && (
+                <div className="interview-caption interview-caption-candidate">
+                  <span className="interview-caption-name">You</span>
+                  <p className="interview-caption-text">{interimTranscript}</p>
+                </div>
+              )}
             </div>
           </div>
 
+          {/* Hands-free status line (replaces the old send-button-centric bar) */}
+          <div className="px-4 pb-1">
+            {isSpeaking ? (
+              <p className="interview-handsfree-hint text-indigo-300">
+                <Volume2 size={13} /> {round.persona_name} is speaking — just start talking to jump in
+              </p>
+            ) : isListening ? (
+              <p className="interview-handsfree-hint text-emerald-300">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Listening — answer naturally, then pause. I'll pick it up.
+                {interimTranscript ? <span className="text-emerald-200/80 italic">“{interimTranscript.slice(0, 50)}”</span> : null}
+              </p>
+            ) : (
+              <p className="interview-handsfree-hint text-surface-500">
+                <Mic size={13} /> Hands-free — speak when you're ready, or type below.
+              </p>
+            )}
+          </div>
+
           {practicalMode && (
-            <div className="p-3 border-t border-surface-800 bg-surface-900/50 space-y-2">
+            <div className="px-4 py-2 border-t border-surface-800 bg-surface-900/50 space-y-2 mt-1">
               <p className="text-xs text-cyan-400 flex items-center gap-1">
                 <Terminal size={12} /> Hands-on lab — complete the scenario in a real FixitLab environment
               </p>
@@ -1101,22 +1181,14 @@ export default function InterviewRoom() {
             />
           )}
 
-          {(isListening || isSpeaking) && (
-            <div className="px-3 pt-2 -mb-1">
-              <p className={`text-[10px] flex items-center gap-1.5 ${isSpeaking ? 'text-indigo-300' : 'text-emerald-300'}`}>
-                {isSpeaking ? (
-                  <><Volume2 size={11} /> Interviewer speaking — start talking any time to interrupt</>
-                ) : (
-                  <><span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Listening… {interimTranscript ? `“${interimTranscript.slice(0, 60)}”` : 'speak your answer'}</>
-                )}
-              </p>
-            </div>
-          )}
           {practiceMode && coaching && (
-            <div className="px-3 pt-2">
+            <div className="px-4 pt-2">
               <CoachingTip coaching={coaching} />
             </div>
           )}
+
+          {/* Control bar — hands-free is the default; these are fallbacks for
+              accessibility (manual mic toggle, type-to-answer, Done, Skip). */}
           <div className="p-3 border-t border-surface-800 flex gap-2 items-center">
             <button
               type="button"
@@ -1130,34 +1202,34 @@ export default function InterviewRoom() {
             >
               Coach {practiceMode ? 'on' : 'off'}
             </button>
-            <input
-              value={answer}
-              onChange={e => setAnswer(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && submitAnswer()}
-              placeholder="Type your answer or use voice…"
-              className="input-field flex-1 text-sm"
-            />
             <button
               type="button"
               onClick={voiceAnswer}
-              className={`px-3 rounded-lg transition-colors ${
+              className={`px-3 py-2 rounded-lg transition-colors shrink-0 ${
                 isListening
                   ? 'bg-emerald-500/30 text-emerald-200 ring-1 ring-emerald-400 animate-pulse'
                   : 'btn-secondary'
               }`}
-              title={isListening ? 'Stop & send (or just stop talking)' : 'Voice answer'}
+              title={isListening ? 'Done — submit now (or just stop talking)' : 'Start speaking'}
             >
-              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+              {isListening ? <CheckCircle2 size={16} /> : <Mic size={16} />}
             </button>
+            <input
+              value={answer}
+              onChange={e => setAnswer(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submitAnswer()}
+              placeholder={isListening ? 'Listening… or type to override' : 'Speak, or type your answer…'}
+              className="input-field flex-1 text-sm"
+            />
             <button
               type="button"
               onClick={skipQuestion}
-              className="btn-secondary px-3"
+              className="btn-secondary px-3 shrink-0"
               title="Skip this question"
             >
               <SkipForward size={16} />
             </button>
-            <button type="button" onClick={() => submitAnswer()} className="btn-primary px-4 text-sm">
+            <button type="button" onClick={() => submitAnswer()} className="btn-primary px-4 text-sm shrink-0" title="Send typed answer">
               Send
             </button>
           </div>

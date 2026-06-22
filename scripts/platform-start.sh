@@ -62,6 +62,24 @@ ENV_FILE=".env.production"
 echo "=== FixitLab Platform START ==="
 echo "Compose: $COMPOSE_FILE | Env: $ENV_FILE"
 
+# Resolve the host's docker group id so the backend (which bind-mounts
+# /var/run/docker.sock for admin monitoring) can READ the socket via `group_add`
+# even if the image ever runs as a non-root user. Compose interpolates
+# ${DOCKER_GID} from .env.production; we persist the *real* host gid here (Debian
+# default 999) so it is correct on every node. Harmless when the backend is root.
+DOCKER_GID="$(getent group docker 2>/dev/null | cut -d: -f3 || true)"
+if [ -z "${DOCKER_GID:-}" ]; then
+  DOCKER_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || true)"
+fi
+DOCKER_GID="${DOCKER_GID:-999}"
+if grep -q '^DOCKER_GID=' "$ENV_FILE" 2>/dev/null; then
+  sed -i "s/^DOCKER_GID=.*/DOCKER_GID=${DOCKER_GID}/" "$ENV_FILE"
+else
+  echo "DOCKER_GID=${DOCKER_GID}" >> "$ENV_FILE"
+fi
+export DOCKER_GID
+echo "Resolved host docker gid: DOCKER_GID=${DOCKER_GID} (backend added to docker group for socket read)"
+
 # Image source — DEFAULT (PULL_IMAGES unset/false) is the current behavior: build
 # every service from its local ./backend|./frontend|./gateway context with
 # `up -d --build`. When the Docker Hub pipeline is enabled the gated deploy sets

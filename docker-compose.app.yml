@@ -51,6 +51,15 @@ services:
       # system containers (backend / celery) even though DOCKER_HOST points at
       # the remote labs engine. Read-only.
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Add the backend to the host's docker group so it can READ the mounted
+    # /var/run/docker.sock for admin monitoring even if the image ever runs as a
+    # non-root user (the :ro mount only makes the socket file read-only, not the
+    # Docker API — group membership is what grants access to the socket). The
+    # host's docker gid is `getent group docker | cut -d: -f3` (Debian default
+    # 999); wire DOCKER_GID through .env.production (see ci-wire-cluster-env.py).
+    # Harmless for the current root user; required the moment a USER is added.
+    group_add:
+      - "${DOCKER_GID:-999}"
     networks:
       - fixitlab_net
     healthcheck:

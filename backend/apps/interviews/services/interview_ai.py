@@ -262,7 +262,9 @@ _ACK_WITH_PHRASE = [
 ]
 
 # Acknowledgements when we couldn't pull a clean phrase. Deliberately varied so
-# a long round never repeats the same opener twice in a row.
+# a long round never repeats the same opener twice in a row. These short human
+# fillers/back-channels (FIX 2 reply style) are what make the bot read as a live
+# person reacting in the moment rather than a quiz reading the next item.
 _ACK_GENERIC = [
     "Got it.",
     "Makes sense.",
@@ -274,6 +276,24 @@ _ACK_GENERIC = [
     "Noted.",
     "That tracks.",
     "Mm-hm.",
+    "Yeah, okay.",
+    "Right, right.",
+    "Gotcha.",
+    "Okay, with you.",
+    "Sure, that makes sense.",
+    "Mm, okay.",
+]
+
+# Tiny conversational connectors occasionally stitched between the acknowledgement
+# and the follow-up so the turn flows like speech ("Right — so, what breaks…")
+# instead of two clipped sentences. Kept varied; deduped per round like the rest.
+_CONNECTORS = [
+    "so,",
+    "now,",
+    "okay so,",
+    "alright, so",
+    "here's what I'm curious about —",
+    "let me ask you this —",
 ]
 
 # Light, human asides occasionally prepended/appended (kept professional, low
@@ -454,6 +474,23 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip().lower())
 
 
+def _lower_first(text: str) -> str:
+    """Lowercase the first letter so a body reads smoothly after a connector/aside
+    that ends in a comma or dash. Leaves the standalone pronoun "I" and obvious
+    acronyms (two+ leading capitals, e.g. "SLA", "TLS") capitalised."""
+    if not text:
+        return text
+    first_word = text.split(" ", 1)[0]
+    if first_word == "I" or first_word.startswith("I "):
+        return text
+    # ALL-CAPS / acronym start (e.g. "SLA", "CPU") — don't lowercase.
+    if len(first_word) >= 2 and first_word[:2].isupper():
+        return text
+    if text[:1].isupper():
+        return text[:1].lower() + text[1:]
+    return text
+
+
 def _pick_unused(options: list[str], used: set[str], rng: random.Random) -> str:
     """Choose an option whose normalized form isn't already in `used`. Falls back
     to any option if all have been used (very long rounds). Records the choice."""
@@ -606,8 +643,15 @@ def generate_interviewer_reply(
         # Asides end in a comma/dash, so lowercase the body's first letter for
         # smoother prose ("Honestly, what breaks first…" not "Honestly, What…").
         parts.append(aside)
-        if body and body[:1].isupper() and not body.startswith("I "):
-            body = body[:1].lower() + body[1:]
+        body = _lower_first(body)
+    elif quality != "weak" and rng.random() < 0.30:
+        # No aside — sometimes stitch a light spoken connector so the reply flows
+        # into the follow-up like a real conversation ("Right — so, what breaks…")
+        # rather than two clipped sentences. Skip on weak answers (stay direct).
+        connector = _pick_unused(_CONNECTORS, used, rng)
+        if connector:
+            parts.append(connector)
+            body = _lower_first(body)
     parts.append(body)
     reply = " ".join(p for p in parts if p).strip()
     return finish(reply)
