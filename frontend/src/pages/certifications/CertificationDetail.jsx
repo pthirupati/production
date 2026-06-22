@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
-  Award, ArrowLeft, CheckCircle2, Circle, Clock, ShieldCheck, Timer, ExternalLink,
+  Award, ArrowLeft, CheckCircle2, Circle, ShieldCheck, Timer, ExternalLink,
 } from 'lucide-react'
 import PublicLayout from '../../components/layout/PublicLayout'
 import MarketingPageShell from '../../components/MarketingPageShell'
@@ -11,13 +11,23 @@ import { usePageTitle } from '../../hooks/usePageTitle'
 import { useAuthStore } from '../../store/authStore'
 import { certApi } from '../../api/certifications'
 
+// Wait for the persisted auth store to rehydrate before trusting isAuthenticated,
+// so a logged-in user isn't wrongly bounced to /login right after page load.
+function useHydrated() {
+  const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated())
+  useEffect(() => {
+    if (hydrated) return undefined
+    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true))
+    return unsub
+  }, [hydrated])
+  return hydrated
+}
+
 function ProgressBar({ percent }) {
+  const p = Math.min(100, Math.max(0, Number(percent) || 0))
   return (
     <div className="h-2 rounded-full bg-surface-800 overflow-hidden w-full">
-      <div
-        className="h-full bg-accent-cyan rounded-full transition-all"
-        style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
-      />
+      <div className="h-full bg-accent-cyan rounded-full transition-all" style={{ width: `${p}%` }} />
     </div>
   )
 }
@@ -33,6 +43,7 @@ function fmt(seconds) {
 export default function CertificationDetail() {
   const { slug } = useParams()
   const navigate = useNavigate()
+  const hydrated = useHydrated()
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   const [detail, setDetail] = useState(null)
@@ -41,6 +52,7 @@ export default function CertificationDetail() {
   const [result, setResult] = useState(null)
   const [remaining, setRemaining] = useState(0)
   const [busy, setBusy] = useState(false)
+  const autoSubmitted = useRef(false)
 
   usePageTitle(detail ? `${detail.code} Certification Prep` : 'Certification Prep')
 
@@ -68,42 +80,54 @@ export default function CertificationDetail() {
   useEffect(() => {
     if (!exam) return undefined
     setRemaining(exam.seconds_remaining || 0)
-    const id = setInterval(() => {
-      setRemaining((r) => Math.max(0, r - 1))
-    }, 1000)
+    const id = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000)
     return () => clearInterval(id)
   }, [exam])
 
+  const submitExam = useCallback(
+    async (auto = false) => {
+      if (!exam) return
+      setBusy(true)
+      try {
+        const data = await certApi.submitExam(exam.id)
+        setResult(data)
+        setExam(null)
+        load()
+        if (data.passed) toast.success(`Passed with ${data.score}% — certificate issued!`)
+        else if (auto) toast(`Time's up — scored ${data.score}% (need ${data.passing_score}%).`)
+        else toast(`Scored ${data.score}% (need ${data.passing_score}%).`)
+      } catch (err) {
+        toast.error(err?.response?.data?.error || 'Could not submit the exam.')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [exam, load],
+  )
+
+  // Auto-submit once the timer reaches zero.
+  useEffect(() => {
+    if (exam && remaining === 0 && !autoSubmitted.current && !busy) {
+      autoSubmitted.current = true
+      submitExam(true)
+    }
+  }, [exam, remaining, busy, submitExam])
+
   const startExam = async () => {
-    if (!isAuthenticated) {
+    if (hydrated && !isAuthenticated) {
       navigate('/login', { state: { from: `/certifications/${slug}` } })
       return
     }
     setBusy(true)
     try {
+      autoSubmitted.current = false
       const data = await certApi.startExam(slug)
       setExam(data)
       setResult(null)
-      toast.success('Timed mock exam started — complete the labs before time runs out.')
+      if (data.resumed) toast('Resumed your in-progress exam.')
+      else toast.success('Timed mock exam started — complete the labs before time runs out.')
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Could not start the exam.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const submitExam = async () => {
-    if (!exam) return
-    setBusy(true)
-    try {
-      const data = await certApi.submitExam(exam.id)
-      setResult(data)
-      setExam(null)
-      load()
-      if (data.passed) toast.success(`Passed with ${data.score}% — certificate issued!`)
-      else toast(`Scored ${data.score}% (need ${data.passing_score}%).`)
-    } catch (err) {
-      toast.error(err?.response?.data?.error || 'Could not submit the exam.')
     } finally {
       setBusy(false)
     }
@@ -183,25 +207,28 @@ export default function CertificationDetail() {
           <FixitPanel className="mb-8 border-accent-amber/30" padding="p-6">
             <div className="flex items-center justify-between gap-4 mb-4">
               <h3 className="font-display font-semibold text-white">Mock exam in progress</h3>
-              <button onClick={submitExam} disabled={busy} className="btn-primary text-sm disabled:opacity-60">
+              <button onClick={() => submitExam(false)} disabled={busy} className="btn-primary text-sm disabled:opacity-60">
                 {busy ? 'Submitting…' : 'Submit exam'}
               </button>
             </div>
             <p className="text-sm text-surface-400 mb-4">
-              Complete each lab below in a separate tab. When you finish (or time runs out), submit to be graded.
+              Open each lab below in a new tab and complete it. When you finish (or time runs out) the exam is
+              graded on the labs you completed during this window.
             </p>
             <ul className="space-y-2">
               {exam.scenarios.map((s) => (
                 <li key={s.slug}>
-                  <Link
-                    to={`/scenarios/${s.slug}`}
+                  <a
+                    href={`/scenarios/${s.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-surface-900 border border-surface-800 hover:border-accent-cyan/40 text-sm"
                   >
                     <span className="text-surface-200">{s.title}</span>
                     <span className="text-accent-cyan inline-flex items-center gap-1 text-xs">
                       Open <ExternalLink size={12} />
                     </span>
-                  </Link>
+                  </a>
                 </li>
               ))}
             </ul>
@@ -215,11 +242,13 @@ export default function CertificationDetail() {
             padding="p-6"
           >
             <h3 className="font-display font-semibold text-white mb-1">
-              {result.passed ? 'Passed 🎉' : 'Not yet'}
+              {result.passed ? 'Passed 🎉' : result.expired ? 'Time expired' : 'Not yet'}
             </h3>
             <p className="text-sm text-surface-400">
               You scored {result.score}% (pass mark {result.passing_score}%).
-              {result.certificate ? ` Certificate ${result.certificate.certificate_id} issued.` : ' Complete more objective labs and try again.'}
+              {result.certificate
+                ? ` Certificate ${result.certificate.certificate_id} issued.`
+                : ' Complete more objective labs and try again.'}
             </p>
           </FixitPanel>
         ) : null}

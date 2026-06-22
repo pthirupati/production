@@ -43,6 +43,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [socialConfig, setSocialConfig] = useState(null)
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     authApi.getSocialConfig().then(setSocialConfig).catch(() => {})
@@ -63,7 +64,10 @@ export default function Login() {
     try {
       const data = await authApi.login(email, password)
       toast.success('Welcome back!')
-      navigate(data.user?.is_staff ? '/admin' : '/dashboard')
+      // Honor a redirect target set by a gated page (e.g. starting a cert exam),
+      // otherwise land on the role's default home.
+      const from = location.state?.from
+      navigate(from || (data.user?.is_staff ? '/admin' : '/dashboard'))
     } catch (err) {
       setError(loginErrorMessage(err))
     } finally {

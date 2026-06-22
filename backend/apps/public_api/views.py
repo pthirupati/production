@@ -2272,6 +2272,30 @@ class CertificateVerifyView(APIView):
                 "is_test_certificate": True,
             })
 
+        # ── Certification-track certificates (apps.certifications) ──
+        # Resolved strictly by the stored opaque id (which carries a random
+        # component, so it is not enumerable). Lets the shared verify page work
+        # for track certs too.
+        from apps.certifications.models import CertEarnedCertificate
+
+        track_cert = (
+            CertEarnedCertificate.objects.select_related("track")
+            .filter(certificate_id=cert_id)
+            .first()
+        )
+        if track_cert:
+            return Response({
+                "valid": not track_cert.is_expired,
+                "type": "certification",
+                "certificate_id": track_cert.certificate_id,
+                "holder_name": track_cert.holder_name,
+                "technology": track_cert.track.name,
+                "level": track_cert.track.code,
+                "overall_score": track_cert.score,
+                "total_score": track_cert.score,
+                "issued_date": track_cert.issued_at.strftime("%Y-%m-%d"),
+            })
+
         # ── Look up STRICTLY by the stored opaque certificate id ──
         # (PRODUCTION_AUDIT PRIV-01) Certificate ids embed a user id
         # (FIXIT-<tech>-<USERID>-<DATE>), but we must NEVER derive the holder

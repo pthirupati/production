@@ -4,13 +4,15 @@ Public reads (list / detail / verify) are ``AllowAny`` + per-IP throttled and
 degrade gracefully (empty payload / 404, never a 500 that blanks the page),
 mirroring ``apps.tutorials``. Exam actions are owner-scoped.
 
-Per-objective progress and exam grading both read ``UserScenarioProgress`` —
-the existing single source of truth for scenario completion — so the cert layer
-adds no parallel progress bookkeeping.
+Per-objective progress and exam grading read ``UserScenarioProgress`` — the
+existing single source of truth for scenario completion. For the *timed mock
+exam*, only completions recorded DURING the exam window count, so prior lab
+completions can't be cashed in for an exam pass.
 """
 
 import logging
 import random
+from uuid import uuid4
 
 from django.db.models import Count
 from django.utils import timezone
@@ -34,15 +36,16 @@ logger = logging.getLogger(__name__)
 EXAM_SCENARIOS_PER_OBJECTIVE = 2
 
 
-def _completed_scenario_ids(user, scenario_ids):
-    """Set of scenario ids the user has completed, restricted to scenario_ids."""
+def _completed_scenario_ids(user, scenario_ids, since=None):
+    """Scenario ids the user has completed (optionally only since a datetime)."""
     if not user or not user.is_authenticated or not scenario_ids:
         return set()
-    return set(
-        UserScenarioProgress.objects.filter(
-            user=user, completed=True, scenario_id__in=scenario_ids
-        ).values_list("scenario_id", flat=True)
+    qs = UserScenarioProgress.objects.filter(
+        user=user, completed=True, scenario_id__in=scenario_ids
     )
+    if since is not None:
+        qs = qs.filter(completed_at__gte=since)
+    return set(qs.values_list("scenario_id", flat=True))
 
 
 def _track_objectives_payload(track, user):
@@ -109,14 +112,14 @@ class TrackListView(APIView):
         try:
             tracks = list(
                 CertificationTrack.objects.filter(is_active=True)
-                .annotate(objective_count=Count("objectives", distinct=True))
+                .annotate(
+                    objective_count=Count("objectives", distinct=True),
+                    scenario_count=Count(
+                        "objectives__track_scenarios__scenario", distinct=True
+                    ),
+                )
                 .order_by("order", "name")
             )
-            # scenario_count = distinct scenarios mapped across the track's objectives
-            for t in tracks:
-                t.scenario_count = (
-                    t.objectives.values("track_scenarios__scenario").distinct().count()
-                )
         except Exception:
             logger.exception("TrackListView failed — returning empty payload")
             return Response({"tracks": []})
@@ -197,7 +200,7 @@ class ExamStartView(APIView):
             .first()
         )
         if existing and not existing.is_expired:
-            return Response(self._attempt_payload(existing))
+            return Response(self._attempt_payload(existing, resumed=True))
         if existing and existing.is_expired:
             existing.status = "expired"
             existing.save(update_fields=["status"])
@@ -218,7 +221,6 @@ class ExamStartView(APIView):
                         "slug": ts.scenario.slug,
                         "title": ts.scenario.title,
                         "objective_code": obj.code,
-                        "weight": obj.weight or 1,
                         "passed": False,
                         "score": 0,
                     }
@@ -236,12 +238,13 @@ class ExamStartView(APIView):
         return Response(self._attempt_payload(attempt), status=201)
 
     @staticmethod
-    def _attempt_payload(attempt):
+    def _attempt_payload(attempt, resumed=False):
         remaining = int((attempt.expires_at - timezone.now()).total_seconds())
         return {
             "id": str(attempt.id),
             "track_slug": attempt.track.slug,
             "status": attempt.status,
+            "resumed": resumed,
             "started_at": attempt.started_at,
             "expires_at": attempt.expires_at,
             "seconds_remaining": max(0, remaining),
@@ -276,32 +279,37 @@ class ExamSubmitView(APIView):
         except ExamAttempt.DoesNotExist:
             return Response({"error": "Attempt not found"}, status=404)
 
-        if attempt.status not in ("in_progress",):
+        if attempt.status != "in_progress":
             # Already graded — return the stored result idempotently.
             return Response(self._result_payload(attempt))
 
         scenarios = attempt.results.get("scenarios", [])
         scenario_ids = [s["scenario_id"] for s in scenarios]
-        completed_ids = _completed_scenario_ids(request.user, scenario_ids)
-        best_scores = dict(
-            UserScenarioProgress.objects.filter(
-                user=request.user, scenario_id__in=scenario_ids
-            ).values_list("scenario_id", "best_score")
+        # Exam integrity: only completions DURING this attempt's window count.
+        completed_ids = _completed_scenario_ids(
+            request.user, scenario_ids, since=attempt.started_at
         )
 
-        # Per-objective + overall weighted score.
+        # Re-read objective weights from the DB (don't trust the snapshot) and
+        # divide by the FULL track weight, so an untested/failed objective drags
+        # the score down — a cert can't be earned on partial objective coverage.
+        track_weights = {o.code: (o.weight or 1) for o in attempt.track.objectives.all()}
         by_obj = {}
         for s in scenarios:
             passed = s["scenario_id"] in completed_ids
             s["passed"] = passed
-            s["score"] = best_scores.get(s["scenario_id"], 100 if passed else 0)
-            o = by_obj.setdefault(s["objective_code"], {"weight": s["weight"], "total": 0, "passed": 0})
+            s["score"] = 100 if passed else 0
+            o = by_obj.setdefault(s["objective_code"], {"total": 0, "passed": 0})
             o["total"] += 1
             o["passed"] += 1 if passed else 0
 
-        weighted_sum = sum((o["passed"] / o["total"]) * 100 * o["weight"] for o in by_obj.values() if o["total"])
-        weight_total = sum(o["weight"] for o in by_obj.values() if o["total"])
-        overall = round(weighted_sum / weight_total) if weight_total else 0
+        weighted_sum = sum(
+            (o["passed"] / o["total"]) * 100 * track_weights.get(code, 1)
+            for code, o in by_obj.items()
+            if o["total"]
+        )
+        weight_total = sum(track_weights.values()) or 1
+        overall = round(weighted_sum / weight_total)
 
         attempt.score = overall
         attempt.submitted_at = timezone.now()
@@ -323,29 +331,39 @@ class ExamSubmitView(APIView):
     @staticmethod
     def _issue_certificate(user, attempt, score):
         track = attempt.track
-        holder = (user.get_full_name() or "").strip() or getattr(user, "email", "") or f"User {user.id}"
-        cert_id = f"FIXIT-{track.code}-{user.id}-{timezone.now():%Y%m%d}"
-        cert, _ = CertEarnedCertificate.objects.get_or_create(
-            certificate_id=cert_id,
+        # Never expose the user's email on a public certificate.
+        holder = (user.get_full_name() or "").strip() or getattr(user, "username", "") or "FixitLab Learner"
+        expires = timezone.now() + timezone.timedelta(days=30 * (track.validity_months or 36))
+        # One certificate per (user, track); a re-pass at >= the stored score
+        # updates it in place. certificate_id carries a random component so it is
+        # NOT enumerable from public track code + user id + date.
+        cert, created = CertEarnedCertificate.objects.get_or_create(
+            user=user,
+            track=track,
             defaults={
-                "user": user,
-                "track": track,
+                "certificate_id": f"FIXIT-{track.code}-{uuid4().hex[:12].upper()}",
                 "attempt": attempt,
                 "holder_name": holder,
                 "score": score,
-                "expires_at": timezone.now()
-                + timezone.timedelta(days=30 * (track.validity_months or 36)),
+                "expires_at": expires,
             },
         )
+        if not created and score >= cert.score:
+            cert.attempt = attempt
+            cert.score = score
+            cert.holder_name = holder
+            cert.issued_at = timezone.now()
+            cert.expires_at = expires
+            cert.save(update_fields=["attempt", "score", "holder_name", "issued_at", "expires_at"])
         return cert
 
     @staticmethod
     def _result_payload(attempt, certificate=None):
-        if certificate is None:
+        if certificate is None and attempt.status == "passed":
             certificate = (
-                CertEarnedCertificate.objects.filter(attempt=attempt).first()
-                if attempt.status == "passed"
-                else None
+                CertEarnedCertificate.objects.filter(
+                    user=attempt.user, track=attempt.track
+                ).first()
             )
         return {
             "id": str(attempt.id),
@@ -353,6 +371,7 @@ class ExamSubmitView(APIView):
             "score": attempt.score,
             "passing_score": attempt.track.passing_score,
             "passed": attempt.status == "passed",
+            "expired": attempt.status == "expired",
             "objective_breakdown": attempt.results.get("objective_breakdown", {}),
             "certificate": CertificateSerializer(certificate).data if certificate else None,
         }

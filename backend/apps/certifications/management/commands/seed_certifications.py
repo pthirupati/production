@@ -164,7 +164,9 @@ class Command(BaseCommand):
                 _, created = TrackScenario.objects.update_or_create(
                     objective=objective,
                     scenario=scenario,
-                    defaults={"in_exam_pool": True},
+                    # Stable, non-colliding order for tag-linked scenarios
+                    # (the inline-list path uses a 0-based index instead).
+                    defaults={"in_exam_pool": True, "order": scenario.id},
                 )
                 if created:
                     links += 1

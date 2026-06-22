@@ -172,6 +172,8 @@ class CertEarnedCertificate(models.Model):
 
     class Meta:
         ordering = ["-issued_at"]
+        # One certificate per learner per track; a re-pass updates it in place.
+        unique_together = ("user", "track")
 
     def __str__(self):
         return self.certificate_id
