@@ -37,6 +37,8 @@ services:
       CLUSTER_ROLE: ${CLUSTER_ROLE:-app}
       MONITORING_NODE_NAME: ${MONITORING_NODE_NAME:-app}
       MONITORING_LOCAL_DOCKER_SOCKET: unix:///var/run/docker.sock
+      # Lets the fleet monitor read the 4-droplet topology (see ./infra mount).
+      CLUSTER_TOPOLOGY_FILE: ${CLUSTER_TOPOLOGY_FILE:-/app/infra/digitalocean/cluster.json}
     ports:
       # Gateway on D1 proxies here over the VPC; firewall limits source to D1
       - "8000:8000"
@@ -47,6 +49,8 @@ services:
       - ./deploy/labs_ssh:/root/.ssh:ro
       - ./scripts:/scripts
       - ./scenarios:/scenarios:ro
+      # Cluster topology (cluster.json) so the fleet monitor sees all 4 droplets.
+      - ./infra:/app/infra:ro
       # Local D2 Docker socket — lets admin monitoring enumerate THIS node's own
       # system containers (backend / celery) even though DOCKER_HOST points at
       # the remote labs engine. Read-only.
@@ -95,6 +99,8 @@ services:
       - ./deploy/labs_ssh:/root/.ssh:ro
       - ./scripts:/scripts
       - ./scenarios:/scenarios:ro
+      # Cluster topology (cluster.json) so the fleet monitor sees all 4 droplets.
+      - ./infra:/app/infra:ro
     networks:
       - fixitlab_net
     healthcheck:
@@ -126,6 +132,8 @@ services:
       - ./deploy/labs_ssh:/root/.ssh:ro
       - ./scripts:/scripts
       - ./scenarios:/scenarios:ro
+      # Cluster topology (cluster.json) so the fleet monitor sees all 4 droplets.
+      - ./infra:/app/infra:ro
     networks:
       - fixitlab_net
     healthcheck:
@@ -157,6 +165,8 @@ services:
       - ./deploy/labs_ssh:/root/.ssh:ro
       - ./scripts:/scripts
       - ./scenarios:/scenarios:ro
+      # Cluster topology (cluster.json) so the fleet monitor sees all 4 droplets.
+      - ./infra:/app/infra:ro
     networks:
       - fixitlab_net
     healthcheck:

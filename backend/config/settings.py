@@ -558,6 +558,13 @@ SANDBOX_DOCKER = env.bool("SANDBOX_DOCKER", default=(not DEBUG))
 SANDBOX_PYTHON_IMAGE = env("SANDBOX_PYTHON_IMAGE", default="python:3.12-alpine")
 SANDBOX_NODE_IMAGE = env("SANDBOX_NODE_IMAGE", default="node:20-alpine")
 
+# Explicit path to the cluster topology file (infra/digitalocean/cluster.json).
+# When unset, cluster_topology falls back to <repo>/infra/... — but inside the
+# backend container BASE_DIR is /app, so the fallback resolves to /infra (not
+# mounted). Setting this (with the ./infra:/app/infra mount in compose) lets the
+# fleet monitor read the 4-droplet topology instead of showing a single host.
+CLUSTER_TOPOLOGY_FILE = env("CLUSTER_TOPOLOGY_FILE", default="")
+
 # --------------------------------------------------
 # Fleet server monitoring (FREE — no paid APM)
 # --------------------------------------------------
