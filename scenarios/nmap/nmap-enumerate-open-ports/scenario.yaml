@@ -1,0 +1,33 @@
+title: Enumerate open ports on the web server
+slug: nmap-enumerate-open-ports
+category: Nmap Network Scanning
+description: A new web server web01 (10.10.10.10) just came online and the security team wants its
+  exposed TCP ports documented. Use the Nmap simulator to scan the host and enumerate every open port.
+difficulty: easy
+lab_mode: simulation
+simulation_type: nmap
+technology: nmap
+jira_priority: Low
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Open the Nmap simulator from the lab toolbar (Open Nmap)
+- Run a TCP port scan against web01 (10.10.10.10)
+- Identify all of its open ports — SSH (22), HTTP (80) and HTTPS (443)
+initial_state: web01 (10.10.10.10) is reachable but its open ports are unknown until you scan it. The
+  Discovered Hosts panel shows no ports for the host yet.
+hints:
+- order: 1
+  cost: 10
+  content: Open the Nmap simulator and scan the single target, e.g. nmap 10.10.10.10. A default scan
+    probes the common top ports and reports their state (open / closed / filtered).
+- order: 2
+  cost: 15
+  content: To be thorough, scan a specific port list with -p, e.g. nmap -p 22,80,443 10.10.10.10, or
+    run a privileged SYN scan (sudo nmap -sS 10.10.10.10) for the fastest accurate result.
+- order: 3
+  cost: 20
+  content: You are looking for three OPEN ports on web01 — 22 (ssh), 80 (http) and 443 (https). The
+    task is complete once all three show as open in the Discovered Hosts panel.

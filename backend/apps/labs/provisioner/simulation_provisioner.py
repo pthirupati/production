@@ -372,7 +372,9 @@ class SimulationProvisioner:
                 entry = None
         engine = entry.get("state", {}).get("engine") if entry else None
         slug = scenario_slug or (entry.get("state", {}).get("scenario_slug", "") if entry else "")
-        if "vmware" in (slug or "").lower():
+        sim_type = (entry.get("state", {}).get("simulation_type", "") if entry else "") or ""
+        low_slug = (slug or "").lower()
+        if "vmware" in low_slug:
             from apps.labs.models import LabSession
             from apps.vmware_sim.engine import validate_vmware_lab, _ensure_session
             try:
@@ -381,6 +383,24 @@ class SimulationProvisioner:
                 return validate_vmware_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "VMware simulation session not found"
+        if low_slug.startswith("nmap-") or sim_type == "nmap":
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.nmap_engine import validate_nmap_lab, _ensure_session
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                _ensure_session(str(lab_session.id), slug)
+                return validate_nmap_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Nmap simulation session not found"
+        if low_slug.startswith("wireshark-") or sim_type == "wireshark":
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.wireshark_engine import validate_wireshark_lab, _ensure_session
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                _ensure_session(str(lab_session.id), slug)
+                return validate_wireshark_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Wireshark simulation session not found"
         script = resolve_simulation_validation_script(slug, validation_script or "")
         if engine and hasattr(engine, "state"):
             return validate_simulation_state(engine.state, script, engine=engine)

@@ -1,0 +1,907 @@
+"""
+In-memory Nmap network-scanning simulator for training labs.
+
+Models a realistic virtual /24 network so a learner can run nmap-style scans
+from an in-app console and observe results that are *consistent* with the
+underlying inventory and the flags they pass:
+
+  - Host discovery (ping sweep) reveals which hosts are live; a host behind the
+    firewall that drops ICMP/SYN probes only shows up with -Pn (treat-as-online)
+    or a privileged SYN scan (-sS, needs sudo).
+  - Port scans report open/closed/filtered states. A firewall can silently DROP
+    SYN packets to protected ports, so they appear `filtered` unless the learner
+    uses the right technique.
+  - -sV performs service/version detection (banner grab) and reveals product +
+    version strings that a plain port scan does not.
+  - -O performs OS fingerprinting, which requires raw packets (sudo) to read.
+
+The engine tracks everything the learner has *discovered* in session state, and
+validate_nmap_lab grades the lab by checking the learner discovered the required
+fact via an appropriate scan — never by inspecting the ground-truth inventory
+directly. A fresh session always fails validation; only the intended scan
+sequence flips it to pass.
+
+Sessions live in the Django cache (Redis in production) for multi-worker safety,
+mirroring the VMware / K8s / Docker / monitoring engines (SESSION_TTL=7200).
+"""
+
+from __future__ import annotations
+
+import copy
+import ipaddress
+import json
+import random
+import re
+import time
+from typing import Any
+
+from django.core.cache import cache
+
+SESSION_TTL = 7200  # 2-hour TTL matching the other simulator engines
+
+
+def _session_key(session_id: str) -> str:
+    return f"nmap_session:{session_id}"
+
+
+def _load_session(session_id: str) -> dict | None:
+    data = cache.get(_session_key(str(session_id)))
+    if data is None:
+        return None
+    return json.loads(data) if isinstance(data, str) else data
+
+
+def _save_session(session_id: str, entry: dict) -> None:
+    cache.set(_session_key(str(session_id)), json.dumps(entry, default=str), SESSION_TTL)
+
+
+def _now_iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _now() -> float:
+    return time.time()
+
+
+# ---------------------------------------------------------------------------
+# Ground-truth virtual network (the "real" topology the scanner probes).
+# The learner never sees this directly — only what their scans reveal.
+# ---------------------------------------------------------------------------
+
+SUBNET = "10.10.10.0/24"
+GATEWAY = "10.10.10.1"
+
+
+def _port(number: int, state: str, service: str, version: str = "",
+          product: str = "", proto: str = "tcp") -> dict:
+    """A single ground-truth port on a host.
+
+    state here is the *intrinsic* state (open|closed). Whether the learner sees
+    it as open/closed/filtered is derived per-scan from the firewall + flags.
+    """
+    return {
+        "port": number,
+        "proto": proto,
+        "state": state,            # intrinsic: open | closed
+        "service": service,
+        "product": product,
+        "version": version,
+        # banner/version only revealed by -sV; OS only revealed by -O+sudo.
+    }
+
+
+def _host(ip: str, hostname: str, mac: str, vendor: str, os_name: str,
+          os_family: str, ports: list[dict], *,
+          live: bool = True,
+          icmp_blocked: bool = False,
+          firewalled: bool = False) -> dict:
+    """A ground-truth host.
+
+    - live: the host actually exists / is powered on.
+    - icmp_blocked: host drops ICMP echo (so a plain -sn ping sweep misses it;
+      needs -Pn or a SYN probe to a known port).
+    - firewalled: a stateful firewall in front of this host DROPs unsolicited
+      SYN packets to its *protected* ports, so they read `filtered` on an
+      unprivileged scan and only resolve with -sS (sudo) or after the learner
+      treats the host as up with -Pn and probes specific ports.
+    """
+    return {
+        "ip": ip,
+        "hostname": hostname,
+        "mac": mac,
+        "vendor": vendor,
+        "os": os_name,
+        "os_family": os_family,
+        "live": live,
+        "icmp_blocked": icmp_blocked,
+        "firewalled": firewalled,
+        "ports": ports,
+    }
+
+
+def _base_inventory() -> dict:
+    """The realistic /24 used by every scenario; presets tweak per-scenario flags."""
+    return {
+        "subnet": SUBNET,
+        "gateway": GATEWAY,
+        "scanner_ip": "10.10.10.250",
+        # A network-edge firewall description shown in the UI topology panel.
+        "firewall": {
+            "name": "edge-fw-01",
+            "ip": "10.10.10.254",
+            "policy": "default-deny inbound; drops unsolicited SYN to protected hosts",
+            "drops_icmp": True,
+        },
+        "hosts": [
+            _host(
+                "10.10.10.1", "gw.lab.local", "00:0c:29:3a:11:01", "Cisco Systems",
+                "Cisco IOS 15.2", "ios",
+                [
+                    _port(22, "open", "ssh", "Cisco SSH 1.25", "Cisco SSH"),
+                    _port(80, "open", "http", "Cisco IOS http config", "Cisco IOS httpd"),
+                    _port(443, "closed", "https"),
+                ],
+            ),
+            _host(
+                "10.10.10.10", "web01.lab.local", "00:0c:29:3a:11:0a", "VMware, Inc.",
+                "Ubuntu 22.04 (Linux 5.15)", "linux",
+                [
+                    _port(22, "open", "ssh", "OpenSSH 8.9p1 Ubuntu 3", "OpenSSH"),
+                    _port(80, "open", "http", "nginx 1.18.0", "nginx"),
+                    _port(443, "open", "https", "nginx 1.18.0", "nginx"),
+                    _port(3306, "closed", "mysql"),
+                ],
+            ),
+            _host(
+                "10.10.10.20", "db01.lab.local", "00:0c:29:3a:11:14", "VMware, Inc.",
+                "Debian 12 (Linux 6.1)", "linux",
+                [
+                    _port(22, "open", "ssh", "OpenSSH 9.2p1 Debian 2", "OpenSSH"),
+                    # The DB port lives behind the firewall — filtered until -sS/sudo.
+                    _port(5432, "open", "postgresql", "PostgreSQL 15.3", "PostgreSQL DB"),
+                    _port(8080, "closed", "http-proxy"),
+                ],
+                firewalled=True,
+            ),
+            _host(
+                "10.10.10.30", "win-app01.lab.local", "00:0c:29:3a:11:1e", "Microsoft Corp.",
+                "Windows Server 2019", "windows",
+                [
+                    _port(135, "open", "msrpc", "Microsoft Windows RPC", "Microsoft Windows RPC"),
+                    _port(139, "open", "netbios-ssn", "Microsoft Windows netbios-ssn"),
+                    _port(445, "open", "microsoft-ds", "Windows Server 2019 microsoft-ds"),
+                    _port(3389, "open", "ms-wbt-server", "Microsoft Terminal Services"),
+                ],
+            ),
+            _host(
+                # The "hidden" host: powered on but drops ICMP. A -sn ping sweep
+                # misses it; needs -Pn (or a SYN probe) to be discovered.
+                "10.10.10.40", "bastion.lab.local", "00:0c:29:3a:11:28", "VMware, Inc.",
+                "Alpine Linux 3.18", "linux",
+                [
+                    _port(22, "open", "ssh", "OpenSSH 9.3 (Alpine)", "OpenSSH"),
+                    _port(8443, "open", "https-alt", "HAProxy 2.8", "HAProxy"),
+                ],
+                icmp_blocked=True,
+            ),
+            _host(
+                # A dead/unassigned address: never live, useful as a negative.
+                "10.10.10.99", "", "", "", "", "unknown",
+                [],
+                live=False,
+            ),
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Scan flag parsing
+# ---------------------------------------------------------------------------
+
+_FLAG_TOKENS = {
+    "-sn": "ping_sweep",      # host discovery only, no port scan
+    "-sP": "ping_sweep",      # legacy alias
+    "-sS": "syn_scan",        # TCP SYN (half-open) scan — needs raw sockets (sudo)
+    "-sT": "connect_scan",    # TCP connect() scan — works unprivileged
+    "-sV": "version",         # service/version detection
+    "-O": "os_detect",        # OS fingerprinting — needs raw sockets (sudo)
+    "-A": "aggressive",       # enables -sV and -O (and more)
+    "-Pn": "no_ping",         # treat all hosts as online (skip host discovery)
+}
+
+
+def _parse_flags(flags: Any) -> dict:
+    """Normalise a flag list/string into a capabilities dict.
+
+    Recognises -sn/-sS/-sT/-sV/-O/-A/-Pn and `-p <spec>` (also `-p<spec>`).
+    Unknown tokens are ignored so realistic command lines still parse.
+    """
+    if isinstance(flags, (list, tuple)):
+        tokens = [str(t) for t in flags]
+    else:
+        tokens = str(flags or "").split()
+
+    caps = {
+        "ping_sweep": False,
+        "syn_scan": False,
+        "connect_scan": False,
+        "version": False,
+        "os_detect": False,
+        "aggressive": False,
+        "no_ping": False,
+        "ports": None,   # None => default top-ports; list[int] => explicit
+    }
+
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        # -p 22,80  OR  -p22,80  OR  -p1-100
+        if tok == "-p" and i + 1 < len(tokens):
+            caps["ports"] = _parse_ports(tokens[i + 1])
+            i += 2
+            continue
+        if tok.startswith("-p") and len(tok) > 2:
+            caps["ports"] = _parse_ports(tok[2:])
+            i += 1
+            continue
+        key = _FLAG_TOKENS.get(tok)
+        if key:
+            caps[key] = True
+        i += 1
+
+    if caps["aggressive"]:
+        caps["version"] = True
+        caps["os_detect"] = True
+    return caps
+
+
+def _parse_ports(spec: str) -> list[int]:
+    out: list[int] = []
+    for part in str(spec).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        m = re.match(r"^(\d+)-(\d+)$", part)
+        if m:
+            lo, hi = int(m.group(1)), int(m.group(2))
+            if hi - lo <= 2000:  # guard against silly ranges
+                out.extend(range(lo, hi + 1))
+        elif part.isdigit():
+            out.append(int(part))
+    return sorted(set(out))
+
+
+# Default "top ports" nmap probes when -p is not given (a representative subset).
+_DEFAULT_TOP_PORTS = [21, 22, 23, 25, 80, 110, 135, 139, 143, 443, 445,
+                      993, 995, 1723, 3306, 3389, 5432, 5900, 8080, 8443]
+
+
+# ---------------------------------------------------------------------------
+# Target expansion
+# ---------------------------------------------------------------------------
+
+def _expand_targets(targets: Any, inv: dict) -> list[str]:
+    """Resolve a target spec into a list of candidate IPs in our subnet.
+
+    Accepts a single IP, a CIDR (10.10.10.0/24), a hyphen range
+    (10.10.10.1-50), a hostname, or 'all'/'*'. Limited to our /24.
+    """
+    if isinstance(targets, (list, tuple)):
+        out: list[str] = []
+        for t in targets:
+            out.extend(_expand_targets(t, inv))
+        return sorted(set(out), key=_ip_sort_key)
+
+    spec = str(targets or "").strip()
+    net = ipaddress.ip_network(inv["subnet"], strict=False)
+    all_ips = [str(ip) for ip in net.hosts()]
+
+    if not spec or spec in ("all", "*", inv["subnet"]):
+        return all_ips
+
+    # hostname?
+    for h in inv["hosts"]:
+        if h.get("hostname") and h["hostname"] == spec:
+            return [h["ip"]]
+
+    # CIDR
+    if "/" in spec:
+        try:
+            sub = ipaddress.ip_network(spec, strict=False)
+            return [str(ip) for ip in sub.hosts() if ip in net]
+        except ValueError:
+            return []
+
+    # last-octet range: 10.10.10.1-50  or  10.10.10.1-10.10.10.50
+    m = re.match(r"^(\d+\.\d+\.\d+\.)(\d+)-(\d+)$", spec)
+    if m:
+        base, lo, hi = m.group(1), int(m.group(2)), int(m.group(3))
+        return [f"{base}{n}" for n in range(lo, hi + 1) if 0 < n < 255]
+
+    # single IP
+    try:
+        ip = ipaddress.ip_address(spec)
+        return [str(ip)] if ip in net else []
+    except ValueError:
+        return []
+
+
+def _ip_sort_key(ip: str):
+    try:
+        return int(ipaddress.ip_address(ip))
+    except ValueError:
+        return 0
+
+
+def _find_host(inv: dict, ip: str) -> dict | None:
+    for h in inv["hosts"]:
+        if h["ip"] == ip:
+            return h
+    return None
+
+
+# ---------------------------------------------------------------------------
+# The scan engine — derive observed results from ground truth + flags
+# ---------------------------------------------------------------------------
+
+def _host_is_discoverable(host: dict, caps: dict, sudo: bool) -> tuple[bool, str]:
+    """Would this host show as 'up' for the given scan?
+
+    Returns (up, reason). Mirrors nmap reality:
+      - A live host that answers ICMP is always discovered.
+      - A live host that blocks ICMP is missed by a plain ping sweep (-sn)
+        UNLESS the learner passes -Pn (treat as online) or runs a SYN/connect
+        port scan that elicits a response from an open port.
+      - A non-live host is never up.
+    """
+    if not host.get("live"):
+        return False, "no response"
+
+    if caps["no_ping"]:
+        return True, "skipped host discovery (-Pn)"
+
+    if not host.get("icmp_blocked"):
+        return True, "echo reply"
+
+    # ICMP blocked: a pure ping sweep misses it; a port scan that touches an
+    # open port still reveals it (SYN/connect probe gets SYN-ACK).
+    if caps["ping_sweep"] and not (caps["syn_scan"] or caps["connect_scan"]):
+        return False, "no ICMP reply (host filters ping)"
+
+    if caps["syn_scan"] or caps["connect_scan"]:
+        # A probe to any open & reachable port wakes it up.
+        if any(p["state"] == "open" for p in host["ports"]):
+            return True, "SYN-ACK from open port"
+    return False, "no ICMP reply (use -Pn)"
+
+
+def _observed_port_state(host: dict, port: dict, caps: dict, sudo: bool) -> str:
+    """Derive open|closed|filtered for one port under this scan."""
+    intrinsic = port["state"]  # open | closed
+    if intrinsic == "closed":
+        # A firewall that drops everything makes even closed ports look filtered.
+        if host.get("firewalled") and not (caps["syn_scan"] and sudo):
+            # closed ports behind the FW are dropped -> filtered
+            return "filtered" if port["port"] not in (22,) else "closed"
+        return "closed"
+
+    # intrinsic open
+    if host.get("firewalled"):
+        # Stateful FW DROPs unsolicited SYN to protected ports. SSH (22) is the
+        # one allow-listed mgmt port; everything else needs a privileged SYN scan.
+        if port["port"] == 22:
+            return "open"
+        if caps["syn_scan"] and sudo:
+            return "open"   # half-open SYN gets through the allow rule for the probe
+        return "filtered"
+    return "open"
+
+
+def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
+    """Execute one nmap-style scan and return a structured result.
+
+    Result shape:
+      {
+        "command": "...",
+        "scan_type": "ping_sweep|port_scan",
+        "hosts": [ {ip, hostname, mac, vendor, state(up/down),
+                    reason, os(optional), os_accuracy(optional),
+                    ports: [{port, proto, state, service, version?}]} ],
+        "hosts_up": int, "summary": "..."
+      }
+    """
+    caps = _parse_flags(flags)
+    candidate_ips = _expand_targets(targets, inv)
+
+    # Privileged scans without sudo are downgraded — exactly like nmap, which
+    # warns and falls back to a connect scan when not root.
+    privileged_warning = None
+    effective_syn = caps["syn_scan"]
+    effective_os = caps["os_detect"]
+    if caps["syn_scan"] and not sudo:
+        privileged_warning = "TCP SYN scan (-sS) requires root; falling back to connect scan. Re-run with sudo."
+        effective_syn = False
+        caps["connect_scan"] = True
+    if caps["os_detect"] and not sudo:
+        privileged_warning = (privileged_warning or "") + \
+            " OS detection (-O) requires root privileges (raw sockets); skipped."
+
+    # If no scan technique flag was given at all, default to a connect-style
+    # port scan (nmap defaults to SYN as root, connect otherwise).
+    if not (caps["ping_sweep"] or caps["syn_scan"] or caps["connect_scan"]):
+        if sudo:
+            effective_syn = True
+            caps["syn_scan"] = True
+        else:
+            caps["connect_scan"] = True
+
+    eff_caps = dict(caps)
+    eff_caps["syn_scan"] = effective_syn
+    eff_caps["os_detect"] = effective_os and sudo
+
+    ports_to_scan = caps["ports"] if caps["ports"] is not None else _DEFAULT_TOP_PORTS
+
+    result_hosts: list[dict] = []
+    hosts_up = 0
+    for ip in candidate_ips:
+        host = _find_host(inv, ip)
+        if host is None:
+            # An address with no host behind it.
+            up = bool(caps["no_ping"])  # -Pn marks every address "up" optimistically
+            if up:
+                result_hosts.append({
+                    "ip": ip, "hostname": "", "mac": "", "vendor": "",
+                    "state": "up", "reason": "user-set (-Pn)",
+                    "ports": [], "note": "no ports responded",
+                })
+                hosts_up += 1
+            continue
+
+        up, reason = _host_is_discoverable(host, eff_caps, sudo)
+        if not up:
+            continue
+        hosts_up += 1
+
+        entry: dict = {
+            "ip": ip,
+            "hostname": host.get("hostname", ""),
+            "mac": host.get("mac", ""),
+            "vendor": host.get("vendor", ""),
+            "state": "up",
+            "reason": reason,
+            "ports": [],
+        }
+
+        if caps["ping_sweep"] and not (caps["syn_scan"] or caps["connect_scan"]):
+            # Host-discovery-only scan: report up/down, no ports.
+            result_hosts.append(entry)
+            continue
+
+        for pnum in ports_to_scan:
+            port = next((p for p in host["ports"] if p["port"] == pnum), None)
+            if port is None:
+                # Unlisted port: closed (or filtered behind a drop-all FW).
+                if host.get("firewalled") and not (eff_caps["syn_scan"] and sudo):
+                    state = "filtered"
+                else:
+                    state = "closed"
+                # nmap only prints open / open|filtered by default; we surface
+                # filtered explicitly (for the blocked-scan scenario) but omit
+                # plain closed to keep output readable.
+                if state == "filtered":
+                    entry["ports"].append({
+                        "port": pnum, "proto": "tcp", "state": "filtered",
+                        "service": _guess_service(pnum),
+                    })
+                continue
+
+            state = _observed_port_state(host, port, eff_caps, sudo)
+            pinfo: dict = {
+                "port": pnum, "proto": port["proto"], "state": state,
+                "service": port["service"],
+            }
+            if state == "open" and caps["version"]:
+                pinfo["version"] = port.get("version", "")
+                pinfo["product"] = port.get("product", "")
+            entry["ports"].append(pinfo)
+
+        # OS detection only with -O (or -A) AND sudo.
+        if eff_caps["os_detect"] and any(p["state"] == "open" for p in host["ports"]):
+            entry["os"] = host.get("os", "")
+            entry["os_family"] = host.get("os_family", "")
+            entry["os_accuracy"] = 96
+
+        result_hosts.append(entry)
+
+    scan_type = ("ping_sweep" if caps["ping_sweep"]
+                 and not (caps["syn_scan"] or caps["connect_scan"]) else "port_scan")
+
+    cmd = _format_command(targets, flags, sudo)
+    summary = f"Nmap done: {len(candidate_ips)} IP addresses ({hosts_up} hosts up) scanned"
+    return {
+        "command": cmd,
+        "scan_type": scan_type,
+        "hosts": result_hosts,
+        "hosts_up": hosts_up,
+        "addresses_scanned": len(candidate_ips),
+        "warning": privileged_warning.strip() if privileged_warning else None,
+        "summary": summary,
+        "caps": {k: v for k, v in caps.items() if k != "ports"},
+        "sudo": bool(sudo),
+        "ports_spec": caps["ports"],
+    }
+
+
+_COMMON_SERVICES = {
+    21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "domain", 80: "http",
+    110: "pop3", 135: "msrpc", 139: "netbios-ssn", 143: "imap", 443: "https",
+    445: "microsoft-ds", 993: "imaps", 995: "pop3s", 1723: "pptp", 3306: "mysql",
+    3389: "ms-wbt-server", 5432: "postgresql", 5900: "vnc", 8080: "http-proxy",
+    8443: "https-alt",
+}
+
+
+def _guess_service(port: int) -> str:
+    return _COMMON_SERVICES.get(port, "unknown")
+
+
+def _format_command(targets: Any, flags: Any, sudo: bool) -> str:
+    if isinstance(flags, (list, tuple)):
+        flag_str = " ".join(str(f) for f in flags)
+    else:
+        flag_str = str(flags or "")
+    tgt = targets if isinstance(targets, str) else " ".join(str(t) for t in (targets or []))
+    parts = []
+    if sudo:
+        parts.append("sudo")
+    parts.append("nmap")
+    if flag_str:
+        parts.append(flag_str)
+    parts.append(tgt)
+    return " ".join(p for p in parts if p).strip()
+
+
+# ---------------------------------------------------------------------------
+# Discovery tracking — what the learner has actually learned this session
+# ---------------------------------------------------------------------------
+
+def _record_discovery(state: dict, scan: dict) -> None:
+    """Fold a scan's findings into the cumulative `discovered` knowledge base.
+
+    discovered = {
+      "live_hosts": {ip: {"via": scan_type, "hostname": ...}},
+      "ports": {ip: {port: {"state": ..., "via_version": bool}}},
+      "versions": {ip: {port: "product version"}},
+      "os": {ip: "os string"},
+      "scans": [ {command, scan_type, ...} ]  # recent scan log
+    }
+    """
+    disc = state.setdefault("discovered", {
+        "live_hosts": {}, "ports": {}, "versions": {}, "os": {}, "scans": [],
+    })
+    for h in scan.get("hosts", []):
+        if h.get("state") != "up":
+            continue
+        ip = h["ip"]
+        disc["live_hosts"][ip] = {
+            "hostname": h.get("hostname", ""),
+            "via": scan.get("scan_type"),
+            "mac": h.get("mac", ""),
+        }
+        if h.get("os"):
+            disc["os"][ip] = h["os"]
+        host_ports = disc["ports"].setdefault(ip, {})
+        host_versions = disc["versions"].setdefault(ip, {})
+        for p in h.get("ports", []):
+            pn = str(p["port"])
+            host_ports[pn] = {"state": p["state"], "service": p.get("service", "")}
+            if p.get("version"):
+                ver = p["version"].strip()
+                product = (p.get("product") or "").strip()
+                # The ground-truth version string usually already embeds the
+                # product name (e.g. "nginx 1.18.0"); only prefix the product
+                # when it is not already present so we don't get "nginx nginx".
+                if product and product.lower() not in ver.lower():
+                    host_versions[pn] = f"{product} {ver}".strip()
+                else:
+                    host_versions[pn] = ver
+
+    disc["scans"] = ([{
+        "command": scan.get("command"),
+        "scan_type": scan.get("scan_type"),
+        "hosts_up": scan.get("hosts_up"),
+        "time": _now_iso(),
+    }] + disc.get("scans", []))[:25]
+
+
+# ---------------------------------------------------------------------------
+# Scenario presets — set a goal + (optionally) tweak the topology per scenario
+# ---------------------------------------------------------------------------
+
+def _apply_preset(state: dict, slug: str) -> None:
+    """Attach a per-scenario `goal` describing what fact must be discovered
+    and how. Validation reads only `goal` + `discovered` (never ground truth)."""
+    s = (slug or "").lower()
+    inv = state["inventory"]
+
+    if "live-hosts" in s or "host-discovery" in s or "discover" in s:
+        state["goal"] = {
+            "kind": "live_hosts",
+            "title": "Map the live hosts on 10.10.10.0/24",
+            "require_live_ips": ["10.10.10.1", "10.10.10.10", "10.10.10.20",
+                                 "10.10.10.30"],
+            "objective": "Run a host-discovery scan and find every responsive host on the subnet.",
+        }
+
+    elif "open-ports" in s or "enumerate-ports" in s or "port-enum" in s:
+        state["goal"] = {
+            "kind": "open_ports",
+            "title": "Enumerate open ports on web01 (10.10.10.10)",
+            "target_ip": "10.10.10.10",
+            "require_open_ports": [22, 80, 443],
+            "objective": "Scan web01 and identify its open TCP ports (22, 80, 443).",
+        }
+
+    elif "service-version" in s or "version-detect" in s or "sv-" in s or "banner" in s:
+        state["goal"] = {
+            "kind": "service_version",
+            "title": "Fingerprint the web server software on web01",
+            "target_ip": "10.10.10.10",
+            "target_port": 80,
+            "require_version_contains": "nginx",
+            "objective": "Use service/version detection to learn what HTTP server web01 runs on port 80.",
+        }
+
+    elif "blocked-syn" in s or "filtered" in s or "firewall" in s or "blocked-scan" in s:
+        state["goal"] = {
+            "kind": "unblock_filtered",
+            "title": "Get past the firewall to confirm the database port is open",
+            "target_ip": "10.10.10.20",
+            "target_port": 5432,
+            "objective": ("A default scan reports db01:5432 as filtered (the firewall drops "
+                          "unsolicited SYNs). Use a privileged SYN scan (sudo nmap -sS) to "
+                          "confirm the PostgreSQL port is actually open."),
+            "require_state": "open",
+        }
+
+    elif "os-fingerprint" in s or "os-detect" in s or "fingerprint" in s:
+        state["goal"] = {
+            "kind": "os_fingerprint",
+            "title": "Fingerprint the operating system of win-app01 (10.10.10.30)",
+            "target_ip": "10.10.10.30",
+            "require_os_family": "windows",
+            "objective": "Use OS detection (sudo nmap -O) to identify what OS win-app01 runs.",
+        }
+
+    else:
+        # Default goal so an unrecognised slug still presents a real task.
+        state["goal"] = {
+            "kind": "live_hosts",
+            "title": "Discover the live hosts on the network",
+            "require_live_ips": ["10.10.10.10"],
+            "objective": "Run a scan to discover at least one live host on 10.10.10.0/24.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# Session lifecycle (mirrors the other engines)
+# ---------------------------------------------------------------------------
+
+def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
+    key = str(session_id)
+    entry = _load_session(key)
+    if entry is None:
+        state = {"inventory": _base_inventory()}
+        _apply_preset(state, scenario_slug)
+        state.setdefault("discovered", {
+            "live_hosts": {}, "ports": {}, "versions": {}, "os": {}, "scans": [],
+        })
+        entry = {"session_id": key, "scenario_slug": scenario_slug, "state": state,
+                 "created_at": _now_iso()}
+        _save_session(key, entry)
+    return entry
+
+
+def get_state(session_id: str, scenario_slug: str = "") -> dict:
+    entry = _ensure_session(session_id, scenario_slug)
+    state = copy.deepcopy(entry["state"])
+    inv = state["inventory"]
+    disc = state.get("discovered", {})
+    goal = state.get("goal", {})
+
+    # The client UI sees the *topology shell* (subnet, gateway, firewall, the
+    # scanner) and whatever it has discovered — never the ground-truth ports of
+    # undiscovered hosts. This keeps the lab honest: you must scan to learn.
+    return {
+        "session_id": str(session_id),
+        "scenario_slug": entry.get("scenario_slug") or scenario_slug,
+        "inventory": {
+            "subnet": inv["subnet"],
+            "gateway": inv["gateway"],
+            "scanner_ip": inv["scanner_ip"],
+            "firewall": inv["firewall"],
+            # Total host count is known (DHCP leases etc.) but details are hidden.
+            "hosts_total": sum(1 for h in inv["hosts"] if h.get("live")),
+            "discovered_hosts": [
+                {
+                    "ip": ip,
+                    "hostname": meta.get("hostname", ""),
+                    "mac": meta.get("mac", ""),
+                    "os": disc.get("os", {}).get(ip, ""),
+                    "ports": [
+                        {"port": int(pn), **pd,
+                         "version": disc.get("versions", {}).get(ip, {}).get(pn, "")}
+                        for pn, pd in sorted(
+                            disc.get("ports", {}).get(ip, {}).items(),
+                            key=lambda kv: int(kv[0]))
+                    ],
+                }
+                for ip, meta in sorted(disc.get("live_hosts", {}).items(),
+                                       key=lambda kv: _ip_sort_key(kv[0]))
+            ],
+        },
+        "goal": goal,
+        "scan_log": disc.get("scans", []),
+        # `events` is the contract-named field (mirrors the VMware engine shape
+        # {session_id, scenario_slug, inventory, summary, events}); it aliases
+        # the scan log so the simulator surfaces an activity feed.
+        "events": disc.get("scans", []),
+        "summary": {
+            "hosts_discovered": len(disc.get("live_hosts", {})),
+            "hosts_total": sum(1 for h in inv["hosts"] if h.get("live")),
+            "open_ports_found": sum(
+                1 for ports in disc.get("ports", {}).values()
+                for pd in ports.values() if pd.get("state") == "open"),
+            "versions_found": sum(len(v) for v in disc.get("versions", {}).values()),
+            "os_identified": len(disc.get("os", {})),
+            "scans_run": len(disc.get("scans", [])),
+            "goal_title": goal.get("title", ""),
+            "objective": goal.get("objective", ""),
+        },
+    }
+
+
+def drop_session(session_id: str) -> None:
+    cache.delete(_session_key(str(session_id)))
+
+
+# ---------------------------------------------------------------------------
+# Actions
+# ---------------------------------------------------------------------------
+
+def apply_action(session_id: str, action: str, payload: dict | None = None) -> dict:
+    """Interactive actions. The headline action is `scan` (an nmap run).
+
+    scan payload: {targets, flags, sudo}
+      targets: ip / cidr / range / hostname / "all"
+      flags:   list or string, e.g. ["-sS","-sV","-p","22,80,443"] or "-sn"
+      sudo:    bool — required for -sS raw SYN and -O OS detection
+
+    Other actions: reset (clear discoveries). Validation reads `discovered`.
+    """
+    payload = payload or {}
+    entry = _load_session(str(session_id))
+    if not entry:
+        return {"ok": False, "error": "Nmap simulation session not found"}
+    state = entry["state"]
+    inv = state["inventory"]
+
+    if action == "scan":
+        targets = payload.get("targets") or payload.get("target") or "all"
+        flags = payload.get("flags", payload.get("args", ""))
+        sudo = bool(payload.get("sudo", False))
+        # Convenience: allow a full raw command string in `command`.
+        raw = payload.get("command")
+        if raw and not payload.get("targets") and not payload.get("flags"):
+            parsed = _parse_command_string(raw, inv)
+            targets, flags, sudo = parsed["targets"], parsed["flags"], parsed["sudo"]
+
+        scan = _run_scan(inv, targets, flags, sudo)
+        _record_discovery(state, scan)
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": scan["summary"], "scan": scan}
+
+    if action == "reset":
+        state["discovered"] = {
+            "live_hosts": {}, "ports": {}, "versions": {}, "os": {}, "scans": [],
+        }
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Discovery state reset"}
+
+    return {"ok": False, "error": f"unknown action: {action}"}
+
+
+def _parse_command_string(raw: str, inv: dict) -> dict:
+    """Parse a raw 'nmap ...' / 'sudo nmap ...' command line."""
+    toks = str(raw or "").split()
+    sudo = False
+    if toks and toks[0] == "sudo":
+        sudo = True
+        toks = toks[1:]
+    if toks and toks[0] == "nmap":
+        toks = toks[1:]
+    flags: list[str] = []
+    targets: list[str] = []
+    i = 0
+    while i < len(toks):
+        tok = toks[i]
+        if tok == "-p" and i + 1 < len(toks):
+            flags.extend([tok, toks[i + 1]])
+            i += 2
+            continue
+        if tok.startswith("-"):
+            flags.append(tok)
+        else:
+            targets.append(tok)
+        i += 1
+    return {"targets": targets or "all", "flags": flags, "sudo": sudo}
+
+
+# ---------------------------------------------------------------------------
+# Validation — grade purely on what the learner DISCOVERED via scans
+# ---------------------------------------------------------------------------
+
+def validate_nmap_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
+    entry = _load_session(str(session_id)) or _ensure_session(session_id, scenario_slug)
+    state = entry["state"]
+    goal = state.get("goal") or {}
+    disc = state.get("discovered", {})
+    kind = goal.get("kind")
+
+    if kind == "live_hosts":
+        required = goal.get("require_live_ips", [])
+        found = set(disc.get("live_hosts", {}).keys())
+        missing = [ip for ip in required if ip not in found]
+        if missing:
+            return False, ("Host discovery incomplete — still need to find: "
+                           + ", ".join(missing))
+        return True, f"All {len(required)} live hosts discovered — validation passed"
+
+    if kind == "open_ports":
+        ip = goal.get("target_ip")
+        required = goal.get("require_open_ports", [])
+        host_ports = disc.get("ports", {}).get(ip, {})
+        open_found = {int(pn) for pn, pd in host_ports.items() if pd.get("state") == "open"}
+        missing = [p for p in required if p not in open_found]
+        if missing:
+            return False, (f"Open-port enumeration incomplete on {ip} — still need: "
+                           + ", ".join(str(p) for p in missing))
+        return True, f"All required open ports on {ip} discovered — validation passed"
+
+    if kind == "service_version":
+        ip = goal.get("target_ip")
+        port = str(goal.get("target_port"))
+        want = (goal.get("require_version_contains") or "").lower()
+        ver = disc.get("versions", {}).get(ip, {}).get(port, "")
+        if not ver:
+            return False, (f"No service/version recorded for {ip}:{port} — "
+                           "run a version-detection scan (nmap -sV).")
+        if want and want not in ver.lower():
+            return False, f"Version for {ip}:{port} does not match the expected service yet"
+        return True, f"Service version on {ip}:{port} identified ({ver}) — validation passed"
+
+    if kind == "unblock_filtered":
+        ip = goal.get("target_ip")
+        port = str(goal.get("target_port"))
+        want_state = goal.get("require_state", "open")
+        pd = disc.get("ports", {}).get(ip, {}).get(port)
+        if not pd:
+            return False, (f"{ip}:{port} not probed yet — scan that specific port.")
+        if pd.get("state") != want_state:
+            return False, (f"{ip}:{port} still reads '{pd.get('state')}'. The firewall drops "
+                           "unsolicited SYNs — re-run with a privileged SYN scan (sudo nmap -sS).")
+        return True, f"{ip}:{port} confirmed {want_state} through the firewall — validation passed"
+
+    if kind == "os_fingerprint":
+        ip = goal.get("target_ip")
+        want_family = (goal.get("require_os_family") or "").lower()
+        os_str = (disc.get("os", {}).get(ip) or "").lower()
+        if not os_str:
+            return False, (f"No OS fingerprint recorded for {ip} — run OS detection "
+                           "with privileges (sudo nmap -O).")
+        if want_family and want_family not in os_str:
+            return False, f"OS fingerprint for {ip} does not match the expected family yet"
+        return True, f"OS of {ip} fingerprinted ({os_str}) — validation passed"
+
+    # Unknown goal — fail closed.
+    return False, "No validation goal configured for this scenario"

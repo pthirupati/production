@@ -12,6 +12,12 @@ from .views import (
     MonitoringSimDemoStateView,
     MonitoringSimReleaseView,
     MonitoringSimStateView,
+    NmapSimActionView,
+    NmapSimReleaseView,
+    NmapSimStateView,
+    WiresharkSimActionView,
+    WiresharkSimReleaseView,
+    WiresharkSimStateView,
     VMwareSimActionView,
     VMwareSimDemoActionView,
     VMwareSimDemoStateView,
@@ -43,4 +49,14 @@ urlpatterns = [
     path("monitoring/sessions/<uuid:session_id>/", MonitoringSimStateView.as_view(), name="monitoring-sim-state"),
     path("monitoring/sessions/<uuid:session_id>/action/", MonitoringSimActionView.as_view(), name="monitoring-sim-action"),
     path("monitoring/sessions/<uuid:session_id>/release/", MonitoringSimReleaseView.as_view(), name="monitoring-sim-release"),
+
+    # Nmap simulation (network scanning)
+    path("nmap/sessions/<uuid:session_id>/", NmapSimStateView.as_view(), name="nmap-sim-state"),
+    path("nmap/sessions/<uuid:session_id>/action/", NmapSimActionView.as_view(), name="nmap-sim-action"),
+    path("nmap/sessions/<uuid:session_id>/release/", NmapSimReleaseView.as_view(), name="nmap-sim-release"),
+
+    # Wireshark simulation (packet capture / analysis)
+    path("wireshark/sessions/<uuid:session_id>/", WiresharkSimStateView.as_view(), name="wireshark-sim-state"),
+    path("wireshark/sessions/<uuid:session_id>/action/", WiresharkSimActionView.as_view(), name="wireshark-sim-action"),
+    path("wireshark/sessions/<uuid:session_id>/release/", WiresharkSimReleaseView.as_view(), name="wireshark-sim-release"),
 ]

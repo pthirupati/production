@@ -1,0 +1,9 @@
+name: Wireshark Packet Analysis
+slug: wireshark
+description: Learn packet capture and analysis with an in-app Wireshark simulator — a live packet list, BPF capture filters, Wireshark display-filter syntax, Follow TCP Stream, and packet marking. Capture and isolate HTTP traffic, drill into a single conversation, reassemble a request/response, fix a capture filter that grabbed nothing useful, and diagnose TCP retransmissions and resets.
+icon: wifi
+color: blue
+order: 24
+price: 0
+is_active: true
+coming_soon: false

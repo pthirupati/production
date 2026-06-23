@@ -1,0 +1,33 @@
+title: Fingerprint the operating system of an unknown host
+slug: nmap-os-fingerprint
+category: Nmap Network Scanning
+description: An unidentified server win-app01 (10.10.10.30) is exposing several services. Asset
+  management needs to know what operating system it runs. Use Nmap OS detection to fingerprint it.
+difficulty: hard
+lab_mode: simulation
+simulation_type: nmap
+technology: nmap
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Open the Nmap simulator from the lab toolbar (Open Nmap)
+- Run OS detection against win-app01 (10.10.10.30) with privileges (sudo nmap -O 10.10.10.30)
+- Identify the host's operating system family (Windows)
+initial_state: win-app01 (10.10.10.30) responds to scans but its OS is unknown. OS fingerprinting needs
+  raw packets, which require root — an unprivileged -O scan will skip detection.
+hints:
+- order: 1
+  cost: 10
+  content: Nmap OS detection uses the -O flag, e.g. nmap -O 10.10.10.30. It analyses TCP/IP stack
+    behaviour to guess the OS, so it needs at least one open port to probe.
+- order: 2
+  cost: 15
+  content: OS fingerprinting crafts raw packets, which require root privileges. Run it with sudo —
+    sudo nmap -O 10.10.10.30 — or nmap will warn that OS detection was skipped.
+- order: 3
+  cost: 20
+  content: You can also use -A (aggressive) which enables both -O and -sV. The task completes once the
+    Discovered Hosts panel shows an OS for 10.10.10.30 (it is a Windows server).

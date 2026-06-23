@@ -1,0 +1,9 @@
+name: Nmap Network Scanning
+slug: nmap
+description: Learn network reconnaissance with a full in-app Nmap simulator — host discovery, port scanning, service/version detection, OS fingerprinting, and getting past a stateful firewall. Run realistic nmap commands against a virtual /24, watch results that stay consistent with your flags (-sn, -sS, -sV, -O, -Pn, -p), and track what you discover.
+icon: radar
+color: green
+order: 24
+price: 0
+is_active: true
+coming_soon: false

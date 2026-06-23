@@ -16,6 +16,12 @@ from .docker_engine import get_state as docker_get_state
 from .monitoring_engine import apply_action as monitoring_apply_action
 from .monitoring_engine import drop_session as monitoring_drop_session
 from .monitoring_engine import get_state as monitoring_get_state
+from .nmap_engine import apply_action as nmap_apply_action
+from .nmap_engine import drop_session as nmap_drop_session
+from .nmap_engine import get_state as nmap_get_state
+from .wireshark_engine import apply_action as wireshark_apply_action
+from .wireshark_engine import drop_session as wireshark_drop_session
+from .wireshark_engine import get_state as wireshark_get_state
 
 
 def _demo_session_id(user) -> str:
@@ -256,4 +262,94 @@ class MonitoringSimReleaseView(APIView):
         if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
             return Response({"error": "Session not found"}, status=404)
         monitoring_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ---------------------------------------------------------------------------
+# Nmap views (network scanning simulator)
+# ---------------------------------------------------------------------------
+
+class NmapSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario", "scenario__technology").filter(
+            pk=session_id, user=request.user,
+        ).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(nmap_get_state(session_id, slug))
+
+
+class NmapSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        # Ensure the simulation session is initialized in Redis before applying any action
+        nmap_get_state(session_id, slug)
+        result = nmap_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": nmap_get_state(session_id, slug)})
+
+
+class NmapSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        nmap_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ---------------------------------------------------------------------------
+# Wireshark views (packet capture / analysis simulator)
+# ---------------------------------------------------------------------------
+
+class WiresharkSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario", "scenario__technology").filter(
+            pk=session_id, user=request.user,
+        ).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(wireshark_get_state(session_id, slug))
+
+
+class WiresharkSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        # Ensure the simulation session is initialized in Redis before applying any action
+        wireshark_get_state(session_id, slug)
+        result = wireshark_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": wireshark_get_state(session_id, slug)})
+
+
+class WiresharkSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        wireshark_drop_session(session_id)
         return Response({"released": True})

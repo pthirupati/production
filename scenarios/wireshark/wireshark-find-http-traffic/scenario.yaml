@@ -1,0 +1,35 @@
+title: Capture and find the HTTP traffic
+slug: wireshark-find-http-traffic
+category: Wireshark Packet Analysis
+description: A mixed capture (DNS, HTTP, TLS, SSH) is open in the in-app Wireshark simulator. Apply a display
+  filter that isolates only the HTTP packets so you can confirm the web request to example.com was made,
+  then run Check Solution.
+difficulty: easy
+lab_mode: simulation
+simulation_type: wireshark
+technology: wireshark
+jira_priority: Low
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark)
+- Inspect the packet list — note the mix of DNS, HTTP, TLS and SSH protocols
+- Apply a display filter so the packet list shows ONLY HTTP packets
+- Run Check Solution to confirm the HTTP request to example.com is isolated
+initial_state: The capture contains DNS, HTTP, TLS and SSH packets with no display filter applied, so all
+  protocols are interleaved in the packet list.
+hints:
+- order: 1
+  cost: 5
+  content: In the Display Filter bar you type Wireshark display syntax (not BPF). The simplest way to show
+    only one application protocol is to type its name.
+- order: 2
+  cost: 10
+  content: Type http into the display filter bar and apply it. The list should collapse to just the HTTP
+    request/response packets.
+- order: 3
+  cost: 15
+  content: After applying the http display filter, only the GET /index.html and HTTP/1.1 200 OK packets should
+    remain. Then run Check Solution.

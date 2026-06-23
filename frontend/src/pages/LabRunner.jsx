@@ -20,6 +20,8 @@ import LabTerminal from '../components/LabTerminal'
 import CodingIDE from '../components/ide/CodingIDE'
 import PromptPlayground from '../components/promptlab/PromptPlayground'
 import MonitoringSimulator from '../components/monitoring/MonitoringSimulator'
+import NmapSimulator from '../components/nmap/NmapSimulator'
+import WiresharkSimulator from '../components/wireshark/WiresharkSimulator'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
@@ -117,6 +119,9 @@ export default function LabRunner() {
   const [showSimWizard, setShowSimWizard] = useState(false)
   // Grafana/Prometheus simulator overlay (opened from the lab toolbar button).
   const [showMonitoringSim, setShowMonitoringSim] = useState(false)
+  // Nmap + Wireshark simulator overlays (opened from the lab toolbar buttons).
+  const [showNmapSim, setShowNmapSim] = useState(false)
+  const [showWiresharkSim, setShowWiresharkSim] = useState(false)
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
@@ -906,6 +911,15 @@ export default function LabRunner() {
   const isMonitoringLab = !isCrossTech && (monitoringSimType || monitoringTech)
   const monitoringFlavor = (scenario?.simulation_type === 'prometheus' || scenario?.technology?.slug === 'prometheus')
     ? 'prometheus' : 'grafana'
+  // Nmap + Wireshark labs open their own in-app simulator inline (target/flags
+  // scan builder, packet capture/display filters + follow-stream) — mirroring the
+  // Monitoring sim. Keyed on simulation_type or technology slug. No new route.
+  const isNmapLab = !isCrossTech && (
+    scenario?.simulation_type === 'nmap' || scenario?.technology?.slug === 'nmap'
+  )
+  const isWiresharkLab = !isCrossTech && (
+    scenario?.simulation_type === 'wireshark' || scenario?.technology?.slug === 'wireshark'
+  )
   // coding_mode scenarios open a browser surface instead of a terminal. Prompt
   // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
   // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
@@ -1532,6 +1546,28 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open {monitoringFlavor === 'prometheus' ? 'Prometheus' : 'Grafana'}
             </button>
           )}
+          {isNmapLab && (
+            <button
+              type="button"
+              onClick={() => setShowNmapSim(true)}
+              title="Open the in-app Nmap scanner to discover hosts, scan ports, fingerprint services and OS, then Check Solution."
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(74,222,128,.4)', color: '#4ade80', background: 'rgba(74,222,128,.1)' }}
+            >
+              <ExternalLink size={12} /> Open Nmap
+            </button>
+          )}
+          {isWiresharkLab && (
+            <button
+              type="button"
+              onClick={() => setShowWiresharkSim(true)}
+              title="Open the in-app Wireshark capture to set capture/display filters, follow TCP streams, and mark packets, then Check Solution."
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(76,141,255,.4)', color: '#4c8dff', background: 'rgba(76,141,255,.1)' }}
+            >
+              <ExternalLink size={12} /> Open Wireshark
+            </button>
+          )}
           {isSimulationLab && (
             <>
               <SimLabQuickActions
@@ -1812,6 +1848,54 @@ export default function LabRunner() {
               onExit={() => setShowMonitoringSim(false)}
               onHints={() => { setShowMonitoringSim(false); toggleHints() }}
               onStop={() => { setShowMonitoringSim(false); setShowStopConfirm(true) }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Nmap scanner — full-screen overlay opened from the toolbar. The learner
+          crafts scans (targets + flags), reads back discovered hosts/ports/
+          versions/OS, then runs Check Solution (graded via the engine). */}
+      {isNmapLab && showNmapSim && (
+        <div className="fixed inset-0 z-[60] bg-surface-950">
+          <button
+            type="button"
+            onClick={() => setShowNmapSim(false)}
+            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
+          >
+            <XCircle size={14} /> Close simulator
+          </button>
+          <div className="h-full overflow-auto">
+            <NmapSimulator
+              sessionId={sessionId}
+              scenario={scenario}
+              onExit={() => setShowNmapSim(false)}
+              onHints={() => { setShowNmapSim(false); toggleHints() }}
+              onStop={() => { setShowNmapSim(false); setShowStopConfirm(true) }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Wireshark capture — full-screen overlay opened from the toolbar. The
+          learner sets capture/display filters, follows TCP streams, marks
+          packets, then runs Check Solution (graded via the engine). */}
+      {isWiresharkLab && showWiresharkSim && (
+        <div className="fixed inset-0 z-[60] bg-surface-950">
+          <button
+            type="button"
+            onClick={() => setShowWiresharkSim(false)}
+            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
+          >
+            <XCircle size={14} /> Close simulator
+          </button>
+          <div className="h-full overflow-auto">
+            <WiresharkSimulator
+              sessionId={sessionId}
+              scenario={scenario}
+              onExit={() => setShowWiresharkSim(false)}
+              onHints={() => { setShowWiresharkSim(false); toggleHints() }}
+              onStop={() => { setShowWiresharkSim(false); setShowStopConfirm(true) }}
             />
           </div>
         </div>

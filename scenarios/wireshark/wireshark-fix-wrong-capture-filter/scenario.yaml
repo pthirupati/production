@@ -1,0 +1,35 @@
+title: Fix the wrong capture filter that captured nothing useful
+slug: wireshark-fix-wrong-capture-filter
+category: Wireshark Packet Analysis
+description: The on-call engineer set a capture filter of 'udp port 53' and the resulting capture has no web
+  traffic at all — only DNS. Fix the capture filter so the HTTP traffic to the web server on TCP port 80 is
+  actually captured, then run Check Solution.
+difficulty: medium
+lab_mode: simulation
+simulation_type: wireshark
+technology: wireshark
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark)
+- Notice the capture filter is 'udp port 53', so only DNS packets were captured
+- Correct the CAPTURE filter so TCP port 80 (HTTP) traffic is captured off the wire
+- Run Check Solution to confirm HTTP packets are now present in the capture
+initial_state: The capture filter is set to 'udp port 53'. Only the DNS query/response were captured; the
+  HTTP, TLS and SSH traffic never made it into the capture.
+hints:
+- order: 1
+  cost: 10
+  content: Unlike a display filter, a CAPTURE filter (BPF) decides what is recorded off the wire — anything it
+    excludes is gone. 'udp port 53' only keeps DNS.
+- order: 2
+  cost: 15
+  content: Change the capture filter to include the web traffic. 'tcp port 80' captures the HTTP conversation;
+    a broader 'tcp' or an empty filter also works.
+- order: 3
+  cost: 20
+  content: After re-capturing with a filter that includes TCP port 80, the HTTP GET and 200 OK packets should
+    appear in the capture. Then run Check Solution.

@@ -1,0 +1,35 @@
+title: Diagnose TCP retransmissions and a connection reset
+slug: wireshark-diagnose-tcp-retransmission
+category: Wireshark Packet Analysis
+description: Users report the service on port 8080 is unreachable. The capture holds the failed connection.
+  Use a display filter to surface the TCP retransmissions and the RST, then mark the packet where the server
+  reset the connection and run Check Solution.
+difficulty: medium
+lab_mode: simulation
+simulation_type: wireshark
+technology: wireshark
+jira_priority: High
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark)
+- Apply a display filter that surfaces the TCP retransmissions and the RST on port 8080
+- Identify the packet where the server reset the connection (the TCP RST)
+- Mark that RST packet, then run Check Solution
+initial_state: The full capture is shown with no display filter. Buried in the traffic is a connection to
+  port 8080 that retransmits its SYN three times and then receives a RST, ACK from the server.
+hints:
+- order: 1
+  cost: 10
+  content: Wireshark flags expert info. Try the display filter tcp.analysis.retransmission to see the repeated
+    SYNs, or tcp.flags.reset==1 to jump straight to the reset.
+- order: 2
+  cost: 15
+  content: The failing connection is to host 198.51.100.23 on port 8080. The client retransmits its SYN, then
+    the server replies with [RST, ACK] — that RST is the root cause.
+- order: 3
+  cost: 20
+  content: Surface the RST with a display filter, then click the [RST, ACK] packet and Mark it. With the RST
+    packet marked, run Check Solution.
