@@ -455,6 +455,18 @@ export const adminApi = {
     const { data } = await api.get('/admin/interviews/questions/')
     return data
   },
+  async createInterviewQuestion(payload) {
+    const { data } = await api.post('/admin/interviews/questions/', payload)
+    return data
+  },
+  async updateInterviewQuestion(id, payload) {
+    const { data } = await api.put(`/admin/interviews/questions/${id}/`, payload)
+    return data
+  },
+  async deleteInterviewQuestion(id) {
+    await api.delete(`/admin/interviews/questions/${id}/`)
+    return { deleted: true }
+  },
   async grantInterviewEntitlement(payload) {
     const { data } = await api.post('/admin/interviews/entitlements/', payload)
     return data

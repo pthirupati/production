@@ -3,7 +3,7 @@ import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
 import {
   BarChart3, Users, MessageSquare, CreditCard, Settings, CalendarClock, Mic,
-  Gift, DollarSign, Eye,
+  Gift, DollarSign, Eye, Plus, Trash2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -31,6 +31,42 @@ export default function AdminInterviews() {
   const [tab, setTab] = useState('overview')
   const [grantEmail, setGrantEmail] = useState('')
   const [saving, setSaving] = useState(false)
+  const [qForm, setQForm] = useState({ question_text: '', category: 'technical', difficulty: 'medium', technology: '' })
+
+  const addQuestion = async () => {
+    if (!qForm.question_text.trim()) { toast.error('Question text is required'); return }
+    setSaving(true)
+    try {
+      const slug = `q-${qForm.question_text.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 80).replace(/^-|-$/g, '')}-${Date.now().toString().slice(-5)}`
+      const created = await adminApi.createInterviewQuestion({
+        slug,
+        question_text: qForm.question_text.trim(),
+        category: qForm.category,
+        difficulty: qForm.difficulty,
+        technology: qForm.technology.trim(),
+        round_types: [],
+        is_active: true,
+      })
+      setQuestions((qs) => [created, ...qs])
+      setQForm({ question_text: '', category: 'technical', difficulty: 'medium', technology: '' })
+      toast.success('Question added to the bank')
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || JSON.stringify(err?.response?.data || {}) || 'Could not add question')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteQuestion = async (q) => {
+    if (!window.confirm('Delete this interview question from the bank?')) return
+    try {
+      await adminApi.deleteInterviewQuestion(q.id)
+      setQuestions((qs) => qs.filter((x) => x.id !== q.id))
+      toast.success('Question deleted')
+    } catch {
+      toast.error('Delete failed')
+    }
+  }
 
   const reload = () => {
     adminApi.getInterviewOverview().then(setOverview).catch(() => {})
@@ -494,15 +530,43 @@ export default function AdminInterviews() {
       )}
 
       {tab === 'questions' && (
-        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-          {questions.map(q => (
-            <div key={q.id} className="glass-card p-3 border border-surface-800 text-xs">
-              <span className="text-indigo-400 font-mono">{q.slug}</span>
-              <span className="text-surface-600 mx-2">·</span>
-              <span className="text-surface-500">{q.category} / diff {q.difficulty}</span>
-              <p className="text-surface-300 mt-1">{q.question_text}</p>
+        <div className="space-y-3">
+          {/* Add a question to the bank */}
+          <div className="glass-card p-4 border border-surface-800 space-y-2">
+            <div className="text-sm font-semibold flex items-center gap-2"><Plus size={15} /> Add interview question</div>
+            <textarea
+              value={qForm.question_text}
+              onChange={e => setQForm({ ...qForm, question_text: e.target.value })}
+              placeholder="Question text…"
+              className="input-field w-full text-sm" rows={2} />
+            <div className="flex flex-wrap gap-2">
+              <input value={qForm.technology} onChange={e => setQForm({ ...qForm, technology: e.target.value })}
+                placeholder="technology (e.g. linux)" className="input-field text-sm flex-1 min-w-[140px]" />
+              <select value={qForm.category} onChange={e => setQForm({ ...qForm, category: e.target.value })} className="input-field text-sm">
+                {['technical', 'behavioral', 'scenario', 'casual', 'itil', 'sla', 'tricky', 'troubleshooting', 'practical'].map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={qForm.difficulty} onChange={e => setQForm({ ...qForm, difficulty: e.target.value })} className="input-field text-sm">
+                {['easy', 'medium', 'hard'].map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <button type="button" onClick={addQuestion} disabled={saving} className="btn-primary text-sm flex items-center gap-1">
+                <Plus size={14} /> Add
+              </button>
             </div>
-          ))}
+          </div>
+          <div className="space-y-2 max-h-[55vh] overflow-y-auto">
+            {questions.map(q => (
+              <div key={q.id} className="glass-card p-3 border border-surface-800 text-xs flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="text-indigo-400 font-mono">{q.slug}</span>
+                  <span className="text-surface-600 mx-2">·</span>
+                  <span className="text-surface-500">{q.technology || '—'} / {q.category} / diff {q.difficulty}</span>
+                  <p className="text-surface-300 mt-1">{q.question_text}</p>
+                </div>
+                <button type="button" onClick={() => deleteQuestion(q)} title="Delete question"
+                  className="p-2 rounded-lg text-surface-400 hover:text-accent-red hover:bg-red-500/10 shrink-0"><Trash2 size={15} /></button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
