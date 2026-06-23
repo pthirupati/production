@@ -122,6 +122,42 @@ _REACTIONS = {
     ],
 }
 
+# Verdict-aware reaction bank (WS2) — keyed on the correctness signal the scorer
+# emits ("correct" | "partial" | "off_base" | "unknown"). These lead the human
+# reaction so the bot actually reacts to *whether they were right*, not just how
+# long they talked. Combined with the phrase-quoting acknowledgement, the reply
+# reads like a real interviewer who heard and judged the answer.
+_VERDICT_REACTIONS = {
+    "correct": [
+        "Yeah, that's right.",
+        "Exactly — that's the answer I was looking for.",
+        "Spot on.",
+        "That's correct, and you framed it well.",
+        "Right, that lines up with how I'd approach it too.",
+        "Good — you nailed the key idea there.",
+    ],
+    "partial": [
+        "You're on the right track, but not all the way there.",
+        "Partly — you've got the gist, though you're missing a piece.",
+        "That's half of it. There's an important part you skipped.",
+        "Close. You're circling the right idea but haven't landed it.",
+        "Okay, you've got the shape of it — let's tighten it up.",
+    ],
+    "off_base": [
+        "Hmm, that's not quite where I'd go with it.",
+        "I don't think that's it — let me steer you a little.",
+        "That's a bit off-base. Let's reset.",
+        "Not really, no — but let's work toward it.",
+        "I'd actually push back on that.",
+    ],
+    "unknown": [
+        "Okay.",
+        "Alright.",
+        "Let's see.",
+        "Got it.",
+    ],
+}
+
 _ROUND_NUDGES = {
     "hr": [
         "By the way, what does your ideal team culture look like?",
@@ -242,6 +278,72 @@ _GENERIC_FOLLOWUPS = [
     "What would you do if that approach failed at step three?",
 ]
 
+
+# Clarify/probe lines (WS2) — used when the prior answer was brief/weak so the
+# SAME question is re-asked rather than advancing. {phrase} is filled from the
+# candidate's own words when available. Always asks them to go concrete.
+_CLARIFY_PROBES = [
+    "I want to make sure I follow — can you walk me through {phrase} concretely, step by step?",
+    "Before we move on, give me the specifics on {phrase}: what exactly would you do?",
+    "Let's stay here a second. Make {phrase} concrete for me — the actual command, tool, or step.",
+    "Help me picture it — walk me through {phrase} as if you were doing it right now.",
+    "I'm not quite there yet. Can you go deeper on {phrase} with a real example?",
+]
+_CLARIFY_PROBES_NO_PHRASE = [
+    "I want to make sure I follow — can you walk me through that concretely, step by step?",
+    "Before we move on, give me the specifics: what exactly would you do, and in what order?",
+    "Let's stay here a second. Make it concrete for me — the actual command, tool, or metric.",
+    "Help me picture it — walk me through it as if you were doing it right now.",
+    "I'm not quite there yet. Can you go a level deeper with a real example?",
+]
+
+# ---------------------------------------------------------------------------
+# Candidate-asks-a-question responder banks (WS5). All free/local — when the
+# candidate interrupts to ask something instead of answering, we ANSWER it and
+# re-ask the SAME question without scoring/advancing.
+# ---------------------------------------------------------------------------
+
+# Patterns that mark the candidate's text as a question/meta-request rather than
+# an answer (used alongside input_type=="question" and a trailing "?").
+_META_QUESTION_PATTERNS = (
+    "can you repeat", "could you repeat", "say that again", "repeat the question",
+    "what do you mean", "what does that mean", "not sure what you mean",
+    "can you clarify", "could you clarify", "please clarify", "clarify",
+    "can you explain", "could you explain", "what is", "what's a", "what are",
+    "i don't understand", "didn't understand", "didn't catch", "did not catch",
+    "rephrase", "come again", "what was the question",
+)
+
+# Short, on-topic definitions pulled from our existing topic vocabulary so a
+# "what is X?" can be answered without any external API.
+_TERM_DEFINITIONS = {
+    "kubernetes": "Kubernetes is a container orchestrator — it schedules containers across nodes and keeps the declared desired state.",
+    "pod": "A pod is the smallest deployable unit in Kubernetes — one or more containers sharing network and storage.",
+    "deployment": "A Deployment manages a replicated, self-healing set of pods and handles rolling updates for you.",
+    "statefulset": "A StatefulSet manages stateful pods with stable identities and stable storage — used for databases and the like.",
+    "readiness probe": "A readiness probe tells Kubernetes when a pod is ready to receive traffic; failing it pulls the pod out of the load balancer.",
+    "liveness probe": "A liveness probe tells Kubernetes when to restart a container that's wedged but still running.",
+    "docker": "Docker packages an app and its dependencies into an image you can run as an isolated container anywhere.",
+    "container": "A container is an isolated process running from an image, sharing the host kernel but with its own filesystem and namespaces.",
+    "image": "An image is the immutable, layered template a container is started from.",
+    "nginx": "nginx is a high-performance web server and reverse proxy that routes traffic to upstream services.",
+    "reverse proxy": "A reverse proxy sits in front of your services and forwards client requests to them, often adding TLS, caching, or rate limiting.",
+    "load balancer": "A load balancer spreads incoming requests across multiple backends so no single one is overwhelmed.",
+    "slo": "An SLO is a target for a reliability metric (an SLI) over a window — e.g. 99.9% of requests under 300ms.",
+    "sli": "An SLI is the actual measured signal of service health, like success rate or latency.",
+    "sla": "An SLA is the contractual promise to a customer, usually backed by penalties if you miss it.",
+    "idempotent": "Idempotent means running the operation again produces the same result — safe to retry without side effects.",
+    "circuit breaker": "A circuit breaker stops calling a failing dependency for a while so you don't pile on load while it recovers.",
+    "blast radius": "Blast radius is how much breaks when one thing fails — you design to keep it small.",
+    "terraform": "Terraform declares infrastructure as code and reconciles real resources to that declared state via a state file.",
+    "ansible": "Ansible is agentless configuration management — it pushes idempotent tasks to hosts over SSH from a playbook.",
+    "ci_cd": "CI builds and tests every change; CD takes a passing build and releases it, ideally automatically.",
+    "monitoring": "Monitoring collects metrics, logs, and traces so you can see — and alert on — how a system is behaving.",
+    "security": "Security here means least-privilege access, secret hygiene, and limiting what a single compromise can reach.",
+    "database": "A database stores and serves structured data; in ops we care about replication, backups, and migration safety.",
+    "networking": "Networking covers how packets get from client to service — DNS, routing, firewalls, and the OSI layers in between.",
+    "python": "Python is a high-level language widely used for automation, services, and tooling in ops and SRE work.",
+}
 
 # ---------------------------------------------------------------------------
 # Human-touch banks (P2.3): varied acknowledgements + casual asides + openers
@@ -546,6 +648,9 @@ def generate_interviewer_reply(
       * An occasional light/casual aside is mixed in.
     """
     quality = score_hint.get("quality") or _assess_quality(candidate_answer, question_text)
+    # Correctness verdict (WS2) — drives a verdict-aware reaction so the reply
+    # reacts to *whether they were right*, not just how long they spoke.
+    correctness = score_hint.get("correctness") or "unknown"
     company = profile_snapshot.get("current_company") or "your current org"
     role = profile_snapshot.get("target_role") or profile_snapshot.get("experience_level", "mid")
 
@@ -555,6 +660,13 @@ def generate_interviewer_reply(
     # Seed RNG off what's been said so picks vary turn-to-turn but stay free.
     rng = random.Random()
     phrase = _extract_quote_phrase(candidate_answer) if quality not in ("skipped",) else None
+
+    def verdict_reaction() -> str:
+        """A short reaction keyed on the correctness verdict, deduped per round.
+        Empty string for 'unknown' so we don't editorialize when we can't judge."""
+        if correctness in ("correct", "partial", "off_base"):
+            return _pick_unused(_VERDICT_REACTIONS.get(correctness, []), used, rng)
+        return ""
 
     def finish(reply: str) -> str:
         """Guarantee we never (a) return an empty line, or (b) say the exact
@@ -568,24 +680,33 @@ def generate_interviewer_reply(
             text = f"{text} {extra}".strip() if extra else f"{text} Tell me more."
         return text
 
+    # Human acknowledgement that quotes the candidate when possible — built up
+    # front so EVERY non-skipped reply LEADS by referencing what they actually
+    # said (WS2). The verdict reaction (correct/partial/off_base) rides in front
+    # of it so the bot reacts to whether they were right, then quotes them.
+    verdict = verdict_reaction() if quality != "skipped" else ""
+    ack = _compose_ack(phrase, used, rng) if quality != "skipped" else ""
+
+    def lead(*rest: str) -> str:
+        """Compose: <verdict reaction> <phrase-quoting ack> <follow-up...>."""
+        pieces = [p for p in (verdict, ack, *rest) if p and p.strip()]
+        return finish(" ".join(pieces))
+
     # STAR gap detection for behavioral/HR rounds
     if round_type in ("behavioral", "hr") and candidate_answer and len(candidate_answer) > 40:
         star = _score_star_coverage(candidate_answer)
         missing = [k for k, v in star.items() if not v]
         if quality != "skipped" and len(missing) >= 2:
             if "situation" in missing:
-                return finish(_pick_unused(_REACTIONS["missing_star_s"], used, rng))
+                return lead(_pick_unused(_REACTIONS["missing_star_s"], used, rng))
             if "action" in missing:
-                return finish(_pick_unused(_REACTIONS["missing_star_a"], used, rng))
+                return lead(_pick_unused(_REACTIONS["missing_star_a"], used, rng))
             if "result" in missing:
-                return finish(_pick_unused(_REACTIONS["missing_star_r"], used, rng))
+                return lead(_pick_unused(_REACTIONS["missing_star_r"], used, rng))
 
     # Skipped: short, varied, no quoting.
     if quality == "skipped":
         return finish(_pick_unused(_REACTIONS["skipped"], used, rng))
-
-    # Human acknowledgement that quotes the candidate when possible.
-    ack = _compose_ack(phrase, used, rng)
 
     # The "push" reaction (deduped) carries the substance of the follow-up.
     if quality == "strong":
@@ -614,12 +735,15 @@ def generate_interviewer_reply(
             tail_followup = _pick_unused(nudges, used, rng)
 
     # Candidate asked a question back — answer it, then redirect (still human).
+    # NOTE: the engine (WS5) now intercepts genuine candidate questions BEFORE
+    # this function and routes them to generate_clarification_reply, so this is a
+    # backstop for the rare case the engine still calls us with a trailing "?".
     if candidate_answer and candidate_answer.rstrip().endswith("?"):
         flip = (
             "Good question — it depends on blast radius and rollback strategy. "
             "But let me flip it back: how have you actually made that call before?"
         )
-        return finish(f"{ack} {flip}" if phrase else flip)
+        return lead(flip)
 
     # Resume/experience reference.
     if candidate_answer and re.search(r"\b(resume|cv|previous|my experience|i worked at)\b", candidate_answer, re.I):
@@ -627,15 +751,15 @@ def generate_interviewer_reply(
             f"Your {role} background sounds relevant — "
             f"how would you apply that on a new team where everything is set up differently?"
         )
-        return finish(f"{ack} {body}")
+        return lead(body)
 
     # Company-personalized follow-up (15% chance).
     if rng.random() < 0.15 and company != "your current org":
-        return finish(f"{ack} At a company like {company}, what constraints would change your approach?")
+        return lead(f"At a company like {company}, what constraints would change your approach?")
 
     body = tail_followup or reaction
     # Occasional casual aside (~18%), but never on a weak answer (stay focused).
-    parts = [ack]
+    parts = [p for p in (verdict, ack) if p]
     aside = ""
     if quality != "weak" and rng.random() < 0.18:
         aside = _pick_unused(_CASUAL_ASIDES, used, rng)
@@ -655,6 +779,142 @@ def generate_interviewer_reply(
     parts.append(body)
     reply = " ".join(p for p in parts if p).strip()
     return finish(reply)
+
+
+# ---------------------------------------------------------------------------
+# WS2 — clarify/probe re-ask (interviewer asks the SAME question again because
+# the prior answer was too thin to advance on). Leads with a phrase-quoting
+# acknowledgement so it feels like the bot heard them, then asks for concrete
+# detail. The engine re-asks the original question text after this reply.
+# ---------------------------------------------------------------------------
+
+def generate_clarify_probe(
+    *,
+    candidate_answer: str,
+    question_text: str = "",
+    conversation_tail: list[dict] | None = None,
+) -> str:
+    """Return a clarify/probe line that re-opens the SAME question (WS2).
+
+    Free/local. Quotes the candidate's own phrase when one exists ('walk me
+    through "the cache TTL" concretely') so the re-prompt reads like a real
+    interviewer pressing for specifics rather than a canned retry."""
+    used = _prior_interviewer_lines(conversation_tail or [])
+    rng = random.Random()
+    phrase = _extract_quote_phrase(candidate_answer)
+    if phrase:
+        templates = [t.format(phrase=f"“{phrase}”") for t in _CLARIFY_PROBES]
+        line = _pick_unused(templates, used, rng)
+        if line:
+            return line
+    line = _pick_unused(_CLARIFY_PROBES_NO_PHRASE, used, rng)
+    return line or "I want to make sure I follow — can you walk me through that concretely, step by step?"
+
+
+# ---------------------------------------------------------------------------
+# WS5 — candidate asks a question / interrupts. We ANSWER it (repeat / rephrase /
+# define a term / scope) and re-ask the SAME question WITHOUT scoring/advancing.
+# Intent-keyed responder, all free/local — replaces the single canned flip-back.
+# ---------------------------------------------------------------------------
+
+def detect_question_intent(text: str) -> str | None:
+    """Classify a candidate interruption into an intent the responder can answer.
+
+    Returns ``repeat`` | ``definition`` | ``clarify`` | ``scope`` | ``generic``
+    when the text reads as a question/meta-request, else ``None`` (it's a real
+    answer). Free/local — keyword + punctuation heuristics only."""
+    if not text:
+        return None
+    low = text.strip().lower()
+    ends_q = low.endswith("?")
+
+    # Repeat / didn't-catch.
+    if any(p in low for p in ("repeat", "say that again", "come again", "what was the question", "didn't catch", "did not catch")):
+        return "repeat"
+    # Definition ("what is X", "what's a Y", "what do you mean by Z").
+    if low.startswith(("what is", "what's", "what are", "whats ")) or "what do you mean" in low or "what does that mean" in low:
+        return "definition"
+    # Scope ("how much detail", "do you want code", "high level or deep").
+    if any(p in low for p in ("how much detail", "how deep", "high level", "do you want", "should i", "are you looking for", "in detail")):
+        return "scope"
+    # Generic clarify request.
+    if any(p in low for p in ("clarify", "rephrase", "explain", "don't understand", "do not understand", "not sure what you mean")):
+        return "clarify"
+    # Otherwise it's only a "question" if it actually ends with '?'.
+    if ends_q:
+        return "generic"
+    return None
+
+
+def _define_term(text: str, question_text: str) -> str | None:
+    """Find a short on-topic definition for a term the candidate asked about."""
+    low = f"{text} {question_text}".lower()
+    # Direct term hits first (longest key wins so 'readiness probe' beats 'probe').
+    for term in sorted(_TERM_DEFINITIONS, key=len, reverse=True):
+        if term in low:
+            return _TERM_DEFINITIONS[term]
+    # Fall back to the detected topic's definition.
+    topic = _detect_topic(low)
+    if topic and topic in _TERM_DEFINITIONS:
+        return _TERM_DEFINITIONS[topic]
+    return None
+
+
+def generate_clarification_reply(
+    *,
+    candidate_question: str,
+    question_text: str,
+    intent: str | None = None,
+    conversation_tail: list[dict] | None = None,
+) -> str:
+    """Answer a candidate's interruption, then re-ask the SAME question (WS5).
+
+    The engine calls this INSTEAD of scoring when the candidate is asking rather
+    than answering (input_type=='question', trailing '?', or a meta pattern). It
+    never advances and never scores. 100% free/local — repeats/rephrases the
+    current question or returns a short on-topic definition from the topic banks.
+    """
+    intent = intent or detect_question_intent(candidate_question) or "generic"
+    q = (question_text or "").strip()
+    reask = q if q else "Let me restate it."
+
+    if intent == "repeat":
+        return f"Sure — here it is again: {reask}"
+    if intent == "definition":
+        definition = _define_term(candidate_question, question_text)
+        if definition:
+            return f"Good question. {definition} With that in mind — {reask}"
+        return f"Good question — think of it in plain terms and answer from your own experience. {reask}"
+    if intent == "scope":
+        return (
+            "Go as deep as you'd go in a real incident — the actual steps, commands, or trade-offs, "
+            f"not just the headline. So: {reask}"
+        )
+    if intent == "clarify":
+        definition = _define_term(candidate_question, question_text)
+        lead = f"Let me put it differently. {definition} " if definition else "Let me put it differently. "
+        return f"{lead}{reask}"
+    # generic
+    definition = _define_term(candidate_question, question_text)
+    if definition:
+        return f"Fair question. {definition} So, back to it — {reask}"
+    return f"Fair question — answer it the way you'd explain it to a teammate. {reask}"
+
+
+def is_candidate_question(text: str, input_type: str | None = None) -> bool:
+    """True when the candidate is asking/interrupting rather than answering (WS5).
+
+    Triggers on input_type=='question', a trailing '?', or any known meta
+    pattern ('can you repeat', 'what do you mean', 'clarify', 'can you explain',
+    'what is'…). Free/local."""
+    if input_type == "question":
+        return True
+    low = (text or "").strip().lower()
+    if not low:
+        return False
+    if low.endswith("?"):
+        return True
+    return any(p in low for p in _META_QUESTION_PATTERNS)
 
 
 # ---------------------------------------------------------------------------

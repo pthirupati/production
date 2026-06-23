@@ -173,6 +173,43 @@ function pauseAfter(segment) {
   return 200
 }
 
+// ---------------------------------------------------------------------------
+// "Still thinking" detection (WS1)
+//
+// People pause mid-thought right after a connector or filler word ("and…",
+// "so…", "because…", "which means…"). Auto-submitting there cuts them off. If
+// the captured utterance currently TRAILS OFF on one of these, treat the
+// speaker as not-yet-done and extend the trailing-silence window.
+// ---------------------------------------------------------------------------
+const _CONNECTOR_WORDS = new Set([
+  'and', 'so', 'um', 'uh', 'er', 'erm', 'hmm', 'like', 'because', 'cause',
+  "'cause", 'then', 'but', 'or', 'with', 'to', 'the', 'a', 'of', 'for', 'that',
+  'which', 'who', 'where', 'when', 'while', 'also', 'plus', 'basically',
+  'actually', 'well', 'okay', 'right', 'means', 'is', 'are', 'was', 'were',
+  'in', 'on', 'at', 'by', 'as', 'if', 'i', "i'm", "i'd", "it's", 'its',
+])
+// Two-word tails that clearly leave a thought open.
+const _CONNECTOR_PHRASES = [
+  'which means', 'so that', 'such as', 'as well', 'kind of', 'sort of',
+  'i think', 'i mean', 'you know', 'for example', 'let me', 'going to',
+  'want to', 'need to', 'trying to', 'in order', 'depends on',
+]
+
+function endsOnConnector(text) {
+  const clean = (text || '').toLowerCase().replace(/[)\]"']+$/, '').trim()
+  if (!clean) return false
+  // If it ends on sentence-final punctuation, the thought is closed.
+  if (/[.!?]$/.test(clean)) return false
+  // Strip a trailing comma/dash (a clause break) before inspecting the word.
+  const tail = clean.replace(/[,;:—-]+$/, '').trim()
+  if (!tail) return false
+  const words = tail.split(/\s+/)
+  const lastWord = words[words.length - 1].replace(/[^a-z']/g, '')
+  if (_CONNECTOR_WORDS.has(lastWord)) return true
+  const lastTwo = words.slice(-2).join(' ').replace(/[^a-z' ]/g, '')
+  return _CONNECTOR_PHRASES.includes(lastTwo)
+}
+
 const VOICE_STORAGE_KEY = 'fixitlab.interview.voiceURI'
 
 function loadPersistedVoiceURI() {
@@ -608,17 +645,32 @@ export function useInterviewVoice() {
   }, [config.uses_server_stt])
 
   // ------------------------------------------------------------------
-  // listenLive() — TRUE hands-free turn (FIX 1)
+  // listenLive() — TRUE hands-free turn (FIX 1 / WS1)
   //
-  // Continuous browser SpeechRecognition + interim results + a trailing-SILENCE
-  // timer that AUTO-FINALIZES the turn ~1.8s after the candidate stops talking.
-  // This is what removes the send button: the candidate just speaks, stops, and
-  // their answer submits itself.
+  // Continuous browser SpeechRecognition + interim results + a DYNAMIC
+  // trailing-SILENCE timer that AUTO-FINALIZES the turn after the candidate
+  // stops talking. This is what removes the send button: the candidate just
+  // speaks, stops, and their answer submits itself — but only once we're
+  // confident they're actually done, not mid-thought.
   //
-  // Robustness rules baked in (the brief insists on these):
-  //   * The silence timer is RESET on every new token (interim or final), so a
-  //     natural mid-sentence pause never auto-submits — only a real trailing
-  //     window of quiet after speech does.
+  // WS1 — don't cut people off:
+  //   * The silence window is NOT armed until we've both landed at least one
+  //     FINAL result AND heard >~1.2s of real speech. A short "uh, well…" or a
+  //     single early interim never self-submits.
+  //   * The window GROWS with the answer: base + ~400ms per sentence boundary,
+  //     capped at ~4500ms, so a long multi-sentence reply gets more breathing
+  //     room than a one-liner.
+  //   * If the captured utterance currently ENDS on a connector/filler word
+  //     ('and', 'so', 'um', 'because', 'which means', 'then', 'like', …) the
+  //     speaker is still mid-thought, so we EXTEND the window instead of
+  //     settling.
+  //   * onSilenceCountdown(remainingMs, totalMs) fires while the window runs so
+  //     the room can show a "still listening — take your time" affordance with a
+  //     small countdown; it's cancelled (remainingMs=null) on any new speech.
+  //
+  // Other robustness rules (unchanged):
+  //   * The timer is RESET on every new token, so a natural mid-sentence pause
+  //     never auto-submits — only a real trailing window of quiet after speech.
   //   * We only auto-finalize-by-silence once REAL speech has been heard AND we
   //     have a non-empty transcript. An empty/no-speech turn never resolves via
   //     the silence path (it waits for the caller's stop or the safety cap).
@@ -636,8 +688,12 @@ export function useInterviewVoice() {
     const {
       locale = 'en-US',
       maxDuration = 90000,        // hard safety cap
-      silenceMs = 1800,           // trailing quiet after speech → auto-submit
+      silenceMs = 2800,           // BASE trailing quiet after speech → auto-submit
+      minSpeechMs = 1200,         // require this much speech before we arm silence
+      maxSilenceMs = 4500,        // upper bound on the dynamic window
+      perSentenceMs = 400,        // window growth per sentence boundary
       onInterim = null,
+      onSilenceCountdown = null,  // (remainingMs|null, totalMs) for the affordance
     } = options
 
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -662,20 +718,35 @@ export function useInterviewVoice() {
                                      // to promote it to final on a pause.
       let lastConfidence = 0.8
       let hadSpeech = false
+      let hadFinal = false           // at least one finalized result has landed
+      let speechStartedAt = 0        // first real speech (ms) — gates min duration
       let settled = false
       let stopRequested = false      // caller asked us to finalize now (manual)
       let silenceTimer = null
+      let countdownInterval = null
       let restartGuard = false
       recognizerRef.current = r
 
       const clearSilence = () => {
         if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null }
+        if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null }
       }
 
       // Best transcript we currently hold: finalized speech, plus any trailing
       // interim that Chrome hasn't promoted yet (so a short answer ending on a
       // pause isn't lost just because the engine was slow to finalize).
       const bestText = () => (finalText + ' ' + (lastInterim || '')).trim()
+
+      // Compute the dynamic trailing-silence window for the answer captured so
+      // far. Longer / multi-sentence answers earn a wider window; an utterance
+      // that trails off on a connector earns the widest (they're still thinking).
+      const computeSilenceWindow = () => {
+        const text = bestText()
+        const sentences = (text.match(/[.!?]+/g) || []).length
+        let win = silenceMs + sentences * perSentenceMs
+        if (endsOnConnector(text)) win += perSentenceMs * 2
+        return Math.min(maxSilenceMs, win)
+      }
 
       const settle = (reason) => {
         if (settled) return
@@ -692,6 +763,7 @@ export function useInterviewVoice() {
         try { r.abort?.() } catch { /* */ }
         setInterimTranscript('')
         setIsListening(false)
+        if (onSilenceCountdown) onSilenceCountdown(null, 0)
         const text = bestText()
         resolve({
           transcript: text,
@@ -706,18 +778,37 @@ export function useInterviewVoice() {
       }
 
       // Arm the trailing-silence auto-submit. Only meaningful once we've heard
-      // real speech AND captured some text (final or interim) — otherwise it's a
-      // no-op so an idle/empty turn never self-submits on a mid-sentence pause.
+      // real speech, landed a FINAL result, captured some text, AND the speaker
+      // has talked for at least minSpeechMs — otherwise it's a no-op so an
+      // idle/empty/too-brief turn never self-submits on a mid-sentence pause.
       const armSilence = () => {
         clearSilence()
-        if (!hadSpeech || !bestText()) return
-        silenceTimer = setTimeout(() => settle('silence'), silenceMs)
+        if (!hadSpeech || !hadFinal || !bestText()) return
+        if (speechStartedAt && Date.now() - speechStartedAt < minSpeechMs) return
+        const total = computeSilenceWindow()
+        const startedAt = Date.now()
+        silenceTimer = setTimeout(() => settle('silence'), total)
+        if (onSilenceCountdown) {
+          onSilenceCountdown(total, total)
+          // Tick the visible countdown so the affordance counts down smoothly.
+          countdownInterval = setInterval(() => {
+            const remaining = Math.max(0, total - (Date.now() - startedAt))
+            onSilenceCountdown(remaining, total)
+            if (remaining <= 0 && countdownInterval) {
+              clearInterval(countdownInterval); countdownInterval = null
+            }
+          }, 150)
+        }
       }
 
-      r.onspeechstart = () => { hadSpeech = true }
+      r.onspeechstart = () => {
+        hadSpeech = true
+        if (!speechStartedAt) speechStartedAt = Date.now()
+      }
 
       r.onresult = (e) => {
         hadSpeech = true
+        if (!speechStartedAt) speechStartedAt = Date.now()
         let interim = ''
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const res = e.results[i]
@@ -725,6 +816,7 @@ export function useInterviewVoice() {
           if (res.isFinal) {
             finalText += (finalText ? ' ' : '') + chunk.trim()
             lastConfidence = res[0].confidence || lastConfidence
+            hadFinal = true
           } else {
             interim += chunk
           }
@@ -733,8 +825,10 @@ export function useInterviewVoice() {
         const display = bestText()
         setInterimTranscript(display)
         if (onInterim) onInterim(display)
-        // New tokens → reset the trailing-silence countdown. A pause only
-        // counts once tokens STOP arriving for the full silenceMs window.
+        // New tokens → cancel any visible countdown and reset the trailing-silence
+        // window. A pause only counts once tokens STOP arriving for the full
+        // (dynamic) window.
+        if (onSilenceCountdown) onSilenceCountdown(null, 0)
         armSilence()
       }
 

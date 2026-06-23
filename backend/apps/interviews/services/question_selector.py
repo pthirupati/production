@@ -81,11 +81,29 @@ def select_next_question(
 
 
 def round_category_mix(round_type: str, questions_asked: int) -> str | None:
-    """Rotate categories through a round for variety."""
+    """Rotate categories through a round for variety.
+
+    WS4 — real interviews OPEN human, not with a drill. The first one or two
+    slots map to a warm-up: ``intro`` ("tell me about yourself") then
+    ``experience`` (most-recent-role) for EVERY round type, so the question
+    generator serves an opener before any technical cross-questioning. HR rounds
+    additionally get a ``personal`` / fun slot up front. After the opening slots,
+    the per-round rotation below takes over as before.
+    """
+    # Opening warm-up slots, served before the regular rotation (WS4).
+    if round_type == "hr":
+        opening = ["intro", "experience", "personal"]
+    else:
+        opening = ["intro", "experience"]
+    if questions_asked < len(opening):
+        return opening[questions_asked]
+
+    # Index into the regular rotation *after* the opening slots are consumed.
+    idx = questions_asked - len(opening)
     if round_type == "hr":
         mix = ["casual", "behavioral", "behavioral", "casual"]
     elif round_type == "manager":
         mix = ["behavioral", "itil", "sla", "scenario", "tricky"]
     else:
         mix = ["casual", "technical", "troubleshooting", "technical", "scenario", "practical", "tricky"]
-    return mix[questions_asked % len(mix)]
+    return mix[idx % len(mix)]

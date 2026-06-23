@@ -3,6 +3,66 @@
 from __future__ import annotations
 
 
+# Correctness verdicts surfaced to the frontend (SHARED API CONTRACT). Distinct
+# from "quality" (length/structure) — this is a *was-it-right* read derived from
+# expected-keyword / detected-topic hit rate, all free/local.
+CORRECTNESS_CORRECT = "correct"
+CORRECTNESS_PARTIAL = "partial"
+CORRECTNESS_OFF_BASE = "off_base"
+CORRECTNESS_UNKNOWN = "unknown"
+
+
+def correctness_signal(
+    *,
+    answer_text: str,
+    quality: str,
+    keyword_hit_rate: float,
+    has_keywords: bool,
+    topic_detected: str | None,
+    command_validated: bool = False,
+) -> str:
+    """Deterministic correctness verdict for the prior answer (WS2).
+
+    Returns one of ``correct | partial | off_base | unknown``. All free/local —
+    derived from the same signals the scorer already computes:
+
+      * A validated practical command/code is always ``correct``.
+      * When the question carries ``expected_keywords`` we read the *hit rate*:
+        >=60% correct, >=25% partial, otherwise off_base.
+      * With no keywords we fall back to answer quality + whether a real topic was
+        detected (so a substantive, on-topic answer still reads as correct/partial
+        rather than always "unknown").
+      * A skipped/empty answer is ``unknown`` (nothing to judge).
+    """
+    if command_validated:
+        return CORRECTNESS_CORRECT
+
+    if quality in ("skipped", ""):
+        return CORRECTNESS_UNKNOWN
+
+    if has_keywords:
+        if keyword_hit_rate >= 0.60:
+            return CORRECTNESS_CORRECT
+        if keyword_hit_rate >= 0.25:
+            return CORRECTNESS_PARTIAL
+        # Some keywords expected but barely any landed → likely off-base, unless
+        # the answer is clearly strong+on-topic (banks may be sparse), which we
+        # soften to partial below.
+        if quality == "strong" and topic_detected:
+            return CORRECTNESS_PARTIAL
+        return CORRECTNESS_OFF_BASE
+
+    # No expected keywords to grade against — lean on quality + topic signal.
+    if quality == "strong":
+        return CORRECTNESS_CORRECT
+    if quality == "adequate":
+        return CORRECTNESS_CORRECT if topic_detected else CORRECTNESS_PARTIAL
+    if quality == "brief":
+        return CORRECTNESS_PARTIAL if topic_detected else CORRECTNESS_UNKNOWN
+    # weak
+    return CORRECTNESS_PARTIAL if topic_detected else CORRECTNESS_OFF_BASE
+
+
 def score_answer(question, answer_text: str, metadata: dict | None = None) -> dict:
     """Richer scoring using interview_ai.compute_answer_scores — 100% free, no APIs."""
     from apps.interviews.services.interview_ai import compute_answer_scores
@@ -14,6 +74,7 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
         return {
             "score": 0,
             "quality": "skipped",
+            "correctness": CORRECTNESS_UNKNOWN,
             "feedback": "No response recorded — we moved on to keep the interview on schedule.",
         }
 
@@ -31,11 +92,22 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
     if meta.get("command_validated"):
         score = min(100, score + 15)
 
+    correctness = correctness_signal(
+        answer_text=text,
+        quality=breakdown["quality"],
+        keyword_hit_rate=breakdown["keyword_hit_rate"],
+        has_keywords=bool(keywords),
+        topic_detected=breakdown["topic_detected"],
+        command_validated=bool(meta.get("command_validated")),
+    )
+
     return {
         "score": round(score, 1),
         "quality": breakdown["quality"],
+        "correctness": correctness,
         "feedback": breakdown["feedback"],
         "keyword_hits": round(breakdown["keyword_hit_rate"] * len(keywords)) if keywords else 0,
+        "keyword_hit_rate": breakdown["keyword_hit_rate"],
         "word_count": breakdown["word_count"],
         "depth_score": breakdown["depth_score"],
         "concrete_score": breakdown["concrete_score"],

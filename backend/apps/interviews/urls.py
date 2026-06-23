@@ -36,6 +36,7 @@ from .views import (
     InterviewCampaignListView,
     InterviewCertificateVerifyView,
     InterviewEntitlementView,
+    InterviewHistoryDeleteView,
     InterviewPlansView,
     InterviewRoundAvStatusView,
     InterviewRoundDetailView,
@@ -62,6 +63,9 @@ urlpatterns = [
     path("voices/", InterviewVoicesView.as_view()),
     path("campaigns/", InterviewCampaignListView.as_view()),
     path("campaigns/<uuid:campaign_id>/", InterviewCampaignDetailView.as_view()),
+    # WS8 — History delete (SHARED API CONTRACT): DELETE /api/interviews/<id>/.
+    # A bare UUID can't collide with the string-prefixed routes above/below.
+    path("<uuid:interview_id>/", InterviewHistoryDeleteView.as_view(), name="interview-history-delete"),
     path("rounds/<uuid:round_id>/", InterviewRoundDetailView.as_view()),
     path("rounds/<uuid:round_id>/schedule/", InterviewRoundScheduleView.as_view()),
     path("rounds/<uuid:round_id>/start/", InterviewRoundStartView.as_view()),

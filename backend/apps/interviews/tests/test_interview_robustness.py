@@ -373,9 +373,16 @@ class RoundContentRoutingTest(TestCase):
 
     def test_category_rotation_matches_round_type(self):
         from apps.interviews.services.question_selector import round_category_mix
-        hr_seq = {round_category_mix("hr", i) for i in range(8)}
-        self.assertTrue(hr_seq <= {"casual", "behavioral"}, hr_seq)
-        mgr_seq = {round_category_mix("manager", i) for i in range(10)}
+        # WS4 — every round now OPENS with human warm-up slots before any drill:
+        # intro -> experience for all rounds; HR adds a personal/fun slot.
+        self.assertEqual(round_category_mix("hr", 0), "intro")
+        self.assertEqual(round_category_mix("hr", 1), "experience")
+        self.assertEqual(round_category_mix("hr", 2), "personal")
+        # After the opening slots, the HR body rotates only casual/behavioral.
+        hr_body = {round_category_mix("hr", i) for i in range(3, 11)}
+        self.assertTrue(hr_body <= {"casual", "behavioral"}, hr_body)
+        # Manager still surfaces ITIL/SLA in its body after the warm-up.
+        mgr_seq = {round_category_mix("manager", i) for i in range(12)}
         self.assertTrue({"itil", "sla"} <= mgr_seq, mgr_seq)
 
     def test_hr_answers_scored_on_star_coverage(self):

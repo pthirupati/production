@@ -61,6 +61,13 @@ export const interviewsApi = {
   archiveCampaign(id) {
     return api.delete(`/interviews/campaigns/${id}/`).then(r => r.data)
   },
+  // WS8: hard-delete a past/COMPLETED interview from history.
+  // DELETE /api/interviews/<campaign_id>/ -> { deleted: true, id }.
+  // Returns 409 { error, status } for in_progress/scheduled interviews
+  // (caller should toast and keep the row); 404 for non-owned ids (no IDOR).
+  deleteHistory(id) {
+    return api.delete(`/interviews/${id}/`, { silentError: true }).then(r => r.data)
+  },
   getCampaign(id) {
     return api.get(`/interviews/campaigns/${id}/`).then(r => r.data)
   },

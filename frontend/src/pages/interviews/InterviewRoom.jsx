@@ -19,23 +19,41 @@ import { PageHeader } from '../../components/design'
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Clock, MessageSquare, Terminal,
   Volume2, Plus, ExternalLink, Loader2, ArrowLeft, Calendar, X, SkipForward,
-  CheckCircle2,
+  CheckCircle2, HelpCircle, RotateCcw,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // How long (ms) of continuous silence on an open question before the bot moves
 // on, so the fixed round time covers the planned material (skip-on-silence).
 const SILENCE_SKIP_MS = 20000
-// Trailing silence (ms) after the candidate stops talking before we AUTO-SUBMIT
-// their answer (FIX 1 — no send button). Long enough not to fire on a natural
-// mid-sentence pause, short enough to feel live/responsive.
-const TURN_SILENCE_MS = 1900
+// BASE trailing silence (ms) after the candidate stops talking before we
+// AUTO-SUBMIT their answer (FIX 1 — no send button). WS1: raised from 1900 so a
+// normal between-sentence breath never cuts the candidate off; listenLive then
+// GROWS this dynamically for longer/multi-sentence answers (up to ~4.5s) and
+// extends further when they trail off on a connector ("and…", "so…").
+const TURN_SILENCE_MS = 3000
 // Mic energy (0–1, same scale as the preflight meter) that counts as "speaking"
 // for barge-in. Above this while the bot is talking → interrupt the bot.
 const BARGE_IN_LEVEL = 0.18
 // Mic energy that counts as the candidate actively speaking, used to glow their
 // tile as the active speaker (FIX 4). Lower than barge-in: any clear voice.
 const CANDIDATE_SPEAKING_LEVEL = 0.1
+
+// WS5 — lightweight client-side question classifier. The backend is the source
+// of truth for intent, but tagging input_type:'question' up front (e.g. on a
+// barge-in interruption) makes the engine's clarification path deterministic.
+// Matches a trailing '?', leading interrogatives, and common ask/repeat phrasing.
+const _QUESTION_LEADS = /^(what|why|how|when|where|which|who|whom|whose|can|could|would|should|do|does|did|is|are|was|were|will|may|might|shall|sorry|pardon|wait)\b/i
+const _QUESTION_PHRASES = /\b(repeat that|say that again|come again|can you repeat|could you repeat|what do you mean|what does that mean|can you clarify|could you clarify|not sure i (?:understand|follow)|didn'?t (?:catch|hear|understand)|rephrase|one more time|ask that again)\b/i
+function looksLikeQuestion(text) {
+  const t = (text || '').trim()
+  if (!t) return false
+  if (t.endsWith('?')) return true
+  if (_QUESTION_PHRASES.test(t)) return true
+  // Short opener that starts with an interrogative (e.g. "what was the question")
+  // but isn't a long declarative that merely happens to start with "is/do".
+  return _QUESTION_LEADS.test(t) && t.split(/\s+/).length <= 14
+}
 
 export default function InterviewRoom() {
   const { roundId } = useParams()
@@ -113,11 +131,23 @@ export default function InterviewRoom() {
   const [practiceMode, setPracticalCoaching] = useState(false)
   const [coaching, setCoaching] = useState(null)
   const [typingAnswer, setTypingAnswer] = useState(false)
+  // WS1 — visible "still listening — take your time" countdown. When the
+  // trailing-silence window is running, this holds { remaining, total } in ms so
+  // the candidate sees they have a beat before auto-submit; null when idle.
+  const [silenceCountdown, setSilenceCountdown] = useState(null)
+  // WS5 — when true, the NEXT captured utterance is sent as a candidate question
+  // (input_type:'question') rather than an answer: the engine clarifies/repeats
+  // and re-asks the SAME question instead of scoring + advancing.
+  const askModeRef = useRef(false)
+  const [askMode, setAskMode] = useState(false)
 
   // Keep refs in sync so the VAD loop and timers see current speaking/listening.
   useEffect(() => { isSpeakingRef.current = isSpeaking }, [isSpeaking])
   useEffect(() => { isListeningRef.current = isListening }, [isListening])
   useEffect(() => { answerRef.current = answer }, [answer])
+  // WS1 — never leave a stale "still listening" countdown on screen once the
+  // mic closes (skip, end, barge-in, or a finalized turn).
+  useEffect(() => { if (!isListening) setSilenceCountdown(null) }, [isListening])
 
   const endsAt = round?.ends_at ? new Date(round.ends_at).getTime() : null
 
@@ -493,35 +523,62 @@ export default function InterviewRoom() {
   // text === '' (explicit, e.g. skip-on-silence) submits an empty answer the
   // engine scores as "skipped" and advances. A null/undefined text falls back
   // to the typed box and must be non-empty.
-  const submitAnswer = async (text) => {
+  //
+  // WS5: pass { asQuestion: true } when the candidate is ASKING the interviewer
+  // (Ask a question / Repeat that, or a barge-in classified as a question). The
+  // backend then replies with a clarification and re-asks the SAME question
+  // (res.advanced === false) instead of scoring + advancing. We read res.advanced
+  // to decide whether a new question landed: when it's false we keep the current
+  // question on screen and don't treat the turn as progress.
+  const submitAnswer = async (text, { asQuestion = false } = {}) => {
     const isSkip = text === ''
     const ans = isSkip ? '' : (text ?? answer).trim()
     if (!isSkip && !ans) return
+    // A candidate question is never a skip — guard so '' can't be sent as one.
+    const isQuestion = asQuestion && !isSkip && !!ans
     // An answer (or skip) arrived — stop the silence countdown for this turn.
     clearSilenceTimer()
     awaitingAnswerRef.current = false
     setAnswer('')
+    // Reset ask-mode now that we've consumed it for this turn.
+    askModeRef.current = false
+    setAskMode(false)
     try {
       const res = await interviewsApi.sendMessage(roundId, ans, {
-        input_type: isListeningRef.current ? 'voice' : 'text',
+        input_type: isQuestion ? 'question' : 'answer',
         practice: practiceMode,
       })
+      // advanced === false → the interviewer clarified / re-asked the SAME
+      // question (a candidate question, a re-ask of a thin answer, or no new
+      // question). Don't append a duplicate next_question or flip practical mode
+      // in that case — the question already on screen still stands.
+      const advanced = res.advanced !== false && !!res.next_question
       setCoaching(res.coaching || null)
       setMessages(m => [
         ...m,
         res.candidate_message,
         res.interviewer_reply,
-        ...(res.next_question ? [res.next_question] : []),
-      ])
-      const nextIsPractical = res.next_question?.message_type === 'practical'
-      setPracticalMode(nextIsPractical)
-      setPracticalLab(null)
-      // Speak the interviewer reply, then the next question, then re-open the
-      // mic so the candidate can answer — continuing the hands-free loop.
-      // Practical questions don't auto-listen (the candidate works in the lab).
-      await speakThenListen(res.interviewer_reply?.content, { autoListen: false })
-      if (res.next_question?.content) {
-        await speakThenListen(res.next_question.content, { autoListen: !nextIsPractical })
+        ...(advanced ? [res.next_question] : []),
+      ].filter(Boolean))
+      if (advanced) {
+        const nextIsPractical = res.next_question?.message_type === 'practical'
+        setPracticalMode(nextIsPractical)
+        setPracticalLab(null)
+        // Speak the interviewer reply, then the new question, then re-open the
+        // mic so the candidate can answer — continuing the hands-free loop.
+        // Practical questions don't auto-listen (the candidate works in the lab).
+        await speakThenListen(res.interviewer_reply?.content, { autoListen: false })
+        if (res.next_question?.content) {
+          await speakThenListen(res.next_question.content, { autoListen: !nextIsPractical })
+        }
+      } else {
+        // Same question stands. Speak the clarification/reply, then re-open the
+        // mic so the candidate can now answer the (unchanged) question — but
+        // only when we're not in a practical question (they work in the lab).
+        await speakThenListen(
+          res.reply || res.interviewer_reply?.content,
+          { autoListen: !practicalMode },
+        )
       }
     } catch {
       toast.error('Could not send answer')
@@ -529,9 +586,9 @@ export default function InterviewRoom() {
   }
 
   // TRUE hands-free turn (FIX 1 — no send button). Opens the mic and lets the
-  // candidate just SPEAK; when they STOP (trailing silence detected by the hook)
-  // the answer AUTO-SUBMITS and the AI responds. A second click of the mic
-  // button (or Enter / the Done button) finalizes early as an accessibility
+  // candidate just SPEAK; when they STOP (DYNAMIC trailing silence detected by
+  // the hook) the turn AUTO-SUBMITS and the AI responds. A second click of the
+  // mic button (or Enter / the Done button) finalizes early as an accessibility
   // fallback. Uses browser SpeechRecognition only — zero paid STT.
   const voiceAnswer = async () => {
     if (isListening) {
@@ -547,12 +604,22 @@ export default function InterviewRoom() {
     // answer so the round keeps moving. The SHORT trailing-silence window inside
     // listenLive handles the normal "they finished talking" auto-submit.
     armSilenceSkip()
+    // Remember whether this turn was explicitly opened as a question (Ask /
+    // Repeat). A barge-in also opens a turn; we additionally classify the
+    // captured text below so an interrupting question still routes correctly.
+    const openedAsQuestion = askModeRef.current
     // listenLive flips isListening itself and resolves on trailing silence.
+    // WS1 — the silence window is now dynamic (grows with the answer, extends on
+    // connector endings) and surfaces a countdown via onSilenceCountdown.
     const result = await listenLive(streamRef.current, {
       locale: profile.locale || 'en-IN',
       silenceMs: TURN_SILENCE_MS,
       onInterim: (txt) => setAnswer(txt),
+      onSilenceCountdown: (remaining, total) => {
+        setSilenceCountdown(remaining == null ? null : { remaining, total })
+      },
     })
+    setSilenceCountdown(null)
     const text = (result?.transcript || result?.filtered_text || '').trim()
     // If the skip-silence timer (or a manual skip / barge-in) already resolved
     // this turn, awaitingAnswerRef is false — don't submit again even if late
@@ -562,15 +629,40 @@ export default function InterviewRoom() {
       return
     }
     if (text) {
-      // Auto-submit (silence/timeout) OR manual-done — either way we have a real
-      // answer, so send it and the loop continues hands-free.
-      await submitAnswer(text)
+      // Route as a question when the candidate explicitly asked, OR when the
+      // captured utterance heuristically reads like one (covers barge-ins where
+      // they interrupt to ask for a repeat/clarification). The backend also
+      // detects questions, but tagging input_type up front makes its intent
+      // handling deterministic.
+      const asQuestion = openedAsQuestion || looksLikeQuestion(text)
+      await submitAnswer(text, { asQuestion })
     } else {
       // Recognizer ended with nothing captured (e.g. the candidate clicked Done
       // before speaking). Don't submit an empty answer here — leave the
       // skip-silence timer running so a truly idle turn still advances the round.
       setAnswer('')
     }
+  }
+
+  // WS5 — explicit "Ask a question" / "Repeat that" control. Arms ask-mode and
+  // opens the mic; the captured utterance is sent with input_type:'question'.
+  // For "Repeat that" we can submit immediately without waiting for speech.
+  const askQuestion = (prefill) => {
+    if (observerMode) return
+    cancelSpeech()
+    if (prefill) {
+      // One-tap "Repeat that" — no need to speak; ask the engine to repeat.
+      awaitingAnswerRef.current = true
+      submitAnswer(prefill, { asQuestion: true })
+      return
+    }
+    askModeRef.current = true
+    setAskMode(true)
+    if (isListening) {
+      // Already capturing — just let the in-flight turn finalize as a question.
+      return
+    }
+    voiceAnswer()
   }
 
   // Speak a bot line, then automatically open the mic for the candidate's reply.
@@ -777,6 +869,23 @@ export default function InterviewRoom() {
     const m = Math.floor(s / 60)
     const sec = s % 60
     return `${m}:${sec.toString().padStart(2, '0')}`
+  }
+
+  // WS6 — the active practical question's config (kind:'code'|'command' +
+  // language) drives whether the inline panel shows a code editor or a real
+  // terminal. It's the practical_config of the most recent practical message
+  // (the backend stamps it onto the question the engine asks).
+  const activePracticalConfig = practicalMode
+    ? [...messages].reverse().find(m => m.message_type === 'practical')?.practical_config || null
+    : null
+
+  // WS6 — start the interview practical-lab session inline (for command-kind
+  // questions). Stores the result so the embedded terminal can attach. Returns
+  // the lab info (or { error }) so the panel can surface a precise message.
+  const startPracticalLabInline = async () => {
+    const lab = await interviewsApi.startPracticalLab(roundId)
+    if (!lab?.error) setPracticalLab(lab)
+    return lab
   }
 
   if (!round) return <p className="text-surface-500 p-8">Loading room…</p>
@@ -1149,11 +1258,26 @@ export default function InterviewRoom() {
                 <Volume2 size={13} /> {round.persona_name} is speaking — just start talking to jump in
               </p>
             ) : isListening ? (
-              <p className="interview-handsfree-hint text-emerald-300">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                Listening — answer naturally, then pause. I'll pick it up.
-                {interimTranscript ? <span className="text-emerald-200/80 italic">“{interimTranscript.slice(0, 50)}”</span> : null}
-              </p>
+              silenceCountdown ? (
+                // WS1 — the trailing-silence window is running. Reassure the
+                // candidate they still have a beat; any new speech cancels it.
+                <p className="interview-handsfree-hint text-amber-300">
+                  <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  Still listening — take your time
+                  <span className="font-mono text-amber-200/90">
+                    ({Math.ceil(silenceCountdown.remaining / 1000)}s)
+                  </span>
+                  {askMode && <span className="text-amber-200/70 italic">— asking</span>}
+                </p>
+              ) : (
+                <p className="interview-handsfree-hint text-emerald-300">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  {askMode
+                    ? "Go ahead — ask your question, I'll answer and repeat."
+                    : "Listening — answer naturally, then pause. I'll pick it up."}
+                  {interimTranscript ? <span className="text-emerald-200/80 italic">“{interimTranscript.slice(0, 50)}”</span> : null}
+                </p>
+              )
             ) : (
               <p className="interview-handsfree-hint text-surface-500">
                 <Mic size={13} /> Hands-free — speak when you're ready, or type below.
@@ -1190,6 +1314,10 @@ export default function InterviewRoom() {
             <PracticalAnswerPanel
               onValidate={validatePracticalAnswer}
               disabled={observerMode}
+              practicalConfig={activePracticalConfig}
+              labSession={practicalLab}
+              onStartLab={startPracticalLabInline}
+              onOpenLab={launchPracticalLab}
               onValidated={() => {
                 toast.success('Verified — nicely done')
               }}
@@ -1230,6 +1358,31 @@ export default function InterviewRoom() {
               tabIndex={typingAnswer ? 0 : -1}
             >
               {isListening ? <CheckCircle2 size={16} /> : <Mic size={16} />}
+            </button>
+            {/* WS5 — interactive: ask the interviewer a question / get a repeat.
+                The captured speech is sent as input_type:'question', so the bot
+                clarifies and re-asks the SAME question instead of advancing. */}
+            <button
+              type="button"
+              onClick={() => askQuestion()}
+              disabled={observerMode}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium shrink-0 inline-flex items-center gap-1 transition-colors ${
+                askMode
+                  ? 'bg-indigo-500/25 text-indigo-200 ring-1 ring-indigo-400/50'
+                  : 'btn-secondary'
+              }`}
+              title="Ask the interviewer a question (won't be scored)"
+            >
+              <HelpCircle size={14} /> Ask
+            </button>
+            <button
+              type="button"
+              onClick={() => askQuestion('Could you repeat the question, please?')}
+              disabled={observerMode}
+              className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium shrink-0 inline-flex items-center gap-1 btn-secondary"
+              title="Ask the interviewer to repeat the question"
+            >
+              <RotateCcw size={14} /> Repeat
             </button>
             <input
               value={answer}

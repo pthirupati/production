@@ -404,6 +404,44 @@ class InterviewCampaignDetailView(APIView):
         return Response({"status": "cancelled", "id": str(campaign.id)})
 
 
+class InterviewHistoryDeleteView(APIView):
+    """WS8 — History delete: DELETE /api/interviews/<interview_id>/.
+
+    Deletes a COMPLETED/past interview owned by the requesting user. Returns
+    HTTP 409 with {"error": ...} when the interview is ongoing/in_progress or
+    scheduled (those cannot be deleted). Scoped to ``user=request.user`` so a
+    caller can never touch another user's interview (no IDOR). The existing
+    list/detail endpoints (and the campaigns/<id>/ archive endpoint) are left
+    intact — this is the contract-named history-delete surface.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    # Statuses that block deletion (live or upcoming work).
+    BLOCKING_STATUSES = ("in_progress", "scheduled")
+
+    def delete(self, request, interview_id):
+        # Ownership filter on the queryset itself prevents IDOR: a campaign owned
+        # by another user simply isn't found (404), never deleted.
+        campaign = get_object_or_404(
+            InterviewCampaign, id=interview_id, user=request.user
+        )
+        if campaign.status in self.BLOCKING_STATUSES:
+            return Response(
+                {
+                    "error": (
+                        "Cannot delete an ongoing or scheduled interview. "
+                        "End or cancel it first."
+                    ),
+                    "status": campaign.status,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        deleted_id = str(campaign.id)
+        campaign.delete()
+        return Response({"deleted": True, "id": deleted_id}, status=status.HTTP_200_OK)
+
+
 class InterviewRoundScheduleView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -574,8 +612,16 @@ class InterviewRoundMessageView(APIView):
         answer = request.data.get("answer", "")
         if len(answer) > 8000:
             return Response({'error': 'Answer is too long (max 8000 characters)'}, status=400)
+        # SHARED API CONTRACT: input_type is "answer" (default) when the candidate
+        # is answering, or "question" when they're asking/interrupting the
+        # interviewer. We pass it straight through to the engine; "question" turns
+        # must NOT advance to a new question (the bot re-asks the same one).
+        input_type = request.data.get("input_type", "answer")
+        if input_type not in ("answer", "question"):
+            input_type = "answer"
+        is_candidate_question = input_type == "question"
         meta = {
-            "input_type": request.data.get("input_type", "text"),
+            "input_type": input_type,
             "command_validated": request.data.get("command_validated", False),
             "practice": bool(request.data.get("practice", False)),
         }
@@ -594,15 +640,63 @@ class InterviewRoundMessageView(APIView):
                 {"error": "Could not process that answer. Please try again."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        next_q = result.get("next_question")
+        score_result = result.get("score") or {}
+        interviewer_reply = result["interviewer_reply"]
+        # SHARED API CONTRACT — "advanced": false when the bot re-asks the SAME
+        # question (the candidate interrupted with a question, or the engine
+        # produced no new question), true when it moved on to a new question.
+        advanced = bool(next_q) and not is_candidate_question
+        # SHARED API CONTRACT — "correctness": verdict for the PRIOR answer, one of
+        # correct | partial | off_base | unknown. Honour a verdict the scorer
+        # already attached; otherwise derive it from the same free signals.
+        correctness = self._correctness_for(score_result, round_obj, is_candidate_question)
         return Response({
             "candidate_message": InterviewMessageSerializer(result["candidate_message"]).data,
-            "interviewer_reply": InterviewMessageSerializer(result["interviewer_reply"]).data,
-            "score": result["score"],
-            "next_question": InterviewMessageSerializer(result["next_question"]).data
-            if result.get("next_question")
-            else None,
+            "interviewer_reply": InterviewMessageSerializer(interviewer_reply).data,
+            "score": score_result,
+            "next_question": InterviewMessageSerializer(next_q).data if next_q else None,
             "coaching": result.get("coaching"),
+            # New contract fields (additive — existing fields untouched).
+            "advanced": advanced,
+            "reply": interviewer_reply.content,
+            "correctness": correctness,
+            "input_type": input_type,
         })
+
+    @staticmethod
+    def _correctness_for(score_result, round_obj, is_candidate_question):
+        """Resolve the contract "correctness" verdict for the prior answer.
+
+        When the candidate ASKED a question (didn't answer), there's nothing to
+        judge → "unknown". Otherwise reuse a verdict the scorer already produced,
+        or derive one from the free scoring signals via correctness_signal().
+        """
+        from apps.interviews.services.scoring import (
+            CORRECTNESS_UNKNOWN,
+            correctness_signal,
+        )
+
+        if is_candidate_question:
+            return CORRECTNESS_UNKNOWN
+        if not isinstance(score_result, dict):
+            return CORRECTNESS_UNKNOWN
+        existing = score_result.get("correctness")
+        if existing:
+            return existing
+        try:
+            keyword_hits = score_result.get("keyword_hits") or 0
+            return correctness_signal(
+                answer_text="",
+                quality=score_result.get("quality", ""),
+                keyword_hit_rate=score_result.get("keyword_hit_rate", 0.0),
+                has_keywords=bool(keyword_hits) or bool(score_result.get("keyword_hit_rate")),
+                topic_detected=score_result.get("topic_detected"),
+                command_validated=bool(score_result.get("command_validated")),
+            )
+        except Exception:  # noqa: BLE001 - verdict is best-effort, never 500
+            return CORRECTNESS_UNKNOWN
 
 
 class InterviewRoundAvStatusView(APIView):
@@ -800,7 +894,80 @@ class InterviewRoundPracticalValidateView(APIView):
                 },
                 status=200,
             )
+
+        # WS7: on a PASS, persist the submitted command/code text + a detected
+        # topic onto the round so the conversation brain can QUOTE it in the next
+        # generated question ("you ran `kubectl rollout undo` — what would you
+        # check next?"). Free/local: raw text + a heuristic topic. Best-effort —
+        # persistence must never turn a successful validation into a 500.
+        if result.get("validated"):
+            try:
+                topic = self._detect_topic(round_obj, result.get("question_id"), answer)
+                submission = {
+                    "text": (answer or "")[:2000],
+                    "topic": topic,
+                    "method": result.get("method"),
+                    "question_id": result.get("question_id"),
+                    "validated_at": timezone.now().isoformat(),
+                }
+                round_obj.last_practical_submission = submission
+                round_obj.save(update_fields=["last_practical_submission"])
+                # Surface the persisted context so the client (and the next-turn
+                # question generator) can reference exactly what was accepted.
+                result["persisted"] = True
+                result["submission"] = submission
+                result["detected_topic"] = topic
+            except Exception:  # noqa: BLE001 - never 500 a passed validation
+                import logging
+
+                logging.getLogger(__name__).exception(
+                    "could not persist practical submission for round %s", round_id
+                )
         return Response(result)
+
+    @staticmethod
+    def _detect_topic(round_obj, question_id, answer):
+        """Heuristic, free topic detection for the passed practical submission.
+
+        Prefers the scorer's topic detector against the active practical
+        question text; falls back to a few well-known tool keywords in the
+        submitted command/code so the next question still has something to quote.
+        """
+        # 1) Reuse the active practical question's text for a strong topic signal.
+        try:
+            q_msg = (
+                round_obj.messages.filter(
+                    role="interviewer", message_type__in=("practical", "question")
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            question_text = q_msg.content if q_msg else ""
+            if question_text:
+                from apps.interviews.services.scoring import score_answer  # noqa: F401
+                from apps.interviews.services.interview_ai import compute_answer_scores
+
+                breakdown = compute_answer_scores(
+                    candidate_answer=answer or "",
+                    question_text=question_text,
+                    round_type=round_obj.round_type,
+                    expected_keywords=None,
+                )
+                topic = (breakdown or {}).get("topic_detected")
+                if topic:
+                    return topic
+        except Exception:  # noqa: BLE001
+            pass
+        # 2) Cheap fallback: first recognised tool/command token in the answer.
+        low = (answer or "").lower()
+        for token in (
+            "kubectl", "docker", "terraform", "ansible", "git", "systemctl",
+            "vmware", "esxcli", "vmkfstools", "psql", "mysql", "redis",
+            "grep", "awk", "sed", "iptables", "curl", "helm",
+        ):
+            if token in low:
+                return token
+        return ""
 
 
 class InterviewCertificatesListView(APIView):

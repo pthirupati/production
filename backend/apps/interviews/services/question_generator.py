@@ -268,15 +268,46 @@ _FALLBACK_ANGLES = [
 
 # Cross-question scaffolds — these QUOTE the candidate's own answer ("you said X")
 # and pivot to a harder dimension. {phrase} is a fragment from their last answer.
+# Expanded (WS3) with explicit answer-relative angles: failure mode, trade-off,
+# what they'd change, how they'd verify — so the FIRST follow-up after a
+# substantive answer always has somewhere specific to go.
 _CROSS_QUESTION_TEMPLATES = [
+    # scale / load
     "You mentioned “{phrase}” — how does that hold up when traffic suddenly doubles?",
+    # failure mode
     "You said “{phrase}”. What's the failure mode there, and how would you catch it early?",
-    "Picking up on “{phrase}” — how would you prove to a skeptical senior that it's the right call?",
     "You leaned on “{phrase}”. What breaks first if that assumption is wrong?",
+    "On “{phrase}” — what's the worst-case scenario, and how do you detect it before users do?",
+    # trade-off
+    "You brought up “{phrase}” — what's the trade-off you're accepting there, and what did you give up?",
+    "“{phrase}” has a cost. What's the downside of that choice, and when would it bite you?",
+    # what they'd change
+    "If you were redoing “{phrase}” from scratch today, what would you do differently and why?",
+    "Knowing what you know now, what's the one thing about “{phrase}” you'd change?",
+    # how they'd verify
+    "After “{phrase}”, how would you actually verify it worked — what signal confirms it?",
+    "You said “{phrase}”. How do you know it's healthy — what would you measure right after?",
+    # convince / steps / rollback / offline
+    "Picking up on “{phrase}” — how would you prove to a skeptical senior that it's the right call?",
     "On “{phrase}” — walk me through the exact steps, command by command.",
     "You brought up “{phrase}”. How would you roll that back if it went sideways mid-deploy?",
     "Let's stress-test “{phrase}”: what would you watch for the first 24 hours after shipping it?",
     "You said “{phrase}” — how does that change if you can't take the system offline?",
+]
+
+# Command/code-aware cross-question scaffolds (WS7) — used when the candidate has
+# just run/typed a real command or code we validated. {cmd} is their actual
+# command/code text so the follow-up quotes what they RAN, probing
+# verification / idempotency / rollback / failure.
+_COMMAND_CROSS_TEMPLATES = [
+    "You ran `{cmd}` — how would you confirm it actually came back healthy?",
+    "After `{cmd}`, what's the very next thing you check to know it worked?",
+    "Is `{cmd}` safe to run twice? What happens if it's already in the desired state?",
+    "If `{cmd}` had failed halfway, how would you tell, and how would you roll back?",
+    "`{cmd}` did the job — now how do you make sure it survives a reboot / the next deploy?",
+    "What would `{cmd}` look like in its output if something were still wrong underneath?",
+    "Walk me through validating `{cmd}` in staging before you'd ever run it in prod.",
+    "You used `{cmd}`. What's the blast radius if you'd targeted the wrong host or namespace?",
 ]
 
 # Topic-drill scaffolds — go deeper on the topic the candidate is clearly in,
@@ -293,6 +324,27 @@ _DISCUSSION_TEMPLATES = [
     "Let's just talk shop for a sec — where do you land on {topic}: what's overrated and what's underrated?",
     "Off the script for a moment: what's a {topic} take you hold that a lot of engineers would push back on?",
     "Honest question — what part of {topic} do you actually enjoy, and what do you avoid?",
+]
+
+# Real-interview opening (WS4): warm-up questions a human interviewer actually
+# opens with — "tell me about yourself", then most-recent-role / experience —
+# served BEFORE any technical drilling. {role}/{company} are filled from the
+# profile snapshot when available, with graceful generic fallbacks.
+_INTRO_QUESTIONS = [
+    "To start, tell me about yourself and your background — how'd you get into this work?",
+    "Walk me through your most recent role — what were you responsible for day to day?",
+    "Give me the quick version of your experience so far — what have you spent the most time on?",
+    "Before we dig in, tell me what you're working on right now and what drew you to this {role} track.",
+    "Let's start easy — what does a typical week look like in your current role at {company}?",
+]
+
+# Light personal / fun slot for HR rounds (WS4) — keeps the opening human.
+_PERSONAL_QUESTIONS = [
+    "Outside of work, what do you geek out on — any side projects or hobbies?",
+    "What's something you're genuinely excited about in tech right now?",
+    "How do you like to recharge after a rough on-call week?",
+    "What first got you hooked on this field?",
+    "If you weren't doing this, what do you imagine you'd be doing instead?",
 ]
 
 # Behavioral / situational (HR + manager + leadership). Difficulty-banded.
@@ -563,6 +615,67 @@ def _behavioral_question(round_type: str, difficulty: int, used: set[str], rng: 
     return _pick([x for xs in bank.values() for x in xs], set(), rng)
 
 
+def _intro_question(
+    *,
+    profile_snapshot: dict,
+    category_preference: str | None,
+    questions_asked: int,
+    personal_slot: bool,
+    used: set[str],
+    rng: random.Random,
+) -> str | None:
+    """Serve a warm-up opening question (WS4): 'tell me about yourself', then
+    most-recent-role/experience, then (HR only) an optional personal/fun slot.
+
+    Free/local. {role}/{company} are filled from the snapshot with safe generic
+    fallbacks so a missing field never breaks formatting."""
+    snap = profile_snapshot or {}
+    role = snap.get("target_role") or snap.get("experience_level") or "this"
+    company = snap.get("current_company") or "your current company"
+
+    def fmt(q: str) -> str:
+        try:
+            return q.format(role=role, company=company)
+        except (KeyError, IndexError, ValueError):
+            return q
+
+    if personal_slot:
+        q = _pick(_PERSONAL_QUESTIONS, used, rng)
+        if q:
+            return fmt(q)
+
+    # Deterministically prefer the very first warm-up on question 0 so the round
+    # always opens with "tell me about yourself", then most-recent-role on Q1.
+    if questions_asked == 0 and _normalize(fmt(_INTRO_QUESTIONS[0])) not in used:
+        return fmt(_INTRO_QUESTIONS[0])
+    if questions_asked == 1 and _normalize(fmt(_INTRO_QUESTIONS[1])) not in used:
+        return fmt(_INTRO_QUESTIONS[1])
+    q = _pick([fmt(x) for x in _INTRO_QUESTIONS], used, rng)
+    return q
+
+
+def _command_cross_question(
+    last_command: str, used: set[str], rng: random.Random
+) -> str | None:
+    """WS7: quote the candidate's actual validated command/code in the next
+    question, probing verification/idempotency/rollback/failure. Returns None if
+    there's no usable command text."""
+    cmd = (last_command or "").strip()
+    if not cmd:
+        return None
+    # Keep the quoted command to a single readable line/fragment.
+    cmd = re.split(r"[\n\r]", cmd, 1)[0].strip()
+    if len(cmd) > 120:
+        cmd = cmd[:117] + "…"
+    if not cmd:
+        return None
+    tpl = _pick(_COMMAND_CROSS_TEMPLATES, used, rng) or _COMMAND_CROSS_TEMPLATES[0]
+    text = tpl.format(cmd=cmd)
+    if _normalize(text) in used:
+        return None
+    return text
+
+
 def _seed_from(conversation_tail: list[dict], questions_asked: int) -> int:
     """Deterministic seed: stable for a given conversation state so output is
     repeatable (tests) but varies turn-to-turn (not robotic)."""
@@ -587,6 +700,8 @@ def generate_question(
     conversation_tail: list[dict] | None = None,
     strong_streak: int = 0,
     category_preference: str | None = None,
+    last_command: str = "",
+    turns_since_last_cross: int = 99,
 ) -> GeneratedQuestion:
     """Generate the next interview question dynamically. Always returns a
     ``GeneratedQuestion`` — generation never returns ``None`` (that's the whole
@@ -594,10 +709,17 @@ def generate_question(
 
     Decision order (free + deterministic):
 
-      1. If the candidate's last answer was substantive, frequently CROSS-QUESTION
-         it: quote a phrase they used and pivot to a harder dimension. After a
-         strong streak, escalate harder. This is the human-interviewer behaviour
-         the brief asks for ("you said X — how does that handle Y?").
+      0. WARM-UP OPENING (WS4): for the opening slots (category_preference in
+         intro/experience/personal) serve a human opener — "tell me about
+         yourself", then most-recent-role/experience — BEFORE technical drilling.
+      0b. COMMAND/CODE FOLLOW-UP (WS7): if the candidate just ran a validated
+         command/code (``last_command``), quote what they RAN and probe
+         verification / idempotency / rollback / failure.
+      1. If the candidate's last answer was substantive, CROSS-QUESTION it: quote
+         a phrase they used and pivot to a harder dimension. GUARANTEED (WS3) for
+         the FIRST follow-up after that answer (``turns_since_last_cross``),
+         probabilistic afterwards so we don't quiz every single turn. After a
+         strong streak, escalate harder.
       2. Otherwise, or on a rotation, DRILL the current resume/round topic at the
          adapted difficulty (topic-specific bank).
       3. Occasionally open a DISCUSSION turn (opinion/trade-off) to feel human.
@@ -605,7 +727,10 @@ def generate_question(
       5. Fall back to a generic technical question — never a dead end.
 
     ``category_preference`` (from the existing ``round_category_mix``) nudges
-    behavioral/casual vs technical, preserving the round's shape.
+    intro/experience/personal vs behavioral/casual vs technical, preserving the
+    round's shape. ``last_command`` carries the candidate's actual validated
+    command/code text (WS7). ``turns_since_last_cross`` lets the caller avoid
+    cross-questioning on every turn while still guaranteeing the first follow-up.
     """
     snap = profile_snapshot or {}
     asked_texts = asked_texts or []
@@ -613,6 +738,27 @@ def generate_question(
     used = {_normalize(t) for t in asked_texts}
 
     rng = random.Random(_seed_from(conversation_tail, questions_asked))
+
+    # --- 0. WARM-UP OPENING (WS4) — real interviews start human, not with a drill.
+    intro_slot = category_preference in ("intro", "experience", "personal")
+    personal_slot = category_preference == "personal"
+    if intro_slot:
+        iq = _intro_question(
+            profile_snapshot=snap,
+            category_preference=category_preference,
+            questions_asked=questions_asked,
+            personal_slot=personal_slot,
+            used=used,
+            rng=rng,
+        )
+        if iq and _normalize(iq) not in used:
+            return GeneratedQuestion(
+                text=iq,
+                category="casual",
+                topic=None,
+                difficulty=1,
+                kind="intro",
+            )
 
     # Effective difficulty escalates with a strong streak (cross-checks the
     # engine's own difficulty bump so framing gets harder even mid-round).
@@ -637,23 +783,49 @@ def generate_question(
     substantive = bool(last_answer) and last_answer_quality not in ("skipped", "brief", "")
     phrase = _extract_quote_phrase(last_answer) if substantive else None
 
+    # --- 0b. COMMAND/CODE FOLLOW-UP (WS7) — quote what they actually RAN. ---
+    # When a practical command/code answer was validated, the very next question
+    # should reference it ("you ran `systemctl restart sshd` — how would you
+    # confirm it came back healthy?"). Highest priority follow-up so the hands-on
+    # work directly drives the conversation, even in a behavioral slot.
+    if last_command:
+        cq = _command_cross_question(last_command, used, rng)
+        if cq:
+            return GeneratedQuestion(
+                text=cq,
+                category="troubleshooting",
+                topic=current_topic or _detect_topic(last_command),
+                difficulty=eff_difficulty,
+                kind="cross",
+            )
+
     # --- 1. CROSS-QUESTION the candidate's own answer (primary human move). ---
-    # Do this often when we have a quotable phrase and it's a technical-ish slot.
+    # WS3: when we have a quotable phrase in a technical-ish slot, ALWAYS cross
+    # for the FIRST follow-up after that answer (turns_since_last_cross >= 1).
+    # Afterwards keep it probabilistic so we don't quiz on every single turn.
     if phrase and not behavioral_slot:
-        # Higher probability when they're strong (push harder) — but always
-        # possible so follow-ups genuinely track what they said.
-        cross_chance = 0.75 if last_answer_quality == "strong" else 0.55
-        if rng.random() < cross_chance:
-            tpl = _pick(_CROSS_QUESTION_TEMPLATES, used, rng) or _CROSS_QUESTION_TEMPLATES[0]
-            text = tpl.format(phrase=phrase)
-            if _normalize(text) not in used:
-                return GeneratedQuestion(
-                    text=text,
-                    category="troubleshooting" if current_topic else "scenario",
-                    topic=current_topic,
-                    difficulty=eff_difficulty,
-                    kind="cross",
-                )
+        first_followup = turns_since_last_cross >= 1
+        if first_followup:
+            cross = True
+        else:
+            cross_chance = 0.75 if last_answer_quality == "strong" else 0.55
+            cross = rng.random() < cross_chance
+        if cross:
+            tpl = _pick(_CROSS_QUESTION_TEMPLATES, used, rng)
+            # Guaranteed path: if every template is used this round, reuse the
+            # first one anyway so the first follow-up still quotes them (WS3).
+            if tpl is None and first_followup:
+                tpl = _CROSS_QUESTION_TEMPLATES[questions_asked % len(_CROSS_QUESTION_TEMPLATES)]
+            if tpl:
+                text = tpl.format(phrase=phrase)
+                if _normalize(text) not in used or first_followup:
+                    return GeneratedQuestion(
+                        text=text,
+                        category="troubleshooting" if current_topic else "scenario",
+                        topic=current_topic,
+                        difficulty=eff_difficulty,
+                        kind="cross",
+                    )
 
     # --- 3. DISCUSSION turn (sparingly, only when we have a topic + some history). ---
     if current_topic and not behavioral_slot and questions_asked >= 2 and rng.random() < 0.15:

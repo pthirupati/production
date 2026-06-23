@@ -92,21 +92,36 @@ export default function InterviewHub() {
     }
   }
 
-  const handleArchive = async (id) => {
+  const handleDelete = async (id) => {
     setDeletingId(id)
     try {
-      await interviewsApi.archiveCampaign(id)
+      await interviewsApi.deleteHistory(id)
       setCampaigns(prev => prev.filter(c => c.id !== id))
-      toast.success('Interview removed from history')
+      toast.success('Interview deleted from history')
+      setConfirmDeleteId(null)
     } catch (e) {
-      toast.error(e.response?.data?.error || 'Could not remove interview')
+      // 409 => ongoing/scheduled interview can't be deleted; keep the row.
+      if (e.response?.status === 409) {
+        const status = e.response?.data?.status
+        toast.error(
+          status === 'in_progress'
+            ? 'Ongoing interviews can’t be deleted'
+            : status === 'scheduled'
+              ? 'Scheduled interviews can’t be deleted'
+              : (e.response?.data?.error || 'This interview can’t be deleted yet'),
+        )
+        setConfirmDeleteId(null)
+      } else {
+        toast.error(e.response?.data?.error || 'Could not delete interview')
+      }
     } finally {
       setDeletingId(null)
-      setConfirmDeleteId(null)
     }
   }
 
-  const DELETABLE_STATUSES = ['draft', 'completed', 'failed', 'cancelled']
+  // Ongoing/scheduled interviews can't be deleted (backend returns 409).
+  const UNDELETABLE_STATUSES = ['in_progress', 'scheduled']
+  const canDelete = (status) => !UNDELETABLE_STATUSES.includes(status)
 
   const sampleMinutes = sampleInfo?.sample_duration_minutes || entitlement?.sample_duration_minutes || 10
   const showSample = sampleInfo?.sample_available || entitlement?.sample_available
@@ -389,20 +404,21 @@ export default function InterviewHub() {
               <div key={c.id} className="glass-card border border-surface-800 hover:border-indigo-500/30 transition-colors relative group">
                 {confirmDeleteId === c.id ? (
                   <div className="p-4 flex items-center justify-between gap-3">
-                    <p className="text-sm text-surface-300">Remove this interview from history?</p>
+                    <p className="text-sm text-surface-300">Delete this interview from history? This can’t be undone.</p>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
                         disabled={deletingId === c.id}
-                        onClick={() => handleArchive(c.id)}
+                        onClick={() => handleDelete(c.id)}
                         className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-medium hover:bg-red-500/30 disabled:opacity-50"
                       >
-                        {deletingId === c.id ? 'Removing…' : 'Yes, remove'}
+                        {deletingId === c.id ? 'Deleting…' : 'Yes, delete'}
                       </button>
                       <button
                         type="button"
+                        disabled={deletingId === c.id}
                         onClick={() => setConfirmDeleteId(null)}
-                        className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400"
+                        className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400 disabled:opacity-50"
                       >
                         <X size={14} />
                       </button>
@@ -424,15 +440,24 @@ export default function InterviewHub() {
                       </div>
                       <ChevronRight size={16} className="text-surface-600 shrink-0" />
                     </button>
-                    {DELETABLE_STATUSES.includes(c.status) && (
+                    {canDelete(c.status) ? (
                       <button
                         type="button"
-                        title="Remove from history"
+                        title="Delete from history"
+                        aria-label="Delete interview from history"
                         onClick={() => setConfirmDeleteId(c.id)}
-                        className="px-3 py-4 text-surface-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        className="px-3 py-4 text-surface-600 hover:text-red-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity shrink-0"
                       >
                         <Trash2 size={15} />
                       </button>
+                    ) : (
+                      <span
+                        title="ongoing/scheduled interviews can't be deleted"
+                        aria-label="ongoing/scheduled interviews can't be deleted"
+                        className="px-3 py-4 text-surface-700 cursor-not-allowed shrink-0"
+                      >
+                        <Trash2 size={15} />
+                      </span>
                     )}
                   </div>
                 )}

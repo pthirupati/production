@@ -14,7 +14,13 @@ from apps.interviews.models import (
 )
 from apps.interviews.services.campaign_builder import unlock_next_round
 from apps.interviews.services.certificate import issue_certificate
-from apps.interviews.services.interview_ai import generate_interviewer_reply
+from apps.interviews.services.interview_ai import (
+    detect_question_intent,
+    generate_clarification_reply,
+    generate_clarify_probe,
+    generate_interviewer_reply,
+    is_candidate_question,
+)
 from apps.interviews.services.question_generator import (
     generate_question,
     plan_round_topics,
@@ -24,28 +30,32 @@ from apps.interviews.services.question_selector import round_category_mix, selec
 from apps.interviews.services.scoring import aggregate_round_scores, build_strengths_and_improvements, score_answer
 
 
+# WS4 — the intro is now GREETING + AGENDA ONLY. It deliberately does NOT carry
+# the first question; ``start_round`` follows it with a separate warm-up question
+# ("Tell me about yourself…") so the opening reads like a real interview rather
+# than jumping straight into a drill embedded in the greeting.
 INTRO_TEMPLATES = {
     "technical": (
         "Hi, I'm {persona}. Thanks for joining — I've got your resume pulled up. "
         "We'll spend about {minutes} minutes on technical depth, troubleshooting, and maybe a hands-on scenario. "
-        "Camera and mic stay on please; if either drops for five minutes we'll need to end the session. Ready when you are — "
-        "tell me briefly what you're working on at {company} and what drew you to this {role} track."
+        "Camera and mic stay on please; if either drops for five minutes we'll need to end the session. "
+        "Let's ease in first."
     ),
     "manager": (
         "Hey, {persona} here — engineering manager round. We'll talk incidents, SLAs, ITIL-style process, "
-        "and how you work with teams. About {minutes} minutes. How do you usually handle a SEV-1 when you're on call?"
+        "and how you work with teams. About {minutes} minutes. Let's start with some background."
     ),
     "hr": (
         "Hi! I'm {persona} from people ops. Casual chat — background, motivation, logistics. "
-        "Roughly {minutes} minutes. How's your day going so far?"
+        "Roughly {minutes} minutes. Let's just get to know each other a bit first."
     ),
     "deep_dive": (
         "I'm {persona}. This round goes deeper on gaps or strengths from round one — architecture, trade-offs, war stories. "
-        "{minutes} minutes. What area do you feel strongest in technically right now?"
+        "{minutes} minutes. Let's warm up before we dive in."
     ),
     "leadership": (
         "I'm {persona}. Leadership and stakeholder round — influence without authority, mentoring, delivery under pressure. "
-        "Tell me about a time you had to push back on a deadline."
+        "Let's start with a bit of background."
     ),
 }
 
@@ -131,7 +141,7 @@ def start_round(round_obj: InterviewRound) -> dict:
             f"Hi, I'm {round_obj.persona_name}. Welcome to your free {round_obj.duration_minutes}-minute sample interview. "
             "We'll cover a few quick technical questions so you can experience voice Q&A, scoring, and feedback. "
             "Camera and mic must stay on. This is a preview — subscribe for full 3–5 round cycles and certificates. "
-            f"What are you currently working on as a {target_role or level}-level engineer?"
+            "Let's ease in first."
         )
     else:
         tpl = INTRO_TEMPLATES.get(round_obj.round_type, INTRO_TEMPLATES["technical"])
@@ -142,11 +152,26 @@ def start_round(round_obj: InterviewRound) -> dict:
             role=target_role or f"{level} role",
         )
     msg = InterviewMessage.objects.create(
-        round=round_obj,
         role="interviewer",
+        round=round_obj,
         content=intro,
         message_type="introduction",
     )
+
+    # WS4 — follow the greeting with a real warm-up question ("Tell me about
+    # yourself and your background") so the round opens like a human interview.
+    # Best-effort: a failure here must never block the start (the candidate can
+    # still answer and the next /message/ will generate a question).
+    try:
+        warmup = ask_next_question(round_obj)
+        if warmup is not None:
+            return {
+                "message": msg,
+                "first_question": warmup,
+                "ends_at": round_obj.ends_at.isoformat() if round_obj.ends_at else None,
+            }
+    except Exception:  # noqa: BLE001 - opener generation is best-effort
+        pass
     return {"message": msg, "ends_at": round_obj.ends_at.isoformat() if round_obj.ends_at else None}
 
 
@@ -179,6 +204,67 @@ def _asked_question_texts(round_obj: InterviewRound) -> list[str]:
         .values_list("content", flat=True)[:3]
     )
     return questions + recent_replies
+
+
+def _conversation_meta(round_obj: InterviewRound) -> dict:
+    """The mutable conversation-context bucket on round.metadata used to track
+    WS2 reprompt counts and WS3 'turns since last cross'. Lives on the existing
+    ``metadata`` JSONField — no migration. Always returns a dict reference whose
+    parent (round.metadata) is also normalized to a dict."""
+    meta = round_obj.metadata if isinstance(round_obj.metadata, dict) else {}
+    round_obj.metadata = meta
+    return meta.setdefault("conversation", {})
+
+
+def _reprompt_count(round_obj: InterviewRound, question_text: str) -> int:
+    """How many times THIS exact question has already been re-asked (WS2)."""
+    conv = _conversation_meta(round_obj)
+    key = _normalize_q(question_text)
+    return int((conv.get("reprompts") or {}).get(key, 0))
+
+
+def _bump_reprompt(round_obj: InterviewRound, question_text: str) -> int:
+    conv = _conversation_meta(round_obj)
+    reprompts = conv.setdefault("reprompts", {})
+    key = _normalize_q(question_text)
+    reprompts[key] = int(reprompts.get(key, 0)) + 1
+    return reprompts[key]
+
+
+def _normalize_q(text: str) -> str:
+    import re as _re
+    return _re.sub(r"\s+", " ", (text or "").strip().lower())[:200]
+
+
+def _turns_since_last_cross(round_obj: InterviewRound) -> int:
+    conv = _conversation_meta(round_obj)
+    # Default high so the FIRST follow-up always qualifies as a cross (WS3).
+    return int(conv.get("turns_since_cross", 99))
+
+
+def _record_cross_state(round_obj: InterviewRound, asked_kind: str) -> None:
+    """After asking a question, update 'turns since last cross' (WS3): reset to 0
+    when we just cross-questioned, otherwise increment."""
+    conv = _conversation_meta(round_obj)
+    if asked_kind == "cross":
+        conv["turns_since_cross"] = 0
+    else:
+        conv["turns_since_cross"] = int(conv.get("turns_since_cross", 99)) + 1
+
+
+def _last_validated_command(round_obj: InterviewRound, question_id) -> str:
+    """WS7: the candidate's actual validated practical command/code text, read
+    from the round metadata the practical-validate endpoint persists. Returns ''
+    when there's nothing validated for this question."""
+    if question_id is None:
+        return ""
+    meta = round_obj.metadata if isinstance(round_obj.metadata, dict) else {}
+    bucket = meta.get("practical_validations") or {}
+    entry = bucket.get(str(question_id)) or {}
+    if not entry.get("validated"):
+        return ""
+    # Endpoint persists the submitted text under "answer" (and may add "text").
+    return (entry.get("text") or entry.get("answer") or entry.get("command") or "").strip()
 
 
 def _maybe_supplemental_practical(round_obj, snap, asked_ids, category):
@@ -245,7 +331,8 @@ def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
             },
         )
         round_obj.questions_asked += 1
-        round_obj.save(update_fields=["questions_asked"])
+        _record_cross_state(round_obj, "practical")
+        round_obj.save(update_fields=["questions_asked", "metadata"])
         return msg
 
     # PRIMARY: generate the next question dynamically (never returns None).
@@ -255,6 +342,22 @@ def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
         for m in reversed(list(round_obj.messages.order_by("-created_at")[:8]))
     ]
     agenda = (round_obj.metadata or {}).get("topic_agenda") if isinstance(round_obj.metadata, dict) else None
+
+    # WS7 — if the most recently answered question was a practical and the
+    # candidate's command/code was validated, feed the ACTUAL command text so the
+    # next question quotes what they ran. WS3 — pass 'turns since last cross' so
+    # the generator guarantees the first follow-up cross-questions but doesn't
+    # quiz on every turn.
+    last_q_msg = (
+        round_obj.messages.filter(
+            role="interviewer", message_type__in=("question", "practical")
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    last_command = ""
+    if last_q_msg is not None and last_q_msg.question_id:
+        last_command = _last_validated_command(round_obj, last_q_msg.question_id)
 
     gen = generate_question(
         round_type=round_obj.round_type,
@@ -268,6 +371,8 @@ def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
         conversation_tail=tail,
         strong_streak=round_obj.strong_answers_streak,
         category_preference=category,
+        last_command=last_command,
+        turns_since_last_cross=_turns_since_last_cross(round_obj),
     )
 
     msg = InterviewMessage.objects.create(
@@ -286,8 +391,22 @@ def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
         },
     )
     round_obj.questions_asked += 1
-    round_obj.save(update_fields=["questions_asked"])
+    # WS3 — track whether this turn was a cross-question so the generator can
+    # avoid quizzing every turn while still guaranteeing the first follow-up.
+    _record_cross_state(round_obj, gen.kind)
+    round_obj.save(update_fields=["questions_asked", "metadata"])
     return msg
+
+
+def _recent_tail(round_obj: InterviewRound, limit: int = 6) -> list[dict]:
+    return list(
+        reversed(
+            [
+                {"role": m.role, "content": (m.content or "")[:200]}
+                for m in round_obj.messages.order_by("-created_at")[:limit]
+            ]
+        )
+    )
 
 
 def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | None = None) -> dict:
@@ -295,6 +414,8 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     # Tell the scorer which round type this is so behavioral/HR answers are
     # weighted on STAR coverage rather than always defaulting to "technical".
     meta.setdefault("round_type", round_obj.round_type)
+    input_type = meta.get("input_type")  # "answer" (default) | "question"
+
     # The last question asked is now usually a DYNAMICALLY GENERATED message with
     # no DB ``question`` FK, so match on message_type (question/practical) rather
     # than on a non-null FK — otherwise we'd score against a stale banked row (or
@@ -307,6 +428,50 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         .first()
     )
     question = last_q_msg.question if last_q_msg else None
+    question_text = last_q_msg.content if last_q_msg else ""
+
+    # ------------------------------------------------------------------ WS5 ---
+    # The candidate is ASKING/interrupting, not answering. ANSWER it (repeat /
+    # rephrase / define a term / scope) and re-ask the SAME question WITHOUT
+    # scoring or advancing. Detected via input_type=='question', a trailing '?',
+    # or a meta pattern ("can you repeat", "what do you mean", "clarify"…).
+    if is_candidate_question(answer_text, input_type) and answer_text.strip():
+        cand_msg = InterviewMessage.objects.create(
+            round=round_obj,
+            role="candidate",
+            content=answer_text,
+            message_type="question",
+            question=question,
+            score=None,
+            metadata={"input_type": "question"},
+        )
+        try:
+            reply = generate_clarification_reply(
+                candidate_question=answer_text,
+                question_text=question_text,
+                intent=detect_question_intent(answer_text),
+                conversation_tail=_recent_tail(round_obj),
+            )
+        except Exception:  # noqa: BLE001 - clarification must never 500 a live round
+            reply = f"Sure — here it is again: {question_text}".strip() or "Let me restate the question."
+        interviewer_msg = InterviewMessage.objects.create(
+            round=round_obj,
+            role="interviewer",
+            content=reply,
+            message_type="follow_up",
+            metadata={"clarification": True, "advanced": False},
+        )
+        return {
+            "candidate_message": cand_msg,
+            "interviewer_reply": interviewer_msg,
+            "reply": reply,
+            "advanced": False,
+            "correctness": "unknown",
+            "score": None,
+            "next_question": None,
+            "coaching": None,
+            "skipped": False,
+        }
 
     # If the candidate already validated their inline practical command/code for
     # THIS question (P2.4), honour that verified correctness in scoring (+15) even
@@ -320,6 +485,7 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
             pass
 
     score_result = score_answer(question, answer_text, meta)
+    correctness = score_result.get("correctness", "unknown")
     cand_msg = InterviewMessage.objects.create(
         round=round_obj,
         role="candidate",
@@ -339,21 +505,73 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
 
     round_obj.save(update_fields=["strong_answers_streak", "difficulty_level"])
 
-    tail = [
-        {"role": m.role, "content": m.content[:200]}
-        for m in round_obj.messages.order_by("-created_at")[:6]
-    ]
+    # ------------------------------------------------------------------ WS2 ---
+    # Acknowledge + validate the prior answer before moving on. When the answer
+    # is thin (skipped / brief / weak) and we have NOT already re-prompted this
+    # exact question once, DON'T advance — re-ask the SAME question with a
+    # clarify/probe reply. Only advance once the answer is adequate+ OR the
+    # candidate was already re-prompted once for this question.
+    #
+    # We deliberately do NOT re-prompt on warm-up/opening slots (intro /
+    # experience / personal / casual). Drilling "tell me about yourself" for
+    # "concrete commands" reads as broken; those slots always advance.
+    last_q_category = ""
+    if last_q_msg is not None and isinstance(last_q_msg.metadata, dict):
+        last_q_category = last_q_msg.metadata.get("category") or last_q_msg.metadata.get("kind") or ""
+    warmup_slot = last_q_category in ("intro", "experience", "personal", "casual")
+
+    quality = score_result.get("quality", "")
+    thin = quality in ("skipped", "brief", "weak")
+    already_reprompted = _reprompt_count(round_obj, question_text) >= 1
+    reprompt_now = thin and not already_reprompted and bool(question_text) and not warmup_slot
+
+    if reprompt_now:
+        try:
+            reply = generate_clarify_probe(
+                candidate_answer=answer_text,
+                question_text=question_text,
+                conversation_tail=_recent_tail(round_obj),
+            )
+        except Exception:  # noqa: BLE001
+            reply = "I want to make sure I follow — can you walk me through that concretely, step by step?"
+        _bump_reprompt(round_obj, question_text)
+        # Persist the reprompt counter (lives on round.metadata).
+        try:
+            round_obj.save(update_fields=["metadata"])
+        except Exception:  # noqa: BLE001
+            pass
+        interviewer_msg = InterviewMessage.objects.create(
+            round=round_obj,
+            role="interviewer",
+            content=reply,
+            message_type="follow_up",
+            metadata={"prior_score": score_result["score"], "reprompt": True, "advanced": False},
+        )
+        coaching = _maybe_coaching(round_obj, meta, score_result, answer_text)
+        return {
+            "candidate_message": cand_msg,
+            "interviewer_reply": interviewer_msg,
+            "reply": reply,
+            "advanced": False,
+            "correctness": correctness,
+            "score": score_result,
+            "next_question": None,
+            "coaching": coaching,
+            "skipped": quality == "skipped",
+        }
+
+    # Adequate+ (or already re-prompted once) → react and ADVANCE.
     # The reply uses the free rule-based engine; guard it anyway so a single bad
     # answer or snapshot can never 500 the live interview.
     try:
         reply = generate_interviewer_reply(
             persona_name=round_obj.persona_name,
             round_type=round_obj.round_type,
-            question_text=last_q_msg.content if last_q_msg else "",
+            question_text=question_text,
             candidate_answer=answer_text,
             score_hint=score_result,
             profile_snapshot=_profile_for_round(round_obj),
-            conversation_tail=list(reversed(tail)),
+            conversation_tail=_recent_tail(round_obj),
             strong_streak=round_obj.strong_answers_streak,
         )
     except Exception:  # noqa: BLE001
@@ -364,7 +582,7 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         role="interviewer",
         content=reply,
         message_type="follow_up",
-        metadata={"prior_score": score_result["score"]},
+        metadata={"prior_score": score_result["score"], "advanced": True},
     )
 
     next_q = None
@@ -374,32 +592,37 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         except Exception:  # noqa: BLE001
             next_q = None
 
-    # Practice/coaching mode (parity: interviewai.io practice mode): when the
-    # client requests it (or the round/campaign is flagged practice), attach an
-    # instant, actionable coaching tip derived from the same free score
-    # breakdown. Best-effort — never breaks the answer cycle.
-    coaching = None
-    practice = bool(meta.get("practice")) or bool(
-        (round_obj.metadata or {}).get("practice_mode") if isinstance(round_obj.metadata, dict) else False
-    )
-    if practice:
-        try:
-            from apps.interviews.services.coaching import coaching_tip
-
-            coaching = coaching_tip(
-                score_result, round_type=round_obj.round_type, answer_text=answer_text
-            )
-        except Exception:  # noqa: BLE001
-            coaching = None
+    coaching = _maybe_coaching(round_obj, meta, score_result, answer_text)
 
     return {
         "candidate_message": cand_msg,
         "interviewer_reply": interviewer_msg,
+        "reply": reply,
+        "advanced": True,
+        "correctness": correctness,
         "score": score_result,
         "next_question": next_q,
         "coaching": coaching,
-        "skipped": score_result.get("quality") == "skipped",
+        "skipped": quality == "skipped",
     }
+
+
+def _maybe_coaching(round_obj, meta, score_result, answer_text):
+    """Practice/coaching mode tip (parity: interviewai.io practice mode). When
+    the client requests it (or the round/campaign is flagged practice), attach an
+    instant, actionable coaching tip from the same free score breakdown.
+    Best-effort — never breaks the answer cycle."""
+    practice = bool(meta.get("practice")) or bool(
+        (round_obj.metadata or {}).get("practice_mode") if isinstance(round_obj.metadata, dict) else False
+    )
+    if not practice:
+        return None
+    try:
+        from apps.interviews.services.coaching import coaching_tip
+
+        return coaching_tip(score_result, round_type=round_obj.round_type, answer_text=answer_text)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _target_question_count(round_obj: InterviewRound) -> int:

@@ -47,9 +47,35 @@ class CandidateProfileSerializer(serializers.ModelSerializer):
 
 
 class InterviewMessageSerializer(serializers.ModelSerializer):
+    # SHARED API CONTRACT: practical questions expose practical_config so the
+    # frontend renders a code editor (kind == "code") or a command terminal
+    # (kind == "command"). It already lives inside `metadata` (the engine stamps
+    # metadata["practical_config"] when it asks a practical question); we surface
+    # it as a top-level field too without removing anything the frontend reads.
+    practical_config = serializers.SerializerMethodField()
+
     class Meta:
         model = InterviewMessage
-        fields = ("id", "role", "content", "message_type", "score", "metadata", "created_at")
+        fields = (
+            "id", "role", "content", "message_type", "score", "metadata",
+            "practical_config", "created_at",
+        )
+
+    def get_practical_config(self, obj):
+        meta = obj.metadata if isinstance(obj.metadata, dict) else {}
+        cfg = meta.get("practical_config")
+        if not isinstance(cfg, dict) or not cfg:
+            return None
+        # Normalise the contract keys: kind ("code" | "command") + language.
+        kind = cfg.get("kind")
+        if not kind:
+            kind = "code" if cfg.get("code") else "command"
+        out = dict(cfg)
+        out["kind"] = kind
+        if kind == "code" and not out.get("language"):
+            code_spec = cfg.get("code") if isinstance(cfg.get("code"), dict) else {}
+            out["language"] = code_spec.get("language") or "python"
+        return out
 
 
 class InterviewReportSerializer(serializers.ModelSerializer):
@@ -84,7 +110,7 @@ class InterviewRoundSerializer(serializers.ModelSerializer):
             "schedule_deadline", "started_at", "ended_at", "ends_at", "pass_threshold",
             "overall_score", "persona_name", "persona_voice_id", "invite_token",
             "questions_asked", "difficulty_level", "practical_lab_session_id", "is_sample",
-            "mode", "messages", "report",
+            "mode", "last_practical_submission", "messages", "report",
         )
 
 

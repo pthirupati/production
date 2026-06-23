@@ -208,6 +208,15 @@ class InterviewRound(models.Model):
         choices=[("live", "Live"), ("async_video", "One-way async video")],
     )
     metadata = models.JSONField(default=dict, blank=True)
+    # WS7: the most recent PASSED inline practical submission (command/code text +
+    # detected topic). The conversation brain quotes this in the next generated
+    # question (e.g. "you ran `kubectl rollout undo` earlier — walk me through…").
+    # Free/local: just the raw text the candidate typed + a heuristic topic.
+    last_practical_submission = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="{text, topic, method, question_id, validated_at} of the last passed practical answer",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
