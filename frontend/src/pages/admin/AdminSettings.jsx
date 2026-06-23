@@ -25,6 +25,8 @@ export default function AdminSettings() {
     support_bot_custom_faq: [],
   })
   const [faqDraft, setFaqDraft] = useState({ keywords: '', answer: '' })
+  const [gwTest, setGwTest] = useState(null)
+  const [gwTesting, setGwTesting] = useState(false)
   const [envSecrets, setEnvSecrets] = useState(null)
   const [envEdits, setEnvEdits] = useState({})
   const [envVisible, setEnvVisible] = useState({})
@@ -354,6 +356,54 @@ export default function AdminSettings() {
             onChange={e => setPayForm({ ...payForm, payments_enabled: e.target.checked })} />
           Enable payments (turns paid checkout live when keys are present; clears the gateway warning)
         </label>
+        {/* Gateway connectivity test — creates a real ₹1 Razorpay order (no charge) to prove the keys are live. */}
+        <div className="border border-surface-800 rounded-lg p-3 space-y-2">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm">
+              <div className="font-medium flex items-center gap-1"><CreditCard size={14} /> Test the gateway</div>
+              <p className="text-[11px] text-surface-500">Creates a real ₹1 Razorpay order to validate your live keys. No one is charged — decide enable/disable from the result.</p>
+            </div>
+            <button
+              onClick={async () => {
+                setGwTesting(true); setGwTest(null)
+                try {
+                  const result = await adminApi.testPaymentGateway()
+                  setGwTest(result)
+                  if (result?.ok) toast.success('Gateway keys are valid (₹1 test order created)')
+                  else toast.error(result?.error || 'Gateway test failed')
+                } catch (err) {
+                  const d = err.response?.data
+                  setGwTest(d || { ok: false, error: 'Gateway test failed' })
+                  toast.error(d?.error || 'Gateway test failed')
+                } finally {
+                  setGwTesting(false)
+                }
+              }}
+              disabled={gwTesting}
+              className="btn-secondary text-sm flex items-center gap-1 whitespace-nowrap"
+            >
+              {gwTesting ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
+              {gwTesting ? 'Testing…' : 'Send ₹1 test'}
+            </button>
+          </div>
+          {gwTest && (
+            <div className={`text-xs rounded-md px-3 py-2 ${gwTest.ok ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-red/10 text-accent-red'}`}>
+              {gwTest.ok ? (
+                <>
+                  <CheckCircle2 size={12} className="inline mr-1" />
+                  {gwTest.message || 'Gateway OK'} {gwTest.mode ? `(${gwTest.mode} mode)` : ''}
+                  {gwTest.order_id ? <span className="block text-surface-500 mt-0.5">order: {gwTest.order_id}</span> : null}
+                </>
+              ) : (
+                <>
+                  <AlertTriangle size={12} className="inline mr-1" />
+                  {gwTest.error || 'Gateway test failed'}
+                  {gwTest.detail ? <span className="block text-surface-500 mt-0.5">{gwTest.detail}</span> : null}
+                </>
+              )}
+            </div>
+          )}
+        </div>
         <div className="border-t border-surface-800 pt-3">
           <label className="flex items-center gap-2 text-sm mb-2">
             <input type="checkbox" checked={payForm.gst_enabled}

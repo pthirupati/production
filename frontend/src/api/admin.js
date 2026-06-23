@@ -283,6 +283,11 @@ export const adminApi = {
     return data
   },
 
+  async testPaymentGateway() {
+    const { data } = await api.post('/admin/payments/test-gateway/', {}, { silentError: true })
+    return data
+  },
+
   async syncEnvSecrets(updates) {
     const { data } = await api.post('/admin/env-secrets/sync/', { updates })
     return data

@@ -48,6 +48,7 @@ from .views import (
     AdminSecurityMetricsView,
     AdminSecurityActionView,
     AdminTestEmailView,
+    AdminPaymentGatewayTestView,
     AdminSyncScenariosView,
     AdminLabProvisioningView,
     AdminBlogPostsView,
@@ -106,6 +107,7 @@ urlpatterns = [
     path("security/", AdminSecurityMetricsView.as_view()),
     path("security/actions/", AdminSecurityActionView.as_view()),
     path("email/test/", AdminTestEmailView.as_view()),
+    path("payments/test-gateway/", AdminPaymentGatewayTestView.as_view()),
 
     # Maintenance Mode
     path("maintenance/", AdminMaintenanceModeView.as_view()),

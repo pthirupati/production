@@ -4353,6 +4353,74 @@ class AdminTestEmailView(APIView):
         return Response({"sent": False, "error": "Email delivery failed — check Gmail OAuth or SMTP settings."}, status=502)
 
 
+class AdminPaymentGatewayTestView(APIView):
+    """POST /api/admin/payments/test-gateway/ — validate the live Razorpay keys
+    by creating a real ₹1 Order against the Razorpay API.
+
+    Creating an Order does NOT charge anyone — it only proves the configured
+    RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are valid and the account is live.
+    The admin can then confidently flip "Enable payments" on or off. We
+    immediately discard the order id (no checkout is opened).
+    """
+
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        key_id = getattr(settings, "RAZORPAY_KEY_ID", "") or ""
+        key_secret = getattr(settings, "RAZORPAY_KEY_SECRET", "") or ""
+        if not key_id or not key_secret:
+            return Response(
+                {
+                    "ok": False,
+                    "configured": False,
+                    "error": "No Razorpay keys configured. Set RAZORPAY_KEY_ID and "
+                             "RAZORPAY_KEY_SECRET in the env/secret manager (synced to Vault) first.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        mode = "live" if key_id.startswith("rzp_live_") else (
+            "test" if key_id.startswith("rzp_test_") else "unknown"
+        )
+        try:
+            import razorpay
+
+            client = razorpay.Client(auth=(key_id, key_secret))
+            order = client.order.create({
+                "amount": 100,  # ₹1 in paise — a no-charge connectivity probe
+                "currency": "INR",
+                "receipt": f"gw-test-{int(timezone.now().timestamp())}",
+                "notes": {"purpose": "fixitlab admin gateway connectivity test"},
+                "payment_capture": 0,  # never auto-capture even if somehow paid
+            })
+            return Response({
+                "ok": True,
+                "configured": True,
+                "mode": mode,
+                "key_id_masked": key_id[:12] + "…" if len(key_id) > 12 else key_id,
+                "order_id": order.get("id"),
+                "amount_rupees": 1,
+                "message": f"Razorpay {mode} keys are valid — a ₹1 test order was created "
+                           f"successfully (no charge). Safe to enable payments.",
+            })
+        except Exception as exc:  # razorpay.errors.BadRequestError etc.
+            logger.warning("Razorpay gateway test failed: %s", exc)
+            detail = str(exc)
+            hint = ""
+            low = detail.lower()
+            if "authentication" in low or "401" in low or "key" in low:
+                hint = " — the key id/secret pair looks invalid or revoked."
+            elif "account" in low or "activat" in low:
+                hint = " — the Razorpay account may not be activated for live payments yet."
+            return Response({
+                "ok": False,
+                "configured": True,
+                "mode": mode,
+                "error": f"Gateway test failed{hint}",
+                "detail": detail[:300],
+            }, status=status.HTTP_502_BAD_GATEWAY)
+
+
 class AdminSyncScenariosView(APIView):
     """Reload scenario YAML/check.sh from repo into the database."""
     permission_classes = [IsPlatformAdmin]
