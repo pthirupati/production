@@ -2460,6 +2460,10 @@ class ProjectStartView(APIView):
             "status": progress.status,
             "started_at": str(progress.started_at),
             "project_id": project.id,
+            # The lab the frontend should launch so the user gets a working
+            # environment (terminal / sim / IDE / VMware / Grafana) for the project.
+            "lab_scenario_id": project.lab_scenario_id,
+            "lab_scenario_slug": project.lab_scenario.slug if project.lab_scenario_id else None,
         })
 
 

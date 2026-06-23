@@ -309,6 +309,17 @@ class Project(models.Model):
     estimated_hours = models.PositiveIntegerField(default=4)
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
+    # The scenario whose lab environment (terminal / simulation / coding IDE /
+    # VMware / Grafana) this project opens when the user clicks "Start project".
+    # Null = no launchable workspace yet (the project is checklist-only).
+    lab_scenario = models.ForeignKey(
+        "Scenario",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="projects_using",
+        help_text="Scenario whose lab environment this project launches on Start.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

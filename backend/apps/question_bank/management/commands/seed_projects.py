@@ -4,7 +4,7 @@ Seeds starter end-to-end projects (2-tier Nginx, 3-tier architecture) for DevOps
 Usage: python manage.py seed_projects
 """
 from django.core.management.base import BaseCommand
-from apps.question_bank.models import Technology, Project, ProjectTask
+from apps.question_bank.models import Technology, Project, ProjectTask, Scenario
 
 
 PROJECTS = [
@@ -9130,6 +9130,20 @@ class Command(BaseCommand):
                 if task.depends_on_id != dep.id:
                     task.depends_on = dep
                     task.save(update_fields=["depends_on"])
+
+            # Give the project a launchable environment: the first active scenario
+            # of its technology, so "Start project" opens that tech's lab
+            # (terminal / simulation / coding IDE / VMware / Grafana). Only set
+            # when unset, so an explicit per-project mapping is never overwritten.
+            if project.lab_scenario_id is None:
+                env_scn = (
+                    Scenario.objects.filter(technology=tech, is_active=True)
+                    .order_by("difficulty", "id")
+                    .first()
+                )
+                if env_scn is not None:
+                    project.lab_scenario = env_scn
+                    project.save(update_fields=["lab_scenario"])
 
             if created:
                 created_count += 1

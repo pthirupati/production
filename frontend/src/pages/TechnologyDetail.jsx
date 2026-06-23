@@ -156,7 +156,20 @@ export default function TechnologyDetail() {
   const handleStartProject = async (project) => {
     try {
       const { default: apiClient } = await import('../api/client')
-      await apiClient.post(`/projects/${project.id}/start/`)
+      const { data: started } = await apiClient.post(`/projects/${project.id}/start/`)
+      // If the project has a launchable environment, open its lab (terminal /
+      // simulation / IDE / VMware / Grafana) so the user can actually work on it.
+      if (started?.lab_scenario_id) {
+        try {
+          const { labApi } = await import('../api/labs')
+          const session = await labApi.startLab(started.lab_scenario_id)
+          toast.success(`Project workspace ready: ${project.title}`)
+          navigate(`/lab/${session.id}`, { state: { techSlug: slug } })
+          return
+        } catch {
+          // Fall through to the checklist view if the environment can't start.
+        }
+      }
       toast.success(`Project started: ${project.title}`)
       const data = await scenarioApi.getTechnologyDetail(slug)
       setTechDetail(data)
