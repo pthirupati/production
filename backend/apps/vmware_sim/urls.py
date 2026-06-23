@@ -32,6 +32,9 @@ from .views import (
     WindowsSimActionView,
     WindowsSimReleaseView,
     WindowsSimStateView,
+    PeoplesoftSimActionView,
+    PeoplesoftSimReleaseView,
+    PeoplesoftSimStateView,
 )
 
 urlpatterns = [
@@ -83,4 +86,7 @@ urlpatterns = [
     path("windows/sessions/<uuid:session_id>/", WindowsSimStateView.as_view(), name="windows-sim-state"),
     path("windows/sessions/<uuid:session_id>/action/", WindowsSimActionView.as_view(), name="windows-sim-action"),
     path("windows/sessions/<uuid:session_id>/release/", WindowsSimReleaseView.as_view(), name="windows-sim-release"),
+    path("peoplesoft/sessions/<uuid:session_id>/", PeoplesoftSimStateView.as_view(), name="peoplesoft-sim-state"),
+    path("peoplesoft/sessions/<uuid:session_id>/action/", PeoplesoftSimActionView.as_view(), name="peoplesoft-sim-action"),
+    path("peoplesoft/sessions/<uuid:session_id>/release/", PeoplesoftSimReleaseView.as_view(), name="peoplesoft-sim-release"),
 ]

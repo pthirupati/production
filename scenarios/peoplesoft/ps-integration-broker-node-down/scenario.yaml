@@ -1,0 +1,41 @@
+title: Bring a Down Integration Broker Node Back Active
+slug: ps-integration-broker-node-down
+category: Integration Broker
+description: >-
+  HR data is no longer syncing to downstream systems. In Integration Broker, the
+  PSFT_HR node is showing Down, so PERSON_BASIC_SYNC messages are queuing and
+  never delivering. Open the PIA simulator, go to the Integration Broker Nodes
+  page, and bring the PSFT_HR node back to Active.
+difficulty: medium
+lab_mode: simulation
+simulation_type: peoplesoft
+technology: peoplesoft
+jira_priority: High
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Navigate to PeopleTools > Integration Broker > Nodes
+- Identify the PSFT_HR node that is Down
+- Restart/ping the node so its status returns to Active
+initial_state: >-
+  A PeopleSoft environment whose PSFT_HR Integration Broker node is Down,
+  halting HR publish/subscribe message delivery.
+hints:
+- order: 1
+  cost: 10
+  content: >-
+    Integration failures often come from a node being inactive. Open the
+    Integration Broker Nodes list and look for one whose status is Down.
+- order: 2
+  cost: 15
+  content: >-
+    Use the node's Ping/Restart action to bring PSFT_HR back online
+    (restart_ib_node with node PSFT_HR).
+- order: 3
+  cost: 20
+  content: >-
+    Once PSFT_HR reports Active, queued PERSON_BASIC_SYNC messages can flow
+    again and validation passes.

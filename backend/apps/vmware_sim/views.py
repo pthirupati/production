@@ -31,6 +31,9 @@ from .aiml_engine import get_state as aiml_get_state
 from .windows_engine import apply_action as windows_apply_action
 from .windows_engine import drop_session as windows_drop_session
 from .windows_engine import get_state as windows_get_state
+from .peoplesoft_engine import apply_action as peoplesoft_apply_action
+from .peoplesoft_engine import drop_session as peoplesoft_drop_session
+from .peoplesoft_engine import get_state as peoplesoft_get_state
 
 
 def _demo_session_id(user) -> str:
@@ -496,4 +499,45 @@ class WindowsSimReleaseView(APIView):
         if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
             return Response({"error": "Session not found"}, status=404)
         windows_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ── PeopleSoft (D6) views — mirror the Windows non-demo pattern ───────────────
+class PeoplesoftSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario", "scenario__technology").filter(
+            pk=session_id, user=request.user,
+        ).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(peoplesoft_get_state(session_id, slug))
+
+
+class PeoplesoftSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        peoplesoft_get_state(session_id, slug)
+        result = peoplesoft_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": peoplesoft_get_state(session_id, slug)})
+
+
+class PeoplesoftSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        peoplesoft_drop_session(session_id)
         return Response({"released": True})

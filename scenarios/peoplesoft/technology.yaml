@@ -1,0 +1,17 @@
+name: Oracle PeopleSoft
+slug: peoplesoft
+description: >-
+  Administer an Oracle PeopleSoft (PeopleTools 8.59) environment through an
+  authentic PeopleSoft Internet Architecture (PIA) GUI simulator — portal menu
+  navigation, the Process Scheduler / Process Monitor, security (roles,
+  permission lists, user profiles), Integration Broker nodes and services, and
+  component configuration. Rerun a failed batch process, grant a user the role
+  that unlocks a component, restore a missing permission to a permission list,
+  bring a down Integration Broker node back online, correct a component
+  configuration, and reset a locked operator account.
+icon: database
+color: indigo
+order: 50
+price: 0
+is_active: true
+coming_soon: false

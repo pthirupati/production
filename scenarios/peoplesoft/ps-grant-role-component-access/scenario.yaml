@@ -1,0 +1,43 @@
+title: Grant a User the Role to Access a Component
+slug: ps-grant-role-component-access
+category: Security
+description: >-
+  A finance user, FINUSER, has raised a ticket: they cannot open the Voucher
+  Entry component in Accounts Payable — PeopleSoft returns "You are not
+  authorized to access this component." Their account holds only the Financials
+  Analyst role. Open the PIA simulator and grant FINUSER the role that carries
+  the FIN_AP_VOUCHER permission so they can enter vouchers.
+difficulty: easy
+lab_mode: simulation
+simulation_type: peoplesoft
+technology: peoplesoft
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Navigate to PeopleTools > Security > User Profiles for FINUSER
+- Identify which role grants the FIN_AP_VOUCHER permission for Voucher Entry
+- Assign the Accounts Payable Processor role to FINUSER
+initial_state: >-
+  A PeopleSoft HCM/Financials environment where FINUSER holds only FIN_ANALYST
+  and is missing the AP_PROCESSOR role needed to open Voucher Entry.
+hints:
+- order: 1
+  cost: 10
+  content: >-
+    Component access in PeopleSoft is granted through roles, which point at
+    permission lists, which list the components/permissions. Find a role whose
+    permission list grants FIN_AP_VOUCHER.
+- order: 2
+  cost: 15
+  content: >-
+    The AP_PROCESSOR role carries the EPAP1000 permission list (FIN_AP_VOUCHER).
+    On the User Profiles > Roles tab, add that role to FINUSER (assign_role).
+- order: 3
+  cost: 20
+  content: >-
+    After assigning AP_PROCESSOR to FINUSER, the Voucher Entry component should
+    become accessible — the access map for FINUSER unlocks it.

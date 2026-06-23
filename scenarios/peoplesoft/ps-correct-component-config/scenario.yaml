@@ -1,0 +1,45 @@
+title: Navigate to and Correct a Component Configuration
+slug: ps-correct-component-config
+category: Components
+description: >-
+  HR cannot create new positions. The Position Data component was misconfigured
+  during a recent change — auto_create_position is set to N and max_head_count
+  is 0, which blocks every new position. Open the PIA simulator, navigate to the
+  Position Data component, and correct its configuration so positions can be
+  created again (auto_create_position = Y and max_head_count at least 1).
+difficulty: hard
+lab_mode: simulation
+simulation_type: peoplesoft
+technology: peoplesoft
+jira_priority: High
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Navigate to Workforce Administration > Manage Positions > Position Data
+- Review the component configuration that is blocking new positions
+- Set auto_create_position to Y and max_head_count to at least 1, then save
+initial_state: >-
+  A PeopleSoft HCM environment where the Position Data component is
+  misconfigured (auto_create_position=N, max_head_count=0), blocking new
+  positions.
+hints:
+- order: 1
+  cost: 10
+  content: >-
+    You must open the component before you can fix it. Navigate to the Position
+    Data component under Workforce Administration > Manage Positions.
+- order: 2
+  cost: 15
+  content: >-
+    The two offending settings are auto_create_position (must be Y) and
+    max_head_count (must be at least 1). Update both on the component
+    configuration (set_component_config).
+- order: 3
+  cost: 20
+  content: >-
+    Save the Position Data component with auto_create_position=Y and
+    max_head_count>=1; validation requires you to have navigated to the
+    component first.

@@ -445,6 +445,25 @@ class SimulationProvisioner:
                 return validate_windows_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "Windows Server simulation session not found"
+        # peoplesoft normalizes to "generic"; gate on the slug prefix (ps-, reliable)
+        # OR the RAW (pre-normalize) simulation_type read off the scenario.
+        _raw_ps_type = sim_type
+        if not _raw_ps_type or _raw_ps_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _ps_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_ps_type = (getattr(_ps_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_ps_type = ""
+        if low_slug.startswith("ps-") or _raw_ps_type == "peoplesoft":
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.peoplesoft_engine import validate_peoplesoft_lab, _ensure_session
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                _ensure_session(str(lab_session.id), slug)
+                return validate_peoplesoft_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "PeopleSoft simulation session not found"
         # data-dashboard normalizes to "generic", so gate on the slug prefix OR the
         # RAW (pre-normalize) simulation_type read off the scenario.
         if low_slug.startswith("ds-dashboard-"):

@@ -25,6 +25,7 @@ import WiresharkSimulator from '../components/wireshark/WiresharkSimulator'
 import DataDashboardSimulator from '../components/datascience/DataDashboardSimulator'
 import AgentWorkflowSimulator from '../components/aiml/AgentWorkflowSimulator'
 import WindowsServerSimulator from '../components/windows/WindowsServerSimulator'
+import PeopleSoftSimulator from '../components/peoplesoft/PeopleSoftSimulator'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
@@ -131,6 +132,7 @@ export default function LabRunner() {
   const [showAgentSim, setShowAgentSim] = useState(false)
   // Windows Server GUI simulator overlay (opened from the lab toolbar button).
   const [showWindowsSim, setShowWindowsSim] = useState(false)
+  const [showPeopleSoftSim, setShowPeopleSoftSim] = useState(false)
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
@@ -956,6 +958,14 @@ export default function LabRunner() {
   const isWindowsGuiLab = !isCrossTech && (
     scenario?.simulation_type === 'windows-server' || (scenario?.slug || '').startsWith('win-gui-')
   )
+  // PeopleSoft labs open the PIA simulator inline. peoplesoft is a dedicated
+  // technology with no coding labs, so the slug prefix, sim type, or tech slug
+  // all reliably identify it (sim type normalizes to 'generic' in the DB).
+  const isPeopleSoftLab = !isCrossTech && (
+    scenario?.simulation_type === 'peoplesoft'
+    || scenario?.technology?.slug === 'peoplesoft'
+    || (scenario?.slug || '').startsWith('ps-')
+  )
   // coding_mode scenarios open a browser surface instead of a terminal. Prompt
   // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
   // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
@@ -1637,6 +1647,17 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open Windows Server
             </button>
           )}
+          {isPeopleSoftLab && (
+            <button
+              type="button"
+              onClick={() => setShowPeopleSoftSim(true)}
+              title="Open the in-app Oracle PeopleSoft (PIA): sign in, then use Process Monitor, Security, and Integration Broker to perform the fix, then Check Solution."
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(199,70,52,.45)', color: '#e07a5f', background: 'rgba(199,70,52,.14)' }}
+            >
+              <ExternalLink size={12} /> Open PeopleSoft
+            </button>
+          )}
           {isSimulationLab && (
             <>
               <SimLabQuickActions
@@ -2041,6 +2062,27 @@ export default function LabRunner() {
               onExit={() => setShowWindowsSim(false)}
               onHints={() => { setShowWindowsSim(false); toggleHints() }}
               onStop={() => { setShowWindowsSim(false); setShowStopConfirm(true) }}
+            />
+          </div>
+        </div>
+      )}
+
+      {isPeopleSoftLab && showPeopleSoftSim && (
+        <div className="fixed inset-0 z-[60] bg-surface-950">
+          <button
+            type="button"
+            onClick={() => setShowPeopleSoftSim(false)}
+            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
+          >
+            <XCircle size={14} /> Close simulator
+          </button>
+          <div className="h-full overflow-auto">
+            <PeopleSoftSimulator
+              sessionId={sessionId}
+              scenario={scenario}
+              onExit={() => setShowPeopleSoftSim(false)}
+              onHints={() => { setShowPeopleSoftSim(false); toggleHints() }}
+              onStop={() => { setShowPeopleSoftSim(false); setShowStopConfirm(true) }}
             />
           </div>
         </div>

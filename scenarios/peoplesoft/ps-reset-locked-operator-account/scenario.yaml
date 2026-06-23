@@ -1,0 +1,41 @@
+title: Reset a Locked Operator Account
+slug: ps-reset-locked-operator-account
+category: Security
+description: >-
+  An administrator, HCMADMIN, is locked out of PeopleSoft after repeated failed
+  sign-on attempts — the Account Locked Out flag is set on their User Profile.
+  Open the PIA simulator, go to User Profiles for HCMADMIN, and clear the
+  lockout so the administrator can sign in again.
+difficulty: easy
+lab_mode: simulation
+simulation_type: peoplesoft
+technology: peoplesoft
+jira_priority: Medium
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Navigate to PeopleTools > Security > User Profiles for HCMADMIN
+- Confirm the Account Locked Out flag is set
+- Unlock the account so HCMADMIN can sign in again
+initial_state: >-
+  A PeopleSoft environment where the HCMADMIN operator account is locked out
+  after 6 failed sign-on attempts.
+hints:
+- order: 1
+  cost: 10
+  content: >-
+    A locked operator cannot sign on. Open User Profiles for HCMADMIN and look
+    at the Account Locked Out flag on the General tab.
+- order: 2
+  cost: 15
+  content: >-
+    Clear the lockout by unlocking the account (unlock_user with oprid
+    HCMADMIN). Resetting the password also clears the lockout.
+- order: 3
+  cost: 20
+  content: >-
+    Once Account Locked Out reads N for HCMADMIN, the administrator can sign in
+    again and validation passes.
