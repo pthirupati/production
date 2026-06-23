@@ -1,0 +1,38 @@
+slug: win-gui-install-server-role
+title: "Windows GUI: Install the DHCP Server Role in Server Manager"
+technology: windows
+category: Server Manager
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows-server
+infrastructure_type: docker
+time_limit: 900
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: |
+  Network outage: client machines on the LAN are stuck on 169.254.x.x APIPA
+  addresses because they are not getting DHCP leases. This server was meant to
+  be the DHCP server, but the DHCP Server role was never installed after the
+  rebuild. Using Server Manager's Add Roles and Features wizard in the Windows
+  Server simulator, install the DHCP Server role so the service can lease
+  addresses again.
+initial_state: |
+  A domain-joined Windows Server 2022. In Server Manager the DHCP Server role
+  is listed as available but NOT installed (AD DS, DNS and File Services are
+  already installed). The learner passes once the DHCP Server role is installed.
+objectives:
+  - Open Server Manager and start the Add Roles and Features wizard
+  - Locate the DHCP Server role in the role list
+  - Install the DHCP Server role on this server
+hints:
+  - order: 1
+    cost: 10
+    content: "APIPA (169.254.x.x) addresses mean no DHCP server answered — the role is missing here."
+  - order: 2
+    cost: 15
+    content: "In Server Manager choose Manage, then Add Roles and Features."
+  - order: 3
+    cost: 20
+    content: "Select the DHCP Server role and complete the wizard to install it."

@@ -1,0 +1,38 @@
+slug: win-gui-unlock-ad-user
+title: "Windows GUI: Unlock and Re-enable a Locked AD User"
+technology: windows
+category: Active Directory
+difficulty: easy
+lab_mode: simulation
+simulation_type: windows-server
+infrastructure_type: docker
+time_limit: 600
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: |
+  Help-desk ticket: John Smith (jsmith) cannot sign in to the domain. His
+  Active Directory account has been locked out after repeated bad-password
+  attempts and was also disabled. Using the Active Directory Users and
+  Computers console in the Windows Server simulator, unlock the account and
+  re-enable it so he can log on again. No terminal required — this is a
+  full GUI lab.
+initial_state: |
+  A domain-joined Windows Server 2022. In Active Directory Users and Computers
+  the user jsmith shows as Locked out and Disabled. The account must be both
+  unlocked and enabled for the learner to pass.
+objectives:
+  - Open Active Directory Users and Computers and locate the jsmith account
+  - Unlock the locked-out account
+  - Re-enable the disabled account so the user can sign in
+hints:
+  - order: 1
+    cost: 10
+    content: "Open Active Directory Users and Computers and find jsmith under the Users OU."
+  - order: 2
+    cost: 15
+    content: "Right-click the account and choose Unlock to clear the lockout."
+  - order: 3
+    cost: 20
+    content: "Right-click again and choose Enable Account so the disabled flag is cleared."

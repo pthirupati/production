@@ -1,0 +1,862 @@
+"""
+In-memory Windows Server GUI simulator for training labs.
+
+Models a realistic Windows Server 2022 world the learner administers through a
+GUI (Server Manager, Active Directory Users and Computers, Windows Update, and
+the Services console) rather than a terminal. The engine tracks:
+
+  - domain          : forest/domain name + the domain controllers in it, and
+                      whether THIS member server has joined the domain yet.
+  - roles/features  : Server Manager roles (AD DS, DNS, DHCP, IIS, File
+                      Services ...) each either installed or available.
+  - ad              : Active Directory objects — organizational units, security
+                      groups, and users {name, enabled, locked, group, ...}.
+  - updates         : Windows Update entries {kb, title, status pending|
+                      installed|failed}.
+  - services        : Windows services {name, status running|stopped, startup
+                      automatic|manual|disabled}.
+
+Each scenario preset puts the world into a clearly *broken* state (a locked AD
+user, a user missing from a security group, a role not installed, a stuck/
+failed update, a stopped critical service, an un-joined server, ...). The fix
+is exposed purely through ``apply_action`` (install_role, unlock_ad_user,
+add_user_to_group, retry_update, start_service, join_domain, ...). An unknown
+action always returns ``{"ok": False, "error": ...}`` and never raises.
+
+``validate_windows_lab`` grades the lab by checking the broken state was fixed
+via the intended GUI action. A fresh session always fails; only the intended
+remediation flips it to pass.
+
+Sessions live in the Django cache (Redis in production) for multi-worker
+safety, mirroring the VMware / K8s / Docker / monitoring / nmap / datascience
+engines (SESSION_TTL=7200). Pure stdlib — no external dependencies.
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+import time
+from typing import Any
+
+from django.core.cache import cache
+
+SESSION_TTL = 7200  # 2-hour TTL matching the other simulator engines
+
+
+def _session_key(session_id: str) -> str:
+    return f"windows_session:{session_id}"
+
+
+def _load_session(session_id: str) -> dict | None:
+    data = cache.get(_session_key(str(session_id)))
+    if data is None:
+        return None
+    return json.loads(data) if isinstance(data, str) else data
+
+
+def _save_session(session_id: str, entry: dict) -> None:
+    cache.set(_session_key(str(session_id)), json.dumps(entry, default=str), SESSION_TTL)
+
+
+def _now_iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+# Valid enumerations the engine understands (used to validate action payloads).
+_SERVICE_STATUSES = ("running", "stopped")
+_STARTUP_TYPES = ("automatic", "automatic-delayed", "manual", "disabled")
+_UPDATE_STATES = ("pending", "downloading", "installed", "failed")
+
+
+# ---------------------------------------------------------------------------
+# Base Windows Server world (the "real" machine the learner administers).
+# Presets clone this and break one thing.
+# ---------------------------------------------------------------------------
+
+DEFAULT_DOMAIN = "corp.fixitlab.local"
+DEFAULT_DC = "DC01.corp.fixitlab.local"
+
+
+def _role(role_id: str, name: str, installed: bool, *, category: str = "role",
+          description: str = "") -> dict:
+    return {
+        "id": role_id,
+        "name": name,
+        "category": category,            # role | feature
+        "installed": bool(installed),
+        "description": description,
+    }
+
+
+def _user(name: str, *, display: str = "", enabled: bool = True,
+          locked: bool = False, group: str = "Domain Users",
+          groups: list[str] | None = None, ou: str = "Users",
+          must_change_pw: bool = False) -> dict:
+    return {
+        "name": name,
+        "display": display or name,
+        "enabled": bool(enabled),
+        "locked": bool(locked),
+        # `group` is the user's primary group; `groups` is full membership.
+        "group": group,
+        "groups": list(groups) if groups is not None else [group],
+        "ou": ou,
+        "must_change_pw": bool(must_change_pw),
+    }
+
+
+def _service(name: str, display: str, status: str, startup: str) -> dict:
+    return {
+        "name": name,
+        "display": display,
+        "status": status if status in _SERVICE_STATUSES else "stopped",
+        "startup": startup if startup in _STARTUP_TYPES else "manual",
+    }
+
+
+def _update(kb: str, title: str, status: str, *, severity: str = "Important",
+            reboot: bool = False) -> dict:
+    return {
+        "kb": kb,
+        "title": title,
+        "status": status if status in _UPDATE_STATES else "pending",
+        "severity": severity,
+        "reboot_required": bool(reboot),
+        "error_code": "",
+    }
+
+
+def _base_world() -> dict:
+    """A healthy Windows Server 2022 member-server world. Presets break one thing."""
+    return {
+        "computer_name": "WIN-SRV-APP01",
+        "os": "Windows Server 2022 Datacenter",
+        "domain": {
+            "joined": True,
+            "name": DEFAULT_DOMAIN,
+            "netbios": "CORP",
+            "workgroup": "WORKGROUP",
+            "dcs": [DEFAULT_DC, "DC02.corp.fixitlab.local"],
+        },
+        "roles": [
+            _role("AD-Domain-Services", "Active Directory Domain Services", True,
+                  description="Stores directory data and manages the domain."),
+            _role("DNS", "DNS Server", True,
+                  description="Resolves names to IP addresses for the domain."),
+            _role("DHCP", "DHCP Server", False,
+                  description="Leases IP addresses to clients on the network."),
+            _role("Web-Server", "Web Server (IIS)", False,
+                  description="Hosts web sites and applications over HTTP/HTTPS."),
+            _role("FS-FileServer", "File Services", True,
+                  description="Provides SMB file shares and storage management."),
+            _role("NET-Framework-45", "NET Framework 4.5 Features", True,
+                  category="feature",
+                  description="Runtime libraries for .NET applications."),
+            _role("Telnet-Client", "Telnet Client", False, category="feature",
+                  description="Command-line client for the Telnet protocol."),
+        ],
+        "ad": {
+            "ous": ["Users", "Computers", "Servers", "Service Accounts"],
+            "groups": [
+                {"name": "Domain Admins", "scope": "Global",
+                 "description": "Full administrative control of the domain."},
+                {"name": "Domain Users", "scope": "Global",
+                 "description": "All domain user accounts."},
+                {"name": "Remote Desktop Users", "scope": "DomainLocal",
+                 "description": "Members may log on remotely via RDP."},
+                {"name": "Backup Operators", "scope": "DomainLocal",
+                 "description": "May back up and restore files regardless of permissions."},
+                {"name": "Help Desk", "scope": "Global",
+                 "description": "Tier-1 support staff."},
+            ],
+            "users": [
+                _user("administrator", display="Administrator", group="Domain Admins",
+                      groups=["Domain Admins", "Domain Users"], ou="Users"),
+                _user("jsmith", display="John Smith", group="Domain Users",
+                      groups=["Domain Users"], ou="Users"),
+                _user("agarcia", display="Ana Garcia", group="Domain Users",
+                      groups=["Domain Users", "Help Desk"], ou="Users"),
+                _user("svc-backup", display="Backup Service",
+                      group="Backup Operators",
+                      groups=["Backup Operators", "Domain Users"],
+                      ou="Service Accounts"),
+            ],
+        },
+        "updates": [
+            _update("KB5031356", "2024-09 Cumulative Update for Windows Server 2022",
+                    "installed", severity="Critical", reboot=True),
+            _update("KB5030216", "Servicing Stack Update for Windows Server 2022",
+                    "installed", severity="Important"),
+        ],
+        "services": [
+            _service("Netlogon", "Netlogon", "running", "automatic"),
+            _service("DNS", "DNS Server", "running", "automatic"),
+            _service("LanmanServer", "Server", "running", "automatic"),
+            _service("W32Time", "Windows Time", "running", "automatic"),
+            _service("Spooler", "Print Spooler", "running", "automatic"),
+            _service("wuauserv", "Windows Update", "running", "manual"),
+        ],
+        # Login/lock screen gate state for the UI (purely cosmetic for grading).
+        "session": {
+            "logged_in": False,
+            "locked": False,
+            "current_user": "CORP\\Administrator",
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Scenario presets — break exactly one thing + describe the goal.
+# Validation reads `goal` against the live world. A fresh (broken) world fails;
+# the intended action fixes it and flips validation to pass.
+# ---------------------------------------------------------------------------
+
+def _preset_unlock_user(world: dict) -> dict:
+    """A locked + disabled AD user that cannot log in."""
+    for u in world["ad"]["users"]:
+        if u["name"] == "jsmith":
+            u["locked"] = True
+            u["enabled"] = False
+    return {
+        "kind": "ad_user_active",
+        "title": "Restore John Smith's locked-out account",
+        "target_user": "jsmith",
+        "objective": (
+            "John Smith (jsmith) cannot sign in: his Active Directory account is "
+            "locked out and disabled. In Active Directory Users and Computers, "
+            "unlock the account and re-enable it so he can log on again."
+        ),
+        "require": {"locked": False, "enabled": True},
+    }
+
+
+def _preset_add_to_group(world: dict) -> dict:
+    """A user who needs to be added to the Remote Desktop Users group."""
+    # jsmith is a plain Domain User; the task is to grant RDP access.
+    return {
+        "kind": "ad_group_member",
+        "title": "Grant John Smith Remote Desktop access",
+        "target_user": "jsmith",
+        "target_group": "Remote Desktop Users",
+        "objective": (
+            "John Smith needs to connect to this server over RDP, but he is not a "
+            "member of the Remote Desktop Users group. In Active Directory Users "
+            "and Computers, add jsmith to the 'Remote Desktop Users' group."
+        ),
+        "require": {"group": "Remote Desktop Users", "member": True},
+    }
+
+
+def _preset_install_role(world: dict) -> dict:
+    """The DHCP role is missing and must be installed via Server Manager."""
+    for r in world["roles"]:
+        if r["id"] == "DHCP":
+            r["installed"] = False
+    return {
+        "kind": "role_installed",
+        "title": "Install the DHCP Server role",
+        "target_role": "DHCP",
+        "objective": (
+            "Clients on the LAN are no longer getting IP addresses because this "
+            "server is supposed to be the DHCP server but the role was never "
+            "installed. In Server Manager, use Add Roles and Features to install "
+            "the 'DHCP Server' role."
+        ),
+        "require": {"role": "DHCP", "installed": True},
+    }
+
+
+def _preset_retry_update(world: dict) -> dict:
+    """A Windows Update stuck in the failed state that must be retried."""
+    world["updates"].append(_update(
+        "KB5034123", "2025-01 Cumulative Update for Windows Server 2022",
+        "failed", severity="Critical", reboot=True))
+    # Annotate the failure with a realistic error code.
+    for upd in world["updates"]:
+        if upd["kb"] == "KB5034123":
+            upd["error_code"] = "0x80073712"
+    return {
+        "kind": "update_installed",
+        "title": "Recover the failed January cumulative update",
+        "target_kb": "KB5034123",
+        "objective": (
+            "The January 2025 cumulative update (KB5034123) failed to install with "
+            "error 0x80073712 and the server is missing critical security fixes. In "
+            "Windows Update, retry the failed update so it installs successfully."
+        ),
+        "require": {"kb": "KB5034123", "status": "installed"},
+    }
+
+
+def _preset_start_service(world: dict) -> dict:
+    """A critical service stopped and set to disabled — start it + set automatic."""
+    for s in world["services"]:
+        if s["name"] == "Spooler":
+            s["status"] = "stopped"
+            s["startup"] = "disabled"
+    return {
+        "kind": "service_running",
+        "title": "Bring the Print Spooler service back online",
+        "target_service": "Spooler",
+        "objective": (
+            "Users cannot print: the Print Spooler service is stopped and its "
+            "startup type was set to Disabled, so it will not survive a reboot. In "
+            "the Services console, set Print Spooler's startup type to Automatic "
+            "and start the service."
+        ),
+        "require": {"service": "Spooler", "status": "running", "startup": "automatic"},
+    }
+
+
+def _preset_join_domain(world: dict) -> dict:
+    """The server is in a workgroup and must be joined to the domain."""
+    world["domain"]["joined"] = False
+    world["domain"]["name"] = ""
+    world["domain"]["netbios"] = ""
+    world["computer_name"] = "WIN-SRV-NEW01"
+    # An un-joined member server cannot reach the directory: Netlogon is idle.
+    for s in world["services"]:
+        if s["name"] == "Netlogon":
+            s["status"] = "stopped"
+    world["session"]["current_user"] = "WIN-SRV-NEW01\\Administrator"
+    return {
+        "kind": "domain_joined",
+        "title": "Join the new server to the corp domain",
+        "target_domain": DEFAULT_DOMAIN,
+        "objective": (
+            "This freshly imaged server is still in WORKGROUP and cannot use domain "
+            "accounts or Group Policy. Using System Properties, join it to the "
+            f"'{DEFAULT_DOMAIN}' Active Directory domain."
+        ),
+        "require": {"joined": True, "domain": DEFAULT_DOMAIN},
+    }
+
+
+# slug (without the leading "win-gui-") -> preset builder
+_PRESETS = {
+    "unlock-ad-user": _preset_unlock_user,
+    "ad-group-membership": _preset_add_to_group,
+    "install-dns-role": _preset_install_role,   # historical alias -> DHCP role install
+    "install-server-role": _preset_install_role,
+    "retry-windows-update": _preset_retry_update,
+    "start-critical-service": _preset_start_service,
+    "join-domain": _preset_join_domain,
+}
+
+
+def _apply_preset(world: dict, slug: str) -> dict:
+    """Mutate `world` into the broken state for `slug` and return its goal.
+
+    Matching is keyword-based (after stripping the win-gui- prefix) so small
+    naming drift in scenario slugs still resolves to the right preset, mirroring
+    the nmap engine's tolerant preset matcher.
+    """
+    s = (slug or "").lower()
+    if s.startswith("win-gui-"):
+        s = s[len("win-gui-"):]
+
+    builder = _PRESETS.get(s)
+    if builder is None:
+        if "unlock" in s or ("user" in s and "group" not in s):
+            builder = _preset_unlock_user
+        elif "group" in s or "member" in s or "rdp" in s:
+            builder = _preset_add_to_group
+        elif "role" in s or "dhcp" in s or "dns" in s or "iis" in s:
+            builder = _preset_install_role
+        elif "update" in s or "wsus" in s or s.startswith("kb"):
+            builder = _preset_retry_update
+        elif "service" in s or "spooler" in s:
+            builder = _preset_start_service
+        elif "domain" in s or "join" in s:
+            builder = _preset_join_domain
+        else:
+            # Unknown slug still presents a real, gradeable task.
+            builder = _preset_unlock_user
+
+    return builder(world)
+
+
+# ---------------------------------------------------------------------------
+# Lookups
+# ---------------------------------------------------------------------------
+
+def _find_user(world: dict, name: str) -> dict | None:
+    target = (name or "").lower()
+    for u in world["ad"]["users"]:
+        if u["name"].lower() == target:
+            return u
+    return None
+
+
+def _find_role(world: dict, role_id: str) -> dict | None:
+    target = (role_id or "").lower()
+    for r in world["roles"]:
+        if r["id"].lower() == target or r["name"].lower() == target:
+            return r
+    return None
+
+
+def _find_service(world: dict, name: str) -> dict | None:
+    target = (name or "").lower()
+    for s in world["services"]:
+        if s["name"].lower() == target or s["display"].lower() == target:
+            return s
+    return None
+
+
+def _find_update(world: dict, kb: str) -> dict | None:
+    target = (kb or "").lower()
+    for u in world["updates"]:
+        if u["kb"].lower() == target:
+            return u
+    return None
+
+
+def _group_exists(world: dict, name: str) -> bool:
+    target = (name or "").lower()
+    return any(g["name"].lower() == target for g in world["ad"]["groups"])
+
+
+# ---------------------------------------------------------------------------
+# Session lifecycle (mirrors the other engines)
+# ---------------------------------------------------------------------------
+
+def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
+    key = str(session_id)
+    entry = _load_session(key)
+    if entry is None:
+        world = _base_world()
+        goal = _apply_preset(world, scenario_slug)
+        state = {
+            "scenario_slug": scenario_slug,
+            "world": world,
+            "goal": goal,
+            "events": [],
+        }
+        entry = {"session_id": key, "scenario_slug": scenario_slug, "state": state,
+                 "created_at": _now_iso()}
+        _save_session(key, entry)
+    return entry
+
+
+def _event(state: dict, message: str) -> None:
+    state.setdefault("events", []).insert(0, {"time": _now_iso(), "message": message})
+    state["events"] = state["events"][:60]
+
+
+def get_state(session_id: str, scenario_slug: str = "") -> dict:
+    entry = _ensure_session(session_id, scenario_slug)
+    state = copy.deepcopy(entry["state"])
+    world = state["world"]
+    goal = state.get("goal", {})
+
+    installed_roles = sum(1 for r in world["roles"] if r["installed"])
+    pending_updates = sum(1 for u in world["updates"] if u["status"] != "installed")
+    stopped_services = sum(1 for s in world["services"] if s["status"] != "running")
+
+    return {
+        "session_id": str(session_id),
+        "scenario_slug": entry.get("scenario_slug") or scenario_slug,
+        "computer_name": world["computer_name"],
+        "os": world["os"],
+        "domain": world["domain"],
+        "roles": world["roles"],
+        "ad": world["ad"],
+        "updates": world["updates"],
+        "services": world["services"],
+        "session": world["session"],
+        # Human-readable goal (objective/title) — never leaks the answer beyond
+        # what the objective already tells the learner.
+        "goal": {
+            "kind": goal.get("kind"),
+            "title": goal.get("title"),
+            "objective": goal.get("objective"),
+        },
+        "events": state.get("events", []),
+        "summary": {
+            "computer_name": world["computer_name"],
+            "domain": world["domain"]["name"] if world["domain"]["joined"] else "WORKGROUP",
+            "domain_joined": world["domain"]["joined"],
+            "roles_installed": installed_roles,
+            "roles_total": len(world["roles"]),
+            "ad_users": len(world["ad"]["users"]),
+            "ad_groups": len(world["ad"]["groups"]),
+            "updates_pending": pending_updates,
+            "services_stopped": stopped_services,
+            "title": goal.get("title", ""),
+            "objective": goal.get("objective", ""),
+        },
+    }
+
+
+def drop_session(session_id: str) -> None:
+    cache.delete(_session_key(str(session_id)))
+
+
+# ---------------------------------------------------------------------------
+# Actions — the GUI verbs the learner performs to fix the world.
+# Every handler returns {"ok": bool, ...}. Unknown actions never raise.
+# ---------------------------------------------------------------------------
+
+def apply_action(session_id: str, action: str, payload: dict | None = None) -> dict:
+    payload = payload or {}
+    entry = _load_session(str(session_id))
+    if not entry:
+        return {"ok": False, "error": "Windows Server simulation session not found"}
+    state = entry["state"]
+    world = state["world"]
+
+    try:
+        result = _dispatch(world, state, action, payload)
+    except Exception as exc:  # never 500 — surface as a friendly error
+        return {"ok": False, "error": f"action failed: {exc}"}
+
+    if result.get("ok"):
+        _save_session(str(session_id), entry)
+    return result
+
+
+def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
+    act = (action or "").strip()
+
+    # ---- Login / lock screen gate (cosmetic; not graded) ----
+    if act in ("login", "sign_in"):
+        world["session"]["logged_in"] = True
+        world["session"]["locked"] = False
+        _event(state, "Administrator signed in")
+        return {"ok": True, "message": "Signed in"}
+
+    if act in ("lock",):
+        world["session"]["locked"] = True
+        _event(state, "Workstation locked")
+        return {"ok": True, "message": "Workstation locked"}
+
+    if act in ("unlock", "unlock_session"):
+        world["session"]["locked"] = False
+        world["session"]["logged_in"] = True
+        _event(state, "Workstation unlocked")
+        return {"ok": True, "message": "Workstation unlocked"}
+
+    if act in ("logout", "sign_out"):
+        world["session"]["logged_in"] = False
+        _event(state, "Administrator signed out")
+        return {"ok": True, "message": "Signed out"}
+
+    # ---- Server Manager: roles & features ----
+    if act in ("install_role", "install_feature", "add_role"):
+        role_id = payload.get("role") or payload.get("role_id") or payload.get("name")
+        role = _find_role(world, role_id)
+        if not role:
+            return {"ok": False, "error": f"Unknown role or feature '{role_id}'"}
+        if role["installed"]:
+            return {"ok": True, "message": f"{role['name']} is already installed"}
+        role["installed"] = True
+        _event(state, f"Installed role/feature: {role['name']}")
+        return {"ok": True, "message": f"Installed {role['name']}"}
+
+    if act in ("uninstall_role", "remove_role", "uninstall_feature"):
+        role_id = payload.get("role") or payload.get("role_id") or payload.get("name")
+        role = _find_role(world, role_id)
+        if not role:
+            return {"ok": False, "error": f"Unknown role or feature '{role_id}'"}
+        if not role["installed"]:
+            return {"ok": True, "message": f"{role['name']} is not installed"}
+        role["installed"] = False
+        _event(state, f"Removed role/feature: {role['name']}")
+        return {"ok": True, "message": f"Removed {role['name']}"}
+
+    if act in ("configure_dns", "configure_dhcp"):
+        # Post-install configuration only succeeds if the role is present.
+        role_id = "DNS" if act == "configure_dns" else "DHCP"
+        role = _find_role(world, role_id)
+        if not role or not role["installed"]:
+            return {"ok": False,
+                    "error": f"{role_id} role is not installed — install it first"}
+        role.setdefault("configured", True)
+        role["configured"] = True
+        _event(state, f"Configured {role['name']}")
+        return {"ok": True, "message": f"Configured {role['name']}"}
+
+    # ---- Active Directory Users and Computers ----
+    if act in ("create_ad_user", "new_ad_user"):
+        name = (payload.get("name") or payload.get("user") or "").strip()
+        if not name:
+            return {"ok": False, "error": "A username is required"}
+        if _find_user(world, name):
+            return {"ok": False, "error": f"User '{name}' already exists"}
+        group = payload.get("group") or "Domain Users"
+        world["ad"]["users"].append(_user(
+            name,
+            display=payload.get("display") or name,
+            enabled=bool(payload.get("enabled", True)),
+            group=group,
+            groups=[group] if group == "Domain Users" else [group, "Domain Users"],
+            ou=payload.get("ou") or "Users",
+        ))
+        _event(state, f"Created AD user: {name}")
+        return {"ok": True, "message": f"Created user {name}"}
+
+    if act in ("enable_ad_user", "enable_user"):
+        user = _find_user(world, payload.get("user") or payload.get("name"))
+        if not user:
+            return {"ok": False, "error": "User not found"}
+        user["enabled"] = True
+        _event(state, f"Enabled account: {user['name']}")
+        return {"ok": True, "message": f"Enabled {user['name']}"}
+
+    if act in ("disable_ad_user", "disable_user"):
+        user = _find_user(world, payload.get("user") or payload.get("name"))
+        if not user:
+            return {"ok": False, "error": "User not found"}
+        user["enabled"] = False
+        _event(state, f"Disabled account: {user['name']}")
+        return {"ok": True, "message": f"Disabled {user['name']}"}
+
+    if act in ("unlock_ad_user", "unlock_user", "unlock_account"):
+        user = _find_user(world, payload.get("user") or payload.get("name"))
+        if not user:
+            return {"ok": False, "error": "User not found"}
+        user["locked"] = False
+        _event(state, f"Unlocked account: {user['name']}")
+        return {"ok": True, "message": f"Unlocked {user['name']}"}
+
+    if act in ("reset_password", "reset_ad_password"):
+        user = _find_user(world, payload.get("user") or payload.get("name"))
+        if not user:
+            return {"ok": False, "error": "User not found"}
+        user["must_change_pw"] = bool(payload.get("must_change_pw", True))
+        # Resetting a password also clears a lockout, like the real ADUC dialog.
+        user["locked"] = False
+        _event(state, f"Reset password for {user['name']}")
+        return {"ok": True, "message": f"Reset password for {user['name']}"}
+
+    if act in ("add_user_to_group", "add_to_group"):
+        user = _find_user(world, payload.get("user") or payload.get("name"))
+        group = payload.get("group")
+        if not user:
+            return {"ok": False, "error": "User not found"}
+        if not group or not _group_exists(world, group):
+            return {"ok": False, "error": f"Unknown group '{group}'"}
+        # Canonicalize to the stored group casing.
+        canon = next(g["name"] for g in world["ad"]["groups"]
+                     if g["name"].lower() == group.lower())
+        if canon in user["groups"]:
+            return {"ok": True, "message": f"{user['name']} is already in {canon}"}
+        user["groups"].append(canon)
+        _event(state, f"Added {user['name']} to {canon}")
+        return {"ok": True, "message": f"Added {user['name']} to {canon}"}
+
+    if act in ("remove_user_from_group", "remove_from_group"):
+        user = _find_user(world, payload.get("user") or payload.get("name"))
+        group = payload.get("group")
+        if not user:
+            return {"ok": False, "error": "User not found"}
+        if not group:
+            return {"ok": False, "error": "A group is required"}
+        before = len(user["groups"])
+        user["groups"] = [g for g in user["groups"] if g.lower() != group.lower()]
+        if len(user["groups"]) == before:
+            return {"ok": True, "message": f"{user['name']} was not in {group}"}
+        _event(state, f"Removed {user['name']} from {group}")
+        return {"ok": True, "message": f"Removed {user['name']} from {group}"}
+
+    # ---- Windows Update ----
+    if act in ("install_update", "retry_update", "install_updates"):
+        kb = payload.get("kb") or payload.get("update")
+        if kb:
+            upd = _find_update(world, kb)
+            if not upd:
+                return {"ok": False, "error": f"Update '{kb}' not found"}
+            targets = [upd]
+        else:
+            # No KB given -> install every pending/failed update (Install all).
+            targets = [u for u in world["updates"] if u["status"] != "installed"]
+            if not targets:
+                return {"ok": True, "message": "No pending updates"}
+        for upd in targets:
+            upd["status"] = "installed"
+            upd["error_code"] = ""
+            _event(state, f"Installed update {upd['kb']}")
+        names = ", ".join(u["kb"] for u in targets)
+        return {"ok": True, "message": f"Installed {names}"}
+
+    if act in ("check_updates", "scan_updates"):
+        pending = [u["kb"] for u in world["updates"] if u["status"] != "installed"]
+        _event(state, "Checked for updates")
+        return {"ok": True, "message": "Checked for updates",
+                "pending": pending}
+
+    # ---- Services console ----
+    if act in ("start_service",):
+        svc = _find_service(world, payload.get("service") or payload.get("name"))
+        if not svc:
+            return {"ok": False, "error": "Service not found"}
+        if svc["startup"] == "disabled":
+            return {"ok": False,
+                    "error": (f"Cannot start {svc['display']}: its startup type is "
+                              "Disabled. Set startup to Automatic or Manual first.")}
+        svc["status"] = "running"
+        _event(state, f"Started service: {svc['display']}")
+        return {"ok": True, "message": f"Started {svc['display']}"}
+
+    if act in ("stop_service",):
+        svc = _find_service(world, payload.get("service") or payload.get("name"))
+        if not svc:
+            return {"ok": False, "error": "Service not found"}
+        svc["status"] = "stopped"
+        _event(state, f"Stopped service: {svc['display']}")
+        return {"ok": True, "message": f"Stopped {svc['display']}"}
+
+    if act in ("restart_service",):
+        svc = _find_service(world, payload.get("service") or payload.get("name"))
+        if not svc:
+            return {"ok": False, "error": "Service not found"}
+        if svc["startup"] == "disabled":
+            return {"ok": False,
+                    "error": f"Cannot start {svc['display']}: startup type is Disabled."}
+        svc["status"] = "running"
+        _event(state, f"Restarted service: {svc['display']}")
+        return {"ok": True, "message": f"Restarted {svc['display']}"}
+
+    if act in ("set_startup", "set_service_startup"):
+        svc = _find_service(world, payload.get("service") or payload.get("name"))
+        startup = (payload.get("startup") or payload.get("startup_type") or "").lower()
+        if not svc:
+            return {"ok": False, "error": "Service not found"}
+        if startup not in _STARTUP_TYPES:
+            return {"ok": False,
+                    "error": f"Startup type must be one of {', '.join(_STARTUP_TYPES)}"}
+        svc["startup"] = startup
+        _event(state, f"Set {svc['display']} startup to {startup}")
+        return {"ok": True, "message": f"Set {svc['display']} startup to {startup}"}
+
+    # ---- System Properties: domain join ----
+    if act in ("join_domain",):
+        domain = (payload.get("domain") or DEFAULT_DOMAIN).strip()
+        if not domain:
+            return {"ok": False, "error": "A domain name is required"}
+        world["domain"]["joined"] = True
+        world["domain"]["name"] = domain
+        world["domain"]["netbios"] = (domain.split(".")[0] or "CORP").upper()
+        world["domain"].setdefault("dcs", [DEFAULT_DC])
+        # Joining the domain brings Netlogon online.
+        net = _find_service(world, "Netlogon")
+        if net:
+            net["status"] = "running"
+        _event(state, f"Joined domain {domain}")
+        return {"ok": True,
+                "message": f"Joined {domain}. A restart is required to complete the join."}
+
+    if act in ("leave_domain", "unjoin_domain"):
+        world["domain"]["joined"] = False
+        world["domain"]["name"] = ""
+        world["domain"]["netbios"] = ""
+        _event(state, "Left the domain (joined WORKGROUP)")
+        return {"ok": True, "message": "Left the domain"}
+
+    if act in ("rename_computer",):
+        new_name = (payload.get("name") or payload.get("computer_name") or "").strip()
+        if not new_name:
+            return {"ok": False, "error": "A computer name is required"}
+        world["computer_name"] = new_name
+        _event(state, f"Renamed computer to {new_name}")
+        return {"ok": True, "message": f"Renamed to {new_name}"}
+
+    if act in ("reset",):
+        # Re-break the world from the preset (a fresh start for the learner).
+        slug = state.get("scenario_slug", "")
+        new_world = _base_world()
+        state["goal"] = _apply_preset(new_world, slug)
+        state["world"] = new_world
+        state["events"] = []
+        _event(state, "Lab reset to its initial state")
+        # _save handled by caller because ok is True.
+        # Replace the live reference so the caller persists the reset world.
+        world.clear()
+        world.update(new_world)
+        return {"ok": True, "message": "Lab reset"}
+
+    return {"ok": False, "error": f"unknown action: {action}"}
+
+
+# ---------------------------------------------------------------------------
+# Validation — grade purely on the live world vs the scenario goal.
+# A fresh (broken) session fails; the intended fix flips it to pass.
+# ---------------------------------------------------------------------------
+
+def validate_windows_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
+    entry = _load_session(str(session_id)) or _ensure_session(session_id, scenario_slug)
+    state = entry["state"]
+    world = state["world"]
+    goal = state.get("goal") or {}
+    kind = goal.get("kind")
+    req = goal.get("require", {})
+
+    if kind == "ad_user_active":
+        user = _find_user(world, goal.get("target_user"))
+        if not user:
+            return False, f"User {goal.get('target_user')} not found"
+        if user["locked"] != req.get("locked", False):
+            return False, (f"{user['name']} is still locked out — unlock the account "
+                           "in Active Directory Users and Computers.")
+        if user["enabled"] != req.get("enabled", True):
+            return False, (f"{user['name']} is still disabled — enable the account "
+                           "in Active Directory Users and Computers.")
+        return True, (f"{user['name']} is unlocked and enabled — the account can sign "
+                      "in again. Validation passed.")
+
+    if kind == "ad_group_member":
+        user = _find_user(world, goal.get("target_user"))
+        group = goal.get("target_group")
+        if not user:
+            return False, f"User {goal.get('target_user')} not found"
+        members = [g.lower() for g in user.get("groups", [])]
+        if (group or "").lower() not in members:
+            return False, (f"{user['name']} is not yet a member of '{group}'. Add the "
+                           "user to that group in Active Directory Users and Computers.")
+        return True, (f"{user['name']} is now a member of '{group}' — validation passed.")
+
+    if kind == "role_installed":
+        role = _find_role(world, goal.get("target_role"))
+        if not role:
+            return False, f"Role {goal.get('target_role')} not found"
+        if not role["installed"]:
+            return False, (f"The {role['name']} role is not installed yet — use Add "
+                           "Roles and Features in Server Manager to install it.")
+        return True, (f"The {role['name']} role is installed — validation passed.")
+
+    if kind == "update_installed":
+        upd = _find_update(world, goal.get("target_kb"))
+        if not upd:
+            return False, f"Update {goal.get('target_kb')} not found"
+        if upd["status"] != "installed":
+            return False, (f"{upd['kb']} is still '{upd['status']}' — retry the failed "
+                           "update in Windows Update so it installs.")
+        return True, (f"{upd['kb']} installed successfully — validation passed.")
+
+    if kind == "service_running":
+        svc = _find_service(world, goal.get("target_service"))
+        if not svc:
+            return False, f"Service {goal.get('target_service')} not found"
+        if svc["status"] != req.get("status", "running"):
+            return False, (f"The {svc['display']} service is still {svc['status']} — "
+                           "start it in the Services console.")
+        if req.get("startup") and svc["startup"] != req["startup"]:
+            return False, (f"Set {svc['display']}'s startup type to "
+                           f"{req['startup'].title()} so it starts after a reboot.")
+        return True, (f"The {svc['display']} service is running and set to "
+                      f"{svc['startup'].title()} — validation passed.")
+
+    if kind == "domain_joined":
+        dom = world["domain"]
+        if not dom.get("joined"):
+            return False, ("The server is still in WORKGROUP — join it to the "
+                           f"'{goal.get('target_domain')}' domain in System Properties.")
+        want = (goal.get("target_domain") or "").lower()
+        if want and (dom.get("name") or "").lower() != want:
+            return False, (f"The server joined '{dom.get('name')}' but the goal domain "
+                           f"is '{goal.get('target_domain')}'.")
+        return True, (f"The server is joined to {dom.get('name')} — validation passed.")
+
+    return False, "No validation goal configured for this scenario"

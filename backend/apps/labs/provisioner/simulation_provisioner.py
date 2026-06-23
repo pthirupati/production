@@ -425,6 +425,26 @@ class SimulationProvisioner:
                 return validate_aiml_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "Agent simulation session not found"
+        # windows-server normalizes to "generic", so gate on the slug prefix
+        # (win-gui-, reliable) OR the RAW (pre-normalize) simulation_type read off
+        # the scenario when the cached entry doesn't carry it (e.g. worker restart).
+        _raw_win_type = sim_type
+        if not _raw_win_type or _raw_win_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _win_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_win_type = (getattr(_win_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_win_type = ""
+        if low_slug.startswith("win-gui-") or _raw_win_type == "windows-server":
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.windows_engine import validate_windows_lab, _ensure_session
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                _ensure_session(str(lab_session.id), slug)
+                return validate_windows_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Windows Server simulation session not found"
         # data-dashboard normalizes to "generic", so gate on the slug prefix OR the
         # RAW (pre-normalize) simulation_type read off the scenario.
         if low_slug.startswith("ds-dashboard-"):

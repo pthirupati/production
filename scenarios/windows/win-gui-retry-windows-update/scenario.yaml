@@ -1,0 +1,38 @@
+slug: win-gui-retry-windows-update
+title: "Windows GUI: Recover a Failed Cumulative Windows Update"
+technology: windows
+category: Windows Update
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows-server
+infrastructure_type: docker
+time_limit: 900
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: |
+  Patch-compliance alert: this server is missing the January 2025 cumulative
+  update. The update KB5034123 attempted to install but failed with error
+  0x80073712, leaving the server short of critical security fixes. Using the
+  Windows Update panel in the Windows Server simulator, retry the failed update
+  so it installs successfully and the server returns to compliance.
+initial_state: |
+  A domain-joined Windows Server 2022. The Windows Update history shows
+  KB5034123 in the Failed state with error 0x80073712. Older updates are
+  already installed. The learner passes once KB5034123 reaches the Installed
+  state.
+objectives:
+  - Open Windows Update and review the update history
+  - Identify the failed update KB5034123 and its error code
+  - Retry the failed update so it installs successfully
+hints:
+  - order: 1
+    cost: 10
+    content: "Open Windows Update and look at the failed entry KB5034123 (error 0x80073712)."
+  - order: 2
+    cost: 15
+    content: "A transient component-store error usually clears on a retry — use Retry on the failed update."
+  - order: 3
+    cost: 20
+    content: "Retry KB5034123 until its status flips from Failed to Installed."

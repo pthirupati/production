@@ -1,0 +1,38 @@
+slug: win-gui-join-domain
+title: "Windows GUI: Join a New Server to the Active Directory Domain"
+technology: windows
+category: Domain Services
+difficulty: hard
+lab_mode: simulation
+simulation_type: windows-server
+infrastructure_type: docker
+time_limit: 900
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: |
+  Onboarding task: a freshly imaged server (WIN-SRV-NEW01) is still sitting in
+  WORKGROUP. Because it is not a domain member it cannot use domain accounts,
+  receive Group Policy, or talk to the directory (Netlogon is idle). Using the
+  System Properties dialog in the Windows Server simulator, join this server to
+  the corp.fixitlab.local Active Directory domain so it becomes a managed member
+  server.
+initial_state: |
+  A standalone Windows Server 2022 in WORKGROUP (computer name WIN-SRV-NEW01).
+  System Properties shows no domain, and the Netlogon service is stopped. The
+  learner passes once the server is joined to the corp.fixitlab.local domain.
+objectives:
+  - Open System Properties and review the current workgroup membership
+  - Change the membership from Workgroup to Domain
+  - Join the server to the corp.fixitlab.local domain
+hints:
+  - order: 1
+    cost: 10
+    content: "A WORKGROUP server cannot use domain logons or Group Policy — it must join the domain."
+  - order: 2
+    cost: 15
+    content: "In System Properties choose Change, then select Domain instead of Workgroup."
+  - order: 3
+    cost: 20
+    content: "Enter the domain corp.fixitlab.local and join; Netlogon comes online once joined."

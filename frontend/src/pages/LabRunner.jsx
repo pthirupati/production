@@ -24,6 +24,7 @@ import NmapSimulator from '../components/nmap/NmapSimulator'
 import WiresharkSimulator from '../components/wireshark/WiresharkSimulator'
 import DataDashboardSimulator from '../components/datascience/DataDashboardSimulator'
 import AgentWorkflowSimulator from '../components/aiml/AgentWorkflowSimulator'
+import WindowsServerSimulator from '../components/windows/WindowsServerSimulator'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
@@ -128,6 +129,8 @@ export default function LabRunner() {
   const [showDataDashboardSim, setShowDataDashboardSim] = useState(false)
   // AI Agent / Workflow simulator overlay (opened from the lab toolbar button).
   const [showAgentSim, setShowAgentSim] = useState(false)
+  // Windows Server GUI simulator overlay (opened from the lab toolbar button).
+  const [showWindowsSim, setShowWindowsSim] = useState(false)
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
@@ -931,13 +934,28 @@ export default function LabRunner() {
   // chart). Keyed ONLY on simulation_type 'data-dashboard' — NOT the technology
   // slug, because data-science also hosts coding_mode labs that must keep opening
   // the code IDE.
-  const isDataDashboardLab = !isCrossTech && scenario?.simulation_type === 'data-dashboard'
+  // NB: seed_scenarios normalizes unknown simulation_type -> 'generic' in the DB,
+  // so we ALSO match the reliable slug prefix (the raw type survives only in YAML).
+  const isDataDashboardLab = !isCrossTech && (
+    scenario?.simulation_type === 'data-dashboard' || (scenario?.slug || '').startsWith('ds-dashboard-')
+  )
   // AI Agent / Workflow labs open the in-app n8n-style node-graph builder inline
   // (palette → canvas → config panel → Run → execution trace + final output).
   // Keyed ONLY on simulation_type 'ai-agent' — NOT the technology slug, because
   // the ai-ml technology also hosts coding_mode labs that must keep opening the
   // code IDE. Mirrors the data-dashboard detection above.
-  const isAgentLab = !isCrossTech && scenario?.simulation_type === 'ai-agent'
+  const isAgentLab = !isCrossTech && (
+    scenario?.simulation_type === 'ai-agent' || (scenario?.slug || '').startsWith('agent-')
+  )
+  // Windows Server GUI labs open the in-app Server Manager / Active Directory /
+  // Windows Update / Services simulator inline (login gate → panels with action
+  // buttons/dialogs to perform the fix). Keyed ONLY on simulation_type
+  // 'windows-server' so the 50 existing windows TERMINAL scenarios (which keep
+  // opening the Linux/PowerShell terminal) are untouched. Mirrors the
+  // data-dashboard / ai-agent detection above.
+  const isWindowsGuiLab = !isCrossTech && (
+    scenario?.simulation_type === 'windows-server' || (scenario?.slug || '').startsWith('win-gui-')
+  )
   // coding_mode scenarios open a browser surface instead of a terminal. Prompt
   // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
   // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
@@ -1608,6 +1626,17 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open Agent Builder
             </button>
           )}
+          {isWindowsGuiLab && (
+            <button
+              type="button"
+              onClick={() => setShowWindowsSim(true)}
+              title="Open the in-app Windows Server desktop: sign in, then use Server Manager, Active Directory Users and Computers, Windows Update, and the Services console to perform the fix, then Check Solution."
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(0,120,212,.45)', color: '#3a9bdc', background: 'rgba(0,120,212,.14)' }}
+            >
+              <ExternalLink size={12} /> Open Windows Server
+            </button>
+          )}
           {isSimulationLab && (
             <>
               <SimLabQuickActions
@@ -1987,6 +2016,31 @@ export default function LabRunner() {
               onExit={() => setShowAgentSim(false)}
               onHints={() => { setShowAgentSim(false); toggleHints() }}
               onStop={() => { setShowAgentSim(false); setShowStopConfirm(true) }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Windows Server GUI — full-screen overlay opened from the toolbar. The
+          learner signs in, then uses Server Manager / Active Directory Users and
+          Computers / Windows Update / Services to perform the fix, then runs
+          Check Solution (graded via validate_windows_lab on the engine). */}
+      {isWindowsGuiLab && showWindowsSim && (
+        <div className="fixed inset-0 z-[60] bg-surface-950">
+          <button
+            type="button"
+            onClick={() => setShowWindowsSim(false)}
+            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
+          >
+            <XCircle size={14} /> Close simulator
+          </button>
+          <div className="h-full overflow-auto">
+            <WindowsServerSimulator
+              sessionId={sessionId}
+              scenario={scenario}
+              onExit={() => setShowWindowsSim(false)}
+              onHints={() => { setShowWindowsSim(false); toggleHints() }}
+              onStop={() => { setShowWindowsSim(false); setShowStopConfirm(true) }}
             />
           </div>
         </div>

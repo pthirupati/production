@@ -29,6 +29,9 @@ from .views import (
     VMwareSimDemoStateView,
     VMwareSimReleaseView,
     VMwareSimStateView,
+    WindowsSimActionView,
+    WindowsSimReleaseView,
+    WindowsSimStateView,
 )
 
 urlpatterns = [
@@ -75,4 +78,9 @@ urlpatterns = [
     path("aiml/sessions/<uuid:session_id>/", AimlSimStateView.as_view(), name="aiml-sim-state"),
     path("aiml/sessions/<uuid:session_id>/action/", AimlSimActionView.as_view(), name="aiml-sim-action"),
     path("aiml/sessions/<uuid:session_id>/release/", AimlSimReleaseView.as_view(), name="aiml-sim-release"),
+
+    # Windows Server simulation (Server Manager / AD / Windows Update GUI)
+    path("windows/sessions/<uuid:session_id>/", WindowsSimStateView.as_view(), name="windows-sim-state"),
+    path("windows/sessions/<uuid:session_id>/action/", WindowsSimActionView.as_view(), name="windows-sim-action"),
+    path("windows/sessions/<uuid:session_id>/release/", WindowsSimReleaseView.as_view(), name="windows-sim-release"),
 ]

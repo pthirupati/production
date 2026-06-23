@@ -1,0 +1,38 @@
+slug: win-gui-start-critical-service
+title: "Windows GUI: Restore a Stopped and Disabled Critical Service"
+technology: windows
+category: Services
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows-server
+infrastructure_type: docker
+time_limit: 900
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: |
+  Printing is down across the office. On this print server the Print Spooler
+  (Spooler) service is stopped, and worse, someone set its startup type to
+  Disabled, so it will not come back on its own and would not survive a reboot.
+  Using the Services console in the Windows Server simulator, set Print
+  Spooler's startup type back to Automatic and start the service so printing
+  is restored and stays fixed after a restart.
+initial_state: |
+  A domain-joined Windows Server 2022. In the Services console the Print
+  Spooler service shows Status = Stopped and Startup Type = Disabled. The
+  learner passes once Spooler is Running AND its startup type is Automatic.
+objectives:
+  - Open the Services console and find the Print Spooler service
+  - Change the startup type from Disabled to Automatic
+  - Start the Print Spooler service so printing is restored
+hints:
+  - order: 1
+    cost: 10
+    content: "A Disabled service cannot be started — fix the startup type before starting it."
+  - order: 2
+    cost: 15
+    content: "In Spooler's properties set Startup type to Automatic, then Apply."
+  - order: 3
+    cost: 20
+    content: "With startup set to Automatic, click Start so the service runs and survives a reboot."

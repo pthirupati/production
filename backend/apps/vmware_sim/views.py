@@ -28,6 +28,9 @@ from .datascience_engine import get_state as datascience_get_state
 from .aiml_engine import apply_action as aiml_apply_action
 from .aiml_engine import drop_session as aiml_drop_session
 from .aiml_engine import get_state as aiml_get_state
+from .windows_engine import apply_action as windows_apply_action
+from .windows_engine import drop_session as windows_drop_session
+from .windows_engine import get_state as windows_get_state
 
 
 def _demo_session_id(user) -> str:
@@ -448,4 +451,49 @@ class AimlSimReleaseView(APIView):
         if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
             return Response({"error": "Session not found"}, status=404)
         aiml_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ---------------------------------------------------------------------------
+# Windows Server views (Server Manager / AD / Windows Update GUI simulator)
+# ---------------------------------------------------------------------------
+
+class WindowsSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario", "scenario__technology").filter(
+            pk=session_id, user=request.user,
+        ).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(windows_get_state(session_id, slug))
+
+
+class WindowsSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        # Ensure the simulation session is initialized in the cache before applying any action
+        windows_get_state(session_id, slug)
+        result = windows_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": windows_get_state(session_id, slug)})
+
+
+class WindowsSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        windows_drop_session(session_id)
         return Response({"released": True})

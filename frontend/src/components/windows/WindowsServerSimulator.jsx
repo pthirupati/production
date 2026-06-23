@@ -1,0 +1,822 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  LayoutDashboard, Users, RefreshCw, Settings2, ArrowLeft, StopCircle,
+  Lightbulb, XCircle, CheckCircle2, AlertTriangle, Lock, Server,
+  ShieldCheck, Network, Globe, HardDrive, Cpu, ChevronRight, Plus,
+  Play, Square, RotateCw, Download, UserCog, FolderTree, Power,
+} from 'lucide-react'
+import { windowsApi } from '../../api/windows'
+
+/* ── Scoped, self-contained Windows Server chrome (no shared CSS). Windows
+   blue (#0078D4) accents on a light "Server Manager" surface, a dark taskbar,
+   and a flat Fluent-ish control set. ── */
+const SCOPED_CSS = `
+.win-sim {
+  --win-blue: #0078D4;
+  --win-blue-dark: #005a9e;
+  --win-bg: #f3f3f3;
+  --win-panel: #ffffff;
+  --win-border: #e1e1e1;
+  --win-border-2: #d0d0d0;
+  --win-text: #1b1b1b;
+  --win-muted: #616161;
+  --win-nav: #1f1f1f;
+  --win-nav-hover: #2d2d2d;
+  --win-green: #107c10;
+  --win-amber: #9d5d00;
+  --win-red: #c42b1c;
+  --win-taskbar: #1d2230;
+  color: var(--win-text);
+  font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--win-bg);
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.win-sim .win-titlebar {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  padding: 0.45rem 0.9rem; background: var(--win-blue); color: #fff;
+  position: sticky; top: 0; z-index: 20;
+}
+.win-sim .win-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 4px;
+  padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.5); background: rgba(255,255,255,.12); color: #fff;
+  transition: background 0.12s;
+}
+.win-sim .win-btn:hover { background: rgba(255,255,255,.24); }
+.win-sim .win-light-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 4px;
+  padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--win-border-2); background: #fafafa; color: var(--win-text);
+  transition: background 0.12s, border-color 0.12s;
+}
+.win-sim .win-light-btn:hover { background: #f0f0f0; border-color: var(--win-blue); }
+.win-sim .win-light-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.win-sim .win-primary {
+  border: none; background: var(--win-blue); color: #fff;
+}
+.win-sim .win-primary:hover { background: var(--win-blue-dark); }
+.win-sim .win-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+.win-sim .win-body { flex: 1; display: flex; min-height: 0; }
+.win-sim .win-nav {
+  width: 230px; background: var(--win-nav); color: #e6e6e6; flex-shrink: 0;
+  display: flex; flex-direction: column; padding-top: 0.5rem;
+}
+.win-sim .win-nav-item {
+  display: flex; align-items: center; gap: 0.65rem; padding: 0.7rem 1rem;
+  font-size: 0.85rem; cursor: pointer; border-left: 3px solid transparent; color: #d4d4d4;
+}
+.win-sim .win-nav-item:hover { background: var(--win-nav-hover); color: #fff; }
+.win-sim .win-nav-item.active {
+  background: var(--win-nav-hover); color: #fff; border-left-color: var(--win-blue);
+}
+.win-sim .win-content { flex: 1; overflow-y: auto; padding: 1.25rem 1.5rem; min-width: 0; }
+.win-sim .win-h1 { font-size: 1.35rem; font-weight: 600; color: #323130; margin-bottom: 0.15rem; }
+.win-sim .win-sub { font-size: 0.8rem; color: var(--win-muted); }
+.win-sim .win-card {
+  background: var(--win-panel); border: 1px solid var(--win-border); border-radius: 4px;
+}
+.win-sim .win-card-head {
+  padding: 0.7rem 1rem; border-bottom: 1px solid var(--win-border);
+  font-size: 0.9rem; font-weight: 600; color: #323130; display: flex; align-items: center; gap: 0.5rem;
+}
+.win-sim .win-tile {
+  background: var(--win-panel); border: 1px solid var(--win-border); border-radius: 4px;
+  padding: 0.9rem 1rem;
+}
+.win-sim .win-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.win-sim .win-table th {
+  text-align: left; color: var(--win-muted); font-weight: 600; padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--win-border); background: #fafafa; white-space: nowrap;
+}
+.win-sim .win-table td { padding: 0.55rem 0.85rem; border-bottom: 1px solid #f0f0f0; }
+.win-sim .win-table tr:hover td { background: #f7fbff; }
+.win-sim .win-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; font-weight: 700;
+  padding: 0.1rem 0.5rem; border-radius: 3px; letter-spacing: 0.01em; white-space: nowrap;
+}
+.win-sim .win-b-ok { background: rgba(16,124,16,.12); color: var(--win-green); }
+.win-sim .win-b-bad { background: rgba(196,43,28,.12); color: var(--win-red); }
+.win-sim .win-b-warn { background: rgba(157,93,0,.12); color: var(--win-amber); }
+.win-sim .win-b-info { background: rgba(0,120,212,.12); color: var(--win-blue); }
+.win-sim .win-b-muted { background: #ededed; color: var(--win-muted); }
+.win-sim .win-banner {
+  display: flex; align-items: flex-start; gap: 0.55rem; font-size: 0.82rem;
+  padding: 0.7rem 0.9rem; border-radius: 4px; margin-bottom: 1rem; line-height: 1.45;
+}
+.win-sim .win-banner-goal { background: #eef6fd; border: 1px solid #c7e0f4; color: #1b4f72; }
+.win-sim .win-banner-err { background: #fdf3f2; border: 1px solid #f1c7c2; color: #8a2018; }
+.win-sim .win-banner-ok { background: #f1f8f1; border: 1px solid #c8e6c8; color: #0b5c0b; }
+.win-sim .win-input {
+  background: #fff; border: 1px solid var(--win-border-2); border-radius: 4px;
+  padding: 0.5rem 0.65rem; color: var(--win-text); font-size: 0.85rem; outline: none; width: 100%;
+}
+.win-sim .win-input:focus { border-color: var(--win-blue); box-shadow: 0 0 0 1px var(--win-blue); }
+.win-sim .win-select {
+  background: #fff; border: 1px solid var(--win-border-2); border-radius: 4px;
+  padding: 0.45rem 0.55rem; color: var(--win-text); font-size: 0.82rem; outline: none;
+}
+.win-sim .win-taskbar {
+  height: 44px; background: var(--win-taskbar); display: flex; align-items: center;
+  gap: 0.5rem; padding: 0 0.6rem; flex-shrink: 0; border-top: 1px solid #0b0e16;
+}
+.win-sim .win-start {
+  width: 30px; height: 30px; border-radius: 4px; display: grid; place-items: center;
+  cursor: pointer; background: transparent;
+}
+.win-sim .win-start:hover { background: rgba(255,255,255,.1); }
+.win-sim .win-taskitem {
+  display: inline-flex; align-items: center; gap: 0.4rem; height: 32px; padding: 0 0.7rem;
+  border-radius: 4px; font-size: 0.78rem; color: #e6e6e6; cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.win-sim .win-taskitem.active { background: rgba(255,255,255,.12); border-bottom-color: var(--win-blue); }
+.win-sim .win-taskitem:hover { background: rgba(255,255,255,.08); }
+.win-sim .win-clock { margin-left: auto; color: #cfcfcf; font-size: 0.75rem; text-align: right; line-height: 1.1; padding-right: 0.4rem; }
+.win-sim .win-dialog-backdrop {
+  position: absolute; inset: 0; background: rgba(0,0,0,.35); display: grid; place-items: center; z-index: 40;
+}
+.win-sim .win-dialog {
+  background: #fff; border-radius: 6px; width: 440px; max-width: 92vw; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3); border: 1px solid var(--win-border);
+}
+.win-sim .win-dialog-head { background: var(--win-blue); color: #fff; padding: 0.7rem 1rem; font-weight: 600; font-size: 0.9rem; }
+.win-sim .win-dialog-body { padding: 1.1rem; }
+.win-sim .win-dialog-foot { padding: 0.8rem 1.1rem; border-top: 1px solid var(--win-border); display: flex; justify-content: flex-end; gap: 0.5rem; background: #fafafa; }
+/* ── login / lock screen ── */
+.win-sim .win-lock {
+  position: absolute; inset: 0; z-index: 50;
+  background: linear-gradient(135deg, #0a2342 0%, #0078D4 60%, #1b4f8a 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff;
+}
+.win-sim .win-avatar {
+  width: 96px; height: 96px; border-radius: 50%; background: rgba(255,255,255,.16);
+  display: grid; place-items: center; margin-bottom: 1rem; border: 2px solid rgba(255,255,255,.3);
+}
+.win-sim .win-event { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.78rem; padding: 0.35rem 0; }
+`
+
+function Badge({ kind, children }) {
+  const cls = { ok: 'win-b-ok', bad: 'win-b-bad', warn: 'win-b-warn', info: 'win-b-info', muted: 'win-b-muted' }[kind] || 'win-b-muted'
+  return <span className={`win-badge ${cls}`}>{children}</span>
+}
+
+/* ── Login / lock gate — Windows-style sign-in screen ── */
+function LockScreen({ locked, currentUser, onSignIn, signing }) {
+  return (
+    <div className="win-lock">
+      <div className="win-avatar"><UserCog size={42} /></div>
+      <div className="text-lg font-semibold mb-0.5">{currentUser || 'CORP\\Administrator'}</div>
+      <div className="text-sm opacity-80 mb-5">{locked ? 'This workstation is locked' : 'Windows Server 2022'}</div>
+      <button
+        className="win-btn !bg-white !text-[#0078D4] !border-white px-6 py-2 text-sm"
+        onClick={onSignIn}
+        disabled={signing}
+      >
+        {signing ? <RefreshCw size={14} className="animate-spin" /> : <ChevronRight size={15} />}
+        {locked ? 'Unlock' : 'Sign in'}
+      </button>
+      <div className="text-[11px] opacity-60 mt-8 flex items-center gap-1.5">
+        <Lock size={12} /> Press Sign in to administer this server
+      </div>
+    </div>
+  )
+}
+
+/* ── Server Manager dashboard ── */
+function ServerManager({ state, busy, onAction }) {
+  const roles = state.roles || []
+  const domain = state.domain || {}
+  const summary = state.summary || {}
+  const installable = roles.filter(r => !r.installed)
+  const [wizardRole, setWizardRole] = useState(null)
+
+  return (
+    <div>
+      <div className="win-h1">Server Manager · Dashboard</div>
+      <div className="win-sub mb-4">Local Server · {state.computer_name} · {state.os}</div>
+
+      {/* Local server properties tile */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <div className="win-tile">
+          <div className="font-semibold text-sm mb-2 flex items-center gap-1.5"><Server size={14} className="text-[#0078D4]" /> Local server</div>
+          <dl className="text-[0.8rem] grid grid-cols-[120px_1fr] gap-y-1.5">
+            <dt className="text-[#616161]">Computer name</dt><dd className="font-medium">{state.computer_name}</dd>
+            <dt className="text-[#616161]">Domain</dt>
+            <dd className="font-medium flex items-center gap-1.5">
+              {domain.joined ? domain.name : 'WORKGROUP'}
+              {domain.joined ? <Badge kind="ok">Joined</Badge> : <Badge kind="warn">Workgroup</Badge>}
+            </dd>
+            <dt className="text-[#616161]">Operating system</dt><dd className="font-medium">{state.os}</dd>
+            <dt className="text-[#616161]">Domain controllers</dt><dd className="font-medium">{(domain.dcs || []).join(', ') || '—'}</dd>
+          </dl>
+        </div>
+        <div className="win-tile">
+          <div className="font-semibold text-sm mb-2 flex items-center gap-1.5"><ShieldCheck size={14} className="text-[#0078D4]" /> Readiness</div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              ['Roles installed', `${summary.roles_installed ?? 0}/${summary.roles_total ?? 0}`, 'info', Cpu],
+              ['AD users', summary.ad_users ?? 0, 'info', Users],
+              ['Updates pending', summary.updates_pending ?? 0, (summary.updates_pending ? 'warn' : 'ok'), Download],
+              ['Services stopped', summary.services_stopped ?? 0, (summary.services_stopped ? 'bad' : 'ok'), Settings2],
+            ].map(([label, val, kind, Icon]) => (
+              <div key={label} className="flex items-center gap-2">
+                <Icon size={16} className="text-[#616161]" />
+                <div>
+                  <div className="text-base font-semibold leading-none">{val}</div>
+                  <div className="text-[11px] text-[#616161] mt-0.5">{label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Roles and features */}
+      <div className="win-card">
+        <div className="win-card-head justify-between">
+          <span className="flex items-center gap-2"><LayoutDashboard size={15} className="text-[#0078D4]" /> Roles and Features</span>
+          <button className="win-light-btn" onClick={() => setWizardRole(installable[0]?.id || '')} disabled={!installable.length}>
+            <Plus size={13} /> Add Roles and Features
+          </button>
+        </div>
+        <table className="win-table">
+          <thead><tr><th>Role / Feature</th><th>Type</th><th>Status</th><th className="text-right">Action</th></tr></thead>
+          <tbody>
+            {roles.map(r => (
+              <tr key={r.id}>
+                <td>
+                  <div className="font-medium">{r.name}</div>
+                  {r.description && <div className="text-[11px] text-[#616161]">{r.description}</div>}
+                </td>
+                <td><span className="capitalize text-[#616161]">{r.category}</span></td>
+                <td>{r.installed ? <Badge kind="ok"><CheckCircle2 size={11} /> Installed</Badge> : <Badge kind="muted">Available</Badge>}</td>
+                <td className="text-right">
+                  {r.installed ? (
+                    <div className="inline-flex gap-1.5">
+                      {(r.id === 'DNS' || r.id === 'DHCP') && (
+                        <button className="win-light-btn" disabled={busy}
+                          onClick={() => onAction(r.id === 'DNS' ? 'configure_dns' : 'configure_dhcp', {})}>
+                          <Settings2 size={12} /> Configure
+                        </button>
+                      )}
+                      <button className="win-light-btn" disabled={busy} onClick={() => onAction('uninstall_role', { role: r.id })}>Remove</button>
+                    </div>
+                  ) : (
+                    <button className="win-light-btn win-primary !text-white" disabled={busy} onClick={() => setWizardRole(r.id)}>
+                      <Plus size={12} /> Install
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Add Roles and Features wizard */}
+      {wizardRole !== null && (
+        <div className="win-dialog-backdrop" onClick={() => setWizardRole(null)}>
+          <div className="win-dialog" onClick={e => e.stopPropagation()}>
+            <div className="win-dialog-head">Add Roles and Features Wizard</div>
+            <div className="win-dialog-body">
+              <p className="text-[0.82rem] text-[#616161] mb-3">Select a server role to install on <b>{state.computer_name}</b>.</p>
+              <select className="win-select w-full" value={wizardRole} onChange={e => setWizardRole(e.target.value)}>
+                {installable.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+              {(() => {
+                const r = roles.find(x => x.id === wizardRole)
+                return r?.description ? <p className="text-[0.78rem] text-[#616161] mt-3">{r.description}</p> : null
+              })()}
+            </div>
+            <div className="win-dialog-foot">
+              <button className="win-light-btn" onClick={() => setWizardRole(null)}>Cancel</button>
+              <button className="win-light-btn win-primary !text-white" disabled={busy || !wizardRole}
+                onClick={async () => { await onAction('install_role', { role: wizardRole }); setWizardRole(null) }}>
+                Install
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Active Directory Users and Computers ── */
+function ActiveDirectory({ state, busy, onAction }) {
+  const ad = state.ad || {}
+  const ous = ad.ous || []
+  const users = ad.users || []
+  const groups = ad.groups || []
+  const [selectedOu, setSelectedOu] = useState('Users')
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [groupDialog, setGroupDialog] = useState(null) // { user }
+
+  const ouUsers = users.filter(u => (u.ou || 'Users') === selectedOu)
+  const active = users.find(u => u.name === selectedUser) || ouUsers[0] || users[0] || null
+
+  return (
+    <div>
+      <div className="win-h1">Active Directory Users and Computers</div>
+      <div className="win-sub mb-4">{(state.domain || {}).name || 'WORKGROUP'}</div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[230px_1fr_280px] gap-3">
+        {/* OU tree */}
+        <div className="win-card overflow-hidden">
+          <div className="win-card-head"><FolderTree size={14} className="text-[#0078D4]" /> Console tree</div>
+          <div className="p-1">
+            {ous.map(ou => (
+              <button key={ou}
+                onClick={() => { setSelectedOu(ou); setSelectedUser(null) }}
+                className={`w-full text-left px-3 py-2 rounded text-[0.82rem] flex items-center gap-2 ${ou === selectedOu ? 'bg-[#eef6fd] text-[#0a2342] font-medium' : 'hover:bg-[#f5f5f5]'}`}>
+                <Users size={13} className="text-[#616161]" /> {ou}
+                <span className="ml-auto text-[11px] text-[#999]">{users.filter(u => (u.ou || 'Users') === ou).length}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Users list */}
+        <div className="win-card overflow-hidden">
+          <div className="win-card-head">{selectedOu}</div>
+          <table className="win-table">
+            <thead><tr><th>Name</th><th>Status</th><th>Primary group</th></tr></thead>
+            <tbody>
+              {ouUsers.length === 0 ? (
+                <tr><td colSpan={3} className="text-center text-[#616161] py-5">No objects in this container.</td></tr>
+              ) : ouUsers.map(u => (
+                <tr key={u.name} onClick={() => setSelectedUser(u.name)} style={{ cursor: 'pointer', background: u.name === active?.name ? '#f7fbff' : undefined }}>
+                  <td>
+                    <div className="font-medium">{u.display}</div>
+                    <div className="text-[11px] text-[#616161]">{u.name}</div>
+                  </td>
+                  <td className="space-x-1">
+                    {u.locked && <Badge kind="bad"><Lock size={10} /> Locked</Badge>}
+                    {!u.enabled && <Badge kind="warn">Disabled</Badge>}
+                    {u.enabled && !u.locked && <Badge kind="ok">Enabled</Badge>}
+                  </td>
+                  <td className="text-[#616161]">{u.group}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Properties / actions for the selected user */}
+        <div className="win-card overflow-hidden">
+          <div className="win-card-head"><UserCog size={14} className="text-[#0078D4]" /> Properties</div>
+          {!active ? (
+            <div className="p-4 text-[0.82rem] text-[#616161]">Select a user.</div>
+          ) : (
+            <div className="p-3.5 space-y-3">
+              <div>
+                <div className="font-semibold text-sm">{active.display}</div>
+                <div className="text-[11px] text-[#616161]">{(state.domain || {}).netbios || 'CORP'}\\{active.name}</div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {active.locked && <Badge kind="bad"><Lock size={10} /> Locked out</Badge>}
+                <Badge kind={active.enabled ? 'ok' : 'warn'}>{active.enabled ? 'Account enabled' : 'Account disabled'}</Badge>
+              </div>
+              <div>
+                <div className="text-[11px] text-[#616161] mb-1">Member of</div>
+                <div className="flex flex-wrap gap-1">
+                  {(active.groups || []).map(g => <Badge key={g} kind="info">{g}</Badge>)}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                {active.locked && (
+                  <button className="win-light-btn justify-center" disabled={busy} onClick={() => onAction('unlock_ad_user', { user: active.name })}>
+                    <Lock size={12} /> Unlock account
+                  </button>
+                )}
+                {!active.enabled ? (
+                  <button className="win-light-btn justify-center" disabled={busy} onClick={() => onAction('enable_ad_user', { user: active.name })}>
+                    <CheckCircle2 size={12} /> Enable account
+                  </button>
+                ) : (
+                  <button className="win-light-btn justify-center" disabled={busy} onClick={() => onAction('disable_ad_user', { user: active.name })}>
+                    <Square size={12} /> Disable account
+                  </button>
+                )}
+                <button className="win-light-btn justify-center" disabled={busy} onClick={() => onAction('reset_password', { user: active.name })}>
+                  <RotateCw size={12} /> Reset password
+                </button>
+                <button className="win-light-btn justify-center" disabled={busy} onClick={() => setGroupDialog({ user: active.name })}>
+                  <Plus size={12} /> Add to group
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Add to group dialog */}
+      {groupDialog && (
+        <AddToGroupDialog
+          userName={groupDialog.user}
+          groups={groups}
+          currentGroups={(users.find(u => u.name === groupDialog.user)?.groups) || []}
+          busy={busy}
+          onCancel={() => setGroupDialog(null)}
+          onAdd={async (group) => { await onAction('add_user_to_group', { user: groupDialog.user, group }); setGroupDialog(null) }}
+          onRemove={(group) => onAction('remove_user_from_group', { user: groupDialog.user, group })}
+        />
+      )}
+    </div>
+  )
+}
+
+function AddToGroupDialog({ userName, groups, currentGroups, busy, onCancel, onAdd, onRemove }) {
+  const memberSet = new Set((currentGroups || []).map(g => g.toLowerCase()))
+  const available = groups.filter(g => !memberSet.has(g.name.toLowerCase()))
+  const [group, setGroup] = useState(available[0]?.name || '')
+  return (
+    <div className="win-dialog-backdrop" onClick={onCancel}>
+      <div className="win-dialog" onClick={e => e.stopPropagation()}>
+        <div className="win-dialog-head">Member Of — {userName}</div>
+        <div className="win-dialog-body space-y-3">
+          <div>
+            <div className="text-[11px] text-[#616161] mb-1">Current membership</div>
+            <div className="flex flex-wrap gap-1">
+              {(currentGroups || []).map(g => (
+                <span key={g} className="win-badge win-b-info flex items-center gap-1">
+                  {g}
+                  <button title="Remove" className="hover:text-[#c42b1c]" disabled={busy} onClick={() => onRemove(g)}>×</button>
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] text-[#616161] mb-1">Add to group</div>
+            {available.length === 0 ? (
+              <p className="text-[0.8rem] text-[#616161]">Already a member of every group.</p>
+            ) : (
+              <select className="win-select w-full" value={group} onChange={e => setGroup(e.target.value)}>
+                {available.map(g => <option key={g.name} value={g.name}>{g.name} — {g.description}</option>)}
+              </select>
+            )}
+          </div>
+        </div>
+        <div className="win-dialog-foot">
+          <button className="win-light-btn" onClick={onCancel}>Close</button>
+          <button className="win-light-btn win-primary !text-white" disabled={busy || !group || !available.length} onClick={() => onAdd(group)}>Add</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Windows Update ── */
+function WindowsUpdate({ state, busy, onAction }) {
+  const updates = state.updates || []
+  const pending = updates.filter(u => u.status !== 'installed')
+  return (
+    <div>
+      <div className="win-h1">Windows Update</div>
+      <div className="win-sub mb-4">
+        {pending.length === 0 ? 'You\'re up to date' : `${pending.length} update${pending.length !== 1 ? 's' : ''} need attention`}
+      </div>
+
+      <div className="flex gap-2 mb-4">
+        <button className="win-light-btn" disabled={busy} onClick={() => onAction('check_updates', {})}>
+          <RefreshCw size={13} /> Check for updates
+        </button>
+        {pending.length > 0 && (
+          <button className="win-light-btn win-primary !text-white" disabled={busy} onClick={() => onAction('install_update', {})}>
+            <Download size={13} /> Install all
+          </button>
+        )}
+      </div>
+
+      <div className="win-card overflow-hidden">
+        <table className="win-table">
+          <thead><tr><th>Update</th><th>Severity</th><th>Status</th><th className="text-right">Action</th></tr></thead>
+          <tbody>
+            {updates.map(u => {
+              const failed = u.status === 'failed'
+              return (
+                <tr key={u.kb}>
+                  <td>
+                    <div className="font-medium">{u.title}</div>
+                    <div className="text-[11px] text-[#616161]">
+                      {u.kb}{u.reboot_required ? ' · restart required' : ''}{failed && u.error_code ? ` · error ${u.error_code}` : ''}
+                    </div>
+                  </td>
+                  <td><Badge kind={u.severity === 'Critical' ? 'bad' : 'warn'}>{u.severity}</Badge></td>
+                  <td>
+                    {u.status === 'installed' ? <Badge kind="ok"><CheckCircle2 size={11} /> Installed</Badge>
+                      : failed ? <Badge kind="bad"><AlertTriangle size={11} /> Failed</Badge>
+                      : <Badge kind="warn">{u.status}</Badge>}
+                  </td>
+                  <td className="text-right">
+                    {u.status === 'installed' ? <span className="text-[#616161] text-[0.78rem]">—</span> : (
+                      <button className="win-light-btn win-primary !text-white" disabled={busy}
+                        onClick={() => onAction(failed ? 'retry_update' : 'install_update', { kb: u.kb })}>
+                        {failed ? <><RotateCw size={12} /> Retry</> : <><Download size={12} /> Install</>}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+/* ── Services console ── */
+function ServicesConsole({ state, busy, onAction }) {
+  const services = state.services || []
+  const STARTUPS = ['automatic', 'automatic-delayed', 'manual', 'disabled']
+  return (
+    <div>
+      <div className="win-h1">Services</div>
+      <div className="win-sub mb-4">Local services on {state.computer_name}</div>
+
+      <div className="win-card overflow-hidden">
+        <table className="win-table">
+          <thead><tr><th>Name</th><th>Status</th><th>Startup type</th><th className="text-right">Actions</th></tr></thead>
+          <tbody>
+            {services.map(s => {
+              const running = s.status === 'running'
+              return (
+                <tr key={s.name}>
+                  <td>
+                    <div className="font-medium">{s.display}</div>
+                    <div className="text-[11px] text-[#616161]">{s.name}</div>
+                  </td>
+                  <td>{running ? <Badge kind="ok"><Play size={10} /> Running</Badge> : <Badge kind="bad"><Square size={10} /> Stopped</Badge>}</td>
+                  <td>
+                    <select className="win-select capitalize" value={s.startup} disabled={busy}
+                      onChange={e => onAction('set_startup', { service: s.name, startup: e.target.value })}>
+                      {STARTUPS.map(st => <option key={st} value={st}>{st === 'automatic-delayed' ? 'Automatic (Delayed)' : st.charAt(0).toUpperCase() + st.slice(1)}</option>)}
+                    </select>
+                  </td>
+                  <td className="text-right space-x-1.5 whitespace-nowrap">
+                    {running ? (
+                      <>
+                        <button className="win-light-btn" disabled={busy} onClick={() => onAction('stop_service', { service: s.name })}><Square size={12} /> Stop</button>
+                        <button className="win-light-btn" disabled={busy} onClick={() => onAction('restart_service', { service: s.name })}><RotateCw size={12} /> Restart</button>
+                      </>
+                    ) : (
+                      <button className="win-light-btn win-primary !text-white" disabled={busy} onClick={() => onAction('start_service', { service: s.name })}><Play size={12} /> Start</button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+const NAV = [
+  { key: 'dashboard', label: 'Server Manager', icon: LayoutDashboard },
+  { key: 'ad', label: 'Active Directory', icon: Users },
+  { key: 'update', label: 'Windows Update', icon: Download },
+  { key: 'services', label: 'Services', icon: Settings2 },
+  { key: 'system', label: 'System (Domain)', icon: Globe },
+]
+
+/* ── System Properties (domain join) panel ── */
+function SystemPanel({ state, busy, onAction }) {
+  const domain = state.domain || {}
+  const [target, setTarget] = useState(domain.name || 'corp.fixitlab.local')
+  return (
+    <div>
+      <div className="win-h1">System Properties · Computer Name / Domain</div>
+      <div className="win-sub mb-4">Membership for {state.computer_name}</div>
+      <div className="win-card max-w-xl">
+        <div className="win-card-head"><Network size={14} className="text-[#0078D4]" /> Domain membership</div>
+        <div className="p-4 space-y-3">
+          <div className="flex items-center gap-2 text-[0.85rem]">
+            <span className="text-[#616161] w-32">Current membership</span>
+            {domain.joined
+              ? <span className="font-medium flex items-center gap-1.5">{domain.name} <Badge kind="ok">Domain</Badge></span>
+              : <span className="font-medium flex items-center gap-1.5">WORKGROUP <Badge kind="warn">Workgroup</Badge></span>}
+          </div>
+          {!domain.joined ? (
+            <>
+              <div>
+                <label className="text-[11px] text-[#616161] block mb-1">Domain to join</label>
+                <input className="win-input" value={target} spellCheck={false} onChange={e => setTarget(e.target.value)} />
+              </div>
+              <button className="win-light-btn win-primary !text-white" disabled={busy || !target.trim()}
+                onClick={() => onAction('join_domain', { domain: target.trim() })}>
+                <Globe size={13} /> Join domain
+              </button>
+              <p className="text-[0.78rem] text-[#616161]">Joining the domain registers this server with a domain controller and starts the Netlogon service.</p>
+            </>
+          ) : (
+            <button className="win-light-btn" disabled={busy} onClick={() => onAction('leave_domain', {})}>
+              <Power size={13} /> Leave domain (join WORKGROUP)
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Windows Server GUI simulator. Rendered INLINE by LabRunner for Windows Server
+ * GUI labs (simulation_type 'windows-server') — no new route. The learner
+ * administers a Windows Server 2022 world through Server Manager, Active
+ * Directory Users and Computers, Windows Update, and the Services console to
+ * fix the broken state, then runs Check Solution (graded by validate_windows_lab
+ * via the engine — never auto-passes).
+ */
+export default function WindowsServerSimulator({ sessionId, scenario, onExit, onStop, onHints }) {
+  const slug = scenario?.slug || ''
+  const [state, setState] = useState(null)
+  const [error, setError] = useState('')
+  const [signedIn, setSignedIn] = useState(false)
+  const [signing, setSigning] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [view, setView] = useState('dashboard')
+  const [flash, setFlash] = useState(null) // { kind, message }
+  const [now, setNow] = useState(new Date())
+  const pollRef = useRef(null)
+
+  const load = useCallback(async () => {
+    try {
+      const data = await windowsApi.getState(sessionId, slug)
+      setState(data)
+      setError('')
+      // Reflect the engine's own session/lock flags into the gate the first time.
+      if (data?.session?.logged_in) setSignedIn(true)
+    } catch {
+      setError('Could not load the Windows Server simulator')
+    }
+  }, [sessionId, slug])
+
+  useEffect(() => {
+    load()
+    pollRef.current = setInterval(load, 20000)
+    return () => clearInterval(pollRef.current)
+  }, [load])
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000)
+    return () => clearInterval(id)
+  }, [])
+
+  // Auto-dismiss the flash toast.
+  useEffect(() => {
+    if (!flash) return
+    const id = setTimeout(() => setFlash(null), 4000)
+    return () => clearTimeout(id)
+  }, [flash])
+
+  const signIn = useCallback(async () => {
+    setSigning(true)
+    try {
+      await windowsApi.action(sessionId, 'login', {})
+      setSignedIn(true)
+      load()
+    } finally {
+      setSigning(false)
+    }
+  }, [sessionId, load])
+
+  // Every GUI verb routes through here: apply the action, surface its message,
+  // and refresh from the returned `state` (or re-fetch) so the UI is live.
+  const runAction = useCallback(async (action, payload) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const res = await windowsApi.action(sessionId, action, payload)
+      if (res?.ok === false) {
+        setFlash({ kind: 'err', message: res.error || res.message || 'Action failed' })
+      } else {
+        setFlash({ kind: 'ok', message: res?.message || 'Done' })
+      }
+      // The action endpoint echoes the fresh state — use it when present.
+      if (res?.state) setState(res.state)
+      else load()
+    } catch {
+      setFlash({ kind: 'err', message: 'Action failed — try again' })
+    } finally {
+      setBusy(false)
+    }
+  }, [busy, sessionId, load])
+
+  const goal = state?.goal || {}
+  const locked = state?.session?.locked
+  const currentUser = state?.session?.current_user
+
+  const clock = useMemo(() => ({
+    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    date: now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
+  }), [now])
+
+  return (
+    <div className="win-sim min-h-screen relative">
+      <style>{SCOPED_CSS}</style>
+
+      {/* Title bar — lab chrome lives here (hints / stop / back to lab). */}
+      <div className="win-titlebar">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Server size={17} />
+          <span className="font-semibold text-sm">Windows Server 2022</span>
+          <span className="text-[11px] opacity-80 hidden sm:inline truncate">{scenario?.title || slug}</span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <button className="win-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
+          <button className="win-btn" onClick={() => runAction('reset', {})} disabled={busy}><RotateCw size={13} /> Reset</button>
+          {onHints && <button className="win-btn" onClick={onHints}><Lightbulb size={13} /> Hints</button>}
+          {onStop && <button className="win-btn" onClick={onStop}><StopCircle size={13} /> Stop</button>}
+          {onExit && <button className="win-btn" onClick={onExit}><ArrowLeft size={13} /> Back to lab</button>}
+        </div>
+      </div>
+
+      {/* Desktop: nav + content + taskbar */}
+      <div className="win-body">
+        <div className="win-nav">
+          {NAV.map(({ key, label, icon: Icon }) => (
+            <button key={key} className={`win-nav-item ${view === key ? 'active' : ''}`} onClick={() => setView(key)}>
+              <Icon size={16} /> {label}
+            </button>
+          ))}
+          <div className="mt-auto px-4 py-3 text-[11px] text-[#9a9a9a] border-t border-[#2d2d2d]">
+            <div className="flex items-center gap-1.5"><HardDrive size={12} /> {state?.computer_name || 'WIN-SRV'}</div>
+            <div className="mt-1 truncate">{currentUser || 'CORP\\Administrator'}</div>
+          </div>
+        </div>
+
+        <div className="win-content">
+          {error && <div className="win-banner win-banner-err"><XCircle size={15} className="shrink-0 mt-0.5" /> {error}</div>}
+
+          {/* Objective banner */}
+          {(goal.objective || goal.title) && (
+            <div className="win-banner win-banner-goal">
+              <AlertTriangle size={15} className="shrink-0 mt-0.5 text-[#0078D4]" />
+              <span><b>{goal.title || 'Objective'}:</b> {goal.objective}</span>
+            </div>
+          )}
+
+          {/* Flash result toast */}
+          {flash && (
+            <div className={`win-banner ${flash.kind === 'err' ? 'win-banner-err' : 'win-banner-ok'}`}>
+              {flash.kind === 'err' ? <XCircle size={15} className="shrink-0 mt-0.5" /> : <CheckCircle2 size={15} className="shrink-0 mt-0.5" />}
+              <span>{flash.message}</span>
+            </div>
+          )}
+
+          {!state ? (
+            <div className="text-center text-[#616161] py-20">Loading Windows Server…</div>
+          ) : (
+            <>
+              {view === 'dashboard' && <ServerManager state={state} busy={busy} onAction={runAction} />}
+              {view === 'ad' && <ActiveDirectory state={state} busy={busy} onAction={runAction} />}
+              {view === 'update' && <WindowsUpdate state={state} busy={busy} onAction={runAction} />}
+              {view === 'services' && <ServicesConsole state={state} busy={busy} onAction={runAction} />}
+              {view === 'system' && <SystemPanel state={state} busy={busy} onAction={runAction} />}
+
+              {/* Recent events */}
+              {(state.events || []).length > 0 && (
+                <div className="win-card mt-4">
+                  <div className="win-card-head">Recent activity</div>
+                  <div className="px-4 py-2 max-h-40 overflow-y-auto">
+                    {(state.events || []).slice(0, 8).map((ev, i) => (
+                      <div key={i} className="win-event border-b border-[#f3f3f3] last:border-0">
+                        <CheckCircle2 size={13} className="text-[#107c10] mt-0.5 shrink-0" />
+                        <span className="flex-1">{ev.message}</span>
+                        <span className="text-[#999] text-[11px] shrink-0">{(ev.time || '').replace('T', ' ').replace('Z', '')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Taskbar */}
+      <div className="win-taskbar">
+        <div className="win-start" title="Start"><Server size={17} className="text-[#0078D4]" /></div>
+        {NAV.slice(0, 4).map(({ key, label, icon: Icon }) => (
+          <button key={key} className={`win-taskitem ${view === key ? 'active' : ''}`} onClick={() => setView(key)} title={label}>
+            <Icon size={14} /> <span className="hidden md:inline">{label}</span>
+          </button>
+        ))}
+        <div className="win-clock">
+          <div>{clock.time}</div>
+          <div>{clock.date}</div>
+        </div>
+      </div>
+
+      {/* Login / lock gate — sits above everything until the admin signs in. */}
+      {(!signedIn || locked) && (
+        <LockScreen locked={locked} currentUser={currentUser} onSignIn={signIn} signing={signing} />
+      )}
+    </div>
+  )
+}

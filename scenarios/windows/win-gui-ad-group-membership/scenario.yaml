@@ -1,0 +1,38 @@
+slug: win-gui-ad-group-membership
+title: "Windows GUI: Grant RDP Access via Security Group Membership"
+technology: windows
+category: Active Directory
+difficulty: easy
+lab_mode: simulation
+simulation_type: windows-server
+infrastructure_type: docker
+time_limit: 600
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: |
+  Access request: John Smith (jsmith) needs to connect to this server over
+  Remote Desktop, but his login is refused with "you must be granted the Allow
+  log on through Remote Desktop Services right". The correct, least-privilege
+  fix is to add him to the built-in Remote Desktop Users security group rather
+  than to Administrators. Using Active Directory Users and Computers in the
+  Windows Server simulator, add jsmith to the Remote Desktop Users group.
+initial_state: |
+  A domain-joined Windows Server 2022. The user jsmith is a member of Domain
+  Users only and is NOT in Remote Desktop Users, so RDP logon is denied. The
+  learner passes once jsmith is a member of Remote Desktop Users.
+objectives:
+  - Open Active Directory Users and Computers and review jsmith's group membership
+  - Identify the correct group that grants Remote Desktop logon rights
+  - Add jsmith to the Remote Desktop Users security group
+hints:
+  - order: 1
+    cost: 10
+    content: "RDP logon is governed by the built-in Remote Desktop Users group, not Administrators."
+  - order: 2
+    cost: 15
+    content: "Open jsmith's properties, go to Member Of, and add a group."
+  - order: 3
+    cost: 20
+    content: "Add jsmith to Remote Desktop Users to grant least-privilege RDP access."
