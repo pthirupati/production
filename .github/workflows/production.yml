@@ -669,6 +669,8 @@ jobs:
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
               python manage.py seed_certifications || true
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
+              python manage.py seed_tutorials || true
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
               python manage.py seed_interview_data || true
             docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend \
               python /scripts/migrate_jira_to_simulation.py || true

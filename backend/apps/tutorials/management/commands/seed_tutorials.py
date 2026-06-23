@@ -732,8 +732,23 @@ class Command(BaseCommand):
 
         created = 0
         updated = 0
-        for spec in TUTORIALS:
-            sections = spec.pop("sections")
+        # Built-in tutorials plus any original tutorials authored as data in
+        # data/tutorials_extra.json (sections may be 5-item lists or tuples).
+        specs = [dict(s) for s in TUTORIALS]
+        import json
+        import os
+        extra_path = os.path.join(os.path.dirname(__file__), "data", "tutorials_extra.json")
+        if os.path.exists(extra_path):
+            try:
+                with open(extra_path, encoding="utf-8") as fh:
+                    extra = json.load(fh)
+                if isinstance(extra, list):
+                    specs.extend(extra)
+                    self.stdout.write(f"  + loaded {len(extra)} tutorials from tutorials_extra.json")
+            except Exception as exc:
+                self.stderr.write(f"  ! could not load tutorials_extra.json: {exc}")
+        for spec in specs:
+            sections = spec.pop("sections", [])
             obj, was_created = Tutorial.objects.update_or_create(
                 slug=spec["slug"],
                 defaults=spec,
