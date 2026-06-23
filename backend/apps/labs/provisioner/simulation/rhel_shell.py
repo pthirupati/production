@@ -1223,6 +1223,9 @@ class RHELShell:
                 return f"Last metadata expiration check: 0:00:01 ago\n{msg}\nDependencies resolved.\nNothing to do.\nComplete!"
             for n in todo:
                 db[n] = self._rpm_nvra(n)
+                # Installing a package registers the systemd unit(s) it ships so
+                # a follow-up `systemctl start/enable/status <svc>` works.
+                self.state.register_package_service(n)
             rows = "\n".join(f" {n}    x86_64    {self._pkg_ver(n)}    rhel-9-appstream" for n in todo)
             return (f"Last metadata expiration check: 0:00:01 ago\nDependencies resolved.\nInstalling:\n{rows}\n"
                     f"Transaction Summary\nInstall  {len(todo)} Package(s)\n"
@@ -1260,6 +1263,7 @@ class RHELShell:
                 name = name[:-4]
             name = name.split("-")[0] or "package"
             db.setdefault(name, self._rpm_nvra(name))
+            self.state.register_package_service(name)
             return f"Preparing...\n   1:{name}\nComplete!"
         if "-e" in p or "--erase" in p:
             names = [a for a in p[1:] if not a.startswith("-")]
@@ -2309,6 +2313,10 @@ class RHELShell:
         return f"ping: {host}: Name or service not known"
 
     def _cmd_reboot(self, p: list[str]) -> str:
+        # Restart the uptime clock. The unified engine resets boot_time again in
+        # _reboot_from_shell after running the boot sequence; doing it here too
+        # keeps the bare-shell (no-engine) path correct and is idempotent.
+        self.state.boot_time = time.time()
         return "__REBOOT__"
 
     def _cmd_shutdown(self, p: list[str]) -> str:

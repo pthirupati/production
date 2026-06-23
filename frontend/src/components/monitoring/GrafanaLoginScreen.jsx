@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { User, Lock, LogIn, Loader2, AlertCircle } from 'lucide-react'
 import { setMonitoringAuthenticated } from './MonitoringLoginGate'
+import MonitoringLabChrome from './MonitoringLabChrome'
 import '../../styles/monitoring-sim.css'
 
 const ACCENT = '#f7913b'
@@ -39,9 +40,11 @@ function GrafanaOrb({ size = 52 }) {
  * gradient. On a successful sign-in it marks the shared monitoring session as
  * authenticated and invokes the supplied callback.
  *
- * Props: { onAuthenticated }
+ * Props: { onAuthenticated, scenario, onExit, onStop, onHints }
+ * The lab chrome handlers are forwarded from MonitoringSimulator so Hints /
+ * Stop / Back to lab stay reachable even before the learner signs in.
  */
-export default function GrafanaLoginScreen({ onAuthenticated }) {
+export default function GrafanaLoginScreen({ onAuthenticated, scenario, onExit, onStop, onHints }) {
   const [user, setUser] = useState('')
   const [pass, setPass] = useState('')
   const [error, setError] = useState('')
@@ -67,15 +70,27 @@ export default function GrafanaLoginScreen({ onAuthenticated }) {
 
   return (
     <div
-      className="mon-sim min-h-screen flex items-center justify-center p-6 relative overflow-hidden"
+      className="mon-sim mon-shell min-h-screen flex flex-col relative overflow-hidden"
       style={{ background: 'radial-gradient(1100px 620px at 50% -10%, #1c1322 0%, #0b0c1e 55%, #07080f 100%)' }}
     >
+      {/* Lab chrome — keeps Hints / Stop / Back to lab reachable before sign-in. */}
+      <MonitoringLabChrome
+        product="Grafana"
+        accent={ACCENT}
+        subtitle={scenario?.title || scenario?.slug || ''}
+        onExit={onExit}
+        onStop={onStop}
+        onHints={onHints}
+      />
+
       {/* ambient accent glow */}
       <div
         aria-hidden="true"
         className="absolute inset-0 pointer-events-none"
         style={{ background: `radial-gradient(720px 420px at 50% 14%, ${ACCENT}24, transparent 65%)` }}
       />
+
+      <div className="flex-1 flex items-center justify-center p-6 relative">
 
       <div className="relative w-full max-w-[380px]">
         {/* brand mark + wordmark */}
@@ -166,6 +181,7 @@ export default function GrafanaLoginScreen({ onAuthenticated }) {
           {' / '}
           <span className="mon-code !inline !px-1.5 !py-0.5">lab_grafana@123</span>
         </p>
+      </div>
       </div>
     </div>
   )

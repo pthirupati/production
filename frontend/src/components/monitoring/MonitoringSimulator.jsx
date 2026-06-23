@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Activity, Database, Bell, Gauge, Search, Server, GitBranch, Radio,
-  AlertTriangle, CheckCircle2, XCircle, RefreshCw, Play, BellOff, Layers,
-  Compass, Settings, Plug, ArrowLeft, StopCircle, Lightbulb,
+  Bell, Gauge, Search, Server, GitBranch,
+  AlertTriangle, XCircle, RefreshCw, Play, Layers,
+  Compass, Settings, Plug,
 } from 'lucide-react'
 import { monitoringApi } from '../../api/monitoring'
 import MonitoringLoginGate, { isMonitoringAuthenticated } from './MonitoringLoginGate'
 import GrafanaLoginScreen from './GrafanaLoginScreen'
+import MonitoringLabChrome from './MonitoringLabChrome'
 import GrafanaExplorePanel from './GrafanaExplorePanel'
 import GrafanaAlertingPanel from './GrafanaAlertingPanel'
 import GrafanaConnectionsPanel from './GrafanaConnectionsPanel'
@@ -144,6 +145,20 @@ function GrafanaView({ state, sessionId, scenario }) {
               ))}
             </div>
           </>
+        )}
+
+        {/* Empty-state: never leave the default Dashboards tab blank. */}
+        {sub === 'dashboards' && !dash && (
+          <div className="mon-card text-center py-12">
+            <Gauge size={28} className="mx-auto mb-3 text-[#8a93b2]" />
+            <div className="mon-panel-title mb-1">No dashboards provisioned for this scenario</div>
+            <div className="mon-panel-sub max-w-md mx-auto">
+              This lab focuses on data sources, alerting or PromQL rather than pre-built dashboards.
+              Use the <span className="text-[#f7913b]">Explore</span> tab to run queries, or check{' '}
+              <span className="text-[#f7913b]">Alerting</span> and{' '}
+              <span className="text-[#f7913b]">Connections</span> for what to investigate.
+            </div>
+          </div>
         )}
 
         {sub === 'explore' && (
@@ -376,9 +391,14 @@ export default function MonitoringSimulator({ sessionId, scenario, flavor = 'gra
   }, [authed, load])
 
   if (!authed) {
+    // The login gate is the first thing a learner sees when they open the sim.
+    // Forward the lab chrome handlers so Hints / Stop / Back to lab work here too
+    // (mirrors how the VMware / Nmap sims keep that chrome reachable at all times).
     return flavor === 'prometheus'
-      ? <MonitoringLoginGate flavor={flavor} onAuthenticated={() => setAuthed(true)} />
-      : <GrafanaLoginScreen onAuthenticated={() => setAuthed(true)} />
+      ? <MonitoringLoginGate flavor={flavor} onAuthenticated={() => setAuthed(true)}
+                             onExit={onExit} onStop={onStop} onHints={onHints} />
+      : <GrafanaLoginScreen onAuthenticated={() => setAuthed(true)}
+                            scenario={scenario} onExit={onExit} onStop={onStop} onHints={onHints} />
   }
 
   const accent = flavor === 'prometheus' ? '#e6522c' : '#f7913b'
@@ -387,22 +407,18 @@ export default function MonitoringSimulator({ sessionId, scenario, flavor = 'gra
 
   return (
     <div className="mon-sim mon-shell min-h-screen">
-      <div className="mon-topbar">
-        <div className="flex items-center gap-3">
-          <Activity size={18} style={{ color: accent }} />
-          <span className="font-semibold text-white">{product} simulator</span>
-          <span className="mon-panel-sub hidden sm:inline">{scenario?.title || slug}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className={`mon-tab ${view === 'grafana' ? 'mon-tab-active' : ''}`} onClick={() => setView('grafana')}>Grafana</button>
-          <button className={`mon-tab ${view === 'prometheus' ? 'mon-tab-active' : ''}`} onClick={() => setView('prometheus')}>Prometheus</button>
-          <button className="mon-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
-          {/* Lab chrome — mirrors the VMware sim (hints / stop / back to lab). */}
-          {onHints && <button className="mon-btn" onClick={onHints}><Lightbulb size={13} className="text-[#F5A623]" /> Hints</button>}
-          {onStop && <button className="mon-btn" onClick={onStop}><StopCircle size={13} className="text-[#ff6b6b]" /> Stop</button>}
-          {onExit && <button className="mon-btn" onClick={onExit}><ArrowLeft size={13} /> Back to lab</button>}
-        </div>
-      </div>
+      <MonitoringLabChrome
+        product={product}
+        accent={accent}
+        subtitle={scenario?.title || slug}
+        onExit={onExit}
+        onStop={onStop}
+        onHints={onHints}
+      >
+        <button className={`mon-tab ${view === 'grafana' ? 'mon-tab-active' : ''}`} onClick={() => setView('grafana')}>Grafana</button>
+        <button className={`mon-tab ${view === 'prometheus' ? 'mon-tab-active' : ''}`} onClick={() => setView('prometheus')}>Prometheus</button>
+        <button className="mon-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
+      </MonitoringLabChrome>
 
       <div className="p-4 max-w-[1200px] mx-auto">
         {error && <div className="mon-banner mon-banner-err"><XCircle size={15} /> {error}</div>}

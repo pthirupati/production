@@ -3219,12 +3219,24 @@ class AdminMonitoringContainersView(APIView):
                         break
 
         nodes_meta = []
+        # Track which cluster.json service names we have already turned into a row
+        # so that EVERY service the topology declares ends up represented and no
+        # node's services are silently dropped from the list.
+        synthesised_services = set()
         if is_cluster:
             node_for_service = {}
             for cnode in topology.get("nodes", []):
                 for svc in (cnode.get("services") or []):
                     node_for_service[svc.lower()] = cnode
                 is_local = bool(local_node_key) and cnode.get("key") == local_node.get("key")
+                # Probe this node's declared service ports for per-node liveness so
+                # the operator sees that e.g. edge's redis/rabbitmq and data's
+                # postgres are answering, even though their Docker sockets are not
+                # reachable from this engine. Best-effort; never raises.
+                try:
+                    svc_probe = AdminFleetMonitoringView._probe_services(cnode)
+                except Exception:  # pragma: no cover - defensive
+                    svc_probe = {"reachable": None, "services": []}
                 nodes_meta.append({
                     "key": cnode.get("key"),
                     "name": cnode.get("name"),
@@ -3234,8 +3246,15 @@ class AdminMonitoringContainersView(APIView):
                     "is_local": is_local,
                     # Local node: enumerated here. Labs node: lab containers reachable.
                     "containers_available": is_local or cnode.get("role") == "labs",
+                    # Per-service TCP liveness for nodes we cannot enumerate via
+                    # Docker (edge/data) so the panel still reflects their health.
+                    "reachable": svc_probe.get("reachable"),
+                    "service_health": svc_probe.get("services", []),
                 })
 
+            # 3a) Expected platform services that live on another node → "remote"
+            #     rows (keyed off EXPECTED_CONTAINERS so health/labels stay aligned
+            #     with the System Health panel).
             for spec in AdminSystemHealthView.EXPECTED_CONTAINERS:
                 if spec["key"] in seen_system_keys:
                     continue
@@ -3256,6 +3275,40 @@ class AdminMonitoringContainersView(APIView):
                         "exit_code": None,
                         "details": f"Runs on {owner.get('name') or owner.get('key')} node — not reachable from this Docker engine",
                     })
+                    synthesised_services.add(spec["service"].lower())
+
+            # 3b) Any OTHER service the topology declares on a different node that
+            #     has no EXPECTED_CONTAINERS spec (e.g. edge's "certbot",
+            #     "frontend-prod") — still surface it as a "remote" row so a node's
+            #     service is NEVER silently dropped from the fleet list.
+            for cnode in topology.get("nodes", []):
+                if not cnode.get("key") or cnode.get("key") == local_node_key:
+                    continue
+                for svc in (cnode.get("services") or []):
+                    svc_l = svc.lower()
+                    if svc_l in synthesised_services:
+                        continue
+                    # Skip pseudo-services that are not containers (networks, image
+                    # caches, the docker engine itself — those are node facts, not
+                    # platform containers).
+                    if svc_l in ("docker-engine", "scenario-images") or "network" in svc_l:
+                        continue
+                    containers.append({
+                        "id": f"remote-{cnode.get('key')}-{svc_l}",
+                        "full_id": f"remote-{cnode.get('key')}-{svc_l}",
+                        "name": svc,
+                        "kind": "system",
+                        "status": "remote",
+                        "health": "remote",
+                        "node": cnode.get("key"),
+                        "node_name": cnode.get("name"),
+                        "host_role": cnode.get("role"),
+                        "location": "remote",
+                        "restart_count": 0,
+                        "exit_code": None,
+                        "details": f"Runs on {cnode.get('name') or cnode.get('key')} node — not reachable from this Docker engine",
+                    })
+                    synthesised_services.add(svc_l)
 
         # 4) If the LOCAL engine is unreadable (no socket mount, or a non-root
         #    backend not in the host docker group), synthesise the platform
@@ -3631,16 +3684,32 @@ class AdminFleetMonitoringView(APIView):
                     nodes.append(card)
                     continue
 
-            # No agent (or agent unreachable): TCP-probe for reachability so the
-            # operator still sees the node up, just without host metrics.
-            reachable, probe_err = self._probe(cnode)
-            card["status"] = "reachable" if reachable else "unknown"
-            card["metrics_source"] = "none"
+            # Edge / data (and any other) node: there is NO metrics agent wired and
+            # — unlike the labs node — no ssh:// Docker engine the app node can
+            # reach (the deploy authorises the app's SSH key on D4 only). So host
+            # CPU/mem are not obtainable here without new wiring. Surface what we
+            # CAN obtain honestly: probe every service's own port for liveness so
+            # the operator sees per-service health (e.g. postgres:5432 up,
+            # redis:6379 up) and a one-line hint to enable full host metrics.
+            service_probe = self._probe_services(cnode)
+            reachable = service_probe["reachable"]
+            card["service_health"] = service_probe["services"]
             card["metrics_available"] = False
+            card["metrics_source"] = "none"
+            card["status"] = "reachable" if reachable else "unknown"
+            card["metrics_hint"] = self._metrics_hint(cnode)
             if not reachable and not card.get("error"):
-                card["error"] = probe_err or "no metrics agent wired; reachability unconfirmed"
+                card["error"] = (
+                    service_probe.get("error")
+                    or "no metrics agent wired; reachability unconfirmed"
+                )
             elif reachable and not card.get("error"):
-                card["error"] = "host reachable — host metrics need a monitoring agent"
+                up = sum(1 for s in service_probe["services"] if s.get("reachable"))
+                total = len(service_probe["services"]) or 1
+                card["error"] = (
+                    f"host reachable ({up}/{total} services answering) — "
+                    "host CPU/mem need a monitoring agent (see metrics_hint)"
+                )
             nodes.append(card)
 
         payload = self._summarise(nodes)
@@ -3851,11 +3920,36 @@ class AdminFleetMonitoringView(APIView):
         "labs": [2376, 2375, 22],
     }
 
+    # cluster.json service name → (display label, TCP port) so we can probe each
+    # service on a node individually and report per-service liveness. This is the
+    # one signal genuinely obtainable for edge/data over the VPC without any new
+    # agent, SSH key, or firewall rule.
+    _SERVICE_PORTS = {
+        "gateway": [("http", 80), ("https", 443)],
+        "frontend-prod": [("https", 443)],
+        "redis": [("redis", 6379)],
+        "rabbitmq": [("amqp", 5672)],
+        "vault": [("vault", 8200)],
+        "database": [("postgres", 5432)],
+        "postgres": [("postgres", 5432)],
+        "pgbouncer": [("pgbouncer", 6432)],
+        "backend": [("http", 8000)],
+        "docker-engine": [("docker-tls", 2376), ("docker", 2375)],
+    }
+
+    @staticmethod
+    def _tcp_open(host, port, timeout=1.5):
+        import socket
+
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except Exception:
+            return False
+
     @classmethod
     def _probe(cls, cnode):
         """Best-effort TCP reachability probe against a node's likely service ports."""
-        import socket
-
         host = cnode.get("private_ipv4") or cnode.get("public_ipv4") or cnode.get("ip")
         if not host:
             return False, "no address in topology"
@@ -3864,14 +3958,68 @@ class AdminFleetMonitoringView(APIView):
         ports = cls._ROLE_PROBE_PORTS.get(role, []) + [80, 443, 8000, 22]
         # De-dup while preserving order.
         ports = list(dict.fromkeys(ports))
-        last_err = None
         for port in ports:
-            try:
-                with socket.create_connection((host, port), timeout=1.5):
-                    return True, None
-            except Exception as exc:  # noqa: BLE001
-                last_err = exc
-        return False, (str(last_err)[:120] if last_err else "unreachable")
+            if cls._tcp_open(host, port):
+                return True, None
+        return False, "unreachable on all probed service ports"
+
+    @classmethod
+    def _probe_services(cls, cnode):
+        """Probe each service the topology says runs on this node, individually.
+
+        Returns ``{"reachable": bool, "services": [...], "error": str|None}`` where
+        every service entry is ``{"service", "label", "port", "reachable"}``. This
+        gives the operator real per-service health for edge/data (e.g. postgres up,
+        redis up) even though full host CPU/mem requires a metrics agent. Always
+        best-effort — never raises. Falls back to the role port probe when the node
+        declares no recognised services, so the node is never left with an empty
+        health list.
+        """
+        host = cnode.get("private_ipv4") or cnode.get("public_ipv4") or cnode.get("ip")
+        if not host:
+            return {"reachable": False, "services": [], "error": "no address in topology"}
+
+        services = []
+        any_up = False
+        for svc in (cnode.get("services") or []):
+            for label, port in cls._SERVICE_PORTS.get(svc.lower(), []):
+                up = cls._tcp_open(host, port)
+                any_up = any_up or up
+                services.append({
+                    "service": svc,
+                    "label": label,
+                    "port": port,
+                    "reachable": up,
+                })
+
+        if not services:
+            # Node declares no probeable services (or unknown service names):
+            # fall back to the role-level reachability probe so we still report
+            # something rather than nothing.
+            reachable, err = cls._probe(cnode)
+            return {"reachable": reachable, "services": [], "error": None if reachable else err}
+
+        err = None if any_up else "no service ports answered (host may be down or firewalled)"
+        return {"reachable": any_up, "services": services, "error": err}
+
+    @staticmethod
+    def _metrics_hint(cnode):
+        """One-line operator hint: exactly how to enable full host metrics for a
+        node that currently has none. The metrics endpoint already exists and is
+        agent-token protected — the only missing piece is pointing the aggregator
+        at the node, or (cheaper) running a tiny token-guarded metrics agent there.
+        """
+        host = cnode.get("private_ipv4") or cnode.get("ip") or "<node-ip>"
+        name = cnode.get("key") or cnode.get("role") or "node"
+        metrics_path = getattr(
+            settings, "MONITORING_METRICS_PATH", "/api/admin/monitoring/metrics/"
+        )
+        return (
+            f"Set MONITORING_SERVERS to include '{name}=http://{host}:8000' and "
+            "MONITORING_AGENT_TOKEN to a shared secret, then run the same backend "
+            f"image (or a metrics-only agent exposing {metrics_path}) "
+            f"on {name} so the fleet view can pull its live host CPU/mem/disk."
+        )
 
     @staticmethod
     def _parse_spec(spec):

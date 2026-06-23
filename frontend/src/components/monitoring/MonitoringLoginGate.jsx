@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import MonitoringLabChrome from './MonitoringLabChrome'
 
 // Two flavors share one gate. Grafana labs land on the Grafana login; Prometheus
 // labs land on a Prometheus-styled login. Both are sessionStorage-gated so a
@@ -25,7 +26,7 @@ export function clearMonitoringAuth() {
   try { sessionStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
 }
 
-export default function MonitoringLoginGate({ flavor = 'grafana', onAuthenticated }) {
+export default function MonitoringLoginGate({ flavor = 'grafana', onAuthenticated, scenario, onExit, onStop, onHints }) {
   const cfg = CREDS[flavor] || CREDS.grafana
   const isGrafana = flavor === 'grafana'
   const [user, setUser] = useState('')
@@ -57,7 +58,18 @@ export default function MonitoringLoginGate({ flavor = 'grafana', onAuthenticate
   const bg = isGrafana ? 'linear-gradient(135deg,#0b0c1e,#181b2e 60%,#0b0c1e)' : 'linear-gradient(135deg,#1a1206,#241405 60%,#120c05)'
 
   return (
-    <div className="mon-sim min-h-screen flex items-stretch" style={{ background: '#0b0c1e' }}>
+    <div className="mon-sim mon-shell min-h-screen flex flex-col" style={{ background: '#0b0c1e' }}>
+      {/* Lab chrome — keeps Hints / Stop / Back to lab reachable before sign-in. */}
+      <MonitoringLabChrome
+        product={cfg.product}
+        accent={accent}
+        subtitle={scenario?.title || scenario?.slug || ''}
+        onExit={onExit}
+        onStop={onStop}
+        onHints={onHints}
+      />
+
+      <div className="flex-1 flex items-stretch">
       {/* Left brand panel */}
       <div className="hidden md:flex md:w-1/2 lg:w-3/5 flex-col justify-between p-12 relative overflow-hidden" style={{ background: bg }}>
         <div aria-hidden className="absolute inset-0 opacity-25"
@@ -127,6 +139,7 @@ export default function MonitoringLoginGate({ flavor = 'grafana', onAuthenticate
             <span className="font-mono text-[#E8EDF2]">{cfg.pass}</span>
           </p>
         </div>
+      </div>
       </div>
     </div>
   )

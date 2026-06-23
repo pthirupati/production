@@ -39,6 +39,45 @@ class SimProcess:
     command: str
 
 
+# Package -> (systemd unit name, unit description) it ships. Installing the
+# package via dnf/yum/rpm registers the unit (stopped, disabled) so a follow-up
+# `systemctl start/enable/status <unit>` works the way it does on a real RHEL box.
+# A package may ship more than one unit (e.g. nfs-utils).
+PACKAGE_SERVICES: dict[str, list[tuple[str, str]]] = {
+    "nginx": [("nginx", "The nginx HTTP and reverse proxy server")],
+    "httpd": [("httpd", "The Apache HTTP Server")],
+    "mariadb-server": [("mariadb", "MariaDB 10.5 database server")],
+    "mariadb": [("mariadb", "MariaDB 10.5 database server")],
+    "mysql-server": [("mysqld", "MySQL Server")],
+    "postgresql-server": [("postgresql", "PostgreSQL database server")],
+    "postgresql": [("postgresql", "PostgreSQL database server")],
+    "redis": [("redis", "Redis persistent key-value database")],
+    "memcached": [("memcached", "memcached daemon")],
+    "docker": [("docker", "Docker Application Container Engine")],
+    "docker-ce": [("docker", "Docker Application Container Engine")],
+    "podman": [("podman", "Podman API Service")],
+    "vsftpd": [("vsftpd", "Vsftpd ftp daemon")],
+    "httpd-tools": [],
+    "haproxy": [("haproxy", "HAProxy Load Balancer")],
+    "php-fpm": [("php-fpm", "The PHP FastCGI Process Manager")],
+    "mongodb-org": [("mongod", "MongoDB Database Server")],
+    "mongodb": [("mongod", "MongoDB Database Server")],
+    "tomcat": [("tomcat", "Apache Tomcat Web Application Container")],
+    "named": [("named", "Berkeley Internet Name Domain (DNS)")],
+    "bind": [("named", "Berkeley Internet Name Domain (DNS)")],
+    "dovecot": [("dovecot", "Dovecot IMAP/POP3 email server")],
+    "postfix": [("postfix", "Postfix Mail Transport Agent")],
+    "nfs-utils": [("nfs-server", "NFS server and services")],
+    "samba": [("smb", "Samba SMB Daemon")],
+    "chrony": [("chronyd", "NTP client/server")],
+    "firewalld": [("firewalld", "firewalld - dynamic firewall daemon")],
+    "rabbitmq-server": [("rabbitmq-server", "RabbitMQ broker")],
+    "elasticsearch": [("elasticsearch", "Elasticsearch")],
+    "grafana": [("grafana-server", "Grafana instance")],
+    "prometheus": [("prometheus", "Prometheus monitoring system")],
+}
+
+
 @dataclass
 class SimBlockDevice:
     """A whole disk, partition, or LV as seen by lsblk/blkid/mkfs/mount."""
@@ -393,6 +432,33 @@ class RHELOSState:
                 lines_g.append(f"{gname}:x:{u.gid}:")
         self._write_file("/etc/passwd", "\n".join(lines_p) + "\n")
         self._write_file("/etc/group", "\n".join(lines_g) + "\n")
+
+    def register_package_service(self, pkg: str) -> list[str]:
+        """When a package is installed, register the systemd unit(s) it ships as
+        known (stopped, disabled) so a follow-up systemctl start/enable/status of
+        that service works realistically. Returns the unit names registered.
+
+        Existing units are left untouched (an install never stops a running
+        service), and packages with no associated unit are a no-op.
+        """
+        units = PACKAGE_SERVICES.get(pkg)
+        if not units:
+            return []
+        registered = []
+        for name, desc in units:
+            if name in self.services:
+                continue
+            self.services[name] = SimService(
+                name,
+                active="inactive",
+                enabled="disabled",
+                description=desc,
+                loaded="loaded",
+                sub_state="dead",
+                unit_file=f"[Unit]\nDescription={desc}\n",
+            )
+            registered.append(name)
+        return registered
 
     def add_user(self, username: str, home: str | None = None, shell: str = "/bin/bash") -> tuple[bool, str]:
         if username in self.users:

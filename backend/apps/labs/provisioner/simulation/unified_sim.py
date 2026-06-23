@@ -183,6 +183,9 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
         # a SCSI rescan could not (Scenario B), recovers a guest that VMware reset,
         # and surfaces a hot-added NIC. Safe no-ops when nothing is pending.
         st = self.shell.state
+        # A reboot restarts the clock: boot_time becomes "now" so `uptime` and
+        # /proc/uptime report time-since-reboot, not the original session start.
+        st.boot_time = time.time()
         revealed = st.reveal_hidden_disks(after_reboot=True)
         st.reveal_bridge_nic()
         st.recover_from_vmware_reset()
