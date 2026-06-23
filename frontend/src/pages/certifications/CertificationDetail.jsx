@@ -105,13 +105,22 @@ export default function CertificationDetail() {
     [exam, load],
   )
 
-  // Auto-submit once the timer reaches zero.
+  // Auto-submit when the exam's real expiry elapses. Driven off the actual
+  // seconds_remaining via a setTimeout (always async/post-commit) rather than the
+  // ticking `remaining` state — the old `remaining === 0` guard fired on the very
+  // first commit after the exam was set (before the display timer had applied the
+  // real duration), which instantly auto-submitted a fresh exam as "Time's up 0%".
   useEffect(() => {
-    if (exam && remaining === 0 && !autoSubmitted.current && !busy) {
-      autoSubmitted.current = true
-      submitExam(true)
-    }
-  }, [exam, remaining, busy, submitExam])
+    if (!exam) return undefined
+    const secs = Math.max(0, exam.seconds_remaining || 0)
+    const expire = setTimeout(() => {
+      if (!autoSubmitted.current) {
+        autoSubmitted.current = true
+        submitExam(true)
+      }
+    }, secs * 1000)
+    return () => clearTimeout(expire)
+  }, [exam, submitExam])
 
   const startExam = async () => {
     if (hydrated && !isAuthenticated) {

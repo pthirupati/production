@@ -369,8 +369,38 @@ export default function AdminSettings() {
                 try {
                   const result = await adminApi.testPaymentGateway()
                   setGwTest(result)
-                  if (result?.ok) toast.success('Gateway keys are valid (₹1 test order created)')
-                  else toast.error(result?.error || 'Gateway test failed')
+                  if (result?.ok && result.order_id && result.razorpay_key_id) {
+                    // Keys are valid + an order exists → open the real Razorpay
+                    // Checkout so the admin can enter UPI/card and complete a ₹1
+                    // payment end-to-end (authorize-only on the backend order).
+                    const open = () => {
+                      const rzp = new window.Razorpay({
+                        key: result.razorpay_key_id,
+                        amount: result.amount_paise || 100,
+                        currency: 'INR',
+                        name: 'FixitLab',
+                        description: '₹1 payment gateway test',
+                        order_id: result.order_id,
+                        theme: { color: '#06b6d4' },
+                        modal: { ondismiss: () => toast('Test checkout closed.', { icon: 'ℹ️' }) },
+                        handler: (resp) => toast.success(`Payment captured by gateway (id ${resp.razorpay_payment_id}). Gateway works end-to-end.`),
+                      })
+                      rzp.on('payment.failed', (resp) => toast.error(resp.error?.description || 'Test payment failed'))
+                      rzp.open()
+                    }
+                    if (window.Razorpay) open()
+                    else {
+                      const s = document.createElement('script')
+                      s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+                      s.onload = open
+                      s.onerror = () => toast.error('Could not load Razorpay checkout')
+                      document.body.appendChild(s)
+                    }
+                  } else if (result?.ok) {
+                    toast.success('Gateway keys are valid (₹1 test order created)')
+                  } else {
+                    toast.error(result?.error || 'Gateway test failed')
+                  }
                 } catch (err) {
                   const d = err.response?.data
                   setGwTest(d || { ok: false, error: 'Gateway test failed' })

@@ -4398,10 +4398,16 @@ class AdminPaymentGatewayTestView(APIView):
                 "configured": True,
                 "mode": mode,
                 "key_id_masked": key_id[:12] + "…" if len(key_id) > 12 else key_id,
+                # The PUBLIC key id is safe to expose client-side (it's used in the
+                # Razorpay Checkout widget) — return it + the order so the admin can
+                # complete a real ₹1 UPI/card payment in the checkout modal.
+                "razorpay_key_id": key_id,
                 "order_id": order.get("id"),
+                "amount_paise": 100,
                 "amount_rupees": 1,
-                "message": f"Razorpay {mode} keys are valid — a ₹1 test order was created "
-                           f"successfully (no charge). Safe to enable payments.",
+                "message": f"Razorpay {mode} keys are valid — a ₹1 test order was created. "
+                           f"Complete the checkout to verify UPI/card end-to-end (authorize-only, "
+                           f"not captured). Safe to enable payments.",
             })
         except Exception as exc:  # razorpay.errors.BadRequestError etc.
             logger.warning("Razorpay gateway test failed: %s", exc)
