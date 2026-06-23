@@ -1,0 +1,14 @@
+name: AI / ML / LLM & Agents
+slug: ai-ml
+description: >-
+  Hands-on AI/ML challenges that run entirely free and local — no paid LLM, no GPU, no
+  external API. Build the math behind machine learning from scratch in pure Python: vector
+  similarity, tokenization and bag-of-words, TF-IDF scoring, a k-nearest-neighbours classifier,
+  and a hand-rolled gradient-descent step. Plus agent/workflow simulations that wire deterministic
+  rule-based "LLM" nodes, tools, and MCP calls into runnable graphs.
+icon: sparkles
+color: purple
+order: 31
+price: 0
+is_active: true
+coming_soon: false

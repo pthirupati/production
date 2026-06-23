@@ -1,0 +1,40 @@
+title: Build a support-ticket triage agent
+slug: agent-support-ticket-triage
+category: AI / ML / LLM & Agents
+description: A new support ticket has arrived and your team wants it triaged automatically. Open the
+  Agent Workflow simulator and build a small agent that classifies the incoming ticket with a
+  deterministic rule-based "LLM" node, then routes high-priority tickets to a notification tool so the
+  on-call engineer is paged. Everything runs free and local — no paid LLM, no network.
+difficulty: easy
+lab_mode: simulation
+simulation_type: ai-agent
+technology: ai-ml
+jira_priority: Medium
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Open the Agent Workflow simulator from the lab toolbar
+- Add an LLM node in classify mode and feed it the ticket text from the trigger
+- Add a condition node that detects a high-priority ticket and route the true branch to a
+  send_notification tool, then connect the notification to the output
+- Run the workflow so the security incident is classified high priority and an escalation is sent
+initial_state: The canvas starts with only a Trigger node (an urgent security ticket) and an Output
+  node, unconnected. There is no classifier, no routing, and nothing fires — you must build the agent.
+hints:
+- order: 1
+  cost: 10
+  content: From the node palette, add an LLM node and set its mode to "classify" with input_field "text".
+    Connect the Trigger to the LLM so the ticket text flows in. Click Run and inspect the trace — the
+    LLM should tag the ticket with a category and a priority.
+- order: 2
+  cost: 15
+  content: Add a Condition node after the LLM. Set field=priority, op=equals, value=high. Wire the LLM
+    into the condition, then connect the condition's TRUE branch onward (use the branch=true edge).
+- order: 3
+  cost: 20
+  content: Add a Tool node of kind send_notification (set a channel like "oncall" and a message such as
+    "Escalate {ticket_id}"). Connect the condition's true branch to this tool, then the tool to the
+    Output node. Run the workflow — the security ticket classifies as high priority and the notification
+    fires, completing the lab.

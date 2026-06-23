@@ -405,6 +405,26 @@ class SimulationProvisioner:
                 return validate_wireshark_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "Wireshark simulation session not found"
+        # ai-agent normalizes to "generic", so gate on the slug prefix OR the RAW
+        # (pre-normalize) simulation_type. Read the raw type off the scenario when
+        # the cached entry doesn't carry it (e.g. after a worker restart).
+        _raw_agent_type = sim_type
+        if not _raw_agent_type or _raw_agent_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _agent_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_agent_type = (getattr(_agent_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_agent_type = ""
+        if low_slug.startswith("agent-") or _raw_agent_type == "ai-agent":
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.aiml_engine import validate_aiml_lab, _ensure_session
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                _ensure_session(str(lab_session.id), slug)
+                return validate_aiml_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Agent simulation session not found"
         # data-dashboard normalizes to "generic", so gate on the slug prefix OR the
         # RAW (pre-normalize) simulation_type read off the scenario.
         if low_slug.startswith("ds-dashboard-"):

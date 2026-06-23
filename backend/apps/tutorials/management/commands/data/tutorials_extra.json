@@ -3056,5 +3056,158 @@
         "set_ylim(bottom=0) is not optional — a non-zero baseline on a bar/area chart visually lies about the magnitude of differences."
       ]
     ]
+  },
+  {
+    "slug": "how-llm-agents-work-loop-tools-memory",
+    "title": "How LLM Agents Work: The Loop, Tools, and Memory",
+    "summary": "An LLM agent is not magic and not a single API call — it is a plain loop that feeds a model's text output back to itself, lets it call tools, and remembers what happened. Build the whole mental model from scratch with no paid API.",
+    "topic": "AI & Agents",
+    "difficulty": "beginner",
+    "estimated_minutes": 18,
+    "playground_slug": "",
+    "scenario_slug": "",
+    "seo_title": "How LLM Agents Work: Loop, Tools, and Memory Explained from Scratch",
+    "seo_description": "Understand what an LLM agent actually is — a loop around a language model that calls tools and keeps memory. Build a working mental model with a fake local model, no paid API required.",
+    "seo_keywords": "llm agent, how agents work, agent loop, tool calling, agent memory, react agent, agentic loop, build an agent, llm tools, agent architecture",
+    "order": 380,
+    "sections": [
+      [
+        "An agent is a loop, not a model",
+        "People hear 'AI agent' and picture something exotic. Strip away the marketing and an agent is embarrassingly simple: it is a loop that calls a language model, reads the text the model produced, optionally runs an action the model asked for, and feeds the result back in for another turn. The model itself has no memory and takes no actions — it only maps text in to text out. Everything that makes an agent feel autonomous lives in the loop you write around it.\n\nThis matters because it tells you exactly where to look when an agent misbehaves. The model can only ever respond to the text you put in front of it, so a bad answer is almost always a bad context: a missing tool result, a forgotten instruction, history you trimmed too aggressively. Once you see the agent as a loop, debugging stops being mystical and becomes inspecting what string you handed the model on each turn.",
+        "# The entire shape of every agent, in pseudocode\ndef agent(goal, model, tools):\n    history = [(\"user\", goal)]\n    for step in range(MAX_STEPS):          # the loop is the agent\n        reply = model(history)             # text in -> text out\n        if reply.is_final_answer:\n            return reply.text\n        result = tools[reply.tool](reply.args)  # take an action\n        history.append((\"tool\", result))  # feed it back in\n    return \"gave up after MAX_STEPS\"",
+        "python",
+        "The model is stateless and cannot act. The loop is what carries memory and runs tools — so that is where your bugs and your control live."
+      ],
+      [
+        "A stand-in model so you can learn the loop for free",
+        "You do not need a paid API to understand agents. The only thing a model contributes is 'given this text, produce the next text', so we can fake it with a tiny rule-based function. That lets you run the full agent loop on your laptop, watch the control flow, and reason about it — the concepts transfer unchanged when you later swap in a real local model (Ollama, llama.cpp) or a hosted one.\n\nOur fake model looks at the latest message and decides whether to call a tool or to answer. A real model decides the same thing, just with vastly better judgment. Keeping the interface identical — history goes in, a decision comes out — is the whole point: the agent code never needs to know whether the brain behind it is two if-statements or a billion parameters.",
+        "import re\n\ndef fake_model(history):\n    \"\"\"Stands in for a real LLM. Returns a decision dict.\"\"\"\n    last = history[-1][1]\n    # If we just got a tool result, summarize and finish.\n    if history[-1][0] == \"tool\":\n        return {\"type\": \"final\", \"text\": f\"The answer is {last}.\"}\n    # Otherwise, if the user asked arithmetic, call the calc tool.\n    if re.search(r\"\\d+\\s*[-+*/]\\s*\\d+\", last):\n        expr = re.search(r\"[\\d+\\-*/ ]+\", last).group().strip()\n        return {\"type\": \"tool\", \"name\": \"calc\", \"args\": expr}\n    return {\"type\": \"final\", \"text\": \"I can only do arithmetic in this demo.\"}",
+        "python",
+        "Swapping this fake_model for a real local model later changes nothing about the loop. The interface 'history in, decision out' is the contract."
+      ],
+      [
+        "Tools: how a text model touches the real world",
+        "A language model can only emit text, so by itself it cannot check today's date, query a database, or run code. Tools bridge that gap. A tool is just a normal function you register with the agent; the model's job is to emit a structured request naming the tool and its arguments, and your loop's job is to actually call the function and hand back the result as more text.\n\nThe critical safety point: the model does not run anything. It only asks. Your code decides whether to honor the request, validates the arguments, and runs the function in whatever sandbox you choose. That separation is your entire security boundary. Treat every tool argument as untrusted input, exactly as you would a value from a web form, because from the model's side it is generated text and can be wrong or even adversarial.",
+        "def calc(expr):\n    # NEVER eval() model output. Parse a tiny, safe grammar instead.\n    m = re.fullmatch(r\"\\s*(\\d+)\\s*([-+*/])\\s*(\\d+)\\s*\", expr)\n    if not m:\n        return \"error: unsupported expression\"\n    a, op, b = int(m[1]), m[2], int(m[3])\n    return {\"+\": a + b, \"-\": a - b, \"*\": a * b,\n            \"/\": a / b if b else \"error: div by zero\"}[op]\n\nTOOLS = {\"calc\": calc}\nprint(calc(\"6 * 7\"))  # 42\nprint(calc(\"__import__('os')\"))  # error: unsupported expression",
+        "python",
+        "The model proposes a tool call; your code disposes. Validate arguments and never eval() generated text — that is the agent's main attack surface."
+      ],
+      [
+        "Memory: the conversation history is the state",
+        "Because the model is stateless, 'memory' in an agent is nothing more than the list of past messages you choose to send on the next turn. There is no hidden state inside the model between calls — if a fact is not in the history you pass in, the model does not know it. This is liberating: memory is just data you own and can inspect, edit, summarize, or truncate.\n\nThat also reveals the central scaling problem. Every model has a finite context window, so you cannot append forever. Real agents manage memory deliberately: keep the system instructions and recent turns verbatim, summarize older turns into a compact note, and pull in external facts (files, search results) only when relevant. Memory management is less about storage and more about deciding, each turn, which slice of the past is worth the model's limited attention.",
+        "def run(goal, model=fake_model, tools=TOOLS, max_steps=5):\n    history = [(\"user\", goal)]\n    for _ in range(max_steps):\n        decision = model(history)\n        if decision[\"type\"] == \"final\":\n            return decision[\"text\"]\n        result = tools[decision[\"name\"]](decision[\"args\"])\n        history.append((\"tool\", str(result)))\n    return \"stopped: hit max_steps\"\n\nprint(run(\"what is 6 * 7?\"))   # The answer is 42.\nprint(run(\"tell me a joke\"))    # I can only do arithmetic in this demo.",
+        "python",
+        "If a fact is not in the history you pass in, the model cannot know it. 'Memory' is just the messages you decide to include — own that decision."
+      ],
+      [
+        "Stopping, looping safely, and the ReAct pattern",
+        "The loop you have built is essentially the ReAct pattern — reason, act, observe, repeat — which underpins most production agents. Two practical guards keep it from going wrong. First, always cap the number of steps; a model that keeps calling tools without converging will otherwise loop forever and burn time or money. Second, give the model a clear, unambiguous way to signal 'I'm done' so the loop knows when to stop, rather than guessing from prose.\n\nFrom here, every advanced agent is a richer version of this same skeleton. More tools, better stopping criteria, smarter memory summarization, multiple agents passing messages — none of it changes the core. When you read about elaborate agent frameworks, mentally map their features back onto this loop: model call, tool dispatch, history append, stop check. That map is what keeps you in control instead of cargo-culting a library you do not understand.",
+        "def run_traced(goal, max_steps=5):\n    history = [(\"user\", goal)]\n    for step in range(1, max_steps + 1):\n        d = fake_model(history)\n        print(f\"step {step}: {d['type']}\", d.get(\"name\", d.get(\"text\")))\n        if d[\"type\"] == \"final\":\n            return d[\"text\"]\n        out = TOOLS[d[\"name\"]](d[\"args\"])\n        history.append((\"tool\", str(out)))\n    return \"stopped: max_steps reached (no convergence)\"\n\nrun_traced(\"compute 12 / 4\")\n# step 1: tool calc\n# step 2: final The answer is 3.0.",
+        "python",
+        "Always cap steps and give the model an explicit 'final' signal. An uncapped agent loop is a runaway process waiting to happen."
+      ]
+    ]
+  },
+  {
+    "slug": "mcp-connecting-tools-to-models",
+    "title": "MCP: Connecting Tools to Models with a Standard Protocol",
+    "summary": "The Model Context Protocol gives agents one consistent way to discover and call tools instead of a different glue script per integration. Learn what MCP is, why it exists, and build a tiny local server and client to see the handshake yourself.",
+    "topic": "AI & Agents",
+    "difficulty": "intermediate",
+    "estimated_minutes": 20,
+    "playground_slug": "",
+    "scenario_slug": "",
+    "seo_title": "MCP Explained: Connecting Tools to AI Models with the Model Context Protocol",
+    "seo_description": "Learn what the Model Context Protocol (MCP) is and why it standardizes how AI agents discover and call tools. Build a minimal local MCP-style server and client by hand, no paid API needed.",
+    "seo_keywords": "mcp, model context protocol, mcp server, mcp client, tool calling protocol, ai tool integration, agent tools, json-rpc tools, llm integrations, mcp tutorial",
+    "order": 390,
+    "sections": [
+      [
+        "The N-times-M problem MCP solves",
+        "Before MCP, every time you wanted an AI assistant to use a tool — your file system, a database, an issue tracker — you wrote bespoke glue: a custom function, a custom way to describe it to the model, a custom way to pass results back. With N assistants and M tools, you faced N times M integrations, each subtly different. The result was brittle, duplicated work that no one could reuse.\n\nThe Model Context Protocol attacks this directly by standardizing the contract between a model-side client and a tool-side server. Instead of N times M custom integrations, you build M servers and N clients that all speak the same protocol, turning the problem into N plus M. It is the same insight that made USB or the language server protocol valuable: agree on one interface at the boundary, and any conforming piece on either side composes with any other.",
+        "# Before MCP: a custom adapter per (assistant, tool) pair\n# assistant_a + filesystem -> glue_1.py\n# assistant_a + database   -> glue_2.py\n# assistant_b + filesystem -> glue_3.py   (duplicates glue_1's logic)\n\n# With MCP: one server per tool, one client per assistant, one protocol\n#   filesystem_server  <-- MCP -->  any assistant\n#   database_server    <-- MCP -->  any assistant\nprint(\"N*M custom integrations  ->  N+M reusable components\")",
+        "python",
+        "MCP turns an N*M integration explosion into N+M reusable pieces by fixing one protocol at the model/tool boundary."
+      ],
+      [
+        "The three things a server exposes",
+        "An MCP server offers three kinds of capability, and keeping them distinct clarifies the whole protocol. Tools are actions the model can invoke — run a query, send a message, write a file — and they can have side effects. Resources are read-only data the client can fetch and put into the model's context, like the contents of a file or a row from a table. Prompts are reusable templates the server suggests to guide the model for common tasks.\n\nFor learning, tools are where the action is, so we focus there. The key idea is that the server advertises its capabilities in a machine-readable form: each tool comes with a name, a human description, and a schema describing its arguments. The client never has to be hardcoded against a specific tool; it asks the server what is available and learns at runtime. That self-description is what makes the protocol composable.",
+        "# An MCP server describes each tool so any client can discover it.\nTOOL_CATALOG = [\n    {\n        \"name\": \"get_weather\",\n        \"description\": \"Return the current weather for a city.\",\n        \"input_schema\": {\n            \"type\": \"object\",\n            \"properties\": {\"city\": {\"type\": \"string\"}},\n            \"required\": [\"city\"],\n        },\n    }\n]\nimport json\nprint(json.dumps(TOOL_CATALOG[0][\"input_schema\"], indent=2))",
+        "python",
+        "Tools act, resources are read-only data, prompts are templates. Each tool ships a schema so clients discover it instead of hardcoding it."
+      ],
+      [
+        "Build a minimal server (no network, no API)",
+        "You can grasp MCP by building a stripped-down version locally — no real model, no paid service, no network. The actual protocol uses JSON-RPC messages over a transport like stdio or HTTP, but the essence is two methods: one to list tools and one to call a tool by name with arguments. We implement exactly those two as plain Python functions handling dict 'requests', which is the protocol's logical core without the wire format.\n\nNotice that the server is completely independent of any model. It does not know or care who is calling it. That independence is the payoff: the same server we write here could be driven by a hosted assistant, a local model, or a test harness, because the only thing any caller needs is to speak the two simple methods. Decoupling the tool implementation from the consumer is the entire design goal.",
+        "def handle(request):\n    \"\"\"A tiny MCP-style server: supports tools/list and tools/call.\"\"\"\n    method = request[\"method\"]\n    if method == \"tools/list\":\n        return {\"tools\": TOOL_CATALOG}\n    if method == \"tools/call\":\n        name = request[\"params\"][\"name\"]\n        args = request[\"params\"][\"arguments\"]\n        if name == \"get_weather\":\n            city = args[\"city\"]\n            fake_db = {\"London\": \"12C rain\", \"Cairo\": \"34C clear\"}\n            return {\"content\": fake_db.get(city, \"unknown city\")}\n        return {\"error\": f\"no such tool: {name}\"}\n    return {\"error\": f\"unknown method: {method}\"}",
+        "python",
+        "Strip MCP to its core and it is two methods: tools/list and tools/call. The server never references a model — that decoupling is the point."
+      ],
+      [
+        "The client side: discover, then call",
+        "The client is the half that lives next to the model. Its job is a two-phase dance. First it calls tools/list to discover what the server offers, then it formats those descriptions into something the model can read so the model knows which tools exist and what arguments they take. When the model decides to use a tool, the client translates that decision into a tools/call request and routes the server's response back into the model's context.\n\nHere we simulate the model with a fixed decision so the focus stays on the protocol mechanics. The important takeaway is the round trip: discover capabilities, present them, receive a structured tool request, dispatch it, return the result. A real MCP client adds connection management and error handling, but the conversation shape is exactly this — and seeing it bare makes the production libraries far less mysterious.",
+        "def client_session(server, model_decision):\n    # Phase 1: discover what the server can do.\n    catalog = server({\"method\": \"tools/list\"})[\"tools\"]\n    available = {t[\"name\"] for t in catalog}\n    print(\"discovered tools:\", available)\n\n    # Phase 2: the model picked a tool -> issue a tools/call.\n    if model_decision[\"tool\"] in available:\n        resp = server({\n            \"method\": \"tools/call\",\n            \"params\": {\"name\": model_decision[\"tool\"],\n                       \"arguments\": model_decision[\"args\"]},\n        })\n        return resp[\"content\"]\n    return \"model requested an unavailable tool\"\n\nprint(client_session(handle, {\"tool\": \"get_weather\", \"args\": {\"city\": \"Cairo\"}}))\n# discovered tools: {'get_weather'}\n# 34C clear",
+        "python",
+        "The client always discovers first, then calls. Presenting the live catalog to the model is what lets one client work with any conforming server."
+      ],
+      [
+        "Trust boundaries and where to go next",
+        "MCP standardizes plumbing, not safety, so the security thinking from any tool-using agent applies in full. An MCP server runs real code with real permissions; a client connecting to an untrusted server is running someone else's tools, and a model can be coaxed into calling them with bad arguments. Treat tool arguments as untrusted input, scope each server's permissions to the minimum it needs, and review which servers you connect — the convenience of discovery does not lower the bar on validation.\n\nTo go further for free, run a local model with Ollama or llama.cpp as the brain and point it at small MCP servers you write yourself, starting with read-only resources before adding tools that mutate state. Build a file-reading server, then a calculator, then something that touches a local SQLite database. Because the protocol is uniform, each new server you write instantly works with every client you have — which is precisely the leverage MCP was created to give you.",
+        "# A safe first server to extend: read-only file resource, sandboxed to one dir.\nimport os\nBASE = os.path.realpath(\"/tmp/mcp_sandbox\")\n\ndef read_resource(path):\n    full = os.path.realpath(os.path.join(BASE, path))\n    if not full.startswith(BASE + os.sep):   # block path traversal\n        return \"error: outside sandbox\"\n    try:\n        with open(full) as f:\n            return f.read()\n    except FileNotFoundError:\n        return \"error: not found\"\n\nprint(read_resource(\"../../etc/passwd\"))  # error: outside sandbox",
+        "python",
+        "MCP standardizes the wire, not the trust. Sandbox each server, validate every argument, and start new servers read-only before letting them mutate state."
+      ]
+    ]
+  },
+  {
+    "slug": "building-workflows-with-node-graph-automation",
+    "title": "Building Workflows with n8n-Style Node Graphs",
+    "summary": "Visual automation tools like n8n model work as a graph of nodes — a trigger fires, data flows edge to edge, each node transforms it. Learn the model that powers them and build a tiny local node-graph engine that runs without any cloud service.",
+    "topic": "AI & Agents",
+    "difficulty": "intermediate",
+    "estimated_minutes": 19,
+    "playground_slug": "",
+    "scenario_slug": "",
+    "seo_title": "Building Workflows with n8n-Style Node Graphs: The Model and a DIY Engine",
+    "seo_description": "Understand how n8n-style visual workflow automation works — triggers, nodes, edges, and data flow. Build a minimal local node-graph engine in Python with no cloud account or paid API.",
+    "seo_keywords": "n8n, workflow automation, node graph, visual workflow, trigger node, dag execution, automation engine, low code automation, workflow nodes, build a workflow engine",
+    "order": 400,
+    "sections": [
+      [
+        "Work as a graph of nodes",
+        "Tools like n8n, Node-RED, and Zapier share one mental model: a workflow is a directed graph. A trigger node starts things off, edges carry data from one node to the next, and each node is a small, single-purpose unit that takes input data, does one thing, and emits output data. There is no hidden global state to reason about — if you want to know what a node sees, you follow the edges leading into it.\n\nThis model is popular because it makes automation legible to people who do not write code, but the same structure is what makes it robust for engineers too. Because every node has explicit inputs and outputs, you can test a node in isolation, swap one implementation for another, and reason about the whole flow by tracing data along edges. The graph is not just a pretty diagram; it is the actual execution plan.",
+        "# A workflow is just nodes plus the edges between them.\nWORKFLOW = {\n    \"nodes\": {\n        \"trigger\":   {\"type\": \"manual_trigger\"},\n        \"fetch\":     {\"type\": \"http_like\", \"url\": \"orders\"},\n        \"filter\":    {\"type\": \"filter\", \"min_total\": 100},\n        \"notify\":    {\"type\": \"log\"},\n    },\n    \"edges\": [(\"trigger\", \"fetch\"), (\"fetch\", \"filter\"), (\"filter\", \"notify\")],\n}\nprint(\"nodes:\", list(WORKFLOW[\"nodes\"]))\nprint(\"flow :\", \" -> \".join(n for n, _ in WORKFLOW[\"edges\"]) + \" -> notify\")",
+        "python",
+        "A workflow is a directed graph: a trigger starts it, edges carry data, each node does exactly one thing. The diagram IS the execution plan."
+      ],
+      [
+        "Triggers: what makes a workflow start",
+        "Every workflow needs a starting point, and that is the trigger node. Triggers come in a few flavors: manual (a human clicks run), scheduled (fire every hour), or event-driven (a webhook arrives, a file changes, a new row appears). The trigger's job is narrow — produce the initial piece of data and hand it to whatever nodes its edges point to. Everything downstream is the same regardless of which trigger started it.\n\nSeparating the trigger from the rest of the flow is a deliberate design choice with a big payoff: you can develop and test the entire downstream pipeline with a manual trigger that feeds fixed sample data, then switch to a real schedule or webhook in production without touching any other node. This is why workflow tools always model the trigger as just another node — it keeps the start condition swappable while the logic stays put.",
+        "def manual_trigger(config, _input):\n    # Produces the seed payload. In real tools this might be a webhook body.\n    return [{\"id\": 1, \"total\": 250}, {\"id\": 2, \"total\": 40}, {\"id\": 3, \"total\": 130}]\n\ndef http_like(config, _input):\n    # Pretend to fetch; in production this would call a real endpoint.\n    return _input  # passes the trigger's sample data through unchanged\n\nprint(manual_trigger({}, None))",
+        "python",
+        "Keep the trigger as a swappable node. Develop with a manual trigger feeding sample data, then switch to a schedule or webhook with zero downstream changes."
+      ],
+      [
+        "Nodes transform data; edges decide order",
+        "Each node is a pure-ish function: input data in, output data out. A filter node drops items that fail a condition; a transform node reshapes fields; an action node sends a message or writes a record. Keeping nodes small and single-purpose is what lets a non-programmer assemble surprisingly capable automations by connecting them — and what lets an engineer reason about each one independently.\n\nThe edges encode dependency and order. A node cannot run until the nodes feeding it have produced their output, because it literally has no input until then. That dependency relationship is a directed acyclic graph (DAG), and 'running the workflow' means executing the nodes in an order that respects it: every node runs only after all its inputs are ready. Get the ordering right and the data simply flows; get it wrong and a node runs against data that does not exist yet.",
+        "def filter_node(config, items):\n    return [x for x in items if x[\"total\"] >= config[\"min_total\"]]\n\ndef log_node(config, items):\n    for x in items:\n        print(\"NOTIFY:\", x)\n    return items  # pass through so later nodes could chain\n\nNODE_IMPLS = {\n    \"manual_trigger\": manual_trigger,\n    \"http_like\": http_like,\n    \"filter\": filter_node,\n    \"log\": log_node,\n}\nprint(filter_node({\"min_total\": 100}, manual_trigger({}, None)))",
+        "python",
+        "Small single-purpose nodes plus edges that encode dependencies give you a DAG. A node runs only once all of its inputs exist."
+      ],
+      [
+        "Executing the graph in dependency order",
+        "To run the workflow, the engine must visit nodes in an order where every node's inputs are ready before it executes — a topological sort of the DAG. For a simple linear flow this is just following the chain, but the same algorithm handles branches and merges. The engine walks the graph, computes each node by feeding it the output of its predecessor, and stores results so later nodes can read them.\n\nBuilding this yourself, even minimally, demystifies the whole category of tools. There is no magic runtime — just a loop that resolves dependencies, calls a function per node, and threads data along edges. Once you have written the thirty lines below, the elaborate cloud product becomes legible: it is this engine plus a visual editor, a node library, persistence, and retries. The core is small, and understanding it puts you in control of the abstraction.",
+        "def run_workflow(wf):\n    nodes, edges = wf[\"nodes\"], wf[\"edges\"]\n    incoming = {n: None for n in nodes}            # predecessor of each node\n    for src, dst in edges:\n        incoming[dst] = src\n    order = topo_order(nodes, edges)\n    outputs = {}\n    for name in order:\n        impl = NODE_IMPLS[nodes[name][\"type\"]]\n        pred = incoming[name]\n        data_in = outputs[pred] if pred else None\n        outputs[name] = impl(nodes[name], data_in)   # run the node\n    return outputs\n\ndef topo_order(nodes, edges):\n    deps = {n: 0 for n in nodes}\n    for _, dst in edges:\n        deps[dst] += 1\n    ready = [n for n, d in deps.items() if d == 0]\n    order = []\n    while ready:\n        n = ready.pop()\n        order.append(n)\n        for src, dst in edges:\n            if src == n:\n                deps[dst] -= 1\n                if deps[dst] == 0:\n                    ready.append(dst)\n    return order\n\nrun_workflow(WORKFLOW)  # NOTIFY: {'id': 1, 'total': 250}  /  NOTIFY: {'id': 3, 'total': 130}",
+        "python",
+        "Running a workflow is a topological sort plus one function call per node. No magic runtime — just dependency resolution threading data along edges."
+      ],
+      [
+        "Error handling, branching, and where agents fit",
+        "Real automations are messy, so production-grade engines add a few things on top of the bare loop. Branching lets a node send data down different edges based on a condition (an if-node). Error handling decides what happens when a node throws — stop the whole run, skip just that item, or route failures down a dedicated error edge for retry or alerting. Adding even simple try/except around each node call and an error path makes a toy engine dramatically more useful.\n\nThis is also exactly where AI agents meet workflow automation. A node can wrap a call to a model: classify an incoming email, summarize a document, decide which branch to take. The graph gives you deterministic, inspectable structure around the non-deterministic model — you get the model's judgment at specific, bounded points while edges, filters, and error paths keep the overall flow predictable. That combination, a reliable graph with model-powered nodes at key junctions, is how teams ship dependable automation that still benefits from an LLM.",
+        "def safe_run_node(impl, config, data_in):\n    try:\n        return {\"ok\": True, \"data\": impl(config, data_in)}\n    except Exception as e:                       # route the failure, do not crash the run\n        return {\"ok\": False, \"error\": str(e), \"data\": data_in}\n\ndef classify_node(config, items):\n    # A model-powered node: stubbed here, swap in a local LLM call later.\n    return [{**x, \"tier\": \"high\" if x[\"total\"] >= 200 else \"normal\"} for x in items]\n\nresult = safe_run_node(classify_node, {}, [{\"id\": 1, \"total\": 250}])\nprint(result)  # {'ok': True, 'data': [{'id': 1, 'total': 250, 'tier': 'high'}]}",
+        "python",
+        "Wrap each node in try/except and add error edges so one failure does not kill the run. Put model calls inside individual nodes — the graph keeps the unpredictable part bounded."
+      ]
+    ]
   }
 ]

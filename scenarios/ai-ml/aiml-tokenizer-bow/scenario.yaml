@@ -1,0 +1,95 @@
+title: Tokenizer and Bag-of-Words Counts
+slug: aiml-tokenizer-bow
+technology: ai-ml
+category: AI / ML / LLM & Agents
+description: Before any model can read text it must be turned into numbers. Implement a simple
+  tokenizer that lowercases and splits on word characters, then a bag-of-words counter that maps
+  each distinct token to how many times it appears. This is the front door of every classic NLP
+  pipeline.
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Low
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Lowercase text and split it into word tokens, ignoring punctuation
+- Count how many times each token occurs
+- Return a plain dict so results are deterministic and comparable
+initial_state: Before any model can read text it must be turned into numbers. Implement a simple
+  tokenizer that lowercases and splits on word characters, then a bag-of-words counter that maps
+  each distinct token to how many times it appears. This is the front door of every classic NLP
+  pipeline.
+solution_explanation: |
+  tokenize lowercases the string and uses re.findall(r"[a-z0-9]+", ...) to pull out runs of letters
+  and digits, dropping punctuation and whitespace. bag_of_words feeds those tokens into a
+  collections.Counter and returns it as a dict, mapping each unique token to its frequency. Because
+  the steps are pure and order-independent, the same text always yields the same counts.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement two functions using only the standard library (import re, collections allowed):
+      tokenize(text) -> list[str]: lowercase the text and return the tokens, where a token is a run
+        of letters/digits ([a-z0-9]+). Punctuation and whitespace separate tokens and are dropped.
+      bag_of_words(text) -> dict[str, int]: map each distinct token from tokenize(text) to its count.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      import re
+      import collections
+
+      def tokenize(text):
+          # TODO: lowercase, then return runs of [a-z0-9] as tokens.
+          pass
+
+      def bag_of_words(text):
+          # TODO: count each token from tokenize(text) into a dict.
+          pass
+    readonly: false
+  visible_tests:
+  - name: tokenize lowercases and drops punctuation
+    code: |
+      assert tokenize("Hello, WORLD!") == ["hello", "world"], tokenize("Hello, WORLD!")
+  - name: bag-of-words counts repeats
+    code: |
+      assert bag_of_words("the cat the dog the") == {"the": 3, "cat": 1, "dog": 1}, bag_of_words("the cat the dog the")
+  hidden_tests:
+  - name: empty string yields no tokens
+    code: |
+      assert tokenize("") == [], tokenize("")
+      assert bag_of_words("") == {}, bag_of_words("")
+  - name: digits are tokens
+    code: |
+      assert tokenize("Room 101 has 2 beds") == ["room", "101", "has", "2", "beds"], tokenize("Room 101 has 2 beds")
+  - name: collapses multiple spaces and newlines
+    code: |
+      assert tokenize("a\n\n  b\tc") == ["a", "b", "c"], tokenize("a\n\n  b\tc")
+  - name: bag-of-words is a plain dict
+    code: |
+      r = bag_of_words("a a b")
+      assert type(r) is dict, type(r)
+      assert r == {"a": 2, "b": 1}, r
+  - name: punctuation only yields empty
+    code: |
+      assert bag_of_words("!!! ... ???") == {}, bag_of_words("!!! ... ???")
+  - name: case folds so Cat and cat are one token
+    code: |
+      assert bag_of_words("Cat cat CAT") == {"cat": 3}, bag_of_words("Cat cat CAT")
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Lowercase the text first with text.lower(), then split. re.findall does the splitting and filtering in one step.
+- order: 2
+  cost: 20
+  content: 'For tokenize use: re.findall(r"[a-z0-9]+", text.lower()). It returns only the matching runs.'
+- order: 3
+  cost: 30
+  content: 'For bag_of_words, feed tokenize(text) into collections.Counter and return dict(counter) so the result is a plain dict.'

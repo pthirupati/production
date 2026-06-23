@@ -23,6 +23,7 @@ import MonitoringSimulator from '../components/monitoring/MonitoringSimulator'
 import NmapSimulator from '../components/nmap/NmapSimulator'
 import WiresharkSimulator from '../components/wireshark/WiresharkSimulator'
 import DataDashboardSimulator from '../components/datascience/DataDashboardSimulator'
+import AgentWorkflowSimulator from '../components/aiml/AgentWorkflowSimulator'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
@@ -125,6 +126,8 @@ export default function LabRunner() {
   const [showWiresharkSim, setShowWiresharkSim] = useState(false)
   // Data Science dashboard simulator overlay (opened from the lab toolbar button).
   const [showDataDashboardSim, setShowDataDashboardSim] = useState(false)
+  // AI Agent / Workflow simulator overlay (opened from the lab toolbar button).
+  const [showAgentSim, setShowAgentSim] = useState(false)
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
@@ -929,6 +932,12 @@ export default function LabRunner() {
   // slug, because data-science also hosts coding_mode labs that must keep opening
   // the code IDE.
   const isDataDashboardLab = !isCrossTech && scenario?.simulation_type === 'data-dashboard'
+  // AI Agent / Workflow labs open the in-app n8n-style node-graph builder inline
+  // (palette → canvas → config panel → Run → execution trace + final output).
+  // Keyed ONLY on simulation_type 'ai-agent' — NOT the technology slug, because
+  // the ai-ml technology also hosts coding_mode labs that must keep opening the
+  // code IDE. Mirrors the data-dashboard detection above.
+  const isAgentLab = !isCrossTech && scenario?.simulation_type === 'ai-agent'
   // coding_mode scenarios open a browser surface instead of a terminal. Prompt
   // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
   // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
@@ -1588,6 +1597,17 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open Dashboard
             </button>
           )}
+          {isAgentLab && (
+            <button
+              type="button"
+              onClick={() => setShowAgentSim(true)}
+              title="Open the in-app agent workflow builder: add trigger/LLM/tool/MCP/transform/condition/output nodes, wire them on the canvas, configure each node, run the workflow to see the execution trace + final output, then Check Solution."
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(167,139,250,.45)', color: '#a78bfa', background: 'rgba(167,139,250,.12)' }}
+            >
+              <ExternalLink size={12} /> Open Agent Builder
+            </button>
+          )}
           {isSimulationLab && (
             <>
               <SimLabQuickActions
@@ -1941,6 +1961,32 @@ export default function LabRunner() {
               onExit={() => setShowDataDashboardSim(false)}
               onHints={() => { setShowDataDashboardSim(false); toggleHints() }}
               onStop={() => { setShowDataDashboardSim(false); setShowStopConfirm(true) }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* AI Agent / Workflow builder — full-screen overlay opened from the
+          toolbar. The learner builds/fixes an n8n-style node graph (palette →
+          canvas → config panel), runs it to see the deterministic execution
+          trace + final output, then runs Check Solution (graded via
+          validate_aiml_lab on the engine). */}
+      {isAgentLab && showAgentSim && (
+        <div className="fixed inset-0 z-[60] bg-surface-950">
+          <button
+            type="button"
+            onClick={() => setShowAgentSim(false)}
+            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
+          >
+            <XCircle size={14} /> Close simulator
+          </button>
+          <div className="h-full overflow-auto">
+            <AgentWorkflowSimulator
+              sessionId={sessionId}
+              scenario={scenario}
+              onExit={() => setShowAgentSim(false)}
+              onHints={() => { setShowAgentSim(false); toggleHints() }}
+              onStop={() => { setShowAgentSim(false); setShowStopConfirm(true) }}
             />
           </div>
         </div>

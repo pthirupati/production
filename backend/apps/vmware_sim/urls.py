@@ -1,6 +1,9 @@
 from django.urls import path
 
 from .views import (
+    AimlSimActionView,
+    AimlSimReleaseView,
+    AimlSimStateView,
     DatascienceSimActionView,
     DatascienceSimReleaseView,
     DatascienceSimStateView,
@@ -67,4 +70,9 @@ urlpatterns = [
     path("datascience/sessions/<uuid:session_id>/", DatascienceSimStateView.as_view(), name="datascience-sim-state"),
     path("datascience/sessions/<uuid:session_id>/action/", DatascienceSimActionView.as_view(), name="datascience-sim-action"),
     path("datascience/sessions/<uuid:session_id>/release/", DatascienceSimReleaseView.as_view(), name="datascience-sim-release"),
+
+    # AI / ML simulation (n8n-style agent / workflow builder)
+    path("aiml/sessions/<uuid:session_id>/", AimlSimStateView.as_view(), name="aiml-sim-state"),
+    path("aiml/sessions/<uuid:session_id>/action/", AimlSimActionView.as_view(), name="aiml-sim-action"),
+    path("aiml/sessions/<uuid:session_id>/release/", AimlSimReleaseView.as_view(), name="aiml-sim-release"),
 ]

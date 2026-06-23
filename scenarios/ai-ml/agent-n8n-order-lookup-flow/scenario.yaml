@@ -1,0 +1,41 @@
+title: Wire an n8n-style order-lookup flow
+slug: agent-n8n-order-lookup-flow
+category: AI / ML / LLM & Agents
+description: A webhook delivers a raw customer message as a JSON body, and the team wants an automation
+  that parses it, pulls out the order id and email with a deterministic extractor, then calls the Order
+  API to fetch the order status. Wire the n8n-style flow in the Agent Workflow simulator. All tools are
+  canned and local — no external HTTP, no paid LLM.
+difficulty: medium
+lab_mode: simulation
+simulation_type: ai-agent
+technology: ai-ml
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Open the Agent Workflow simulator from the lab toolbar
+- Add a Transform node (op json_parse) to turn the raw webhook body string into structured fields
+- Add an LLM node in extract mode to pull the order id and email out of the message text
+- Connect Trigger -> Transform -> LLM -> the existing Order API (http_get) tool -> Output and run it so
+  the order is looked up and its status is returned
+initial_state: The canvas has a Webhook trigger (carrying a raw JSON body string), a disconnected Order
+  API http_get tool, and an Output node. Nothing is wired and the body is never parsed — you must build
+  the parsing and extraction steps and connect the whole chain.
+hints:
+- order: 1
+  cost: 10
+  content: The trigger's body is a JSON string under the "body" field. Add a Transform node with op
+    "json_parse" and field "body" so the inner {"text" ...} becomes real payload fields. Wire Trigger ->
+    Transform.
+- order: 2
+  cost: 15
+  content: Add an LLM node in "extract" mode (input_field "text"). It deterministically pulls out the
+    email and order_id via regex. Wire Transform -> LLM, then LLM -> the Order API tool that is already
+    on the canvas.
+- order: 3
+  cost: 20
+  content: Finally connect the Order API tool to the Output node and Run. The http_get tool returns the
+    canned order (status "shipped", order_id 1042); the flow passes once that order status reaches the
+    output.

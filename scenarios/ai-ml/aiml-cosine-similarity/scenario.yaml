@@ -1,0 +1,90 @@
+title: Cosine Similarity Between Vectors
+slug: aiml-cosine-similarity
+technology: ai-ml
+category: AI / ML / LLM & Agents
+description: Embeddings are compared by the angle between them, not their raw magnitude. Implement
+  cosine_similarity(a, b) from scratch with stdlib math — dot product over the product of norms —
+  so two vectors pointing the same direction score 1.0 regardless of length, and orthogonal vectors
+  score 0.0.
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Low
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Compute the dot product of two equal-length vectors
+- Divide by the product of the Euclidean norms
+- Return 0.0 safely when either vector is all zeros
+initial_state: Embeddings are compared by the angle between them, not their raw magnitude. Implement
+  cosine_similarity(a, b) from scratch with stdlib math — dot product over the product of norms —
+  so two vectors pointing the same direction score 1.0 regardless of length, and orthogonal vectors
+  score 0.0.
+solution_explanation: |
+  Cosine similarity is the dot product of the two vectors divided by the product of their magnitudes:
+  sum(ai*bi) / (sqrt(sum(ai^2)) * sqrt(sum(bi^2))). It measures the angle, so a vector and any
+  positive scaling of it score exactly 1.0. When either vector has zero magnitude the denominator is
+  0, so we return 0.0 to avoid dividing by zero.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: |
+    Implement cosine_similarity(a, b) -> float using only the standard library (import math).
+    a and b are equal-length lists of numbers. Return the dot product divided by the product of the
+    two Euclidean norms. If either vector has zero magnitude, return 0.0 (do not divide by zero).
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      import math
+
+      def cosine_similarity(a, b):
+          # TODO: dot(a, b) / (norm(a) * norm(b)); return 0.0 if either norm is 0.
+          pass
+    readonly: false
+  visible_tests:
+  - name: identical direction scores 1.0
+    code: |
+      import math
+      assert math.isclose(cosine_similarity([1, 0], [1, 0]), 1.0, rel_tol=1e-9), cosine_similarity([1, 0], [1, 0])
+  - name: orthogonal vectors score 0.0
+    code: |
+      import math
+      assert math.isclose(cosine_similarity([1, 0], [0, 1]), 0.0, abs_tol=1e-9), cosine_similarity([1, 0], [0, 1])
+  hidden_tests:
+  - name: positive scaling is still 1.0
+    code: |
+      import math
+      assert math.isclose(cosine_similarity([1, 2, 3], [2, 4, 6]), 1.0, rel_tol=1e-9), cosine_similarity([1, 2, 3], [2, 4, 6])
+  - name: opposite direction scores -1.0
+    code: |
+      import math
+      assert math.isclose(cosine_similarity([1, 1], [-1, -1]), -1.0, rel_tol=1e-9), cosine_similarity([1, 1], [-1, -1])
+  - name: known angle value
+    code: |
+      import math
+      # [1,1] vs [1,0]: cos(45deg) = 1/sqrt(2)
+      assert math.isclose(cosine_similarity([1, 1], [1, 0]), 1 / math.sqrt(2), rel_tol=1e-9), cosine_similarity([1, 1], [1, 0])
+  - name: zero vector returns 0.0
+    code: |
+      assert cosine_similarity([0, 0, 0], [1, 2, 3]) == 0.0, cosine_similarity([0, 0, 0], [1, 2, 3])
+  - name: floats supported
+    code: |
+      import math
+      assert math.isclose(cosine_similarity([0.5, 0.5], [0.5, 0.5]), 1.0, rel_tol=1e-9), cosine_similarity([0.5, 0.5], [0.5, 0.5])
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: The dot product is sum(x * y for x, y in zip(a, b)). The norm of a vector is math.sqrt(sum(x * x for x in a)).
+- order: 2
+  cost: 20
+  content: Cosine similarity = dot / (norm_a * norm_b). Compute the denominator first so you can guard it.
+- order: 3
+  cost: 30
+  content: 'If norm_a == 0 or norm_b == 0, return 0.0 before dividing — otherwise you get a ZeroDivisionError.'

@@ -1,0 +1,39 @@
+title: Add an MCP tool so the agent can answer a data question
+slug: agent-mcp-metrics-answer
+category: AI / ML / LLM & Agents
+description: An ops chat agent recognises infrastructure questions but has no way to fetch live data, so
+  it just guesses. Give it real grounding by adding a Model-Context-Protocol (MCP) tool node that calls
+  the metrics MCP server, and wire it in so the agent's answer carries the real CPU figure for the host.
+  The MCP server is simulated and deterministic — same call, same data, no network.
+difficulty: hard
+lab_mode: simulation
+simulation_type: ai-agent
+technology: ai-ml
+jira_priority: High
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Open the Agent Workflow simulator and run the flow to see the agent answer without real data
+- Add an MCP tool node configured for server "metrics" and tool "get_cpu"
+- Wire Trigger -> LLM -> MCP tool -> Output so the live CPU metric flows into the final answer
+- Run the workflow so the answer includes the real CPU percentage returned by the MCP server
+initial_state: The canvas has a Trigger (an ops question about CPU on web01) connected to an LLM intent
+  classifier, plus a disconnected Output node. There is no MCP tool, so the agent can recognise the
+  question but cannot fetch the metric — the output never contains a CPU figure.
+hints:
+- order: 1
+  cost: 10
+  content: The LLM already classifies the question, but classification alone can't answer "what is the
+    CPU?". Open the node palette and add an MCP Tool node. Inspect the catalog — the "metrics" MCP
+    server exposes a get_cpu tool.
+- order: 2
+  cost: 15
+  content: Configure the new MCP tool node with server "metrics" and tool "get_cpu". Then wire the LLM
+    node into the MCP tool node so the request flows through after intent is recognised.
+- order: 3
+  cost: 20
+  content: Connect the MCP tool node to the Output node and Run. The MCP server returns a deterministic
+    cpu_pct of 82 for web01 under mcp_data; once that real figure reaches the output, the agent can
+    answer the data question and the lab passes.

@@ -1,0 +1,43 @@
+title: Fix the misrouting billing-escalation agent
+slug: agent-fix-misrouted-escalation
+category: AI / ML / LLM & Agents
+description: An existing triage agent is supposed to escalate high-priority billing tickets, but it is
+  broken. The "LLM" node is summarising instead of classifying, the condition checks the wrong field,
+  and the escalation is wired to the wrong branch so it calls a logging query instead of paging the
+  billing team. Debug the agent in the Agent Workflow simulator and make the refund ticket escalate
+  correctly. Everything is deterministic and local.
+difficulty: medium
+lab_mode: simulation
+simulation_type: ai-agent
+technology: ai-ml
+jira_priority: High
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Open the Agent Workflow simulator and run the broken flow to see what it currently does
+- Reconfigure the LLM node from summarize mode to classify mode so it produces a category and priority
+- Fix the Condition node to detect a high-priority ticket (field priority, equals high)
+- Re-route the escalation so the high-priority (true) branch reaches the send_notification tool, then
+  run it so the billing refund ticket is escalated
+initial_state: The full graph already exists but is wired wrong on three counts — the LLM is in
+  summarize mode, the condition compares sentiment==positive, and the send_notification tool sits on the
+  false branch while a db_query sits on the true branch. The escalation never fires.
+hints:
+- order: 1
+  cost: 10
+  content: Open the node config for the LLM ("Classifier") node and change its mode from "summarize" to
+    "classify". Run the workflow and look at the trace — now you get category and priority fields to
+    route on.
+- order: 2
+  cost: 15
+  content: Edit the Condition ("Route") node — it currently checks field "sentiment" equals "positive".
+    Change it to field "priority", op "equals", value "high" so a high-priority ticket takes the true
+    branch.
+- order: 3
+  cost: 20
+  content: The send_notification ("Escalate") tool is on the false branch and a db_query on the true
+    branch. Disconnect those two edges and reconnect so the condition's TRUE branch goes into the
+    send_notification tool. Run it — the duplicate-charge refund ticket classifies as high-priority
+    billing and the escalation notification fires.
