@@ -9131,17 +9131,23 @@ class Command(BaseCommand):
                     task.depends_on = dep
                     task.save(update_fields=["depends_on"])
 
-            # Give the project a launchable environment: the first active scenario
-            # of its technology, so "Start project" opens that tech's lab
-            # (terminal / simulation / coding IDE / VMware / Grafana). Only set
-            # when unset, so an explicit per-project mapping is never overwritten.
-            if project.lab_scenario_id is None:
-                env_scn = (
-                    Scenario.objects.filter(technology=tech, is_active=True)
-                    .order_by("difficulty", "id")
-                    .first()
-                )
-                if env_scn is not None:
+            # Give the project a launchable environment: an active scenario of its
+            # technology, so "Start project" opens that tech's lab (terminal /
+            # simulation / coding IDE / VMware / Grafana). Prefer a FREE scenario so
+            # Start works for any signed-in user without a subscription; only fall
+            # back to a paid one if the technology has no free scenario.
+            base = Scenario.objects.filter(technology=tech, is_active=True)
+            free_scn = base.filter(is_free=True).order_by("difficulty", "id").first()
+            current = project.lab_scenario
+            # Set when unset; also self-heal earlier auto-links that landed on a
+            # paid scenario (the lab_scenario feature is new — those were never an
+            # explicit choice) by re-pointing them to a free one when available.
+            needs_link = current is None or (
+                free_scn is not None and current is not None and not current.is_free
+            )
+            if needs_link:
+                env_scn = free_scn or base.order_by("difficulty", "id").first()
+                if env_scn is not None and env_scn.id != project.lab_scenario_id:
                     project.lab_scenario = env_scn
                     project.save(update_fields=["lab_scenario"])
 

@@ -3615,6 +3615,22 @@ class AdminFleetMonitoringView(APIView):
                     continue
                 card["error"] = fetched.get("error")
 
+            # Labs node: no HTTP agent, but the app node ALREADY reaches it over
+            # the existing ssh:// Docker engine (DOCKER_SOCKET=ssh://root@labs) for
+            # lab containers. Read its real host CPU/mem/disk over that same path —
+            # zero new SSH wiring, agent, secret, or firewall rule.
+            if (cnode.get("role") or "").lower() == "labs":
+                live = self._labs_host_metrics()
+                if live:
+                    card.update(live)
+                    card.update(self._base_card(cnode))  # topology fields authoritative
+                    card["is_local"] = False
+                    card["status"] = "online"
+                    card["metrics_source"] = "ssh-docker"
+                    card["metrics_available"] = True
+                    nodes.append(card)
+                    continue
+
             # No agent (or agent unreachable): TCP-probe for reachability so the
             # operator still sees the node up, just without host metrics.
             reachable, probe_err = self._probe(cnode)
@@ -3646,6 +3662,148 @@ class AdminFleetMonitoringView(APIView):
             "droplet_id": cnode.get("droplet_id"),
             "is_local": False,
         }
+
+    @staticmethod
+    def _labs_host_metrics():
+        """Live host CPU/mem/disk/load for the labs node, read over the SAME
+        ssh:// Docker engine the app node already uses for lab containers.
+
+        Runs ONE short-lived, unprivileged container (network disabled, read-only
+        rootfs, 64 MB cap, read-only host mount only for the disk figure) that
+        reads /proc — which reflects the host on these droplets (no lxcfs). Never
+        raises; returns None on any failure so the caller falls back to a TCP
+        probe. The fleet payload is cached (CACHE_TTL) so this spins at most once
+        per poll window.
+        """
+        try:
+            client = AdminMonitoringContainersView._labs_client()
+            if client is None:
+                return None
+            image = getattr(settings, "SANDBOX_PYTHON_IMAGE", "python:3.12-alpine")
+            try:
+                client.images.get(image)  # never trigger a (slow) pull on this path
+            except Exception:
+                return None
+            cmd = (
+                "sh -c 'head -1 /proc/stat; sleep 0.3; echo @@; head -1 /proc/stat; "
+                "echo @@; cat /proc/meminfo; echo @@; cat /proc/uptime; echo @@; "
+                "cat /proc/loadavg; echo @@; df -k /hostroot 2>/dev/null | tail -1; "
+                "echo @@; nproc'"
+            )
+            out = client.containers.run(
+                image,
+                cmd,
+                remove=True,
+                network_mode="none",
+                mem_limit="64m",
+                read_only=True,
+                volumes={"/": {"bind": "/hostroot", "mode": "ro"}},
+            )
+            if isinstance(out, (bytes, bytearray)):
+                out = out.decode("utf-8", "replace")
+            return AdminFleetMonitoringView._parse_labs_proc(out)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _parse_labs_proc(out):
+        """Parse the labs /proc snapshot into the same dict shape
+        collect_local_metrics emits, so the frontend card renders unchanged."""
+        import time
+
+        from .server_metrics import _round
+
+        segs = [s.strip() for s in (out or "").split("@@")]
+        if len(segs) < 7:
+            return None
+
+        def _cpu_totals(line):
+            parts = [float(p) for p in line.split()[1:]]
+            idle = parts[3] + (parts[4] if len(parts) > 4 else 0.0)  # idle + iowait
+            return sum(parts), idle
+
+        cpu_percent = None
+        try:
+            t0, i0 = _cpu_totals(segs[0].splitlines()[0])
+            t1, i1 = _cpu_totals(segs[1].splitlines()[0])
+            dt, di = (t1 - t0), (i1 - i0)
+            if dt > 0:
+                cpu_percent = _round(100.0 * (1.0 - di / dt))
+        except Exception:
+            pass
+
+        mem = {"mem_total": None, "mem_used": None, "mem_available": None, "mem_percent": None}
+        try:
+            info = {}
+            for line in segs[2].splitlines():
+                key, _, rest = line.partition(":")
+                rest = rest.strip()
+                if rest:
+                    info[key.strip()] = float(rest.split()[0]) * 1024  # kB → bytes
+            total = info.get("MemTotal")
+            if total:
+                avail = info.get("MemAvailable")
+                if avail is None:
+                    avail = info.get("MemFree", 0) + info.get("Buffers", 0) + info.get("Cached", 0)
+                used = max(total - avail, 0)
+                mem = {
+                    "mem_total": int(total),
+                    "mem_used": int(used),
+                    "mem_available": int(avail),
+                    "mem_percent": _round(100.0 * used / total),
+                }
+        except Exception:
+            pass
+
+        try:
+            uptime = int(float(segs[3].split()[0]))
+        except Exception:
+            uptime = None
+
+        load = {"load_1": None, "load_5": None, "load_15": None}
+        try:
+            parts = segs[4].split()
+            load = {
+                "load_1": _round(float(parts[0]), 2),
+                "load_5": _round(float(parts[1]), 2),
+                "load_15": _round(float(parts[2]), 2),
+            }
+        except Exception:
+            pass
+
+        disk = {"disk_total": None, "disk_used": None, "disk_free": None, "disk_percent": None}
+        try:
+            # df -k line: Filesystem  1K-blocks  Used  Available  Use%  Mounted-on
+            cols = segs[5].split()
+            blocks = float(cols[1]) * 1024
+            used_b = float(cols[2]) * 1024
+            avail_b = float(cols[3]) * 1024
+            disk = {
+                "disk_total": int(blocks),
+                "disk_used": int(used_b),
+                "disk_free": int(avail_b),
+                "disk_percent": _round(100.0 * used_b / blocks) if blocks else None,
+            }
+        except Exception:
+            pass
+
+        try:
+            cpu_count = int(segs[6].split()[0])
+        except Exception:
+            cpu_count = None
+
+        result = {
+            "cpu_percent": cpu_percent,
+            "cpu_count": cpu_count,
+            "uptime_seconds": uptime,
+            "process_count": None,
+            "source": "ssh-docker",
+            "collected_at": int(time.time()),
+        }
+        result.update(mem)
+        result.update(load)
+        result.update(disk)
+        return result
 
     @staticmethod
     def _summarise(nodes):

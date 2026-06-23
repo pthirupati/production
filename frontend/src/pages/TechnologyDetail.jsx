@@ -166,7 +166,12 @@ export default function TechnologyDetail() {
           toast.success(`Project workspace ready: ${project.title}`)
           navigate(`/lab/${session.id}`, { state: { techSlug: slug } })
           return
-        } catch {
+        } catch (e) {
+          // Tell the user why the workspace didn't open instead of silently
+          // dropping to the checklist (e.g. a subscription-gated lab).
+          if (e?.response?.status === 403) {
+            toast.error(e.response?.data?.error || 'Subscribe to this technology to open the project workspace.')
+          }
           // Fall through to the checklist view if the environment can't start.
         }
       }

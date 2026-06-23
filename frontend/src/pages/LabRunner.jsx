@@ -506,7 +506,7 @@ export default function LabRunner() {
         } catch {}
         clearSession()
         stopTimer()
-        navigate('/scenarios')
+        navigate(techSlugRef.current ? `/technologies/${techSlugRef.current}` : '/scenarios')
       }, IDLE_TIMEOUT)
     }
 
@@ -697,7 +697,7 @@ export default function LabRunner() {
       startTimer(res.time_remaining, async () => {
         await labApi.stopLab(sessionId)
         clearSession()
-        navigate('/scenarios')
+        navigate(techSlugRef.current ? `/technologies/${techSlugRef.current}` : '/scenarios')
       })
       toast.success(`+30 min added. ${res.extensions_remaining} extension${res.extensions_remaining !== 1 ? 's' : ''} remaining today.`)
     } catch (err) {
@@ -771,11 +771,12 @@ export default function LabRunner() {
         }
       }
 
+      const stopDest = techSlugRef.current ? `/technologies/${techSlugRef.current}` : '/scenarios'
       toast.success('Lab stopped successfully')
-      navigate('/scenarios')
+      navigate(stopDest)
     } catch {
       toast.error('Failed to stop lab')
-      navigate('/scenarios')
+      navigate(techSlugRef.current ? `/technologies/${techSlugRef.current}` : '/scenarios')
     } finally {
       setStopping(false)
       setShowStopConfirm(false)

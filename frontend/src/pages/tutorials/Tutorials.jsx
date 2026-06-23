@@ -63,7 +63,7 @@ export default function Tutorials() {
         setTutorials(data?.tutorials || [])
         setTopics(data?.topics || [])
       })
-      .catch(() => {})
+      .catch((err) => { if (!cancelled) console.error('Failed to load tutorials', err) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])

@@ -5,7 +5,11 @@ export const tutorialApi = {
   async list(topic = '') {
     const params = topic ? { topic } : undefined
     const { data } = await api.get('/tutorials/', { params, silentError: true })
-    return data // { tutorials: [...], topics: [...] }
+    // Tolerate any response shape: { tutorials, topics }, a bare array, or a
+    // DRF { results } envelope — so a backend/serializer change can't blank the page.
+    const tutorials = Array.isArray(data) ? data : (data?.tutorials ?? data?.results ?? [])
+    const topics = data?.topics ?? [...new Set(tutorials.map((t) => t.topic).filter(Boolean))]
+    return { tutorials, topics }
   },
 
   async detail(slug) {
