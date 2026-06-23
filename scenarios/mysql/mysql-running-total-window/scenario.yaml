@@ -1,0 +1,128 @@
+title: Running Total of Daily Sales
+slug: mysql-running-total-window
+technology: mysql
+category: MySQL
+description: A sales dashboard needs a cumulative (running) total alongside each day's revenue, so the
+  team can see the month build up day by day. Implement it with a window function that sums every
+  amount from the first day through the current row, ordered by day.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Order rows chronologically by day
+- Use SUM(...) OVER (ORDER BY ...) to accumulate a running total
+- Return each day's amount alongside the cumulative total to date
+initial_state: A sales dashboard needs a cumulative (running) total alongside each day's revenue, so
+  the team can see the month build up day by day. Implement it with a window function that sums every
+  amount from the first day through the current row, ordered by day.
+solution_explanation: |
+  A running total is a windowed aggregate: SUM(amount) OVER (ORDER BY day ...) computes the sum over a
+  moving frame that, by default with an ORDER BY, runs from the first row up to the current one.
+  Stating the frame explicitly — ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW — makes the intent
+  unambiguous. Unlike GROUP BY, a window function keeps every original row, so each day still appears
+  with both its own amount and the cumulative total through that day.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: implement
+  instructions: |
+    Implement solution(conn) so it returns, for each day in daily_sales, a row of
+    (day, amount, running_total), where running_total is the sum of every amount from the earliest
+    day through this one. Order the result by day ascending. Use a window function.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      import sqlite3
+
+      def solution(conn):
+          # TODO: return (day, amount, running_total) for each day, ordered by day.
+          # running_total must accumulate every amount from the first day through
+          # the current one. Use a window function: SUM(amount) OVER (ORDER BY day ...).
+          # This stub returns a constant 0 running total and is intentionally wrong.
+          return conn.execute(
+              """
+              SELECT day, amount, 0 AS running_total
+              FROM daily_sales
+              ORDER BY day
+              """
+          ).fetchall()
+    readonly: false
+  visible_tests:
+  - name: accumulates day by day
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE daily_sales (day TEXT PRIMARY KEY, amount REAL);"
+          "INSERT INTO daily_sales (day, amount) VALUES "
+          "('2024-01-01',100.0),('2024-01-02',50.0),('2024-01-03',25.0),('2024-01-04',75.0);"
+      )
+      assert solution(conn) == [
+          ('2024-01-01', 100.0, 100.0),
+          ('2024-01-02', 50.0, 150.0),
+          ('2024-01-03', 25.0, 175.0),
+          ('2024-01-04', 75.0, 250.0),
+      ], solution(conn)
+  - name: single day equals its own amount
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE daily_sales (day TEXT PRIMARY KEY, amount REAL);"
+          "INSERT INTO daily_sales (day, amount) VALUES ('2024-05-01', 9.0);"
+      )
+      assert solution(conn) == [('2024-05-01', 9.0, 9.0)], solution(conn)
+  hidden_tests:
+  - name: final running total equals grand total
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE daily_sales (day TEXT PRIMARY KEY, amount REAL);"
+          "INSERT INTO daily_sales (day, amount) VALUES ('a',1.0),('b',2.0),('c',3.0);"
+      )
+      res = solution(conn)
+      assert [r[2] for r in res] == [1.0, 3.0, 6.0], res
+  - name: each row keeps its own amount
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE daily_sales (day TEXT PRIMARY KEY, amount REAL);"
+          "INSERT INTO daily_sales (day, amount) VALUES ('d1',10.0),('d2',20.0);"
+      )
+      res = solution(conn)
+      assert res == [('d1', 10.0, 10.0), ('d2', 20.0, 30.0)], res
+  - name: handles unordered inserts
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE daily_sales (day TEXT PRIMARY KEY, amount REAL);"
+          "INSERT INTO daily_sales (day, amount) VALUES ('2024-03-03',3.0),('2024-03-01',1.0),('2024-03-02',2.0);"
+      )
+      res = solution(conn)
+      assert res == [
+          ('2024-03-01', 1.0, 1.0),
+          ('2024-03-02', 2.0, 3.0),
+          ('2024-03-03', 3.0, 6.0),
+      ], res
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: A GROUP BY would collapse the days into one row. You want to keep every day, so reach for a window function instead.
+- order: 2
+  cost: 20
+  content: 'SUM(amount) OVER (ORDER BY day) computes a cumulative sum because an ORDER BY in the window defaults to summing from the first row to the current one.'
+- order: 3
+  cost: 30
+  content: 'Select day, amount, SUM(amount) OVER (ORDER BY day ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total, ordered by day.'

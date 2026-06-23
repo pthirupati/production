@@ -1,0 +1,121 @@
+title: Join Customers to Their Orders
+slug: mysql-join-customer-orders
+technology: mysql
+category: MySQL
+description: A reporting query should pair every order with the name of the customer who placed it,
+  but the starter forgot the join condition, so the database pairs every customer with every order
+  (a cartesian product). Add the ON clause so each order shows only its real customer.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Low
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See how a missing ON clause produces a cartesian product
+- Join orders to customers on the matching key
+- Return one row per order with the correct customer name
+initial_state: A reporting query should pair every order with the name of the customer who placed it,
+  but the starter forgot the join condition, so the database pairs every customer with every order
+  (a cartesian product). Add the ON clause so each order shows only its real customer.
+solution_explanation: |
+  Listing two tables without a join predicate cross-joins them: every customer row is matched to
+  every order row. Adding ON o.customer_id = c.id keeps only the pairs where the order actually
+  belongs to that customer, giving one row per order.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix solution(conn) so it returns, for every order, a row of (customer_name, order_id, amount),
+    ordered by customer name then order id. Only real customer/order pairs should appear.
+    The starter cross-joins the tables — add the join condition.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      import sqlite3
+
+      def solution(conn):
+          # BUG: the tables are listed without a join condition, so this
+          # produces a cartesian product (every customer paired with every order).
+          return conn.execute(
+              """
+              SELECT c.name, o.id AS order_id, o.amount
+              FROM customers c, orders o
+              ORDER BY c.name, o.id
+              """
+          ).fetchall()
+    readonly: false
+  visible_tests:
+  - name: pairs each order with its own customer
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);"
+          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount REAL);"
+          "INSERT INTO customers (id, name) VALUES (1,'Ada'),(2,'Bo'),(3,'Cy');"
+          "INSERT INTO orders (id, customer_id, amount) VALUES (10,1,50.0),(11,1,25.5),(12,2,99.0);"
+      )
+      assert solution(conn) == [('Ada', 10, 50.0), ('Ada', 11, 25.5), ('Bo', 12, 99.0)], solution(conn)
+  - name: customer with no orders is excluded
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);"
+          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount REAL);"
+          "INSERT INTO customers (id, name) VALUES (1,'Ada'),(2,'Bo'),(3,'Cy');"
+          "INSERT INTO orders (id, customer_id, amount) VALUES (10,1,50.0),(11,1,25.5),(12,2,99.0);"
+      )
+      names = [r[0] for r in solution(conn)]
+      assert 'Cy' not in names, names
+  hidden_tests:
+  - name: row count equals order count
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);"
+          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount REAL);"
+          "INSERT INTO customers (id, name) VALUES (1,'Ada'),(2,'Bo'),(3,'Cy');"
+          "INSERT INTO orders (id, customer_id, amount) VALUES (10,1,50.0),(11,1,25.5),(12,2,99.0);"
+      )
+      assert len(solution(conn)) == 3, len(solution(conn))
+  - name: one customer with several orders
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);"
+          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount REAL);"
+          "INSERT INTO customers (id, name) VALUES (1,'Zoe');"
+          "INSERT INTO orders (id, customer_id, amount) VALUES (5,1,10.0),(6,1,20.0),(7,1,30.0);"
+      )
+      assert solution(conn) == [('Zoe',5,10.0),('Zoe',6,20.0),('Zoe',7,30.0)], solution(conn)
+  - name: no orders yields empty result
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);"
+          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount REAL);"
+          "INSERT INTO customers (id, name) VALUES (1,'Solo');"
+      )
+      assert solution(conn) == [], solution(conn)
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Run it and count the rows — with 3 customers and 3 orders you get 9 rows, not 3. That is a cartesian product.
+- order: 2
+  cost: 20
+  content: An order knows its customer through orders.customer_id. The query must restrict pairs to where that equals customers.id.
+- order: 3
+  cost: 30
+  content: 'Use an explicit join: FROM customers c JOIN orders o ON o.customer_id = c.id.'

@@ -1,0 +1,12 @@
+name: React Development
+slug: react
+description: Browser-based React coding challenges — fix and build the pure logic
+  behind React apps (reducers, selectors, validators, custom hooks, entity
+  normalization) as plain testable functions in a full in-browser IDE with instant
+  feedback and server-graded hidden tests. No rendering required.
+icon: code
+color: cyan
+order: 17
+price: 0
+is_active: true
+coming_soon: false

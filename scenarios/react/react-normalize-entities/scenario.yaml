@@ -1,0 +1,182 @@
+title: Normalize and Denormalize Entity State
+slug: react-normalize-entities
+technology: react
+category: React Development
+description: A React app fetches a nested list of authors-with-posts from an API and wants to store it
+  in normalized form (entities keyed by id + an ordered id list) so updates are O(1) and components
+  can subscribe to a single entity. Implement normalizeAuthors, denormalizeAuthor, and a pure
+  upsertPost update — the data-layer logic behind a normalized Redux/useReducer store, with no
+  mutation of the existing state.
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: High
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Flatten a nested API payload into { entities, ids } normalized state
+- Rebuild (denormalize) the nested shape for a single id on demand
+- Apply an immutable upsert that touches only the affected entities
+initial_state: A React app stores authors-with-posts in normalized form (entities keyed by id + an
+  ordered id list). Implement normalizeAuthors, denormalizeAuthor, and a pure upsertPost update — the
+  data-layer logic behind a normalized store, with no mutation of existing state.
+solution_explanation: |
+  Normalization is how serious React/Redux apps keep large relational data fast and consistent: instead
+  of deeply nested arrays, you store a flat lookup of entities by id plus an ordered list of ids. Three
+  pieces work together here. normalizeAuthors walks the nested payload and produces two slices — authors
+  { entities, ids } and posts { entities, ids } — where each author keeps only its postIds (the relation),
+  not the embedded post objects. denormalizeAuthor reverses this for one author id, rehydrating the nested
+  shape by looking each postId up in the posts slice (returning null for a missing author). upsertPost is a
+  pure reducer-style update: inserting a new post adds it to posts.entities, appends its id to posts.ids and
+  to the author's postIds; editing an existing post merges fields without changing any id arrays. Every step
+  returns NEW objects/arrays so the previous state is never mutated — the invariant that lets React and
+  reselect-style memoization detect exactly what changed.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: implement
+  instructions: |
+    Implement three pure functions over normalized author/post state. No DOM, no mutation of inputs.
+
+    State shape (the "store"):
+      {
+        authors: { entities: { [id]: { id, name, postIds: number[] } }, ids: number[] },
+        posts:   { entities: { [id]: { id, authorId, title } },          ids: number[] }
+      }
+
+    1) normalizeAuthors(authorList)
+       Input: [{ id, name, posts: [{ id, title }] }, ...]
+       Output: the store shape above.
+         - authors.ids preserves the input author order; each author keeps postIds (the post id list)
+           in the order its posts appeared, and does NOT keep the nested `posts` array.
+         - posts.ids preserves the order posts are encountered while walking authors in order.
+         - each stored post is { id, authorId, title } (authorId = the author it belonged to).
+
+    2) denormalizeAuthor(store, authorId)
+       Return { id, name, posts: [{ id, title }] } for that author, with posts rebuilt from store.posts
+       in the author's postIds order. Return null if the author id is not present.
+       Each rebuilt post is { id, title } only. Do not mutate the store.
+
+    3) upsertPost(store, post)   // post = { id, authorId, title }
+       Return a NEW store with the post inserted or updated, immutably:
+         - if a post with that id already exists: merge the new fields onto it; do NOT change any
+           ids arrays or postIds (the id arrays stay identical).
+         - if it is new: add it to posts.entities, append its id to posts.ids, and append its id to
+           the author's postIds (the author must already exist).
+       Never mutate the incoming store, its slices, its entities, or its arrays.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function normalizeAuthors(authorList) {
+        // TODO: flatten into { authors: { entities, ids }, posts: { entities, ids } }
+        return { authors: { entities: {}, ids: [] }, posts: { entities: {}, ids: [] } };
+      }
+
+      function denormalizeAuthor(store, authorId) {
+        // TODO: rebuild { id, name, posts: [{ id, title }] }, or null if missing
+        return null;
+      }
+
+      function upsertPost(store, post) {
+        // TODO: return a NEW store with the post inserted or merged, immutably
+        return store;
+      }
+    readonly: false
+  visible_tests:
+  - name: normalize flattens authors and posts
+    code: |
+      const store = normalizeAuthors([
+        { id: 1, name: 'Ann', posts: [{ id: 10, title: 'Hi' }, { id: 11, title: 'Yo' }] },
+        { id: 2, name: 'Bob', posts: [{ id: 20, title: 'Sup' }] },
+      ]);
+      assert(JSON.stringify(store.authors.ids) === JSON.stringify([1, 2]), JSON.stringify(store.authors.ids));
+      assert(JSON.stringify(store.posts.ids) === JSON.stringify([10, 11, 20]), JSON.stringify(store.posts.ids));
+      assert(JSON.stringify(store.authors.entities[1].postIds) === JSON.stringify([10, 11]), JSON.stringify(store.authors.entities[1].postIds));
+      assert(store.authors.entities[1].posts === undefined, 'author should not keep nested posts');
+      assert(store.posts.entities[20].authorId === 2, JSON.stringify(store.posts.entities[20]));
+  - name: denormalize rebuilds one author
+    code: |
+      const store = normalizeAuthors([
+        { id: 1, name: 'Ann', posts: [{ id: 10, title: 'Hi' }, { id: 11, title: 'Yo' }] },
+      ]);
+      const ann = denormalizeAuthor(store, 1);
+      assert(ann.id === 1 && ann.name === 'Ann', JSON.stringify(ann));
+      assert(JSON.stringify(ann.posts) === JSON.stringify([{ id: 10, title: 'Hi' }, { id: 11, title: 'Yo' }]), JSON.stringify(ann.posts));
+  hidden_tests:
+  - name: normalize handles authors with no posts
+    code: |
+      const store = normalizeAuthors([{ id: 5, name: 'Cy', posts: [] }]);
+      assert(JSON.stringify(store.authors.entities[5].postIds) === JSON.stringify([]), JSON.stringify(store.authors.entities[5].postIds));
+      assert(store.posts.ids.length === 0, JSON.stringify(store.posts.ids));
+  - name: denormalize returns null for a missing author
+    code: |
+      const store = normalizeAuthors([{ id: 1, name: 'Ann', posts: [] }]);
+      assert(denormalizeAuthor(store, 999) === null, 'expected null for missing author');
+  - name: denormalize does not leak authorId into rebuilt posts
+    code: |
+      const store = normalizeAuthors([{ id: 1, name: 'Ann', posts: [{ id: 10, title: 'Hi' }] }]);
+      const ann = denormalizeAuthor(store, 1);
+      assert(Object.keys(ann.posts[0]).sort().join(',') === 'id,title', JSON.stringify(ann.posts[0]));
+  - name: upsert inserts a new post and updates relations
+    code: |
+      const store = normalizeAuthors([{ id: 1, name: 'Ann', posts: [{ id: 10, title: 'Hi' }] }]);
+      const next = upsertPost(store, { id: 11, authorId: 1, title: 'New' });
+      assert(JSON.stringify(next.posts.ids) === JSON.stringify([10, 11]), JSON.stringify(next.posts.ids));
+      assert(JSON.stringify(next.authors.entities[1].postIds) === JSON.stringify([10, 11]), JSON.stringify(next.authors.entities[1].postIds));
+      assert(next.posts.entities[11].title === 'New', JSON.stringify(next.posts.entities[11]));
+  - name: upsert insert does not mutate the previous store
+    code: |
+      const store = normalizeAuthors([{ id: 1, name: 'Ann', posts: [{ id: 10, title: 'Hi' }] }]);
+      upsertPost(store, { id: 11, authorId: 1, title: 'New' });
+      assert(JSON.stringify(store.posts.ids) === JSON.stringify([10]), 'posts.ids mutated: ' + JSON.stringify(store.posts.ids));
+      assert(JSON.stringify(store.authors.entities[1].postIds) === JSON.stringify([10]), 'postIds mutated: ' + JSON.stringify(store.authors.entities[1].postIds));
+  - name: upsert edit merges fields without touching id arrays
+    code: |
+      const store = normalizeAuthors([{ id: 1, name: 'Ann', posts: [{ id: 10, title: 'Hi' }] }]);
+      const next = upsertPost(store, { id: 10, authorId: 1, title: 'Edited' });
+      assert(next.posts.entities[10].title === 'Edited', JSON.stringify(next.posts.entities[10]));
+      assert(JSON.stringify(next.posts.ids) === JSON.stringify([10]), JSON.stringify(next.posts.ids));
+      assert(JSON.stringify(next.authors.entities[1].postIds) === JSON.stringify([10]), JSON.stringify(next.authors.entities[1].postIds));
+  - name: upsert edit does not mutate the previous entity
+    code: |
+      const store = normalizeAuthors([{ id: 1, name: 'Ann', posts: [{ id: 10, title: 'Hi' }] }]);
+      upsertPost(store, { id: 10, authorId: 1, title: 'Edited' });
+      assert(store.posts.entities[10].title === 'Hi', 'previous entity mutated: ' + JSON.stringify(store.posts.entities[10]));
+  - name: upsert returns a new store and new posts slice
+    code: |
+      const store = normalizeAuthors([{ id: 1, name: 'Ann', posts: [{ id: 10, title: 'Hi' }] }]);
+      const next = upsertPost(store, { id: 11, authorId: 1, title: 'New' });
+      assert(next !== store, 'returned the same store reference');
+      assert(next.posts !== store.posts, 'reused the posts slice');
+      assert(next.posts.entities !== store.posts.entities, 'reused the posts.entities object');
+  - name: full round trip after an insert
+    code: |
+      let store = normalizeAuthors([{ id: 1, name: 'Ann', posts: [{ id: 10, title: 'Hi' }] }]);
+      store = upsertPost(store, { id: 11, authorId: 1, title: 'Yo' });
+      const ann = denormalizeAuthor(store, 1);
+      assert(JSON.stringify(ann.posts) === JSON.stringify([{ id: 10, title: 'Hi' }, { id: 11, title: 'Yo' }]), JSON.stringify(ann.posts));
+  - name: posts order follows author walk order across authors
+    code: |
+      const store = normalizeAuthors([
+        { id: 1, name: 'Ann', posts: [{ id: 10, title: 'a' }] },
+        { id: 2, name: 'Bob', posts: [{ id: 20, title: 'b' }, { id: 21, title: 'c' }] },
+        { id: 3, name: 'Cy', posts: [{ id: 30, title: 'd' }] },
+      ]);
+      assert(JSON.stringify(store.posts.ids) === JSON.stringify([10, 20, 21, 30]), JSON.stringify(store.posts.ids));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: "In normalizeAuthors, loop authors in order. For each author push its id to authors.ids, store { id, name, postIds: [] }, then loop its posts: push each post id to that author's postIds and to posts.ids, and store { id, authorId: author.id, title } in posts.entities."
+- order: 2
+  cost: 20
+  content: "denormalizeAuthor: if !store.authors.entities[authorId] return null; otherwise map the author's postIds through store.posts.entities and project each to { id, title } only."
+- order: 3
+  cost: 30
+  content: "upsertPost: build a new posts.entities with { ...store.posts.entities, [post.id]: { ...store.posts.entities[post.id], ...post } }. If the id is new, also append it to a copied posts.ids and to a copied author's postIds; if it already exists, leave both id arrays as-is. Spread every level you change so nothing is mutated."

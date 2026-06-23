@@ -1,0 +1,119 @@
+title: Fix the Aggregate Filter (WHERE vs HAVING)
+slug: pg-fix-having-aggregate-filter
+technology: postgresql
+category: PostgreSQL Development
+description: A sales report should list only categories whose TOTAL quantity sold is at least 10, but the
+  query filters with `WHERE SUM(quantity) >= 10`. Aggregates cannot be used in WHERE — it is evaluated
+  per row, before grouping — so the query errors or filters the wrong thing. Move the aggregate condition
+  into a HAVING clause that runs after GROUP BY.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Low
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See why an aggregate cannot live in a WHERE clause
+- Move the SUM() condition into HAVING so it runs after grouping
+- Return categories meeting the per-group threshold, correctly ordered
+initial_state: A sales report should list only categories whose TOTAL quantity sold is at least 10, but
+  the query filters with `WHERE SUM(quantity) >= 10`. Aggregates cannot be used in WHERE, so the query is
+  wrong. Move the aggregate condition into HAVING.
+solution_explanation: |
+  WHERE filters individual rows before they are grouped, so it has no access to a per-group SUM().
+  HAVING is the row-group filter: it runs after GROUP BY collapses rows into groups, so SUM(quantity)
+  is defined there. Replacing `WHERE SUM(quantity) >= 10` with `HAVING SUM(quantity) >= 10` keeps only
+  the groups whose total clears the threshold.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix solution(conn). It must return one row per category whose TOTAL quantity sold (SUM of quantity)
+    is at least 10, as tuples (category, total_qty), ordered by total_qty DESC then category ASC.
+    The current query tries to filter the SUM in a WHERE clause, which is illegal for aggregates.
+    The conn argument is a fresh sqlite3 connection with a `sales(id, category, quantity)` table.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      import sqlite3
+
+      def solution(conn):
+          # BUG: SUM(quantity) is an aggregate and cannot be used in WHERE,
+          # which is evaluated per-row before grouping happens.
+          return conn.execute(
+              """
+              SELECT category, SUM(quantity) AS total_qty
+              FROM sales
+              WHERE SUM(quantity) >= 10
+              GROUP BY category
+              ORDER BY total_qty DESC, category ASC
+              """
+          ).fetchall()
+    readonly: false
+  visible_tests:
+  - name: rolls up and filters by total
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE sales (id INTEGER PRIMARY KEY, category TEXT, quantity INTEGER);"
+          "INSERT INTO sales (category, quantity) VALUES "
+          "('books',4),('books',7),('toys',3),('toys',2),"
+          "('games',12),('food',5),('food',5),('food',1);"
+      )
+      assert solution(conn) == [('games', 12), ('books', 11), ('food', 11)], solution(conn)
+  - name: below-threshold group excluded
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE sales (id INTEGER PRIMARY KEY, category TEXT, quantity INTEGER);"
+          "INSERT INTO sales (category, quantity) VALUES "
+          "('books',4),('books',7),('toys',3),('toys',2),"
+          "('games',12),('food',5),('food',5),('food',1);"
+      )
+      assert ('toys', 5) not in solution(conn), solution(conn)
+  hidden_tests:
+  - name: empty table returns nothing
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript("CREATE TABLE sales (id INTEGER PRIMARY KEY, category TEXT, quantity INTEGER);")
+      assert solution(conn) == [], solution(conn)
+  - name: boundary value (exactly 10) is kept
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE sales (id INTEGER PRIMARY KEY, category TEXT, quantity INTEGER);"
+          "INSERT INTO sales (category, quantity) VALUES ('a',6),('a',4),('b',9);"
+      )
+      assert solution(conn) == [('a', 10)], solution(conn)
+  - name: tie broken by category ascending
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE sales (id INTEGER PRIMARY KEY, category TEXT, quantity INTEGER);"
+          "INSERT INTO sales (category, quantity) VALUES ('zeta',10),('alpha',10);"
+      )
+      assert solution(conn) == [('alpha', 10), ('zeta', 10)], solution(conn)
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: WHERE runs once per row before grouping, so it has no SUM() yet — that is why the aggregate
+    condition belongs somewhere else.
+- order: 2
+  cost: 20
+  content: The clause that filters whole groups after GROUP BY is HAVING. Aggregates like SUM() are valid
+    there.
+- order: 3
+  cost: 30
+  content: 'Delete the WHERE line and add `HAVING SUM(quantity) >= 10` after the GROUP BY clause.'

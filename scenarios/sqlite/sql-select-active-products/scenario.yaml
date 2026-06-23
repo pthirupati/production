@@ -1,0 +1,127 @@
+title: Filter and Sort the Active Products
+slug: sql-select-active-products
+technology: sqlite
+category: SQLite
+description: The storefront needs a query that returns only the products that are in
+  stock and currently active, listed cheapest-first. Write a single SELECT with a
+  WHERE filter and an ORDER BY so the catalog page shows the right rows in the right
+  order.
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Low
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Select only the columns the page needs
+- Filter rows with a multi-condition WHERE
+- Sort results with ORDER BY (ascending)
+initial_state: The storefront needs a query that returns only products that are in
+  stock (stock > 0) and active (active = 1), ordered by price ascending. The starter
+  returns an empty list — write the SELECT.
+solution_explanation: |
+  A SELECT lists the columns to return, WHERE keeps only the rows whose conditions
+  are all true (combined with AND), and ORDER BY price ASC sorts the surviving rows
+  from cheapest to most expensive. Returning (name, price) tuples in that order is
+  exactly what the catalog page renders.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: implement
+  instructions: |
+    Implement solution(conn): run ONE SELECT against the `products` table and return
+    its rows. Include only products that are active (active = 1) AND in stock
+    (stock > 0). Return the columns (name, price) ordered by price ascending.
+
+      products(id INTEGER, name TEXT, price REAL, stock INTEGER, active INTEGER)
+
+    Return conn.execute(...).fetchall() — a list of (name, price) tuples.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def solution(conn):
+          # TODO: SELECT name, price FROM products
+          # keep only active = 1 AND stock > 0, ORDER BY price ascending.
+          return conn.execute("SELECT name, price FROM products WHERE 0").fetchall()
+    readonly: false
+  visible_tests:
+  - name: basic filter and order
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE products(id INTEGER, name TEXT, price REAL, stock INTEGER, active INTEGER);
+        INSERT INTO products VALUES (1,'Widget',9.5,4,1);
+        INSERT INTO products VALUES (2,'Gadget',3.0,0,1);
+        INSERT INTO products VALUES (3,'Gizmo',5.0,2,1);
+        INSERT INTO products VALUES (4,'Doohickey',1.0,7,0);
+      ''')
+      assert solution(conn) == [('Gizmo', 5.0), ('Widget', 9.5)], solution(conn)
+  - name: only inactive or out of stock
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE products(id INTEGER, name TEXT, price REAL, stock INTEGER, active INTEGER);
+        INSERT INTO products VALUES (1,'A',2.0,0,1);
+        INSERT INTO products VALUES (2,'B',3.0,5,0);
+      ''')
+      assert solution(conn) == [], solution(conn)
+  hidden_tests:
+  - name: orders ascending by price
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE products(id INTEGER, name TEXT, price REAL, stock INTEGER, active INTEGER);
+        INSERT INTO products VALUES (1,'Pricey',100.0,1,1);
+        INSERT INTO products VALUES (2,'Cheap',1.0,1,1);
+        INSERT INTO products VALUES (3,'Mid',50.0,1,1);
+      ''')
+      assert solution(conn) == [('Cheap',1.0),('Mid',50.0),('Pricey',100.0)], solution(conn)
+  - name: stock zero excluded even if active
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE products(id INTEGER, name TEXT, price REAL, stock INTEGER, active INTEGER);
+        INSERT INTO products VALUES (1,'InStock',4.0,1,1);
+        INSERT INTO products VALUES (2,'Empty',2.0,0,1);
+      ''')
+      assert solution(conn) == [('InStock', 4.0)], solution(conn)
+  - name: returns only name and price columns
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE products(id INTEGER, name TEXT, price REAL, stock INTEGER, active INTEGER);
+        INSERT INTO products VALUES (7,'Solo',12.5,3,1);
+      ''')
+      rows = solution(conn)
+      assert rows == [('Solo', 12.5)], rows
+      assert len(rows[0]) == 2, rows[0]
+  - name: empty table
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('CREATE TABLE products(id INTEGER, name TEXT, price REAL, stock INTEGER, active INTEGER);')
+      assert solution(conn) == [], solution(conn)
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: A row should appear only when BOTH conditions hold — combine them with
+    AND in the WHERE clause.
+- order: 2
+  cost: 20
+  content: Use `active = 1 AND stock > 0`. The catalog page wants cheapest first, so
+    sort with ORDER BY price ASC.
+- order: 3
+  cost: 30
+  content: 'Full query: SELECT name, price FROM products WHERE active = 1 AND stock
+    > 0 ORDER BY price ASC.'

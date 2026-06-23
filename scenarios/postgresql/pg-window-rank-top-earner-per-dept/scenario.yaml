@@ -1,0 +1,139 @@
+title: Top Earner Per Department (Window RANK with Ties)
+slug: pg-window-rank-top-earner-per-dept
+technology: postgresql
+category: PostgreSQL Development
+description: An HR report should return the highest-paid employee in each department, and when several
+  employees tie for top pay it must return ALL of them. The query uses `ROW_NUMBER() OVER (PARTITION BY
+  dept ORDER BY salary DESC)` and keeps row number 1 — but ROW_NUMBER arbitrarily breaks ties, so only one
+  of several equally-paid top earners survives. Switch to a ranking function whose ties share rank 1.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Partition a window by department to rank within each group
+- See why ROW_NUMBER drops tied top earners
+- Use RANK so all rows tied for the maximum share rank 1
+initial_state: An HR report should return the top-paid employee(s) per department including all ties, but
+  it uses ROW_NUMBER() which assigns 1 to only one of several tied rows. Switch to a ranking function whose
+  ties share the same rank.
+solution_explanation: |
+  ROW_NUMBER() assigns a strictly distinct number to every row in a partition, so among employees tied for
+  the highest salary exactly one gets number 1 and the rest are silently demoted. RANK() instead gives
+  every row tied at the top the same value (1), then skips ahead — which is exactly the "include all ties"
+  semantics the report wants. Partitioning by dept evaluates the window independently per department, so a
+  low-paying department still surfaces its own top earner.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix solution(conn). It must return (dept, name, salary) for the highest-paid employee in each
+    department; if several employees tie for the top salary in a department, return ALL of them. Order
+    the result by dept ASC, then name ASC.
+    The conn argument is a fresh sqlite3 connection with an `employees(id, dept, name, salary)` table.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      import sqlite3
+
+      def solution(conn):
+          # BUG: ROW_NUMBER() gives a unique number per row, so when several
+          # employees tie for the top salary only ONE of them gets number 1 and
+          # the other tied top earners are dropped. RANK() lets ties share 1.
+          return conn.execute(
+              """
+              WITH ranked AS (
+                  SELECT dept, name, salary,
+                         ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC) AS rnk
+                  FROM employees
+              )
+              SELECT dept, name, salary
+              FROM ranked
+              WHERE rnk = 1
+              ORDER BY dept ASC, name ASC
+              """
+          ).fetchall()
+    readonly: false
+  visible_tests:
+  - name: tied top earners both returned
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE employees (id INTEGER PRIMARY KEY, dept TEXT, name TEXT, salary INTEGER);"
+          "INSERT INTO employees (dept, name, salary) VALUES "
+          "('eng','Ada',120),('eng','Linus',150),('eng','Grace',150),"
+          "('sales','Tom',90),('sales','Sue',70),('ops','Mia',60);"
+      )
+      assert solution(conn) == [
+          ('eng', 'Grace', 150), ('eng', 'Linus', 150),
+          ('ops', 'Mia', 60),
+          ('sales', 'Tom', 90),
+      ], solution(conn)
+  - name: single top earner per non-tied dept
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE employees (id INTEGER PRIMARY KEY, dept TEXT, name TEXT, salary INTEGER);"
+          "INSERT INTO employees (dept, name, salary) VALUES "
+          "('eng','Ada',120),('eng','Linus',150),('eng','Grace',150),"
+          "('sales','Tom',90),('sales','Sue',70),('ops','Mia',60);"
+      )
+      assert [r for r in solution(conn) if r[0] == 'sales'] == [('sales', 'Tom', 90)], solution(conn)
+  hidden_tests:
+  - name: no ties, single dept
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE employees (id INTEGER PRIMARY KEY, dept TEXT, name TEXT, salary INTEGER);"
+          "INSERT INTO employees (dept,name,salary) VALUES ('a','x',10),('a','y',20),('a','z',15);"
+      )
+      assert solution(conn) == [('a', 'y', 20)], solution(conn)
+  - name: entire department tied returns everyone
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE employees (id INTEGER PRIMARY KEY, dept TEXT, name TEXT, salary INTEGER);"
+          "INSERT INTO employees (dept,name,salary) VALUES ('a','x',50),('a','y',50),('a','z',50);"
+      )
+      assert solution(conn) == [('a','x',50),('a','y',50),('a','z',50)], solution(conn)
+  - name: ranked per dept, not globally
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE employees (id INTEGER PRIMARY KEY, dept TEXT, name TEXT, salary INTEGER);"
+          "INSERT INTO employees (dept,name,salary) VALUES ('big','rich',1000),('small','poor',1);"
+      )
+      assert solution(conn) == [('big','rich',1000),('small','poor',1)], solution(conn)
+  - name: empty table
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript("CREATE TABLE employees (id INTEGER PRIMARY KEY, dept TEXT, name TEXT, salary INTEGER);")
+      assert solution(conn) == [], solution(conn)
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Give a department two employees with the SAME top salary. The report should return both, but
+    only one comes back — ROW_NUMBER picked a single winner.
+- order: 2
+  cost: 20
+  content: You want tied rows to share the same rank value, not get unique sequential numbers. That is the
+    difference between RANK() and ROW_NUMBER().
+- order: 3
+  cost: 30
+  content: 'Replace `ROW_NUMBER()` with `RANK()`; keep `PARTITION BY dept ORDER BY salary DESC` and the
+    `WHERE rnk = 1` filter.'

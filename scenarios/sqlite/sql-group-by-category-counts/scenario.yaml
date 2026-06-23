@@ -1,0 +1,138 @@
+title: Count Orders Per Category
+slug: sql-group-by-category-counts
+technology: sqlite
+category: SQLite
+description: The analytics dashboard needs the number of orders in each product
+  category, but only for categories that have at least two orders, sorted from the
+  busiest category down. Write a GROUP BY with a COUNT aggregate and a HAVING filter
+  to power the report.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Aggregate rows into one row per group with GROUP BY
+- Count rows in each group with COUNT(*)
+- Filter whole groups with HAVING (not WHERE)
+initial_state: report_busy_categories(conn) should return (category, order_count) for
+  every category that has 2 or more orders, ordered by count descending then category
+  ascending. The starter returns an empty list — write the grouped query.
+solution_explanation: |
+  GROUP BY category collapses all rows sharing a category into a single group;
+  COUNT(*) reports how many rows fell into each group. WHERE filters individual rows
+  BEFORE grouping, so a per-group condition like "at least 2 orders" must use HAVING,
+  which filters AFTER aggregation. Ordering by the count descending, then category,
+  gives a stable busiest-first report.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: implement
+  instructions: |
+    Implement solution(conn): return (category, order_count) for each category that
+    has 2 OR MORE orders. Order by order_count descending, then category ascending.
+
+      orders(id INTEGER, category TEXT, amount REAL)
+
+    Use GROUP BY and a HAVING clause. Return conn.execute(...).fetchall().
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def solution(conn):
+          # TODO: count orders per category, keep only categories with >= 2 orders,
+          # order by count desc then category asc.
+          return conn.execute(
+              "SELECT category, COUNT(*) FROM orders WHERE 0 GROUP BY category"
+          ).fetchall()
+    readonly: false
+  visible_tests:
+  - name: counts and filters groups
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);
+        INSERT INTO orders VALUES (1,'books',10);
+        INSERT INTO orders VALUES (2,'books',12);
+        INSERT INTO orders VALUES (3,'books',8);
+        INSERT INTO orders VALUES (4,'toys',5);
+        INSERT INTO orders VALUES (5,'toys',6);
+        INSERT INTO orders VALUES (6,'food',9);
+      ''')
+      assert solution(conn) == [('books',3),('toys',2)], solution(conn)
+  - name: single-order categories are excluded
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);
+        INSERT INTO orders VALUES (1,'a',1);
+        INSERT INTO orders VALUES (2,'b',1);
+        INSERT INTO orders VALUES (3,'c',1);
+      ''')
+      assert solution(conn) == [], solution(conn)
+  hidden_tests:
+  - name: ties on count break by category ascending
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);
+        INSERT INTO orders VALUES (1,'zoo',1);
+        INSERT INTO orders VALUES (2,'zoo',1);
+        INSERT INTO orders VALUES (3,'art',1);
+        INSERT INTO orders VALUES (4,'art',1);
+      ''')
+      assert solution(conn) == [('art',2),('zoo',2)], solution(conn)
+  - name: exactly two qualifies, count is accurate
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);
+        INSERT INTO orders VALUES (1,'x',1);
+        INSERT INTO orders VALUES (2,'x',1);
+        INSERT INTO orders VALUES (3,'y',1);
+        INSERT INTO orders VALUES (4,'y',1);
+        INSERT INTO orders VALUES (5,'y',1);
+        INSERT INTO orders VALUES (6,'y',1);
+      ''')
+      assert solution(conn) == [('y',4),('x',2)], solution(conn)
+  - name: empty table returns nothing
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);')
+      assert solution(conn) == [], solution(conn)
+  - name: filtering happens per group not per row
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);
+        INSERT INTO orders VALUES (1,'solo',1);
+        INSERT INTO orders VALUES (2,'pair',1);
+        INSERT INTO orders VALUES (3,'pair',1);
+      ''')
+      rows = solution(conn)
+      assert rows == [('pair',2)], rows
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: One output row per category means GROUP BY category, and the count of rows
+    in each group is COUNT(*).
+- order: 2
+  cost: 20
+  content: '"At least 2 orders" is a condition on the GROUP, not on individual rows,
+    so it belongs in HAVING COUNT(*) >= 2 — not WHERE.'
+- order: 3
+  cost: 30
+  content: 'Query: SELECT category, COUNT(*) FROM orders GROUP BY category HAVING COUNT(*)
+    >= 2 ORDER BY COUNT(*) DESC, category ASC.'

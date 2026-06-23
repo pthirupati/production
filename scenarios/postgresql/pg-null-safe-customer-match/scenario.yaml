@@ -1,0 +1,122 @@
+title: NULL-Safe Mismatch Detection
+slug: pg-null-safe-customer-match
+technology: postgresql
+category: PostgreSQL Development
+description: A logistics audit must flag shipments whose assigned warehouse differs from where the order
+  actually shipped. The query uses `assigned_wh <> shipped_wh`, but in SQL any comparison with NULL yields
+  UNKNOWN (not true), so rows where exactly one side is NULL are silently dropped — the very rows an audit
+  cares about. Make the comparison NULL-safe so a one-sided NULL counts as a mismatch and two NULLs count
+  as a match.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Understand that `<>` against NULL returns UNKNOWN, not true
+- Use a NULL-safe distinctness test so one-sided NULLs are caught
+- Treat two NULLs as equal and return the right mismatched ids
+initial_state: A logistics audit must flag shipments whose assigned warehouse differs from where the order
+  shipped, but `assigned_wh <> shipped_wh` drops rows where one side is NULL because NULL comparisons are
+  UNKNOWN. Make the comparison NULL-safe.
+solution_explanation: |
+  Three-valued logic means `assigned_wh <> shipped_wh` is UNKNOWN whenever either side is NULL, and WHERE
+  only keeps rows that are TRUE — so one-sided-NULL mismatches vanish. The fix is a NULL-safe distinctness
+  operator. In standard SQL that is `IS DISTINCT FROM`; SQLite spells the same idea as `IS NOT`. Both
+  treat NULL as a comparable value: one NULL vs a non-NULL is "distinct" (a mismatch), and NULL vs NULL is
+  "not distinct" (a match).
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix solution(conn). It must return the ids (as tuples) of shipments where assigned_wh differs from
+    shipped_wh, using NULL-safe comparison: if exactly one of the two columns is NULL the row IS a
+    mismatch; if BOTH are NULL the row is a match (not returned). Order by id ascending.
+    The conn argument is a fresh sqlite3 connection with a `shipments(id, assigned_wh, shipped_wh)` table.
+    Hint: SQLite's NULL-safe inequality is `IS NOT` (the analogue of standard SQL `IS DISTINCT FROM`).
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      import sqlite3
+
+      def solution(conn):
+          # BUG: `<>` with a NULL operand evaluates to UNKNOWN, so rows where
+          # exactly one side is NULL are dropped instead of flagged as mismatches.
+          return conn.execute(
+              """
+              SELECT id
+              FROM shipments
+              WHERE assigned_wh <> shipped_wh
+              ORDER BY id
+              """
+          ).fetchall()
+    readonly: false
+  visible_tests:
+  - name: one-sided NULLs are flagged
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);"
+          "INSERT INTO shipments (id, assigned_wh, shipped_wh) VALUES "
+          "(1,'A','A'),(2,'A','B'),(3,NULL,'A'),(4,'A',NULL),(5,NULL,NULL);"
+      )
+      assert solution(conn) == [(2,), (3,), (4,)], solution(conn)
+  - name: two NULLs count as a match
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);"
+          "INSERT INTO shipments (id, assigned_wh, shipped_wh) VALUES "
+          "(1,'A','A'),(2,'A','B'),(3,NULL,'A'),(4,'A',NULL),(5,NULL,NULL);"
+      )
+      assert (5,) not in solution(conn), solution(conn)
+  hidden_tests:
+  - name: all matching rows return nothing
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);"
+          "INSERT INTO shipments VALUES (1,'X','X'),(2,NULL,NULL);"
+      )
+      assert solution(conn) == [], solution(conn)
+  - name: every row a one-sided NULL
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);"
+          "INSERT INTO shipments VALUES (10,NULL,'Q'),(11,'Q',NULL);"
+      )
+      assert solution(conn) == [(10,), (11,)], solution(conn)
+  - name: result ordered by id
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);"
+          "INSERT INTO shipments VALUES (3,'a','b'),(1,'c','d'),(2,NULL,'z');"
+      )
+      assert solution(conn) == [(1,), (2,), (3,)], solution(conn)
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Try a row where assigned_wh is NULL and shipped_wh is 'A'. With `<>` it disappears, because
+    NULL `<>` 'A' is UNKNOWN and WHERE keeps only TRUE rows.
+- order: 2
+  cost: 20
+  content: You need an operator that treats NULL as just another value to compare. Standard SQL calls it
+    IS DISTINCT FROM; SQLite writes it as `IS NOT`.
+- order: 3
+  cost: 30
+  content: 'Replace `assigned_wh <> shipped_wh` with `assigned_wh IS NOT shipped_wh`.'

@@ -1,0 +1,11 @@
+name: MySQL
+slug: mysql
+description: Browser-based MySQL query challenges — write and debug SQL against a live in-browser
+  database with instant feedback and server-graded hidden tests. Master JOINs, GROUP BY aggregation,
+  subqueries, CTEs, and window functions on realistic e-commerce data.
+icon: database
+color: sky
+order: 11
+price: 0
+is_active: true
+coming_soon: false

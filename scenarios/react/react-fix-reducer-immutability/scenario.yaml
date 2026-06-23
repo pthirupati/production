@@ -1,0 +1,123 @@
+title: Fix the Mutating useReducer Reducer
+slug: react-fix-reducer-immutability
+technology: react
+category: React Development
+description: cartReducer(state, action) powers a shopping cart with useReducer, but the
+  ADD_ITEM case calls state.items.push(...) and returns the same state object. Because the
+  array is mutated in place and the state reference never changes, React's bailout skips the
+  re-render and the UI shows a stale cart. Make the reducer pure — return new objects/arrays
+  instead of mutating the previous state.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See that the reducer mutates the previous state and returns the same reference
+- Return a brand-new state object with a new items array on every change
+- Keep the previous state untouched so React detects the update
+initial_state: cartReducer(state, action) powers a shopping cart with useReducer, but the
+  ADD_ITEM case calls state.items.push(...) and returns the same state object. Because the
+  array is mutated in place and the state reference never changes, React's bailout skips the
+  re-render. Make the reducer pure.
+solution_explanation: |
+  React's useReducer bails out of a re-render when the reducer returns the exact same object
+  reference it was given (Object.is(prev, next) === true). Calling state.items.push() mutates
+  the existing array AND returns the same top-level object, so React sees no change. A pure
+  reducer never touches the incoming state: it builds a NEW object ({ ...state, items: [...] })
+  with a NEW array. Here ADD_ITEM appends with [...state.items, item] (or increments quantity
+  for an existing id), and REMOVE_ITEM uses filter — both produce fresh references, leaving the
+  previous state object completely unchanged.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix cartReducer(state, action) so it is a PURE reducer for a useReducer cart.
+    State shape: { items: [{ id, name, qty }] }.
+      - ADD_ITEM (action.item = { id, name }): if an item with that id already exists,
+        return state with that item's qty incremented by 1; otherwise append { id, name, qty: 1 }.
+      - REMOVE_ITEM (action.id): return state without the item that has that id.
+      - any unknown action type: return the state unchanged (same reference is fine here).
+    The reducer must NEVER mutate the incoming state or its items array — always return new
+    objects/arrays so React detects the change.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function cartReducer(state, action) {
+        switch (action.type) {
+          case 'ADD_ITEM':
+            // BUG: mutates state.items in place and returns the SAME state object,
+            // so React's bailout skips the re-render.
+            state.items.push({ id: action.item.id, name: action.item.name, qty: 1 });
+            return state;
+          case 'REMOVE_ITEM':
+            // BUG: also mutates the existing array.
+            const idx = state.items.findIndex((it) => it.id === action.id);
+            if (idx !== -1) state.items.splice(idx, 1);
+            return state;
+          default:
+            return state;
+        }
+      }
+    readonly: false
+  visible_tests:
+  - name: adds a new item with qty 1
+    code: |
+      const prev = { items: [] };
+      const next = cartReducer(prev, { type: 'ADD_ITEM', item: { id: 'a', name: 'Apple' } });
+      assert(JSON.stringify(next.items) === JSON.stringify([{ id: 'a', name: 'Apple', qty: 1 }]), JSON.stringify(next.items));
+  - name: returns a new state reference
+    code: |
+      const prev = { items: [] };
+      const next = cartReducer(prev, { type: 'ADD_ITEM', item: { id: 'a', name: 'Apple' } });
+      assert(next !== prev, 'reducer returned the same state reference');
+  hidden_tests:
+  - name: does not mutate previous state
+    code: |
+      const prev = { items: [] };
+      cartReducer(prev, { type: 'ADD_ITEM', item: { id: 'a', name: 'Apple' } });
+      assert(prev.items.length === 0, 'previous state was mutated: ' + JSON.stringify(prev.items));
+  - name: existing id increments qty
+    code: |
+      const prev = { items: [{ id: 'a', name: 'Apple', qty: 1 }] };
+      const next = cartReducer(prev, { type: 'ADD_ITEM', item: { id: 'a', name: 'Apple' } });
+      assert(next.items.length === 1 && next.items[0].qty === 2, JSON.stringify(next.items));
+  - name: increment does not mutate the old item
+    code: |
+      const prev = { items: [{ id: 'a', name: 'Apple', qty: 1 }] };
+      cartReducer(prev, { type: 'ADD_ITEM', item: { id: 'a', name: 'Apple' } });
+      assert(prev.items[0].qty === 1, 'old item object was mutated: ' + JSON.stringify(prev.items[0]));
+  - name: new items array reference on add
+    code: |
+      const prev = { items: [{ id: 'a', name: 'Apple', qty: 1 }] };
+      const next = cartReducer(prev, { type: 'ADD_ITEM', item: { id: 'b', name: 'Banana' } });
+      assert(next.items !== prev.items, 'items array reference was reused');
+  - name: remove filters the item out without mutating
+    code: |
+      const prev = { items: [{ id: 'a', name: 'Apple', qty: 1 }, { id: 'b', name: 'Banana', qty: 1 }] };
+      const next = cartReducer(prev, { type: 'REMOVE_ITEM', id: 'a' });
+      assert(next.items.length === 1 && next.items[0].id === 'b', JSON.stringify(next.items));
+      assert(prev.items.length === 2, 'previous state was mutated on remove');
+  - name: unknown action returns same reference
+    code: |
+      const prev = { items: [{ id: 'a', name: 'Apple', qty: 1 }] };
+      const next = cartReducer(prev, { type: 'NOPE' });
+      assert(next === prev, 'unknown action should return the same state reference');
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Log prev === next after an ADD_ITEM — it is true, which is exactly why React skips the render.
+- order: 2
+  cost: 20
+  content: "A pure reducer never calls push/splice on the incoming array. Build a new array with the spread operator and return a new object with { ...state, items: newItems }."
+- order: 3
+  cost: 30
+  content: "For ADD_ITEM, map over items to bump qty when the id matches, or append [...state.items, { id, name, qty: 1 }] when it is new. For REMOVE_ITEM, use state.items.filter(it => it.id !== action.id)."

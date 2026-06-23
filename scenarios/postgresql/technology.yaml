@@ -1,0 +1,9 @@
+name: PostgreSQL
+slug: postgresql
+description: Write and debug real SQL against PostgreSQL-style problems — JOINs, GROUP BY/HAVING, window functions, CTEs, upserts, and NULL-safe logic — in an in-browser IDE with instant feedback and server-graded hidden tests.
+icon: database
+color: sky
+order: 17
+price: 0
+is_active: true
+coming_soon: false

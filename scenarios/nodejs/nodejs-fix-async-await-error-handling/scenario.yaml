@@ -1,0 +1,93 @@
+title: Fix the Swallowed Error in try/catch
+slug: nodejs-fix-async-await-error-handling
+technology: nodejs
+category: Node.js Development
+description: safeCall(fn) should run fn and ALWAYS return a result object — {ok:true, value} on success
+  or {ok:false, error} (the thrown error's message) on failure — so callers never have to wrap every
+  call in their own try/catch. The current code calls fn() with no try/catch, so when fn throws the error
+  escapes and safeCall throws too instead of returning the error object. Add the try/catch so a throw
+  becomes a value.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- See that a throwing fn makes safeCall throw instead of returning an error object
+- Wrap the call in try/catch so both outcomes become a returned value
+- Return {ok:true,value} on success and {ok:false,error} on failure
+initial_state: safeCall(fn) should run fn and ALWAYS return a result object — {ok:true, value} on success
+  or {ok:false, error} (the thrown error's message) on failure. The current code calls fn() with no try/catch,
+  so when fn throws the error escapes and safeCall throws too instead of returning the error object. Add
+  the try/catch so a throw becomes a value.
+solution_explanation: |
+  This is the "Result object" pattern at the heart of robust async/await error handling: instead of letting an exception propagate, you catch it and hand the caller a settled value that says whether it worked. Without a try/catch, a throw from fn() bubbles straight out of safeCall, so every caller would need its own try/catch. Wrapping the call converts a throw into { ok: false, error }, while the happy path returns { ok: true, value }. (In real async code you would mark the function async and `await fn()` inside the same try/catch — the structure is identical.)
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: fix
+  instructions: |
+    Fix safeCall(fn): it must ALWAYS return a result object (never throw).
+      success: { ok: true,  value: <fn's return value> }
+      failure: { ok: false, error: <thrown error's .message> }
+    The current version has no try/catch, so a throwing fn makes safeCall throw too.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function safeCall(fn) {
+        // bug: no try/catch — if fn throws, the error escapes and safeCall throws too,
+        // instead of returning an { ok: false, error } object.
+        const value = fn();
+        return { ok: true, value };
+      }
+    readonly: false
+  visible_tests:
+  - name: success wraps the value
+    code: |
+      const r = safeCall(() => 5);
+      assert(JSON.stringify(r) === JSON.stringify({ ok: true, value: 5 }), JSON.stringify(r));
+  - name: failure becomes a returned error object
+    code: |
+      const r = safeCall(() => { throw new Error('boom'); });
+      assert(r.ok === false && r.error === 'boom', JSON.stringify(r));
+  hidden_tests:
+  - name: never throws on a throwing fn
+    code: |
+      let threw = false; let r = null;
+      try { r = safeCall(() => { throw new Error('nope'); }); }
+      catch (e) { threw = true; }
+      assert(threw === false, 'safeCall must not throw — it must return a result object');
+      assert(r.ok === false, 'expected ok:false, got ' + JSON.stringify(r));
+  - name: preserves object values
+    code: |
+      const r = safeCall(() => ({ a: 1 }));
+      assert(r.ok === true && r.value.a === 1, JSON.stringify(r));
+  - name: error message comes from the thrown error
+    code: |
+      const r = safeCall(() => { throw new Error('disk full'); });
+      assert(r.error === 'disk full', JSON.stringify(r));
+  - name: ok flag is a boolean true on success
+    code: |
+      const r = safeCall(() => 1);
+      assert(r.ok === true, JSON.stringify(r));
+  - name: falsy return values still succeed
+    code: |
+      const r = safeCall(() => 0);
+      assert(r.ok === true && r.value === 0, JSON.stringify(r));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Call safeCall(() => { throw new Error('x'); }) — instead of {ok:false}, the error escapes and safeCall itself throws.
+- order: 2
+  cost: 20
+  content: To turn a throw into a value, you must catch it. Wrap fn() in a try/catch.
+- order: 3
+  cost: 30
+  content: 'try { const value = fn(); return {ok:true, value}; } catch (e) { return {ok:false, error: e.message}; }'

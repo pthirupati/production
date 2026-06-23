@@ -1,0 +1,154 @@
+title: Keep Only the Latest Event Per User (and Index It)
+slug: mysql-dedup-row-number
+technology: mysql
+category: MySQL
+description: An events table records many rows per user over time, and a "current status" view should
+  keep only the most recent event per user. Implement the dedup with ROW_NUMBER(), and add the index
+  that lets a single-user lookup use a SEARCH on the index instead of a full table SCAN.
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: High
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Rank each user's events newest-first with ROW_NUMBER() in a CTE
+- Keep only rank 1 to get one current row per user
+- Break ties deterministically when two events share a timestamp
+- Add a (user_id, ts) index so a single-user lookup uses an index SEARCH, not a full SCAN
+initial_state: An events table records many rows per user over time, and a "current status" view should
+  keep only the most recent event per user. Implement the dedup with ROW_NUMBER(), and add the index
+  that lets a single-user lookup use a SEARCH on the index instead of a full table SCAN.
+solution_explanation: |
+  ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY ts DESC, id DESC) numbers each user's events with
+  the newest as 1; wrapping it in a CTE and filtering WHERE rn = 1 yields exactly one current row per
+  user. Adding id DESC to the window's ORDER BY makes ties (two events sharing a timestamp)
+  deterministic — the later-inserted row wins. Separately, a composite index on (user_id, ts) lets the
+  planner satisfy a "give me this user's events newest-first" lookup with an index SEARCH (a B-tree
+  seek to the user, then an ordered range) instead of reading and sorting the whole table — the
+  difference between an O(log n) seek and an O(n) full scan as the table grows.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: implement
+  instructions: |
+    Implement solution(conn) so it:
+      1) Creates an index named idx_events_user_ts on events(user_id, ts) if it does not exist, so a
+         per-user newest-first lookup can use an index SEARCH instead of a full table SCAN.
+      2) Returns one row (user_id, status, ts) per user — the user's MOST RECENT event — ordered by
+         user_id. When two events share the same ts, the one with the larger id wins.
+    Use ROW_NUMBER() in a CTE to rank and keep only the newest per user.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      import sqlite3
+
+      def solution(conn):
+          # TODO (1): create a composite index so a single-user, newest-first
+          # lookup uses an index SEARCH instead of a full table SCAN:
+          #   CREATE INDEX IF NOT EXISTS idx_events_user_ts ON events(user_id, ts)
+          #
+          # TODO (2): rank each user's events newest-first with ROW_NUMBER() in a
+          # CTE (PARTITION BY user_id ORDER BY ts DESC, id DESC), then keep rn = 1.
+          # Return (user_id, status, ts) ordered by user_id.
+          #
+          # This stub returns every event (no dedup) and creates no index, so it
+          # is intentionally wrong.
+          return conn.execute(
+              "SELECT user_id, status, ts FROM events ORDER BY user_id"
+          ).fetchall()
+    readonly: false
+  visible_tests:
+  - name: keeps the newest event per user
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
+          "INSERT INTO events (id, user_id, status, ts) VALUES "
+          "(1,1,'signup','2024-01-01'),(2,1,'active','2024-02-01'),(3,1,'churned','2024-03-01'),"
+          "(4,2,'signup','2024-01-15'),(5,2,'active','2024-02-15'),(6,3,'signup','2024-01-20');"
+      )
+      assert solution(conn) == [
+          (1,'churned','2024-03-01'),
+          (2,'active','2024-02-15'),
+          (3,'signup','2024-01-20'),
+      ], solution(conn)
+  - name: exactly one row per user
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
+          "INSERT INTO events (id, user_id, status, ts) VALUES "
+          "(1,1,'signup','2024-01-01'),(2,1,'active','2024-02-01'),(3,1,'churned','2024-03-01'),"
+          "(4,2,'signup','2024-01-15'),(5,2,'active','2024-02-15'),(6,3,'signup','2024-01-20');"
+      )
+      ids = [r[0] for r in solution(conn)]
+      assert ids == [1, 2, 3], ids
+      assert len(ids) == len(set(ids)), ids
+  hidden_tests:
+  - name: creates the composite index
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
+          "INSERT INTO events (id, user_id, status, ts) VALUES (1,1,'a','2024-01-01');"
+      )
+      solution(conn)
+      names = [r[0] for r in conn.execute(
+          "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='events' AND sql IS NOT NULL"
+      ).fetchall()]
+      assert 'idx_events_user_ts' in names, names
+  - name: per-user lookup uses an index SEARCH not a full SCAN
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
+          "INSERT INTO events (id, user_id, status, ts) VALUES "
+          "(1,1,'a','2024-01-01'),(2,1,'b','2024-02-01'),(3,2,'c','2024-01-15');"
+      )
+      solution(conn)
+      plan = conn.execute(
+          "EXPLAIN QUERY PLAN SELECT status, ts FROM events WHERE user_id = 1 ORDER BY ts DESC"
+      ).fetchall()
+      detail = ' '.join(str(p[-1]) for p in plan)
+      assert 'idx_events_user_ts' in detail, detail
+      assert 'SCAN events' not in detail, detail
+  - name: ties on timestamp broken by larger id
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
+          "INSERT INTO events (id, user_id, status, ts) VALUES "
+          "(1,5,'old','2024-01-01'),(2,5,'new','2024-01-01');"
+      )
+      assert solution(conn) == [(5,'new','2024-01-01')], solution(conn)
+  - name: single event passes through
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(':memory:')
+      conn.executescript(
+          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
+          "INSERT INTO events (id, user_id, status, ts) VALUES (1,9,'only','2024-06-01');"
+      )
+      assert solution(conn) == [(9,'only','2024-06-01')], solution(conn)
+  timeout: 8
+hints:
+- order: 1
+  cost: 15
+  content: ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY ts DESC) gives each user's newest event the number 1. Filter to rn = 1 in an outer query (a CTE is the clean way).
+- order: 2
+  cost: 25
+  content: Two events can share a ts. Add id DESC to the window's ORDER BY so the tie is broken deterministically and the later row wins.
+- order: 3
+  cost: 35
+  content: 'Run CREATE INDEX IF NOT EXISTS idx_events_user_ts ON events(user_id, ts) first. With it, a WHERE user_id = ? ... ORDER BY ts query becomes an index SEARCH (a seek + ordered range) instead of a full table SCAN.'

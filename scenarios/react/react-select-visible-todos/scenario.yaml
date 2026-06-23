@@ -1,0 +1,153 @@
+title: Build the Visible-Todos Selector
+slug: react-select-visible-todos
+technology: react
+category: React Development
+description: A todo app stores all todos in state and renders a derived "visible" list based on a
+  filter (all/active/completed), a search query, and a sort order. The component should compute
+  this list with a pure selector instead of doing it inline in JSX. Implement selectVisibleTodos
+  so it filters, searches, and sorts — without mutating the input array.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Derive a view from state with a pure selector rather than mutating state
+- Compose filter + search + sort in the right order
+- Sort a copy so the source array is never mutated in place
+initial_state: A todo app renders a derived "visible" list from all todos based on a status filter,
+  a search query, and a sort order. Implement selectVisibleTodos as a pure selector that filters,
+  searches, and sorts without mutating the input array.
+solution_explanation: |
+  In React, anything you can compute from state should be derived at render time, not stored —
+  and a "selector" (a pure function of state) is the clean way to do it. selectVisibleTodos takes
+  the full todos array plus the UI options and returns a fresh array. It applies the status filter
+  (active = not done, completed = done), then a case-insensitive substring search on the title,
+  then sorts. The subtle bug everyone hits: Array.prototype.sort mutates in place, so you must sort
+  a COPY ([...todos].sort(...)) or the React state array gets reordered under you, breaking the
+  next render. The 'created' sort is ascending by createdAt; 'alpha' is a localeCompare on title;
+  ties keep input order because sort is stable in modern engines and we never reorder equal keys.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: implement
+  instructions: |
+    Implement selectVisibleTodos(todos, options) where each todo is
+      { id, title, done, createdAt }   // createdAt is a number (epoch ms)
+    and options = { filter, query, sort } with defaults applied when missing:
+      filter: 'all' (default) | 'active' (done === false) | 'completed' (done === true)
+      query:  '' (default) — case-insensitive substring match against title; '' matches everything
+      sort:   'created' (default, ascending by createdAt) | 'alpha' (A→Z by title, localeCompare)
+    Apply filter, then search, then sort. Return a NEW array — never mutate the input todos array
+    or its sort order. This is a pure selector: no DOM, no state, no side effects.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function selectVisibleTodos(todos, options) {
+        // TODO: derive the visible list.
+        // options = { filter, query, sort } — apply defaults, then filter -> search -> sort.
+        // Must NOT mutate `todos` (including its order).
+        return todos;
+      }
+    readonly: false
+  visible_tests:
+  - name: defaults return all todos sorted by createdAt asc
+    code: |
+      const todos = [
+        { id: 2, title: 'Banana', done: false, createdAt: 200 },
+        { id: 1, title: 'Apple', done: true, createdAt: 100 },
+      ];
+      const out = selectVisibleTodos(todos, {});
+      assert(out.map(t => t.id).join(',') === '1,2', out.map(t => t.id).join(','));
+  - name: does not mutate the input array order
+    code: |
+      const todos = [
+        { id: 2, title: 'Banana', done: false, createdAt: 200 },
+        { id: 1, title: 'Apple', done: true, createdAt: 100 },
+      ];
+      selectVisibleTodos(todos, { sort: 'created' });
+      assert(todos[0].id === 2 && todos[1].id === 1, 'input array was reordered: ' + todos.map(t => t.id).join(','));
+  hidden_tests:
+  - name: active filter keeps only not-done
+    code: |
+      const todos = [
+        { id: 1, title: 'A', done: true, createdAt: 1 },
+        { id: 2, title: 'B', done: false, createdAt: 2 },
+        { id: 3, title: 'C', done: false, createdAt: 3 },
+      ];
+      const out = selectVisibleTodos(todos, { filter: 'active' });
+      assert(out.map(t => t.id).join(',') === '2,3', out.map(t => t.id).join(','));
+  - name: completed filter keeps only done
+    code: |
+      const todos = [
+        { id: 1, title: 'A', done: true, createdAt: 1 },
+        { id: 2, title: 'B', done: false, createdAt: 2 },
+      ];
+      const out = selectVisibleTodos(todos, { filter: 'completed' });
+      assert(out.length === 1 && out[0].id === 1, JSON.stringify(out.map(t => t.id)));
+  - name: query matches case-insensitively as a substring
+    code: |
+      const todos = [
+        { id: 1, title: 'Buy Milk', done: false, createdAt: 1 },
+        { id: 2, title: 'Walk dog', done: false, createdAt: 2 },
+        { id: 3, title: 'milk tea', done: false, createdAt: 3 },
+      ];
+      const out = selectVisibleTodos(todos, { query: 'MILK' });
+      assert(out.map(t => t.id).join(',') === '1,3', out.map(t => t.id).join(','));
+  - name: empty query matches everything
+    code: |
+      const todos = [
+        { id: 1, title: 'A', done: false, createdAt: 1 },
+        { id: 2, title: 'B', done: false, createdAt: 2 },
+      ];
+      const out = selectVisibleTodos(todos, { query: '' });
+      assert(out.length === 2, JSON.stringify(out.map(t => t.id)));
+  - name: alpha sort orders by title A to Z
+    code: |
+      const todos = [
+        { id: 1, title: 'Cherry', done: false, createdAt: 1 },
+        { id: 2, title: 'apple', done: false, createdAt: 2 },
+        { id: 3, title: 'Banana', done: false, createdAt: 3 },
+      ];
+      const out = selectVisibleTodos(todos, { sort: 'alpha' });
+      assert(out.map(t => t.title).join(',') === 'apple,Banana,Cherry', out.map(t => t.title).join(','));
+  - name: filter search and sort compose together
+    code: |
+      const todos = [
+        { id: 1, title: 'Read book', done: false, createdAt: 50 },
+        { id: 2, title: 'Read paper', done: true, createdAt: 10 },
+        { id: 3, title: 'Read mail', done: false, createdAt: 30 },
+        { id: 4, title: 'Cook', done: false, createdAt: 20 },
+      ];
+      const out = selectVisibleTodos(todos, { filter: 'active', query: 'read', sort: 'created' });
+      assert(out.map(t => t.id).join(',') === '3,1', out.map(t => t.id).join(','));
+  - name: returns a new array reference
+    code: |
+      const todos = [{ id: 1, title: 'A', done: false, createdAt: 1 }];
+      const out = selectVisibleTodos(todos, {});
+      assert(out !== todos, 'selector returned the same array reference');
+  - name: no options argument uses all defaults
+    code: |
+      const todos = [
+        { id: 2, title: 'B', done: false, createdAt: 20 },
+        { id: 1, title: 'A', done: true, createdAt: 10 },
+      ];
+      const out = selectVisibleTodos(todos);
+      assert(out.map(t => t.id).join(',') === '1,2', out.map(t => t.id).join(','));
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: "Read options with defaults up front: const { filter = 'all', query = '', sort = 'created' } = options || {}. Then chain filter -> search -> sort."
+- order: 2
+  cost: 20
+  content: "Array.sort mutates in place, so never sort `todos` directly — sort a copy. After filtering with .filter you already have a new array, but the safe habit is [...list].sort(...) or sorting the filtered result."
+- order: 3
+  cost: 30
+  content: "For search, lowercase both sides: title.toLowerCase().includes(query.toLowerCase()). For sort, 'created' compares a.createdAt - b.createdAt; 'alpha' returns a.title.localeCompare(b.title)."

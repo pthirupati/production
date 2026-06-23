@@ -2323,5 +2323,585 @@
     ""
    ]
   ]
+ },
+ {
+  "slug": "mysql-getting-started-databases-tables-crud",
+  "title": "Getting Started with MySQL: Databases, Tables, and CRUD",
+  "summary": "Install nothing, think clearly: create a database, design a table, and run the four operations every application relies on.",
+  "topic": "MySQL",
+  "difficulty": "beginner",
+  "estimated_minutes": 18,
+  "playground_slug": "",
+  "scenario_slug": "mysql-first-database",
+  "seo_title": "Getting Started with MySQL: Databases, Tables, and CRUD",
+  "seo_description": "Learn MySQL from zero: connect to the server, create a database and a well-typed table, and perform INSERT, SELECT, UPDATE, and DELETE with confidence.",
+  "seo_keywords": "mysql, create database, create table, insert, select, update, delete, crud, data types, primary key",
+  "order": 300,
+  "sections": [
+   [
+    "A server you talk to, not a file you open",
+    "MySQL is a client/server database. Unlike a spreadsheet you double-click, MySQL runs as a long-lived background process (mysqld) that listens for connections, and you reach it with a client that speaks SQL over a socket or a TCP port. This separation is the whole point: dozens of application servers can connect to the same data at once, each issuing queries, while MySQL arbitrates who sees what and when.\n\nThe first thing to understand is the hierarchy. A single MySQL server holds many databases (sometimes called schemas). Each database holds many tables. Each table holds rows, and each row has the same set of columns. Everything you do begins by picking which database you are working in, which is why the very first command in most sessions is USE.",
+    "mysql -u root -p\n# Enter password: ********\n\n-- Once connected, see what already exists:\nSHOW DATABASES;\n-- +--------------------+\n-- | Database           |\n-- +--------------------+\n-- | information_schema |\n-- | mysql              |\n-- | performance_schema |\n-- +--------------------+\n\nSELECT VERSION();   -- confirm which server you reached",
+    "sql",
+    "SHOW DATABASES lists every schema on the server; the first few are MySQL's own bookkeeping."
+   ],
+   [
+    "Creating a database and choosing a character set",
+    "Before you can store anything you need a database to put it in. CREATE DATABASE makes one, and the modern, almost always correct choice is to give it the utf8mb4 character set, which can store the full range of Unicode including emoji. The older utf8 alias in MySQL is a three-byte trap that silently rejects four-byte characters, so reach for utf8mb4 every time.\n\nAfter creating the database you select it with USE. From that point on, unqualified table names refer to tables inside that database. You can always switch with another USE, and you can fully qualify a name as database.table when you need to reach across.",
+    "CREATE DATABASE shop\n  CHARACTER SET utf8mb4\n  COLLATE utf8mb4_unicode_ci;\n\nUSE shop;\n\nSELECT DATABASE();   -- shows 'shop', the current default database",
+    "sql",
+    "utf8mb4 stores every Unicode character; the _unicode_ci collation gives sensible case-insensitive sorting."
+   ],
+   [
+    "Designing a table with the right types",
+    "A table definition is a contract: it names each column and pins down what kind of value may live there. Choosing types deliberately is what keeps a database honest. Use INT (often AUTO_INCREMENT) for surrogate keys, VARCHAR(n) for short bounded text, DECIMAL for money where rounding errors are unacceptable, and TIMESTAMP or DATETIME for points in time.\n\nThe PRIMARY KEY is the one column (or set of columns) that uniquely identifies a row; MySQL builds an index on it automatically and will refuse duplicates. NOT NULL says a value is mandatory, and DEFAULT supplies a value when an INSERT omits the column. Spending two minutes on these constraints now prevents a category of bugs later.",
+    "CREATE TABLE products (\n  id          INT          NOT NULL AUTO_INCREMENT,\n  name        VARCHAR(120) NOT NULL,\n  price       DECIMAL(10,2) NOT NULL DEFAULT 0.00,\n  in_stock    INT          NOT NULL DEFAULT 0,\n  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  PRIMARY KEY (id)\n) ENGINE=InnoDB;\n\nDESCRIBE products;   -- inspect the columns you just defined",
+    "sql",
+    "DECIMAL(10,2) stores money exactly; never use FLOAT for currency or prices will drift."
+   ],
+   [
+    "The four operations: INSERT, SELECT, UPDATE, DELETE",
+    "Almost everything an application does reduces to four verbs, collectively called CRUD: create, read, update, delete. In SQL these are INSERT, SELECT, UPDATE, and DELETE. INSERT adds rows, SELECT reads them back, UPDATE changes existing rows, and DELETE removes them.\n\nThe two dangerous ones are UPDATE and DELETE, because without a WHERE clause they apply to every row in the table. Make it a permanent habit to write the WHERE clause first and the verb second. When you SELECT, start broad and then narrow with WHERE, ORDER BY, and LIMIT until you see exactly the rows you intend to change.",
+    "INSERT INTO products (name, price, in_stock)\nVALUES ('USB-C cable', 9.99, 250),\n       ('Laptop stand', 39.50, 40);\n\nSELECT id, name, price FROM products WHERE in_stock > 0 ORDER BY price;\n\nUPDATE products SET price = 8.99 WHERE name = 'USB-C cable';\n\nDELETE FROM products WHERE in_stock = 0;   -- WHERE first, always",
+    "sql",
+    "An UPDATE or DELETE without WHERE touches every row; type the WHERE clause before the verb."
+   ],
+   [
+    "Filtering, sorting, and counting what matters",
+    "Reading data well is a skill of its own. The WHERE clause filters rows using comparisons (=, <, >), ranges (BETWEEN), set membership (IN), pattern matching (LIKE), and NULL tests (IS NULL). ORDER BY sorts the result, LIMIT caps how many rows come back, and aggregate functions like COUNT, SUM, and AVG collapse many rows into a single summary number.\n\nGROUP BY is the bridge between rows and summaries: it splits the table into buckets and computes an aggregate per bucket. The mental model is split, then summarize. Once these clauses feel natural you can answer almost any business question with a single readable query.",
+    "-- How many products in each price band?\nSELECT\n  CASE WHEN price < 10 THEN 'cheap' ELSE 'premium' END AS band,\n  COUNT(*)  AS items,\n  AVG(price) AS avg_price\nFROM products\nGROUP BY band\nORDER BY items DESC;\n\nSELECT * FROM products WHERE name LIKE '%cable%' AND in_stock > 0 LIMIT 5;",
+    "sql",
+    "GROUP BY buckets rows; every selected column must be either grouped or wrapped in an aggregate."
+   ],
+   [
+    "Practice on a throwaway database",
+    "SQL rewards muscle memory, and the only way to build it is to type the statements yourself and watch the result set change. Reading about INSERT teaches you the syntax; running one and then SELECTing the row back teaches you what it actually does.\n\nSpin up the in-browser MySQL playground, create the shop database from this tutorial, and rebuild the products table from scratch. Insert a handful of rows, run a few filtered SELECTs, then deliberately run an UPDATE without a WHERE to see how it rewrites every row — somewhere you can safely make that mistake. Nothing here needs a real server, and nothing you do can break anything.",
+    "",
+    "",
+    ""
+   ]
+  ]
+ },
+ {
+  "slug": "mysql-joins-and-indexes-explained",
+  "title": "MySQL Joins and Indexes, Explained Clearly",
+  "summary": "Stop fearing JOINs and slow queries: learn how tables relate, how each join type behaves, and how indexes turn full scans into instant lookups.",
+  "topic": "MySQL",
+  "difficulty": "intermediate",
+  "estimated_minutes": 22,
+  "playground_slug": "",
+  "scenario_slug": "mysql-joins-indexes",
+  "seo_title": "MySQL Joins and Indexes: A Practical, Visual Guide",
+  "seo_description": "Understand INNER, LEFT, and RIGHT joins, foreign keys, and how to read EXPLAIN to add the right index so your MySQL queries stop doing full table scans.",
+  "seo_keywords": "mysql joins, inner join, left join, foreign key, index, explain, query optimization, full table scan, composite index",
+  "order": 305,
+  "sections": [
+   [
+    "Why one big table is the wrong answer",
+    "The instinct of a beginner is to cram everything into one wide table: customer name, every order, every line item, all in repeated columns. That design rots quickly. Update a customer's email and you must change it in a hundred order rows; a customer with no orders has nowhere to live. The relational answer is to split data into focused tables and connect them on demand.\n\nThis is normalization: each fact lives in exactly one place. Customers live in a customers table, orders in an orders table, and an order points back to its customer by storing that customer's id. The act of recombining these tables in a query is the JOIN, and a foreign key is the formal promise that an order's customer_id actually refers to a real customer.",
+    "CREATE TABLE customers (\n  id    INT PRIMARY KEY AUTO_INCREMENT,\n  name  VARCHAR(120) NOT NULL,\n  email VARCHAR(190) NOT NULL UNIQUE\n) ENGINE=InnoDB;\n\nCREATE TABLE orders (\n  id           INT PRIMARY KEY AUTO_INCREMENT,\n  customer_id  INT NOT NULL,\n  total        DECIMAL(10,2) NOT NULL,\n  placed_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n  FOREIGN KEY (customer_id) REFERENCES customers(id)\n) ENGINE=InnoDB;",
+    "sql",
+    "The FOREIGN KEY makes MySQL reject an order whose customer_id has no matching customer."
+   ],
+   [
+    "INNER JOIN: rows that match on both sides",
+    "An INNER JOIN combines rows from two tables wherever a condition is true, and discards everything that does not match. The condition is almost always equality between a foreign key and the primary key it points to. The result is one row per matching pair: each order paired with its customer.\n\nRead a join from the inside out. The ON clause is the glue; everything else (SELECT columns, WHERE filters, ORDER BY) operates on the combined rows. A customer with no orders simply will not appear in an INNER JOIN, because there is nothing on the orders side to match — that absence is the defining behavior of INNER.",
+    "INSERT INTO customers (name, email) VALUES\n  ('Ada', 'ada@example.com'), ('Grace', 'grace@example.com');\nINSERT INTO orders (customer_id, total) VALUES (1, 50.00), (1, 12.50);\n\nSELECT c.name, o.id AS order_id, o.total\nFROM orders o\nINNER JOIN customers c ON c.id = o.customer_id\nORDER BY o.total DESC;\n-- Grace placed no orders, so Grace does not appear here.",
+    "sql",
+    "Table aliases (o, c) keep joins readable; the ON clause states how the two tables line up."
+   ],
+   [
+    "LEFT JOIN: keep everything from one side",
+    "Often you want the unmatched rows too. A LEFT JOIN keeps every row from the left table and fills in NULLs for the right table wherever there is no match. This is exactly how you answer questions like which customers have never ordered: keep all customers on the left, attach orders on the right, and look for the rows where the order columns came back NULL.\n\nThe direction matters. LEFT JOIN preserves the first-named table; RIGHT JOIN preserves the second. In practice most people standardize on LEFT JOIN and simply reorder the tables, because reading left-to-right matches how we think. The classic find-the-orphans pattern below is worth memorizing.",
+    "-- Every customer, with order count (zero included):\nSELECT c.name, COUNT(o.id) AS order_count\nFROM customers c\nLEFT JOIN orders o ON o.customer_id = c.id\nGROUP BY c.id, c.name\nORDER BY order_count DESC;\n\n-- Customers who have never ordered:\nSELECT c.name\nFROM customers c\nLEFT JOIN orders o ON o.customer_id = c.id\nWHERE o.id IS NULL;",
+    "sql",
+    "COUNT(o.id) counts only non-NULL matches, so a customer with no orders correctly scores 0."
+   ],
+   [
+    "Indexes: the difference between instant and slow",
+    "By default, finding rows that match a WHERE clause forces MySQL to read every row in the table — a full table scan. On a hundred rows that is invisible; on ten million it is a multi-second stall. An index is a sorted, B-tree copy of one or more columns that lets MySQL jump straight to the matching rows, the same way a book index lets you skip to a page instead of reading every one.\n\nThe primary key is always indexed. You add others with CREATE INDEX on the columns you frequently filter, join, or sort by. Indexes are not free: they consume disk and slow down writes slightly, because every INSERT must also update the index. The art is indexing the columns that appear in your hot queries and no more.",
+    "-- A query that filters by customer_id will scan without an index:\nCREATE INDEX idx_orders_customer ON orders (customer_id);\n\n-- A composite index helps queries that filter AND sort together:\nCREATE INDEX idx_orders_cust_date ON orders (customer_id, placed_at);\n\nSHOW INDEX FROM orders;   -- list the indexes now defined",
+    "sql",
+    "Composite index column order matters: (customer_id, placed_at) helps WHERE customer_id ... ORDER BY placed_at."
+   ],
+   [
+    "Reading EXPLAIN to confirm the index is used",
+    "Adding an index is a hypothesis; EXPLAIN is how you test it. Prefix any SELECT with EXPLAIN and MySQL shows its plan without running the query: which tables it touches, in what order, which index it chose, and how many rows it expects to examine. The fields to watch are type and key.\n\nA type of ALL means a full table scan — usually a red flag on a large table. A type of ref or range alongside a populated key column means your index is doing its job. The rows estimate should drop dramatically after a useful index is added. If EXPLAIN still shows ALL after you created an index, the query is probably written in a way that prevents its use, such as wrapping the indexed column in a function.",
+    "EXPLAIN SELECT * FROM orders WHERE customer_id = 1\\G\n-- *************************** 1. row ***************************\n--          type: ref            <- good: index lookup, not a scan\n--           key: idx_orders_customer\n--          rows: 2              <- examines 2 rows, not the whole table\n\n-- Anti-pattern that defeats an index (function on the column):\nEXPLAIN SELECT * FROM orders WHERE YEAR(placed_at) = 2026\\G  -- type: ALL",
+    "sql",
+    "Wrapping an indexed column in a function (YEAR(placed_at)) forces a scan; filter on a raw range instead."
+   ],
+   [
+    "Build the schema and watch EXPLAIN change",
+    "Joins and indexes click the moment you see them work on data you created yourself. The plan in your head and the plan MySQL actually chooses are not always the same, and EXPLAIN is the only way to know for sure.\n\nOpen the in-browser MySQL playground, build the customers and orders tables from this tutorial, and insert a few dozen rows. Run the LEFT JOIN orphan query, then run EXPLAIN on a customer_id filter before and after creating idx_orders_customer, and watch the type flip from ALL to ref. Everything here is reversible and nothing you do needs a real production database.",
+    "",
+    "",
+    ""
+   ]
+  ]
+ },
+ {
+  "slug": "postgresql-getting-started-psql-and-tables",
+  "title": "Getting Started with PostgreSQL and psql",
+  "summary": "Meet Postgres on its own terms: connect with psql, master the backslash commands, and create your first strongly typed table.",
+  "topic": "PostgreSQL",
+  "difficulty": "beginner",
+  "estimated_minutes": 18,
+  "playground_slug": "",
+  "scenario_slug": "postgres-first-table",
+  "seo_title": "Getting Started with PostgreSQL and the psql Shell",
+  "seo_description": "A hands-on PostgreSQL intro: connect with psql, use meta-commands like \\dt and \\d, create a table with SERIAL and proper types, and run your first queries.",
+  "seo_keywords": "postgresql, psql, meta-commands, create table, serial, data types, primary key, postgres tutorial, \\dt, \\d",
+  "order": 310,
+  "sections": [
+   [
+    "PostgreSQL and its command-line companion psql",
+    "PostgreSQL is an object-relational database known for standards compliance, rich data types, and a reputation for never losing your data. Like MySQL it runs as a server process you connect to, but its native client, psql, is unusually powerful and is where most Postgres work begins. Learning psql well pays off every single day.\n\npsql does two things at once: it runs ordinary SQL, and it offers a set of backslash meta-commands that are not SQL at all but shortcuts into the database's catalog. \\l lists databases, \\dt lists tables, \\d describes an object, and \\q quits. These commands are typed without a semicolon, which is the first thing that confuses newcomers coming from other databases.",
+    "psql -U postgres -h localhost\n-- psql (16.2)\n-- Type \"help\" for help.\n\npostgres=# \\conninfo\n-- You are connected to database \"postgres\" as user \"postgres\".\n\npostgres=# SELECT version();   -- ordinary SQL ends with a semicolon\npostgres=# \\l                  -- meta-command: list databases, no semicolon",
+    "sql",
+    "Meta-commands start with a backslash and take no semicolon; SQL statements always end with one."
+   ],
+   [
+    "Creating a database and connecting to it",
+    "A fresh Postgres server already has a database called postgres, but you should not build your application inside it. Create a dedicated database with CREATE DATABASE, then switch to it. In psql you switch with the \\c (connect) meta-command rather than MySQL's USE, which is a common stumbling block for people moving between the two.\n\nPostgres also has a concept MySQL lacks: schemas as namespaces inside a database. Every new database has a default schema called public, and unless you say otherwise your tables land there. For a first project you can happily ignore schemas and let everything live in public.",
+    "CREATE DATABASE shop;\n\n\\c shop\n-- You are now connected to database \"shop\" as user \"postgres\".\n\n\\dn   -- list schemas; you will see 'public'\n\nSELECT current_database(), current_schema();\n-- current_database | current_schema\n-- shop             | public",
+    "sql",
+    "Use \\c to switch databases in psql; there is no USE statement as in MySQL."
+   ],
+   [
+    "Defining a table with Postgres types",
+    "Postgres has a famously rich type system, but a first table needs only a handful. Use SERIAL (or the modern GENERATED ALWAYS AS IDENTITY) for an auto-incrementing primary key, TEXT for strings since Postgres does not penalize you for unbounded text, NUMERIC for exact decimals like money, BOOLEAN for true/false, and TIMESTAMPTZ for times that carry a time zone.\n\nThat last choice matters more than it looks. TIMESTAMPTZ stores an absolute moment and converts to the session's time zone on display, which is almost always what you want for created-at columns. Plain TIMESTAMP discards the zone and is a frequent source of off-by-hours bugs.",
+    "CREATE TABLE products (\n  id          SERIAL PRIMARY KEY,\n  name        TEXT          NOT NULL,\n  price       NUMERIC(10,2) NOT NULL DEFAULT 0,\n  active      BOOLEAN       NOT NULL DEFAULT TRUE,\n  created_at  TIMESTAMPTZ   NOT NULL DEFAULT now()\n);\n\n\\d products   -- describe the table: columns, types, defaults, indexes",
+    "sql",
+    "Prefer TIMESTAMPTZ over TIMESTAMP and NUMERIC over float for money to avoid rounding and time-zone bugs."
+   ],
+   [
+    "Inserting rows and using RETURNING",
+    "INSERT in Postgres works as you would expect, but it has a delightful extra: the RETURNING clause. Because a SERIAL primary key is generated by the server, applications constantly need to know the id of the row they just inserted. RETURNING hands it back in the same round trip, with no second query.\n\nThis pattern scales: RETURNING can hand back any column, including server-computed defaults like created_at. It works on UPDATE and DELETE too, letting you see exactly which rows changed. Once you have used RETURNING you will miss it in databases that lack it.",
+    "INSERT INTO products (name, price)\nVALUES ('USB-C cable', 9.99)\nRETURNING id, created_at;\n--  id |          created_at\n-- ----+-------------------------------\n--   1 | 2026-06-23 10:14:02.31+00\n\nINSERT INTO products (name, price) VALUES\n  ('Laptop stand', 39.50),\n  ('Desk mat', 18.00);",
+    "sql",
+    "RETURNING gives you generated columns (like the new id) without a second SELECT round trip."
+   ],
+   [
+    "Querying: filtering, sorting, and ILIKE",
+    "Reading data back uses the same SELECT, WHERE, ORDER BY, and LIMIT you would find anywhere, but Postgres adds conveniences. ILIKE is a case-insensitive LIKE, so you can match names without worrying about capitalization. Postgres is otherwise case-sensitive about string comparison, which surprises people who expect MySQL's defaults.\n\nLIMIT and OFFSET handle pagination, and ORDER BY can sort by an expression, not just a column. Aggregates and GROUP BY behave per the SQL standard. A small but important detail: identifiers you create unquoted are folded to lowercase, so a column written as \"createdAt\" must be quoted forever after, which is why snake_case is the Postgres convention.",
+    "SELECT id, name, price\nFROM products\nWHERE name ILIKE '%cable%' AND active = TRUE\nORDER BY price DESC\nLIMIT 10 OFFSET 0;\n\nSELECT active, count(*), round(avg(price), 2) AS avg_price\nFROM products\nGROUP BY active;",
+    "sql",
+    "ILIKE is case-insensitive matching; stick to snake_case names so you never have to quote identifiers."
+   ],
+   [
+    "Practice in a sandbox you cannot harm",
+    "psql becomes second nature only through repetition: connect, run a meta-command to orient yourself, run a query, repeat. The backslash commands in particular reward five minutes of deliberate practice that save you hours later.\n\nOpen the in-browser PostgreSQL playground, create the shop database, connect with \\c, and rebuild the products table. Insert a few rows with RETURNING, describe the table with \\d products, and try an ILIKE search. Then explore the catalog with \\dt and \\l until the meta-commands feel automatic. Nothing here touches a real server and every action is reversible.",
+    "",
+    "",
+    ""
+   ]
+  ]
+ },
+ {
+  "slug": "postgresql-window-functions-and-ctes",
+  "title": "PostgreSQL Window Functions and CTEs in Practice",
+  "summary": "Answer ranking, running-total, and per-group questions that plain GROUP BY cannot, using window functions and readable common table expressions.",
+  "topic": "PostgreSQL",
+  "difficulty": "advanced",
+  "estimated_minutes": 24,
+  "playground_slug": "",
+  "scenario_slug": "postgres-analytics-queries",
+  "seo_title": "PostgreSQL Window Functions and CTEs: A Practical Guide",
+  "seo_description": "Master PostgreSQL analytics: ROW_NUMBER, RANK, running totals with OVER, PARTITION BY, and chaining logic cleanly with WITH (common table expressions).",
+  "seo_keywords": "postgresql, window functions, over, partition by, row_number, rank, running total, cte, with clause, analytics sql",
+  "order": 315,
+  "sections": [
+   [
+    "The question GROUP BY cannot answer",
+    "GROUP BY collapses many rows into one summary row, which is perfect for totals but destroys the detail. The moment you want both the individual rows and a calculation across their group — each sale alongside its running total, each employee alongside their department's average — GROUP BY is the wrong tool, because it throws away the rows you wanted to keep.\n\nWindow functions solve exactly this. A window function computes a value across a set of rows related to the current row, but unlike an aggregate it does not collapse them. You get one output row for every input row, each carrying its own summary alongside. The keyword that unlocks this is OVER.",
+    "-- Sample data we will use throughout:\nCREATE TABLE sales (\n  id     SERIAL PRIMARY KEY,\n  region TEXT NOT NULL,\n  rep    TEXT NOT NULL,\n  amount NUMERIC(10,2) NOT NULL\n);\nINSERT INTO sales (region, rep, amount) VALUES\n  ('West','Ada',100),('West','Bo',250),('West','Ada',75),\n  ('East','Cy',300),('East','Di',125),('East','Cy',180);",
+    "sql",
+    "Window functions keep every row; aggregates with GROUP BY collapse rows into one per group."
+   ],
+   [
+    "OVER and PARTITION BY: aggregates that keep the rows",
+    "The simplest window applies an aggregate over a window of rows defined by OVER. With an empty OVER () the window is the entire result set, so SUM(amount) OVER () repeats the grand total on every row. Add PARTITION BY and the window resets per group: SUM(amount) OVER (PARTITION BY region) gives each row its region's subtotal while preserving the row itself.\n\nThink of PARTITION BY as a GROUP BY that does not delete anything. This is the foundation for percent-of-total calculations: divide each row's amount by its partition's sum and you have each sale's share of its region, all in one pass and one readable query.",
+    "SELECT\n  region, rep, amount,\n  SUM(amount) OVER (PARTITION BY region) AS region_total,\n  ROUND(amount / SUM(amount) OVER (PARTITION BY region) * 100, 1) AS pct_of_region\nFROM sales\nORDER BY region, amount DESC;\n-- region | rep | amount | region_total | pct_of_region\n-- East   | Cy  | 300.00 |       605.00 |          49.6",
+    "sql",
+    "PARTITION BY is a non-destructive GROUP BY; the row survives and carries its group's aggregate."
+   ],
+   [
+    "Ranking with ROW_NUMBER, RANK, and DENSE_RANK",
+    "Ranking questions — top seller per region, the three most recent orders per customer — are where window functions truly shine. ROW_NUMBER() assigns a unique sequential number within each partition based on an ORDER BY inside the OVER clause. RANK() is similar but leaves gaps after ties (1,1,3), while DENSE_RANK() does not (1,1,2).\n\nThe killer pattern is top-N-per-group: number the rows within each partition, then keep only those numbered at or below N. Because you cannot reference a window function in a WHERE clause directly, you wrap the numbered query in a subquery or CTE and filter on the alias outside.",
+    "SELECT * FROM (\n  SELECT\n    region, rep, amount,\n    ROW_NUMBER() OVER (PARTITION BY region ORDER BY amount DESC) AS rn\n  FROM sales\n) ranked\nWHERE rn = 1;          -- the single biggest sale in each region\n\n-- Compare the three ranking functions on tied amounts:\nSELECT rep, amount,\n  RANK()       OVER (ORDER BY amount DESC) AS rnk,\n  DENSE_RANK() OVER (ORDER BY amount DESC) AS dense\nFROM sales;",
+    "sql",
+    "You cannot filter on a window alias in WHERE; wrap it in a subquery or CTE and filter outside."
+   ],
+   [
+    "Running totals with an ordered window frame",
+    "Order a window and a new dimension appears: each row can see the rows before it. A running total is SUM(amount) OVER (ORDER BY id), which accumulates from the first row to the current one. Postgres builds this with an implicit frame meaning all rows from the start of the partition up to and including the current row.\n\nYou can make the frame explicit with ROWS BETWEEN to compute moving averages or trailing windows, and functions like LAG() and LEAD() let a row peek at its neighbor's value to compute period-over-period change. These ordered windows are the backbone of time-series and financial reporting in SQL.",
+    "SELECT\n  region, rep, amount,\n  SUM(amount) OVER (PARTITION BY region ORDER BY id\n                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total,\n  amount - LAG(amount) OVER (PARTITION BY region ORDER BY id) AS change_vs_prev\nFROM sales\nORDER BY region, id;",
+    "sql",
+    "ORDER BY inside OVER turns an aggregate into a running calculation; LAG() reaches the previous row."
+   ],
+   [
+    "CTEs: naming the steps with WITH",
+    "Complex queries become unreadable when subqueries nest three deep. A common table expression (CTE), written with WITH, lets you name an intermediate result and then reference it like a table. The query reads top to bottom as a sequence of named steps, which is far easier to follow and to debug than a pyramid of parentheses.\n\nCTEs pair beautifully with window functions: compute the ranking in one CTE, then SELECT from it with a clean WHERE in the main query. You can chain several CTEs separated by commas, each building on the last. For genuinely recursive problems — walking an org chart or a category tree — WITH RECURSIVE handles hierarchies that flat SQL cannot.",
+    "WITH ranked AS (\n  SELECT region, rep, amount,\n         ROW_NUMBER() OVER (PARTITION BY region ORDER BY amount DESC) AS rn\n  FROM sales\n),\ntop_per_region AS (\n  SELECT region, rep, amount FROM ranked WHERE rn = 1\n)\nSELECT region, rep, amount\nFROM top_per_region\nORDER BY amount DESC;",
+    "sql",
+    "Each CTE is a named step; chain them with commas so a hard query reads top-to-bottom."
+   ],
+   [
+    "Try the analytics queries on your own data",
+    "Window functions and CTEs are the leap from querying data to analyzing it, and they only become intuitive when you run them and inspect every output row. The behavior of frames, ties, and partitions is easiest to grasp by changing one clause and watching the numbers move.\n\nOpen the in-browser PostgreSQL playground, create the sales table from this tutorial, and work through each section: a percent-of-region calculation, a top-1-per-region with ROW_NUMBER, a running total, and finally a CTE that names the steps. Tweak the PARTITION BY and ORDER BY clauses and predict the result before you run it. Everything is in a throwaway database you cannot harm.",
+    "",
+    "",
+    ""
+   ]
+  ]
+ },
+ {
+  "slug": "sqlite-getting-started-zero-config-database",
+  "title": "SQLite Getting Started: A Zero-Config Database in a File",
+  "summary": "Understand why SQLite powers phones, browsers, and apps everywhere, then create a database that lives in a single file and query it from the shell.",
+  "topic": "SQLite",
+  "difficulty": "beginner",
+  "estimated_minutes": 16,
+  "playground_slug": "",
+  "scenario_slug": "sqlite-first-file",
+  "seo_title": "SQLite Getting Started: The Zero-Config Embedded Database",
+  "seo_description": "Learn SQLite from scratch: how an entire database fits in one file, using the sqlite3 shell, dot-commands, type affinity, and the special rowid primary key.",
+  "seo_keywords": "sqlite, sqlite3, embedded database, dot commands, type affinity, rowid, integer primary key, .schema, .tables",
+  "order": 320,
+  "sections": [
+   [
+    "A whole database in a single file",
+    "SQLite is the most widely deployed database in the world, and most people have never installed it. It runs inside your phone, your browser, your text editor, and countless apps because it is not a server at all — it is a small library that reads and writes an ordinary file on disk. There is no daemon to start, no port to open, no user to authenticate.\n\nThat design makes SQLite perfect for local storage, tests, prototypes, and any single-application data store. The trade-off is concurrency: because the whole database is one file, heavy simultaneous writes from many processes are not its strength. For the overwhelmingly common case of one application owning its own data, SQLite is fast, reliable, and refreshingly simple.",
+    "# Open (or create) a database file. It springs into existence on first write.\nsqlite3 shop.db\n-- SQLite version 3.45.1\n-- Enter \".help\" for usage hints.\n\nsqlite> .databases\n-- main: /home/you/shop.db r/w\n\nsqlite> SELECT sqlite_version();",
+    "bash",
+    "Pointing sqlite3 at a filename opens it, creating the file the moment the first table is written."
+   ],
+   [
+    "Dot-commands: the sqlite3 shell's controls",
+    "Inside the sqlite3 shell, SQL statements end with a semicolon, while shell controls are dot-commands that start with a period and take no semicolon — much like psql's backslash commands. The essential ones are .tables to list tables, .schema to print the CREATE statements, .mode to change output formatting, and .quit to leave.\n\nThe formatting commands turn the shell into a usable inspection tool. .mode column with .headers on gives aligned, labeled output, and .mode box draws a tidy table. These settings live only for the session, so many people keep their favorites in a ~/.sqliterc file that the shell reads on startup.",
+    "sqlite> .headers on\nsqlite> .mode box\nsqlite> .tables          -- list tables (none yet)\nsqlite> .schema          -- show all CREATE statements\nsqlite> .help            -- the full list of dot-commands\nsqlite> .quit            -- exit the shell",
+    "bash",
+    "Dot-commands configure the shell and take no semicolon; only SQL statements need one."
+   ],
+   [
+    "Creating a table and SQLite's type affinity",
+    "Creating a table looks like any other SQL, but SQLite handles types differently from every other database, and this is the single most important thing to understand. SQLite uses type affinity: a column has a preferred type but will store whatever you give it. A column declared INTEGER will happily hold the string 'banana' unless you add a constraint, because SQLite is dynamically typed at heart.\n\nThe practical types are INTEGER, REAL, TEXT, and BLOB, plus NULL. There is no separate boolean or date type; booleans are stored as 0 and 1, and dates as ISO-8601 text or Unix integers. Knowing this prevents the confusion of why a date comes back as a string — it is by design, and the date functions parse that text on demand.",
+    "CREATE TABLE products (\n  id     INTEGER PRIMARY KEY,\n  name   TEXT    NOT NULL,\n  price  REAL    NOT NULL DEFAULT 0,\n  active INTEGER NOT NULL DEFAULT 1     -- 0/1 stands in for boolean\n);\n\nsqlite> .schema products\nsqlite> PRAGMA table_info(products);   -- inspect columns and types",
+    "sql",
+    "SQLite uses type affinity, not strict typing: declare the intended type but expect flexible storage."
+   ],
+   [
+    "rowid and the magic of INTEGER PRIMARY KEY",
+    "Every ordinary SQLite table has a hidden 64-bit rowid that uniquely identifies each row and is what the table is physically sorted by. There is a special rule worth knowing: when you declare a column as exactly INTEGER PRIMARY KEY, that column becomes an alias for the rowid rather than a separate indexed column. It auto-increments, it is the fastest possible lookup, and it costs no extra storage.\n\nThis is why id INTEGER PRIMARY KEY is the idiomatic SQLite key. If you instead write INT PRIMARY KEY (note: INT, not INTEGER) you lose the alias and get a slower secondary index. The distinction is subtle but real, and getting it right gives you free, fast, auto-incrementing identifiers.",
+    "INSERT INTO products (name, price) VALUES ('USB-C cable', 9.99);\nINSERT INTO products (name, price) VALUES ('Laptop stand', 39.50);\n\nSELECT rowid, id, name FROM products;\n-- rowid | id | name\n-- 1     | 1  | USB-C cable      <- id IS the rowid here\n-- 2     | 2  | Laptop stand\n\nSELECT last_insert_rowid();   -- id of the most recent insert",
+    "sql",
+    "Declare keys as INTEGER PRIMARY KEY (not INT) to alias the fast built-in rowid."
+   ],
+   [
+    "Querying, dates, and importing data",
+    "Querying is standard SQL — SELECT, WHERE, ORDER BY, LIMIT, joins, and aggregates all work as expected. Because there is no native date type, you store dates as ISO text and use SQLite's date functions to compute with them. date('now'), datetime('now','localtime'), and strftime() cover almost every need.\n\nFor loading data quickly, the shell's .import command reads a CSV straight into a table, and .mode csv with .output writes query results back out to a file. This makes SQLite a handy scratchpad for analyzing a CSV without a heavyweight tool. Combine .import to load, a few SELECTs to explore, and .output to export your findings.",
+    "SELECT name, price, datetime('now','localtime') AS checked_at\nFROM products\nWHERE active = 1\nORDER BY price;\n\n-- Load a CSV into a new table:\nsqlite> .mode csv\nsqlite> .import inventory.csv inventory\nsqlite> SELECT count(*) FROM inventory;",
+    "sql",
+    "Store dates as ISO text and compute with date()/datetime()/strftime(); there is no native DATE type."
+   ],
+   [
+    "Practice with a file you can throw away",
+    "SQLite's whole appeal is how little ceremony stands between you and a working database, and the best way to feel that is to create one, query it, and delete the file when you are done. Because the entire database is one file, experimenting is consequence-free: copy the file to snapshot it, delete it to start over.\n\nOpen the in-browser SQLite playground, create shop.db, and rebuild the products table. Insert rows, inspect them with .schema and PRAGMA table_info, query with the date functions, and try INTEGER versus INT primary keys to see the rowid behavior change. Everything lives in a disposable file, so nothing you do can break anything.",
+    "",
+    "",
+    ""
+   ]
+  ]
+ },
+ {
+  "slug": "sqlite-transactions-constraints-and-performance",
+  "title": "SQLite Transactions, Constraints, and Performance",
+  "summary": "Make SQLite fast and trustworthy: wrap writes in transactions, enforce data rules with constraints and foreign keys, and unlock WAL mode and indexes.",
+  "topic": "SQLite",
+  "difficulty": "intermediate",
+  "estimated_minutes": 20,
+  "playground_slug": "",
+  "scenario_slug": "sqlite-tuning",
+  "seo_title": "SQLite Transactions, Constraints, and Performance Tuning",
+  "seo_description": "Go beyond basics in SQLite: use transactions for speed and safety, enforce CHECK and FOREIGN KEY constraints, enable WAL mode, and add the right indexes.",
+  "seo_keywords": "sqlite, transactions, begin commit, foreign keys, check constraint, wal mode, pragma, index, explain query plan, performance",
+  "order": 325,
+  "sections": [
+   [
+    "Every write is a transaction whether you ask or not",
+    "When you run a bare INSERT in SQLite, the library quietly wraps it in its own transaction: it acquires a lock, writes, flushes to disk, and releases. That durability is wonderful for one statement and disastrous for ten thousand, because each one pays the full cost of a disk flush. Loading a large dataset row by row can take minutes when it should take a fraction of a second.\n\nThe fix is to take control with an explicit transaction. BEGIN starts one, your statements run against it in memory, and a single COMMIT flushes everything to disk at once. This is the number-one SQLite performance tip and the first thing to reach for when bulk inserts feel inexplicably slow.",
+    "BEGIN;\nINSERT INTO products (name, price) VALUES ('Mouse', 15.00);\nINSERT INTO products (name, price) VALUES ('Keyboard', 45.00);\nINSERT INTO products (name, price) VALUES ('Webcam', 60.00);\nCOMMIT;        -- one flush to disk for all three rows\n\n-- If something goes wrong mid-batch, undo everything:\n-- ROLLBACK;",
+    "sql",
+    "Wrapping many INSERTs in one BEGIN/COMMIT turns thousands of disk flushes into one — often a 100x speedup."
+   ],
+   [
+    "Atomicity: all of it, or none of it",
+    "Transactions are not only about speed; they are about correctness. The defining property is atomicity: every statement between BEGIN and COMMIT either succeeds together or, on ROLLBACK or a crash, leaves the database exactly as it was before. There is never a half-finished state on disk.\n\nThis is what makes a money-transfer safe: debit one account and credit another inside one transaction, and you can never lose money to a crash that lands between the two updates. SQLite implements this with a rollback journal or, in WAL mode, a write-ahead log, so even a power cut mid-write cannot corrupt the file. Treat any multi-statement change that must stay consistent as a single transaction.",
+    "BEGIN;\nUPDATE accounts SET balance = balance - 100 WHERE id = 1;\nUPDATE accounts SET balance = balance + 100 WHERE id = 2;\n-- If the second UPDATE fails or the app crashes here, ROLLBACK\n-- restores both rows; the money is never half-moved.\nCOMMIT;",
+    "sql",
+    "Atomicity means the whole transaction commits or none of it does — no partial writes survive a crash."
+   ],
+   [
+    "Constraints: let the database enforce the rules",
+    "A database that accepts garbage is worse than no database. Constraints push your invariants down into the schema so bad data is rejected at the source, no matter which code path tries to insert it. NOT NULL forbids missing values, UNIQUE forbids duplicates, CHECK enforces an arbitrary condition, and DEFAULT supplies a value when one is omitted.\n\nCHECK constraints are underused and powerful: you can require that a price is non-negative or that a status is one of a fixed set, and SQLite will refuse any INSERT or UPDATE that violates it. Encoding rules here means you do not have to trust every caller to validate, which is exactly the kind of safety net a long-lived database needs.",
+    "CREATE TABLE products (\n  id     INTEGER PRIMARY KEY,\n  name   TEXT    NOT NULL UNIQUE,\n  price  REAL    NOT NULL CHECK (price >= 0),\n  status TEXT    NOT NULL DEFAULT 'active'\n         CHECK (status IN ('active','discontinued'))\n);\n\nINSERT INTO products (name, price) VALUES ('Cable', -1);\n-- Error: CHECK constraint failed: price >= 0",
+    "sql",
+    "CHECK constraints reject invalid data at the database level so no code path can sneak it in."
+   ],
+   [
+    "Foreign keys are off by default — turn them on",
+    "SQLite supports foreign keys, but for historical compatibility it does not enforce them unless you ask, per connection, every session. This trips up nearly everyone: you define a FOREIGN KEY, insert an order pointing at a nonexistent customer, and SQLite happily accepts it because enforcement was off. The fix is one pragma you must run on every connection.\n\nWith PRAGMA foreign_keys = ON, SQLite rejects orphaned references and can cascade deletes. Because the setting is per-connection and not stored in the file, the reliable habit is to issue it immediately after opening the database, and most application frameworks have a setting to do this for you automatically.",
+    "PRAGMA foreign_keys = ON;   -- run this every time you connect\n\nCREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\nCREATE TABLE orders (\n  id          INTEGER PRIMARY KEY,\n  customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,\n  total       REAL NOT NULL\n);\n\nINSERT INTO orders (customer_id, total) VALUES (999, 10);\n-- Error: FOREIGN KEY constraint failed   (only with the pragma ON)",
+    "sql",
+    "Foreign keys are NOT enforced by default; run PRAGMA foreign_keys = ON on every connection."
+   ],
+   [
+    "WAL mode, indexes, and EXPLAIN QUERY PLAN",
+    "Two switches unlock most of SQLite's performance. First, WAL (write-ahead logging) mode lets readers and a writer work at the same time instead of blocking each other, and it is a one-time setting stored in the file. Second, indexes turn full table scans into fast lookups exactly as in any database; create them on the columns you filter and join by.\n\nTo confirm an index helps, use EXPLAIN QUERY PLAN, SQLite's lightweight cousin of EXPLAIN. It prints whether the query SCANs the whole table or SEARCHes using an index. Seeing SCAN on a hot query is your cue to add an index; seeing SEARCH ... USING INDEX confirms the optimizer is using it.",
+    "PRAGMA journal_mode = WAL;     -- better read/write concurrency (persisted)\n\nCREATE INDEX idx_orders_customer ON orders (customer_id);\n\nEXPLAIN QUERY PLAN\nSELECT * FROM orders WHERE customer_id = 1;\n-- QUERY PLAN\n-- `--SEARCH orders USING INDEX idx_orders_customer (customer_id=?)\n-- (SEARCH = index used; SCAN would mean a full table read)",
+    "sql",
+    "EXPLAIN QUERY PLAN shows SEARCH (index used) vs SCAN (full read); WAL mode improves concurrency."
+   ],
+   [
+    "Tune a real database in the sandbox",
+    "These techniques are easiest to internalize by measuring them. Insert ten thousand rows without a transaction, then again inside one, and the speed difference is unforgettable. Run EXPLAIN QUERY PLAN before and after adding an index and watch SCAN become SEARCH.\n\nOpen the in-browser SQLite playground, create the products and orders tables with their constraints, and confirm that a bad INSERT is rejected. Turn foreign keys on and watch an orphan order fail. Switch on WAL mode, add an index, and read the query plan. Everything happens in a disposable file, so you can experiment freely without risk.",
+    "",
+    "",
+    ""
+   ]
+  ]
+ },
+ {
+  "slug": "nodejs-fundamentals-runtime-modules-npm",
+  "title": "Node.js Fundamentals: The Runtime, Modules, and npm",
+  "summary": "Understand what Node actually is, write your first scripts, organize code into ES modules, and manage dependencies and scripts with npm.",
+  "topic": "Node.js",
+  "difficulty": "beginner",
+  "estimated_minutes": 20,
+  "playground_slug": "",
+  "scenario_slug": "node-first-script",
+  "seo_title": "Node.js Fundamentals: Runtime, Modules, and npm Explained",
+  "seo_description": "A practical Node.js intro: the V8 event loop, running scripts, ES modules vs CommonJS, package.json, npm install and scripts, and reading from the filesystem.",
+  "seo_keywords": "node.js, nodejs, npm, package.json, es modules, commonjs, import export, require, event loop, fs module, node scripts",
+  "order": 330,
+  "sections": [
+   [
+    "JavaScript outside the browser",
+    "For most of its life JavaScript could only run inside a web browser. Node.js changed that by taking Google's V8 engine — the same one in Chrome — and wrapping it with libraries for talking to the operating system: reading files, opening network sockets, spawning processes. The result is a runtime that lets you write servers, command-line tools, and build scripts in the same language as the front end.\n\nNode's defining trait is its event loop. Instead of blocking a thread while it waits for a file or a network response, Node registers a callback and moves on, handling thousands of concurrent connections on a single thread. This non-blocking, asynchronous model is why Node excels at I/O-heavy work like APIs, and it shapes every API you will use.",
+    "node --version\n# v20.11.0\n\n# Run a one-liner straight from the shell:\nnode -e \"console.log('hello from', process.platform, 'node', process.version)\"\n# hello from linux node v20.11.0\n\n# Or start the interactive REPL to experiment:\nnode\n> [1,2,3].map(n => n * 2)\n[ 2, 4, 6 ]",
+    "bash",
+    "Node is V8 plus OS bindings; its non-blocking event loop is what makes it good at I/O-heavy work."
+   ],
+   [
+    "Your first script and the process object",
+    "A Node program is just a JavaScript file you run with node. There is no compile step. Inside any script you have access to globals that do not exist in the browser, most importantly process, which represents the running Node process: its arguments, environment variables, and standard streams.\n\nprocess.argv holds the command-line arguments, process.env exposes environment variables, and process.exit() ends the program with a status code. Reading configuration from process.env is the standard way to keep secrets and per-environment settings out of your code. These objects are your script's link to the outside world.",
+    "// greet.js\nconst name = process.argv[2] || 'world';     // first user argument\nconst loud = process.env.LOUD === '1';\nconst msg  = `Hello, ${name}!`;\nconsole.log(loud ? msg.toUpperCase() : msg);\n\n// Run it:\n//   node greet.js Ada            -> Hello, Ada!\n//   LOUD=1 node greet.js Ada     -> HELLO, ADA!",
+    "javascript",
+    "process.argv is the argument list (index 2 is the first real arg); process.env reads environment variables."
+   ],
+   [
+    "Modules: import, export, and the two systems",
+    "Real programs are split across files, and Node has two module systems. The modern standard is ES Modules (ESM), using import and export, which you enable by setting \"type\": \"module\" in package.json or naming files .mjs. The older CommonJS system uses require() and module.exports and is still everywhere in existing code.\n\nFor new projects, prefer ESM — it matches the browser and is the direction the ecosystem is heading. The key idea either way is the same: a module exposes only what it explicitly exports, keeping everything else private. This is how you build a codebase out of small, focused files instead of one giant script.",
+    "// math.js  (ES module)\nexport function add(a, b) { return a + b; }\nexport const PI = 3.14159;\n\n// app.js\nimport { add, PI } from './math.js';\nconsole.log(add(2, 3), PI);   // 5 3.14159\n\n// The CommonJS equivalent you'll see in older code:\n// const { add } = require('./math');\n// module.exports = { add };",
+    "javascript",
+    "Prefer ES modules (import/export) for new code; set \"type\":\"module\" in package.json to enable them."
+   ],
+   [
+    "package.json and npm: managing dependencies",
+    "Every Node project is described by a package.json file, created with npm init. It records the project's name, its dependencies, and named scripts. When you install a library with npm install, npm downloads it into node_modules and records the version in package.json so anyone can reproduce the exact setup.\n\nThe lockfile, package-lock.json, pins the precise version of every transitive dependency, making installs deterministic across machines. The golden rules: commit package.json and package-lock.json, never commit node_modules, and run npm ci (not npm install) in automated builds for a clean, lockfile-exact install.",
+    "npm init -y                 # create package.json with defaults\nnpm install dayjs           # add a runtime dependency\nnpm install --save-dev vitest   # add a dev-only dependency\n\ncat package.json\n# \"dependencies\":    { \"dayjs\": \"^1.11.10\" }\n# \"devDependencies\": { \"vitest\": \"^1.4.0\" }\n\nnpm ci                      # clean, lockfile-exact install (use in CI)",
+    "bash",
+    "Commit package.json and the lockfile, never node_modules; use npm ci for reproducible CI installs."
+   ],
+   [
+    "npm scripts and reading a file",
+    "The scripts section of package.json defines named commands you run with npm run. This is how projects standardize their start, test, and build commands so every contributor uses the same incantation. A script named start is special and runs with just npm start; test runs with npm test.\n\nTo do something genuinely Node-flavored, use the built-in fs module to read a file. Modern Node offers a promise-based API under fs/promises that pairs cleanly with async/await, reflecting Node's asynchronous nature. Combining an npm script with a small fs-based program is the seed of nearly every Node tool you will write.",
+    "// package.json\n// \"scripts\": { \"start\": \"node app.js\", \"greet\": \"node greet.js\" }\n\n// readfile.js\nimport { readFile } from 'node:fs/promises';\n\nconst text = await readFile('package.json', 'utf8');\nconst pkg  = JSON.parse(text);\nconsole.log('Project:', pkg.name, 'v' + pkg.version);\n\n// Run via npm:  npm start   (or)   npm run greet -- Ada",
+    "javascript",
+    "Define start/test/build in package.json scripts; the node:fs/promises API pairs with async/await."
+   ],
+   [
+    "Build and run it yourself",
+    "Node makes sense once you have a folder with a package.json, a dependency or two, and a script you run repeatedly. The loop of editing a file, running node, and reading the output is fast and forgiving, which makes it ideal for learning by doing.\n\nOpen the in-browser Node.js playground, run npm init -y, write the greet.js and math.js files from this tutorial, and wire up npm scripts. Install a small package, import it, and read your own package.json with the fs module. Pass arguments and environment variables to see process.argv and process.env respond. Everything runs in a sandbox you cannot break.",
+    "",
+    "",
+    ""
+   ]
+  ]
+ },
+ {
+  "slug": "nodejs-async-and-building-an-http-api",
+  "title": "Async Node.js: Promises, async/await, and an HTTP API",
+  "summary": "Master the asynchronous heart of Node — callbacks, promises, and async/await — then build a small JSON HTTP server that handles routes and errors.",
+  "topic": "Node.js",
+  "difficulty": "intermediate",
+  "estimated_minutes": 24,
+  "playground_slug": "",
+  "scenario_slug": "node-http-api",
+  "seo_title": "Async Node.js: Promises, async/await, and Building an HTTP API",
+  "seo_description": "Understand Node's async model end to end: from callbacks to promises to async/await, handling concurrency with Promise.all, then build a routed JSON HTTP server.",
+  "seo_keywords": "node.js, async await, promises, callbacks, event loop, promise.all, http server, json api, error handling, node http module",
+  "order": 335,
+  "sections": [
+   [
+    "Why Node is asynchronous in the first place",
+    "Node runs your JavaScript on a single thread, so if it ever stopped to wait — for a disk read, a database query, a network call — the entire program would freeze and could serve no one else. Node's answer is to never wait. It hands slow work to the operating system, registers a function to run when the result arrives, and immediately moves on to the next task. That registered function is a callback, and the machinery scheduling them is the event loop.\n\nThis is the mental shift that trips up newcomers: in Node, code does not run strictly top to bottom. A line that starts a file read finishes instantly, the rest of the function continues, and the callback fires later. Embracing this — rather than fighting it — is the key to writing correct Node programs.",
+    "console.log('1: start');\n\nsetTimeout(() => console.log('3: timer fired (later)'), 0);\n\nPromise.resolve().then(() => console.log('2: microtask, before the timer'));\n\nconsole.log('1.5: end of synchronous code');\n// Output order: 1, 1.5, 2, 3  -- not the order written!",
+    "javascript",
+    "Node never blocks: slow work is deferred and its callback runs later via the event loop."
+   ],
+   [
+    "From callbacks to promises",
+    "The original Node style passed a callback as the last argument, by convention taking an error first: fn(args, (err, result) => ...). Nesting these for sequential steps produced the infamous callback pyramid, hard to read and harder to handle errors in. Promises were introduced to fix this.\n\nA promise is an object representing a value that is not ready yet. It is pending, then either fulfilled with a value or rejected with an error. You attach .then() for success and .catch() for failure, and crucially, promises chain: each .then returns a new promise, so steps line up vertically instead of nesting. Most modern Node APIs return promises directly, and you can wrap old callback APIs with util.promisify.",
+    "import { readFile } from 'node:fs/promises';\n\nreadFile('config.json', 'utf8')\n  .then(text => JSON.parse(text))\n  .then(cfg  => console.log('port:', cfg.port))\n  .catch(err => console.error('failed to load config:', err.message));\n\n// Each .then returns a new promise, so steps chain instead of nesting.",
+    "javascript",
+    "A promise is a future value; .then chains steps and .catch handles any error in the chain."
+   ],
+   [
+    "async/await: asynchronous code that reads top to bottom",
+    "async/await is syntax sugar over promises that lets you write asynchronous code as if it were synchronous. Mark a function async and you may await any promise inside it; execution pauses at the await until the promise settles, then resumes with its value — but without blocking the event loop, so other work proceeds.\n\nError handling becomes ordinary try/catch, which is a huge readability win over chained .catch(). The one rule to internalize: await must live inside an async function (with top-level await in modules as a modern exception). This is the style nearly all new Node code uses, and it makes the asynchronous nature almost invisible.",
+    "import { readFile } from 'node:fs/promises';\n\nasync function loadConfig() {\n  try {\n    const text = await readFile('config.json', 'utf8');\n    return JSON.parse(text);\n  } catch (err) {\n    console.error('failed to load config:', err.message);\n    return { port: 3000 };          // sensible fallback\n  }\n}\n\nconst cfg = await loadConfig();      // top-level await works in ES modules\nconsole.log('port:', cfg.port);",
+    "javascript",
+    "await pauses inside an async function until the promise settles; wrap it in try/catch for errors."
+   ],
+   [
+    "Doing things concurrently with Promise.all",
+    "await is sequential by default: await A then await B runs them one after another. When two operations do not depend on each other, that wastes time. Promise.all starts them together and waits for all to finish, so the total time is the slowest one rather than the sum — a frequent and large speedup for independent I/O.\n\nBe aware of the failure semantics: Promise.all rejects as soon as any single promise rejects. When you want every result regardless of individual failures, Promise.allSettled returns the outcome of each. Choosing between starting promises together versus awaiting them in sequence is one of the most impactful performance decisions in Node code.",
+    "// Slow: 200ms + 200ms = 400ms total\nconst a = await fetchUser(1);\nconst b = await fetchUser(2);\n\n// Fast: both run together, ~200ms total\nconst [u1, u2] = await Promise.all([fetchUser(1), fetchUser(2)]);\n\n// Tolerate partial failure:\nconst results = await Promise.allSettled([fetchUser(1), fetchUser(2)]);\nresults.forEach(r => console.log(r.status));  // 'fulfilled' or 'rejected'",
+    "javascript",
+    "Promise.all runs independent work concurrently; it rejects on the first failure, allSettled never does."
+   ],
+   [
+    "Putting it together: a small JSON HTTP API",
+    "Node's built-in http module is all you need to serve a JSON API, and writing one with no framework makes the request/response cycle concrete. The server is created with a request handler that receives the incoming request and a response object you write to. You inspect req.method and req.url to route, set a Content-Type header, and end the response with a JSON body.\n\nNotice how the handler is asynchronous-friendly: real handlers await a database or file, so wrapping the body in try/catch and returning a 500 on failure is essential. This tiny server is the foundation under every framework like Express or Fastify, which simply add ergonomic routing and middleware on top.",
+    "import { createServer } from 'node:http';\n\nconst products = [{ id: 1, name: 'Cable' }, { id: 2, name: 'Stand' }];\n\nconst server = createServer(async (req, res) => {\n  res.setHeader('Content-Type', 'application/json');\n  try {\n    if (req.method === 'GET' && req.url === '/products') {\n      res.end(JSON.stringify(products));\n    } else {\n      res.statusCode = 404;\n      res.end(JSON.stringify({ error: 'not found' }));\n    }\n  } catch (err) {\n    res.statusCode = 500;\n    res.end(JSON.stringify({ error: err.message }));\n  }\n});\n\nserver.listen(3000, () => console.log('listening on http://localhost:3000'));",
+    "javascript",
+    "The built-in http module routes on req.method/req.url; always try/catch handlers and return a 500 on error."
+   ],
+   [
+    "Run the server and watch the event loop work",
+    "Async Node clicks when you watch real requests flow through a server you wrote. Logging the order of operations, racing concurrent fetches with Promise.all, and triggering an error to see your 500 path fire all turn abstract ideas into observed behavior.\n\nOpen the in-browser Node.js playground, build the HTTP server from this tutorial, and hit /products and an unknown path. Convert a callback example to async/await, then speed up two independent awaits with Promise.all and compare timings. Deliberately throw inside the handler to confirm the try/catch returns a clean 500. Everything runs in a sandbox with nothing real at risk.",
+    "",
+    "",
+    ""
+   ]
+  ]
+ },
+ {
+  "slug": "react-fundamentals-components-jsx-props-state",
+  "title": "React Fundamentals: Components, JSX, Props, and State",
+  "summary": "Build your mental model of React: write function components, understand JSX, pass data down with props, and add interactivity with the useState hook.",
+  "topic": "React",
+  "difficulty": "beginner",
+  "estimated_minutes": 22,
+  "playground_slug": "",
+  "scenario_slug": "react-first-component",
+  "seo_title": "React Fundamentals: Components, JSX, Props, and useState",
+  "seo_description": "Learn React from the ground up: function components, how JSX compiles to function calls, passing props, rendering lists with keys, and managing state with useState.",
+  "seo_keywords": "react, jsx, function components, props, usestate, state, hooks, rendering lists, keys, react tutorial, declarative ui",
+  "order": 340,
+  "sections": [
+   [
+    "React is a function from data to UI",
+    "The central idea of React is deceptively simple: your UI is a function of your data. You describe what the screen should look like for a given state, and React figures out the DOM operations needed to make the real page match. You never reach into the document to manually move elements around; you change the data and let React reconcile the difference. This is what people mean by declarative UI.\n\nThe unit of a React app is the component — a JavaScript function that returns markup. Components compose: a page is built from sections, sections from widgets, widgets from buttons. Because components are just functions, you reuse them by calling them, and you reason about them in isolation. Everything else in React is in service of this model.",
+    "// A component is a function whose name starts with a capital letter\n// and that returns markup.\nfunction Welcome() {\n  return <h1>Hello, React!</h1>;\n}\n\n// You 'use' a component by writing it like an HTML tag:\nfunction App() {\n  return (\n    <main>\n      <Welcome />\n      <Welcome />\n    </main>\n  );\n}",
+    "jsx",
+    "Component names must be capitalized so React tells your components apart from HTML tags."
+   ],
+   [
+    "JSX: markup that is really JavaScript",
+    "The HTML-looking syntax in a component is JSX, and it is not a string or a template — it is JavaScript. A build tool compiles each tag into a function call that creates a lightweight description of the UI. That is why you can embed any JavaScript expression inside curly braces, and why the whole thing follows JavaScript's rules.\n\nA few differences from HTML follow from this. Because class is a reserved word, you write className; because JSX is an expression, a component must return a single root element (or a <>...</> fragment); and attributes use camelCase like onClick. Inside braces you can interpolate variables, call functions, and use ternaries, but not statements like if — for conditionals you reach for && or a ternary.",
+    "function Greeting({ user }) {\n  const hour = new Date().getHours();\n  return (\n    <div className=\"greeting\">\n      <p>{hour < 12 ? 'Good morning' : 'Hello'}, {user.name}!</p>\n      {user.isAdmin && <span className=\"badge\">admin</span>}\n    </div>\n  );\n}\n// {} embeds any JS expression; && and ternary handle conditionals.",
+    "jsx",
+    "JSX compiles to JS, so use className not class, return one root element, and put expressions in {}."
+   ],
+   [
+    "Props: passing data into a component",
+    "Components become reusable when they accept inputs. Those inputs are props — a single object of named values passed in by the parent, exactly like attributes on an HTML tag. The child reads them to decide what to render, but it must never modify them: props flow one way, from parent down to child, and that one-way data flow is what keeps a React app predictable.\n\nThe idiomatic style is to destructure props in the function signature so each one reads as a plain parameter. You can pass strings, numbers, objects, arrays, and even functions as props — passing a callback down is precisely how a child tells its parent that something happened, which we will use for events next.",
+    "function ProductCard({ name, price, onSale }) {\n  return (\n    <article className=\"card\">\n      <h3>{name}</h3>\n      <p>${price.toFixed(2)} {onSale && <em>(on sale)</em>}</p>\n    </article>\n  );\n}\n\nfunction Catalog() {\n  return (\n    <>\n      <ProductCard name=\"Cable\" price={9.99} onSale />\n      <ProductCard name=\"Stand\" price={39.5} />\n    </>\n  );\n}",
+    "jsx",
+    "Props flow one way, parent to child, and are read-only; destructure them in the parameter list."
+   ],
+   [
+    "State: data that changes over time",
+    "Props come from the parent and never change from inside the component. But UIs need data that does change — a counter, a form field, whether a menu is open. That is state, and you create it with the useState hook. Calling useState(initial) returns the current value and a setter function; calling the setter tells React the data changed, and React re-renders the component with the new value.\n\nThe rule that surprises beginners is that you must never mutate state directly; you always call the setter. React compares the new value to decide whether to re-render, and mutating in place hides the change. When new state depends on the old, pass a function to the setter so you always build on the latest value.",
+    "import { useState } from 'react';\n\nfunction Counter() {\n  const [count, setCount] = useState(0);   // [value, setter]\n  return (\n    <div>\n      <p>Count: {count}</p>\n      {/* Use the updater form when the next value depends on the last */}\n      <button onClick={() => setCount(c => c + 1)}>+1</button>\n      <button onClick={() => setCount(0)}>reset</button>\n    </div>\n  );\n}",
+    "jsx",
+    "Never mutate state directly; call the setter. Use the function form setCount(c => c+1) for safe updates."
+   ],
+   [
+    "Rendering lists and the role of keys",
+    "Real apps render lists, and in React you do that by mapping an array of data to an array of elements with JavaScript's .map(). There is no special loop syntax — it is ordinary JavaScript producing JSX. This is the payoff of JSX being real code: your data structures drive the UI directly.\n\nEach element in a rendered list needs a key prop: a stable, unique identifier React uses to track which item is which across re-renders. Without keys, React cannot tell whether an item moved, was added, or was removed, leading to subtle bugs when the list changes. Use a stable id from your data as the key; avoid using the array index when the list can reorder or have items inserted.",
+    "function ProductList({ products }) {\n  if (products.length === 0) return <p>No products yet.</p>;\n  return (\n    <ul>\n      {products.map(p => (\n        <li key={p.id}>{p.name} - ${p.price}</li>\n      ))}\n    </ul>\n  );\n}\n// key={p.id} must be stable and unique; do not use the array index\n// for lists that can reorder or change length.",
+    "jsx",
+    "Give each mapped list item a stable, unique key (an id, not the array index) so React tracks items correctly."
+   ],
+   [
+    "Build a component and make it interactive",
+    "React clicks when you write a component, pass it props, add a piece of state, and watch the screen update the instant you click a button. The declarative model — change data, UI follows — only feels real once you have experienced the round trip yourself.\n\nOpen the in-browser React playground, build the Counter and ProductCard components from this tutorial, and compose them in an App. Pass different props, render a list of products with keys, and wire a button to a useState setter. Try mutating state directly to see why it silently fails, then fix it with the setter. Everything runs in a sandbox where nothing can break.",
+    "",
+    "",
+    ""
+   ]
+  ]
+ },
+ {
+  "slug": "react-hooks-effects-and-data-fetching",
+  "title": "React Hooks: useEffect, Data Fetching, and Custom Hooks",
+  "summary": "Connect React to the outside world: run side effects with useEffect, fetch data with loading and error states, and extract reusable logic into custom hooks.",
+  "topic": "React",
+  "difficulty": "intermediate",
+  "estimated_minutes": 24,
+  "playground_slug": "",
+  "scenario_slug": "react-data-fetching",
+  "seo_title": "React Hooks in Practice: useEffect, Data Fetching, and Custom Hooks",
+  "seo_description": "Go beyond useState: understand the useEffect lifecycle and dependency array, fetch API data with loading/error/success states and cleanup, and write your own custom hook.",
+  "seo_keywords": "react, useeffect, hooks, data fetching, dependency array, cleanup, loading state, error handling, custom hooks, useState",
+  "order": 345,
+  "sections": [
+   [
+    "Side effects and why they need useEffect",
+    "Rendering in React should be pure: given the same props and state, a component returns the same UI and changes nothing else. But real apps must do impure things — fetch data, set up a subscription, start a timer, read from localStorage. These are side effects, and they cannot happen during rendering because rendering can run multiple times and at unpredictable moments.\n\nThe useEffect hook is React's designated place for side effects. It runs your effect function after the component has rendered and the screen has updated, keeping render itself pure. Understanding when an effect runs — and how to control that — is the difference between smooth apps and ones that fetch in infinite loops or leak resources.",
+    "import { useState, useEffect } from 'react';\n\nfunction Clock() {\n  const [now, setNow] = useState(new Date());\n  useEffect(() => {\n    console.log('effect ran after render');\n    // effect body runs AFTER the DOM is painted\n  });\n  return <time>{now.toLocaleTimeString()}</time>;\n}",
+    "jsx",
+    "Rendering must stay pure; useEffect is where side effects run, after the render is painted."
+   ],
+   [
+    "The dependency array controls when effects run",
+    "An effect with no second argument runs after every single render, which is almost never what you want. The second argument — the dependency array — tells React when to re-run the effect. An empty array [] means run once, after the first render, and never again. An array with values means re-run only when one of those values changes between renders.\n\nGetting the dependencies right is the heart of useEffect. List every prop or state value the effect reads; omitting one leads to stale data, while including a value that changes every render causes an infinite loop. The linter's exhaustive-deps rule exists precisely because this is the most common source of effect bugs.",
+    "useEffect(() => {\n  console.log('runs after EVERY render');\n});                                  // no array\n\nuseEffect(() => {\n  console.log('runs ONCE, after mount');\n}, []);                              // empty array\n\nuseEffect(() => {\n  console.log('runs when userId changes:', userId);\n}, [userId]);                        // re-runs only on change",
+    "jsx",
+    "[] runs once on mount; [a, b] re-runs when a or b changes; no array re-runs every render."
+   ],
+   [
+    "Cleanup: undoing what an effect set up",
+    "Many effects set something up that must be torn down: a timer that should be cleared, an event listener that should be removed, a subscription that should be closed. If you do not clean up, you leak resources and cause bugs — a timer keeps firing after the component is gone, or two listeners stack up.\n\nuseEffect handles this elegantly: if your effect returns a function, React runs that cleanup function before the effect runs again and when the component unmounts. The pattern reads naturally — set up at the top, return the teardown at the bottom. This same mechanism is what lets you cancel an in-flight fetch so a slow response cannot update a component that has already unmounted.",
+    "useEffect(() => {\n  const id = setInterval(() => setNow(new Date()), 1000);\n  // The returned function is the cleanup:\n  return () => clearInterval(id);   // runs on unmount / before re-run\n}, []);\n\n// Same idea for event listeners:\nuseEffect(() => {\n  const onResize = () => setWidth(window.innerWidth);\n  window.addEventListener('resize', onResize);\n  return () => window.removeEventListener('resize', onResize);\n}, []);",
+    "jsx",
+    "Return a function from the effect to clean up (clearInterval, removeEventListener) on unmount or re-run."
+   ],
+   [
+    "Fetching data with loading and error states",
+    "The most common real-world effect is fetching data from an API. The robust pattern tracks three pieces of state — the data, a loading flag, and an error — because at any moment the UI is in exactly one of those situations and must render accordingly. Skipping the loading and error states is the number-one cause of janky, confusing interfaces.\n\nFetch inside a useEffect with the right dependencies (re-fetch when the id changes). Crucially, guard against a race condition: if the component unmounts or the id changes before the response arrives, you must not call the state setter. A cancellation flag in the cleanup function, or an AbortController, prevents the 'cannot update an unmounted component' problem.",
+    "function Product({ id }) {\n  const [data, setData]       = useState(null);\n  const [loading, setLoading] = useState(true);\n  const [error, setError]     = useState(null);\n\n  useEffect(() => {\n    let active = true;\n    setLoading(true); setError(null);\n    fetch(`/api/products/${id}`)\n      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })\n      .then(json => { if (active) setData(json); })\n      .catch(err => { if (active) setError(err.message); })\n      .finally(() => { if (active) setLoading(false); });\n    return () => { active = false; };   // ignore a late response\n  }, [id]);\n\n  if (loading) return <p>Loading...</p>;\n  if (error)   return <p role=\"alert\">Error: {error}</p>;\n  return <h2>{data.name}</h2>;\n}",
+    "jsx",
+    "Track data/loading/error, re-fetch on [id], and use a flag in cleanup so a late response is ignored."
+   ],
+   [
+    "Custom hooks: extracting reusable logic",
+    "Once two components both need to fetch with loading and error handling, you feel the duplication. React's answer is the custom hook: a function whose name starts with use that calls other hooks. Moving the fetch logic into useFetch lets any component reuse it with a single line, and the stateful behavior travels with it.\n\nCustom hooks are not a special API — they are just functions following the naming convention, which is what lets React's rules of hooks apply to them. They are the primary way you share stateful logic in React, replacing older patterns. A good custom hook hides the messy useState and useEffect details behind a clean return value.",
+    "// useFetch.js — reusable data-fetching logic\nimport { useState, useEffect } from 'react';\n\nexport function useFetch(url) {\n  const [data, setData]       = useState(null);\n  const [loading, setLoading] = useState(true);\n  const [error, setError]     = useState(null);\n  useEffect(() => {\n    let active = true;\n    fetch(url).then(r => r.json())\n      .then(d => active && setData(d))\n      .catch(e => active && setError(e.message))\n      .finally(() => active && setLoading(false));\n    return () => { active = false; };\n  }, [url]);\n  return { data, loading, error };\n}\n\n// Any component now does:\n//   const { data, loading, error } = useFetch(`/api/products/${id}`);",
+    "jsx",
+    "A custom hook is a use-prefixed function that calls other hooks; it is how you share stateful logic."
+   ],
+   [
+    "Wire it up and watch the lifecycle",
+    "Hooks become intuitive when you watch effects fire, clean up, and re-run in response to changing dependencies. Logging inside an effect and its cleanup, then changing a prop, makes the lifecycle visible in a way no diagram can.\n\nOpen the in-browser React playground, build the Clock with an interval and its cleanup, then the Product component with loading and error states. Change the id prop and watch the effect re-run and the old fetch get ignored. Finally, extract useFetch and use it from two components. Add console.logs to the effect and cleanup to trace the order. Everything runs in a sandbox where nothing can break.",
+    "",
+    "",
+    ""
+   ]
+  ]
  }
 ]

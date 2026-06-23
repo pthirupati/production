@@ -1,0 +1,115 @@
+title: Implement retry with Exponential Backoff
+slug: nodejs-impl-retry-backoff-async
+technology: nodejs
+category: Node.js Development
+description: 'Implement retryWithBackoff(fn, options): call fn; if it throws, retry up to options.retries
+  times (so at most retries+1 total attempts). Before each retry, record the wait by calling the injected
+  options.sleep(ms) — never a real timer — with an exponential delay: options.baseMs * 2**(retryIndex),
+  where retryIndex starts at 0 for the first wait. Return fn''s value on success; if every attempt throws,
+  re-throw the LAST error. The stub returns undefined so tests fail.'
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Return fn's value on the first successful attempt
+- Retry on throw up to options.retries, calling options.sleep between attempts
+- Compute exponential delays baseMs * 2**index and re-throw the last error if all fail
+initial_state: 'Implement retryWithBackoff(fn, options): call fn; on throw, retry up to options.retries
+  times (retries+1 attempts total). Before each retry call options.sleep(baseMs * 2**retryIndex), index
+  starting at 0. Return fn''s value on success; re-throw the last error if every attempt fails. The injected
+  sleep is synchronous (it just records the delay) so the schedule is deterministic — no real timers.
+  The stub returns undefined so tests fail.'
+solution_explanation: |
+  Backoff spaces out retries so a struggling dependency isn't hammered. Loop over attempts: call fn() inside try and return on success. On catch, remember the error; if attempts remain, compute delay = baseMs * 2**(retry index) and call the injected sleep before looping again. Injecting sleep (instead of a real timer) makes the schedule observable and the test deterministic — the test's fake sleep just records the requested delays. After the final attempt fails, re-throw the last error so the caller sees the real failure, not a generic one.
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: |
+    Implement retryWithBackoff(fn, options) where options = { retries, baseMs, sleep }.
+      - Call fn(); return its value on success.
+      - On throw, if retries remain, call options.sleep(delay) then try again.
+      - delay for the i-th wait (i starts at 0) is options.baseMs * 2 ** i.
+      - At most retries + 1 attempts. If all fail, re-throw the LAST error.
+    Use ONLY options.sleep to wait — never setTimeout. A test passes a fake sleep that records delays.
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.js
+    content: |
+      function retryWithBackoff(fn, options) {
+        // options = { retries, baseMs, sleep }
+        // TODO: call fn(); on throw, call options.sleep(baseMs * 2**i) and retry up to `retries` times.
+        // Return fn's value on success; re-throw the last error if all attempts fail.
+      }
+    readonly: false
+  visible_tests:
+  - name: succeeds after a couple of failures
+    code: |
+      let n = 0;
+      const delays = [];
+      const fn = () => { n++; if (n < 3) throw new Error('flaky'); return 'ok'; };
+      const sleep = (ms) => { delays.push(ms); };
+      const v = retryWithBackoff(fn, { retries: 5, baseMs: 100, sleep });
+      assert(v === 'ok', 'value=' + v);
+      assert(n === 3, 'attempts=' + n);
+      assert(JSON.stringify(delays) === JSON.stringify([100, 200]), 'delays=' + JSON.stringify(delays));
+  - name: first-try success never sleeps
+    code: |
+      let slept = false;
+      const v = retryWithBackoff(() => 42, { retries: 3, baseMs: 50, sleep: () => { slept = true; } });
+      assert(v === 42, 'value=' + v);
+      assert(slept === false, 'should not sleep on immediate success');
+  hidden_tests:
+  - name: re-throws the LAST error after exhausting retries
+    code: |
+      let n = 0;
+      const fn = () => { n++; throw new Error('err-' + n); };
+      let caught = null;
+      try { retryWithBackoff(fn, { retries: 2, baseMs: 10, sleep: () => {} }); }
+      catch (e) { caught = e.message; }
+      assert(n === 3, 'expected 3 attempts (retries+1), got ' + n);
+      assert(caught === 'err-3', 'expected last error err-3, got ' + caught);
+  - name: exponential delay schedule is correct
+    code: |
+      const delays = [];
+      const fn = () => { throw new Error('no'); };
+      try { retryWithBackoff(fn, { retries: 4, baseMs: 1, sleep: (ms) => { delays.push(ms); } }); } catch (e) {}
+      assert(JSON.stringify(delays) === JSON.stringify([1, 2, 4, 8]), 'delays=' + JSON.stringify(delays));
+  - name: zero retries means a single attempt and no sleep
+    code: |
+      let n = 0; let slept = false;
+      try { retryWithBackoff(() => { n++; throw new Error('x'); }, { retries: 0, baseMs: 10, sleep: () => { slept = true; } }); } catch (e) {}
+      assert(n === 1, 'attempts=' + n);
+      assert(slept === false, 'should not sleep with zero retries');
+  - name: sleeps before retrying (ordering)
+    code: |
+      const events = [];
+      let n = 0;
+      const fn = () => { events.push('try' + n); n++; if (n < 2) throw new Error('again'); return 'done'; };
+      const sleep = (ms) => { events.push('sleep' + ms); };
+      const v = retryWithBackoff(fn, { retries: 3, baseMs: 5, sleep });
+      assert(v === 'done', 'value=' + v);
+      assert(JSON.stringify(events) === JSON.stringify(['try0', 'sleep5', 'try1']), JSON.stringify(events));
+  - name: returns the value unchanged on success without retries
+    code: |
+      const obj = { a: 1 };
+      const v = retryWithBackoff(() => obj, { retries: 2, baseMs: 1, sleep: () => {} });
+      assert(v === obj, 'should return fn result by reference');
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Loop with an index i from 0 up to options.retries; inside try, `return fn();`.
+- order: 2
+  cost: 20
+  content: On catch, save the error. If i < options.retries, `options.sleep(options.baseMs * 2 ** i)` then continue; otherwise stop.
+- order: 3
+  cost: 30
+  content: After the loop, `throw lastError;`. Note retries=0 means exactly one attempt and no sleep.

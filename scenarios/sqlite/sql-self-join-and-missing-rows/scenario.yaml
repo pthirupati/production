@@ -1,0 +1,179 @@
+title: Roommate Pairs and the Students With No Room
+slug: sql-self-join-and-missing-rows
+technology: sqlite
+category: SQLite
+description: The housing system needs two reports from one students table. First, every
+  pair of students assigned to the same room (each pair listed once, no self-pairs).
+  Second, every student who has not been assigned to any room at all. The first calls
+  for a self-join with an ordering trick to dedupe pairs; the second is a classic
+  LEFT JOIN anti-join to surface the missing rows.
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: High
+time_limit: 1800
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Join a table to itself to relate rows that share a column
+- Dedupe symmetric pairs with an a.id < b.id guard (no self-pairs, no mirror dupes)
+- Find rows with no match using a LEFT JOIN ... WHERE right IS NULL anti-join
+initial_state: solution(conn) returns two query functions. roommate_pairs(c) finds
+  every unordered pair of students sharing the same non-null room_id; unassigned(c)
+  finds every student whose room_id is NULL. Both starters return empty lists — write
+  the self-join and the LEFT JOIN anti-join.
+solution_explanation: |
+  Roommate pairs come from joining students to themselves on room_id. Joining on
+  equality alone would return each student paired with itself and each pair twice
+  (A-B and B-A), so the guard a.id < b.id keeps exactly one ordered representative
+  per pair and drops self-pairs. Rooms are matched only when room_id is NOT NULL so
+  unassigned students never pair up.
+
+  The unassigned report is an anti-join: although here a simple WHERE room_id IS NULL
+  works, the portable, generalizable pattern is to LEFT JOIN students to the rooms
+  table and keep the rows where the right side failed to match (rooms.id IS NULL) —
+  that surfaces exactly the "missing" rows that an INNER JOIN would silently drop.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: implement
+  instructions: |
+    Implement solution(conn) to RETURN A TUPLE of two functions: (roommate_pairs, unassigned).
+
+    Schema (created fresh by each test):
+      rooms(id INTEGER, label TEXT)
+      students(id INTEGER, name TEXT, room_id INTEGER)   -- room_id may be NULL
+
+    1) roommate_pairs(c): return (name_a, name_b) for every pair of DIFFERENT students
+       sharing the same room. List each pair ONCE (not both A-B and B-A), with
+       name_a < name_b within the row. Order by name_a, then name_b. Students with a
+       NULL room_id are not in any pair.
+
+    2) unassigned(c): return (name,) for every student whose room_id does NOT match any
+       row in `rooms` (i.e. NULL or dangling). Use a LEFT JOIN from students to rooms
+       and keep the rows where the room side is NULL. Order by name ascending.
+
+    Each function takes the connection and returns conn.execute(...).fetchall().
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def solution(conn):
+          def roommate_pairs(c):
+              # TODO: self-join students a, students b on a.room_id = b.room_id,
+              # keep one row per pair (a.name < b.name), ignore NULL room_id.
+              return c.execute("SELECT name, name FROM students WHERE 0").fetchall()
+
+          def unassigned(c):
+              # TODO: LEFT JOIN students -> rooms on students.room_id = rooms.id,
+              # keep rows where rooms.id IS NULL. Order by name.
+              return c.execute("SELECT name FROM students WHERE 0").fetchall()
+
+          return (roommate_pairs, unassigned)
+    readonly: false
+  visible_tests:
+  - name: pairs share a room and dedupe
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE rooms(id INTEGER, label TEXT);
+        CREATE TABLE students(id INTEGER, name TEXT, room_id INTEGER);
+        INSERT INTO rooms VALUES (1,'101'),(2,'102');
+        INSERT INTO students VALUES (1,'Ava',1),(2,'Ben',1),(3,'Cy',2);
+      ''')
+      pairs, _ = solution(conn)
+      assert pairs(conn) == [('Ava','Ben')], pairs(conn)
+  - name: unassigned finds null room
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE rooms(id INTEGER, label TEXT);
+        CREATE TABLE students(id INTEGER, name TEXT, room_id INTEGER);
+        INSERT INTO rooms VALUES (1,'101');
+        INSERT INTO students VALUES (1,'Ava',1),(2,'Ben',NULL);
+      ''')
+      _, unassigned = solution(conn)
+      assert unassigned(conn) == [('Ben',)], unassigned(conn)
+  hidden_tests:
+  - name: three in a room give three pairs no mirrors
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE rooms(id INTEGER, label TEXT);
+        CREATE TABLE students(id INTEGER, name TEXT, room_id INTEGER);
+        INSERT INTO rooms VALUES (1,'101');
+        INSERT INTO students VALUES (1,'Ava',1),(2,'Ben',1),(3,'Cy',1);
+      ''')
+      pairs, _ = solution(conn)
+      assert pairs(conn) == [('Ava','Ben'),('Ava','Cy'),('Ben','Cy')], pairs(conn)
+  - name: no self pairs and null rooms never pair
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE rooms(id INTEGER, label TEXT);
+        CREATE TABLE students(id INTEGER, name TEXT, room_id INTEGER);
+        INSERT INTO rooms VALUES (1,'101');
+        INSERT INTO students VALUES (1,'Ava',1),(2,'Ben',NULL),(3,'Cy',NULL);
+      ''')
+      pairs, _ = solution(conn)
+      assert pairs(conn) == [], pairs(conn)
+  - name: pairs ordered across multiple rooms
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE rooms(id INTEGER, label TEXT);
+        CREATE TABLE students(id INTEGER, name TEXT, room_id INTEGER);
+        INSERT INTO rooms VALUES (1,'101'),(2,'102');
+        INSERT INTO students VALUES (1,'Dan',2),(2,'Eve',2),(3,'Ada',1),(4,'Bo',1);
+      ''')
+      pairs, _ = solution(conn)
+      assert pairs(conn) == [('Ada','Bo'),('Dan','Eve')], pairs(conn)
+  - name: dangling room_id counts as unassigned via left join
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE rooms(id INTEGER, label TEXT);
+        CREATE TABLE students(id INTEGER, name TEXT, room_id INTEGER);
+        INSERT INTO rooms VALUES (1,'101');
+        INSERT INTO students VALUES (1,'Ava',1),(2,'Ben',99),(3,'Cy',NULL);
+      ''')
+      _, unassigned = solution(conn)
+      assert unassigned(conn) == [('Ben',),('Cy',)], unassigned(conn)
+  - name: all assigned to real rooms means none unassigned
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE rooms(id INTEGER, label TEXT);
+        CREATE TABLE students(id INTEGER, name TEXT, room_id INTEGER);
+        INSERT INTO rooms VALUES (1,'101'),(2,'102');
+        INSERT INTO students VALUES (1,'Ava',1),(2,'Ben',2);
+      ''')
+      _, unassigned = solution(conn)
+      assert unassigned(conn) == [], unassigned(conn)
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: For pairs, join students to themselves — FROM students a JOIN students b
+    ON a.room_id = b.room_id — then think about what stops A pairing with itself.
+- order: 2
+  cost: 20
+  content: Add `a.name < b.name` so each unordered pair appears once and no student
+    pairs with itself. For the second query, LEFT JOIN students to rooms and keep
+    rows where rooms.id IS NULL.
+- order: 3
+  cost: 30
+  content: 'Pairs: SELECT a.name, b.name FROM students a JOIN students b ON a.room_id
+    = b.room_id AND a.name < b.name ORDER BY a.name, b.name. Unassigned: SELECT s.name
+    FROM students s LEFT JOIN rooms r ON s.room_id = r.id WHERE r.id IS NULL ORDER BY
+    s.name.'

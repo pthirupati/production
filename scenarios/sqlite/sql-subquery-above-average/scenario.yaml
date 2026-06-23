@@ -1,0 +1,137 @@
+title: Find Above-Average Orders with a Subquery
+slug: sql-subquery-above-average
+technology: sqlite
+category: SQLite
+description: The finance team wants every order whose amount is strictly greater than
+  the average order amount across the whole table. The threshold isn't a fixed number
+  — it's computed from the same data — so you'll compare each row against a scalar
+  subquery that returns the overall average.
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Compute an aggregate as a scalar subquery
+- Compare each row to that subquery in WHERE
+- Understand strict greater-than against a computed threshold
+initial_state: above_average_orders(conn) should return (id, amount) for every order
+  whose amount is strictly greater than AVG(amount) over all orders, ordered by amount
+  descending then id ascending. The starter returns an empty list — write the query
+  with a subquery in WHERE.
+solution_explanation: |
+  The comparison threshold is itself derived from the table, so you nest a scalar
+  subquery — (SELECT AVG(amount) FROM orders) — inside the WHERE clause and compare
+  each row's amount against it. The subquery runs once and yields a single value;
+  rows with amount strictly greater than that average survive. Ordering by amount
+  descending, then id, makes the result deterministic.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: implement
+  instructions: |
+    Implement solution(conn): return (id, amount) for every order whose amount is
+    STRICTLY greater than the average amount across all orders. Order by amount
+    descending, then id ascending.
+
+      orders(id INTEGER, amount REAL)
+
+    Use a scalar subquery in the WHERE clause. Return conn.execute(...).fetchall().
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def solution(conn):
+          # TODO: SELECT id, amount FROM orders where amount is strictly above the
+          # overall AVG(amount); order by amount desc then id asc.
+          return conn.execute(
+              "SELECT id, amount FROM orders WHERE 0 ORDER BY amount DESC, id ASC"
+          ).fetchall()
+    readonly: false
+  visible_tests:
+  - name: returns rows above the mean
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE orders(id INTEGER, amount REAL);
+        INSERT INTO orders VALUES (1,10);
+        INSERT INTO orders VALUES (2,20);
+        INSERT INTO orders VALUES (3,30);
+      ''')
+      assert solution(conn) == [(3,30.0)], solution(conn)
+  - name: nothing above when all equal
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE orders(id INTEGER, amount REAL);
+        INSERT INTO orders VALUES (1,5);
+        INSERT INTO orders VALUES (2,5);
+        INSERT INTO orders VALUES (3,5);
+      ''')
+      assert solution(conn) == [], solution(conn)
+  hidden_tests:
+  - name: strictly greater excludes values equal to the average
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE orders(id INTEGER, amount REAL);
+        INSERT INTO orders VALUES (1,10);
+        INSERT INTO orders VALUES (2,10);
+        INSERT INTO orders VALUES (3,40);
+      ''')
+      assert solution(conn) == [(3,40.0)], solution(conn)
+  - name: ordered by amount desc then id asc
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE orders(id INTEGER, amount REAL);
+        INSERT INTO orders VALUES (1,1);
+        INSERT INTO orders VALUES (2,100);
+        INSERT INTO orders VALUES (3,100);
+        INSERT INTO orders VALUES (4,1);
+      ''')
+      assert solution(conn) == [(2,100.0),(3,100.0)], solution(conn)
+  - name: average recomputed from this table
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE orders(id INTEGER, amount REAL);
+        INSERT INTO orders VALUES (1,2);
+        INSERT INTO orders VALUES (2,4);
+        INSERT INTO orders VALUES (3,6);
+        INSERT INTO orders VALUES (4,8);
+      ''')
+      assert solution(conn) == [(4,8.0),(3,6.0)], solution(conn)
+  - name: single row never beats its own average
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript('''
+        CREATE TABLE orders(id INTEGER, amount REAL);
+        INSERT INTO orders VALUES (1,42);
+      ''')
+      assert solution(conn) == [], solution(conn)
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: The threshold is the table's own average, so compute it inside the query
+    with (SELECT AVG(amount) FROM orders).
+- order: 2
+  cost: 20
+  content: Put that scalar subquery on the right side of a strict comparison in WHERE
+    — amount > (SELECT AVG(amount) FROM orders).
+- order: 3
+  cost: 30
+  content: 'Query: SELECT id, amount FROM orders WHERE amount > (SELECT AVG(amount)
+    FROM orders) ORDER BY amount DESC, id ASC.'
