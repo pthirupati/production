@@ -1,6 +1,9 @@
 from django.urls import path
 
 from .views import (
+    DatascienceSimActionView,
+    DatascienceSimReleaseView,
+    DatascienceSimStateView,
     DockerSimActionView,
     DockerSimReleaseView,
     DockerSimStateView,
@@ -59,4 +62,9 @@ urlpatterns = [
     path("wireshark/sessions/<uuid:session_id>/", WiresharkSimStateView.as_view(), name="wireshark-sim-state"),
     path("wireshark/sessions/<uuid:session_id>/action/", WiresharkSimActionView.as_view(), name="wireshark-sim-action"),
     path("wireshark/sessions/<uuid:session_id>/release/", WiresharkSimReleaseView.as_view(), name="wireshark-sim-release"),
+
+    # Data Science simulation (BI dashboard builder)
+    path("datascience/sessions/<uuid:session_id>/", DatascienceSimStateView.as_view(), name="datascience-sim-state"),
+    path("datascience/sessions/<uuid:session_id>/action/", DatascienceSimActionView.as_view(), name="datascience-sim-action"),
+    path("datascience/sessions/<uuid:session_id>/release/", DatascienceSimReleaseView.as_view(), name="datascience-sim-release"),
 ]

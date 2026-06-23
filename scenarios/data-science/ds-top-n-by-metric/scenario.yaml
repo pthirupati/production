@@ -1,0 +1,82 @@
+title: Top N Products by Revenue
+slug: ds-top-n-by-metric
+technology: data-science
+category: Data Science & Analytics
+description: A leaderboard helper should return the names of the top N products ranked by revenue,
+  highest first, but the starter sorts ascending and slices the wrong end, so it returns the WORST
+  performers instead of the best. Fix the ranking so the highest-revenue products come back.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Low
+time_limit: 900
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Sort a list of dicts by a numeric field
+- Order the result descending (highest first)
+- Return the top N names, breaking ties deterministically
+initial_state: A leaderboard helper should return the names of the top N products ranked by revenue,
+  highest first, but the starter sorts ascending and slices the wrong end, so it returns the WORST
+  performers. Fix the ranking so the highest-revenue products come back, ties broken by name ascending.
+solution_explanation: |
+  Sorting ascending puts the smallest revenue first; slicing [:n] then returns the lowest performers.
+  Sort by (-revenue, name) so highest revenue comes first and equal revenues fall back to alphabetical
+  name order, then take the first n names.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix solution(products, n): products is a list of dicts like {"name": "A", "revenue": 30}. Return a
+    list of the n product NAMES with the HIGHEST revenue, highest first. Break ties by name ascending.
+      top([{"name":"A","revenue":1},{"name":"B","revenue":9}], 1) -> ["B"]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      def solution(products, n):
+          # BUG: sorts ascending (smallest revenue first) and so returns the
+          # WORST performers, not the best.
+          ranked = sorted(products, key=lambda p: p["revenue"])
+          return [p["name"] for p in ranked[:n]]
+    readonly: false
+  visible_tests:
+  - name: returns highest revenue first
+    code: |
+      data = [{"name":"A","revenue":1},{"name":"B","revenue":9},{"name":"C","revenue":5}]
+      assert solution(data, 2) == ["B", "C"], solution(data, 2)
+  - name: single top
+    code: |
+      data = [{"name":"A","revenue":1},{"name":"B","revenue":9}]
+      assert solution(data, 1) == ["B"], solution(data, 1)
+  hidden_tests:
+  - name: ties broken by name ascending
+    code: |
+      data = [{"name":"Zed","revenue":5},{"name":"Abe","revenue":5},{"name":"Mid","revenue":5}]
+      assert solution(data, 2) == ["Abe", "Mid"], solution(data, 2)
+  - name: n larger than list returns all sorted
+    code: |
+      data = [{"name":"A","revenue":3},{"name":"B","revenue":7}]
+      assert solution(data, 10) == ["B", "A"], solution(data, 10)
+  - name: n zero returns empty
+    code: |
+      data = [{"name":"A","revenue":3}]
+      assert solution(data, 0) == [], solution(data, 0)
+  - name: empty products returns empty
+    code: |
+      assert solution([], 3) == [], solution([], 3)
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Run it — the names you get back are the lowest-revenue products. The sort direction is wrong.
+- order: 2
+  cost: 20
+  content: To rank highest first, sort by negative revenue, or pass reverse=True. For stable ties, also key on the name.
+- order: 3
+  cost: 30
+  content: 'Use sorted(products, key=lambda p: (-p["revenue"], p["name"])) then take [:n] of the names.'

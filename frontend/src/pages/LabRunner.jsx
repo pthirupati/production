@@ -22,6 +22,7 @@ import PromptPlayground from '../components/promptlab/PromptPlayground'
 import MonitoringSimulator from '../components/monitoring/MonitoringSimulator'
 import NmapSimulator from '../components/nmap/NmapSimulator'
 import WiresharkSimulator from '../components/wireshark/WiresharkSimulator'
+import DataDashboardSimulator from '../components/datascience/DataDashboardSimulator'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
@@ -122,6 +123,8 @@ export default function LabRunner() {
   // Nmap + Wireshark simulator overlays (opened from the lab toolbar buttons).
   const [showNmapSim, setShowNmapSim] = useState(false)
   const [showWiresharkSim, setShowWiresharkSim] = useState(false)
+  // Data Science dashboard simulator overlay (opened from the lab toolbar button).
+  const [showDataDashboardSim, setShowDataDashboardSim] = useState(false)
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
@@ -920,6 +923,12 @@ export default function LabRunner() {
   const isWiresharkLab = !isCrossTech && (
     scenario?.simulation_type === 'wireshark' || scenario?.technology?.slug === 'wireshark'
   )
+  // Data Science DASHBOARD labs open the in-app dashboard builder inline (dataset
+  // preview + dimension/measure/aggregation/filter/chart pickers + a rendered
+  // chart). Keyed ONLY on simulation_type 'data-dashboard' — NOT the technology
+  // slug, because data-science also hosts coding_mode labs that must keep opening
+  // the code IDE.
+  const isDataDashboardLab = !isCrossTech && scenario?.simulation_type === 'data-dashboard'
   // coding_mode scenarios open a browser surface instead of a terminal. Prompt
   // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
   // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
@@ -1568,6 +1577,17 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open Wireshark
             </button>
           )}
+          {isDataDashboardLab && (
+            <button
+              type="button"
+              onClick={() => setShowDataDashboardSim(true)}
+              title="Open the in-app data dashboard builder to pick a dimension, measure, aggregation, filter and chart type, then Check Solution."
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(52,211,153,.4)', color: '#34d399', background: 'rgba(52,211,153,.1)' }}
+            >
+              <ExternalLink size={12} /> Open Dashboard
+            </button>
+          )}
           {isSimulationLab && (
             <>
               <SimLabQuickActions
@@ -1896,6 +1916,31 @@ export default function LabRunner() {
               onExit={() => setShowWiresharkSim(false)}
               onHints={() => { setShowWiresharkSim(false); toggleHints() }}
               onStop={() => { setShowWiresharkSim(false); setShowStopConfirm(true) }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Data Science dashboard builder — full-screen overlay opened from the
+          toolbar. The learner picks dimension/measure/aggregation/filter/chart,
+          sees the engine-computed series rendered as a chart + table, then runs
+          Check Solution (graded via validate_datascience_lab). */}
+      {isDataDashboardLab && showDataDashboardSim && (
+        <div className="fixed inset-0 z-[60] bg-surface-950">
+          <button
+            type="button"
+            onClick={() => setShowDataDashboardSim(false)}
+            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
+          >
+            <XCircle size={14} /> Close simulator
+          </button>
+          <div className="h-full overflow-auto">
+            <DataDashboardSimulator
+              sessionId={sessionId}
+              scenario={scenario}
+              onExit={() => setShowDataDashboardSim(false)}
+              onHints={() => { setShowDataDashboardSim(false); toggleHints() }}
+              onStop={() => { setShowDataDashboardSim(false); setShowStopConfirm(true) }}
             />
           </div>
         </div>

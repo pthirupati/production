@@ -1,0 +1,129 @@
+title: Monthly Revenue with a Running Total (SQL)
+slug: ds-sql-revenue-by-month
+technology: data-science
+category: Data Science & Analytics
+description: An analytics query should report revenue per calendar month plus a running cumulative total,
+  but the starter forgets to GROUP BY month (so it sums everything into one row) and its window frame is
+  unbounded on the wrong side. Fix the GROUP BY aggregation and the running-total window.
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: High
+time_limit: 1500
+max_score: 100
+is_free: true
+dual_terminal: false
+objectives:
+- Bucket rows into months with strftime and GROUP BY
+- Aggregate revenue per month with SUM
+- Add a cumulative running total with a window function
+initial_state: An analytics query should report revenue per month plus a running cumulative total, but
+  the starter omits GROUP BY (collapsing all sales into one row) and its window frame is wrong. Fix it
+  so each row is (month 'YYYY-MM', monthly_revenue, running_total) ordered by month ascending, where
+  running_total is the cumulative sum of monthly_revenue through that month.
+solution_explanation: |
+  SELECT the month bucket with strftime('%Y-%m', sold_at), SUM(amount) AS monthly_revenue, GROUP BY that
+  bucket, ORDER BY it. The running total is SUM(SUM(amount)) OVER (ORDER BY the month ROWS BETWEEN
+  UNBOUNDED PRECEDING AND CURRENT ROW) — a window over the grouped aggregate. The starter omitted GROUP
+  BY (so every sale collapsed into a single row) and used the wrong frame, giving a flat or wrong total.
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: |
+    Fix solution(conn): the `sales` table has columns (id, sold_at TEXT 'YYYY-MM-DD', amount REAL).
+    Return rows of (month, monthly_revenue, running_total) where month is 'YYYY-MM', monthly_revenue is
+    the SUM of amount in that month, and running_total is the cumulative sum of monthly_revenue from the
+    first month through the current one. Order by month ascending.
+      Two Jan sales of 10 and 5, one Feb sale of 20 ->
+        [('2024-01', 15.0, 15.0), ('2024-02', 20.0, 35.0)]
+    Click Run to try it, then Check Solution to grade against all tests.
+  files:
+  - path: solution.py
+    content: |
+      import sqlite3
+
+      def solution(conn):
+          # BUG: no GROUP BY, so SUM collapses every sale into ONE row; and the
+          # window frame looks at FOLLOWING rows instead of preceding ones.
+          return conn.execute(
+              """
+              SELECT strftime('%Y-%m', sold_at) AS month,
+                     SUM(amount) AS monthly_revenue,
+                     SUM(SUM(amount)) OVER (
+                         ORDER BY strftime('%Y-%m', sold_at)
+                         ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
+                     ) AS running_total
+              FROM sales
+              ORDER BY month
+              """
+          ).fetchall()
+    readonly: false
+  visible_tests:
+  - name: groups by month with running total
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript(
+          "CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);"
+          "INSERT INTO sales (sold_at, amount) VALUES "
+          "('2024-01-05', 10.0), ('2024-01-20', 5.0), ('2024-02-10', 20.0);"
+      )
+      assert solution(conn) == [
+          ('2024-01', 15.0, 15.0), ('2024-02', 20.0, 35.0)], solution(conn)
+  - name: single month single row
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript(
+          "CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);"
+          "INSERT INTO sales (sold_at, amount) VALUES ('2024-03-01', 7.0), ('2024-03-31', 3.0);"
+      )
+      assert solution(conn) == [('2024-03', 10.0, 10.0)], solution(conn)
+  hidden_tests:
+  - name: running total accumulates across three months
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript(
+          "CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);"
+          "INSERT INTO sales (sold_at, amount) VALUES "
+          "('2024-01-01', 100.0), ('2024-02-01', 50.0), ('2024-03-01', 25.0);"
+      )
+      assert solution(conn) == [
+          ('2024-01', 100.0, 100.0),
+          ('2024-02', 50.0, 150.0),
+          ('2024-03', 25.0, 175.0)], solution(conn)
+  - name: months come back in ascending order even if inserted out of order
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript(
+          "CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);"
+          "INSERT INTO sales (sold_at, amount) VALUES "
+          "('2024-12-01', 4.0), ('2024-01-01', 1.0), ('2024-06-01', 2.0);"
+      )
+      rows = solution(conn)
+      assert [r[0] for r in rows] == ['2024-01', '2024-06', '2024-12'], rows
+      assert rows[-1][2] == 7.0, rows
+  - name: empty table yields no rows
+    code: |
+      import sqlite3
+      conn = sqlite3.connect(":memory:")
+      conn.executescript(
+          "CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);"
+      )
+      assert solution(conn) == [], solution(conn)
+  timeout: 8
+hints:
+- order: 1
+  cost: 10
+  content: Without GROUP BY, SUM(amount) collapses every sale into a single row. You need one row per month bucket.
+- order: 2
+  cost: 20
+  content: Bucket with strftime('%Y-%m', sold_at) and GROUP BY it. The running total is a window SUM over those grouped totals, ordered by month.
+- order: 3
+  cost: 30
+  content: 'Frame the window as ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW so it accumulates earlier months, not following ones.'

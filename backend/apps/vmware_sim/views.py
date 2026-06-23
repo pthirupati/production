@@ -22,6 +22,9 @@ from .nmap_engine import get_state as nmap_get_state
 from .wireshark_engine import apply_action as wireshark_apply_action
 from .wireshark_engine import drop_session as wireshark_drop_session
 from .wireshark_engine import get_state as wireshark_get_state
+from .datascience_engine import apply_action as datascience_apply_action
+from .datascience_engine import drop_session as datascience_drop_session
+from .datascience_engine import get_state as datascience_get_state
 
 
 def _demo_session_id(user) -> str:
@@ -352,4 +355,49 @@ class WiresharkSimReleaseView(APIView):
         if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
             return Response({"error": "Session not found"}, status=404)
         wireshark_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ---------------------------------------------------------------------------
+# Data Science views (BI dashboard builder simulator)
+# ---------------------------------------------------------------------------
+
+class DatascienceSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario", "scenario__technology").filter(
+            pk=session_id, user=request.user,
+        ).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(datascience_get_state(session_id, slug))
+
+
+class DatascienceSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        # Ensure the simulation session is initialized in the cache before applying any action
+        datascience_get_state(session_id, slug)
+        result = datascience_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": datascience_get_state(session_id, slug)})
+
+
+class DatascienceSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        datascience_drop_session(session_id)
         return Response({"released": True})

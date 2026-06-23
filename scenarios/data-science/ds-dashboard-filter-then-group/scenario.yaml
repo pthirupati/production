@@ -1,0 +1,41 @@
+slug: ds-dashboard-filter-then-group
+title: "Filter Then Group: Completed Order Value by Category"
+technology: Data Science & Analytics
+category: Dashboards
+difficulty: medium
+lab_mode: simulation
+simulation_type: data-dashboard
+coding_mode: false
+time_limit: 900
+max_score: 100
+infrastructure_type: docker
+jira_priority: Medium
+is_free: true
+description: |
+  Finance wants total order value per product category, but cancelled orders are
+  inflating the totals. The orders dataset has a 'status' column (completed or
+  cancelled). You must FILTER the data to completed orders first, then GROUP by
+  category and sum the amount, shown as a bar chart.
+
+  Order of operations matters: if you group without filtering, cancelled orders
+  are counted and the totals are wrong. Apply the filter, set the right
+  dimension/measure/aggregation, and choose a bar chart.
+objectives:
+  - Filter the dataset to status = 'completed' (exclude cancelled orders)
+  - Group by 'category' and sum the 'amount' measure
+  - Render the result as a bar chart
+initial_state: |
+  A fresh dashboard with no filter, dimension, measure, aggregation, or chart set.
+  The orders dataset has 9 rows. After filtering to completed orders, summing
+  amount per category gives Books 65, Electronics 500, Toys 30. Cancelled orders
+  (Books 99, Electronics 450, Toys 15) must NOT be included.
+hints:
+  - order: 1
+    cost: 10
+    content: "Filter first: set a filter on column 'status' with value 'completed'. This drops the cancelled rows from every downstream aggregation."
+  - order: 2
+    cost: 15
+    content: "Now group: set the dimension to 'category', the measure to 'amount', and the aggregation to 'sum'."
+  - order: 3
+    cost: 20
+    content: "Set the chart type to 'bar'. If your Electronics bar reads 950 instead of 500, the filter is missing — cancelled orders are still being summed."

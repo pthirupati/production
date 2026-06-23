@@ -260,6 +260,10 @@ class SimulationProvisioner:
             from apps.vmware_sim.engine import _ensure_session
             _ensure_session(str(lab_session.id), slug)
 
+        if slug.lower().startswith("ds-dashboard-") or raw_type == "data-dashboard":
+            from apps.vmware_sim.datascience_engine import _ensure_session as _ensure_ds_session
+            _ensure_ds_session(str(lab_session.id), slug)
+
         logger.info("Simulation lab %s persona=%s resource=%s", lab_session.id, sim_type, resource_id)
         return resource_id, f"sim-{slug}"
 
@@ -401,6 +405,28 @@ class SimulationProvisioner:
                 return validate_wireshark_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "Wireshark simulation session not found"
+        # data-dashboard normalizes to "generic", so gate on the slug prefix OR the
+        # RAW (pre-normalize) simulation_type read off the scenario.
+        if low_slug.startswith("ds-dashboard-"):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.datascience_engine import validate_datascience_lab, _ensure_session
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                _ensure_session(str(lab_session.id), slug)
+                return validate_datascience_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Data dashboard simulation session not found"
+        from apps.labs.models import LabSession
+        try:
+            _ds_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+            _raw_sim_type = (getattr(_ds_session.scenario, "simulation_type", "") or "")
+        except LabSession.DoesNotExist:
+            _ds_session = None
+            _raw_sim_type = ""
+        if _raw_sim_type == "data-dashboard" and _ds_session is not None:
+            from apps.vmware_sim.datascience_engine import validate_datascience_lab, _ensure_session
+            _ensure_session(str(_ds_session.id), slug)
+            return validate_datascience_lab(str(_ds_session.id), slug)
         script = resolve_simulation_validation_script(slug, validation_script or "")
         if engine and hasattr(engine, "state"):
             return validate_simulation_state(engine.state, script, engine=engine)
