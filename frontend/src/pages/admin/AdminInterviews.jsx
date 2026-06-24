@@ -319,7 +319,7 @@ export default function AdminInterviews() {
                     {req.status}
                     {req.status === 'approved' && req.observer_token && (
                       <a
-                        href={`/interviews/round/${req.round_id}?observer=${req.observer_token}`}
+                        href={`/interviews/room/${req.round_id}?observer=${req.observer_token}`}
                         className="ml-2 text-indigo-400 hover:underline"
                       >
                         Open observer view

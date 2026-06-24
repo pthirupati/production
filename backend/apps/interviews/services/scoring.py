@@ -80,6 +80,8 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
 
     round_type = meta.get("round_type", "technical")
     keywords = list(question.expected_keywords) if question and question.expected_keywords else []
+    if not keywords:
+        keywords = list(meta.get("expected_keywords") or [])
     if question and question.technology_id:
         from apps.interviews.services.answer_corpus import corpus_keywords_for_technology
 
@@ -90,7 +92,7 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
 
     breakdown = compute_answer_scores(
         candidate_answer=text,
-        question_text=(question.question_text if question else ""),
+        question_text=meta.get("question_text") or (question.question_text if question else ""),
         round_type=round_type,
         expected_keywords=keywords or None,
     )
@@ -142,7 +144,7 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
     }
 
 
-def aggregate_round_scores(message_scores: list[float]) -> dict:
+def aggregate_round_scores(message_scores: list[float], round_type: str = "technical") -> dict:
     if not message_scores:
         return {
             "technical_score": 0,
@@ -154,14 +156,25 @@ def aggregate_round_scores(message_scores: list[float]) -> dict:
             "overall_score": 0,
         }
     avg = sum(message_scores) / len(message_scores)
-    return {
+    dims = {
         "technical_score": round(min(100, avg * 1.05), 1),
         "communication_score": round(min(100, avg * 0.95 + 5), 1),
         "problem_solving_score": round(min(100, avg), 1),
         "practical_score": round(min(100, avg * 1.1), 1),
         "presence_score": 72.0,
         "resume_alignment_score": 68.0,
-        "overall_score": round(avg, 1),
+    }
+    try:
+        from apps.interviews.services.interview_types import get_eval_weights
+
+        weights = get_eval_weights(round_type)
+        w_sum = sum(weights.values()) or 1.0
+        overall = sum(dims.get(k, avg) * weights.get(k, 0) for k in weights) / w_sum
+    except Exception:  # noqa: BLE001
+        overall = avg
+    return {
+        **dims,
+        "overall_score": round(overall, 1),
     }
 
 
@@ -179,6 +192,12 @@ def build_strengths_and_improvements(scores: list[dict], round_type: str) -> tup
         strengths.append("Discussed process, ownership, and stakeholder angles.")
     if round_type == "hr":
         strengths.append("Communicated motivation and career narrative.")
+    if round_type in ("devops_debug", "sre_oncall"):
+        strengths.append("Worked through incident methodology and on-call communication.")
+    if round_type == "system_design":
+        strengths.append("Discussed architecture trade-offs and scaling dimensions.")
+    if round_type == "live_coding":
+        strengths.append("Engaged with hands-on coding and implementation details.")
 
     if weak:
         improvements.append(f"Deepen answers where you scored below 55 — {len(weak)} area(s) flagged.")

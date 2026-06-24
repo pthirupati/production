@@ -549,6 +549,35 @@ export const adminApi = {
     const { data } = await api.get(`/admin/interviews/observer/${token}/`)
     return data
   },
+  async observerJoinSession(token, displayName) {
+    const { data } = await api.post(`/admin/interviews/observer/${token}/`, {
+      action: 'join',
+      display_name: displayName,
+    })
+    return data
+  },
+  async observerAskQuestion(token, question, extra = {}) {
+    const { data } = await api.post(`/admin/interviews/observer/${token}/`, {
+      action: 'ask',
+      question,
+      ...extra,
+    })
+    return data
+  },
+  async observerSetAi(token, enabled) {
+    const { data } = await api.post(`/admin/interviews/observer/${token}/`, {
+      action: 'ai',
+      enabled,
+    })
+    return data
+  },
+  async observerRateAnswer(token, payload = {}) {
+    const { data } = await api.post(`/admin/interviews/observer/${token}/`, {
+      action: 'rate',
+      ...payload,
+    })
+    return data
+  },
   async getInterviewEntitlements() {
     const { data } = await api.get('/admin/interviews/entitlements/')
     return data

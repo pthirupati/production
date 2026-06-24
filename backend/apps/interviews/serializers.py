@@ -101,6 +101,7 @@ class InterviewRoundSerializer(serializers.ModelSerializer):
     messages = InterviewMessageSerializer(many=True, read_only=True)
     report = InterviewReportSerializer(read_only=True)
     is_sample = serializers.BooleanField(source="campaign.is_sample", read_only=True)
+    host_state = serializers.SerializerMethodField()
 
     class Meta:
         model = InterviewRound
@@ -110,8 +111,16 @@ class InterviewRoundSerializer(serializers.ModelSerializer):
             "schedule_deadline", "started_at", "ended_at", "ends_at", "paused_at", "pass_threshold",
             "overall_score", "persona_name", "persona_voice_id", "invite_token",
             "questions_asked", "difficulty_level", "practical_lab_session_id", "is_sample",
-            "mode", "last_practical_submission", "messages", "report",
+            "mode", "last_practical_submission", "messages", "report", "host_state",
         )
+
+    def get_host_state(self, obj):
+        try:
+            from apps.interviews.services.admin_host import host_state
+
+            return host_state(obj)
+        except Exception:  # noqa: BLE001
+            return {"joined": False, "ai_enabled": True}
 
 
 class InterviewCampaignListSerializer(serializers.ModelSerializer):

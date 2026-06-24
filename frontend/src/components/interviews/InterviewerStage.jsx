@@ -26,13 +26,23 @@ function initials(name) {
 
 export default function InterviewerStage({
   personaName = 'Interviewer',
+  personaTitle = '',
   roundTitle = '',
   speaking = false,
   listening = false,
+  thinking = false,
   caption = '',
   live = false,
 }) {
-  const status = speaking ? 'Speaking' : listening ? 'Listening' : live ? 'Connected' : 'Ready'
+  const status = speaking
+    ? 'Speaking'
+    : listening
+      ? 'Listening'
+      : thinking
+        ? 'Thinking…'
+        : live
+          ? 'Connected'
+          : 'Ready'
 
   return (
     <div className="interview-stage-ai">
@@ -41,7 +51,7 @@ export default function InterviewerStage({
 
       <div className="interview-stage-ai-center">
         {/* Avatar with pulsing rings while speaking */}
-        <div className={`interview-avatar-wrap ${speaking ? 'is-speaking' : ''}`}>
+        <div className={`interview-avatar-wrap ${speaking ? 'is-speaking' : thinking ? 'is-thinking' : ''}`}>
           <span className="interview-avatar-ring interview-avatar-ring-1" aria-hidden />
           <span className="interview-avatar-ring interview-avatar-ring-2" aria-hidden />
           <div className="interview-avatar-core">
@@ -61,11 +71,12 @@ export default function InterviewerStage({
         </div>
 
         <p className="interview-stage-ai-name">{personaName}</p>
+        {personaTitle && <p className="interview-stage-ai-role">{personaTitle}</p>}
         {roundTitle && <p className="interview-stage-ai-round">{roundTitle}</p>}
       </div>
 
       {/* Status pill (top-left) */}
-      <div className={`interview-status-pill ${speaking ? 'is-speaking' : listening ? 'is-listening' : ''}`}>
+      <div className={`interview-status-pill ${speaking ? 'is-speaking' : listening ? 'is-listening' : thinking ? 'is-thinking' : ''}`}>
         {speaking ? <Volume2 size={12} /> : <Sparkles size={12} />}
         <span>{status}</span>
       </div>

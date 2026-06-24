@@ -24,6 +24,11 @@ export default function CoachingTip({ coaching }) {
             Coaching tip
             <span className="text-[10px] font-normal text-surface-400">· {Math.round(score)}/100 · {coaching.quality}</span>
           </p>
+          {coaching.quoted_phrase && (
+            <p className="text-[10px] text-indigo-300/90 mt-1">
+              Thread: “{coaching.quoted_phrase}”
+            </p>
+          )}
           <ul className="mt-1 space-y-1">
             {(coaching.all_tips || [coaching.tip]).map((t, i) => (
               <li key={i} className="text-xs text-surface-300">• {t}</li>

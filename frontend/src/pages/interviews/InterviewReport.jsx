@@ -75,6 +75,9 @@ ${[['Overall', r.overall_score], ['Technical', r.technical_score], ['Communicati
 ${comp ? `<h3>Competency scorecard</h3><table><tr><th>Competency</th><th style="text-align:right">Score</th><th>Rating</th></tr>${comp}</table>` : ''}
 ${conf.confidence_score != null ? `<h3>Communication & confidence (heuristic)</h3><p>${conf.summary || ''}</p>
 <p class="muted">Confidence ${conf.confidence_score}/100 · ${conf.filler_per_100_words ?? 0} fillers/100 words · ${conf.avg_answer_words ?? 0} avg words/answer</p>` : ''}
+${conf.round_narrative ? `<h3>Round narrative</h3><p>${conf.round_narrative}</p>` : ''}
+${conf.phrase_coaching?.phrases_referenced?.length ? `<h3>Phrases from your answers</h3><p class="muted">${conf.phrase_coaching.summary_line || ''}</p><ul>${conf.phrase_coaching.phrases_referenced.map(p => `<li>${p}</li>`).join('')}</ul>` : ''}
+${conf.phrase_coaching?.improvements?.length ? `<h3>Phrase-level coaching</h3><ul>${conf.phrase_coaching.improvements.map(s => `<li>${s}</li>`).join('')}</ul>` : ''}
 <h3>Strengths</h3><ul>${(r.strengths || []).map(s => `<li>${s}</li>`).join('')}</ul>
 <h3>Areas to improve</h3><ul>${(r.improvements || []).map(s => `<li>${s}</li>`).join('')}</ul>
 ${(transcript?.transcript || []).length ? `<h3>Transcript</h3>${transcript.transcript.filter(m => m.role !== 'system').map(m => `<p style="font-size:13px"><b>${m.role === 'candidate' ? 'You' : 'Interviewer'}:</b> ${m.content}</p>`).join('')}` : ''}
@@ -136,6 +139,11 @@ ${(transcript?.transcript || []).length ? `<h3>Transcript</h3>${transcript.trans
 
       <div className="glass-card p-4 border border-surface-800">
         <p className="text-sm text-surface-300">{r.summary}</p>
+        {r.confidence_analysis?.round_narrative && (
+          <p className="text-xs text-surface-400 mt-3 pt-3 border-t border-surface-800">
+            {r.confidence_analysis.round_narrative}
+          </p>
+        )}
       </div>
 
       {/* Parity: hiring recommendation + per-competency scorecard */}

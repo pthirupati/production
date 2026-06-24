@@ -625,6 +625,16 @@ class InterviewRoundStartView(APIView):
             payload["intro"] = InterviewMessageSerializer(intro_msg).data
         if first_q:
             payload["first_question"] = InterviewMessageSerializer(first_q).data
+        try:
+            from apps.interviews.services.engine import _speech_hints_for_round
+            from apps.interviews.services.persona_style import speech_profile
+
+            payload["speech_profile"] = speech_profile(
+                round_obj.round_type, round_obj.persona_voice_id or ""
+            )
+            payload.update(_speech_hints_for_round(round_obj, first_q))
+        except Exception:  # noqa: BLE001
+            pass
         return Response(payload)
 
 
@@ -660,6 +670,7 @@ class InterviewRoundMessageView(APIView):
             "user_skip": bool(request.data.get("user_skip")),
             "audio_unclear": bool(request.data.get("audio_unclear")),
             "transcription_confidence": request.data.get("transcription_confidence"),
+            "barge_in": bool(request.data.get("barge_in")),
         }
         # The whole answer/score/reply cycle runs on the free rule-based engine.
         # A malformed question (e.g. non-string expected_keywords) or any edge in
@@ -679,27 +690,28 @@ class InterviewRoundMessageView(APIView):
 
         next_q = result.get("next_question")
         score_result = result.get("score") or {}
-        interviewer_reply = result["interviewer_reply"]
-        # SHARED API CONTRACT — "advanced": false when the bot re-asks the SAME
-        # question (the candidate interrupted with a question, or the engine
-        # produced no new question), true when it moved on to a new question.
+        interviewer_reply = result.get("interviewer_reply")
         advanced = bool(next_q) and not is_candidate_question
-        # SHARED API CONTRACT — "correctness": verdict for the PRIOR answer, one of
-        # correct | partial | off_base | unknown. Honour a verdict the scorer
-        # already attached; otherwise derive it from the same free signals.
         correctness = self._correctness_for(score_result, round_obj, is_candidate_question)
-        return Response({
+        payload = {
             "candidate_message": InterviewMessageSerializer(result["candidate_message"]).data,
-            "interviewer_reply": InterviewMessageSerializer(interviewer_reply).data,
+            "interviewer_reply": (
+                InterviewMessageSerializer(interviewer_reply).data if interviewer_reply else None
+            ),
             "score": score_result,
             "next_question": InterviewMessageSerializer(next_q).data if next_q else None,
             "coaching": result.get("coaching"),
-            # New contract fields (additive — existing fields untouched).
             "advanced": advanced,
-            "reply": interviewer_reply.content,
+            "reply": (interviewer_reply.content if interviewer_reply else result.get("reply") or ""),
             "correctness": correctness,
             "input_type": input_type,
-        })
+            "host_mode": bool(result.get("host_mode")),
+            "ai_paused": bool(result.get("ai_paused")),
+            "speech_profile": result.get("speech_profile"),
+            "thinking_delay_ms": result.get("thinking_delay_ms"),
+            "candidate_tone": result.get("candidate_tone"),
+        }
+        return Response(payload)
 
     @staticmethod
     def _correctness_for(score_result, round_obj, is_candidate_question):
@@ -830,6 +842,8 @@ class InterviewRoundEndView(APIView):
         }
         if result.get("next_round"):
             data["next_round"] = InterviewRoundSerializer(result["next_round"]).data
+        if result.get("closing_remark"):
+            data["closing_remark"] = result["closing_remark"]
         return Response(data)
 
 

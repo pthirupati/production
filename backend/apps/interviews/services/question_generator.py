@@ -702,6 +702,13 @@ def generate_question(
     category_preference: str | None = None,
     last_command: str = "",
     turns_since_last_cross: int = 99,
+    system_design_prompt: str = "",
+    system_design_phase: str = "",
+    memory: dict | None = None,
+    seconds_left: float | None = None,
+    active_incident: dict | None = None,
+    last_question_kind: str = "",
+    last_practical_config: dict | None = None,
 ) -> GeneratedQuestion:
     """Generate the next interview question dynamically. Always returns a
     ``GeneratedQuestion`` — generation never returns ``None`` (that's the whole
@@ -736,8 +743,39 @@ def generate_question(
     asked_texts = asked_texts or []
     conversation_tail = conversation_tail or []
     used = {_normalize(t) for t in asked_texts}
+    mem = memory if isinstance(memory, dict) else {}
 
     rng = random.Random(_seed_from(conversation_tail, questions_asked))
+
+    from apps.interviews.services.conversation_intelligence import (
+        claim_cross_question,
+        detect_contradiction,
+        generate_contradiction_probe,
+        generate_thread_callback,
+        suggest_answer_mode,
+        time_pressure_stitch,
+        weakest_topic,
+    )
+
+    answer_mode = suggest_answer_mode(mem)
+    time_stitch = time_pressure_stitch(seconds_left, used, rng)
+
+    def _personalize(text: str) -> str:
+        from apps.interviews.services.resume_context import personalize_question
+        return personalize_question(text, snap, rng)
+
+    def _finalize(text: str) -> str:
+        return _personalize(text)
+
+    incident_round = round_type in ("devops_debug", "sre_oncall")
+
+    # Effective difficulty escalates with a strong streak (cross-checks the
+    # engine's own difficulty bump so framing gets harder even mid-round).
+    eff_difficulty = int(difficulty or 2)
+    if strong_streak >= 4:
+        eff_difficulty = min(5, eff_difficulty + 2)
+    elif strong_streak >= 2:
+        eff_difficulty = min(5, eff_difficulty + 1)
 
     # --- 0. WARM-UP OPENING (WS4) — real interviews start human, not with a drill.
     intro_slot = category_preference in ("intro", "experience", "personal")
@@ -753,20 +791,127 @@ def generate_question(
         )
         if iq and _normalize(iq) not in used:
             return GeneratedQuestion(
-                text=iq,
+                text=_finalize(iq),
                 category="casual",
                 topic=None,
                 difficulty=1,
                 kind="intro",
             )
 
-    # Effective difficulty escalates with a strong streak (cross-checks the
-    # engine's own difficulty bump so framing gets harder even mid-round).
-    eff_difficulty = int(difficulty or 2)
-    if strong_streak >= 4:
-        eff_difficulty = min(5, eff_difficulty + 2)
-    elif strong_streak >= 2:
-        eff_difficulty = min(5, eff_difficulty + 1)
+    # --- 0b. LIVE CODING follow-ups (edge cases, complexity, tests). ---
+    lc_config = last_practical_config if isinstance(last_practical_config, dict) else {}
+    if (
+        round_type == "live_coding"
+        and last_question_kind == "live_coding"
+        and last_answer
+        and not intro_slot
+        and category_preference != "practical"
+    ):
+        from apps.interviews.services.live_coding import generate_followup
+
+        title = lc_config.get("coding_title") or "this exercise"
+        signals = lc_config.get("expected_signals") or []
+        phase = lc_config.get("live_coding_phase") or "edge_case"
+        follow = generate_followup(
+            last_answer=last_answer,
+            coding_title=title,
+            expected_signals=signals,
+            phase=phase,
+            used=used,
+            rng=rng,
+        )
+        if follow:
+            text, next_phase, patch = follow
+            cfg = {**lc_config, **patch}
+            return GeneratedQuestion(
+                text=_finalize(text),
+                category="technical",
+                topic="linux",
+                difficulty=eff_difficulty,
+                kind="live_coding_followup",
+                practical_config=cfg,
+            )
+
+    # --- 0c. LIVE CODING — starter problems (free, no LLM). ---
+    if category_preference == "practical" and round_type == "live_coding" and not intro_slot:
+        from apps.interviews.services.live_coding import generate_opening
+
+        opened = generate_opening(used=used, rng=rng, difficulty=eff_difficulty)
+        if opened:
+            text, config = opened
+            return GeneratedQuestion(
+                text=_finalize(text),
+                category="practical",
+                topic="linux",
+                difficulty=eff_difficulty,
+                kind="live_coding",
+                practical_config=config,
+            )
+
+    # --- 0d. SYSTEM DESIGN (free dimension drilling — no LLM/API). ---
+    if category_preference == "system_design":
+        from apps.interviews.services.system_design import generate_system_design_question
+
+        text, phase, kind = generate_system_design_question(
+            last_answer=last_answer,
+            active_prompt=system_design_prompt,
+            phase=system_design_phase or None,
+            difficulty=eff_difficulty,
+            used=used,
+            rng=rng,
+            questions_asked=questions_asked,
+        )
+        prompt_key = system_design_prompt
+        if kind == "system_design_open":
+            prompt_key = text.split(".")[0][:160]
+        return GeneratedQuestion(
+            text=_finalize(text),
+            category="system_design",
+            topic="system_design",
+            difficulty=eff_difficulty,
+            kind=kind,
+            practical_config={
+                "design_prompt": prompt_key,
+                "design_phase": phase,
+            },
+        )
+
+    # --- 0d. INCIDENT / ON-CALL scenarios (progressive clues — no LLM/API). ---
+    incident_slot = (
+        category_preference in ("scenario", "troubleshooting", "sla", "itil")
+        or incident_round
+    )
+    if incident_slot and not intro_slot:
+        from apps.interviews.services.incident_scenarios import generate_incident_turn, pick_scenario
+
+        inc = active_incident if isinstance(active_incident, dict) else {}
+        scenario = inc.get("scenario")
+        if not scenario:
+            scenario = pick_scenario(used, rng, round_type=round_type)
+            inc = {"title": scenario["title"], "revealed": 0, "phase": "open"}
+        text, revealed, phase = generate_incident_turn(
+            scenario=scenario,
+            last_answer=last_answer,
+            revealed_clues=int(inc.get("revealed", 0)),
+            phase=inc.get("phase", "open"),
+            used=used,
+            rng=rng,
+            time_stitch=time_stitch,
+            round_type=round_type,
+        )
+        return GeneratedQuestion(
+            text=_finalize(text),
+            category="scenario",
+            topic=_detect_topic(text) or "kubernetes",
+            difficulty=eff_difficulty,
+            kind="incident",
+            practical_config={
+                "incident_title": scenario.get("title"),
+                "incident_revealed": revealed,
+                "incident_phase": phase,
+                "incident_scenario": scenario,
+            },
+        )
 
     # What topic is the candidate clearly engaged in right now? Prefer the topic
     # detected from their last answer; otherwise walk the resume/round agenda.
@@ -783,6 +928,69 @@ def generate_question(
     substantive = bool(last_answer) and last_answer_quality not in ("skipped", "brief", "")
     phrase = _extract_quote_phrase(last_answer) if substantive else None
 
+    # --- 0a. CONVERSATION MEMORY — thread back to earlier phrases/claims (~20%). ---
+    if not intro_slot and questions_asked >= 3 and rng.random() < 0.22:
+        if answer_mode == "deep" or int(mem.get("strong_streak", 0)) >= 2:
+            contradiction = detect_contradiction(mem, last_answer)
+            if contradiction:
+                text = generate_contradiction_probe(contradiction, used, rng)
+                return GeneratedQuestion(
+                    text=_finalize(text),
+                    category="scenario",
+                    topic=current_topic,
+                    difficulty=eff_difficulty,
+                    kind="consistency",
+                )
+            cq = claim_cross_question(mem, used, rng)
+            if cq:
+                text = f"{time_stitch} {cq}".strip() if time_stitch else cq
+                return GeneratedQuestion(
+                    text=_finalize(text),
+                    category="troubleshooting",
+                    topic=current_topic,
+                    difficulty=eff_difficulty,
+                    kind="cross",
+                )
+        thread = generate_thread_callback(mem, used, rng)
+        if thread:
+            text = f"{time_stitch} {thread}".strip() if time_stitch else thread
+            return GeneratedQuestion(
+                text=_finalize(text),
+                category="scenario",
+                topic=current_topic,
+                difficulty=eff_difficulty,
+                kind="thread",
+            )
+
+    # Narrow mode: candidate keeps giving brief answers — ask a focused single-step question.
+    if answer_mode == "narrow" and current_topic and not behavioral_slot and rng.random() < 0.45:
+        narrow_band = max(1, eff_difficulty - 1)
+        nq = _topic_question(current_topic, narrow_band, used, rng)
+        if nq:
+            text = f"{time_stitch} Let's focus on one step: {nq}".strip() if time_stitch else f"Let's focus on one step: {nq}"
+            return GeneratedQuestion(
+                text=_finalize(text),
+                category="technical",
+                topic=current_topic,
+                difficulty=narrow_band,
+                kind="narrow",
+            )
+
+    # Underexplored agenda topic — steer toward a gap in resume coverage.
+    if not intro_slot and agenda and questions_asked >= 4 and rng.random() < 0.25:
+        gap_topic = weakest_topic(mem, agenda)
+        if gap_topic and gap_topic != current_topic:
+            gq = _topic_question(gap_topic, eff_difficulty, used, rng)
+            if gq:
+                text = f"{time_stitch} We haven't touched {gap_topic.replace('_', '/')} much — {gq}".strip()
+                return GeneratedQuestion(
+                    text=_finalize(text),
+                    category="technical",
+                    topic=gap_topic,
+                    difficulty=eff_difficulty,
+                    kind="agenda",
+                )
+
     # --- 0b. COMMAND/CODE FOLLOW-UP (WS7) — quote what they actually RAN. ---
     # When a practical command/code answer was validated, the very next question
     # should reference it ("you ran `systemctl restart sshd` — how would you
@@ -792,7 +1000,7 @@ def generate_question(
         cq = _command_cross_question(last_command, used, rng)
         if cq:
             return GeneratedQuestion(
-                text=cq,
+                text=_finalize(cq),
                 category="troubleshooting",
                 topic=current_topic or _detect_topic(last_command),
                 difficulty=eff_difficulty,
@@ -820,7 +1028,7 @@ def generate_question(
                 text = tpl.format(phrase=phrase)
                 if _normalize(text) not in used or first_followup:
                     return GeneratedQuestion(
-                        text=text,
+                        text=_finalize(text),
                         category="troubleshooting" if current_topic else "scenario",
                         topic=current_topic,
                         difficulty=eff_difficulty,
@@ -834,7 +1042,7 @@ def generate_question(
             text = tpl.format(topic=current_topic.replace("_", "/"))
             if _normalize(text) not in used:
                 return GeneratedQuestion(
-                    text=text,
+                    text=_finalize(text),
                     category="casual",
                     topic=current_topic,
                     difficulty=eff_difficulty,
@@ -847,7 +1055,7 @@ def generate_question(
         if bq:
             stitch = _maybe_stitch(last_answer_quality, rng)
             return GeneratedQuestion(
-                text=f"{stitch} {bq}".strip() if stitch else bq,
+                text=_finalize(f"{stitch} {bq}".strip() if stitch else bq),
                 category="behavioral" if round_type != "hr" else "casual",
                 topic=None,
                 difficulty=eff_difficulty,
@@ -870,7 +1078,7 @@ def generate_question(
                 kind = "followup" if substantive else "generated"
             if _normalize(text) not in used:
                 return GeneratedQuestion(
-                    text=text,
+                    text=_finalize(text),
                     category="troubleshooting",
                     topic=current_topic,
                     difficulty=eff_difficulty,
@@ -892,7 +1100,7 @@ def generate_question(
         gq = f"{base} {angle}"
     stitch = _maybe_stitch(last_answer_quality, rng)
     return GeneratedQuestion(
-        text=f"{stitch} {gq}".strip() if stitch else gq,
+        text=_finalize(f"{stitch} {gq}".strip() if stitch else gq),
         category="technical",
         topic=current_topic,
         difficulty=eff_difficulty,

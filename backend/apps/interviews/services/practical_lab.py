@@ -58,15 +58,20 @@ def _validation_key(msg: InterviewMessage) -> str:
 
 
 def _current_practical_message(round_obj: InterviewRound) -> InterviewMessage | None:
-    """The most recent practical question asked this round (with its config)."""
-    msg = (
-        round_obj.messages.filter(message_type="practical")
+    """The most recent practical / live-coding question asked this round."""
+    for msg in (
+        round_obj.messages.filter(role="interviewer")
         .select_related("question")
-        .order_by("-created_at")
-        .first()
-    )
-    if msg:
-        return msg
+        .order_by("-created_at")[:12]
+    ):
+        meta = msg.metadata if isinstance(msg.metadata, dict) else {}
+        pc = meta.get("practical_config") if isinstance(meta.get("practical_config"), dict) else {}
+        if msg.message_type == "practical":
+            return msg
+        if meta.get("kind") in ("live_coding", "live_coding_followup"):
+            return msg
+        if pc.get("kind") in ("code", "command"):
+            return msg
     return (
         round_obj.messages.filter(question__category="practical", question__isnull=False)
         .select_related("question")
@@ -75,12 +80,31 @@ def _current_practical_message(round_obj: InterviewRound) -> InterviewMessage | 
     )
 
 
+def _fallback_scenario_slug(round_obj: InterviewRound) -> str | None:
+    """Best-effort default lab when a generated practical omits scenario_slug."""
+    snap = round_obj.campaign.profile_snapshot if round_obj.campaign else {}
+    if not isinstance(snap, dict):
+        snap = {}
+    tech = str(snap.get("primary_technology_slug") or snap.get("primary_technology_name") or "").lower()
+    if any(k in tech for k in ("k8s", "kube", "kubernetes")):
+        return "sim-k8s-crashloop"
+    if any(k in tech for k in ("docker", "container")):
+        return "sim-rhel-nginx-down"
+    return "sim-rhel-ssh-stop"
+
+
 def _practical_scenario_slug(round_obj: InterviewRound) -> str | None:
     msg = _current_practical_message(round_obj)
     if not msg:
-        return None
+        return _fallback_scenario_slug(round_obj)
     config = _practical_config_from_message(msg)
-    return config.get("scenario_slug") or None
+    slug = config.get("scenario_slug")
+    if slug:
+        return slug
+    # Code-only live coding does not require a lab session.
+    if config.get("kind") == "code" and not config.get("scenario_slug"):
+        return None
+    return _fallback_scenario_slug(round_obj)
 
 
 def start_practical_lab(user, round_obj: InterviewRound) -> dict:
@@ -92,7 +116,11 @@ def start_practical_lab(user, round_obj: InterviewRound) -> dict:
 
     slug = _practical_scenario_slug(round_obj)
     if not slug:
-        return {"error": "No practical scenario configured for this round", "code": "NO_PRACTICAL"}
+        return {
+            "error": "Inline code grading is available — no terminal lab needed for this task.",
+            "code": "NO_PRACTICAL",
+            "inline_only": True,
+        }
 
     scenario = Scenario.objects.filter(slug=slug, is_active=True).first()
     if not scenario:
@@ -341,6 +369,18 @@ def validate_practical_answer(round_obj: InterviewRound, answer: str) -> dict:
     code_spec = config.get("code")
     if code_spec and (code_spec.get("tests")):
         result = _grade_code_answer(round_obj, msg.question, answer, code_spec)
+        if not result.get("validated"):
+            signals = config.get("expected_signals") or []
+            if signals:
+                from apps.interviews.services.live_coding import grade_by_signals
+
+                sig = grade_by_signals(answer, signals)
+                if sig.get("validated") or result.get("method") == "code":
+                    result = sig
+    elif config.get("expected_signals") and config.get("kind") == "code":
+        from apps.interviews.services.live_coding import grade_by_signals
+
+        result = grade_by_signals(answer, config.get("expected_signals") or [])
     else:
         result = _grade_command_answer(round_obj, msg.question, answer, config)
 

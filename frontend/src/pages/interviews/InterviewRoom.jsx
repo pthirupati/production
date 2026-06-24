@@ -19,7 +19,7 @@ import { PageHeader } from '../../components/design'
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Clock, MessageSquare, Terminal,
   Volume2, Plus, ExternalLink, Loader2, ArrowLeft, Calendar, X, SkipForward,
-  CheckCircle2, HelpCircle, RotateCcw,
+  CheckCircle2, HelpCircle, RotateCcw, Star,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -77,6 +77,8 @@ export default function InterviewRoom() {
   const { roundId } = useParams()
   const [searchParams] = useSearchParams()
   const observerToken = searchParams.get('observer')
+  const observerTokenRef = useRef(observerToken)
+  const processedHostMsgRef = useRef(new Set())
   const navigate = useNavigate()
 
   // Strip sensitive observer token from URL immediately to avoid leaking via
@@ -138,6 +140,12 @@ export default function InterviewRoom() {
   const [preflight, setPreflight] = useState(true)
   const [joinRequests, setJoinRequests] = useState([])
   const [observerMode, setObserverMode] = useState(!!observerToken)
+  const [hostState, setHostState] = useState(null)
+  const [adminQuestion, setAdminQuestion] = useState('')
+  const [hostBusy, setHostBusy] = useState(false)
+  const [observerJoined, setObserverJoined] = useState(false)
+  const [rateTarget, setRateTarget] = useState(null)
+  const [hostFeedback, setHostFeedback] = useState('')
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [showReschedule, setShowReschedule] = useState(false)
   const [rescheduleAt, setRescheduleAt] = useState('')
@@ -158,6 +166,10 @@ export default function InterviewRoom() {
   // and re-asks the SAME question instead of scoring + advancing.
   const askModeRef = useRef(false)
   const [askMode, setAskMode] = useState(false)
+  const unclearAudioCountRef = useRef(0)
+  const speechProfileRef = useRef(null)
+  const [personaTitle, setPersonaTitle] = useState('')
+  const [isThinking, setIsThinking] = useState(false)
 
   // Keep refs in sync so the VAD loop and timers see current speaking/listening.
   useEffect(() => { isSpeakingRef.current = isSpeaking }, [isSpeaking])
@@ -174,22 +186,25 @@ export default function InterviewRoom() {
   // Goes through the same acquireMedia() path as the buttons so a grant attaches
   // the stream and clears any error automatically (no manual re-click needed).
   useEffect(() => {
-    if (!preflight || !isMediaDevicesSupported()) return
-    // Silent: don't surface an error banner on the auto-prompt. If the user
-    // dismisses the native dialog they can still click Enable / Try again.
+    if (observerMode && !preflight && isMediaDevicesSupported()) {
+      acquireMedia('both', { silent: true })
+    }
+  }, [observerMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!preflight || observerMode || !isMediaDevicesSupported()) return
     acquireMedia('both', { silent: true })
   }, [preflight]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Recover automatically when a device is plugged in or permission is granted
-  // after the fact — re-attempt acquisition so video/mic turn on without a reload.
   useEffect(() => {
-    if (!preflight || !navigator.mediaDevices?.addEventListener) return
+    if ((!preflight && !observerMode) || !navigator.mediaDevices?.addEventListener) return
     const onDeviceChange = () => {
       if (!micOn || !cameraOn) acquireMedia('both', { silent: true })
     }
     navigator.mediaDevices.addEventListener('devicechange', onDeviceChange)
     return () => navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange)
-  }, [preflight, micOn, cameraOn]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [preflight, observerMode, micOn, cameraOn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => {
@@ -398,9 +413,12 @@ export default function InterviewRoom() {
       setObserverMode(true)
       setPreflight(false)
       setStarted(true)
-      adminApi.getInterviewObserverSession(observerToken).then(data => {
+      const token = observerTokenRef.current || observerToken
+      adminApi.getInterviewObserverSession(token).then(data => {
         setRound(data.round)
         setMessages(data.messages || [])
+        setHostState(data.host_state || null)
+        setObserverJoined(!!data.host_state?.joined)
       }).catch(() => {
         toast.error('Observer session unavailable')
         navigate('/admin/interviews')
@@ -412,6 +430,167 @@ export default function InterviewRoom() {
       navigate('/interviews')
     })
   }, [roundId, observerToken, navigate])
+
+  // Admin host: poll transcript while observing.
+  useEffect(() => {
+    if (!observerMode || !observerTokenRef.current) return
+    const token = observerTokenRef.current
+    const poll = () => {
+      adminApi.getInterviewObserverSession(token).then(data => {
+        setMessages(data.messages || [])
+        setHostState(data.host_state || null)
+        setObserverJoined(!!data.host_state?.joined)
+        setRateTarget(data.rate_target || null)
+      }).catch(() => {})
+    }
+    poll()
+    const iv = setInterval(poll, 2500)
+    return () => clearInterval(iv)
+  }, [observerMode])
+
+  const joinAsHost = async () => {
+    const token = observerTokenRef.current
+    if (!token) return
+    if (!micOn) {
+      toast.error('Enable microphone before joining live')
+      await acquireMedia('both')
+      if (!streamRef.current?.getAudioTracks?.().some(t => t.readyState === 'live')) return
+    }
+    setHostBusy(true)
+    try {
+      const res = await adminApi.observerJoinSession(token, 'Founder')
+      setHostState(res.host_state)
+      setObserverJoined(true)
+      if (res.messages?.length) {
+        setMessages(m => [...m, ...res.messages.filter(x => !m.some(y => y.id === x.id))])
+      }
+      toast.success('You joined live — AI is paused while you host')
+    } catch {
+      toast.error('Could not join session')
+    } finally {
+      setHostBusy(false)
+    }
+  }
+
+  const sendAdminQuestion = async (textOverride, { spoken = false } = {}) => {
+    const token = observerTokenRef.current
+    const q = (textOverride ?? adminQuestion).trim()
+    if (!token || !q) return
+    if (spoken && !micOn) {
+      toast.error('Enable your microphone to ask by voice')
+      await acquireMedia('audio')
+      return
+    }
+    setHostBusy(true)
+    try {
+      const res = await adminApi.observerAskQuestion(token, q, { spoken })
+      setAdminQuestion('')
+      if (res.message) setMessages(m => [...m, res.message])
+      setHostState(res.host_state)
+      toast.success(spoken ? 'Question sent (from your voice)' : 'Question sent to candidate')
+    } catch {
+      toast.error('Could not send question')
+    } finally {
+      setHostBusy(false)
+    }
+  }
+
+  const adminVoiceAsk = async () => {
+    if (hostBusy) return
+    if (!micOn || !mediaStream) {
+      toast.error('Allow microphone access to ask by voice')
+      await acquireMedia('both')
+      return
+    }
+    if (isListening) {
+      stopListening()
+      return
+    }
+    unlockSpeech()
+    try {
+      const result = await listenLive(mediaStream, {
+        locale: 'en-US',
+        silenceMs: 1600,
+        minSpeechMs: 500,
+        maxSilenceMs: 4000,
+        onInterim: (txt) => setAdminQuestion(txt),
+      })
+      const text = (result?.transcript || result?.filtered_text || '').trim()
+      if (text) {
+        setAdminQuestion(text)
+        await sendAdminQuestion(text, { spoken: true })
+      } else {
+        toast('No speech detected — try again or type your question', { icon: '🎤' })
+      }
+    } catch {
+      toast.error('Could not capture your voice')
+    }
+  }
+
+  const toggleHostMic = async () => {
+    if (micOn) {
+      mediaStream?.getAudioTracks().forEach(t => { t.enabled = false })
+      setMicOn(false)
+      return
+    }
+    await acquireMedia('audio')
+  }
+
+  const toggleHostCamera = async () => {
+    if (cameraOn) {
+      mediaStream?.getVideoTracks().forEach(t => { t.enabled = false })
+      setCameraOn(false)
+      return
+    }
+    await acquireMedia('video')
+  }
+
+  const submitAdminRating = async ({ quality, score, useAi = true } = {}) => {
+    const token = observerTokenRef.current
+    if (!token || !rateTarget?.candidate_message_id) return
+    setHostBusy(true)
+    try {
+      const res = await adminApi.observerRateAnswer(token, {
+        candidate_message_id: rateTarget.candidate_message_id,
+        quality,
+        score,
+        use_ai: useAi,
+        feedback: hostFeedback.trim() || undefined,
+      })
+      if (res.candidate_message) {
+        setMessages(m => m.map(x => x.id === res.candidate_message.id ? res.candidate_message : x))
+      }
+      if (res.feedback_message) setMessages(m => [...m, res.feedback_message])
+      setRateTarget(res.rate_target || null)
+      setHostFeedback('')
+      toast.success(`Rated ${Math.round(res.score_result?.score || 0)}/100`)
+    } catch {
+      toast.error('Could not save rating')
+    } finally {
+      setHostBusy(false)
+    }
+  }
+
+  const toggleHostAi = async (enabled) => {
+    const token = observerTokenRef.current
+    if (!token) return
+    setHostBusy(true)
+    try {
+      const res = await adminApi.observerSetAi(token, enabled)
+      setHostState(res.host_state)
+      if (res.messages?.length) {
+        setMessages(m => {
+          const ids = new Set(m.map(x => x.id))
+          return [...m, ...res.messages.filter(x => !ids.has(x.id))]
+        })
+      }
+      toast.success(enabled ? 'AI resumed — next question sent' : 'AI paused — you are hosting')
+    } catch {
+      toast.error('Could not update AI mode')
+    } finally {
+      setHostBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (observerMode || !started) return
@@ -529,12 +708,16 @@ export default function InterviewRoom() {
       if (data.first_question) msgs.push(data.first_question)
       setMessages(msgs)
       setStarted(true)
+      if (data.speech_profile) {
+        speechProfileRef.current = data.speech_profile
+        setPersonaTitle(data.speech_profile.persona_title || '')
+      }
       // Start recording once the interview is live
       if (streamRef.current) startRecording(streamRef.current)
       const voiceId = data.persona_voice_id
       const introText = data.intro?.content || ''
       const firstQ = data.first_question
-      if (firstQ?.message_type === 'practical') {
+      if (isPracticalMessage(firstQ)) {
         setPracticalMode(true)
         if (data.practical_lab_session_id) {
           setPracticalLab({ session_id: data.practical_lab_session_id, lab_url: `/lab/${data.practical_lab_session_id}` })
@@ -542,13 +725,10 @@ export default function InterviewRoom() {
           startPracticalLabInline().catch(() => {})
         }
       }
-      // Speak the intro (no listen), then the first question and auto-open the
-      // mic. speakThenListen awaits TTS completion, so the mic opens exactly
-      // when the bot stops talking — no brittle length*40ms guess.
       if (introText) await speakThenListen(introText, { autoListen: false, voiceId })
       if (firstQ?.content) {
         await speakThenListen(firstQ.content, {
-          autoListen: firstQ.message_type !== 'practical', voiceId,
+          autoListen: !isPracticalMessage(firstQ), voiceId,
         })
       }
     } catch (e) {
@@ -571,6 +751,7 @@ export default function InterviewRoom() {
     forceAdvance = false,
     audioUnclear = false,
     transcriptionConfidence = null,
+    bargeIn = false,
   } = {}) => {
     const isSkip = text === '' && !forceAdvance
     const ans = (text === '' && forceAdvance) ? '' : (isSkip ? '' : (text ?? answer).trim())
@@ -584,6 +765,11 @@ export default function InterviewRoom() {
     // Reset ask-mode now that we've consumed it for this turn.
     askModeRef.current = false
     setAskMode(false)
+    if (audioUnclear) {
+      unclearAudioCountRef.current += 1
+    } else if (ans) {
+      unclearAudioCountRef.current = 0
+    }
     try {
       const res = await interviewsApi.sendMessage(roundId, ans, {
         input_type: isQuestion ? 'question' : 'answer',
@@ -592,7 +778,16 @@ export default function InterviewRoom() {
         user_skip: forceAdvance,
         audio_unclear: audioUnclear,
         transcription_confidence: transcriptionConfidence,
+        barge_in: bargeIn,
       })
+      if (res.host_mode || res.ai_paused) {
+        setHostState(prev => ({ ...(prev || {}), joined: true, ai_enabled: false }))
+      }
+      if (res.speech_profile) {
+        speechProfileRef.current = res.speech_profile
+        setPersonaTitle(res.speech_profile.persona_title || '')
+      }
+      const thinkingDelayMs = res.thinking_delay_ms
       // advanced === false → the interviewer clarified / re-asked the SAME
       // question (a candidate question, a re-ask of a thin answer, or no new
       // question). Don't append a duplicate next_question or flip practical mode
@@ -605,8 +800,22 @@ export default function InterviewRoom() {
         res.interviewer_reply,
         ...(advanced ? [res.next_question] : []),
       ].filter(Boolean))
+      for (const m of [res.candidate_message, res.interviewer_reply, res.next_question].filter(Boolean)) {
+        if (m?.id) processedHostMsgRef.current.add(m.id)
+      }
+      if (res.host_mode || res.ai_paused) {
+        if (res.interviewer_reply?.content) {
+          await speakThenListen(res.interviewer_reply.content, { autoListen: !practicalMode, thinkingDelayMs })
+        } else {
+          awaitingAnswerRef.current = true
+          if (micOn && !practicalMode && !typingAnswer) {
+            setTimeout(() => voiceAnswer(), 400)
+          }
+        }
+        return
+      }
       if (advanced) {
-        const nextIsPractical = res.next_question?.message_type === 'practical'
+        const nextIsPractical = isPracticalMessage(res.next_question)
         setPracticalMode(nextIsPractical)
         if (nextIsPractical) {
           setPracticalLab(null)
@@ -617,17 +826,26 @@ export default function InterviewRoom() {
         // Speak the interviewer reply, then the new question, then re-open the
         // mic so the candidate can answer — continuing the hands-free loop.
         // Practical questions don't auto-listen (the candidate works in the lab).
-        await speakThenListen(res.interviewer_reply?.content, { autoListen: false })
+        await speakThenListen(res.interviewer_reply?.content, {
+          autoListen: false,
+          thinkingDelayMs,
+        })
         if (res.next_question?.content) {
-          await speakThenListen(res.next_question.content, { autoListen: !nextIsPractical })
+          await speakThenListen(res.next_question.content, {
+            autoListen: !nextIsPractical,
+            thinkingDelayMs: res.thinking_delay_ms,
+          })
         }
       } else {
         // Same question stands. Speak the clarification/reply, then re-open the
         // mic so the candidate can now answer the (unchanged) question — but
         // only when we're not in a practical question (they work in the lab).
+        if (audioUnclear && unclearAudioCountRef.current >= 2 && !typingAnswer) {
+          toast('Audio keeps cutting out — try Type mode below if that\'s easier.', { icon: '⌨️', duration: 6000 })
+        }
         await speakThenListen(
           res.reply || res.interviewer_reply?.content,
-          { autoListen: !practicalMode },
+          { autoListen: !practicalMode, thinkingDelayMs },
         )
       }
     } catch {
@@ -688,11 +906,14 @@ export default function InterviewRoom() {
         await submitAnswer(text, {
           audioUnclear: true,
           transcriptionConfidence: result?.confidence ?? null,
+          bargeIn: bargedInRef.current,
         })
+        bargedInRef.current = false
         return
       }
       const asQuestion = openedAsQuestion || looksLikeQuestion(text)
-      await submitAnswer(text, { asQuestion })
+      await submitAnswer(text, { asQuestion, bargeIn: bargedInRef.current })
+      bargedInRef.current = false
     } else if (result?.reason === 'silence' || result?.reason === 'manual') {
       setAnswer('')
     } else {
@@ -726,7 +947,7 @@ export default function InterviewRoom() {
 
   // Speak a bot line, then automatically open the mic for the candidate's reply.
   // This is the heart of the hands-free voice loop.
-  const speakThenListen = async (text, { autoListen = true, voiceId } = {}) => {
+  const speakThenListen = async (text, { autoListen = true, voiceId, thinking = true, thinkingDelayMs } = {}) => {
     if (!text) {
       if (autoListen && !observerMode && !practicalMode && !isListeningRef.current) {
         voiceAnswer()
@@ -734,8 +955,23 @@ export default function InterviewRoom() {
       return
     }
     bargedInRef.current = false
+    const sp = speechProfileRef.current
+    if (thinking) {
+      const base = thinkingDelayMs ?? sp?.thinking_base_ms ?? 400
+      const jitter = 120 + Math.random() * 200
+      setIsThinking(true)
+      setAiCaption(`${round?.persona_name || 'Interviewer'} is thinking…`)
+      await new Promise(r => setTimeout(r, base + jitter))
+      setIsThinking(false)
+    }
     setAiCaption(text)
-    const { spoken } = await speak(text, voiceId ?? round?.persona_voice_id) || {}
+    const speechOpts = sp ? {
+      rate: sp.rate,
+      pitch: sp.pitch,
+      pauseQuestionMs: sp.pause_question_ms,
+      pausePeriodMs: sp.pause_period_ms,
+    } : {}
+    const { spoken } = await speak(text, voiceId ?? round?.persona_voice_id, speechOpts) || {}
     if (spoken === false) {
       toast('Voice unavailable — read the caption, then tap the mic when ready.', { icon: '🔊' })
     }
@@ -743,6 +979,58 @@ export default function InterviewRoom() {
       voiceAnswer()
     }
   }
+
+  // Candidate: sync admin/host messages (founder join, manual questions, AI resume).
+  useEffect(() => {
+    if (!started || observerMode || !roundId) return
+    const syncHost = async () => {
+      try {
+        const data = await interviewsApi.getRound(roundId)
+        const hs = data.host_state || null
+        setHostState(hs)
+        const incoming = data.messages || []
+        setMessages(prev => {
+          const ids = new Set(prev.map(m => m.id))
+          const added = incoming.filter(m => !ids.has(m.id))
+          return added.length ? [...prev, ...added] : prev
+        })
+        for (const m of incoming) {
+          if (!m?.id || processedHostMsgRef.current.has(m.id)) continue
+          const meta = m.metadata || {}
+          const isAdminLine = meta.admin_host
+          const isNewQuestion = m.message_type === 'question' && m.role === 'interviewer'
+          const isWelcome = meta.event === 'admin_welcome'
+          const isHandoff = meta.event === 'ai_resume'
+          if (!isWelcome && !isHandoff && !(isNewQuestion && m.content)) continue
+          processedHostMsgRef.current.add(m.id)
+          if (isWelcome && m.content) {
+            cancelSpeech()
+            setAiCaption(m.content)
+            await speak(m.content, round?.persona_voice_id)
+          } else if (isHandoff && m.content) {
+            cancelSpeech()
+            setAiCaption(m.content)
+            await speakThenListen(m.content, { autoListen: false, voiceId: round?.persona_voice_id })
+          } else if (isNewQuestion && m.content) {
+            cancelSpeech()
+            const hostLabel = hs?.display_name || meta.asked_by || 'Guest interviewer'
+            if (isAdminLine) setPersonaTitle(hostLabel)
+            setAiCaption(isAdminLine ? `${hostLabel}: ${m.content}` : m.content)
+            awaitingAnswerRef.current = true
+            await speakThenListen(m.content, {
+              autoListen: !practicalMode,
+              voiceId: round?.persona_voice_id,
+            })
+          }
+        }
+      } catch {
+        /* polling best-effort */
+      }
+    }
+    syncHost()
+    const iv = setInterval(syncHost, 3000)
+    return () => clearInterval(iv)
+  }, [started, observerMode, roundId, round?.persona_voice_id, practicalMode, speak, cancelSpeech]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- skip-on-silence -------------------------------------------------
   const clearSilenceTimer = () => {
@@ -870,6 +1158,16 @@ export default function InterviewRoom() {
     setMediaStream(null)
     try {
       const res = await interviewsApi.endRound(roundId)
+      if (res.closing_remark) {
+        setIsThinking(false)
+        setAiCaption(res.closing_remark)
+        const sp = speechProfileRef.current
+        await speak(res.closing_remark, round?.persona_voice_id, sp ? {
+          rate: sp.rate, pitch: sp.pitch,
+          pauseQuestionMs: sp.pause_question_ms,
+          pausePeriodMs: sp.pause_period_ms,
+        } : {})
+      }
       if (goNextRound && res.next_round?.id) {
         toast.success('Moving to the next interview round')
         navigate(`/interviews/room/${res.next_round.id}`)
@@ -956,19 +1254,23 @@ export default function InterviewRoom() {
     return `${m}:${sec.toString().padStart(2, '0')}`
   }
 
-  // WS6 — the active practical question's config (kind:'code'|'command' +
-  // language) drives whether the inline panel shows a code editor or a real
-  // terminal. It's the practical_config of the most recent practical message
-  // (the backend stamps it onto the question the engine asks).
+  const isPracticalMessage = (m) => {
+    if (!m) return false
+    if (m.message_type === 'practical') return true
+    const k = m.metadata?.kind
+    if (k === 'live_coding' || k === 'live_coding_followup') return true
+    return Boolean(m.practical_config?.kind)
+  }
+
   const activePracticalConfig = practicalMode
-    ? [...messages].reverse().find(m => m.message_type === 'practical')?.practical_config || null
+    ? [...messages].reverse().find(isPracticalMessage)?.practical_config || null
     : null
 
-  // WS6 — start the interview practical-lab session inline (for command-kind
-  // questions). Stores the result so the embedded terminal can attach. Returns
-  // the lab info (or { error }) so the panel can surface a precise message.
   const startPracticalLabInline = async () => {
     const lab = await interviewsApi.startPracticalLab(roundId)
+    if (lab?.inline_only) {
+      return lab
+    }
     if (!lab?.error) setPracticalLab(lab)
     return lab
   }
@@ -976,20 +1278,242 @@ export default function InterviewRoom() {
   if (!round) return <p className="text-surface-500 p-8">Loading room…</p>
 
   if (observerMode) {
+    const aiOn = hostState?.ai_enabled !== false
     return (
       <div className="h-[calc(100vh-4rem)] flex flex-col bg-surface-950">
-        <header className="px-4 py-2 border-b border-surface-800 bg-amber-500/10">
-          <p className="text-xs text-amber-300">Observer mode — read-only transcript</p>
-          <p className="text-sm font-medium text-white">{round.title}</p>
+        <header className="px-4 py-3 border-b border-surface-800 bg-amber-500/10 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-amber-300 font-medium">
+              Live host — {round.title}
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={toggleHostMic}
+                disabled={mediaLoading}
+                className={`text-xs px-2 py-1 rounded-lg border inline-flex items-center gap-1 ${
+                  micOn ? 'border-emerald-500/40 text-emerald-300' : 'border-surface-700 text-surface-400'
+                }`}
+                title="Microphone"
+              >
+                {micOn ? <Mic size={12} /> : <MicOff size={12} />}
+                Mic
+              </button>
+              <button
+                type="button"
+                onClick={toggleHostCamera}
+                disabled={mediaLoading}
+                className={`text-xs px-2 py-1 rounded-lg border inline-flex items-center gap-1 ${
+                  cameraOn ? 'border-emerald-500/40 text-emerald-300' : 'border-surface-700 text-surface-400'
+                }`}
+                title="Camera (optional)"
+              >
+                {cameraOn ? <Video size={12} /> : <VideoOff size={12} />}
+                Cam
+              </button>
+              {!micOn && !cameraOn && (
+                <button
+                  type="button"
+                  onClick={() => acquireMedia('both')}
+                  disabled={mediaLoading}
+                  className="btn-primary text-[10px] py-1 px-2"
+                >
+                  Allow mic & camera
+                </button>
+              )}
+            </div>
+          </div>
+          {mediaError && (
+            <p className="text-[10px] text-amber-200 bg-amber-500/10 rounded px-2 py-1">{mediaError}</p>
+          )}
+          {!observerJoined ? (
+            <button
+              type="button"
+              disabled={hostBusy || !micOn}
+              onClick={joinAsHost}
+              className="btn-primary text-xs py-1.5 px-3 disabled:opacity-50"
+            >
+              Join session & welcome candidate
+            </button>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
+                Hosting as {hostState?.display_name || 'Founder'}
+              </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${aiOn ? 'bg-indigo-500/20 text-indigo-300' : 'bg-surface-700 text-surface-400'}`}>
+                AI {aiOn ? 'on' : 'paused'}
+              </span>
+              <button
+                type="button"
+                disabled={hostBusy}
+                onClick={() => toggleHostAi(!aiOn)}
+                className="btn-secondary text-[10px] py-1 px-2"
+              >
+                {aiOn ? 'Pause AI — I will ask' : 'Hand back to AI'}
+              </button>
+            </div>
+          )}
+          {!micOn && (
+            <p className="text-[10px] text-surface-400">
+              Allow microphone access to join and ask questions by voice (same as the candidate flow).
+            </p>
+          )}
         </header>
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {cameraOn && mediaStream && (
+          <div className="px-4 pt-3">
+            <div className="aspect-video max-h-36 rounded-lg overflow-hidden border border-surface-800">
+              <InterviewVideoPreview
+                stream={mediaStream}
+                cameraOn={cameraOn}
+                backgroundId="none"
+                className="w-full h-full"
+                mirror
+              />
+            </div>
+          </div>
+        )}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
           {messages.map(m => (
-            <div key={m.id} className="text-xs rounded-lg p-2 bg-surface-900 border border-surface-800 text-surface-200">
-              <span className="text-[10px] uppercase opacity-60">{m.role}</span>
+            <div
+              key={m.id}
+              className={`text-xs rounded-lg p-2 border ${
+                m.role === 'interviewer'
+                  ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-100'
+                  : m.role === 'candidate'
+                    ? 'bg-surface-900 border-surface-800 text-surface-200 ml-6'
+                    : 'bg-amber-500/10 border-amber-500/20 text-amber-200 text-center'
+              }`}
+            >
+              <span className="text-[10px] uppercase opacity-60">
+                {m.metadata?.admin_host ? (m.metadata?.asked_by || 'host') : m.role}
+              </span>
               <p className="mt-0.5 whitespace-pre-wrap">{m.content}</p>
+              {m.score != null && (
+                <p className="text-[10px] text-surface-500 mt-1">
+                  Score: {Math.round(m.score)}
+                  {m.metadata?.admin_rated && m.metadata?.admin_rater && (
+                    <span className="text-amber-400 ml-1">· rated by {m.metadata.admin_rater}</span>
+                  )}
+                </p>
+              )}
             </div>
           ))}
         </div>
+        {observerJoined && rateTarget && (
+          <div className="px-4 py-3 border-t border-indigo-500/30 bg-indigo-500/5 space-y-2">
+            <div className="flex items-center gap-1.5 text-xs text-indigo-200 font-medium">
+              <Star size={13} className="text-amber-400" />
+              Rate latest answer — same scoring model as AI
+            </div>
+            {rateTarget.question_preview && (
+              <p className="text-[10px] text-surface-500 line-clamp-2">
+                Q: {rateTarget.question_preview}
+              </p>
+            )}
+            <p className="text-xs text-surface-300 bg-surface-950/60 rounded-lg px-2 py-1.5 line-clamp-3">
+              {rateTarget.answer_preview}
+            </p>
+            {rateTarget.ai_suggestion && (
+              <p className="text-[10px] text-indigo-300">
+                AI suggests{' '}
+                <span className="font-semibold">{Math.round(rateTarget.ai_suggestion.score || 0)}/100</span>
+                {' '}({rateTarget.ai_suggestion.quality || 'adequate'})
+                {rateTarget.ai_suggestion.feedback && (
+                  <span className="text-surface-400"> — {rateTarget.ai_suggestion.feedback.slice(0, 120)}</span>
+                )}
+              </p>
+            )}
+            <textarea
+              value={hostFeedback}
+              onChange={e => setHostFeedback(e.target.value)}
+              rows={2}
+              placeholder="Optional feedback to candidate (defaults to AI wording)"
+              className="w-full text-xs rounded-lg bg-surface-950 border border-surface-700 px-2 py-1.5 text-white"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                disabled={hostBusy}
+                onClick={() => submitAdminRating({ quality: 'strong', useAi: false })}
+                className="text-[10px] py-1.5 px-2.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+              >
+                Strong
+              </button>
+              <button
+                type="button"
+                disabled={hostBusy}
+                onClick={() => submitAdminRating({ quality: 'adequate', useAi: false })}
+                className="text-[10px] py-1.5 px-2.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+              >
+                Adequate
+              </button>
+              <button
+                type="button"
+                disabled={hostBusy}
+                onClick={() => submitAdminRating({ quality: 'brief', useAi: false })}
+                className="text-[10px] py-1.5 px-2.5 rounded-lg bg-surface-700/50 text-surface-300 border border-surface-600"
+              >
+                Brief
+              </button>
+              <button
+                type="button"
+                disabled={hostBusy}
+                onClick={() => submitAdminRating({ quality: 'weak', useAi: false })}
+                className="text-[10px] py-1.5 px-2.5 rounded-lg bg-red-500/15 text-red-300 border border-red-500/25"
+              >
+                Weak
+              </button>
+              <button
+                type="button"
+                disabled={hostBusy}
+                onClick={() => submitAdminRating({ useAi: true })}
+                className="text-[10px] py-1.5 px-2.5 rounded-lg btn-primary"
+              >
+                Accept AI score
+              </button>
+            </div>
+          </div>
+        )}
+        {observerJoined && (
+          <div className="p-4 border-t border-surface-800 space-y-2 bg-surface-900/80">
+            {(isListening || interimTranscript) && (
+              <p className="text-[10px] text-emerald-400 flex items-center gap-1">
+                <Mic size={11} className="animate-pulse" /> Listening… {interimTranscript}
+              </p>
+            )}
+            <textarea
+              value={adminQuestion}
+              onChange={e => setAdminQuestion(e.target.value)}
+              rows={2}
+              placeholder="Type a question — or tap the mic and speak"
+              className="w-full text-sm rounded-lg bg-surface-950 border border-surface-700 px-3 py-2 text-white"
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={hostBusy || !micOn}
+                onClick={adminVoiceAsk}
+                className={`text-xs py-2 px-4 inline-flex items-center gap-1.5 ${
+                  isListening ? 'btn-secondary ring-2 ring-emerald-500/50' : 'btn-primary'
+                }`}
+              >
+                {isListening ? <Loader2 size={14} className="animate-spin" /> : <Mic size={14} />}
+                {isListening ? 'Done speaking' : 'Ask by voice'}
+              </button>
+              <button
+                type="button"
+                disabled={hostBusy || !adminQuestion.trim()}
+                onClick={() => sendAdminQuestion()}
+                className="btn-secondary text-xs py-2 px-4"
+              >
+                Send typed question
+              </button>
+            </div>
+            {aiOn && (
+              <p className="text-[10px] text-surface-500">Your question pauses the AI until you hand back control.</p>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -1298,9 +1822,11 @@ export default function InterviewRoom() {
             <div className={`interview-tile ${isSpeaking ? 'interview-tile-active' : ''}`}>
               <InterviewerStage
                 personaName={round.persona_name}
+                personaTitle={personaTitle}
                 roundTitle={round.title}
                 speaking={isSpeaking}
                 listening={isListening}
+                thinking={isThinking}
                 caption={aiCaption}
                 live
               />
@@ -1395,10 +1921,10 @@ export default function InterviewRoom() {
             )}
           </div>
 
-          {practicalMode && (
+          {practicalMode && activePracticalConfig?.kind === 'command' && (
             <div className="px-4 py-2 border-t border-surface-800 bg-surface-900/50 space-y-2 mt-1">
               <p className="text-xs text-cyan-400 flex items-center gap-1">
-                <Terminal size={12} /> Hands-on lab — complete the scenario in a real FixitLab environment
+                <Terminal size={12} /> Command lab — run commands in the terminal below or grade inline
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -1414,10 +1940,12 @@ export default function InterviewRoom() {
                   <span className="text-[10px] text-surface-500">{practicalLab.scenario_title}</span>
                 )}
               </div>
-              <p className="text-[10px] text-surface-500">
-                Open the full lab in a new tab, or just type the command/code below and I'll check it inline.
-              </p>
             </div>
+          )}
+          {practicalMode && activePracticalConfig?.kind === 'code' && (
+            <p className="text-[10px] text-surface-500 px-4 py-2 border-t border-surface-800">
+              Live coding — paste your solution below. I&apos;ll grade it inline (no separate lab needed).
+            </p>
           )}
 
           {practicalMode && (
@@ -1529,6 +2057,15 @@ export default function InterviewRoom() {
         </div>
 
         <div className="flex flex-col min-h-0 bg-surface-900/30">
+          {hostState?.joined && (
+            <div className="p-3 border-b border-indigo-500/30 bg-indigo-500/10 text-xs text-indigo-100">
+              <p className="font-medium">
+                {hostState.display_name || 'FixitLab team'} joined live
+                {hostState.ai_enabled === false ? ' — answering your questions now' : ' — AI will continue shortly'}
+              </p>
+              <p className="text-[10px] text-indigo-200/80 mt-1">Take your time — jump in anytime if you need to clarify.</p>
+            </div>
+          )}
           {joinRequests.length > 0 && (
             <div className="p-3 border-b border-amber-500/30 bg-amber-500/10 space-y-2">
               {joinRequests.map(req => (

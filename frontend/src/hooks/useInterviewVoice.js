@@ -508,7 +508,7 @@ export function useInterviewVoice() {
   // ------------------------------------------------------------------
   // speak() — server TTS with browser fallback
   // ------------------------------------------------------------------
-  const speak = useCallback(async (text, voiceCode) => {
+  const speak = useCallback(async (text, voiceCode, speechOverrides = {}) => {
     if (!text) return { spoken: false }
     setIsSpeaking(true)
     let spoken = false
@@ -537,9 +537,13 @@ export function useInterviewVoice() {
       const voice = pickBrowserVoice(
         profile.browser_voice_hint, profile.locale, selectedVoiceRef.current,
       )
-      const rate = Math.min(1.08, Math.max(0.92, profile.rate ?? 0.98))
-      const pitch = Math.min(1.15, Math.max(0.9, profile.pitch ?? 1))
+      const rate = Math.min(1.08, Math.max(0.88, speechOverrides.rate ?? profile.rate ?? 0.98))
+      const pitch = Math.min(1.15, Math.max(0.88, speechOverrides.pitch ?? profile.pitch ?? 1))
       const utterOpts = { voice, locale: profile.locale, rate, pitch }
+      const pauseOverrides = {
+        question: speechOverrides.pauseQuestionMs,
+        period: speechOverrides.pausePeriodMs,
+      }
 
       const segments = segmentForSpeech(text)
       const myToken = ++speakTokenRef.current
@@ -551,7 +555,10 @@ export function useInterviewVoice() {
         const started = await speakBrowserUtterance(seg, utterOpts)
         if (started) spoken = true
         if (i < segments.length - 1 && speakTokenRef.current === myToken) {
-          const gap = pauseAfter(seg)
+          const last = seg.trim().slice(-1)
+          let gap = pauseAfter(seg)
+          if (last === '?' && pauseOverrides.question) gap = pauseOverrides.question
+          else if (last === '.' && pauseOverrides.period) gap = pauseOverrides.period
           // eslint-disable-next-line no-await-in-loop
           await new Promise((resolve) => {
             speakPauseTimerRef.current = setTimeout(() => {

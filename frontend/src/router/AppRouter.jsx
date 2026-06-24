@@ -186,6 +186,7 @@ export default function AppRouter() {
           <Route path="/interviews/setup" element={<InterviewSetup />} />
           <Route path="/interviews/campaign/:campaignId" element={<InterviewCampaign />} />
           <Route path="/interviews/room/:roundId" element={<InterviewRoom />} />
+          <Route path="/interviews/round/:roundId" element={<InterviewRoom />} />
           <Route path="/interviews/round/:roundId/report" element={<InterviewReport />} />
           <Route path="/interviews/analytics" element={<InterviewAnalytics />} />
           <Route path="/interviews/templates" element={<InterviewTemplates />} />

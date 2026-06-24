@@ -11,7 +11,24 @@ from rest_framework.views import APIView
 from apps.adminpanel.permissions import IsPlatformAdmin
 from apps.interviews.models import InterviewAdminJoinRequest, InterviewRound
 from apps.interviews.serializers import InterviewMessageSerializer, InterviewRoundSerializer
+from apps.interviews.services.admin_host import (
+    admin_join_session,
+    admin_post_question,
+    admin_rate_answer,
+    admin_rate_target,
+    admin_set_ai_enabled,
+    host_state,
+)
 from apps.interviews.services.interview_settings import get_platform_settings
+
+
+def _approved_request(request, token: str) -> InterviewAdminJoinRequest:
+    return get_object_or_404(
+        InterviewAdminJoinRequest.objects.select_related("round", "round__campaign"),
+        observer_token=token,
+        status="approved",
+        admin_user=request.user,
+    )
 
 
 class AdminRequestJoinInterviewView(APIView):
@@ -71,23 +88,95 @@ class AdminLiveInterviewSessionsView(APIView):
 
 
 class AdminObserverSessionView(APIView):
-    """GET approved observer transcript (admin)."""
+    """GET approved observer transcript (admin). POST actions: join, ask, ai toggle."""
 
     permission_classes = [IsPlatformAdmin]
 
     def get(self, request, token):
-        req = get_object_or_404(
-            InterviewAdminJoinRequest.objects.select_related("round"),
-            observer_token=token,
-            status="approved",
-            admin_user=request.user,
-        )
+        req = _approved_request(request, token)
         round_obj = req.round
         return Response({
             "round": InterviewRoundSerializer(round_obj).data,
             "messages": InterviewMessageSerializer(round_obj.messages.all(), many=True).data,
             "observer_mode": True,
+            "host_state": host_state(round_obj),
+            "rate_target": admin_rate_target(round_obj),
         })
+
+    def post(self, request, token):
+        req = _approved_request(request, token)
+        round_obj = req.round
+        if round_obj.status != "in_progress":
+            return Response({"error": "Round is not live"}, status=400)
+
+        action = (request.data.get("action") or "join").strip().lower()
+        if action == "join":
+            result = admin_join_session(
+                round_obj,
+                admin_user=request.user,
+                display_name=request.data.get("display_name"),
+            )
+            msgs = InterviewMessageSerializer(result.get("messages") or [], many=True).data
+            return Response({
+                "host_state": result["host_state"],
+                "messages": msgs,
+                "already_joined": result.get("already_joined", False),
+            })
+
+        if action == "ask":
+            text = (request.data.get("question") or request.data.get("text") or "").strip()
+            if not text:
+                return Response({"error": "question required"}, status=400)
+            try:
+                msg = admin_post_question(
+                    round_obj,
+                    text=text,
+                    admin_user=request.user,
+                    spoken=bool(request.data.get("spoken")),
+                )
+            except ValueError as exc:
+                return Response({"error": str(exc)}, status=400)
+            return Response({
+                "message": InterviewMessageSerializer(msg).data,
+                "host_state": host_state(round_obj),
+            })
+
+        if action == "ai":
+            enabled = bool(request.data.get("enabled"))
+            result = admin_set_ai_enabled(round_obj, enabled=enabled, admin_user=request.user)
+            return Response({
+                "host_state": result["host_state"],
+                "messages": InterviewMessageSerializer(result.get("messages") or [], many=True).data,
+                "next_question": (
+                    InterviewMessageSerializer(result["next_question"]).data
+                    if result.get("next_question") else None
+                ),
+            })
+
+        if action == "rate":
+            try:
+                raw_score = request.data.get("score")
+                score_val = float(raw_score) if raw_score is not None and raw_score != "" else None
+                result = admin_rate_answer(
+                    round_obj,
+                    admin_user=request.user,
+                    candidate_message_id=request.data.get("candidate_message_id"),
+                    score=score_val,
+                    quality=(request.data.get("quality") or "").strip() or None,
+                    feedback=(request.data.get("feedback") or "").strip() or None,
+                    use_ai=request.data.get("use_ai", True) is not False,
+                )
+            except ValueError as exc:
+                return Response({"error": str(exc)}, status=400)
+            return Response({
+                "host_state": result["host_state"],
+                "score_result": result["score_result"],
+                "candidate_message": InterviewMessageSerializer(result["candidate_message"]).data,
+                "feedback_message": InterviewMessageSerializer(result["feedback_message"]).data,
+                "rate_target": admin_rate_target(round_obj),
+            })
+
+        return Response({"error": "Unknown action"}, status=400)
 
 
 class UserPendingJoinRequestsView(APIView):

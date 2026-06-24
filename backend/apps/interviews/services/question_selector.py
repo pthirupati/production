@@ -104,6 +104,18 @@ def round_category_mix(round_type: str, questions_asked: int) -> str | None:
         mix = ["casual", "behavioral", "behavioral", "casual"]
     elif round_type == "manager":
         mix = ["behavioral", "itil", "sla", "scenario", "tricky"]
+    elif round_type == "deep_dive":
+        mix = ["system_design", "system_design", "scenario", "tricky", "technical", "troubleshooting"]
+    elif round_type == "devops_debug":
+        mix = ["scenario", "troubleshooting", "scenario", "troubleshooting", "technical", "scenario"]
+    elif round_type == "sre_oncall":
+        mix = ["scenario", "sla", "itil", "scenario", "troubleshooting", "scenario"]
+    elif round_type == "system_design":
+        mix = ["system_design", "system_design", "system_design", "technical", "scenario"]
+    elif round_type == "live_coding":
+        mix = ["practical", "technical", "practical", "troubleshooting", "practical", "technical"]
+    elif round_type == "behavioral":
+        mix = ["behavioral", "behavioral", "casual", "behavioral", "scenario"]
     else:
         mix = ["casual", "technical", "troubleshooting", "technical", "scenario", "practical", "tricky"]
     return mix[idx % len(mix)]

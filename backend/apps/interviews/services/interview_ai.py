@@ -60,6 +60,57 @@ _CONCRETE_EVIDENCE = [
     "region", "availability zone", "cidr", "cpu", "memory", "disk",
 ]
 
+# Filler words stripped before keyword scoring so "um, I'd restart nginx" still hits.
+_FILLER_RE = re.compile(
+    r"\b(um+|uh+|er+|erm+|like|you know|sort of|kind of|basically|literally|actually)\b",
+    re.I,
+)
+
+# Synonym expansion for expected-keyword matching — accepts spoken variants.
+_KEYWORD_SYNONYMS: dict[str, list[str]] = {
+    "restart": ["reboot", "reload", "bounce", "start again", "bring back up"],
+    "nginx": ["web server", "reverse proxy"],
+    "systemctl": ["systemd", "service nginx", "service command"],
+    "kubectl": ["k8s cli", "kube control"],
+    "pod": ["pods", "container group"],
+    "deployment": ["deploy", "rolling update"],
+    "rollback": ["roll back", "revert", "undo deploy"],
+    "scale": ["scaling", "autoscale", "hpa", "replicas"],
+    "monitor": ["monitoring", "observability", "watch", "metrics"],
+    "log": ["logs", "logging", "journalctl", "log line"],
+    "cache": ["caching", "redis", "memcached", "ttl"],
+    "iam": ["identity", "permissions", "access control"],
+    "role": ["roles", "assume role", "sts"],
+    "policy": ["policies", "permission document"],
+    "association": ["group membership", "attached to group", "through group"],
+    "terraform": ["tf", "infrastructure as code", "iac"],
+    "ansible": ["playbook", "configuration management"],
+    "docker": ["container", "containerized"],
+    "ingress": ["load balancer", "routing rule"],
+    "secret": ["secrets", "credentials", "vault"],
+    "backup": ["restore", "snapshot", "dr"],
+    "latency": ["slow", "p99", "response time"],
+    "debug": ["troubleshoot", "investigate", "diagnose"],
+    "curl": ["http check", "health check"],
+    "prometheus": ["metrics", "monitoring", "time series"],
+    "grafana": ["dashboard", "visualization", "monitoring"],
+    "helm": ["chart", "package manager", "k8s deploy"],
+    "postgres": ["postgresql", "sql database", "rdbms"],
+    "redis": ["cache", "in-memory", "key value"],
+    "kafka": ["event stream", "message broker", "queue"],
+    "lambda": ["serverless", "function", "faas"],
+    "vpc": ["network", "subnet", "private cloud"],
+    "certificate": ["tls", "ssl", "https"],
+    "firewall": ["security group", "iptables", "acl"],
+    "oncall": ["on-call", "on call", "pager", "incident response"],
+    "slo": ["service level objective", "error budget", "sla"],
+    "runbook": ["playbook", "procedure", "operational doc"],
+    "ci/cd": ["pipeline", "continuous integration", "continuous delivery", "github actions"],
+    "kubernetes": ["k8s", "kube", "cluster orchestration"],
+    "observability": ["metrics logs traces", "otel", "apm", "monitoring stack"],
+    "root cause": ["rca", "five whys", "underlying cause", "why it happened"],
+}
+
 
 # ---------------------------------------------------------------------------
 # Rich reaction banks — contextual, persona-aware
@@ -85,20 +136,18 @@ _REACTIONS = {
         "Excellent. Now challenge your own answer — what's the weakest assumption in what you just said?",
     ],
     "weak": [
-        "I'd want a bit more depth there. Walk me through the exact commands or steps you'd run.",
-        "Help me understand your mental model — what's the failure mode you're most worried about?",
-        "Let's slow down. What would you check first, before touching anything?",
-        "I'm not quite seeing the technical path. How would you confirm your hypothesis before acting?",
-        "Can you be more specific? What tool, command, or metric would tell you you're on the right track?",
-        "Let's unpack that. What does 'it was slow' actually mean — what signal did you see?",
-        "I need more. Walk me through your checklist — what do you verify in what order?",
+        "Help me connect the dots — what would you check or run first in practice?",
+        "Walk me through your mental model — what's the first signal you'd look at?",
+        "I want to hear the practical path — what tool or command would you reach for?",
+        "Paint me the scene — what would you verify before making a change?",
+        "Talk me through it like we're on a bridge call — what's step one?",
     ],
     "brief": [
-        "Short answer — can you expand? I'd love a real example from your experience.",
-        "Tell me more. What was the actual command or config change you made?",
-        "Walk me through the specifics. What did your monitoring show before you acted?",
-        "I need more detail. What was the impact, and how did you measure improvement?",
-        "That's a start. Give me the full picture — what happened before, during, and after.",
+        "That's a start — can you add a concrete example from something you've actually done?",
+        "Give me one more layer — what command, config, or metric backs that up?",
+        "Walk me through the specifics — what did you see in monitoring or logs?",
+        "I'd love a bit more color — what happened before, during, and after?",
+        "Expand on that — even one real incident example would help.",
     ],
     "skipped": [
         "No worries — let's keep moving.",
@@ -282,18 +331,47 @@ _GENERIC_FOLLOWUPS = [
 # SAME question is re-asked rather than advancing. {phrase} is filled from the
 # candidate's own words when available. Always asks them to go concrete.
 _CLARIFY_PROBES = [
-    "I want to make sure I follow — can you walk me through {phrase} concretely, step by step?",
-    "Before we move on, give me the specifics on {phrase}: what exactly would you do?",
-    "Let's stay here a second. Make {phrase} concrete for me — the actual command, tool, or step.",
-    "Help me picture it — walk me through {phrase} as if you were doing it right now.",
-    "I'm not quite there yet. Can you go deeper on {phrase} with a real example?",
+    "Thanks — I follow the gist on {phrase}. Can you walk me through the actual steps you'd take?",
+    "I hear you on {phrase}. What would that look like in practice — tools, commands, or order of operations?",
+    "Good start on {phrase}. Help me picture the hands-on part — what would you do first?",
+    "That makes sense at a high level. For {phrase}, what's the concrete sequence you'd follow?",
 ]
 _CLARIFY_PROBES_NO_PHRASE = [
-    "I want to make sure I follow — can you walk me through that concretely, step by step?",
-    "Before we move on, give me the specifics: what exactly would you do, and in what order?",
-    "Let's stay here a second. Make it concrete for me — the actual command, tool, or metric.",
-    "Help me picture it — walk me through it as if you were doing it right now.",
-    "I'm not quite there yet. Can you go a level deeper with a real example?",
+    "Thanks — I follow the gist. Can you walk me through the actual steps you'd take?",
+    "I hear you. What would that look like in practice — tools, commands, or order of operations?",
+    "Good start. Help me picture the hands-on part — what would you do first?",
+    "That makes sense at a high level. What's the concrete sequence you'd follow on a real system?",
+]
+_CLARIFY_PARTIAL = [
+    "You're on the right track with {phrase} — can you flesh out the steps a bit more?",
+    "Good direction on {phrase}. What's the hands-on sequence — tools and order?",
+    "I follow {phrase} — one more layer of detail would nail it for me.",
+]
+_CLARIFY_PARTIAL_NO_PHRASE = [
+    "You're on the right track — can you flesh out the steps a bit more?",
+    "Good direction. What's the hands-on sequence — tools and order?",
+    "I follow the gist — one more layer of detail would nail it for me.",
+]
+
+# Natural bridges spoken before the next question lands (engine appends to reply).
+_TRANSITION_CORRECT = [
+    "Alright — let's keep the momentum going.",
+    "Good — shifting gears a little.",
+    "Nice. Next one for you.",
+    "Okay, moving on.",
+]
+_TRANSITION_PARTIAL = [
+    "Thanks — let's try a related angle.",
+    "Got the gist — here's a follow-up.",
+    "Fair enough — let's keep going.",
+]
+_TRANSITION_SKIPPED = [
+    "No worries — next one:",
+    "All good — let's keep pace.",
+]
+_TRANSITION_DEFAULT = [
+    "Let's move on.",
+    "Next question.",
 ]
 
 # ---------------------------------------------------------------------------
@@ -442,14 +520,66 @@ _PHRASE_STOPWORDS = {
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _score_star_coverage(answer: str) -> dict[str, bool]:
-    low = answer.lower()
-    return {
-        "situation": any(k in low for k in _STAR_SITUATION),
-        "task": any(k in low for k in _STAR_TASK),
-        "action": any(k in low for k in _STAR_ACTION),
-        "result": any(k in low for k in _STAR_RESULT),
-    }
+def _normalize_answer_for_scoring(text: str) -> str:
+    """Strip fillers and collapse whitespace for fairer keyword matching."""
+    t = _FILLER_RE.sub(" ", (text or "").strip())
+    return re.sub(r"\s+", " ", t).strip().lower()
+
+
+def _expand_for_keyword_match(text: str) -> str:
+    """Expand answer text with synonym tokens so spoken variants still score."""
+    low = _normalize_answer_for_scoring(text)
+    extras: list[str] = []
+    for base, syns in _KEYWORD_SYNONYMS.items():
+        if base in low:
+            extras.extend(syns)
+        else:
+            for s in syns:
+                if s in low:
+                    extras.append(base)
+                    break
+    if not extras:
+        return low
+    return f"{low} {' '.join(extras)}"
+
+
+def _keyword_matches(expanded_text: str, keyword: str) -> bool:
+    """True when keyword or a known synonym/base form appears in expanded text."""
+    kw = (keyword or "").strip().lower()
+    if not kw:
+        return False
+    if kw in expanded_text:
+        return True
+    for syn in _KEYWORD_SYNONYMS.get(kw, []):
+        if syn in expanded_text:
+            return True
+    for base, syn_list in _KEYWORD_SYNONYMS.items():
+        if kw in syn_list and base in expanded_text:
+            return True
+    return False
+
+
+def _count_keyword_hits(answer_text: str, keywords: list[str]) -> tuple[int, float]:
+    expanded = _expand_for_keyword_match(answer_text)
+    if not keywords:
+        return 0, 0.0
+    hits = sum(1 for k in keywords if _keyword_matches(expanded, k))
+    return hits, hits / len(keywords)
+
+
+def _effective_reply_quality(quality: str, correctness: str) -> str:
+    """Map scorer quality + correctness to the reaction tone — concise-but-correct
+    answers shouldn't get a harsh 'go deeper' push."""
+    if quality == "skipped":
+        return quality
+    if correctness == "correct" and quality in ("brief", "weak"):
+        return "adequate"
+    if correctness == "partial":
+        if quality == "weak":
+            return "brief"
+        if quality == "brief":
+            return "adequate"
+    return quality
 
 
 def _detect_topic(text: str) -> str | None:
@@ -518,6 +648,16 @@ def _refine_quality(
     if keyword_hit_rate >= 0.55 and quality in ("brief", "weak"):
         return "adequate"
     return quality
+
+
+def _score_star_coverage(answer: str) -> dict[str, bool]:
+    low = answer.lower()
+    return {
+        "situation": any(k in low for k in _STAR_SITUATION),
+        "task": any(k in low for k in _STAR_TASK),
+        "action": any(k in low for k in _STAR_ACTION),
+        "result": any(k in low for k in _STAR_RESULT),
+    }
 
 
 def _assess_quality(answer: str, question: str = "") -> str:
@@ -740,6 +880,7 @@ def generate_interviewer_reply(
     # Correctness verdict (WS2) — drives a verdict-aware reaction so the reply
     # reacts to *whether they were right*, not just how long they spoke.
     correctness = score_hint.get("correctness") or "unknown"
+    reply_quality = _effective_reply_quality(quality, correctness)
     company = profile_snapshot.get("current_company") or "your current org"
     role = profile_snapshot.get("target_role") or profile_snapshot.get("experience_level", "mid")
 
@@ -774,7 +915,79 @@ def generate_interviewer_reply(
     # said (WS2). The verdict reaction (correct/partial/off_base) rides in front
     # of it so the bot reacts to whether they were right, then quotes them.
     verdict = verdict_reaction() if quality != "skipped" else ""
-    ack = _compose_ack(phrase, used, rng) if quality != "skipped" else ""
+    if quality != "skipped" and score_hint.get("barge_in"):
+        verdict = _pick_unused(
+            [
+                "No problem at all — jump in anytime.",
+                "Sure — go ahead, I'm listening.",
+                "All good — take the floor.",
+                "That's fine — I was just wrapping up.",
+            ],
+            used,
+            rng,
+        ) or "No problem — go ahead."
+    memory = score_hint.get("memory") if isinstance(score_hint.get("memory"), dict) else {}
+
+    if quality != "skipped" and memory:
+        from apps.interviews.services.conversation_intelligence import (
+            detect_contradiction,
+            generate_contradiction_probe,
+            generate_off_topic_redirect,
+            tone_adaptive_opener,
+        )
+        prior = detect_contradiction(memory, candidate_answer)
+        if prior and rng.random() < 0.6:
+            probe = generate_contradiction_probe(prior, used, rng)
+            return finish(probe)
+
+    if quality != "skipped":
+        from apps.interviews.services.conversation_intelligence import (
+            generate_off_topic_redirect,
+            tone_adaptive_opener,
+        )
+        tone_line = tone_adaptive_opener(memory, used, rng)
+        if tone_line and rng.random() < 0.55:
+            verdict = f"{verdict} {tone_line}".strip() if verdict else tone_line
+        redirect = generate_off_topic_redirect(
+            answer_text=candidate_answer,
+            question_text=question_text,
+            question_topic=score_hint.get("question_topic") or _detect_topic(question_text),
+            used=used,
+            rng=rng,
+        )
+        if redirect and score_hint.get("correctness") in ("off_base", "unknown") and rng.random() < 0.5:
+            return finish(f"{verdict} {redirect}".strip() if verdict else redirect)
+
+        if phrase:
+            ack = _compose_ack(phrase, used, rng)
+        else:
+            from apps.interviews.services.persona_style import persona_ack
+            ack = persona_ack(round_type, used, rng)
+    else:
+        ack = ""
+
+    q_category = score_hint.get("question_category") or ""
+    if q_category == "system_design" and quality != "skipped":
+        from apps.interviews.services.system_design import system_design_reply_probe
+        sd_probe = system_design_reply_probe(
+            candidate_answer=candidate_answer,
+            question_text=question_text,
+            conversation_tail=conversation_tail,
+        )
+        if sd_probe:
+            ack = sd_probe
+
+    q_kind = score_hint.get("question_kind") or ""
+    if q_kind in ("live_coding", "live_coding_followup") and quality != "skipped":
+        from apps.interviews.services.live_coding import live_coding_reply_probe
+
+        lc_probe = live_coding_reply_probe(
+            candidate_answer=candidate_answer,
+            expected_signals=score_hint.get("expected_signals") or [],
+            phase=score_hint.get("live_coding_phase") or "",
+        )
+        if lc_probe:
+            ack = lc_probe
 
     def lead(*rest: str) -> str:
         """Compose: <verdict reaction> <phrase-quoting ack> <follow-up...>."""
@@ -798,14 +1011,14 @@ def generate_interviewer_reply(
         return finish(_pick_unused(_REACTIONS["skipped"], used, rng))
 
     # The "push" reaction (deduped) carries the substance of the follow-up.
-    if quality == "strong":
+    if reply_quality == "strong":
         reaction = _pick_unused(
             _REACTIONS["strong_streak"] if strong_streak >= 4 else _REACTIONS["strong"],
             used, rng,
         )
-    elif quality == "weak":
+    elif reply_quality == "weak":
         reaction = _pick_unused(_REACTIONS["weak"], used, rng)
-    elif quality == "brief":
+    elif reply_quality == "brief":
         reaction = _pick_unused(_REACTIONS["brief"], used, rng)
     else:
         reaction = _pick_unused(_REACTIONS["strong"], used, rng)
@@ -850,24 +1063,70 @@ def generate_interviewer_reply(
     # Occasional casual aside (~18%), but never on a weak answer (stay focused).
     parts = [p for p in (verdict, ack) if p]
     aside = ""
-    if quality != "weak" and rng.random() < 0.18:
-        aside = _pick_unused(_CASUAL_ASIDES, used, rng)
+    from apps.interviews.services.persona_style import persona_asides, persona_connectors, apply_vocabulary
+    if reply_quality != "weak" and rng.random() < 0.18:
+        pool = persona_asides(round_type) + _CASUAL_ASIDES
+        aside = _pick_unused(pool, used, rng)
     if aside:
         # Asides end in a comma/dash, so lowercase the body's first letter for
         # smoother prose ("Honestly, what breaks first…" not "Honestly, What…").
         parts.append(aside)
         body = _lower_first(body)
-    elif quality != "weak" and rng.random() < 0.30:
+    elif reply_quality != "weak" and rng.random() < 0.30:
         # No aside — sometimes stitch a light spoken connector so the reply flows
         # into the follow-up like a real conversation ("Right — so, what breaks…")
         # rather than two clipped sentences. Skip on weak answers (stay direct).
-        connector = _pick_unused(_CONNECTORS, used, rng)
+        pool = persona_connectors(round_type) + _CONNECTORS
+        connector = _pick_unused(pool, used, rng)
         if connector:
             parts.append(connector)
             body = _lower_first(body)
     parts.append(body)
     reply = " ".join(p for p in parts if p).strip()
-    return finish(reply)
+    return apply_vocabulary(finish(reply), round_type, rng)
+
+
+# ---------------------------------------------------------------------------
+# Warm round closing — spoken before the report (free/local).
+# ---------------------------------------------------------------------------
+
+_CLOSING_PASSED = [
+    "That wraps our time — really solid conversation. You'll see detailed feedback in your report.",
+    "Good round — thanks for walking through all of that. Check your scorecard for specifics.",
+    "Nice work getting through that — I'll put my notes together in your report now.",
+]
+
+_CLOSING_Mixed = [
+    "That wraps our time — thanks for sticking with it. Your report has concrete areas to sharpen.",
+    "Appreciate you working through those — feedback is in your scorecard with specific next steps.",
+]
+
+_CLOSING_HR = [
+    "Thanks for sharing your story today — really helpful context. Your report is ready when you are.",
+    "Great chatting — I enjoyed learning about your background. You'll find feedback in your report.",
+]
+
+
+def generate_round_closing(
+    *,
+    round_type: str,
+    passed: bool,
+    memory: dict | None = None,
+    persona_name: str = "",
+) -> str:
+    mem = memory if isinstance(memory, dict) else {}
+    tone = mem.get("tone") or "neutral"
+    name = (persona_name or "your interviewer").split()[0]
+    pool = _CLOSING_PASSED if passed else _CLOSING_Mixed
+    if round_type == "hr":
+        pool = _CLOSING_HR
+    rng = random.Random()
+    line = rng.choice(pool)
+    if tone == "nervous" and passed:
+        line = f"{line} You settled in well as we went — trust that pace."
+    if int(mem.get("strong_streak", 0)) >= 3:
+        line = f"{line} Strong finish from you."
+    return f"{line} — {name}."
 
 
 # ---------------------------------------------------------------------------
@@ -882,6 +1141,7 @@ def generate_clarify_probe(
     candidate_answer: str,
     question_text: str = "",
     conversation_tail: list[dict] | None = None,
+    correctness: str | None = None,
 ) -> str:
     """Return a clarify/probe line that re-opens the SAME question (WS2).
 
@@ -891,20 +1151,44 @@ def generate_clarify_probe(
     used = _prior_interviewer_lines(conversation_tail or [])
     rng = random.Random()
     phrase = _extract_quote_phrase(candidate_answer)
+    partial = correctness == "partial"
     if phrase:
-        templates = [t.format(phrase=f"“{phrase}”") for t in _CLARIFY_PROBES]
+        bank = _CLARIFY_PARTIAL if partial else _CLARIFY_PROBES
+        templates = [t.format(phrase=f"“{phrase}”") for t in bank]
         line = _pick_unused(templates, used, rng)
         if line:
             q = (question_text or "").strip()
             if q:
                 return f"{line} So again: {q}"
             return line
-    line = _pick_unused(_CLARIFY_PROBES_NO_PHRASE, used, rng)
-    line = line or "I want to make sure I follow — can you walk me through that concretely, step by step?"
+    no_phrase = _CLARIFY_PARTIAL_NO_PHRASE if partial else _CLARIFY_PROBES_NO_PHRASE
+    line = _pick_unused(no_phrase, used, rng)
+    line = line or "Thanks — can you walk me through that concretely, step by step?"
     q = (question_text or "").strip()
     if q:
         return f"{line} So again: {q}"
     return line
+
+
+def generate_transition_bridge(
+    *,
+    round_type: str,
+    quality: str,
+    correctness: str,
+    conversation_tail: list[dict] | None = None,
+) -> str:
+    """Short spoken bridge before the next question — keeps pacing human."""
+    used = _prior_interviewer_lines(conversation_tail or [])
+    rng = random.Random()
+    if quality == "skipped":
+        pool = _TRANSITION_SKIPPED
+    elif correctness == "correct":
+        pool = _TRANSITION_CORRECT
+    elif correctness == "partial":
+        pool = _TRANSITION_PARTIAL
+    else:
+        pool = _TRANSITION_DEFAULT
+    return _pick_unused(pool, used, rng) or pool[0]
 
 
 # ---------------------------------------------------------------------------
@@ -1131,7 +1415,8 @@ def compute_answer_scores(
     star = _score_star_coverage(candidate_answer)
     topic = _detect_topic(f"{question_text} {candidate_answer}")
     word_count = len(candidate_answer.split()) if candidate_answer else 0
-    low = (candidate_answer or "").lower()
+    scored_text = _normalize_answer_for_scoring(candidate_answer)
+    low = scored_text
 
     depth_score = min(100, sum(1 for k in _TECHNICAL_DEPTH if k in low) * 12)
     concrete_score = min(100, sum(1 for k in _CONCRETE_EVIDENCE if k in low) * 15)
@@ -1145,8 +1430,7 @@ def compute_answer_scores(
         # bad keyword can never crash live answer scoring (was a raw 500).
         clean_keywords = [str(k).lower() for k in expected_keywords if k not in (None, "")]
         if clean_keywords:
-            hits = sum(1 for k in clean_keywords if k in low)
-            expected_hit_rate = hits / len(clean_keywords)
+            _, expected_hit_rate = _count_keyword_hits(candidate_answer, clean_keywords)
         else:
             expected_keywords = None
 

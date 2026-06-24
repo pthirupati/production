@@ -20,6 +20,7 @@ from apps.interviews.services.interview_ai import (
     generate_clarify_probe,
     generate_force_advance_reply,
     generate_interviewer_reply,
+    generate_transition_bridge,
     generate_unclear_audio_reply,
     is_candidate_question,
 )
@@ -27,6 +28,10 @@ from apps.interviews.services.question_generator import (
     generate_question,
     plan_round_topics,
     starting_difficulty,
+)
+from apps.interviews.services.conversation_intelligence import (
+    empty_memory,
+    update_memory,
 )
 from apps.interviews.services.question_selector import round_category_mix, select_next_question
 from apps.interviews.services.scoring import (
@@ -38,6 +43,54 @@ from apps.interviews.services.scoring import (
     build_strengths_and_improvements,
     score_answer,
 )
+
+
+def _ai_may_speak(round_obj: InterviewRound) -> bool:
+    try:
+        from apps.interviews.services.admin_host import ai_interviewer_active
+
+        return ai_interviewer_active(round_obj)
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _host_mode_response(
+    round_obj: InterviewRound,
+    *,
+    cand_msg: InterviewMessage,
+    score_result: dict | None = None,
+    acknowledge: bool = True,
+) -> dict:
+    """Return after storing the candidate turn while a human admin hosts."""
+    from apps.interviews.services.admin_host import host_mode_ack_reply, host_state
+
+    st = host_state(round_obj)
+    interviewer_msg = None
+    reply = ""
+    if acknowledge and (cand_msg.content or "").strip():
+        reply = host_mode_ack_reply(st.get("display_name") or "")
+        interviewer_msg = InterviewMessage.objects.create(
+            round=round_obj,
+            role="interviewer",
+            content=reply,
+            message_type="follow_up",
+            metadata={"admin_host": True, "host_ack": True, "advanced": False},
+        )
+    hints = _speech_hints_for_round(round_obj, question_meta={})
+    return {
+        "candidate_message": cand_msg,
+        "interviewer_reply": interviewer_msg,
+        "reply": reply,
+        "advanced": False,
+        "correctness": (score_result or {}).get("correctness", "unknown"),
+        "score": score_result,
+        "next_question": None,
+        "coaching": None,
+        "skipped": (score_result or {}).get("quality") == "skipped",
+        "host_mode": True,
+        "ai_paused": True,
+        **hints,
+    }
 
 
 # WS4 — the intro is now GREETING + AGENDA ONLY. It deliberately does NOT carry
@@ -72,6 +125,12 @@ INTRO_TEMPLATES = {
 
 def _profile_for_round(round_obj: InterviewRound) -> dict:
     return round_obj.campaign.profile_snapshot or {}
+
+
+def _detect_topic_from_meta(last_q_msg) -> str | None:
+    if last_q_msg is None or not isinstance(getattr(last_q_msg, "metadata", None), dict):
+        return None
+    return last_q_msg.metadata.get("topic")
 
 
 def start_round(round_obj: InterviewRound) -> dict:
@@ -140,6 +199,14 @@ def start_round(round_obj: InterviewRound) -> dict:
         round_obj.difficulty_level = seed_difficulty
         round_obj.save(update_fields=["metadata", "difficulty_level"])
     except Exception:  # noqa: BLE001 - planning is best-effort, never fatal
+        pass
+    # Seed conversation memory for cross-turn intelligence.
+    try:
+        conv = _conversation_meta(round_obj)
+        if "memory" not in conv:
+            conv["memory"] = empty_memory()
+            round_obj.save(update_fields=["metadata"])
+    except Exception:  # noqa: BLE001
         pass
     # Resolve these defensively: snapshot values can be explicitly None (not just
     # missing), and "None + ' role'" would raise TypeError and 500 the start.
@@ -346,7 +413,12 @@ def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
         return msg
 
     # PRIMARY: generate the next question dynamically (never returns None).
+    conv = _conversation_meta(round_obj)
+    memory = conv.get("memory") if isinstance(conv.get("memory"), dict) else empty_memory()
     last_answer, last_quality = _last_candidate_answer(round_obj)
+    seconds_left = None
+    if round_obj.ends_at:
+        seconds_left = max(0, (round_obj.ends_at - timezone.now()).total_seconds())
     tail = [
         {"role": m.role, "content": (m.content or "")[:200]}
         for m in reversed(list(round_obj.messages.order_by("-created_at")[:8]))
@@ -366,9 +438,14 @@ def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
         .first()
     )
     last_command = ""
+    last_question_kind = ""
+    last_practical_config: dict = {}
     if last_q_msg is not None:
         vkey = last_q_msg.question_id if last_q_msg.question_id else f"msg:{last_q_msg.id}"
         last_command = _last_validated_command(round_obj, vkey)
+        meta = last_q_msg.metadata if isinstance(last_q_msg.metadata, dict) else {}
+        last_question_kind = meta.get("kind") or ""
+        last_practical_config = dict(meta.get("practical_config") or {})
 
     gen = generate_question(
         round_type=round_obj.round_type,
@@ -384,6 +461,13 @@ def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
         category_preference=category,
         last_command=last_command,
         turns_since_last_cross=_turns_since_last_cross(round_obj),
+        system_design_prompt=conv.get("system_design_prompt", ""),
+        system_design_phase=conv.get("system_design_phase", ""),
+        memory=memory,
+        seconds_left=seconds_left,
+        active_incident=conv.get("active_incident"),
+        last_question_kind=last_question_kind,
+        last_practical_config=last_practical_config,
     )
 
     msg = InterviewMessage.objects.create(
@@ -405,6 +489,29 @@ def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
     # WS3 — track whether this turn was a cross-question so the generator can
     # avoid quizzing every turn while still guaranteeing the first follow-up.
     _record_cross_state(round_obj, gen.kind)
+    if gen.category == "system_design":
+        pc = gen.practical_config or {}
+        if pc.get("design_prompt"):
+            conv["system_design_prompt"] = pc["design_prompt"]
+        if pc.get("design_phase"):
+            conv["system_design_phase"] = pc["design_phase"]
+    if gen.kind == "incident" or gen.category == "scenario":
+        pc = gen.practical_config or {}
+        if pc.get("incident_scenario"):
+            conv["active_incident"] = {
+                "title": pc.get("incident_title"),
+                "scenario": pc.get("incident_scenario"),
+                "revealed": pc.get("incident_revealed", 0),
+                "phase": pc.get("incident_phase", "investigate"),
+            }
+    if gen.kind in ("live_coding", "live_coding_followup"):
+        pc = gen.practical_config or {}
+        if pc.get("coding_title"):
+            conv["live_coding_title"] = pc["coding_title"]
+        if pc.get("live_coding_phase"):
+            conv["live_coding_phase"] = pc["live_coding_phase"]
+        if pc.get("expected_signals"):
+            conv["live_coding_signals"] = pc["expected_signals"]
     round_obj.save(update_fields=["questions_asked", "metadata"])
     return msg
 
@@ -418,6 +525,34 @@ def _recent_tail(round_obj: InterviewRound, limit: int = 6) -> list[dict]:
             ]
         )
     )
+
+
+def _speech_hints_for_round(round_obj: InterviewRound, next_q=None, *, question_meta: dict | None = None) -> dict:
+    """Persona speech cadence + adaptive thinking delay for the frontend TTS layer."""
+    from apps.interviews.services.persona_style import speech_profile, thinking_delay_ms
+
+    meta = question_meta if isinstance(question_meta, dict) else {}
+    if next_q is not None and isinstance(getattr(next_q, "metadata", None), dict):
+        meta = {**meta, **next_q.metadata}
+    difficulty = meta.get("difficulty") or round_obj.difficulty_level or 2
+    conv = (round_obj.metadata or {}).get("conversation") or {}
+    memory = conv.get("memory") if isinstance(conv.get("memory"), dict) else {}
+    tone = memory.get("tone") or "neutral"
+
+    profile = speech_profile(round_obj.round_type, round_obj.persona_voice_id or "")
+    delay = thinking_delay_ms(
+        round_obj.round_type,
+        difficulty=int(difficulty),
+        question_kind=str(meta.get("kind") or ""),
+        category=str(meta.get("category") or ""),
+        persona_voice_id=round_obj.persona_voice_id or "",
+    )
+    if tone == "nervous":
+        delay = max(180, int(delay * 0.75))
+        profile = {**profile, "rate": round(max(0.88, profile.get("rate", 0.96) - 0.04), 2)}
+    elif tone == "confident":
+        delay = min(1400, int(delay * 1.08))
+    return {"speech_profile": profile, "thinking_delay_ms": delay, "candidate_tone": tone}
 
 
 def _should_reprompt_answer(score_result: dict, correctness: str) -> bool:
@@ -463,6 +598,8 @@ def _submit_force_advance(
         score=None,
         metadata={"user_skip": True, "force_advance": True},
     )
+    if not _ai_may_speak(round_obj):
+        return _host_mode_response(round_obj, cand_msg=cand_msg, acknowledge=bool(partial))
     next_q = None
     if _should_ask_another(round_obj):
         try:
@@ -519,6 +656,8 @@ def _submit_unclear_audio(
             "transcription_confidence": meta.get("transcription_confidence"),
         },
     )
+    if not _ai_may_speak(round_obj):
+        return _host_mode_response(round_obj, cand_msg=cand_msg, acknowledge=True)
     try:
         reply = generate_unclear_audio_reply(
             question_text=question_text,
@@ -554,8 +693,6 @@ def _submit_unclear_audio(
 
 def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | None = None) -> dict:
     meta = metadata or {}
-    # Tell the scorer which round type this is so behavioral/HR answers are
-    # weighted on STAR coverage rather than always defaulting to "technical".
     meta.setdefault("round_type", round_obj.round_type)
     input_type = meta.get("input_type")  # "answer" (default) | "question"
 
@@ -608,6 +745,8 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
             score=None,
             metadata={"input_type": "question"},
         )
+        if not _ai_may_speak(round_obj):
+            return _host_mode_response(round_obj, cand_msg=cand_msg, acknowledge=True)
         try:
             reply = generate_clarification_reply(
                 candidate_question=answer_text,
@@ -649,7 +788,40 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         except Exception:  # noqa: BLE001 - never let the bonus lookup break scoring
             pass
 
+    last_q_category = ""
+    last_q_kind = ""
+    last_q_difficulty = round_obj.difficulty_level or 2
+    if last_q_msg is not None and isinstance(last_q_msg.metadata, dict):
+        last_q_category = last_q_msg.metadata.get("category") or last_q_msg.metadata.get("kind") or ""
+        last_q_kind = last_q_msg.metadata.get("kind") or ""
+        last_q_difficulty = last_q_msg.metadata.get("difficulty") or last_q_difficulty
+    meta["question_category"] = last_q_category
+
     score_result = score_answer(question, answer_text, meta)
+    score_result["question_category"] = last_q_category
+    score_result["question_kind"] = last_q_kind
+    score_result["question_difficulty"] = last_q_difficulty
+    score_result["question_topic"] = _detect_topic_from_meta(last_q_msg)
+    if last_q_msg and isinstance(last_q_msg.metadata, dict):
+        pc = last_q_msg.metadata.get("practical_config") or {}
+        if isinstance(pc, dict):
+            score_result["expected_signals"] = pc.get("expected_signals") or []
+            score_result["live_coding_phase"] = pc.get("live_coding_phase") or ""
+
+    conv = _conversation_meta(round_obj)
+    memory = update_memory(
+        conv.get("memory") if isinstance(conv.get("memory"), dict) else empty_memory(),
+        answer_text=answer_text,
+        score_result=score_result,
+        question_topic=_detect_topic_from_meta(last_q_msg),
+    )
+    conv["memory"] = memory
+    score_result["memory_tone"] = memory.get("tone")
+    try:
+        round_obj.save(update_fields=["metadata"])
+    except Exception:  # noqa: BLE001
+        pass
+
     correctness = score_result.get("correctness", "unknown")
     cand_msg = InterviewMessage.objects.create(
         round=round_obj,
@@ -668,7 +840,24 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     else:
         round_obj.strong_answers_streak = 0
 
+    # Micro difficulty: adapt per answer, not only on streaks.
+    score_val = float(score_result.get("score") or 0)
+    if score_val >= 82 and score_result.get("quality") == "strong":
+        round_obj.difficulty_level = min(5, round_obj.difficulty_level + 1)
+    elif score_val < 42 and score_result.get("quality") in ("weak", "brief"):
+        round_obj.difficulty_level = max(1, round_obj.difficulty_level - 1)
+
     round_obj.save(update_fields=["strong_answers_streak", "difficulty_level"])
+
+    if not _ai_may_speak(round_obj):
+        if meta.get("barge_in"):
+            score_result["barge_in"] = True
+        return _host_mode_response(
+            round_obj,
+            cand_msg=cand_msg,
+            score_result=score_result,
+            acknowledge=bool((answer_text or "").strip()),
+        )
 
     # ------------------------------------------------------------------ WS2 ---
     # Acknowledge + validate the prior answer before moving on. When the answer
@@ -680,9 +869,6 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     # We deliberately do NOT re-prompt on warm-up/opening slots (intro /
     # experience / personal / casual). Drilling "tell me about yourself" for
     # "concrete commands" reads as broken; those slots always advance.
-    last_q_category = ""
-    if last_q_msg is not None and isinstance(last_q_msg.metadata, dict):
-        last_q_category = last_q_msg.metadata.get("category") or last_q_msg.metadata.get("kind") or ""
     warmup_slot = last_q_category in ("intro", "experience", "personal", "casual")
 
     quality = score_result.get("quality", "")
@@ -700,9 +886,10 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
                 candidate_answer=answer_text,
                 question_text=question_text,
                 conversation_tail=_recent_tail(round_obj),
+                correctness=correctness,
             )
         except Exception:  # noqa: BLE001
-            reply = "I want to make sure I follow — can you walk me through that concretely, step by step?"
+            reply = "Thanks — can you walk me through that concretely, step by step?"
         _bump_reprompt(round_obj, question_text)
         # Persist the reprompt counter (lives on round.metadata).
         try:
@@ -717,6 +904,14 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
             metadata={"prior_score": score_result["score"], "reprompt": True, "advanced": False},
         )
         coaching = _maybe_coaching(round_obj, meta, score_result, answer_text)
+        hints = _speech_hints_for_round(
+            round_obj,
+            question_meta={
+                "category": last_q_category,
+                "kind": last_q_kind,
+                "difficulty": last_q_difficulty,
+            },
+        )
         return {
             "candidate_message": cand_msg,
             "interviewer_reply": interviewer_msg,
@@ -727,6 +922,7 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
             "next_question": None,
             "coaching": coaching,
             "skipped": quality == "skipped",
+            **hints,
         }
 
     # Adequate+ (or already re-prompted once) → react and ADVANCE.
@@ -738,13 +934,33 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
             round_type=round_obj.round_type,
             question_text=question_text,
             candidate_answer=answer_text,
-            score_hint=score_result,
+            score_hint={**score_result, "memory": memory, "barge_in": bool(meta.get("barge_in"))},
             profile_snapshot=_profile_for_round(round_obj),
             conversation_tail=_recent_tail(round_obj),
             strong_streak=round_obj.strong_answers_streak,
         )
     except Exception:  # noqa: BLE001
         reply = "Got it — thanks. Let's keep going."
+
+    next_q = None
+    if _should_ask_another(round_obj):
+        try:
+            next_q = ask_next_question(round_obj)
+        except Exception:  # noqa: BLE001
+            next_q = None
+
+    if next_q:
+        try:
+            bridge = generate_transition_bridge(
+                round_type=round_obj.round_type,
+                quality=quality,
+                correctness=correctness,
+                conversation_tail=_recent_tail(round_obj),
+            )
+            if bridge:
+                reply = f"{reply.rstrip()} {bridge}".strip()
+        except Exception:  # noqa: BLE001
+            pass
 
     interviewer_msg = InterviewMessage.objects.create(
         round=round_obj,
@@ -754,14 +970,8 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         metadata={"prior_score": score_result["score"], "advanced": True},
     )
 
-    next_q = None
-    if _should_ask_another(round_obj):
-        try:
-            next_q = ask_next_question(round_obj)
-        except Exception:  # noqa: BLE001
-            next_q = None
-
     coaching = _maybe_coaching(round_obj, meta, score_result, answer_text)
+    hints = _speech_hints_for_round(round_obj, next_q)
 
     return {
         "candidate_message": cand_msg,
@@ -773,6 +983,7 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         "next_question": next_q,
         "coaching": coaching,
         "skipped": quality == "skipped",
+        **hints,
     }
 
 
@@ -921,22 +1132,54 @@ def end_round(round_obj: InterviewRound, reason: str = "completed") -> dict:
         scores = list(
             round_obj.messages.filter(role="candidate", score__isnull=False).values_list("score", flat=True)
         )
-        agg = aggregate_round_scores(scores)
+        agg = aggregate_round_scores(scores, round_type=round_obj.round_type)
         passed = agg["overall_score"] >= round_obj.pass_threshold and reason != "av_timeout"
         strengths, improvements = build_strengths_and_improvements(
             [{"score": s} for s in scores],
             round_obj.round_type,
         )
+        phrase_coach: dict = {}
+        narrative = ""
+        conv = (round_obj.metadata or {}).get("conversation") or {}
+        try:
+            from apps.interviews.services.coaching import build_phrase_coaching
+            from apps.interviews.services.conversation_intelligence import build_round_narrative
 
-        # Parity scorecard: hiring recommendation, per-competency ratings, and a
-        # heuristic confidence/communication read-out — all free/derived. Guarded
-        # so a malformed transcript can never break round finalization.
+            msg_rows = list(
+                round_obj.messages.filter(role="candidate").values("role", "content", "score", "metadata")
+            )
+            phrase_coach = build_phrase_coaching(msg_rows, round_type=round_obj.round_type)
+            strengths = (strengths + phrase_coach.get("strengths", []))[:6]
+            improvements = (improvements + phrase_coach.get("improvements", []))[:6]
+            narrative = build_round_narrative(
+                conv.get("memory") or {},
+                round_obj.round_type,
+            )
+        except Exception:  # noqa: BLE001
+            phrase_coach = {}
+            narrative = ""
+
+        round_obj.overall_score = agg["overall_score"]
+        round_obj.status = "passed" if passed else "failed"
+        round_obj.save(update_fields=["overall_score", "status"])
+
+        # Parity scorecard:
         try:
             from apps.interviews.services.scorecard import build_scorecard_fields
 
             scorecard = build_scorecard_fields(round_obj, agg, passed=passed, reason=reason)
         except Exception:  # noqa: BLE001
             scorecard = {}
+        if phrase_coach.get("summary_line"):
+            scorecard = {**scorecard, "phrase_coaching": phrase_coach}
+        if narrative:
+            scorecard = {**scorecard, "round_narrative": narrative}
+
+        confidence = dict(scorecard.get("confidence_analysis") or {})
+        if phrase_coach:
+            confidence["phrase_coaching"] = phrase_coach
+        if narrative:
+            confidence["round_narrative"] = narrative
 
         report = InterviewReport.objects.create(
             round=round_obj,
@@ -944,8 +1187,8 @@ def end_round(round_obj: InterviewRound, reason: str = "completed") -> dict:
             **agg,
             strengths=strengths,
             improvements=improvements,
-            summary=_build_summary(round_obj, passed, reason),
-            study_plan=_study_plan(round_obj),
+            summary=_build_summary(round_obj, passed, reason, extra=narrative),
+            study_plan=_study_plan(round_obj, memory=conv.get("memory") if isinstance(conv.get("memory"), dict) else {}),
             question_breakdown=list(
                 round_obj.messages.filter(role="candidate", score__isnull=False).values(
                     "content", "score", "metadata"
@@ -953,15 +1196,24 @@ def end_round(round_obj: InterviewRound, reason: str = "completed") -> dict:
             ),
             recommendation=scorecard.get("recommendation", ""),
             competency_ratings=scorecard.get("competency_ratings", []),
-            confidence_analysis=scorecard.get("confidence_analysis", {}),
+            confidence_analysis=confidence,
         )
 
-        round_obj.overall_score = agg["overall_score"]
-        round_obj.status = "passed" if passed else "failed"
-        round_obj.save(update_fields=["overall_score", "status"])
-
         campaign = round_obj.campaign
-        result = {"report": report, "passed": passed, "reason": reason}
+        mem_for_close = conv.get("memory") if isinstance(conv.get("memory"), dict) else {}
+        try:
+            from apps.interviews.services.interview_ai import generate_round_closing
+
+            closing_remark = generate_round_closing(
+                round_type=round_obj.round_type,
+                passed=passed,
+                memory=mem_for_close,
+                persona_name=round_obj.persona_name,
+            )
+        except Exception:  # noqa: BLE001
+            closing_remark = "Thanks for your time today — your report is ready."
+
+        result = {"report": report, "passed": passed, "reason": reason, "closing_remark": closing_remark}
 
         if getattr(campaign, "is_sample", False):
             campaign.status = "completed"
@@ -1010,28 +1262,45 @@ def end_round(round_obj: InterviewRound, reason: str = "completed") -> dict:
     return result
 
 
-def _build_summary(round_obj: InterviewRound, passed: bool, reason: str) -> str:
+def _build_summary(round_obj: InterviewRound, passed: bool, reason: str, extra: str = "") -> str:
     if reason == "av_timeout":
-        return "Session ended: microphone/camera were not enabled within the grace period."
-    if passed:
-        return (
+        base = "Session ended: microphone/camera were not enabled within the grace period."
+    elif passed:
+        base = (
             f"{round_obj.persona_name} recommends proceeding — solid performance for "
             f"{round_obj.round_type} at {round_obj.campaign.experience_level} level."
         )
-    return (
-        f"Below passing threshold ({round_obj.pass_threshold}). Focus on depth, structure, "
-        "and hands-on practice before retrying."
-    )
+    else:
+        base = (
+            f"Below passing threshold ({round_obj.pass_threshold}). Focus on depth, structure, "
+            "and hands-on practice before retrying."
+        )
+    if extra:
+        return f"{base} {extra}".strip()
+    return base
 
 
-def _study_plan(round_obj: InterviewRound) -> list:
-    tech = round_obj.campaign.primary_technology
-    slug = tech.slug if tech else "linux"
-    return [
-        {"title": "Practice scenarios", "url": f"/technologies/{slug}"},
-        {"title": "Simulation labs", "url": "/scenarios?mode=simulation"},
-        {"title": "Review round transcript", "url": f"/interviews/round/{round_obj.id}/report"},
-    ]
+def _study_plan(round_obj: InterviewRound, memory: dict | None = None) -> list:
+    from apps.interviews.services.conversation_intelligence import weakest_topic
+    from apps.interviews.services.resume_context import personalized_study_links
+
+    snap = _profile_for_round(round_obj)
+    mem = memory if isinstance(memory, dict) else {}
+    agenda = (round_obj.metadata or {}).get("topic_agenda") or []
+    weak = []
+    if agenda:
+        gap = weakest_topic(mem, agenda)
+        if gap:
+            weak.append(gap)
+    hits = mem.get("topics_hit") or {}
+    for t, count in sorted(hits.items(), key=lambda x: x[1]):
+        if count <= 1 and t not in weak:
+            weak.append(t)
+    plan = personalized_study_links(snap, weak[:4])
+    for item in plan:
+        if item.get("title") == "Review round transcript" or not item.get("url"):
+            item["url"] = f"/interviews/round/{round_obj.id}/report"
+    return plan
 
 
 def _finalize_campaign(campaign: InterviewCampaign) -> InterviewCampaign:

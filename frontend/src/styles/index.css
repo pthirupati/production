@@ -546,6 +546,14 @@ body::after {
   font-size: 15px;
   margin: 0;
 }
+.interview-stage-ai-role {
+  color: rgb(var(--a-cyan));
+  font-size: 11px;
+  font-weight: 600;
+  margin: 2px 0 0;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
 .interview-stage-ai-round {
   color: rgb(var(--s-400));
   font-size: 11px;
@@ -596,6 +604,21 @@ body::after {
 }
 .interview-avatar-wrap.is-speaking .interview-avatar-ring-2 {
   animation: interview-ring-out 1.8s ease-out infinite 0.9s;
+}
+.interview-avatar-wrap.is-thinking .interview-avatar-core {
+  animation: interview-avatar-think 1.2s ease-in-out infinite;
+}
+.interview-avatar-wrap.is-thinking .interview-avatar-ring-1 {
+  opacity: 0.35;
+  animation: interview-ring-think 2s ease-in-out infinite;
+}
+@keyframes interview-ring-think {
+  0%, 100% { transform: scale(0.95); opacity: 0.25; }
+  50%      { transform: scale(1.05); opacity: 0.45; }
+}
+@keyframes interview-avatar-think {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.03); }
 }
 @keyframes interview-ring-out {
   0%   { transform: scale(0.8); opacity: 0.7; }
@@ -656,6 +679,10 @@ body::after {
 .interview-status-pill.is-listening {
   background: rgb(var(--a-green) / 0.18);
   color: rgb(var(--a-green));
+}
+.interview-status-pill.is-thinking {
+  background: rgb(var(--a-amber, 245 158 11) / 0.18);
+  color: rgb(245 158 11);
 }
 .interview-freevoice-badge {
   position: absolute;
