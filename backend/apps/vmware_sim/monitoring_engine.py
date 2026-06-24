@@ -775,19 +775,76 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         dash_uid = payload.get("dashboard_uid")
         panel_id = int(payload.get("panel_id") or 0)
         new_expr = (payload.get("expr") or "").strip()
-        if not dash_uid or not panel_id or not new_expr:
-            return {"ok": False, "error": "dashboard_uid, panel_id, and expr required"}
+        new_title = (payload.get("title") or "").strip()
+        new_type = (payload.get("type") or "").strip()
+        if not dash_uid or not panel_id:
+            return {"ok": False, "error": "dashboard_uid and panel_id required"}
         for dash in state["grafana"]["dashboards"]:
             if dash.get("uid") == dash_uid:
                 for panel in dash.get("panels") or []:
                     if panel.get("id") == panel_id:
-                        panel["expr"] = new_expr
+                        if new_expr:
+                            panel["expr"] = new_expr
+                        if new_title:
+                            panel["title"] = new_title
+                        if new_type in ("timeseries", "stat", "gauge", "table"):
+                            panel["type"] = new_type
                         no_data = broken.get("panels_no_data") or []
-                        if panel_id in no_data:
+                        if panel_id in no_data and new_expr:
                             broken["panels_no_data"] = [p for p in no_data if p != panel_id]
                         _save_session(str(session_id), entry)
-                        return {"ok": True, "message": "Panel query updated", "panel": panel}
+                        return {"ok": True, "message": "Panel updated", "panel": panel}
         return {"ok": False, "error": "panel not found"}
+
+    if action == "add_panel":
+        dash_uid = payload.get("dashboard_uid")
+        title = (payload.get("title") or "New panel").strip()
+        expr = (payload.get("expr") or "up").strip()
+        ptype = (payload.get("type") or "timeseries").strip()
+        unit = (payload.get("unit") or "short").strip()
+        if not dash_uid:
+            return {"ok": False, "error": "dashboard_uid required"}
+        for dash in state["grafana"]["dashboards"]:
+            if dash.get("uid") == dash_uid:
+                panels = dash.setdefault("panels", [])
+                next_id = max((p.get("id", 0) for p in panels), default=0) + 1
+                panel = _panel(next_id, title, ptype, expr, unit)
+                panels.append(panel)
+                _save_session(str(session_id), entry)
+                return {"ok": True, "message": "Panel added", "panel": panel}
+        return {"ok": False, "error": "dashboard not found"}
+
+    if action == "remove_panel":
+        dash_uid = payload.get("dashboard_uid")
+        panel_id = int(payload.get("panel_id") or 0)
+        if not dash_uid or not panel_id:
+            return {"ok": False, "error": "dashboard_uid and panel_id required"}
+        for dash in state["grafana"]["dashboards"]:
+            if dash.get("uid") == dash_uid:
+                before = len(dash.get("panels") or [])
+                dash["panels"] = [p for p in (dash.get("panels") or []) if p.get("id") != panel_id]
+                if len(dash["panels"]) == before:
+                    return {"ok": False, "error": "panel not found"}
+                broken["panels_no_data"] = [p for p in (broken.get("panels_no_data") or []) if p != panel_id]
+                _save_session(str(session_id), entry)
+                return {"ok": True, "message": "Panel removed", "panel_id": panel_id}
+        return {"ok": False, "error": "dashboard not found"}
+
+    if action == "reorder_panels":
+        dash_uid = payload.get("dashboard_uid")
+        order = payload.get("order") or []
+        if not dash_uid or not isinstance(order, list):
+            return {"ok": False, "error": "dashboard_uid and order[] required"}
+        for dash in state["grafana"]["dashboards"]:
+            if dash.get("uid") == dash_uid:
+                panels = dash.get("panels") or []
+                by_id = {p["id"]: p for p in panels}
+                if set(order) != set(by_id.keys()):
+                    return {"ok": False, "error": "order must list every panel id exactly once"}
+                dash["panels"] = [by_id[pid] for pid in order]
+                _save_session(str(session_id), entry)
+                return {"ok": True, "message": "Panels reordered", "order": order}
+        return {"ok": False, "error": "dashboard not found"}
 
     if action == "mark_fix_applied":
         # The Linux/terminal fix step (rewriting the broken config + FIXED-OK)

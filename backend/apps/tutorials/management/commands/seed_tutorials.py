@@ -787,6 +787,14 @@ class Command(BaseCommand):
                     self.stdout.write(f"  + loaded {len(e3d)} tutorials from tutorials_e3_batch4.json")
             except Exception as exc:
                 self.stderr.write(f"  ! could not load tutorials_e3_batch4.json: {exc}")
+        try:
+            from .course_catalog import build_catalog_specs
+
+            catalog = build_catalog_specs()
+            specs.extend(catalog)
+            self.stdout.write(f"  + expanded {len(catalog)} tutorials from course_catalog")
+        except Exception as exc:
+            self.stderr.write(f"  ! could not expand course_catalog: {exc}")
         for spec in specs:
             sections = spec.pop("sections", [])
             obj, was_created = Tutorial.objects.update_or_create(

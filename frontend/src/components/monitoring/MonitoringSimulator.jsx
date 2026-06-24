@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell, Gauge, Search, Server, GitBranch,
   AlertTriangle, XCircle, RefreshCw, Play, Layers,
-  Compass, Settings, Plug,
+  Compass, Settings, Plug, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
 } from 'lucide-react'
 import { monitoringApi } from '../../api/monitoring'
 import MonitoringLoginGate, { isMonitoringAuthenticated } from './MonitoringLoginGate'
@@ -45,15 +45,18 @@ function fmtVal(v, unit) {
 }
 
 /* ── a single dashboard panel: evaluates its expr to a value/series ── */
-function DashPanel({ panel, sessionId, scenario, dashboardUid, noData }) {
+function DashPanel({ panel, sessionId, scenario, dashboardUid, noData, editLayout, panelIndex, panelCount, onMutate }) {
   const [series, setSeries] = useState([])
   const [value, setValue] = useState(null)
   const [empty, setEmpty] = useState(noData)
   const [editing, setEditing] = useState(false)
+  const [metaEditing, setMetaEditing] = useState(false)
   const [exprDraft, setExprDraft] = useState(panel.expr)
+  const [titleDraft, setTitleDraft] = useState(panel.title)
+  const [typeDraft, setTypeDraft] = useState(panel.type)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { setExprDraft(panel.expr) }, [panel.expr])
+  useEffect(() => { setExprDraft(panel.expr); setTitleDraft(panel.title); setTypeDraft(panel.type) }, [panel.expr, panel.title, panel.type])
 
   useEffect(() => {
     let live = true
@@ -79,10 +82,50 @@ function DashPanel({ panel, sessionId, scenario, dashboardUid, noData }) {
   const color = panel.type === 'gauge' ? '#f5c451' : '#56e0b0'
   return (
     <div className="mon-card">
-      <div className="flex items-center justify-between mb-1">
-        <span className="mon-panel-title">{panel.title}</span>
-        <span className="mon-panel-sub uppercase">{panel.type}</span>
+      <div className="flex items-center justify-between mb-1 gap-2">
+        {metaEditing ? (
+          <input className="mon-input flex-1 !text-xs font-semibold" value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)} />
+        ) : (
+          <span className="mon-panel-title">{panel.title}</span>
+        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {editLayout && (
+            <>
+              <button type="button" className="mon-btn !p-1" title="Move up" disabled={panelIndex === 0}
+                onClick={() => onMutate?.('reorder', { direction: 'up' })}><ChevronUp size={12} /></button>
+              <button type="button" className="mon-btn !p-1" title="Move down" disabled={panelIndex >= panelCount - 1}
+                onClick={() => onMutate?.('reorder', { direction: 'down' })}><ChevronDown size={12} /></button>
+              <button type="button" className="mon-btn !p-1 text-[#ffb4b4]" title="Delete panel"
+                onClick={() => onMutate?.('remove')}><Trash2 size={12} /></button>
+              <button type="button" className="mon-btn !p-1" title="Edit title/type"
+                onClick={() => setMetaEditing((m) => !m)}><Pencil size={12} /></button>
+            </>
+          )}
+          {metaEditing ? (
+            <select className="mon-input !text-[10px] !py-0.5" value={typeDraft} onChange={(e) => setTypeDraft(e.target.value)}>
+              {['timeseries', 'stat', 'gauge', 'table'].map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          ) : (
+            <span className="mon-panel-sub uppercase">{panel.type}</span>
+          )}
+        </div>
       </div>
+      {metaEditing && (
+        <div className="flex gap-1 mb-2">
+          <button type="button" className="mon-btn !text-[10px]" disabled={saving} onClick={async () => {
+            setSaving(true)
+            try {
+              await monitoringApi.action(sessionId, 'update_panel', {
+                dashboard_uid: dashboardUid, panel_id: panel.id, title: titleDraft, type: typeDraft,
+              })
+              setMetaEditing(false)
+              onMutate?.('refresh')
+            } finally { setSaving(false) }
+          }}>Save panel</button>
+          <button type="button" className="mon-btn !text-[10px]" onClick={() => setMetaEditing(false)}>Cancel</button>
+        </div>
+      )}
       {empty ? (
         <div className="flex items-center gap-2 text-[#f5c451] text-xs py-5 justify-center">
           <AlertTriangle size={14} /> No data
@@ -109,6 +152,7 @@ function DashPanel({ panel, sessionId, scenario, dashboardUid, noData }) {
                       dashboard_uid: dashboardUid, panel_id: panel.id, expr: exprDraft,
                     })
                     setEditing(false)
+                    onMutate?.('refresh')
                   } finally { setSaving(false) }
                 }}>Save query</button>
               <button type="button" className="mon-btn !text-[10px] !py-0.5" onClick={() => setEditing(false)}>Cancel</button>
@@ -125,12 +169,43 @@ function DashPanel({ panel, sessionId, scenario, dashboardUid, noData }) {
 }
 
 /* ── Grafana view ── */
-function GrafanaView({ state, sessionId, scenario }) {
+function GrafanaView({ state, sessionId, scenario, onReload }) {
   const graf = state.grafana || {}
   const [activeDash, setActiveDash] = useState(graf.dashboards?.[0]?.uid || '')
-  const [sub, setSub] = useState('dashboards') // dashboards | alerting | datasources | contactpoints
+  const [sub, setSub] = useState('dashboards')
+  const [editLayout, setEditLayout] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [newPanel, setNewPanel] = useState({ title: 'New panel', expr: 'up', type: 'timeseries' })
   const noDataPanels = new Set(state.broken?.panels_no_data || [])
   const dash = (graf.dashboards || []).find(d => d.uid === activeDash) || graf.dashboards?.[0]
+
+  const mutatePanels = async (kind, panelId, extra = {}) => {
+    if (!dash) return
+    if (kind === 'remove') {
+      await monitoringApi.action(sessionId, 'remove_panel', { dashboard_uid: dash.uid, panel_id: panelId })
+    } else if (kind === 'reorder') {
+      const ids = (dash.panels || []).map((p) => p.id)
+      const idx = ids.indexOf(panelId)
+      const swap = extra.direction === 'up' ? idx - 1 : idx + 1
+      if (swap < 0 || swap >= ids.length) return
+      ;[ids[idx], ids[swap]] = [ids[swap], ids[idx]]
+      await monitoringApi.action(sessionId, 'reorder_panels', { dashboard_uid: dash.uid, order: ids })
+    }
+    onReload?.()
+  }
+
+  const addPanel = async () => {
+    if (!dash) return
+    await monitoringApi.action(sessionId, 'add_panel', {
+      dashboard_uid: dash.uid,
+      title: newPanel.title,
+      expr: newPanel.expr,
+      type: newPanel.type,
+    })
+    setAdding(false)
+    setNewPanel({ title: 'New panel', expr: 'up', type: 'timeseries' })
+    onReload?.()
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4">
@@ -153,7 +228,34 @@ function GrafanaView({ state, sessionId, scenario }) {
                 <button key={d.uid} onClick={() => setActiveDash(d.uid)}
                         className={`mon-tab ${d.uid === activeDash ? 'mon-tab-active' : ''}`}>{d.title}</button>
               ))}
+              <span className="flex-1" />
+              <button type="button" className={`mon-tab ${editLayout ? 'mon-tab-active' : ''}`}
+                onClick={() => setEditLayout((e) => !e)}>
+                <Pencil size={13} /> {editLayout ? 'Done editing' : 'Edit dashboard'}
+              </button>
+              {editLayout && (
+                <button type="button" className="mon-btn-primary !text-xs" onClick={() => setAdding(true)}>
+                  <Plus size={13} /> Add panel
+                </button>
+              )}
             </div>
+            {adding && (
+              <div className="mon-card mb-3 space-y-2">
+                <p className="mon-panel-title text-sm">New panel</p>
+                <input className="mon-input w-full" placeholder="Title" value={newPanel.title}
+                  onChange={(e) => setNewPanel((p) => ({ ...p, title: e.target.value }))} />
+                <input className="mon-input w-full font-mono text-xs" placeholder="PromQL expr" value={newPanel.expr}
+                  onChange={(e) => setNewPanel((p) => ({ ...p, expr: e.target.value }))} />
+                <select className="mon-input w-full" value={newPanel.type}
+                  onChange={(e) => setNewPanel((p) => ({ ...p, type: e.target.value }))}>
+                  {['timeseries', 'stat', 'gauge', 'table'].map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <div className="flex gap-2">
+                  <button type="button" className="mon-btn-primary !text-xs" onClick={addPanel}>Create panel</button>
+                  <button type="button" className="mon-btn !text-xs" onClick={() => setAdding(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
             {/* template variables */}
             {dash.templating?.length > 0 && (
               <div className="flex items-center gap-3 mb-3 flex-wrap">
@@ -168,9 +270,14 @@ function GrafanaView({ state, sessionId, scenario }) {
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {(dash.panels || []).map(p => (
+              {(dash.panels || []).map((p, i) => (
                 <DashPanel key={`${dash.uid}-${p.id}`} panel={p} sessionId={sessionId}
-                           scenario={scenario} dashboardUid={dash.uid} noData={noDataPanels.has(p.id)} />
+                           scenario={scenario} dashboardUid={dash.uid} noData={noDataPanels.has(p.id)}
+                           editLayout={editLayout} panelIndex={i} panelCount={(dash.panels || []).length}
+                           onMutate={(kind, extra) => {
+                             if (kind === 'refresh') { onReload?.(); return }
+                             mutatePanels(kind, p.id, extra)
+                           }} />
               ))}
             </div>
           </>
@@ -488,7 +595,7 @@ export default function MonitoringSimulator({
         {!state ? (
           <div className="text-center text-[#8a93b2] py-16">Loading {product} state…</div>
         ) : view === 'grafana' ? (
-          <GrafanaView state={state} sessionId={sessionId} scenario={slug} />
+          <GrafanaView state={state} sessionId={sessionId} scenario={slug} onReload={load} />
         ) : (
           <PrometheusView state={state} sessionId={sessionId} scenario={slug}
                           defaultExpr={summary.targets_down ? 'up == 0' : 'up'} />

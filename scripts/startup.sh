@@ -22,6 +22,9 @@ with open(lock_path, "w") as lock_file:
     subprocess.check_call([sys.executable, "manage.py", "migrate", "--noinput"])
 PY
 
+echo "[startup] Seeding tutorials (idempotent)..."
+python manage.py seed_tutorials || echo "[startup] seed_tutorials skipped or failed — continuing"
+
 echo "[startup] Collecting static files..."
 python manage.py collectstatic --noinput
 

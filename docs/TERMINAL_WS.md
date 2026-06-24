@@ -12,7 +12,9 @@ FixitLab lab terminals use a long-lived WebSocket at `/ws/terminal/<session_id>/
 
 Simulation engine state is registered in-process per worker (`register_sim_session`). If Daphne runs multiple workers **without** sticky routing, a reconnect may land on a different worker and trigger rehydration from `simulation_snapshot` (slower but functional).
 
-**Production recommendation:**
+**Production (enforced):** nginx `backend_ws` upstream uses **`ip_hash`** in `gateway/nginx.prod.conf`, `nginx.cluster.conf.template`, `nginx.bootstrap.conf`, and `nginx.http.conf` so reconnects from the same client IP land on the same worker.
+
+Alternative options if you add more WS upstreams:
 
 1. Use **ip_hash** (or consistent hash on session id) for `/ws/terminal/` upstream in nginx, **or**
 2. Run a **single Daphne worker** for WebSocket traffic on a dedicated port, **or**
@@ -33,3 +35,9 @@ When the exec/simulation stream EOFs, `consumers.py` calls `_respawn_shell()` an
 ## Vault degradation
 
 If Vault API is unreachable (`http://vault:8200`) but secrets are loaded at startup, labs continue with cached secrets. Terminal provisioning does not require live Vault unless rotating credentials mid-session.
+
+**Operational tooling:**
+
+- `GET /api/health/ready/` — returns `vault.status: degraded` when secrets were loaded but the API is down (HTTP 200 overall).
+- `scripts/vault/health-check.sh` — cron-friendly probe; exits 0 if API is healthy **or** `VAULT_SECRETS_LOADED=1`.
+- `vault_loader.py` retries startup load (`VAULT_STARTUP_RETRIES`, default 3) before falling back to `.env`.

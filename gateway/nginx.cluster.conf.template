@@ -31,8 +31,9 @@ upstream backend_pool {
     keepalive 32;
 }
 
-# WebSocket terminal — no keepalive pool (reuse breaks Upgrade handshakes)
+# WebSocket terminal — ip_hash sticky sessions across Daphne/uvicorn workers
 upstream backend_ws {
+    ip_hash;
     server {{APP_PRIVATE_IP}}:8000;
 }
 

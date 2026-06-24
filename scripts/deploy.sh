@@ -364,6 +364,12 @@ while [ "$TRIES" -lt "$MAX_TRIES" ]; do
 done
 log "Backend is healthy"
 
+log "Running database migrations..."
+docker compose --env-file .env -f "$COMPOSE_FILE" exec -T backend python manage.py migrate --noinput
+
+log "Seeding tutorials and content (idempotent)..."
+docker compose --env-file .env -f "$COMPOSE_FILE" exec -T backend python manage.py seed_tutorials || warn "seed_tutorials failed — check logs"
+
 # ══════════════════════════════════════════════════════════════
 step "7/7 — Verification"
 # ══════════════════════════════════════════════════════════════
@@ -392,6 +398,14 @@ if echo "$API_RESULT" | grep -q '"ok"'; then
     log "API health check: OK"
 else
     warn "API health check: $API_RESULT"
+fi
+
+READY_RESULT=$(docker compose --env-file .env -f "$COMPOSE_FILE" exec -T backend \
+    python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/api/health/ready/').read().decode())" 2>/dev/null || echo "FAIL")
+if echo "$READY_RESULT" | grep -q '"status"'; then
+    log "Readiness check: $(echo "$READY_RESULT" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("status","?"))' 2>/dev/null || echo OK)"
+else
+    warn "Readiness check: $READY_RESULT"
 fi
 
 echo ""

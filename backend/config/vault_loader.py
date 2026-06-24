@@ -10,10 +10,51 @@ Secrets path: VAULT_KV_PATH (default: secret/fixitlab/config, KV v2).
 
 import logging
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
 _VAULT_LOADED = False
+_VAULT_LAST_PROBE: dict | None = None
+
+
+def vault_api_reachable(timeout: int = 3) -> bool:
+    """Lightweight Vault health probe for readiness checks."""
+    global _VAULT_LAST_PROBE
+    now = time.time()
+    if _VAULT_LAST_PROBE and now - _VAULT_LAST_PROBE.get("ts", 0) < 30:
+        return bool(_VAULT_LAST_PROBE.get("ok"))
+
+    vault_enabled = os.environ.get("VAULT_ENABLED", "").lower() in ("1", "true", "yes", "on")
+    if not vault_enabled:
+        _VAULT_LAST_PROBE = {"ts": now, "ok": False}
+        return False
+
+    vault_addr = os.environ.get("VAULT_ADDR", "http://vault:8200")
+    if "127.0.0.1" in vault_addr and os.path.exists("/.dockerenv"):
+        vault_addr = "http://vault:8200"
+
+    ok = False
+    try:
+        import urllib.request
+
+        req = urllib.request.Request(
+            f"{vault_addr.rstrip('/')}/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200",
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            ok = 200 <= resp.status < 500
+    except Exception:
+        try:
+            import hvac
+
+            client = hvac.Client(url=vault_addr, timeout=timeout)
+            ok = client.sys.is_initialized() and not client.sys.is_sealed()
+        except Exception:
+            ok = False
+
+    _VAULT_LAST_PROBE = {"ts": now, "ok": ok}
+    return ok
 
 
 def load_vault_secrets() -> None:
@@ -40,46 +81,66 @@ def load_vault_secrets() -> None:
         return
 
     vault_addr = os.environ.get("VAULT_ADDR", "http://vault:8200")
-    # Host-rendered env uses 127.0.0.1; inside Docker reach Vault by service name.
     if "127.0.0.1" in vault_addr and os.path.exists("/.dockerenv"):
         vault_addr = "http://vault:8200"
     kv_path = os.environ.get("VAULT_KV_PATH", "secret/fixitlab/config")
     vault_override = os.environ.get("VAULT_OVERRIDE", "").lower() in ("1", "true", "yes")
+    max_attempts = int(os.environ.get("VAULT_STARTUP_RETRIES", "3") or "3")
 
-    try:
-        import hvac  # pip install hvac
+    last_exc: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            import hvac
 
-        client = hvac.Client(url=vault_addr, timeout=5)
+            client = hvac.Client(url=vault_addr, timeout=5)
+            login_resp = client.auth.approle.login(role_id=role_id, secret_id=secret_id)
+            client.token = login_resp["auth"]["client_token"]
 
-        # AppRole login
-        login_resp = client.auth.approle.login(role_id=role_id, secret_id=secret_id)
-        client.token = login_resp["auth"]["client_token"]
+            parts = kv_path.split("/", 1)
+            mount = parts[0] if len(parts) > 1 else "secret"
+            path = parts[1] if len(parts) > 1 else kv_path
 
-        # Parse KV v2 path: first segment is mount point, rest is secret path
-        parts = kv_path.split("/", 1)
-        mount = parts[0] if len(parts) > 1 else "secret"
-        path = parts[1] if len(parts) > 1 else kv_path
+            secret_resp = client.secrets.kv.v2.read_secret_version(
+                path=path,
+                mount_point=mount,
+                raise_on_deleted_version=True,
+            )
+            secrets: dict = secret_resp["data"]["data"]
 
-        secret_resp = client.secrets.kv.v2.read_secret_version(
-            path=path,
-            mount_point=mount,
-            raise_on_deleted_version=True,
-        )
-        secrets: dict = secret_resp["data"]["data"]
+            injected = 0
+            for key, value in secrets.items():
+                if value is None:
+                    continue
+                str_value = str(value)
+                if vault_override or not os.environ.get(key):
+                    os.environ[key] = str_value
+                    injected += 1
 
-        injected = 0
-        for key, value in secrets.items():
-            if value is None:
-                continue
-            str_value = str(value)
-            if vault_override or not os.environ.get(key):
-                os.environ[key] = str_value
-                injected += 1
+            _VAULT_LOADED = True
+            os.environ["VAULT_SECRETS_LOADED"] = "1"
+            logger.info(
+                "Vault: injected %d secrets from %s (override=%s, attempt=%d)",
+                injected, kv_path, vault_override, attempt,
+            )
+            return
 
-        _VAULT_LOADED = True
-        logger.info("Vault: injected %d secrets from %s (override=%s)", injected, kv_path, vault_override)
-
-    except ImportError:
-        logger.error("Vault: hvac package not installed — add hvac to requirements.txt")
-    except Exception as exc:
-        logger.warning("Vault: could not load secrets (%s: %s) — falling back to env file", type(exc).__name__, exc)
+        except ImportError:
+            logger.error("Vault: hvac package not installed — add hvac to requirements.txt")
+            return
+        except Exception as exc:
+            last_exc = exc
+            if attempt < max_attempts:
+                delay = attempt * 2
+                logger.warning(
+                    "Vault: load attempt %d/%d failed (%s) — retry in %ds",
+                    attempt, max_attempts, exc, delay,
+                )
+                time.sleep(delay)
+            else:
+                logger.warning(
+                    "Vault: could not load secrets after %d attempts (%s) — using env file / cached secrets",
+                    max_attempts, last_exc,
+                )
+                if os.environ.get("VAULT_SECRETS_LOADED") == "1":
+                    _VAULT_LOADED = True
+                    logger.info("Vault: continuing with previously loaded secrets (VAULT_SECRETS_LOADED=1)")

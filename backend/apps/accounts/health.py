@@ -1,19 +1,76 @@
-"""Lightweight health check — no authentication required.
-Only accessible internally (Docker/k8s healthchecks).
-External access is blocked by nginx in production.
-"""
+"""Health and readiness probes — minimal public liveness; richer internal readiness."""
+
+import logging
+import os
+
+from django.conf import settings
+from django.db import connection
 from django.http import JsonResponse
 from django.urls import path
 
+logger = logging.getLogger(__name__)
+
 
 def health_check(request):
-    """Return 200 OK if the server is running.
-    Deliberately minimal — no DB/Redis/version info exposed.
-    This is a liveness probe only. Readiness probes should check dependencies.
-    """
+    """Liveness — server process is up."""
     return JsonResponse({"status": "ok"})
+
+
+def _vault_status() -> dict:
+    """Report Vault without failing liveness when API is down but secrets were loaded."""
+    enabled = str(getattr(settings, "VAULT_ENABLED", "") or os.environ.get("VAULT_ENABLED", "")).lower() in (
+        "1", "true", "yes", "on",
+    )
+    if not enabled:
+        return {"enabled": False, "status": "disabled"}
+
+    try:
+        from config.vault_loader import _VAULT_LOADED, vault_api_reachable
+
+        loaded = _VAULT_LOADED
+        reachable = vault_api_reachable()
+    except Exception as exc:
+        logger.debug("Vault readiness check failed: %s", exc)
+        loaded = False
+        reachable = False
+
+    if loaded and reachable:
+        status = "ok"
+    elif loaded:
+        status = "degraded"
+    else:
+        status = "unavailable"
+
+    return {
+        "enabled": True,
+        "status": status,
+        "secrets_loaded": loaded,
+        "api_reachable": reachable,
+    }
+
+
+def readiness_check(request):
+    """Readiness — dependencies required to serve traffic (used by deploy/CI)."""
+    checks: dict = {}
+    overall = "ok"
+
+    try:
+        connection.ensure_connection()
+        checks["database"] = {"status": "ok"}
+    except Exception as exc:
+        checks["database"] = {"status": "error", "error": str(exc)}
+        overall = "error"
+
+    vault = _vault_status()
+    checks["vault"] = vault
+    if vault.get("enabled") and vault.get("status") == "unavailable":
+        overall = "degraded" if overall == "ok" else overall
+
+    code = 200 if overall in ("ok", "degraded") else 503
+    return JsonResponse({"status": overall, "checks": checks}, status=code)
 
 
 urlpatterns = [
     path("", health_check, name="health"),
+    path("ready/", readiness_check, name="health-ready"),
 ]
