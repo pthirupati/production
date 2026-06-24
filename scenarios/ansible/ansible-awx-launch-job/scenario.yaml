@@ -1,0 +1,30 @@
+slug: ansible-awx-launch-job
+title: Launch and Fix Failed AWX Job Template
+technology: Ansible
+category: AWX / Tower
+difficulty: hard
+scenario_type: fix
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: ansible-awx
+infrastructure_type: simulation
+is_free: false
+description: >-
+  The Deploy App job template is failing after a bad project sync. Fix the underlying issue and
+  re-launch the template until the job succeeds.
+objectives:
+  - Sync the failing project if needed
+  - Launch the Deploy App job template
+  - Confirm the job completes successfully
+initial_state: AWX with a failed Deploy App template run and a project sync error.
+hints:
+  - order: 1
+    cost: 10
+    content: Sync **tower-config** under Projects first if it shows error.
+  - order: 2
+    cost: 15
+    content: Under **Templates**, launch **Deploy App** with the play button.
+  - order: 3
+    cost: 20
+    content: Verify job status is **successful**, then click **Check**.

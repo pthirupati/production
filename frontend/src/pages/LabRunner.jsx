@@ -972,7 +972,6 @@ export default function LabRunner() {
   )
   const isAwxLab = !isCrossTech && (
     scenario?.simulation_type === 'ansible-awx'
-    || scenario?.technology?.slug === 'ansible'
     || (scenario?.slug || '').includes('awx')
     || (scenario?.slug || '').includes('tower')
   )

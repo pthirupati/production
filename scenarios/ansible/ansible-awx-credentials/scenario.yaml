@@ -1,0 +1,30 @@
+slug: ansible-awx-credentials
+title: Attach Machine Credential to AWX Template
+technology: Ansible
+category: AWX / Tower
+difficulty: medium
+scenario_type: fix
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: ansible-awx
+infrastructure_type: simulation
+is_free: false
+description: >-
+  A job template fails because the Machine SSH credential is not attached. Fix credential assignment
+  in AWX so launches can authenticate to managed hosts.
+objectives:
+  - Open AWX Credentials section
+  - Attach the Machine credential to the failing template
+  - Validate the template can launch
+initial_state: AWX with Machine credential defined but not linked to the failing job template.
+hints:
+  - order: 1
+    cost: 10
+    content: Open **Credentials** and use **Attach Machine credential to template**.
+  - order: 2
+    cost: 15
+    content: Launch the template from **Templates** to confirm SSH auth works.
+  - order: 3
+    cost: 20
+    content: Click **Check** when the credential issue is resolved.

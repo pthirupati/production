@@ -24,6 +24,8 @@ const SIMULATION_TYPES = [
   { value: 'baremetal', label: 'Bare Metal / IPMI / VMware' },
   { value: 'database', label: 'Database Simulation' },
   { value: 'ansible', label: 'Ansible Simulation' },
+  { value: 'ansible-awx', label: 'Ansible AWX / Tower Simulation' },
+  { value: 'terraform', label: 'Terraform / AWS CLI Simulation' },
   { value: 'python', label: 'Python Simulation' },
 ]
 
@@ -60,6 +62,7 @@ export default function AdminScenarios() {
     jira_priority: 'Medium', jira_issue_template: '',
     requires_companion_hosts: false, dual_terminal: false,
     lab_mode: 'docker', simulation_type: 'generic', docker_privileged: false,
+    certification_only: false,
   })
   const [newBlockedCmd, setNewBlockedCmd] = useState('')
   const [hints, setHints] = useState([])
@@ -140,6 +143,7 @@ export default function AdminScenarios() {
         lab_mode: s.lab_mode || 'docker',
         simulation_type: normalizeSimType(s.simulation_type),
         docker_privileged: s.docker_privileged || false,
+        certification_only: s.certification_only || false,
       })
       setEditingId(scenario.id)
       setHints(s.hints || [])
@@ -190,6 +194,7 @@ export default function AdminScenarios() {
     jira_priority: 'Medium', jira_issue_template: '',
     requires_companion_hosts: false, dual_terminal: false,
     lab_mode: 'docker', simulation_type: 'generic', docker_privileged: false,
+    certification_only: false,
   })
     setNewBlockedCmd('')
   }
@@ -502,6 +507,10 @@ export default function AdminScenarios() {
                 <label className="flex items-center gap-2 text-sm text-surface-300 cursor-pointer">
                   <input type="checkbox" checked={form.is_free} onChange={(e) => setForm(f => ({ ...f, is_free: e.target.checked }))} className="rounded" />
                   Free (no subscription required)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-surface-300 cursor-pointer" title="Hide from technology scenario lists; cert tracks only">
+                  <input type="checkbox" checked={form.certification_only} onChange={(e) => setForm(f => ({ ...f, certification_only: e.target.checked }))} className="rounded" />
+                  Certification only
                 </label>
               </div>
             </div>

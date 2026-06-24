@@ -1,0 +1,30 @@
+slug: ansible-tower-ha-setup
+title: Ansible Tower HA and Instance Groups
+technology: Ansible
+category: AWX / Tower
+difficulty: hard
+scenario_type: do
+time_limit: 1500
+max_score: 100
+lab_mode: simulation
+simulation_type: ansible-awx
+infrastructure_type: simulation
+is_free: false
+description: >-
+  Configure Tower-style HA readiness: sync projects, ensure credentials are attached, and run patch
+  jobs across both Production and Staging inventories.
+objectives:
+  - Sign in to AWX / Tower
+  - Sync all projects and fix any errors
+  - Launch Patch Linux against Production successfully
+initial_state: Tower cluster with mixed project sync states and a pending patch rollout.
+hints:
+  - order: 1
+    cost: 10
+    content: Sync both projects under **Projects** until all show **successful**.
+  - order: 2
+    cost: 15
+    content: Launch **Patch Linux** from **Templates** targeting Production.
+  - order: 3
+    cost: 20
+    content: Use **Check** when all objectives are met.

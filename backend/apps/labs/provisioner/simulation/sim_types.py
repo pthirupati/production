@@ -12,6 +12,7 @@ UNIFIED_SIM_TYPES = {
     "vmware": "VMware vCenter Simulation",
     "database": "Database Simulation",
     "ansible": "Ansible Simulation",
+    "ansible-awx": "Ansible AWX / Tower Simulation",
     "python": "Python Simulation",
     "java": "Java Development Simulation",
     "terraform": "Terraform / AWS IaC Simulation",

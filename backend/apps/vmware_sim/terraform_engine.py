@@ -58,7 +58,11 @@ def _base_state() -> dict:
 
 def _apply_preset(state: dict, slug: str) -> None:
     slug = (slug or "").lower()
-    if "aws" in slug or "s3" in slug:
+    if "lock" in slug:
+        state["goal"] = {"title": "Unlock state", "objective": "Force-unlock the stale DynamoDB state lock and re-run plan/apply."}
+        state["broken"] = {"stale_lock": True, "plan_required": True}
+        state["terraform"]["initialized"] = True
+    elif "aws" in slug or "s3" in slug:
         state["goal"] = {"title": "AWS resource fix", "objective": "Use aws cli to verify and fix the S3 bucket policy."}
     if "vmware" in slug:
         state["goal"]["objective"] = "Apply Terraform to clone a VM from template in VMware."
@@ -121,6 +125,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         tf["last_apply"] = _now_iso()
         tf["drift_detected"] = False
         broken.pop("drift", None)
+        broken.pop("stale_lock", None)
         tf["resources"] = [
             {"type": "aws_instance", "name": "web", "status": "applied"},
             {"type": "aws_security_group", "name": "web-sg", "status": "applied"},
@@ -128,6 +133,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["events"].insert(0, {"time": _now_iso(), "message": "Apply complete! Resources: 3 added, 0 changed, 0 destroyed.", "severity": "success"})
         _save(session_id, entry)
         return {"ok": True, "message": "Apply complete"}
+
+    if action == "force_unlock":
+        broken.pop("stale_lock", None)
+        state["events"].insert(0, {"time": _now_iso(), "message": "State lock force-unlocked", "severity": "success"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Lock released"}
 
     if action == "aws_cli":
         cmd = (payload.get("command") or "").strip()
@@ -140,3 +151,17 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": True, "output": f"(simulated) {cmd}"}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
+
+
+def validate_terraform_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
+    entry = _load(session_id)
+    if not entry:
+        return False, "No Terraform session"
+    broken = entry["state"].get("broken") or {}
+    tf = entry["state"].get("terraform") or {}
+    if broken:
+        return False, "Terraform environment still has unresolved issues"
+    if not tf.get("last_apply") and not broken:
+        if tf.get("drift_detected"):
+            return False, "Run terraform plan and apply to reconcile drift"
+    return True, "Terraform lab objectives met"

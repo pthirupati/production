@@ -101,6 +101,13 @@ export default function AwxSimulator({ sessionId, scenario, onExit, onStop, onHi
         <main className="flex-1 overflow-auto p-5">
           {section === 'dashboard' && (
             <div className="space-y-4">
+              {(inv.broken?.awx_not_installed) && (
+                <div className="bg-white border rounded p-4 flex items-center justify-between gap-3">
+                  <div><div className="font-medium">AWX Operator</div><div className="text-sm text-slate-500">Not installed — run operator install for this cluster.</div></div>
+                  <button onClick={() => run(() => awxApi.installAwx(sessionId), 'AWX installed')}
+                    className="px-3 py-1.5 rounded text-white text-sm" style={{ background: AWX_RED }}>Install AWX</button>
+                </div>
+              )}
               <h2 className="text-lg font-semibold">Recent Jobs</h2>
               <table className="w-full text-sm bg-white border rounded">
                 <thead><tr className="bg-slate-50 text-left"><th className="p-2">Job</th><th className="p-2">Status</th></tr></thead>
@@ -115,7 +122,13 @@ export default function AwxSimulator({ sessionId, scenario, onExit, onStop, onHi
           )}
           {section === 'templates' && (
             <div className="space-y-3">
-              <h2 className="text-lg font-semibold">Job Templates</h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold">Job Templates</h2>
+                {inv.broken?.missing_template && (
+                  <button onClick={() => run(() => awxApi.createTemplate(sessionId, 'Site Deploy'), 'Template created')}
+                    className="px-3 py-1.5 rounded text-white text-sm" style={{ background: AWX_RED }}>+ New Template</button>
+                )}
+              </div>
               {(inv.job_templates || []).map((jt) => (
                 <div key={jt.id} className="bg-white border rounded p-3 flex items-center justify-between gap-3">
                   <div><div className="font-medium">{jt.name}</div><div className="text-xs text-slate-500">{jt.playbook} · {jt.inventory}</div></div>
@@ -148,6 +161,10 @@ export default function AwxSimulator({ sessionId, scenario, onExit, onStop, onHi
           )}
           {section === 'credentials' && (
             <div className="space-y-2">
+              {inv.broken?.credential_missing && (
+                <button onClick={() => run(() => awxApi.attachCredential(sessionId), 'Credential attached')}
+                  className="mb-2 px-3 py-1.5 rounded text-white text-sm" style={{ background: AWX_RED }}>Attach Machine credential to template</button>
+              )}
               {(inv.credentials || []).map((c) => (
                 <div key={c.id} className="bg-white border rounded p-3 flex justify-between"><span>{c.name}</span><span className="text-xs text-slate-500">{c.kind}</span></div>
               ))}

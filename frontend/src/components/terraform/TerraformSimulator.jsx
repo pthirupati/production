@@ -75,6 +75,10 @@ export default function TerraformSimulator({ sessionId, scenario, onExit, onStop
                 className="px-3 py-1.5 rounded bg-slate-700 text-sm disabled:opacity-50">terraform plan</button>
               <button onClick={() => run('terraform_apply')} disabled={busy || !tf.last_plan}
                 className="px-3 py-1.5 rounded bg-green-700 text-sm disabled:opacity-50 flex items-center gap-1"><Play size={14} /> apply</button>
+              {state?.state?.broken?.stale_lock && (
+                <button onClick={() => run('force_unlock', {}, 'Lock released')} disabled={busy}
+                  className="px-3 py-1.5 rounded bg-amber-700 text-sm">force-unlock</button>
+              )}
               <button onClick={refresh} className="px-3 py-1.5 rounded border border-slate-600 text-sm flex items-center gap-1"><RefreshCw size={14} /> refresh</button>
             </div>
             <div className="text-xs text-slate-400">Workspace: {tf.workspace || 'default'} · Drift: {tf.drift_detected ? 'yes' : 'no'}</div>

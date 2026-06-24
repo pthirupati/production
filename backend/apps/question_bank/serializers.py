@@ -91,7 +91,7 @@ class ScenarioAdminSerializer(serializers.ModelSerializer):
             "jira_priority", "jira_issue_template",
             "requires_companion_hosts", "dual_terminal", "lab_mode", "simulation_type",
             "docker_privileged", "coding_mode", "coding_spec",
-            "cross_technology", "vmware_link",
+            "cross_technology", "vmware_link", "certification_only",
             "time_limit", "max_score",
             "definition_path", "is_free", "is_active", "interview_mode",
             "attempts_count", "completions_count", "avg_completion_time",

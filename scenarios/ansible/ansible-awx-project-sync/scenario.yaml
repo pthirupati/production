@@ -1,0 +1,30 @@
+slug: ansible-awx-project-sync
+title: Sync Failing AWX Project from SCM
+technology: Ansible
+category: AWX / Tower
+difficulty: medium
+scenario_type: fix
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: ansible-awx
+infrastructure_type: simulation
+is_free: false
+description: >-
+  The tower-config Git project failed its last SCM sync, blocking job templates. Diagnose in AWX and
+  re-sync the project so templates can launch again.
+objectives:
+  - Sign in to AWX and open Projects
+  - Sync the failing tower-config project until status is successful
+  - Confirm job templates are no longer blocked
+initial_state: AWX with one project in error state (tower-config). Dependent templates cannot launch.
+hints:
+  - order: 1
+    cost: 10
+    content: Open **Open AWX** → **Projects** and find tower-config with status **error**.
+  - order: 2
+    cost: 15
+    content: Click **Sync** on the failing project and wait for **successful**.
+  - order: 3
+    cost: 20
+    content: Use **Check** to validate the project sync issue is resolved.

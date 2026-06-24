@@ -1,0 +1,29 @@
+slug: ansible-awx-create-template
+title: Create AWX Job Template from Project
+technology: Ansible
+category: AWX / Tower
+difficulty: medium
+scenario_type: do
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: ansible-awx
+infrastructure_type: simulation
+is_free: false
+description: >-
+  After syncing the ansible-playbooks project, create a new job template and prepare it for launch.
+objectives:
+  - Sign in to AWX
+  - Create a new job template from the synced project
+  - Verify the template appears under Job Templates
+initial_state: AWX with a synced project but no job template for the new site playbook.
+hints:
+  - order: 1
+    cost: 10
+    content: Go to **Templates** and click **+ New Template**.
+  - order: 2
+    cost: 15
+    content: Name it (e.g. Site Deploy) and link it to the Production inventory.
+  - order: 3
+    cost: 20
+    content: Click **Check** once the template is created.

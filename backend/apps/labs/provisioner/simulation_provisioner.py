@@ -486,6 +486,40 @@ class SimulationProvisioner:
             from apps.vmware_sim.datascience_engine import validate_datascience_lab, _ensure_session
             _ensure_session(str(_ds_session.id), slug)
             return validate_datascience_lab(str(_ds_session.id), slug)
+        _raw_awx_type = sim_type
+        if not _raw_awx_type or _raw_awx_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _awx_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_awx_type = (getattr(_awx_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_awx_type = ""
+        if "awx" in low_slug or "tower" in low_slug or _raw_awx_type == "ansible-awx":
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.awx_engine import validate_awx_lab, _ensure as awx_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                awx_ensure(str(lab_session.id), slug)
+                return validate_awx_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "AWX simulation session not found"
+        _raw_tf_type = sim_type
+        if not _raw_tf_type or _raw_tf_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _tf_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_tf_type = (getattr(_tf_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_tf_type = ""
+        if _raw_tf_type == "terraform" or low_slug.startswith("terraform-"):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.terraform_engine import validate_terraform_lab, _ensure as tf_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                tf_ensure(str(lab_session.id), slug)
+                return validate_terraform_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Terraform simulation session not found"
         script = resolve_simulation_validation_script(slug, validation_script or "")
         if engine and hasattr(engine, "state"):
             return validate_simulation_state(engine.state, script, engine=engine)

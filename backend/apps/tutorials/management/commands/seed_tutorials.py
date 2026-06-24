@@ -739,6 +739,7 @@ class Command(BaseCommand):
         import os
         extra_path = os.path.join(os.path.dirname(__file__), "data", "tutorials_extra.json")
         e3_path = os.path.join(os.path.dirname(__file__), "data", "tutorials_e3_batch.json")
+        e3b_path = os.path.join(os.path.dirname(__file__), "data", "tutorials_e3_batch2.json")
         if os.path.exists(extra_path):
             try:
                 with open(extra_path, encoding="utf-8") as fh:
@@ -757,6 +758,15 @@ class Command(BaseCommand):
                     self.stdout.write(f"  + loaded {len(e3)} tutorials from tutorials_e3_batch.json")
             except Exception as exc:
                 self.stderr.write(f"  ! could not load tutorials_e3_batch.json: {exc}")
+        if os.path.exists(e3b_path):
+            try:
+                with open(e3b_path, encoding="utf-8") as fh:
+                    e3b = json.load(fh)
+                if isinstance(e3b, list):
+                    specs.extend(e3b)
+                    self.stdout.write(f"  + loaded {len(e3b)} tutorials from tutorials_e3_batch2.json")
+            except Exception as exc:
+                self.stderr.write(f"  ! could not load tutorials_e3_batch2.json: {exc}")
         for spec in specs:
             sections = spec.pop("sections", [])
             obj, was_created = Tutorial.objects.update_or_create(

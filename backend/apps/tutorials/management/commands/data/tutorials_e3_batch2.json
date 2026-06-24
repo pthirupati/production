@@ -1,0 +1,53 @@
+[
+  {
+    "slug": "vyos-routing-zero-to-hero",
+    "title": "VyOS Routing & Firewall: Zero to Hero",
+    "summary": "Configure VyOS interfaces, static routes, OSPF, NAT, and site-to-site VPN for AI cluster edge networking.",
+    "topic": "Networking",
+    "difficulty": "intermediate",
+    "estimated_minutes": 40,
+    "playground_slug": "networking",
+    "order": 302,
+    "sections": [
+      ["VyOS overview", "VyOS is a Debian-based network OS with a JunOS-like CLI. It runs on bare metal or VMs at the edge of GPU clusters, handling north-south traffic, BGP to ISPs, and east-west segmentation.", "", "text", ""],
+      ["Initial setup", "Boot VyOS, set host-name, configure eth0/eth1 with set interfaces ethernet. commit; save persists to /config/config.boot.", "configure\nset interfaces ethernet eth0 address dhcp\ncommit; save", "bash", ""],
+      ["Static routing", "Add default route and internal summaries. show ip route verifies FIB.", "set protocols static route 0.0.0.0/0 next-hop 203.0.113.1\nshow ip route", "bash", ""],
+      ["OSPF on AI racks", "Enable OSPF on internal VLANs so training nodes learn routes to storage and inference subnets.", "set protocols ospf area 0 network 10.10.0.0/16\nshow ip ospf neighbor", "bash", "Use MD5 auth in production."],
+      ["NAT and firewall", "Source NAT for GPU nodes without public IPs. set nat source rule and firewall name.", "set nat source rule 100 outbound-interface eth0\nset firewall name WAN default-action drop", "bash", ""]
+    ]
+  },
+  {
+    "slug": "pxe-boot-ipxe-zero-to-hero",
+    "title": "PXE, iPXE & Network Boot: Zero to Hero",
+    "summary": "DHCP options, TFTP, iPXE chains, and UEFI HTTP boot for bare-metal AI node provisioning.",
+    "topic": "Bare Metal",
+    "difficulty": "intermediate",
+    "estimated_minutes": 35,
+    "playground_slug": "baremetal",
+    "order": 303,
+    "sections": [
+      ["PXE fundamentals", "Preboot eXecution Environment loads a bootloader via DHCP+TFTP. Option 66 = next-server, option 67 = bootfile. UEFI uses ipxe.efi or grubx64.efi.", "", "text", ""],
+      ["dnsmasq for lab PXE", "Configure dhcp-range, tftp-root, and pxelinux or iPXE. In FixitLab baremetal labs maas and pxe keywords trigger simulator output.", "dhcp-range=192.168.100.100,192.168.100.200,12h\ntftp-root=/var/lib/tftpboot", "bash", ""],
+      ["iPXE chainloading", "Chain from PXE ROM to iPXE script that HTTP-fetches kernel+initrd — required for large GPU driver initrds.", "chain http://boot.example/ipxe/script.ipxe", "bash", ""],
+      ["UEFI HTTP boot", "Modern servers boot directly over HTTP(S) without TFTP size limits. Match Secure Boot keys.", "", "text", ""],
+      ["Troubleshooting", "Common failures: wrong VLAN, blocked UDP 67/69, MTU on TFTP, or stale DHCP lease. tcpdump -i eth0 port 67 or 69.", "tcpdump -ni eth0 port 67 or port 69", "bash", ""]
+    ]
+  },
+  {
+    "slug": "nvidia-amd-gpu-troubleshooting",
+    "title": "NVIDIA & AMD GPU Troubleshooting for AI Engineers",
+    "summary": "Driver mismatches, ECC errors, thermal throttle, persistence mode, and ROCm vs CUDA debugging.",
+    "topic": "GPU",
+    "difficulty": "advanced",
+    "estimated_minutes": 55,
+    "playground_slug": "gpu",
+    "order": 304,
+    "sections": [
+      ["Symptom triage", "Start with nvidia-smi or rocm-smi. Xid errors in dmesg indicate GPU resets. Thermal throttle shows as SW power cap or GPU Max Operating Temp.", "dmesg | grep -i xid\nnvidia-smi -q -d PERFORMANCE,TEMPERATURE", "bash", ""],
+      ["Driver vs kernel", "DKMS rebuild fails after kernel upgrade. Match driver branch to CUDA in containers. blacklist nouveau before NVIDIA install.", "modinfo nvidia | head\nuname -r", "bash", ""],
+      ["Thermal and airflow", "Training jobs peg power limits. Fix rack airflow, replace fans, use nvidia-smi -pl to cap until hardware fixed.", "nvidia-smi dmon -s pucvmet\nnvidia-smi -pl 280", "bash", "Sustained >85°C risks throttle."],
+      ["AMD MI / ROCm", "rocminfo lists agents. HIP_VISIBLE_DEVICES mirrors CUDA_VISIBLE_DEVICES. Mixed vendor clusters need separate queues.", "rocminfo | grep -i agent\nhipcc --version", "bash", ""],
+      ["Multi-GPU NCCL", "NCCL_SOCKET_IFNAME and IB HCA selection matter for all-reduce. Test with nccl-tests before large jobs.", "export NCCL_DEBUG=INFO\n./all_reduce_perf -b 8 -e 128M -f 2 -g 8", "bash", ""]
+    ]
+  }
+]

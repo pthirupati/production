@@ -19,4 +19,13 @@ export const awxApi = {
   launchTemplate(sessionId, templateId) {
     return awxApi.action(sessionId, 'launch_template', { template_id: templateId })
   },
+  createTemplate(sessionId, name) {
+    return awxApi.action(sessionId, 'create_template', { name })
+  },
+  attachCredential(sessionId) {
+    return awxApi.action(sessionId, 'attach_credential', {})
+  },
+  installAwx(sessionId) {
+    return awxApi.action(sessionId, 'install_awx', {})
+  },
 }

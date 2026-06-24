@@ -152,6 +152,8 @@ class Scenario(models.Model):
         ("baremetal", "Bare Metal / IPMI / VMware"),
         ("database", "Database Simulation"),
         ("ansible", "Ansible Simulation"),
+        ("ansible-awx", "Ansible AWX / Tower Simulation"),
+        ("terraform", "Terraform / AWS CLI Simulation"),
         ("python", "Python Simulation"),
         ("java", "Java Development Simulation"),
     ]
