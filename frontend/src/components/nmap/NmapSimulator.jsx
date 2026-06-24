@@ -8,6 +8,13 @@ import { nmapApi } from '../../api/nmap'
 import { LabChromeControls } from '../lab/LabChromeBar'
 
 /* ── scoped, self-contained "security tool" chrome (no shared CSS) ── */
+const SCAN_PROFILES = [
+  { id: 'quick', label: 'Quick scan', flags: ['-T4'], ports: '22,80,443', desc: 'Fast top ports' },
+  { id: 'intense', label: 'Intense scan', flags: ['-T4', '-A', '-v'], ports: '', desc: 'OS, version, scripts' },
+  { id: 'ping', label: 'Ping scan', flags: ['-sn'], ports: '', desc: 'Host discovery only' },
+  { id: 'comprehensive', label: 'Comprehensive', flags: ['-sS', '-sV', '-O'], ports: '1-1024', desc: 'SYN + versions + OS' },
+]
+
 const SCOPED_CSS = `
 .nmap-sim {
   --nm-bg: #0a0f0a;
@@ -108,11 +115,12 @@ function StateBadge({ state }) {
  */
 export default function NmapSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
-  hintsLabel, checkDisabled, extendDisabled,
+  hintsLabel, checkDisabled, extendDisabled, embedded = false,
 }) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
   const [error, setError] = useState('')
+  const [profile, setProfile] = useState('quick')
   const [targets, setTargets] = useState('')
   const [ports, setPorts] = useState('')
   const [flags, setFlags] = useState(new Set(['-sV']))
@@ -217,7 +225,7 @@ export default function NmapSimulator({
   ]
 
   return (
-    <div className="nmap-sim min-h-screen">
+    <div className={`nmap-sim ${embedded ? 'h-full min-h-0 flex flex-col overflow-hidden' : 'min-h-screen'}`}>
       <style>{SCOPED_CSS}</style>
 
       <div className="nm-topbar">
@@ -288,6 +296,14 @@ export default function NmapSimulator({
 
         {/* scan builder */}
         <div className="nm-card p-4 mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--nm-muted)' }}>Profile</span>
+            {SCAN_PROFILES.map((p) => (
+              <button key={p.id} type="button" title={p.desc}
+                onClick={() => { setProfile(p.id); setFlags(new Set(p.flags)); setPorts(p.ports) }}
+                className={`nm-chip ${profile === p.id ? 'nm-chip-active' : ''}`}>{p.label}</button>
+            ))}
+          </div>
           <div className="flex flex-col lg:flex-row gap-3">
             <div className="flex-1 min-w-0">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--nm-muted)' }}>Target(s)</label>

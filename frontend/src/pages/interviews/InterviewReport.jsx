@@ -6,7 +6,6 @@ import toast from 'react-hot-toast'
 import { PageHeader } from '../../components/design'
 import CompetencyScorecard from '../../components/interviews/CompetencyScorecard'
 import ConfidenceAnalysis from '../../components/interviews/ConfidenceAnalysis'
-import TranscriptPlayer from '../../components/interviews/TranscriptPlayer'
 
 export default function InterviewReport() {
   const { roundId } = useParams()
@@ -174,13 +173,6 @@ ${(transcript?.transcript || []).length ? `<h3>Transcript</h3>${transcript.trans
           </ul>
         </div>
       </div>
-
-      {/* Parity: timestamped transcript + playback + résumé mapping */}
-      {transcript && (
-        <div className="glass-card p-4 border border-surface-800">
-          <TranscriptPlayer data={transcript} />
-        </div>
-      )}
 
       {(r.study_plan || []).length > 0 && (
         <div className="glass-card p-4 border border-surface-800">

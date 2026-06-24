@@ -1136,11 +1136,12 @@ def _register_terraform(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
 
     def handler(parts: list[str], line: str) -> str | None:
         low = line.strip().lower()
-        if not (low.startswith("terraform") or low.startswith("aws ")):
+        is_tf = low.startswith("terraform")
+        if not (is_tf or low.startswith("aws ")):
             return None
         sid = getattr(shell.state, "session_id", "") or ""
         if not sid:
-            return "terraform: lab session not linked"
+            return "iac: lab session not linked"
         from apps.vmware_sim import terraform_engine as te
 
         slug = engine.scenario_slug or getattr(shell.state, "scenario_slug", "") or ""
@@ -1155,14 +1156,14 @@ def _register_terraform(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
         elif low.startswith("terraform apply"):
             res = te.apply_action(sid, "terraform_apply")
         elif low.startswith("terraform validate"):
-            res = {"ok": True, "output": "Success! The configuration is valid."}
+            res = te.apply_action(sid, "terraform_validate")
         elif low.startswith("aws "):
             res = te.apply_action(sid, "aws_cli", {"command": line.strip()})
         else:
             return (
-                "Usage: terraform init | plan | apply | force-unlock\n"
+                "Usage: terraform init | plan | apply | validate | force-unlock\n"
                 "       aws <service> <command> …\n"
-                "(state synced with Terraform IDE simulator)"
+                "(state synced with Terraform workspace simulator)"
             )
 
         if not res.get("ok"):

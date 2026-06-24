@@ -1,3 +1,6 @@
+@import './sim-products.css';
+@import './vscode-workbench.css';
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&family=JetBrains+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap');
 
 @tailwind base;
@@ -3898,27 +3901,340 @@ body::after {
   }
 }
 
-/* ── Tutorial reader typography (distinct from marketing pages) ── */
-.tutorial-prose p {
+/* ── Tutorial learning hub — theme-aware typography & section design ── */
+.tutorial-page {
+  --tutorial-prose: rgb(var(--s-200));
+  --tutorial-prose-strong: rgb(var(--s-50));
+  --tutorial-muted: rgb(var(--s-400));
+  --tutorial-subtle: rgb(var(--s-500));
+  --tutorial-heading: rgb(var(--s-50));
+  --tutorial-card-bg: rgb(var(--s-900) / 0.65);
+  --tutorial-card-border: rgb(var(--s-700) / 0.8);
+  --tutorial-code-bg: rgb(var(--s-950));
+  --tutorial-code-text: rgb(var(--s-100));
+  --tutorial-code-bar: rgb(var(--s-800));
+  --tutorial-nav-active-bg: rgb(var(--a-cyan) / 0.12);
+  --tutorial-nav-active-text: rgb(var(--a-cyan));
+}
+
+.tutorial-page .tutorial-prose {
+  max-width: 68ch;
+}
+
+.tutorial-page .tutorial-prose p {
   font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
   font-size: 1.0625rem;
   line-height: 1.85;
-  color: rgb(226 232 240);
-  letter-spacing: 0.01em;
+  color: var(--tutorial-prose);
+  letter-spacing: 0.012em;
+  margin: 0;
 }
-.tutorial-prose p strong {
-  color: rgb(248 250 252);
+
+.tutorial-page .tutorial-prose p strong {
+  color: var(--tutorial-prose-strong);
+  font-weight: 650;
+}
+
+.tutorial-page .tutorial-section-card {
+  background: var(--tutorial-card-bg);
+  border: 1px solid var(--tutorial-card-border);
+  border-radius: 1rem;
+  padding: 1.5rem 1.75rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tutorial-page .tutorial-section-card:hover {
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.12);
+}
+
+.tutorial-page .tutorial-section-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+.tutorial-page .tutorial-section-num {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
-.tutorial-section-theory { border-left: 3px solid rgb(56 189 248); }
-.tutorial-section-architecture { border-left: 3px solid rgb(129 140 248); }
-.tutorial-section-labs { border-left: 3px solid rgb(52 211 153); }
-.tutorial-section-troubleshooting { border-left: 3px solid rgb(251 191 36); }
-.tutorial-section-security { border-left: 3px solid rgb(248 113 113); }
-.tutorial-section-enterprise { border-left: 3px solid rgb(192 132 252); }
-.tutorial-level-beginner { color: rgb(74 222 128); }
-.tutorial-level-intermediate { color: rgb(251 191 36); }
-.tutorial-level-advanced { color: rgb(248 113 113); }
-.tutorial-level-expert { color: rgb(244 114 182); }
-.tutorial-level-enterprise { color: rgb(192 132 252); }
+
+.tutorial-page .tutorial-section-title {
+  font-family: "DM Sans", Inter, system-ui, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--tutorial-heading);
+  line-height: 1.35;
+  padding-top: 0.125rem;
+}
+
+.tutorial-page .tutorial-section-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.tutorial-page .tutorial-code-block {
+  margin: 1.25rem 0;
+  border-radius: 0.875rem;
+  overflow: hidden;
+  border: 1px solid rgb(var(--a-cyan) / 0.22);
+  background: var(--tutorial-code-bg);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.15);
+}
+
+.tutorial-page .tutorial-code-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid rgb(var(--s-700) / 0.6);
+  background: var(--tutorial-code-bar);
+}
+
+.tutorial-page .tutorial-code-lang {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--a-cyan));
+}
+
+.tutorial-page .tutorial-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--tutorial-muted);
+  transition: color 0.15s;
+}
+.tutorial-page .tutorial-code-copy:hover {
+  color: rgb(var(--a-cyan));
+}
+
+.tutorial-page .tutorial-code-pre {
+  padding: 1rem 1.125rem;
+  overflow-x: auto;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: var(--tutorial-code-text);
+  margin: 0;
+}
+
+.tutorial-page .tutorial-code-caption {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--tutorial-subtle);
+  padding-left: 0.25rem;
+}
+
+.tutorial-page .tutorial-hero {
+  background: linear-gradient(
+    135deg,
+    rgb(var(--s-900) / 0.95) 0%,
+    rgb(var(--s-900) / 0.7) 45%,
+    rgb(var(--a-cyan) / 0.06) 100%
+  );
+  border: 1px solid rgb(var(--a-cyan) / 0.18);
+  border-radius: 1.125rem;
+  padding: 1.75rem 2rem;
+}
+
+.tutorial-page .tutorial-topic-pill {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--a-cyan));
+}
+
+.tutorial-page .tutorial-sidebar-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--tutorial-heading);
+}
+
+.tutorial-page .tutorial-nav-link {
+  display: block;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--tutorial-muted);
+  transition: background 0.15s, color 0.15s;
+}
+.tutorial-page .tutorial-nav-link:hover {
+  color: var(--tutorial-prose);
+  background: rgb(var(--s-800) / 0.5);
+}
+.tutorial-page .tutorial-nav-link.is-active {
+  color: var(--tutorial-nav-active-text);
+  background: var(--tutorial-nav-active-bg);
+  border: 1px solid rgb(var(--a-cyan) / 0.25);
+}
+
+.tutorial-page .tutorial-track-card {
+  border-radius: 0.875rem;
+  border: 1px solid var(--tutorial-card-border);
+  background: var(--tutorial-card-bg);
+  transition: border-color 0.2s, transform 0.2s;
+}
+.tutorial-page .tutorial-track-card:hover {
+  border-color: rgb(var(--a-cyan) / 0.35);
+  transform: translateY(-1px);
+}
+
+.tutorial-page .tutorial-course-header {
+  background: linear-gradient(120deg, rgb(var(--a-purple) / 0.1), rgb(var(--a-cyan) / 0.06));
+  border-color: rgb(var(--a-purple) / 0.22);
+}
+
+.tutorial-page .tutorial-tech-header {
+  background: linear-gradient(120deg, rgb(var(--a-cyan) / 0.1), rgb(var(--a-blue) / 0.05));
+  border-color: rgb(var(--a-cyan) / 0.2);
+}
+
+/* Section type accents */
+.tutorial-page .tutorial-section-card.tutorial-section-theory {
+  border-left: 4px solid rgb(var(--a-cyan));
+  background: linear-gradient(90deg, rgb(var(--a-cyan) / 0.1) 0%, var(--tutorial-card-bg) 28%);
+}
+.tutorial-page .tutorial-section-card.tutorial-section-architecture {
+  border-left: 4px solid rgb(var(--a-purple));
+  background: linear-gradient(90deg, rgb(var(--a-purple) / 0.1) 0%, var(--tutorial-card-bg) 28%);
+}
+.tutorial-page .tutorial-section-card.tutorial-section-concepts {
+  border-left: 4px solid rgb(var(--a-blue));
+  background: linear-gradient(90deg, rgb(var(--a-blue) / 0.1) 0%, var(--tutorial-card-bg) 28%);
+}
+.tutorial-page .tutorial-section-card.tutorial-section-labs {
+  border-left: 4px solid rgb(var(--a-green));
+  background: linear-gradient(90deg, rgb(var(--a-green) / 0.12) 0%, var(--tutorial-card-bg) 28%);
+}
+.tutorial-page .tutorial-section-card.tutorial-section-troubleshooting {
+  border-left: 4px solid rgb(var(--a-amber));
+  background: linear-gradient(90deg, rgb(var(--a-amber) / 0.12) 0%, var(--tutorial-card-bg) 28%);
+}
+.tutorial-page .tutorial-section-card.tutorial-section-security {
+  border-left: 4px solid rgb(var(--a-red));
+  background: linear-gradient(90deg, rgb(var(--a-red) / 0.1) 0%, var(--tutorial-card-bg) 28%);
+}
+.tutorial-page .tutorial-section-card.tutorial-section-enterprise {
+  border-left: 4px solid rgb(var(--a-pink));
+  background: linear-gradient(90deg, rgb(var(--a-pink) / 0.1) 0%, var(--tutorial-card-bg) 28%);
+}
+.tutorial-page .tutorial-section-card.tutorial-section-interview {
+  border-left: 4px solid rgb(168 85 247);
+  background: linear-gradient(90deg, rgb(168 85 247 / 0.1) 0%, var(--tutorial-card-bg) 28%);
+}
+.tutorial-page .tutorial-section-card.tutorial-section-monitoring {
+  border-left: 4px solid rgb(20 184 166);
+  background: linear-gradient(90deg, rgb(20 184 166 / 0.1) 0%, var(--tutorial-card-bg) 28%);
+}
+
+.tutorial-page .tutorial-section-theory .tutorial-section-num { background: rgb(var(--a-cyan) / 0.15); color: rgb(var(--a-cyan)); border: 1px solid rgb(var(--a-cyan) / 0.3); }
+.tutorial-page .tutorial-section-architecture .tutorial-section-num { background: rgb(var(--a-purple) / 0.15); color: rgb(var(--a-purple)); border: 1px solid rgb(var(--a-purple) / 0.3); }
+.tutorial-page .tutorial-section-concepts .tutorial-section-num { background: rgb(var(--a-blue) / 0.15); color: rgb(var(--a-blue)); border: 1px solid rgb(var(--a-blue) / 0.3); }
+.tutorial-page .tutorial-section-labs .tutorial-section-num { background: rgb(var(--a-green) / 0.15); color: rgb(var(--a-green)); border: 1px solid rgb(var(--a-green) / 0.3); }
+.tutorial-page .tutorial-section-troubleshooting .tutorial-section-num { background: rgb(var(--a-amber) / 0.15); color: rgb(var(--a-amber)); border: 1px solid rgb(var(--a-amber) / 0.3); }
+.tutorial-page .tutorial-section-security .tutorial-section-num { background: rgb(var(--a-red) / 0.15); color: rgb(var(--a-red)); border: 1px solid rgb(var(--a-red) / 0.3); }
+.tutorial-page .tutorial-section-enterprise .tutorial-section-num { background: rgb(var(--a-pink) / 0.15); color: rgb(var(--a-pink)); border: 1px solid rgb(var(--a-pink) / 0.3); }
+.tutorial-page .tutorial-section-interview .tutorial-section-num { background: rgb(168 85 247 / 0.15); color: rgb(168 85 247); border: 1px solid rgb(168 85 247 / 0.3); }
+.tutorial-page .tutorial-section-monitoring .tutorial-section-num { background: rgb(20 184 166 / 0.15); color: rgb(20 184 166); border: 1px solid rgb(20 184 166 / 0.3); }
+
+.tutorial-page .tutorial-section-theory .tutorial-section-badge { background: rgb(var(--a-cyan) / 0.12); color: rgb(var(--a-cyan)); border-color: rgb(var(--a-cyan) / 0.25); }
+.tutorial-page .tutorial-section-architecture .tutorial-section-badge { background: rgb(var(--a-purple) / 0.12); color: rgb(var(--a-purple)); border-color: rgb(var(--a-purple) / 0.25); }
+.tutorial-page .tutorial-section-concepts .tutorial-section-badge { background: rgb(var(--a-blue) / 0.12); color: rgb(var(--a-blue)); border-color: rgb(var(--a-blue) / 0.25); }
+.tutorial-page .tutorial-section-labs .tutorial-section-badge { background: rgb(var(--a-green) / 0.12); color: rgb(var(--a-green)); border-color: rgb(var(--a-green) / 0.25); }
+.tutorial-page .tutorial-section-troubleshooting .tutorial-section-badge { background: rgb(var(--a-amber) / 0.12); color: rgb(var(--a-amber)); border-color: rgb(var(--a-amber) / 0.25); }
+.tutorial-page .tutorial-section-security .tutorial-section-badge { background: rgb(var(--a-red) / 0.12); color: rgb(var(--a-red)); border-color: rgb(var(--a-red) / 0.25); }
+.tutorial-page .tutorial-section-enterprise .tutorial-section-badge { background: rgb(var(--a-pink) / 0.12); color: rgb(var(--a-pink)); border-color: rgb(var(--a-pink) / 0.25); }
+.tutorial-page .tutorial-section-interview .tutorial-section-badge { background: rgb(168 85 247 / 0.12); color: rgb(168 85 247); border-color: rgb(168 85 247 / 0.25); }
+.tutorial-page .tutorial-section-monitoring .tutorial-section-badge { background: rgb(20 184 166 / 0.12); color: rgb(20 184 166); border-color: rgb(20 184 166 / 0.25); }
+
+.tutorial-level-beginner { color: rgb(var(--a-green)); }
+.tutorial-level-intermediate { color: rgb(var(--a-amber)); }
+.tutorial-level-advanced { color: rgb(var(--a-red)); }
+.tutorial-level-expert { color: rgb(var(--a-pink)); }
+.tutorial-level-enterprise { color: rgb(var(--a-purple)); }
+
+/* Light mode — readable contrast on white surfaces */
+[data-theme="light"] .tutorial-page {
+  --tutorial-prose: rgb(51 65 85);
+  --tutorial-prose-strong: rgb(15 23 42);
+  --tutorial-muted: rgb(100 116 139);
+  --tutorial-subtle: rgb(148 163 184);
+  --tutorial-heading: rgb(15 23 42);
+  --tutorial-card-bg: rgb(255 255 255 / 0.92);
+  --tutorial-card-border: rgb(226 232 240);
+  --tutorial-code-bg: rgb(241 245 249);
+  --tutorial-code-text: rgb(30 41 59);
+  --tutorial-code-bar: rgb(248 250 252);
+  --tutorial-nav-active-bg: rgb(var(--a-cyan) / 0.1);
+}
+
+[data-theme="light"] .tutorial-page .tutorial-hero {
+  background: linear-gradient(
+    135deg,
+    rgb(255 255 255) 0%,
+    rgb(248 250 252) 50%,
+    rgb(var(--a-cyan) / 0.08) 100%
+  );
+  border-color: rgb(var(--a-cyan) / 0.25);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.06);
+}
+
+[data-theme="light"] .tutorial-page .tutorial-code-block {
+  border-color: rgb(var(--a-cyan) / 0.35);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.06);
+}
+
+[data-theme="light"] .tutorial-page .tutorial-section-card:hover {
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.08);
+}
+
+[data-theme="light"] .tutorial-page .tutorial-course-header {
+  background: linear-gradient(120deg, rgb(var(--a-purple) / 0.08), rgb(var(--a-cyan) / 0.05));
+}
+
+[data-theme="light"] .tutorial-page .tutorial-tech-header {
+  background: linear-gradient(120deg, rgb(var(--a-cyan) / 0.08), rgb(var(--a-blue) / 0.04));
+}
+
+[data-theme="light"] .tutorial-page .aurora-bg {
+  opacity: 0.08;
+}
+
+[data-theme="light"] .tutorial-page .text-surface-300 {
+  color: rgb(71 85 105);
+}
+
+[data-theme="light"] .tutorial-page .text-surface-400 {
+  color: rgb(100 116 139);
+}
+
+[data-theme="light"] .tutorial-page .text-surface-500 {
+  color: rgb(100 116 139);
+}
+
+[data-theme="light"] .tutorial-page .tutorial-nav-link:hover {
+  background: rgb(241 245 249);
+}
 

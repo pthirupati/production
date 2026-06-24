@@ -14,6 +14,7 @@ export const PUBLIC_NAV_PRIMARY = [
 ]
 
 export const PUBLIC_NAV_SECONDARY = [
+  { to: '/simulators', label: 'Simulators' },
   { to: '/about', label: 'About' },
   { to: '/blog', label: 'Blog' },
   { to: '/changelog', label: 'Changelog' },

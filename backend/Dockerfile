@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
     postgresql-client \
+    nodejs \
     && curl -fsSL https://get.docker.com | sh \
     && rm -rf /var/lib/apt/lists/*
 

@@ -5,7 +5,8 @@ import {
   Database, CheckCircle2,
 } from 'lucide-react'
 import { datascienceApi } from '../../api/datascience'
-import { LabChromeControls } from '../lab/LabChromeBar'
+import LabChromeBar from '../lab/LabChromeBar'
+import '../../styles/sim-products.css'
 
 /* ── scoped, self-contained BI-tool chrome (no shared CSS) ── */
 const SCOPED_CSS = `
@@ -75,7 +76,22 @@ const SCOPED_CSS = `
 .ds-sim .ds-banner-goal { background: rgba(56,224,208,.08); border: 1px solid rgba(56,224,208,.28); color: #9beee3; }
 .ds-sim .ds-banner-err { background: rgba(255,107,107,.1); border: 1px solid rgba(255,107,107,.3); color: #ffb4b4; }
 .ds-sim .ds-banner-ok { background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.32); color: #9ff0cf; }
+.ds-sim .ds-sidebar-item {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left;
+  padding: 0.55rem 0.85rem; font-size: 0.78rem; font-weight: 600; color: var(--ds-muted);
+  border: none; background: transparent; cursor: pointer;
+}
+.ds-sim .ds-sidebar-item:hover { color: var(--ds-text); background: #0e2117; }
+.ds-sim .ds-sidebar-active { color: var(--ds-green); background: rgba(52,211,153,.12); border-right: 2px solid var(--ds-green); }
 `
+
+const ACCENT = '#34d399'
+
+const DS_TABS = [
+  { key: 'chart', label: 'Dashboard', icon: BarChart3 },
+  { key: 'data', label: 'Dataset', icon: Database },
+  { key: 'events', label: 'Activity', icon: History },
+]
 
 const CHART_META = {
   bar: { label: 'Bar', Icon: BarChart3 },
@@ -264,7 +280,7 @@ function ChartCanvas({ chartType, dimension, measure, aggregation, series }) {
  */
 export default function DataDashboardSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
-  hintsLabel, checkDisabled, extendDisabled,
+  hintsLabel, checkDisabled, extendDisabled, embedded = false,
 }) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
@@ -335,34 +351,28 @@ export default function DataDashboardSimulator({
 
   const objective = state?.objective || summary.objective || scenario?.description || ''
 
+  const chromeProps = {
+    onHints, onCheck, onExtend, onStop,
+    onBackToTerminal: embedded ? undefined : onExit,
+    hintsLabel, checkDisabled, extendDisabled,
+  }
+
   return (
-    <div className="ds-sim min-h-screen">
+    <div className={`ds-sim sim-product ${embedded ? 'h-full min-h-0 flex flex-col overflow-hidden' : 'min-h-screen flex flex-col'}`}>
       <style>{SCOPED_CSS}</style>
 
-      <div className="ds-topbar">
-        <div className="flex items-center gap-3 min-w-0">
-          <BarChart3 size={18} style={{ color: 'var(--ds-green)' }} />
-          <span className="font-semibold text-white">Data dashboard builder</span>
-          <span className="text-xs hidden sm:inline" style={{ color: 'var(--ds-muted)' }}>{state?.title || scenario?.title || slug}</span>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <button className="ds-btn" onClick={load} disabled={busy}><RefreshCw size={13} className={busy ? 'animate-spin' : ''} /> Refresh</button>
-          <button className="ds-btn" onClick={() => fire(() => datascienceApi.reset(sessionId))} disabled={busy}><RotateCcw size={13} /> Reset</button>
-          <LabChromeControls
-            buttonClass="ds-btn"
-            onHints={onHints}
-            onCheck={onCheck}
-            onExtend={onExtend}
-            onStop={onStop}
-            onBackToTerminal={onExit}
-            hintsLabel={hintsLabel || 'Hints'}
-            checkDisabled={checkDisabled}
-            extendDisabled={extendDisabled}
-          />
-        </div>
-      </div>
+      <LabChromeBar title="Looker Studio · Data Dashboard" subtitle={state?.title || scenario?.title || slug} accent={ACCENT} icon={BarChart3} {...chromeProps} />
 
-      <div className="p-4 max-w-[1180px] mx-auto">
+      <div className="flex flex-1 min-h-0">
+        <nav className="ds-sidebar shrink-0 hidden sm:flex flex-col py-2 border-r" style={{ borderColor: 'var(--ds-border)', width: '168px', background: 'var(--ds-panel)' }}>
+          {DS_TABS.map(({ key, label, icon: Icon }) => (
+            <button key={key} type="button" onClick={() => setTab(key)}
+              className={`ds-sidebar-item ${tab === key ? 'ds-sidebar-active' : ''}`}>
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+        </nav>
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 max-w-[1180px] mx-auto w-full">
         {error && <div className="ds-banner ds-banner-err"><XCircle size={15} className="shrink-0 mt-0.5" /> {error}</div>}
 
         {/* objective banner */}
@@ -503,17 +513,19 @@ export default function DataDashboardSimulator({
           </div>
         </div>
 
-        {/* tabs */}
-        <div className="flex items-center gap-2 mb-3">
-          {[['chart', 'Dashboard', BarChart3], ['data', 'Dataset', Database], ['events', 'Activity', History]].map(([k, label, Icon]) => (
-            <button
-              key={k}
-              onClick={() => setTab(k)}
-              className={`ds-chip ${tab === k ? 'ds-chip-active' : ''}`}
-            >
+        {/* tabs — mobile */}
+        <div className="flex sm:hidden items-center gap-2 mb-3 overflow-x-auto">
+          {DS_TABS.map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => setTab(key)} className={`ds-chip ${tab === key ? 'ds-chip-active' : ''}`}>
               <Icon size={13} /> {label}
             </button>
           ))}
+        </div>
+
+        {/* tabs — desktop duplicate removed; sidebar handles nav */}
+        <div className="hidden sm:flex items-center gap-2 mb-3">
+          <button className="ds-btn !text-xs" onClick={load} disabled={busy}><RefreshCw size={12} className={busy ? 'animate-spin' : ''} /> Refresh</button>
+          <button className="ds-btn !text-xs" onClick={() => fire(() => datascienceApi.reset(sessionId))} disabled={busy}><RotateCcw size={12} /> Reset</button>
         </div>
 
         {tab === 'chart' && (
@@ -615,6 +627,7 @@ export default function DataDashboardSimulator({
         <div className="mt-4 text-[11px] flex items-center gap-1.5" style={{ color: 'var(--ds-muted)' }}>
           <Lightbulb size={12} className="text-[#f5c451]" />
           Build the dashboard to match the objective, then run <b>Check Solution</b> from the lab — grading re-derives the expected result from the source data.
+        </div>
         </div>
       </div>
     </div>

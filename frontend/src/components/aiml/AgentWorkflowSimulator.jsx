@@ -5,7 +5,8 @@ import {
   CheckCircle2, Target, Trash2, Plus, Link2, Settings2, Activity, X, ChevronRight,
 } from 'lucide-react'
 import { aimlApi } from '../../api/aiml'
-import { LabChromeControls } from '../lab/LabChromeBar'
+import LabChromeBar from '../lab/LabChromeBar'
+import '../../styles/sim-products.css'
 
 /* ── scoped, self-contained n8n-style automation chrome (no shared CSS) ── */
 const SCOPED_CSS = `
@@ -288,7 +289,7 @@ function NodeCard({ node, selected, connectSrc, runStatus, onSelect, onDragStart
  */
 export default function AgentWorkflowSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
-  hintsLabel, checkDisabled, extendDisabled,
+  hintsLabel, checkDisabled, extendDisabled, embedded = false,
 }) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
@@ -472,37 +473,25 @@ export default function AgentWorkflowSimulator({
   const finalOutput = lastRun?.final_output || {}
   const notifications = lastRun?.notifications || []
 
+  const chromeProps = {
+    onHints, onCheck, onExtend, onStop,
+    onBackToTerminal: embedded ? undefined : onExit,
+    hintsLabel, checkDisabled, extendDisabled,
+  }
+
   return (
-    <div className="agent-sim min-h-screen">
+    <div className={`agent-sim sim-product ${embedded ? 'h-full min-h-0 flex flex-col overflow-hidden' : 'min-h-screen flex flex-col'}`}>
       <style>{SCOPED_CSS}</style>
 
-      <div className="ag-topbar">
-        <div className="flex items-center gap-3 min-w-0">
-          <Bot size={18} style={{ color: 'var(--ag-purple)' }} />
-          <span className="font-semibold text-white">Agent workflow builder</span>
-          <span className="text-xs hidden sm:inline" style={{ color: 'var(--ag-muted)' }}>{scenario?.title || slug}</span>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <button className="ag-btn ag-btn-primary" disabled={running} onClick={runWorkflow}>
-            {running ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />} Run workflow
-          </button>
-          <button className="ag-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
-          <button className="ag-btn" onClick={resetGraph} disabled={busy}><RefreshCw size={13} /> Reset</button>
-          <LabChromeControls
-            buttonClass="ag-btn"
-            onHints={onHints}
-            onCheck={onCheck}
-            onExtend={onExtend}
-            onStop={onStop}
-            onBackToTerminal={onExit}
-            hintsLabel={hintsLabel || 'Hints'}
-            checkDisabled={checkDisabled}
-            extendDisabled={extendDisabled}
-          />
-        </div>
-      </div>
+      <LabChromeBar title="n8n · Agent Workflow" subtitle={scenario?.title || slug} accent="#a78bfa" icon={Bot} {...chromeProps}>
+        <button type="button" className="lab-chrome-btn" disabled={running} onClick={runWorkflow}>
+          {running ? <RefreshCw size={13} className="animate-spin" /> : <Play size={13} />} Run
+        </button>
+        <button type="button" className="lab-chrome-btn" onClick={load}><RefreshCw size={13} /></button>
+        <button type="button" className="lab-chrome-btn" onClick={resetGraph} disabled={busy}>Reset</button>
+      </LabChromeBar>
 
-      <div className="p-4 max-w-[1320px] mx-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 max-w-[1320px] mx-auto w-full">
         {error && (
           <div className="ag-banner ag-banner-err">
             <XCircle size={15} className="shrink-0 mt-0.5" /> {error}

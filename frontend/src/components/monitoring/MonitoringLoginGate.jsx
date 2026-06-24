@@ -26,7 +26,10 @@ export function clearMonitoringAuth() {
   try { sessionStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
 }
 
-export default function MonitoringLoginGate({ flavor = 'grafana', onAuthenticated, scenario, onExit, onStop, onHints }) {
+export default function MonitoringLoginGate({
+  flavor = 'grafana', onAuthenticated, scenario, onExit, onStop, onHints,
+  onCheck, onExtend, hintsLabel, checkDisabled, extendDisabled, embedded = false,
+}) {
   const cfg = CREDS[flavor] || CREDS.grafana
   const isGrafana = flavor === 'grafana'
   const [user, setUser] = useState('')
@@ -57,9 +60,13 @@ export default function MonitoringLoginGate({ flavor = 'grafana', onAuthenticate
   const accent = isGrafana ? '#f7913b' : '#e6522c'
   const bg = isGrafana ? 'linear-gradient(135deg,#0b0c1e,#181b2e 60%,#0b0c1e)' : 'linear-gradient(135deg,#1a1206,#241405 60%,#120c05)'
 
+  const shellClass = embedded
+    ? 'mon-sim mon-shell h-full min-h-0 flex flex-col overflow-hidden'
+    : 'mon-sim mon-shell min-h-[100dvh] flex flex-col overflow-hidden'
+
   return (
-    <div className="mon-sim mon-shell min-h-screen flex flex-col" style={{ background: '#0b0c1e' }}>
-      {/* Lab chrome — keeps Hints / Stop / Back to lab reachable before sign-in. */}
+    <div className={shellClass} style={{ background: '#0b0c1e' }}>
+      {/* Lab chrome — keeps Hints / Check / +30m / Stop reachable before sign-in. */}
       <MonitoringLabChrome
         product={cfg.product}
         accent={accent}
@@ -67,6 +74,11 @@ export default function MonitoringLoginGate({ flavor = 'grafana', onAuthenticate
         onExit={onExit}
         onStop={onStop}
         onHints={onHints}
+        onCheck={onCheck}
+        onExtend={onExtend}
+        hintsLabel={hintsLabel}
+        checkDisabled={checkDisabled}
+        extendDisabled={extendDisabled}
       />
 
       <div className="flex-1 flex items-stretch">

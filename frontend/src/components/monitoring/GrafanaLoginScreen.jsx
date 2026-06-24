@@ -44,7 +44,10 @@ function GrafanaOrb({ size = 52 }) {
  * The lab chrome handlers are forwarded from MonitoringSimulator so Hints /
  * Stop / Back to lab stay reachable even before the learner signs in.
  */
-export default function GrafanaLoginScreen({ onAuthenticated, scenario, onExit, onStop, onHints }) {
+export default function GrafanaLoginScreen({
+  onAuthenticated, scenario, onExit, onStop, onHints,
+  onCheck, onExtend, hintsLabel, checkDisabled, extendDisabled, embedded = false,
+}) {
   const [user, setUser] = useState('')
   const [pass, setPass] = useState('')
   const [error, setError] = useState('')
@@ -68,12 +71,16 @@ export default function GrafanaLoginScreen({ onAuthenticated, scenario, onExit, 
     }, 350)
   }
 
+  const shellClass = embedded
+    ? 'mon-sim mon-shell h-full min-h-0 flex flex-col relative overflow-hidden'
+    : 'mon-sim mon-shell min-h-[100dvh] flex flex-col relative overflow-hidden'
+
   return (
     <div
-      className="mon-sim mon-shell min-h-screen flex flex-col relative overflow-hidden"
+      className={shellClass}
       style={{ background: 'radial-gradient(1100px 620px at 50% -10%, #1c1322 0%, #0b0c1e 55%, #07080f 100%)' }}
     >
-      {/* Lab chrome — keeps Hints / Stop / Back to lab reachable before sign-in. */}
+      {/* Lab chrome — keeps Hints / Check / +30m / Stop reachable before sign-in. */}
       <MonitoringLabChrome
         product="Grafana"
         accent={ACCENT}
@@ -81,6 +88,11 @@ export default function GrafanaLoginScreen({ onAuthenticated, scenario, onExit, 
         onExit={onExit}
         onStop={onStop}
         onHints={onHints}
+        onCheck={onCheck}
+        onExtend={onExtend}
+        hintsLabel={hintsLabel}
+        checkDisabled={checkDisabled}
+        extendDisabled={extendDisabled}
       />
 
       {/* ambient accent glow */}

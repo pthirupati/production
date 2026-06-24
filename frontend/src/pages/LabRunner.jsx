@@ -28,6 +28,7 @@ import WindowsServerSimulator from '../components/windows/WindowsServerSimulator
 import PeopleSoftSimulator from '../components/peoplesoft/PeopleSoftSimulator'
 import AwxSimulator from '../components/awx/AwxSimulator'
 import TerraformSimulator from '../components/terraform/TerraformSimulator'
+import { isTerraformLab } from '../utils/iacFlavor'
 import BaremetalSimulator from '../components/baremetal/BaremetalSimulator'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
@@ -40,6 +41,16 @@ function formatLabTime(seconds) {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+}
+
+/** After stop/complete, return to the scenario page the learner launched from. */
+function getLabExitPath(sessionOrLab, slugOverride, techSlugRef, scenarioSlugRef) {
+  const sc = sessionOrLab?.scenario || sessionOrLab?.scenario_detail || {}
+  const slug = slugOverride || sc.slug || scenarioSlugRef?.current || ''
+  const tech = techSlugRef?.current || sc.technology?.slug || ''
+  if (slug) return `/scenarios/${slug}`
+  if (tech) return `/technologies/${tech}`
+  return '/scenarios'
 }
 
 /** Isolated timer display — avoids re-rendering the terminal tree every second. */
@@ -155,6 +166,7 @@ export default function LabRunner() {
   // so completion redirects work even for sessions whose detail payload never
   // populated technology (simulation / coding / cross-tech labs).
   const techSlugRef = useRef(useLocation().state?.techSlug || '')
+  const scenarioSlugRef = useRef(useLocation().state?.scenarioSlug || '')
 
   const LAB_CLOSE_SECONDS = 10
 
@@ -178,11 +190,8 @@ export default function LabRunner() {
       if (closeCountdownRef.current) clearInterval(closeCountdownRef.current)
       setClosingIn(null)
       cleanupLabResources()
-      // Return to the SAME technology's page so the user can immediately pick
-      // another scenario in that technology, rather than the global list.
       const sc = session?.scenario || session?.scenario_detail || {}
-      const techSlug = sc.technology?.slug
-      const dest = techSlug ? `/technologies/${techSlug}` : `/scenarios/${slug || ''}`
+      const dest = getLabExitPath(session, slug || sc.slug, techSlugRef, scenarioSlugRef)
       navigate(dest, {
         state: {
           labCompleted: true,
@@ -270,9 +279,7 @@ export default function LabRunner() {
             : reason === 'expired' ? 'Lab time expired!'
             : 'Lab was stopped in another tab'
           toast(msg, { icon: '🔄', duration: 4000, ...TOAST })
-          // After completing, drop back to the technology page when known.
-          const techSlug = techSlugRef.current
-          navigate(reason === 'completed' && techSlug ? `/technologies/${techSlug}` : '/scenarios')
+          navigate(getLabExitPath(null, '', techSlugRef, scenarioSlugRef))
         }
         if (reason === 'completed' && closingDelayMs > 0) {
           toast(`Lab completed — closing in ${Math.ceil(closingDelayMs / 1000)}s…`, { icon: '✅', duration: closingDelayMs, ...TOAST })
@@ -305,13 +312,7 @@ export default function LabRunner() {
             : lab.status === 'EXPIRED' ? 'Lab time expired!'
             : 'Lab session ended'
           toast(msg, { icon: lab.status === 'COMPLETED' ? '✅' : '⏰', duration: 4000, ...TOAST })
-          // On completion, return to the technology page (continue other
-          // scenarios there); otherwise fall back to the scenario detail page.
-          const techSlug = lab.scenario?.technology?.slug
-          const dest = lab.status === 'COMPLETED' && techSlug
-            ? `/technologies/${techSlug}`
-            : `/scenarios/${lab.scenario?.slug || ''}`
-          navigate(dest, {
+          navigate(getLabExitPath(lab, lab.scenario?.slug, techSlugRef, scenarioSlugRef), {
             state: lab.status === 'COMPLETED'
               ? { labCompleted: true, scenarioTitle: lab.scenario?.title }
               : undefined,
@@ -445,7 +446,7 @@ export default function LabRunner() {
 
               // Redirect to scenarios page after brief delay
               setTimeout(() => {
-                navigate(`/scenarios/${lab.scenario?.slug || ''}`, {
+                navigate(getLabExitPath(lab, lab.scenario?.slug, techSlugRef, scenarioSlugRef), {
                   state: { labExpired: true, scenarioTitle: lab.scenario?.title }
                 })
               }, 2000)
@@ -528,7 +529,7 @@ export default function LabRunner() {
         } catch {}
         clearSession()
         stopTimer()
-        navigate(techSlugRef.current ? `/technologies/${techSlugRef.current}` : '/scenarios')
+        navigate(getLabExitPath(session, '', techSlugRef, scenarioSlugRef))
       }, IDLE_TIMEOUT)
     }
 
@@ -719,7 +720,7 @@ export default function LabRunner() {
       startTimer(res.time_remaining, async () => {
         await labApi.stopLab(sessionId)
         clearSession()
-        navigate(techSlugRef.current ? `/technologies/${techSlugRef.current}` : '/scenarios')
+        navigate(getLabExitPath(session, '', techSlugRef, scenarioSlugRef))
       })
       toast.success(`+30 min added. ${res.extensions_remaining} extension${res.extensions_remaining !== 1 ? 's' : ''} remaining today.`)
     } catch (err) {
@@ -793,12 +794,12 @@ export default function LabRunner() {
         }
       }
 
-      const stopDest = techSlugRef.current ? `/technologies/${techSlugRef.current}` : '/scenarios'
+      const stopDest = getLabExitPath(session, '', techSlugRef, scenarioSlugRef)
       toast.success('Lab stopped successfully')
       navigate(stopDest)
     } catch {
       toast.error('Failed to stop lab')
-      navigate(techSlugRef.current ? `/technologies/${techSlugRef.current}` : '/scenarios')
+      navigate(getLabExitPath(session, '', techSlugRef, scenarioSlugRef))
     } finally {
       setStopping(false)
       setShowStopConfirm(false)
@@ -809,6 +810,7 @@ export default function LabRunner() {
   // Keep the technology slug in a ref so async/cross-tab handlers (which don't
   // re-subscribe on session changes) can route back to the technology page.
   techSlugRef.current = scenario?.technology?.slug || techSlugRef.current
+  scenarioSlugRef.current = scenario?.slug || scenarioSlugRef.current
   const labHosts = session?.lab_hosts || []
   const blockedCmds = useMemo(
     () => (Array.isArray(scenario.blocked_commands) ? scenario.blocked_commands : []),
@@ -956,13 +958,14 @@ export default function LabRunner() {
     scenario?.simulation_type === 'ai-agent' || (scenario?.slug || '').startsWith('agent-')
   )
   // Windows Server GUI labs open the in-app Server Manager / Active Directory /
-  // Windows Update / Services simulator inline (login gate → panels with action
-  // buttons/dialogs to perform the fix). Keyed ONLY on simulation_type
-  // 'windows-server' so the 50 existing windows TERMINAL scenarios (which keep
-  // opening the Linux/PowerShell terminal) are untouched. Mirrors the
-  // data-dashboard / ai-agent detection above.
+  // Windows Update / Services simulator inline. Match simulation_type, technology
+  // slug, and win-* scenario slugs so every Windows lab opens the GUI mock.
   const isWindowsGuiLab = !isCrossTech && (
-    scenario?.simulation_type === 'windows-server' || (scenario?.slug || '').startsWith('win-gui-')
+    scenario?.simulation_type === 'windows-server'
+    || scenario?.simulation_type === 'windows'
+    || scenario?.technology?.slug === 'windows'
+    || (scenario?.slug || '').startsWith('win-gui-')
+    || (scenario?.slug || '').startsWith('win-')
   )
   // PeopleSoft labs open the PIA simulator inline. peoplesoft is a dedicated
   // technology with no coding labs, so the slug prefix, sim type, or tech slug
@@ -977,17 +980,21 @@ export default function LabRunner() {
     || (scenario?.slug || '').includes('awx')
     || (scenario?.slug || '').includes('tower')
   )
-  const isTerraformSimLab = !isCrossTech && (
-    scenario?.simulation_type === 'terraform'
-    || scenario?.technology?.slug === 'terraform'
-  )
+  const isTerraformSimLab = !isCrossTech && isTerraformLab(scenario)
   const isBaremetalGuiLab = !isCrossTech && (
     scenario?.simulation_type === 'baremetal'
     && /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
   )
-  const simOverlayOpen = showMonitoringSim || showNmapSim || showWiresharkSim
+  const isSimPrimaryLab = !isCrossTech && (
+    isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
+    || isPeopleSoftLab || isBaremetalGuiLab || isDataDashboardLab || isAgentLab
+    || isNmapLab || isWiresharkLab
+  )
+  const simOverlayOpen = !isSimPrimaryLab && (
+    showMonitoringSim || showNmapSim || showWiresharkSim
     || showDataDashboardSim || showAgentSim || showWindowsSim || showPeopleSoftSim
     || showAwxSim || showBaremetalSim || showTerraformSim
+  )
   const solved = validationResult?.passed
   const expired = validationResult?.expired
   const simChromeProps = {
@@ -1003,6 +1010,9 @@ export default function LabRunner() {
     ['grafana', 'prometheus'].includes(scenario?.technology?.slug)
     || /monitor|grafana|prometheus/.test((scenario?.slug || '').toLowerCase())
   )
+  const isCrossTechMonitoringSplit = isCrossTechMonitoring
+  const crossTechMonitoringFlavor = isCrossTechMonitoring && scenario?.technology?.slug === 'prometheus'
+    ? 'prometheus' : 'grafana'
   // coding_mode scenarios open a browser surface instead of a terminal. Prompt
   // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
   // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
@@ -1012,6 +1022,31 @@ export default function LabRunner() {
     || scenario?.technology?.slug === 'prompt-engineering'
   const isPromptLab = Boolean(scenario?.coding_mode) && promptKind
   const isCodingLab = Boolean(scenario?.coding_mode) && !isPromptLab
+
+  const primarySimProps = { sessionId, scenario, embedded: true, ...simChromeProps }
+  const renderPrimarySim = () => {
+    if (isTerraformSimLab) {
+      return (
+        <TerraformSimulator
+          {...primarySimProps}
+          terminalSession={terminalSession}
+          terminalHost={terminalHost}
+          blockedCommands={blockedCmds}
+          isMobile={isMobile}
+        />
+      )
+    }
+    if (isAwxLab) return <AwxSimulator {...primarySimProps} />
+    if (isMonitoringLab) return <MonitoringSimulator {...primarySimProps} flavor={monitoringFlavor} />
+    if (isWindowsGuiLab) return <WindowsServerSimulator {...primarySimProps} />
+    if (isPeopleSoftLab) return <PeopleSoftSimulator {...primarySimProps} />
+    if (isBaremetalGuiLab) return <BaremetalSimulator {...primarySimProps} />
+    if (isDataDashboardLab) return <DataDashboardSimulator {...primarySimProps} />
+    if (isAgentLab) return <AgentWorkflowSimulator {...primarySimProps} />
+    if (isNmapLab) return <NmapSimulator {...primarySimProps} />
+    if (isWiresharkLab) return <WiresharkSimulator {...primarySimProps} />
+    return null
+  }
 
   const labUnavailable = session && !['RUNNING', 'PROVISIONING'].includes(session.status)
 
@@ -1575,6 +1610,21 @@ export default function LabRunner() {
         </div>
 
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative">
+        {isSimPrimaryLab ? (
+          renderPrimarySim()
+        ) : (
+        <>
+        {isCrossTechMonitoringSplit && (
+          <div className="shrink-0 h-[min(48vh,440px)] min-h-[220px] border-b border-surface-800 flex flex-col overflow-hidden">
+            <MonitoringSimulator
+              sessionId={sessionId}
+              scenario={scenario}
+              flavor={crossTechMonitoringFlavor}
+              embedded
+              {...simChromeProps}
+            />
+          </div>
+        )}
         {/* Fullscreen restore tab — collapses the side panel and lets the lab
             fill the width. Click to exit fullscreen and bring the panel back. */}
         {terminalFullscreen && !isMobile && (
@@ -1614,7 +1664,7 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open VMware (same server)
             </Link>
           )}
-          {isCrossTechMonitoring && (
+          {isCrossTechMonitoring && !isCrossTechMonitoringSplit && (
             <button
               type="button"
               onClick={() => setShowMonitoringSim(true)}
@@ -1623,6 +1673,11 @@ export default function LabRunner() {
             >
               <ExternalLink size={12} /> Open Grafana (cross-tech)
             </button>
+          )}
+          {isCrossTechMonitoringSplit && (
+            <span className="text-[10px] text-[#f7913b] font-medium px-2 py-1 rounded border border-[#f7913b]/30 bg-[#f7913b]/10">
+              Grafana embedded above terminal
+            </span>
           )}
           {isMonitoringLab && (
             <button
@@ -1901,11 +1956,13 @@ export default function LabRunner() {
             </div>
           )}
         </div>
+        </>
+        )}
         </div>
       </div>
 
       {/* Mobile: floating terminal input bar */}
-      {showMobileInput && (
+      {!isSimPrimaryLab && showMobileInput && (
         <div className="sm:hidden fixed bottom-14 inset-x-0 bg-surface-950/95 border-t border-accent-cyan/30 px-3 py-2 flex gap-2 z-40 backdrop-blur-sm">
           <input
             autoFocus
@@ -1935,6 +1992,7 @@ export default function LabRunner() {
       )}
 
       {/* Mobile: floating action bar */}
+      {!isSimPrimaryLab && (
       <div className="sm:hidden fixed bottom-0 inset-x-0 bg-surface-900 border-t border-surface-700/50 px-2 py-2 flex items-center justify-around z-30 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <LabTimerBadge variant="mobile-float" />
         <button onClick={() => { setSidebarTab('instructions'); setSidebarOpen(p => !p) }}
@@ -1969,6 +2027,7 @@ export default function LabRunner() {
           <Keyboard size={20} />
         </button>
       </div>
+      )}
 
       {/* Stop confirmation dialog */}
       <ConfirmDialog
@@ -1999,7 +2058,7 @@ export default function LabRunner() {
           toolbar. The learner inspects dashboards/panels/targets/alerts + runs
           PromQL here, applies the documented config fix in the terminal, then
           runs Check Solution (which grades via check.sh, never auto-passes). */}
-      {(isMonitoringLab || isCrossTechMonitoring) && showMonitoringSim && (
+      {(isMonitoringLab || (isCrossTechMonitoring && !isCrossTechMonitoringSplit)) && !isSimPrimaryLab && showMonitoringSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
             <MonitoringSimulator
@@ -2016,7 +2075,7 @@ export default function LabRunner() {
       {/* Nmap scanner — full-screen overlay opened from the toolbar. The learner
           crafts scans (targets + flags), reads back discovered hosts/ports/
           versions/OS, then runs Check Solution (graded via the engine). */}
-      {isNmapLab && showNmapSim && (
+      {isNmapLab && !isSimPrimaryLab && showNmapSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
             <NmapSimulator
@@ -2032,7 +2091,7 @@ export default function LabRunner() {
       {/* Wireshark capture — full-screen overlay opened from the toolbar. The
           learner sets capture/display filters, follows TCP streams, marks
           packets, then runs Check Solution (graded via the engine). */}
-      {isWiresharkLab && showWiresharkSim && (
+      {isWiresharkLab && !isSimPrimaryLab && showWiresharkSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
             <WiresharkSimulator
@@ -2049,7 +2108,7 @@ export default function LabRunner() {
           toolbar. The learner picks dimension/measure/aggregation/filter/chart,
           sees the engine-computed series rendered as a chart + table, then runs
           Check Solution (graded via validate_datascience_lab). */}
-      {isDataDashboardLab && showDataDashboardSim && (
+      {isDataDashboardLab && !isSimPrimaryLab && showDataDashboardSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
             <DataDashboardSimulator
@@ -2067,7 +2126,7 @@ export default function LabRunner() {
           canvas → config panel), runs it to see the deterministic execution
           trace + final output, then runs Check Solution (graded via
           validate_aiml_lab on the engine). */}
-      {isAgentLab && showAgentSim && (
+      {isAgentLab && !isSimPrimaryLab && showAgentSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
             <AgentWorkflowSimulator
@@ -2084,7 +2143,7 @@ export default function LabRunner() {
           learner signs in, then uses Server Manager / Active Directory Users and
           Computers / Windows Update / Services to perform the fix, then runs
           Check Solution (graded via validate_windows_lab on the engine). */}
-      {isWindowsGuiLab && showWindowsSim && (
+      {isWindowsGuiLab && !isSimPrimaryLab && showWindowsSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
             <WindowsServerSimulator
@@ -2097,7 +2156,7 @@ export default function LabRunner() {
         </div>
       )}
 
-      {isPeopleSoftLab && showPeopleSoftSim && (
+      {isPeopleSoftLab && !isSimPrimaryLab && showPeopleSoftSim && (
         <div className="fixed inset-0 z-[60]">
           <PeopleSoftSimulator
             sessionId={sessionId}
@@ -2108,7 +2167,7 @@ export default function LabRunner() {
         </div>
       )}
 
-      {isAwxLab && showAwxSim && (
+      {isAwxLab && !isSimPrimaryLab && showAwxSim && (
         <AwxSimulator
           sessionId={sessionId}
           scenario={scenario}
@@ -2117,7 +2176,7 @@ export default function LabRunner() {
         />
       )}
 
-      {isBaremetalGuiLab && showBaremetalSim && (
+      {isBaremetalGuiLab && !isSimPrimaryLab && showBaremetalSim && (
         <BaremetalSimulator
           sessionId={sessionId}
           scenario={scenario}
@@ -2126,7 +2185,7 @@ export default function LabRunner() {
         />
       )}
 
-      {isTerraformSimLab && showTerraformSim && (
+      {isTerraformSimLab && !isSimPrimaryLab && showTerraformSim && (
         <TerraformSimulator
           sessionId={sessionId}
           scenario={scenario}

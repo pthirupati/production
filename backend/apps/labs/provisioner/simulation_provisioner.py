@@ -519,7 +519,7 @@ class SimulationProvisioner:
                 tf_ensure(str(lab_session.id), slug)
                 return validate_terraform_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
-                return False, "Terraform simulation session not found"
+                return False, "IaC simulation session not found"
         _raw_bm_type = sim_type
         if not _raw_bm_type or _raw_bm_type == "generic":
             from apps.labs.models import LabSession

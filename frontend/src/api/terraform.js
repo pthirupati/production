@@ -1,6 +1,6 @@
 import api from './client'
 
-const base = (sessionId) => `/vmware-sim/terraform/sessions/${sessionId}`
+const base = (sessionId) => `/vmware/terraform/sessions/${sessionId}`
 
 export const terraformApi = {
   getState(sessionId, scenarioSlug = '') {

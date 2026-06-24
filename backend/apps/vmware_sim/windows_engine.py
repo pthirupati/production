@@ -127,6 +127,34 @@ def _update(kb: str, title: str, status: str, *, severity: str = "Important",
     }
 
 
+def _gpo_setting(key: str, value: str, *, enabled: bool = True, category: str = "Security Settings") -> dict:
+    return {"key": key, "value": value, "enabled": bool(enabled), "category": category}
+
+
+def _gpo(gid: str, name: str, *, settings: list[dict] | None = None,
+         links: list[str] | None = None, status: str = "Enabled") -> dict:
+    return {
+        "id": gid,
+        "name": name,
+        "status": status if status in ("Enabled", "Disabled") else "Enabled",
+        "settings": settings if settings is not None else [
+            _gpo_setting("Enforce password history", "24 passwords remembered"),
+            _gpo_setting("Maximum password age", "90 days"),
+            _gpo_setting("Minimum password length", "14 characters"),
+            _gpo_setting("Password must meet complexity requirements", "Enabled"),
+        ],
+        "links": list(links) if links is not None else [],
+    }
+
+
+def _find_gpo(world: dict, gpo_id: str) -> dict | None:
+    target = (gpo_id or "").lower()
+    for g in world.get("group_policy", {}).get("gpos", []):
+        if g["id"].lower() == target or g["name"].lower() == target:
+            return g
+    return None
+
+
 def _base_world() -> dict:
     """A healthy Windows Server 2022 member-server world. Presets break one thing."""
     return {
@@ -202,6 +230,23 @@ def _base_world() -> dict:
             "logged_in": False,
             "locked": False,
             "current_user": "CORP\\Administrator",
+        },
+        "group_policy": {
+            "forest": DEFAULT_DOMAIN,
+            "containers": [
+                {"path": DEFAULT_DOMAIN, "type": "domain"},
+                {"path": f"{DEFAULT_DOMAIN}/Policies", "type": "policies"},
+            ],
+            "gpos": [
+                _gpo("default-domain-policy", "Default Domain Policy",
+                     links=[DEFAULT_DOMAIN]),
+                _gpo("rdp-lockdown", "RDP Lockdown GPO", settings=[
+                    _gpo_setting("Allow log on through Remote Desktop Services",
+                                 "Remote Desktop Users", category="User Rights Assignment"),
+                    _gpo_setting("Deny log on through Remote Desktop Services",
+                                 "Not configured", category="User Rights Assignment"),
+                ], links=[]),
+            ],
         },
     }
 
@@ -466,6 +511,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "updates": world["updates"],
         "services": world["services"],
         "session": world["session"],
+        "group_policy": world.get("group_policy", {}),
         # Human-readable goal (objective/title) — never leaks the answer beyond
         # what the objective already tells the learner.
         "goal": {
@@ -585,14 +631,26 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
             return {"ok": False, "error": "A username is required"}
         if _find_user(world, name):
             return {"ok": False, "error": f"User '{name}' already exists"}
-        group = payload.get("group") or "Domain Users"
+        groups_in = payload.get("groups")
+        if isinstance(groups_in, list) and groups_in:
+            groups = [str(g).strip() for g in groups_in if str(g).strip()]
+        else:
+            groups = []
+        group = (payload.get("group") or (groups[0] if groups else "") or "Domain Users").strip()
+        if group and group not in groups:
+            groups = [group, *groups]
+        if not groups:
+            groups = [group]
+        if "Domain Users" not in groups:
+            groups.append("Domain Users")
         world["ad"]["users"].append(_user(
             name,
             display=payload.get("display") or name,
             enabled=bool(payload.get("enabled", True)),
             group=group,
-            groups=[group] if group == "Domain Users" else [group, "Domain Users"],
+            groups=groups,
             ou=payload.get("ou") or "Users",
+            must_change_pw=bool(payload.get("must_change_pw", payload.get("mustChange", False))),
         ))
         _event(state, f"Created AD user: {name}")
         return {"ok": True, "message": f"Created user {name}"}
@@ -762,6 +820,84 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
         world["computer_name"] = new_name
         _event(state, f"Renamed computer to {new_name}")
         return {"ok": True, "message": f"Renamed to {new_name}"}
+
+    # ---- Group Policy Management ----
+    if act in ("create_gpo", "new_gpo"):
+        gp = world.setdefault("group_policy", {"forest": DEFAULT_DOMAIN, "gpos": [], "containers": []})
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "A GPO name is required"}
+        if _find_gpo(world, name):
+            return {"ok": False, "error": f"GPO '{name}' already exists"}
+        gid = (payload.get("id") or name.lower().replace(" ", "-"))[:48]
+        gp["gpos"].append(_gpo(gid, name, links=[]))
+        _event(state, f"Created GPO: {name}")
+        return {"ok": True, "message": f"Created GPO {name}", "gpo_id": gid}
+
+    if act in ("delete_gpo", "remove_gpo"):
+        gpo = _find_gpo(world, payload.get("gpo") or payload.get("id") or payload.get("name"))
+        if not gpo:
+            return {"ok": False, "error": "GPO not found"}
+        if gpo["id"] == "default-domain-policy":
+            return {"ok": False, "error": "Cannot delete the Default Domain Policy"}
+        gp = world.get("group_policy", {})
+        gp["gpos"] = [g for g in gp.get("gpos", []) if g["id"] != gpo["id"]]
+        _event(state, f"Deleted GPO: {gpo['name']}")
+        return {"ok": True, "message": f"Deleted GPO {gpo['name']}"}
+
+    if act in ("update_gpo_setting", "edit_gpo_setting"):
+        gpo = _find_gpo(world, payload.get("gpo") or payload.get("id"))
+        if not gpo:
+            return {"ok": False, "error": "GPO not found"}
+        key = (payload.get("key") or "").strip()
+        if not key:
+            return {"ok": False, "error": "A setting key is required"}
+        for s in gpo["settings"]:
+            if s["key"].lower() == key.lower():
+                if "value" in payload:
+                    s["value"] = str(payload["value"])
+                if "enabled" in payload:
+                    s["enabled"] = bool(payload["enabled"])
+                _event(state, f"Updated GPO setting '{key}' on {gpo['name']}")
+                return {"ok": True, "message": f"Updated {key}"}
+        gpo["settings"].append(_gpo_setting(
+            key, str(payload.get("value") or ""), enabled=bool(payload.get("enabled", True)),
+            category=str(payload.get("category") or "Custom"),
+        ))
+        _event(state, f"Added GPO setting '{key}' to {gpo['name']}")
+        return {"ok": True, "message": f"Added setting {key}"}
+
+    if act in ("link_gpo", "link_gpo_ou"):
+        gpo = _find_gpo(world, payload.get("gpo") or payload.get("id"))
+        ou = (payload.get("ou") or payload.get("path") or DEFAULT_DOMAIN).strip()
+        if not gpo:
+            return {"ok": False, "error": "GPO not found"}
+        if ou not in gpo["links"]:
+            gpo["links"].append(ou)
+        _event(state, f"Linked GPO {gpo['name']} to {ou}")
+        return {"ok": True, "message": f"Linked {gpo['name']} to {ou}"}
+
+    if act in ("unlink_gpo", "unlink_gpo_ou"):
+        gpo = _find_gpo(world, payload.get("gpo") or payload.get("id"))
+        ou = (payload.get("ou") or payload.get("path") or "").strip()
+        if not gpo:
+            return {"ok": False, "error": "GPO not found"}
+        gpo["links"] = [l for l in gpo.get("links", []) if l.lower() != ou.lower()]
+        _event(state, f"Unlinked GPO {gpo['name']} from {ou}")
+        return {"ok": True, "message": f"Unlinked {gpo['name']}"}
+
+    if act in ("toggle_gpo", "enable_gpo", "disable_gpo"):
+        gpo = _find_gpo(world, payload.get("gpo") or payload.get("id"))
+        if not gpo:
+            return {"ok": False, "error": "GPO not found"}
+        if act == "enable_gpo":
+            gpo["status"] = "Enabled"
+        elif act == "disable_gpo":
+            gpo["status"] = "Disabled"
+        else:
+            gpo["status"] = "Disabled" if gpo.get("status") == "Enabled" else "Enabled"
+        _event(state, f"Set GPO {gpo['name']} to {gpo['status']}")
+        return {"ok": True, "message": f"GPO {gpo['name']} is now {gpo['status']}"}
 
     if act in ("reset",):
         # Re-break the world from the preset (a fresh start for the learner).

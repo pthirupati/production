@@ -5,6 +5,8 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { labApi } from '../../api/labs'
+import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab } from '../ide/VsCodeWorkbench'
+import '../../styles/vscode-workbench.css'
 
 /*
  * PromptPlayground — a FREE, fully rule-based "AI practice" simulator for the
@@ -147,6 +149,8 @@ export default function PromptPlayground({ sessionId, scenario, solved: solvedPr
   const [chat, setChat] = useState([])        // [{ role, text, analysis }]
   const [sandboxInput, setSandboxInput] = useState('')
   const [completing, setCompleting] = useState(false)
+  const [exPanelTab, setExPanelTab] = useState('output')   // output | quality
+  const [sandboxPanelTab, setSandboxPanelTab] = useState('chat') // chat | quality
 
   const mountedRef = useRef(true)
   const chatEndRef = useRef(null)
@@ -207,6 +211,7 @@ export default function PromptPlayground({ sessionId, scenario, solved: solvedPr
     const text = drafts[ex.id] || ''
     const evalResult = evaluateExercise(text, ex.success)
     setResults((prev) => ({ ...prev, [ex.id]: evalResult }))
+    setExPanelTab('output')
     return evalResult
   }, [drafts])
 
@@ -293,6 +298,10 @@ export default function PromptPlayground({ sessionId, scenario, solved: solvedPr
 
   const current = exercises[activeEx]
   const currentResult = current ? results[current.id] : null
+  const currentDraft = current ? (drafts[current.id] || '') : ''
+  const currentAnalysis = analyzePrompt(currentDraft)
+
+  const promptTextareaClass = 'w-full h-full min-h-[180px] resize-none border-0 outline-none bg-transparent text-[var(--vsc-text,#e4e4e7)] font-mono text-sm p-3 leading-relaxed placeholder:text-[var(--vsc-muted,#71717a)]'
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-surface-950 text-surface-200">
@@ -356,101 +365,119 @@ export default function PromptPlayground({ sessionId, scenario, solved: solvedPr
       <div className="flex-1 min-h-0 overflow-hidden">
         {/* ── Exercises tab ── */}
         {tab === 'exercises' && (
-          <div className="h-full flex flex-col md:flex-row min-h-0">
-            {/* Exercise list */}
-            <div className="md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-surface-800 overflow-y-auto bg-surface-900/40">
-              {exercises.map((ex, i) => {
-                const r = results[ex.id]
-                return (
-                  <button
-                    key={ex.id}
-                    onClick={() => setActiveEx(i)}
-                    className={`w-full text-left px-3 py-2.5 flex items-start gap-2 border-l-2 transition-colors ${
-                      i === activeEx ? 'border-accent-cyan bg-surface-800/60' : 'border-transparent hover:bg-surface-800/30'
-                    }`}
-                  >
-                    {r?.passed ? (
-                      <CheckCircle2 size={14} className="text-accent-green mt-0.5 shrink-0" />
-                    ) : (
-                      <Target size={14} className="text-surface-500 mt-0.5 shrink-0" />
-                    )}
-                    <span className={`text-xs ${i === activeEx ? 'text-surface-100 font-medium' : 'text-surface-400'}`}>
-                      {ex.title}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Active exercise */}
-            {current && (
-              <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
-                <div>
-                  <h3 className="text-sm font-bold text-surface-100 flex items-center gap-2">
-                    <Target size={14} className="text-accent-cyan" /> {current.title}
-                  </h3>
-                  <p className="text-sm text-surface-400 mt-1.5 leading-relaxed">{current.goal}</p>
-                </div>
-
-                <textarea
-                  value={drafts[current.id] ?? ''}
-                  onChange={(e) => setDrafts((p) => ({ ...p, [current.id]: e.target.value }))}
-                  placeholder="Write your prompt here…"
-                  rows={6}
-                  className="w-full rounded-lg bg-surface-900 border border-surface-700 focus:border-accent-cyan focus:outline-none text-sm text-surface-100 p-3 font-mono leading-relaxed resize-y"
-                />
-
-                <QualityMeter analysis={analyzePrompt(drafts[current.id] || '')} />
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => submitExercise(current)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-accent-cyan/40 text-accent-cyan bg-accent-cyan/10 hover:bg-accent-cyan/20"
-                  >
-                    <Send size={12} /> Test prompt
-                  </button>
-                  <button
-                    onClick={() => setDrafts((p) => ({ ...p, [current.id]: current.starter || '' }))}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-surface-700 text-surface-400 hover:text-surface-200"
-                  >
-                    <RotateCcw size={12} /> Reset
-                  </button>
-                </div>
-
-                {/* Result: simulated reply + checklist */}
-                {currentResult && (
-                  <div className="space-y-3 pt-1">
-                    <div className={`rounded-lg border p-3 ${currentResult.passed ? 'border-accent-green/30 bg-accent-green/5' : 'border-accent-amber/30 bg-accent-amber/5'}`}>
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <Bot size={13} className={currentResult.passed ? 'text-accent-green' : 'text-accent-amber'} />
-                        <span className="text-[11px] font-semibold uppercase tracking-wide text-surface-400">Simulated assistant</span>
-                      </div>
-                      <p className="text-sm text-surface-200 whitespace-pre-wrap leading-relaxed">
-                        {replyForExercise(current, currentResult)}
-                      </p>
-                    </div>
-
-                    {currentResult.passed ? (
-                      <p className="text-xs text-accent-green font-medium flex items-center gap-1.5">
-                        <CheckCircle2 size={13} /> Exercise cleared — this prompt meets every requirement.
-                      </p>
-                    ) : (
-                      <div className="rounded-lg border border-surface-700/60 bg-surface-900/60 p-3">
-                        <p className="text-[11px] font-semibold text-surface-400 mb-1.5">Still missing:</p>
-                        <ul className="space-y-1">
-                          {currentResult.missing.map((m, i) => (
-                            <li key={i} className="flex items-start gap-1.5 text-xs text-surface-300">
-                              <XCircle size={11} className="text-accent-red mt-0.5 shrink-0" /> {m}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
+          <VsCodeWorkbench
+            theme="app"
+            accent="#22d3ee"
+            className="h-full"
+            sidebarMobile="horizontal"
+            title={current?.title || 'Prompt exercise'}
+            subtitle={scenario?.title}
+            sidebarHeader="EXERCISES"
+            sidebar={exercises.map((ex, i) => {
+              const r = results[ex.id]
+              return (
+                <VscFileItem key={ex.id} active={i === activeEx} onClick={() => setActiveEx(i)}>
+                  {r?.passed ? '✓ ' : '○ '}{ex.title}
+                </VscFileItem>
+              )
+            })}
+            editorTabs={current && (
+              <VscEditorTab active>{`${current.id || 'prompt'}.txt`}</VscEditorTab>
+            )}
+            editorToolbar={current && (
+              <div className="flex items-center gap-2 w-full">
+                <button type="button" onClick={() => submitExercise(current)}
+                  className="vsc-btn vsc-btn-primary flex items-center gap-1">
+                  <Send size={12} /> Test prompt
+                </button>
+                <button type="button"
+                  onClick={() => setDrafts((p) => ({ ...p, [current.id]: current.starter || '' }))}
+                  className="vsc-btn flex items-center gap-1">
+                  <RotateCcw size={12} /> Reset
+                </button>
               </div>
             )}
-          </div>
+            editor={current ? (
+              <div className="h-full min-h-0 flex flex-col">
+                <textarea
+                  value={currentDraft}
+                  onChange={(e) => setDrafts((p) => ({ ...p, [current.id]: e.target.value }))}
+                  placeholder="Write your prompt here…"
+                  spellCheck={false}
+                  className={`${promptTextareaClass} flex-1`}
+                />
+              </div>
+            ) : (
+              <div className="p-4 text-sm text-[var(--vsc-muted)]">Select an exercise from the sidebar.</div>
+            )}
+            bottomPanel={{
+              height: 240,
+              tabs: (
+                <>
+                  <VscPanelTab active={exPanelTab === 'output'} onClick={() => setExPanelTab('output')}>Output</VscPanelTab>
+                  <VscPanelTab active={exPanelTab === 'quality'} onClick={() => setExPanelTab('quality')}>Quality</VscPanelTab>
+                </>
+              ),
+              content: exPanelTab === 'quality' ? (
+                <QualityMeter analysis={currentAnalysis} />
+              ) : currentResult ? (
+                <div className="space-y-2 text-sm">
+                  <div className={`rounded border p-2.5 ${currentResult.passed ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}>
+                    <div className="flex items-center gap-1.5 mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--vsc-muted)]">
+                      <Bot size={12} /> Simulated assistant
+                    </div>
+                    <p className="text-[var(--vsc-text)] whitespace-pre-wrap leading-relaxed">
+                      {replyForExercise(current, currentResult)}
+                    </p>
+                  </div>
+                  {currentResult.passed ? (
+                    <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 size={12} /> Exercise cleared — meets every requirement.
+                    </p>
+                  ) : (
+                    <ul className="space-y-1 text-xs text-[var(--vsc-text)]">
+                      {currentResult.missing.map((m, i) => (
+                        <li key={i} className="flex items-start gap-1.5">
+                          <XCircle size={10} className="text-red-400 mt-0.5 shrink-0" /> {m}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--vsc-muted)]">Run <strong>Test prompt</strong> to see the simulated assistant reply and checklist.</p>
+              ),
+            }}
+            rightPanel={{
+              width: 280,
+              header: 'Brief',
+              content: current ? (
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <h3 className="font-semibold text-[var(--vsc-text)] flex items-center gap-1.5 mb-1">
+                      <Target size={13} className="text-cyan-400" /> {current.title}
+                    </h3>
+                    <p className="text-[var(--vsc-muted)] leading-relaxed text-xs">{current.goal}</p>
+                  </div>
+                  {current.hints?.length > 0 && (
+                    <div className="rounded border border-amber-500/20 bg-amber-500/5 p-2.5">
+                      <p className="text-[10px] font-semibold text-amber-400 mb-1 flex items-center gap-1">
+                        <Lightbulb size={11} /> Hints
+                      </p>
+                      <ul className="text-xs text-[var(--vsc-muted)] space-y-1">
+                        {current.hints.map((h, i) => <li key={i}>• {h}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : null,
+            }}
+            statusBar={{
+              left: `${passedCount}/${exercises.length} exercises passed`,
+              center: current ? `${currentAnalysis.words} words` : '',
+              right: current ? `Quality ${currentAnalysis.score}/100` : '',
+            }}
+          />
         )}
 
         {/* ── Lesson tab ── */}
@@ -481,51 +508,23 @@ export default function PromptPlayground({ sessionId, scenario, solved: solvedPr
 
         {/* ── Free Practice (sandbox chat) tab ── */}
         {tab === 'sandbox' && (
-          <div className="h-full flex flex-col min-h-0">
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
-              {chat.length === 0 && (
-                <div className="text-center py-10 max-w-md mx-auto">
-                  <Bot size={28} className="text-surface-600 mx-auto mb-3" />
-                  <p className="text-sm text-surface-400">
-                    Write any prompt and get a rule-based reply plus a live quality score. Experiment freely — nothing here is graded.
-                  </p>
-                </div>
-              )}
-              {chat.map((msg, i) => (
-                <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {msg.role === 'assistant' && (
-                    <div className="w-7 h-7 shrink-0 rounded-md bg-accent-purple/15 border border-accent-purple/30 flex items-center justify-center">
-                      <Bot size={14} className="text-accent-purple" />
-                    </div>
-                  )}
-                  <div className={`max-w-[75%] ${msg.role === 'user' ? 'order-1' : ''}`}>
-                    <div className={`rounded-lg px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                      msg.role === 'user'
-                        ? 'bg-accent-cyan/15 border border-accent-cyan/25 text-surface-100'
-                        : 'bg-surface-800/70 border border-surface-700 text-surface-200'
-                    }`}>
-                      {msg.text}
-                    </div>
-                    {msg.role === 'user' && msg.analysis == null && null}
-                    {msg.role === 'assistant' && msg.analysis && (
-                      <div className="mt-1.5">
-                        <span className={`text-[10px] font-mono ${scoreColor(msg.analysis.score)}`}>
-                          your prompt scored {msg.analysis.score}/100
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  {msg.role === 'user' && (
-                    <div className="w-7 h-7 shrink-0 rounded-md bg-accent-cyan/15 border border-accent-cyan/30 flex items-center justify-center order-2">
-                      <User size={14} className="text-accent-cyan" />
-                    </div>
-                  )}
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-            <div className="shrink-0 border-t border-surface-800 p-3 bg-surface-900/60">
-              <div className="flex items-end gap-2">
+          <VsCodeWorkbench
+            theme="app"
+            accent="#a78bfa"
+            className="h-full"
+            title="Free Practice"
+            subtitle="Rule-based chat — no live model"
+            editorTabs={<VscEditorTab active>prompt.txt</VscEditorTab>}
+            editorToolbar={(
+              <div className="flex items-center gap-2 w-full">
+                <button type="button" onClick={sendSandbox} disabled={!sandboxInput.trim()}
+                  className="vsc-btn vsc-btn-primary flex items-center gap-1 disabled:opacity-40">
+                  <Send size={12} /> Send (⌘↵)
+                </button>
+              </div>
+            )}
+            editor={(
+              <div className="h-full min-h-0 flex flex-col">
                 <textarea
                   value={sandboxInput}
                   onChange={(e) => setSandboxInput(e.target.value)}
@@ -533,19 +532,63 @@ export default function PromptPlayground({ sessionId, scenario, solved: solvedPr
                     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendSandbox() }
                   }}
                   placeholder="Write a prompt… (Cmd/Ctrl+Enter to send)"
-                  rows={2}
-                  className="flex-1 rounded-lg bg-surface-900 border border-surface-700 focus:border-accent-cyan focus:outline-none text-sm text-surface-100 p-2.5 font-mono resize-none"
+                  spellCheck={false}
+                  className={`${promptTextareaClass} flex-1`}
                 />
-                <button
-                  onClick={sendSandbox}
-                  disabled={!sandboxInput.trim()}
-                  className="h-10 px-3 rounded-lg bg-accent-cyan text-surface-950 font-semibold flex items-center gap-1.5 text-sm disabled:opacity-50"
-                >
-                  <Send size={14} /> Send
-                </button>
               </div>
-            </div>
-          </div>
+            )}
+            bottomPanel={{
+              height: 280,
+              tabs: (
+                <>
+                  <VscPanelTab active={sandboxPanelTab === 'chat'} onClick={() => setSandboxPanelTab('chat')}>Chat</VscPanelTab>
+                  <VscPanelTab active={sandboxPanelTab === 'quality'} onClick={() => setSandboxPanelTab('quality')}>Quality</VscPanelTab>
+                </>
+              ),
+              content: sandboxPanelTab === 'quality' ? (
+                <QualityMeter analysis={analyzePrompt(sandboxInput)} />
+              ) : (
+                <div className="space-y-3 overflow-y-auto max-h-full pr-1">
+                  {chat.length === 0 && (
+                    <p className="text-xs text-[var(--vsc-muted)] py-4 text-center">
+                      Send a prompt to start a rule-based conversation. Nothing here is graded.
+                    </p>
+                  )}
+                  {chat.map((msg, i) => (
+                    <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      {msg.role === 'assistant' && (
+                        <div className="w-6 h-6 shrink-0 rounded bg-purple-500/15 flex items-center justify-center">
+                          <Bot size={12} className="text-purple-400" />
+                        </div>
+                      )}
+                      <div className={`max-w-[85%] rounded px-2.5 py-2 text-xs leading-relaxed whitespace-pre-wrap ${
+                        msg.role === 'user'
+                          ? 'bg-cyan-500/15 text-[var(--vsc-text)]'
+                          : 'bg-[var(--vsc-tab)] text-[var(--vsc-text)]'
+                      }`}>
+                        {msg.text}
+                        {msg.role === 'assistant' && msg.analysis && (
+                          <div className={`mt-1 text-[10px] font-mono ${scoreColor(msg.analysis.score)}`}>
+                            prompt scored {msg.analysis.score}/100
+                          </div>
+                        )}
+                      </div>
+                      {msg.role === 'user' && (
+                        <div className="w-6 h-6 shrink-0 rounded bg-cyan-500/15 flex items-center justify-center">
+                          <User size={12} className="text-cyan-400" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+              ),
+            }}
+            statusBar={{
+              left: `${chat.length} messages`,
+              right: sandboxInput.trim() ? `Quality ${analyzePrompt(sandboxInput).score}/100` : 'Ready',
+            }}
+          />
         )}
       </div>
     </div>

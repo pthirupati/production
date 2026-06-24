@@ -39,6 +39,13 @@ const EXAMPLE_QUERIES = [
   'prometheus_tsdb_head_series',
 ]
 
+const METRIC_SUGGESTIONS = [
+  'up', 'node_cpu_seconds_total', 'node_memory_MemAvailable_bytes', 'node_filesystem_avail_bytes',
+  'node_network_receive_bytes_total', 'http_requests_total', 'process_cpu_seconds_total',
+  'prometheus_tsdb_head_series', 'scrape_duration_seconds', 'ALERTS', 'ALERTS_FOR_STATE',
+  'rate(', 'sum by (', 'avg(', 'max(', 'min(', 'count(', 'histogram_quantile(0.99,',
+]
+
 /**
  * GrafanaExplorePanel — an original functional emulation of Grafana's "Explore" view
  * for the FixitLab monitoring sim. Lets a learner pick a data source, type a PromQL
@@ -69,6 +76,14 @@ export default function GrafanaExplorePanel({ sessionId, scenarioSlug, datasourc
   const [series, setSeries] = useState([])
   const [history, setHistory] = useState([])
   const [split, setSplit] = useState(false)
+  const [showSuggest, setShowSuggest] = useState(false)
+
+  const suggestions = useMemo(() => {
+    const q = (expr || '').trim().toLowerCase()
+    const pool = [...new Set([...METRIC_SUGGESTIONS, ...EXAMPLE_QUERIES, ...history])]
+    if (!q) return pool.slice(0, 10)
+    return pool.filter((s) => s.toLowerCase().includes(q)).slice(0, 8)
+  }, [expr, history])
 
   const dsKey = useCallback(
     (d) => d?.uid ?? d?.name ?? '',
@@ -146,7 +161,7 @@ export default function GrafanaExplorePanel({ sessionId, scenarioSlug, datasourc
 
       <div className="p-3 space-y-3">
         {/* query editor row */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative flex-1 min-w-0">
           <span className="mon-panel-sub font-mono hidden sm:inline">
             {activeSource?.type || 'prometheus'}
           </span>
@@ -156,8 +171,29 @@ export default function GrafanaExplorePanel({ sessionId, scenarioSlug, datasourc
             spellCheck={false}
             placeholder="Enter a PromQL expression…"
             onChange={e => setExpr(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') runQuery() }}
+            onFocus={() => setShowSuggest(true)}
+            onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { runQuery(); setShowSuggest(false) }
+              if (e.key === 'Escape') setShowSuggest(false)
+              if (e.key === 'Tab' && showSuggest && suggestions[0]) {
+                e.preventDefault()
+                setExpr(suggestions[0])
+              }
+            }}
           />
+          {showSuggest && suggestions.length > 0 && (
+            <ul className="absolute left-0 right-0 top-full mt-1 z-20 mon-card !p-0 max-h-48 overflow-y-auto shadow-xl">
+              {suggestions.map((s) => (
+                <li key={s}>
+                  <button type="button" className="w-full text-left px-3 py-2 text-xs font-mono hover:bg-[#262a45] text-[#d8def0]"
+                    onMouseDown={(e) => { e.preventDefault(); setExpr(s); setShowSuggest(false) }}>
+                    {s}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           <button
             className="mon-btn-primary flex items-center gap-1.5"
             style={{ background: '#f7913b', color: '#1a1206' }}

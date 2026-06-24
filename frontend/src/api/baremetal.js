@@ -1,6 +1,6 @@
 import api from './client'
 
-const base = (sessionId) => `/vmware-sim/baremetal/sessions/${sessionId}`
+const base = (sessionId) => `/vmware/baremetal/sessions/${sessionId}`
 
 export const baremetalApi = {
   getState(sessionId, scenarioSlug = '') {

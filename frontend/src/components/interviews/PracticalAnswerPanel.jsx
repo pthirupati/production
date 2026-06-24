@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Terminal, CheckCircle2, XCircle, Loader2, Play, Code2, ExternalLink } from 'lucide-react'
 import CodeEditor from '../ide/CodeEditor'
 import LabTerminal from '../LabTerminal'
+import VsCodeWorkbench, { VscPanelTab } from '../ide/VsCodeWorkbench'
+import '../../styles/vscode-workbench.css'
 import { labApi } from '../../api/labs'
 
 /**
@@ -219,14 +221,26 @@ export default function PracticalAnswerPanel({
           />
         </>
       ) : (
-        // Embedded code editor for code-kind practicals.
-        <div className="h-64 rounded-lg overflow-hidden border border-surface-800">
-          <CodeEditor
-            value={value}
-            onChange={setValue}
-            language={language}
-            onRun={check}
-            readOnly={disabled || checking}
+        <div className="h-72 rounded-lg overflow-hidden border border-surface-800">
+          <VsCodeWorkbench
+            theme="app"
+            className="h-full"
+            title={`${language} workspace`}
+            subtitle="Interview practical"
+            showSidebar={false}
+            editor={(
+              <CodeEditor value={value} onChange={setValue} language={language} onRun={check} readOnly={disabled || checking} />
+            )}
+            bottomPanel={{
+              height: 48,
+              tabs: <VscPanelTab active>Output</VscPanelTab>,
+              content: result ? (
+                <span className={result.validated ? 'text-emerald-400' : 'text-amber-300'}>{result.feedback}</span>
+              ) : (
+                <span className="text-[var(--vsc-muted)]">Ctrl/⌘+Enter to check your answer.</span>
+              ),
+            }}
+            statusBar={{ left: 'solution' + (language === 'python' ? '.py' : '.js'), center: language, right: checking ? 'Checking…' : 'Ready' }}
           />
         </div>
       )}

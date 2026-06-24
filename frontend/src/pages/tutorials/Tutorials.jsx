@@ -19,14 +19,18 @@ function TutorialCard({ t }) {
   return (
     <Link
       to={`/tutorials/${t.slug}`}
-      className="group fx-panel p-5 flex flex-col hover:border-accent-cyan/40 transition-all hover:shadow-lg hover:shadow-accent-cyan/5"
+      className="group tutorial-track-card p-5 flex flex-col hover:border-accent-cyan/40 transition-all hover:shadow-lg hover:shadow-accent-cyan/5"
     >
       <div className="flex items-center justify-between gap-2 mb-3">
-        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border capitalize ${DIFFICULTY_CLASS[t.difficulty] || DIFFICULTY_CLASS.beginner}`}>
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border capitalize ${DIFFICULTY_CLASS[t.difficulty] || DIFFICULTY_CLASS.beginner}`}>
           {t.difficulty}
         </span>
-        <span className="text-[10px] text-surface-600">{t.section_count} topics</span>
+        {t.level_track && (
+          <span className={`text-[10px] font-medium capitalize tutorial-level-${t.level_track}`}>{t.level_track}</span>
+        )}
+        <span className="text-[10px] text-surface-500 ml-auto">{t.section_count} sections</span>
       </div>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-accent-cyan mb-1">{t.topic}</p>
       <h3 className="font-display font-semibold text-white text-base leading-snug mb-2 group-hover:text-accent-cyan transition-colors">
         {t.title}
       </h3>
@@ -44,7 +48,7 @@ function TutorialCard({ t }) {
 function CourseTrack({ course, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <section className="fx-panel overflow-hidden border-accent-purple/20 bg-gradient-to-br from-accent-purple/[0.04] to-transparent">
+    <section className="tutorial-track-card overflow-hidden tutorial-course-header">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -78,7 +82,7 @@ function CourseTrack({ course, defaultOpen }) {
                 <p className="text-[11px] text-surface-500 truncate">{t.summary}</p>
               </div>
               {t.level_track && (
-                <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full border border-surface-700 text-surface-500 capitalize">{t.level_track}</span>
+                <span className={`hidden sm:inline text-[10px] px-2 py-0.5 rounded-full border border-surface-700 capitalize tutorial-level-${t.level_track}`}>{t.level_track}</span>
               )}
               <ArrowRight size={14} className="text-surface-600 group-hover:text-accent-cyan shrink-0" />
             </Link>
@@ -92,7 +96,7 @@ function CourseTrack({ course, defaultOpen }) {
 function TechnologyTrack({ track, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <section className="fx-panel overflow-hidden border-surface-800/80">
+    <section className="tutorial-track-card overflow-hidden tutorial-tech-header">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -191,6 +195,7 @@ export default function Tutorials() {
 
   return (
     <PublicLayout>
+      <div className="tutorial-page">
       <MarketingPageShell
         eyebrow="Learn by doing"
         title="Technology Tutorials"
@@ -204,7 +209,7 @@ export default function Tutorials() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search tutorials…"
-              className="w-full pl-9 pr-3 py-2 rounded-lg bg-surface-900 border border-surface-700 text-sm text-surface-100 placeholder:text-surface-500 focus:border-accent-cyan focus:outline-none"
+              className="w-full pl-9 pr-3 py-2 rounded-lg bg-surface-900 border border-surface-700 text-sm text-surface-100 placeholder:text-surface-500 focus:border-accent-cyan focus:outline-none focus:ring-2 focus:ring-accent-cyan/20"
             />
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -275,6 +280,7 @@ export default function Tutorials() {
           </div>
         )}
       </MarketingPageShell>
+      </div>
     </PublicLayout>
   )
 }

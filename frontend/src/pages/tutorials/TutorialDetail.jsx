@@ -19,14 +19,18 @@ const DIFFICULTY_CLASS = {
   enterprise: 'text-accent-purple bg-accent-purple/10 border-accent-purple/20',
 }
 
-const SECTION_ACCENT = {
-  Theory: 'tutorial-section-theory',
-  Architecture: 'tutorial-section-architecture',
-  'Hands-on labs': 'tutorial-section-labs',
-  Troubleshooting: 'tutorial-section-troubleshooting',
-  'Security practices': 'tutorial-section-security',
-  'Enterprise production examples': 'tutorial-section-enterprise',
-  'Root cause analysis': 'tutorial-section-enterprise',
+function sectionTheme(heading) {
+  const h = (heading || '').toLowerCase()
+  if (h.includes('theory')) return 'tutorial-section-theory'
+  if (h.includes('architecture')) return 'tutorial-section-architecture'
+  if (h.includes('concept')) return 'tutorial-section-concepts'
+  if (h.includes('lab') || h.includes('hands-on') || h.includes('simulation') || h.includes('project')) return 'tutorial-section-labs'
+  if (h.includes('troubleshoot') || h.includes('incident') || h.includes('rca') || h.includes('root cause')) return 'tutorial-section-troubleshooting'
+  if (h.includes('security')) return 'tutorial-section-security'
+  if (h.includes('enterprise') || h.includes('production')) return 'tutorial-section-enterprise'
+  if (h.includes('interview') || h.includes('scenario question') || h.includes('assessment') || h.includes('certification')) return 'tutorial-section-interview'
+  if (h.includes('monitor') || h.includes('performance')) return 'tutorial-section-monitoring'
+  return 'tutorial-section-concepts'
 }
 
 const LEVEL_CLASS = {
@@ -35,6 +39,16 @@ const LEVEL_CLASS = {
   advanced: 'tutorial-level-advanced',
   expert: 'tutorial-level-expert',
   enterprise: 'tutorial-level-enterprise',
+}
+
+function formatInline(text) {
+  const parts = (text || '').split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>
+    }
+    return part
+  })
 }
 
 function CodeBlock({ code, language, caption }) {
@@ -47,23 +61,16 @@ function CodeBlock({ code, language, caption }) {
     } catch { /* clipboard unavailable */ }
   }
   return (
-    <figure className="my-5">
-      <div className="relative rounded-xl border border-accent-cyan/15 bg-surface-950 overflow-hidden shadow-lg shadow-black/20">
-        <div className="flex items-center justify-between px-4 py-2 border-b border-surface-800 bg-gradient-to-r from-surface-900/90 to-surface-900/40">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-accent-cyan/80">{language || 'code'}</span>
-          <button
-            onClick={copy}
-            className="flex items-center gap-1 text-[11px] text-surface-400 hover:text-accent-cyan transition-colors"
-          >
-            {copied ? <Check size={12} className="text-accent-green" /> : <Copy size={12} />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
-        </div>
-        <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed font-mono text-surface-100">
-          <code>{code}</code>
-        </pre>
+    <figure className="tutorial-code-block">
+      <div className="tutorial-code-bar">
+        <span className="tutorial-code-lang">{language || 'code'}</span>
+        <button type="button" onClick={copy} className="tutorial-code-copy">
+          {copied ? <Check size={12} className="text-accent-green" /> : <Copy size={12} />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
       </div>
-      {caption && <figcaption className="mt-2 text-xs text-surface-500 italic pl-1">{caption}</figcaption>}
+      <pre className="tutorial-code-pre"><code>{code}</code></pre>
+      {caption && <figcaption className="tutorial-code-caption">{caption}</figcaption>}
     </figure>
   )
 }
@@ -73,7 +80,7 @@ function Body({ text }) {
   return (
     <div className="tutorial-prose space-y-4">
       {text.split('\n\n').map((para, i) => (
-        <p key={i} className="text-[15px] text-surface-200 leading-[1.75] whitespace-pre-line">{para}</p>
+        <p key={i} className="whitespace-pre-line">{formatInline(para)}</p>
       ))}
     </div>
   )
@@ -89,13 +96,9 @@ function SectionNav({ sections, activeOrder }) {
           <a
             key={s.order}
             href={`#section-${s.order}`}
-            className={`block px-2 py-1.5 rounded-lg text-xs transition-colors truncate ${
-              active
-                ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20'
-                : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800/50'
-            }`}
+            className={`tutorial-nav-link truncate ${active ? 'is-active' : ''}`}
           >
-            <span className="font-mono text-[10px] text-surface-600 mr-1.5">{String(i + 1).padStart(2, '0')}</span>
+            <span className="font-mono text-[10px] opacity-60 mr-1.5">{String(i + 1).padStart(2, '0')}</span>
             {s.heading}
           </a>
         )
@@ -141,7 +144,6 @@ export default function TutorialDetail() {
     meta.content = tutorial.seo_keywords
   }, [tutorial])
 
-  // Highlight active section in sidebar while scrolling
   useEffect(() => {
     if (!tutorial?.sections?.length) return
     const obs = new IntersectionObserver(
@@ -164,7 +166,7 @@ export default function TutorialDetail() {
   if (loading) {
     return (
       <PublicLayout>
-        <div className="max-w-6xl mx-auto px-4 py-16">
+        <div className="tutorial-page max-w-6xl mx-auto px-4 py-16">
           <div className="h-8 w-2/3 bg-surface-800 rounded animate-pulse mb-4" />
           <div className="grid lg:grid-cols-[240px_1fr] gap-8">
             <div className="h-64 bg-surface-900 rounded-xl animate-pulse hidden lg:block" />
@@ -181,8 +183,8 @@ export default function TutorialDetail() {
   if (notFound || !tutorial) {
     return (
       <PublicLayout>
-        <div className="max-w-2xl mx-auto px-4 py-24 text-center">
-          <BookOpen size={36} className="mx-auto mb-4 text-surface-600" />
+        <div className="tutorial-page max-w-2xl mx-auto px-4 py-24 text-center">
+          <BookOpen size={36} className="mx-auto mb-4 text-surface-500" />
           <h1 className="font-display text-2xl font-bold text-white mb-2">Tutorial not found</h1>
           <Link to="/tutorials" className="btn-primary text-sm">Back to all tutorials</Link>
         </div>
@@ -211,12 +213,11 @@ export default function TutorialDetail() {
 
   return (
     <PublicLayout>
-      <div className="relative overflow-hidden min-h-screen">
+      <div className="tutorial-page relative overflow-hidden min-h-screen">
         <div className="absolute inset-0 aurora-bg opacity-25 pointer-events-none" aria-hidden="true" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-accent-cyan/[0.04] blur-[100px] pointer-events-none" />
 
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-10">
-          {/* Breadcrumb */}
           <div className="flex flex-wrap items-center gap-2 text-sm text-surface-500 mb-6">
             <Link to="/tutorials" className="hover:text-accent-cyan transition-colors">Tutorials</Link>
             <span>/</span>
@@ -237,12 +238,11 @@ export default function TutorialDetail() {
           </div>
 
           <div className="grid lg:grid-cols-[260px_minmax(0,1fr)] gap-8 items-start">
-            {/* Sidebar — curriculum + section TOC */}
             <aside className="hidden lg:block sticky top-24 space-y-6">
               <FixitPanel padding="p-4" className="border-accent-cyan/10">
                 <div className="flex items-center gap-2 mb-3">
                   <GraduationCap size={16} className="text-accent-cyan" />
-                  <p className="text-xs font-semibold text-white">{curriculum.topic} path</p>
+                  <p className="tutorial-sidebar-title">{curriculum.topic} path</p>
                 </div>
                 <p className="text-[10px] text-surface-500 mb-2">
                   Lesson {curriculum.position} of {curriculum.total_in_topic}
@@ -257,7 +257,7 @@ export default function TutorialDetail() {
                       to={`/tutorials/${p.slug}`}
                       className={`block text-[11px] py-1 px-2 rounded truncate ${
                         p.slug === tutorial.slug
-                          ? 'bg-accent-cyan/10 text-accent-cyan font-medium'
+                          ? 'bg-accent-cyan/10 text-accent-cyan font-medium border border-accent-cyan/20'
                           : 'text-surface-500 hover:text-surface-300'
                       }`}
                     >
@@ -269,20 +269,19 @@ export default function TutorialDetail() {
 
               <FixitPanel padding="p-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <ListTree size={14} className="text-surface-400" />
-                  <p className="text-xs font-semibold text-surface-300">Topics & subtopics</p>
+                  <ListTree size={14} className="text-accent-cyan" />
+                  <p className="tutorial-sidebar-title">Topics & subtopics</p>
                 </div>
                 <SectionNav sections={sections} activeOrder={activeSection} />
               </FixitPanel>
             </aside>
 
-            {/* Main content */}
             <article>
-              <header className="mb-8 fx-panel p-6 sm:p-8 border-accent-cyan/10 bg-gradient-to-br from-surface-900/80 via-surface-900/40 to-accent-cyan/[0.03]">
+              <header className="tutorial-hero mb-8">
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-accent-cyan">{tutorial.course_title || tutorial.topic}</span>
+                  <span className="tutorial-topic-pill">{tutorial.course_title || tutorial.topic}</span>
                   {tutorial.level_track && (
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border border-surface-700 capitalize ${LEVEL_CLASS[tutorial.level_track] || 'text-surface-300'}`}>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border border-surface-700 bg-surface-900/40 capitalize ${LEVEL_CLASS[tutorial.level_track] || 'text-surface-300'}`}>
                       {tutorial.level_track} track
                     </span>
                   )}
@@ -300,8 +299,8 @@ export default function TutorialDetail() {
                 </h1>
                 <p className="text-lg text-surface-300 leading-relaxed max-w-2xl">{tutorial.summary}</p>
                 <div className="mt-5 flex flex-wrap items-center gap-4 text-xs text-surface-500">
-                  <span className="flex items-center gap-1"><Clock size={13} /> {tutorial.estimated_minutes} min</span>
-                  <span className="flex items-center gap-1"><Layers size={13} /> {sections.length} topics</span>
+                  <span className="flex items-center gap-1"><Clock size={13} /> {tutorial.estimated_minutes} min read</span>
+                  <span className="flex items-center gap-1"><Layers size={13} /> {sections.length} sections</span>
                 </div>
                 {(hasPlayground || hasScenario) && (
                   <div className="mt-5 flex flex-wrap gap-2">
@@ -319,31 +318,34 @@ export default function TutorialDetail() {
                 )}
               </header>
 
-              <div className="space-y-6">
-                {sections.map((s, i) => (
-                  <section
-                    key={i}
-                    id={`section-${s.order}`}
-                    className={`scroll-mt-24 fx-panel p-6 sm:p-7 border-surface-800/80 hover:border-accent-cyan/15 transition-colors ${SECTION_ACCENT[s.heading] || ''}`}
-                  >
-                    <h2 className="font-display text-xl font-semibold text-white mb-4 flex items-start gap-3">
-                      <span className="shrink-0 w-8 h-8 rounded-lg bg-accent-cyan/10 border border-accent-cyan/20 flex items-center justify-center text-accent-cyan text-sm font-mono">
-                        {String(i + 1).padStart(2, '0')}
-                      </span>
-                      <span className="pt-0.5">{s.heading}</span>
-                    </h2>
-                    <Body text={s.body} />
-                    {s.code && <CodeBlock code={s.code} language={s.code_language} caption={s.code_caption} />}
-                  </section>
-                ))}
+              <div className="space-y-5">
+                {sections.map((s, i) => {
+                  const theme = sectionTheme(s.heading)
+                  return (
+                    <section
+                      key={i}
+                      id={`section-${s.order}`}
+                      className={`tutorial-section-card scroll-mt-24 ${theme}`}
+                    >
+                      <div className="tutorial-section-head">
+                        <span className="tutorial-section-num">{String(i + 1).padStart(2, '0')}</span>
+                        <div>
+                          <h2 className="tutorial-section-title">{s.heading}</h2>
+                          <span className="tutorial-section-badge">{s.heading}</span>
+                        </div>
+                      </div>
+                      <Body text={s.body} />
+                      {s.code && <CodeBlock code={s.code} language={s.code_language} caption={s.code_caption} />}
+                    </section>
+                  )
+                })}
               </div>
 
-              {/* Prev / Next */}
               <div className="mt-10 grid sm:grid-cols-2 gap-3">
                 {curriculum.prev ? (
                   <Link
                     to={`/tutorials/${curriculum.prev.slug}`}
-                    className="group fx-panel p-4 flex items-center gap-3 hover:border-accent-cyan/30 transition-colors"
+                    className="group tutorial-track-card p-4 flex items-center gap-3"
                   >
                     <ChevronLeft size={18} className="text-surface-500 group-hover:text-accent-cyan shrink-0" />
                     <div className="min-w-0">
@@ -355,7 +357,7 @@ export default function TutorialDetail() {
                 {curriculum.next ? (
                   <Link
                     to={`/tutorials/${curriculum.next.slug}`}
-                    className="group fx-panel p-4 flex items-center justify-end gap-3 hover:border-accent-cyan/30 transition-colors text-right"
+                    className="group tutorial-track-card p-4 flex items-center justify-end gap-3 text-right"
                   >
                     <div className="min-w-0">
                       <p className="text-[10px] uppercase tracking-wider text-surface-500">Next lesson</p>

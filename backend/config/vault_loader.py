@@ -11,11 +11,12 @@ Secrets path: VAULT_KV_PATH (default: secret/fixitlab/config, KV v2).
 import logging
 import os
 import time
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 _VAULT_LOADED = False
-_VAULT_LAST_PROBE: dict | None = None
+_VAULT_LAST_PROBE: Optional[Dict[str, Any]] = None
 
 
 def vault_api_reachable(timeout: int = 3) -> bool:

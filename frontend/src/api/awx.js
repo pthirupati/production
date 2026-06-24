@@ -1,6 +1,6 @@
 import api from './client'
 
-const base = (sessionId) => `/vmware-sim/awx/sessions/${sessionId}`
+const base = (sessionId) => `/vmware/awx/sessions/${sessionId}`
 
 export const awxApi = {
   getState(sessionId, scenarioSlug = '') {

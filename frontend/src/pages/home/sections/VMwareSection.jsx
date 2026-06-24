@@ -74,10 +74,10 @@ export default function VMwareSection({ isAuthenticated }) {
               {isAuthenticated ? 'Open VMware simulator' : 'Try VMware scenarios'} <ArrowRight size={16} />
             </Link>
             <Link
-              to={isAuthenticated ? '/scenarios?technology=vmware' : '/pricing'}
+              to={isAuthenticated ? '/simulators' : '/register'}
               className="fx-btn-secondary inline-flex items-center gap-2"
             >
-              Browse scenarios
+              All enterprise simulators
             </Link>
           </div>
         </motion.div>

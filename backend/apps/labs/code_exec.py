@@ -124,7 +124,18 @@ def language_runtime_available(language: str) -> bool:
     if lang == "python":
         return True  # we always have the running interpreter
     if lang == "javascript":
-        return shutil.which("node") is not None
+        if shutil.which("node") is not None:
+            return True
+        # Production grades JS inside the Docker sandbox (node:20-alpine) even when
+        # the app host has no node binary installed.
+        try:
+            from apps.labs import sandbox_runner
+            return (
+                sandbox_runner.docker_sandbox_enabled()
+                and sandbox_runner.docker_runtime_available()
+            )
+        except Exception:
+            return False
     return False
 
 

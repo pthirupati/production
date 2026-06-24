@@ -760,6 +760,45 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "datasource not found"}
         return {"ok": True, "status": ds.get("status", "ok"), "message": ds.get("message", "")}
 
+    if action == "add_datasource":
+        name = (payload.get("name") or "").strip()
+        ds_type = (payload.get("type") or "prometheus").strip().lower()
+        url = (payload.get("url") or "").strip()
+        if not name:
+            return {"ok": False, "error": "name is required"}
+        graf = state["grafana"]
+        if any(d.get("name", "").lower() == name.lower() for d in graf.get("datasources", [])):
+            return {"ok": False, "error": f"Data source '{name}' already exists"}
+        uid = (payload.get("uid") or name.lower().replace(" ", "-"))[:32]
+        default_urls = {
+            "prometheus": "http://prometheus:9090",
+            "loki": "http://loki:3100",
+            "tempo": "http://tempo:3200",
+            "graphite": "http://graphite:8080",
+            "influxdb": "http://influxdb:8086",
+            "elasticsearch": "http://elasticsearch:9200",
+            "mysql": "mysql://grafana:secret@mysql:3306/metrics",
+            "postgresql": "postgres://grafana:secret@postgres:5432/metrics",
+            "cloudwatch": "https://monitoring.amazonaws.com",
+            "azure monitor": "https://management.azure.com",
+        }
+        ds = {
+            "uid": uid,
+            "name": name,
+            "type": ds_type,
+            "url": url or default_urls.get(ds_type, "http://localhost:9090"),
+            "access": payload.get("access") or "proxy",
+            "is_default": bool(payload.get("is_default", False)),
+            "status": "ok",
+            "message": "Data source is working",
+        }
+        if ds["is_default"]:
+            for d in graf["datasources"]:
+                d["is_default"] = False
+        graf.setdefault("datasources", []).append(ds)
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Added data source {name}", "datasource": ds}
+
     if action == "silence_alert":
         # Add an Alertmanager silence (cosmetic — alerts still defined).
         am = state["prometheus"]["alertmanager"]

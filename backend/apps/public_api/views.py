@@ -1551,7 +1551,7 @@ class LabAiHintView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    MAX_AI_HINTS = 5
+    MAX_AI_HINTS = 12
 
     def post(self, request, session_id):
         from apps.labs.ai_hint_service import answer_lab_question, generate_lab_hint

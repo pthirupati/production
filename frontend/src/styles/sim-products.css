@@ -1,0 +1,142 @@
+/* Shared simulator product chrome — scoped under .sim-product */
+
+.sim-product {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sim-sidebar {
+  width: 220px;
+  background: #1a1a2e;
+  border-right: 1px solid #2d2d44;
+  color: #c8cad8;
+}
+.sim-sidebar-item {
+  border-left: 3px solid transparent;
+  color: #a8abbd;
+  transition: background 0.12s, color 0.12s;
+}
+.sim-sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+}
+.sim-sidebar-active {
+  background: rgba(92, 78, 229, 0.15);
+  color: #fff;
+  border-left-color: #5c4ee5;
+}
+
+/* Terraform Cloud */
+.tfc-shell { background: #0f0f14; color: #e2e8f0; }
+.tfc-topbar { background: #1a1a2e; border-bottom: 1px solid #2d2d44; }
+.tfc-org-switcher {
+  background: #252538; border: 1px solid #3d3d55; border-radius: 6px;
+  padding: 0.35rem 0.65rem; font-size: 0.8rem; font-weight: 600; color: #fff;
+}
+.tfc-content { background: #12121a; }
+.tfc-card { background: #1a1a2e; border: 1px solid #2d2d44; border-radius: 8px; }
+.tfc-btn-primary {
+  background: #5c4ee5; color: #fff; border-radius: 6px; padding: 0.45rem 0.85rem;
+  font-size: 0.8rem; font-weight: 600;
+}
+.tfc-btn-primary:hover { background: #4a3ed4; }
+.tfc-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.tfc-tab { padding: 0.5rem 1rem; font-size: 0.8rem; color: #94a3b8; border-bottom: 2px solid transparent; }
+.tfc-tab-active { color: #fff; border-bottom-color: #5c4ee5; }
+.tfc-run-timeline { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.tfc-run-step {
+  padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.65rem; font-weight: 600;
+  background: #252538; color: #94a3b8; border: 1px solid #3d3d55;
+}
+.tfc-run-step-done { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16,185,129,.35); }
+.tfc-run-step-active { background: rgba(92, 78, 229, 0.2); color: #a78bfa; border-color: rgba(92,78,229,.4); }
+
+/* AWX */
+.awx-shell { background: #f4f4f4; color: #333; }
+.awx-sidebar { width: 220px; background: #1c1c1c; color: #ddd; }
+.awx-sidebar-item {
+  border-left: 3px solid transparent; padding: 0.55rem 1rem; font-size: 0.85rem; text-align: left; width: 100%;
+}
+.awx-sidebar-active { background: rgba(255,255,255,0.08); border-left-color: #EE0000; color: #fff; }
+.awx-widget { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 1rem; }
+.awx-btn-launch { background: #EE0000; color: #fff; border-radius: 4px; padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600; }
+.awx-btn-launch:hover { background: #cc0000; }
+
+.sim-data-table table { border-collapse: collapse; }
+
+/* PeopleSoft Fluid */
+.ps-fluid { font-family: 'Segoe UI', 'Inter', system-ui, sans-serif; }
+.ps-fluid .ps-tile {
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.ps-fluid .ps-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(27, 58, 92, 0.12);
+}
+.ps-fluid .ps-navbar-search input::placeholder { color: rgba(255,255,255,0.45); }
+
+/* Bare Metal / MAAS */
+.bm-shell { background: #eef2f6; color: #1e293b; }
+.bm-sidebar {
+  width: 220px; background: #111827; color: #e5e7eb;
+  border-right: 1px solid #374151;
+}
+.bm-sidebar-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  width: 100%; padding: 0.65rem 1rem; font-size: 0.85rem; text-align: left;
+  border-left: 3px solid transparent;
+}
+.bm-sidebar-item:hover { background: rgba(255,255,255,0.05); }
+.bm-sidebar-active {
+  background: rgba(13, 148, 136, 0.15); border-left-color: #0d9488; color: #fff;
+}
+.bm-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.bm-card-head {
+  padding: 0.65rem 1rem; font-weight: 600; font-size: 0.9rem;
+  border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+}
+.bm-kpi {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem;
+}
+.bm-kpi-val { font-size: 1.25rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+/* Wireshark 3-pane */
+.ws-hex-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+}
+@media (min-width: 1024px) {
+  .ws-layout-3pane {
+    display: grid;
+    grid-template-rows: minmax(200px, 1fr) minmax(140px, auto) minmax(120px, auto);
+    gap: 0.5rem;
+    min-height: 480px;
+  }
+}
+.ws-dissect-tree { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; line-height: 1.45; }
+.ws-dissect-row { padding: 0.1rem 0.35rem; border-radius: 2px; }
+.ws-dissect-row:hover { background: rgba(76, 141, 255, 0.08); }
+.ws-hex-dump {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; line-height: 1.55;
+  background: #07090f; border: 1px solid var(--ws-border, #1a2233); border-radius: 6px;
+  padding: 0.5rem 0.65rem; overflow: auto; max-height: 180px;
+}
+.ws-hex-offset { color: #64748b; user-select: none; }
+.ws-hex-byte { color: #94a3b8; }
+.ws-hex-ascii { color: #cbd5e1; }
+
+/* Data Science dashboard */
+.ds-shell { --ds-accent: #34d399; }
+.ds-workbench-title { font-family: 'Inter', system-ui, sans-serif; letter-spacing: -0.01em; }
+
+/* AI Agent / n8n canvas */
+.ag-shell { background: #0f1117; }
+.ag-node-card { box-shadow: 0 2px 8px rgba(0,0,0,0.35); border-radius: 8px; }
+
+/* Nmap / Zenmap cue */
+.nm-profile-bar { border-bottom: 1px solid var(--nm-border, #1d2d1d); padding-bottom: 0.5rem; margin-bottom: 0.75rem; }
+
+/* Prompt lab */
+.prompt-workbench { background: #0a0c18; border: 1px solid #2d2d44; border-radius: 8px; }

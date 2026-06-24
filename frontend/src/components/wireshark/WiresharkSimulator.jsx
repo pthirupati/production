@@ -116,6 +116,45 @@ function rowTint(pkt) {
   return 'transparent'
 }
 
+/** Mock protocol dissection tree (Wireshark-style). */
+function dissectTree(pkt) {
+  if (!pkt) return []
+  const proto = (pkt.protocol || 'DATA').toUpperCase()
+  const rows = [
+    { depth: 0, label: `Frame ${pkt.no}: ${pkt.length} bytes on wire` },
+    { depth: 1, label: `Ethernet II, Src/Dst` },
+    { depth: 1, label: `Internet Protocol Version 4, Src: ${pkt.src}, Dst: ${pkt.dst}` },
+  ]
+  if (proto === 'TCP' || pkt.src_port) {
+    rows.push({ depth: 1, label: `Transmission Control Protocol, Src Port: ${pkt.src_port || '?'}, Dst Port: ${pkt.dst_port || '?'}` })
+    if (pkt.tcp_flags) rows.push({ depth: 2, label: `Flags: ${pkt.tcp_flags}` })
+  }
+  if (proto === 'UDP') rows.push({ depth: 1, label: `User Datagram Protocol, Src Port: ${pkt.src_port}, Dst Port: ${pkt.dst_port}` })
+  rows.push({ depth: 1, label: `${proto} Protocol`, highlight: true })
+  if (pkt.info) rows.push({ depth: 2, label: pkt.info })
+  return rows
+}
+
+/** Generate a mock hex dump from packet metadata. */
+function hexDump(pkt) {
+  if (!pkt) return []
+  const seed = pkt.no * 17 + (pkt.length || 64)
+  const lines = []
+  const bytesPerLine = 16
+  const total = Math.min(pkt.length || 64, 128)
+  for (let off = 0; off < total; off += bytesPerLine) {
+    const bytes = []
+    const ascii = []
+    for (let i = 0; i < bytesPerLine && off + i < total; i++) {
+      const b = (seed + off + i * 7) % 256
+      bytes.push(b.toString(16).padStart(2, '0'))
+      ascii.push(b >= 32 && b < 127 ? String.fromCharCode(b) : '.')
+    }
+    lines.push({ offset: off.toString(16).padStart(4, '0'), bytes, ascii: ascii.join('') })
+  }
+  return lines
+}
+
 /**
  * Wireshark packet-capture simulator. Rendered INLINE by LabRunner for wireshark
  * labs (simulation_type 'wireshark' / technology.slug 'wireshark') — no new route.
@@ -125,7 +164,7 @@ function rowTint(pkt) {
  */
 export default function WiresharkSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
-  hintsLabel, checkDisabled, extendDisabled,
+  hintsLabel, checkDisabled, extendDisabled, embedded = false,
 }) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
@@ -228,7 +267,7 @@ export default function WiresharkSimulator({
   const selPkt = packets.find(p => p.no === selected) || null
 
   return (
-    <div className="ws-sim min-h-screen">
+    <div className={`ws-sim ${embedded ? 'h-full min-h-0 flex flex-col overflow-hidden' : 'min-h-screen'}`}>
       <style>{SCOPED_CSS}</style>
 
       <div className="ws-topbar">
@@ -413,32 +452,34 @@ export default function WiresharkSimulator({
           </div>
         </div>
 
-        {/* Packet detail + stream follow */}
+        {/* Packet detail — Wireshark 3-pane: tree + hex + stream */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
-          {/* packet detail */}
-          <div className="ws-card overflow-hidden">
-            <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider border-b"
+          <div className="ws-card overflow-hidden lg:col-span-2">
+            <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider border-b flex items-center justify-between"
                  style={{ color: 'var(--ws-muted)', borderColor: 'var(--ws-border)' }}>
-              Packet detail {selPkt ? `· #${selPkt.no}` : ''}
+              <span>Packet Bytes {selPkt ? `· #${selPkt.no}` : ''}</span>
+              <span className="normal-case font-normal">Protocol tree · Hex dump</span>
             </div>
             {!selPkt ? (
-              <div className="p-6 text-sm text-center" style={{ color: 'var(--ws-muted)' }}>Click a packet to inspect it.</div>
+              <div className="p-6 text-sm text-center" style={{ color: 'var(--ws-muted)' }}>Select a packet to view the dissection tree and hex dump.</div>
             ) : (
-              <div className="p-3 space-y-1.5 text-xs ws-mono">
-                {[
-                  ['Frame', `#${selPkt.no} · ${selPkt.length} bytes · t=${Number(selPkt.time).toFixed(6)}s`],
-                  ['Source', `${selPkt.src}${selPkt.src_port ? `:${selPkt.src_port}` : ''}`],
-                  ['Destination', `${selPkt.dst}${selPkt.dst_port ? `:${selPkt.dst_port}` : ''}`],
-                  ['Protocol', selPkt.protocol],
-                  ...(selPkt.tcp_flags ? [['TCP flags', selPkt.tcp_flags]] : []),
-                  ...(selPkt.stream_id != null ? [['Stream', `tcp.stream==${selPkt.stream_id}`]] : []),
-                  ['Info', selPkt.info],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex gap-2">
-                    <span className="w-24 shrink-0" style={{ color: 'var(--ws-muted)' }}>{k}</span>
-                    <span style={{ color: k === 'Protocol' ? protoColor(selPkt.protocol) : 'var(--ws-text)' }}>{v}</span>
-                  </div>
-                ))}
+              <div className="ws-hex-grid p-3">
+                <div className="ws-dissect-tree">
+                  {dissectTree(selPkt).map((row, i) => (
+                    <div key={i} className="ws-dissect-row" style={{ paddingLeft: `${row.depth * 12 + 4}px`, color: row.highlight ? protoColor(selPkt.protocol) : 'var(--ws-text)' }}>
+                      ▸ {row.label}
+                    </div>
+                  ))}
+                </div>
+                <div className="ws-hex-dump">
+                  {hexDump(selPkt).map((line) => (
+                    <div key={line.offset} className="flex gap-2">
+                      <span className="ws-hex-offset">{line.offset}</span>
+                      <span className="ws-hex-byte">{line.bytes.join(' ')}</span>
+                      <span className="ws-hex-ascii ml-auto">{line.ascii}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

@@ -7,6 +7,8 @@ import {
 import toast from 'react-hot-toast'
 import CodeEditor from './CodeEditor'
 import MentorPanel from './MentorPanel'
+import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab } from './VsCodeWorkbench'
+import '../../styles/vscode-workbench.css'
 import { runPython, runPythonTests } from '../../utils/ide/pyodideRunner'
 import { runJavaScript, runJavaScriptTests } from '../../utils/ide/jsRunner'
 import { labApi } from '../../api/labs'
@@ -475,374 +477,163 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   ]
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-surface-950">
-      {/* Action bar */}
-      <div className="shrink-0 flex items-center gap-2 px-3 py-2 bg-surface-900 border-b border-surface-800">
-        <span className="flex items-center gap-1.5 text-xs font-medium text-surface-300">
-          <FileCode size={14} className="text-accent-cyan" /> {langLabel} IDE
-        </span>
-        <div className="w-px h-5 bg-surface-700 mx-1" />
-        <button
-          onClick={handleRun}
-          disabled={running || checking || solved}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-surface-700 text-surface-200 hover:border-accent-cyan hover:text-accent-cyan disabled:opacity-50 transition-colors"
-          title="Run your code (Ctrl/Cmd+Enter)"
-        >
-          {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-          {pyLoading && running ? 'Loading Python…' : 'Run'}
-        </button>
-        <button
-          onClick={handleCheck}
-          disabled={checking || running || solved}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border disabled:opacity-50 transition-colors ${
-            solved
-              ? 'border-accent-green/30 text-accent-green bg-accent-green/10'
-              : 'border-accent-cyan/40 text-accent-cyan bg-accent-cyan/10 hover:bg-accent-cyan/20'
-          }`}
-          title="Grade against all tests (server-side)"
-        >
-          {checking ? <Loader2 size={13} className="animate-spin" /> : solved ? <Trophy size={13} /> : <ListChecks size={13} />}
-          {solved ? 'Solved' : 'Check Solution'}
-        </button>
-
-        {/* Editor controls */}
-        <div className="w-px h-5 bg-surface-700 mx-1" />
-        <button
-          onClick={() => editorRef.current?.openSearch()}
-          className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium border border-surface-700 text-surface-300 hover:border-accent-cyan hover:text-accent-cyan transition-colors"
-          title="Search & replace (Ctrl/Cmd+F)"
-        >
-          <Search size={13} /> <span className="hidden sm:inline">Find</span>
-        </button>
-        <button
-          onClick={() => setVimMode((v) => !v)}
-          className={`px-2 py-1.5 rounded-md text-xs font-medium border transition-colors ${vimMode ? 'border-accent-amber text-accent-amber bg-accent-amber/10' : 'border-surface-700 text-surface-300'}`}
-          title="Toggle Vim keybindings"
-        >
-          Vim
-        </button>
-        <button
-          onClick={() => editorRef.current?.formatDocument?.()}
-          className="px-2 py-1.5 rounded-md text-xs font-medium border border-surface-700 text-surface-300 hover:border-accent-cyan"
-          title="Format document (Ctrl/Cmd+Shift+F)"
-        >
-          Format
-        </button>
-        <div className="hidden sm:flex items-center gap-0.5">
-          <button onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="p-1.5 rounded text-surface-400 hover:text-surface-100" title="Zoom out"><ZoomOut size={13} /></button>
-          <button onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="p-1.5 rounded text-surface-400 hover:text-surface-100" title="Zoom in"><ZoomIn size={13} /></button>
-        </div>
-        <button
-          onClick={toggleTheme}
-          className="p-1.5 rounded text-surface-400 hover:text-accent-amber transition-colors"
-          title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
-        >
-          {isDark ? <Sun size={14} /> : <Moon size={14} />}
-        </button>
-        <button
-          onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-            rightTab === 'mentor' ? 'border-accent-purple/50 text-accent-purple bg-accent-purple/10' : 'border-surface-700 text-surface-300 hover:border-accent-purple hover:text-accent-purple'
-          }`}
-          title="Open the rule-based AI Mentor"
-        >
-          <Sparkles size={13} /> <span className="hidden md:inline">Mentor</span>
-        </button>
-
-        {savedAt && !solved && (
-          <span
-            className="ml-auto flex items-center gap-1 text-[11px] text-accent-green/80"
-            title={`Your work is autosaved in this browser · ${new Date(savedAt).toLocaleTimeString()}`}
-          >
-            <Save size={11} /> <span className="hidden sm:inline">Saved</span>
-          </span>
-        )}
-        <span className={`text-[11px] text-surface-500 hidden lg:flex items-center gap-1 ${savedAt && !solved ? '' : 'ml-auto'}`}>
-          <EyeOff size={11} /> {hiddenCount} hidden test{hiddenCount === 1 ? '' : 's'} run on the server
-        </span>
-      </div>
-
-      {/* Main grid: explorer | editor | right panel */}
-      <div className="flex-1 flex min-h-0">
-        {/* File explorer */}
-        <div className="w-44 shrink-0 border-r border-surface-800 bg-surface-900/50 overflow-y-auto hidden md:block">
-          <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Files</p>
-          {paths.map((p) => (
-            <button
-              key={p}
-              onClick={() => setActivePath(p)}
-              className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-xs text-left transition-colors ${
-                activePath === p ? 'bg-accent-cyan/10 text-accent-cyan border-l-2 border-accent-cyan' : 'text-surface-300 hover:bg-surface-800 border-l-2 border-transparent'
-              }`}
-            >
-              <FileCode size={12} className="shrink-0" />
-              <span className="truncate">{fileName(p)}</span>
-              {readonlyPaths.has(p) && <Lock size={10} className="ml-auto text-surface-600 shrink-0" />}
+    <VsCodeWorkbench
+      theme="app"
+      className="flex-1 min-h-0"
+      title={`${langLabel} IDE`}
+      subtitle={scenario?.title || 'Coding Lab'}
+      toolbar={(
+        <>
+          <button onClick={handleRun} disabled={running || checking || solved} className="vsc-btn" title="Run (Ctrl/Cmd+Enter)">
+            {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+            {pyLoading && running ? 'Loading…' : 'Run'}
+          </button>
+          <button onClick={handleCheck} disabled={checking || running || solved} className="vsc-btn vsc-btn-primary" title="Grade on server">
+            {checking ? <Loader2 size={13} className="animate-spin" /> : solved ? <Trophy size={13} /> : <ListChecks size={13} />}
+            {solved ? 'Solved' : 'Check Solution'}
+          </button>
+          <button onClick={() => editorRef.current?.openSearch()} className="vsc-btn" title="Find"><Search size={13} /></button>
+          <button onClick={() => setVimMode((v) => !v)} className={`vsc-btn ${vimMode ? 'vsc-btn-primary' : ''}`}>Vim</button>
+          <button onClick={() => editorRef.current?.formatDocument?.()} className="vsc-btn">Format</button>
+          <button onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="vsc-btn" title="Zoom out"><ZoomOut size={13} /></button>
+          <button onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="vsc-btn" title="Zoom in"><ZoomIn size={13} /></button>
+          <button onClick={toggleTheme} className="vsc-btn" title="Toggle theme">{isDark ? <Sun size={13} /> : <Moon size={13} />}</button>
+          <button onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className="vsc-btn"><Sparkles size={13} /> Mentor</button>
+          {savedAt && !solved && <span className="text-[10px] text-emerald-400 flex items-center gap-1"><Save size={11} /> Saved</span>}
+          <span className="text-[10px] text-[var(--vsc-muted)] hidden lg:inline flex items-center gap-1"><EyeOff size={10} /> {hiddenCount} hidden</span>
+        </>
+      )}
+      sidebarHeader="Explorer"
+      sidebar={paths.map((p) => (
+        <VscFileItem key={p} active={activePath === p} onClick={() => setActivePath(p)}>
+          <FileCode size={13} className="shrink-0 opacity-70" />
+          <span className="truncate">{fileName(p)}</span>
+          {readonlyPaths.has(p) && <Lock size={10} className="ml-auto opacity-50" />}
+        </VscFileItem>
+      ))}
+      editorTabs={paths.map((p) => (
+        <VscEditorTab key={p} active={activePath === p} onClick={() => setActivePath(p)}>
+          <FileCode size={12} /> {fileName(p)}{readonlyPaths.has(p) ? ' 🔒' : ''}
+        </VscEditorTab>
+      ))}
+      editor={activePath ? (
+        <CodeEditor ref={editorRef} key={activePath} value={files[activePath] ?? ''} onChange={handleEditorChange}
+          language={language} readOnly={solved || readonlyPaths.has(activePath)} onRun={handleRun}
+          fontSize={fontSize} vimMode={vimMode} formatOnSave={formatOnSave} />
+      ) : (
+        <div className="h-full flex items-center justify-center text-[var(--vsc-muted)] text-sm">No file open</div>
+      )}
+      bottomPanel={{
+        height: 224,
+        tabs: BOTTOM_TABS.map(({ key, label, icon: Icon }) => (
+          <VscPanelTab key={key} active={bottomTab === key} onClick={() => setBottomTab(key)}>
+            <Icon size={12} /> {label}
+            {key === 'tests' && testResults && (
+              <span className="ml-1 text-[9px] opacity-80">{testResults.passed_count}/{testResults.total_count}</span>
+            )}
+          </VscPanelTab>
+        )),
+        content: (
+          <>
+            {bottomTab === 'terminal' && (
+              <pre className="text-[var(--vsc-text)] whitespace-pre-wrap break-words m-0">
+                {terminalText || 'Run or Check Solution to see a session transcript here.'}
+              </pre>
+            )}
+            {bottomTab === 'output' && (
+              <pre className="text-[var(--vsc-text)] whitespace-pre-wrap break-words m-0">
+                {output || 'Click Run to execute your code. stdout appears here.'}
+              </pre>
+            )}
+            {bottomTab === 'logs' && (
+              <pre className="text-red-400 whitespace-pre-wrap break-words m-0">
+                {logsText || 'stderr and runtime errors appear here.'}
+              </pre>
+            )}
+            {bottomTab === 'tests' && (
+              <div className="space-y-1.5 font-sans">
+                {!testResults ? (
+                  <p className="text-xs text-[var(--vsc-muted)]">Click Check Solution to run all tests on the server.</p>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-1 text-xs">
+                      <span>{testResults.passed_count}/{testResults.total_count} passed{testResults.preview && ' (preview)'}</span>
+                      {testResults.hidden_total > 0 && <span className="text-[var(--vsc-muted)] flex items-center gap-1"><EyeOff size={10} /> {testResults.hidden_total} hidden</span>}
+                    </div>
+                    {(() => {
+                      const fail = firstFailingVisible(testResults.tests)
+                      if (!fail) return null
+                      return (
+                        <div className="rounded border border-red-500/30 bg-red-500/10 p-2 mb-1.5 text-xs">
+                          <p className="font-semibold text-red-400 flex items-center gap-1"><XCircle size={12} /> {fail.name}</p>
+                          {fail.message && <p className="font-mono text-red-300/90 mt-1 whitespace-pre-wrap">{fail.message}</p>}
+                          <button onClick={() => askMentor('tests')} disabled={mentorLoading} className="mt-2 vsc-btn"><Sparkles size={11} /> Why did this fail?</button>
+                        </div>
+                      )
+                    })()}
+                    {(testResults.tests || []).map((t, i) => <TestRow key={i} {...t} />)}
+                  </>
+                )}
+              </div>
+            )}
+            {bottomTab === 'debug' && (
+              <div className="space-y-2 font-sans">
+                <pre className="text-cyan-400 whitespace-pre-wrap break-words m-0 text-xs">{debugText || 'Diagnostics from Run / Check appear here.'}</pre>
+                {(output || logsText || testResults) && (
+                  <button onClick={() => askMentor('all')} disabled={mentorLoading} className="vsc-btn"><Sparkles size={12} /> Ask Mentor</button>
+                )}
+              </div>
+            )}
+          </>
+        ),
+      }}
+      rightPanel={{
+        width: 320,
+        header: (
+          <>
+            <button onClick={() => setRightTab('instructions')} className={`vsc-right-tab ${rightTab === 'instructions' ? 'active' : ''}`}>
+              <FileText size={12} className="inline mr-1" /> Instructions
             </button>
-          ))}
-        </div>
-
-        {/* Editor column */}
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          {/* Open-file tabs */}
-          <div className="shrink-0 flex items-stretch overflow-x-auto bg-surface-900 border-b border-surface-800">
-            {paths.map((p) => (
-              <button
-                key={p}
-                onClick={() => setActivePath(p)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs border-r border-surface-800 whitespace-nowrap transition-colors ${
-                  activePath === p ? 'bg-surface-950 text-white' : 'text-surface-400 hover:text-surface-200'
-                }`}
-              >
-                <FileCode size={12} />
-                {fileName(p)}
-                {readonlyPaths.has(p) && <Lock size={10} className="text-surface-600" />}
-              </button>
-            ))}
-          </div>
-          {/* Editor */}
-          <div className="flex-1 min-h-0 bg-surface-950">
-            {activePath ? (
-              <CodeEditor
-                ref={editorRef}
-                key={activePath}
-                value={files[activePath] ?? ''}
-                onChange={handleEditorChange}
-                language={language}
-                readOnly={solved || readonlyPaths.has(activePath)}
-                onRun={handleRun}
-                fontSize={fontSize}
-                vimMode={vimMode}
-                formatOnSave={formatOnSave}
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center text-surface-600 text-sm">No file open</div>
+            <button onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className={`vsc-right-tab ${rightTab === 'mentor' ? 'active' : ''}`}>
+              <Sparkles size={12} className="inline mr-1" /> Mentor
+            </button>
+          </>
+        ),
+        content: rightTab === 'mentor' ? (
+          <MentorPanel report={mentor} loading={mentorLoading} onAsk={(req) => askMentor(req)} onUnlock={handleUnlockReference} disabled={mentorDisabled} />
+        ) : (
+          <div className="p-4 space-y-4 text-sm">
+            <div>
+              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--vsc-muted)] mb-1.5">Task</h3>
+              <p className="text-[var(--vsc-text)] leading-relaxed whitespace-pre-wrap">{spec?.instructions || scenario?.description || 'Implement the solution.'}</p>
+            </div>
+            {objectives.length > 0 && (
+              <div>
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--vsc-muted)] mb-1.5">Requirements</h3>
+                <ul className="space-y-1.5">{objectives.map((obj, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[var(--vsc-text)]"><CheckCircle2 size={12} className="text-cyan-400 mt-0.5 shrink-0" /><span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span></li>
+                ))}</ul>
+              </div>
+            )}
+            {visibleTests.length > 0 && (
+              <div>
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--vsc-muted)] mb-1.5">Visible tests</h3>
+                <ul className="space-y-1">{visibleTests.map((t, i) => (
+                  <li key={i} className="flex items-center gap-2 text-xs text-[var(--vsc-muted)]"><ListChecks size={11} /><span className="truncate">{t.name}</span></li>
+                ))}</ul>
+              </div>
+            )}
+            {!canRunInBrowser && (
+              <p className="text-[11px] text-amber-400 flex gap-1.5"><Lightbulb size={12} className="shrink-0 mt-0.5" /> Use Check Solution for {langLabel} — server grades your code.</p>
             )}
           </div>
-          {/* VS Code-style status bar */}
-          <div className="shrink-0 flex items-center justify-between gap-3 px-3 py-1 bg-[#007acc]/90 text-white text-[10px] font-mono border-t border-surface-800">
-            <span className="truncate">{activePath ? fileName(activePath) : 'No file'}</span>
-            <span className="hidden sm:inline">{langLabel} · UTF-8 · Spaces: 4{vimMode ? ' · VIM' : ''}</span>
-            <span className="flex items-center gap-2 shrink-0">
-              <span>{fontSize}px</span>
-              <span>{solved ? 'Read-only' : 'Editing'}</span>
-            </span>
-          </div>
-
-          {/* Bottom panel: Terminal / Output / Logs / Test Results / Debug Console */}
-          <div className="shrink-0 h-56 flex flex-col border-t border-surface-800 bg-surface-950">
-            <div className="flex border-b border-surface-800 bg-surface-900 overflow-x-auto">
-              {BOTTOM_TABS.map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setBottomTab(key)}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
-                    bottomTab === key ? 'text-accent-cyan border-b-2 border-accent-cyan' : 'text-surface-500 hover:text-surface-300'
-                  }`}
-                >
-                  <Icon size={12} /> {label}
-                  {key === 'tests' && testResults && (
-                    <span className={`ml-1 text-[10px] px-1 rounded ${testResults.passed_count === testResults.total_count && testResults.total_count > 0 ? 'bg-accent-green/20 text-accent-green' : 'bg-surface-800 text-surface-400'}`}>
-                      {testResults.passed_count}/{testResults.total_count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <div className="flex-1 overflow-auto p-3">
-              {bottomTab === 'terminal' && (
-                <pre className="text-xs font-mono text-surface-300 whitespace-pre-wrap break-words">
-                  {terminalText || <span className="text-surface-600">Run or Check Solution to see a session transcript here.</span>}
-                </pre>
-              )}
-              {bottomTab === 'output' && (
-                <pre className="text-xs font-mono text-surface-200 whitespace-pre-wrap break-words">
-                  {output || <span className="text-surface-600">Click Run to execute your code. stdout appears here.</span>}
-                </pre>
-              )}
-              {bottomTab === 'logs' && (
-                <pre className="text-xs font-mono text-accent-red whitespace-pre-wrap break-words">
-                  {logsText || <span className="text-surface-600">stderr, console output and runtime errors appear here.</span>}
-                </pre>
-              )}
-              {bottomTab === 'tests' && (
-                <div className="space-y-1.5">
-                  {!testResults ? (
-                    <p className="text-xs text-surface-600">Click "Check Solution" to run all tests on the server.</p>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-surface-300">
-                          {testResults.passed_count}/{testResults.total_count} passed
-                          {testResults.preview && <span className="text-surface-500"> (local preview — server is grading…)</span>}
-                        </span>
-                        {testResults.hidden_total > 0 && (
-                          <span className="text-[11px] text-surface-500 flex items-center gap-1">
-                            <EyeOff size={10} /> includes {testResults.hidden_total} hidden
-                          </span>
-                        )}
-                      </div>
-
-                      {/* First failing VISIBLE test, surfaced prominently. Hidden
-                          test internals are never shown — only visible failures. */}
-                      {(() => {
-                        const fail = firstFailingVisible(testResults.tests)
-                        if (!fail) return null
-                        return (
-                          <div className="rounded-lg border border-accent-red/30 bg-accent-red/[0.07] p-2.5 mb-1.5">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <XCircle size={13} className="text-accent-red shrink-0" />
-                              <span className="text-[11px] font-semibold uppercase tracking-wider text-accent-red">
-                                First failing test
-                              </span>
-                            </div>
-                            <p className="text-xs font-mono font-medium text-surface-100 break-words">{fail.name}</p>
-                            {fail.message ? (
-                              <p className="mt-1.5 text-[11px] font-mono text-accent-red/90 break-words whitespace-pre-wrap">
-                                {fail.message}
-                              </p>
-                            ) : (
-                              <p className="mt-1.5 text-[11px] text-surface-400">
-                                This assertion didn't hold. Check your output against what this test expects.
-                              </p>
-                            )}
-                            <button
-                              onClick={() => askMentor('tests')}
-                              disabled={mentorLoading}
-                              className="mt-2 flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium border border-accent-purple/40 text-accent-purple hover:bg-accent-purple/10 disabled:opacity-50"
-                            >
-                              <Sparkles size={11} /> Why did this fail?
-                            </button>
-                          </div>
-                        )
-                      })()}
-
-                      {(testResults.tests || []).map((t, i) => (
-                        <TestRow key={i} {...t} />
-                      ))}
-                    </>
-                  )}
-                </div>
-              )}
-              {bottomTab === 'debug' && (
-                <div className="space-y-2">
-                  <pre className="text-xs font-mono text-accent-cyan whitespace-pre-wrap break-words">
-                    {debugText || <span className="text-surface-600">Diagnostics from each Run / Check (language, byte counts, verdict) and mentor summaries appear here.</span>}
-                  </pre>
-                  {(output || logsText || testResults) && (
-                    <button
-                      onClick={() => askMentor('all')}
-                      disabled={mentorLoading}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium border border-accent-purple/40 text-accent-purple hover:bg-accent-purple/10 disabled:opacity-50"
-                    >
-                      <Sparkles size={12} /> Ask the AI Mentor to diagnose this
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right panel: Instructions / AI Mentor (tabbed) */}
-        <div className="w-72 xl:w-80 shrink-0 border-l border-surface-800 bg-surface-900/50 hidden lg:flex flex-col min-h-0">
-          <div className="shrink-0 flex border-b border-surface-800">
-            <button
-              onClick={() => setRightTab('instructions')}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
-                rightTab === 'instructions' ? 'text-accent-cyan border-b-2 border-accent-cyan' : 'text-surface-500 hover:text-surface-300'
-              }`}
-            >
-              <FileText size={12} /> Instructions
-            </button>
-            <button
-              onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
-                rightTab === 'mentor' ? 'text-accent-purple border-b-2 border-accent-purple' : 'text-surface-500 hover:text-surface-300'
-              }`}
-            >
-              <Sparkles size={12} /> AI Mentor
-            </button>
-          </div>
-
-          {rightTab === 'mentor' ? (
-            <MentorPanel
-              report={mentor}
-              loading={mentorLoading}
-              onAsk={(req) => askMentor(req)}
-              onUnlock={handleUnlockReference}
-              disabled={mentorDisabled}
-            />
-          ) : (
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500 mb-1.5">Task</h3>
-                <p className="text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">
-                  {spec?.instructions || scenario?.description || 'Implement the solution.'}
-                </p>
-              </div>
-
-              {objectives.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500 mb-1.5">Requirements</h3>
-                  <ul className="space-y-1.5">
-                    {objectives.map((obj, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
-                        <CheckCircle2 size={12} className="text-accent-cyan mt-0.5 shrink-0" />
-                        <span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {visibleTests.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500 mb-1.5">Visible tests</h3>
-                  <ul className="space-y-1">
-                    {visibleTests.map((t, i) => (
-                      <li key={i} className="flex items-center gap-2 text-xs text-surface-400">
-                        <ListChecks size={11} className="text-surface-500 shrink-0" />
-                        <span className="truncate">{t.name}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="rounded-lg bg-surface-800/50 border border-surface-700/50 p-3">
-                <p className="text-[11px] text-surface-400 flex items-start gap-1.5">
-                  <EyeOff size={12} className="text-accent-amber mt-0.5 shrink-0" />
-                  <span>
-                    {hiddenCount > 0
-                      ? `${hiddenCount} hidden test${hiddenCount === 1 ? '' : 's'} run on the server when you click Check Solution. Your code must pass every test to solve this scenario.`
-                      : 'Your code is graded on the server. It must pass every test to solve this scenario.'}
-                  </span>
-                </p>
-              </div>
-
-              <div className="rounded-lg bg-accent-purple/5 border border-accent-purple/20 p-3">
-                <p className="text-[11px] text-surface-300 flex items-start gap-1.5">
-                  <Sparkles size={12} className="text-accent-purple mt-0.5 shrink-0" />
-                  <span>
-                    Stuck? Open the <button onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className="text-accent-purple underline">AI Mentor</button> — it explains
-                    errors and what failing tests check, and teaches the concept, without giving away the answer.
-                  </span>
-                </p>
-              </div>
-
-              {!canRunInBrowser && (
-                <div className="rounded-lg bg-accent-amber/5 border border-accent-amber/20 p-3">
-                  <p className="text-[11px] text-accent-amber flex items-start gap-1.5">
-                    <Lightbulb size={12} className="mt-0.5 shrink-0" />
-                    <span>In-browser Run is unavailable for {langLabel}. Use Check Solution — the server runs and grades your code.</span>
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+        ),
+      }}
+      statusBar={{
+        left: activePath ? fileName(activePath) : 'No file',
+        center: `${langLabel} · UTF-8 · Spaces: 4${vimMode ? ' · VIM' : ''}`,
+        right: <><span>{fontSize}px</span><span>{solved ? 'Read-only' : 'Editing'}</span></>,
+      }}
+    />
   )
 }

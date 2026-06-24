@@ -101,6 +101,91 @@ def _sync_files_to_sim_shell(session_id: str, files: dict) -> None:
         pass
 
 
+def _iac_tool(slug: str = "") -> str:
+    return "Terraform"
+
+
+def _normalize_action(action: str) -> str:
+    return action
+
+
+def _format_init_output(tool: str) -> str:
+    return (
+        f"\nInitializing the backend...\n\n"
+        f"Initializing provider plugins...\n"
+        f"- Finding hashicorp/aws versions matching \"~> 5.0\"...\n"
+        f"- Installing hashicorp/aws v5.82.0...\n"
+        f"- Installed hashicorp/aws v5.82.0 (signed by HashiCorp)\n\n"
+        f"{tool} has been successfully initialized!\n"
+    )
+
+
+def _format_plan_output(tool: str, files: dict, plan: dict, slug: str) -> str:
+    main = files.get("main.tf", "")
+    lines = [
+        f"{tool} used the selected providers to generate the following execution plan.",
+        "Resource actions are indicated with the following symbols:",
+        "  + create",
+        "  ~ update in-place",
+        "",
+    ]
+    if "aws_instance" in main:
+        lines.extend([
+            "  # aws_instance.web will be created",
+            '  + resource "aws_instance" "web" {',
+            '      + ami           = "ami-0c55b159cbfafe1f0"',
+            '      + instance_type = "t3.medium"',
+            '      + tags          = { "Name" = "web-server" }',
+            "    }",
+            "",
+        ])
+    if "vsphere_virtual_machine" in main or "vmware" in slug:
+        lines.extend([
+            "  # vsphere_virtual_machine.clone will be created",
+            '  + resource "vsphere_virtual_machine" "clone" {',
+            '      + name     = "lab-clone-01"',
+            "      + num_cpus = 2",
+            "      + memory   = 4096",
+            "    }",
+            "",
+        ])
+    if plan.get("change", 0):
+        lines.extend([
+            "  # aws_security_group.web-sg will be updated in-place",
+            '  ~ resource "aws_security_group" "web-sg" {',
+            "      ~ ingress = (known after apply)",
+            "    }",
+            "",
+        ])
+    lines.append(plan.get("summary") or "Plan: 0 to add, 0 to change, 0 to destroy.")
+    if "lock" in slug and plan.get("change", 0):
+        lines.append("\nNote: state was locked — run force-unlock if planning fails.")
+    return "\n".join(lines)
+
+
+def _format_apply_output(tool: str, tf: dict) -> str:
+    resources = tf.get("resources") or []
+    lines = [
+        f"{tool} apply — auto-approving plan",
+        "",
+        *(_format_plan_output(tool, {}, {"summary": "Plan applied.", "change": 0}, "").split("\n")[:4]),
+        "",
+    ]
+    for r in resources:
+        lines.append(f"{r.get('type')}.{r.get('name')}: Creating...")
+        lines.append(f"{r.get('type')}.{r.get('name')}: Creation complete")
+    lines.extend([
+        "",
+        "Apply complete! Resources: 3 added, 0 changed, 0 destroyed.",
+        "",
+        "Outputs:",
+        "",
+        "instance_id = \"i-0abc123def456\"",
+        "public_ip   = \"203.0.113.42\"",
+    ])
+    return "\n".join(lines)
+
+
 def _now_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
@@ -134,6 +219,7 @@ def _base_state() -> dict:
 
 def _apply_preset(state: dict, slug: str) -> None:
     slug = (slug or "").lower()
+    tool = _iac_tool(slug)
     if "lock" in slug:
         state["goal"] = {
             "title": "Unlock state",
@@ -193,9 +279,11 @@ def _ensure(session_id: str, slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
+    slug = entry.get("scenario_slug") or scenario_slug
     return {
         "session_id": str(session_id),
-        "scenario_slug": entry.get("scenario_slug") or scenario_slug,
+        "scenario_slug": slug,
+        "iac_tool": _iac_tool(slug).lower(),
         "state": copy.deepcopy(entry["state"]),
     }
 
@@ -213,6 +301,22 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     tf = state["terraform"]
     broken = state.get("broken") or {}
     files = state.setdefault("files", copy.deepcopy(DEFAULT_FILES))
+    slug = entry.get("scenario_slug") or ""
+    tool = _iac_tool(slug)
+    action = _normalize_action(action)
+
+    if action == "delete_file":
+        path = payload.get("path") or ""
+        if path not in files:
+            return {"ok": False, "error": "File not found"}
+        if path in ("main.tf", "variables.tf", "outputs.tf"):
+            return {"ok": False, "error": f"Cannot delete required file {path}"}
+        del files[path]
+        if state.get("active_file") == path:
+            state["active_file"] = "main.tf"
+        state["events"].insert(0, {"time": _now_iso(), "message": f"Deleted {path}", "severity": "info"})
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Deleted {path}"}
 
     if action == "save_files":
         incoming = payload.get("files") or {}
@@ -238,47 +342,66 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     if action == "terraform_init":
         tf["initialized"] = True
-        state["events"].insert(0, {"time": _now_iso(), "message": "Terraform initialized", "severity": "info"})
+        out = _format_init_output(tool)
+        state["events"].insert(0, {"time": _now_iso(), "message": f"{tool} initialized", "severity": "info"})
         _save(session_id, entry)
-        return {"ok": True, "output": "Terraform has been successfully initialized!"}
+        return {"ok": True, "output": out, "message": f"{tool} initialized"}
+
+    if action == "terraform_validate":
+        main = files.get("main.tf", "")
+        if not main.strip():
+            return {"ok": False, "output": "Error: main.tf is empty", "error": "Configuration invalid"}
+        if "resource " not in main and "module " not in main:
+            return {"ok": False, "output": "Error: No resources declared in main.tf", "error": "Configuration invalid"}
+        out = "Success! The configuration is valid.\n"
+        state["events"].insert(0, {"time": _now_iso(), "message": "Configuration validated", "severity": "info"})
+        _save(session_id, entry)
+        return {"ok": True, "output": out}
 
     if action == "terraform_plan":
         if not tf.get("initialized"):
-            return {"ok": False, "error": "Run terraform init first"}
+            return {"ok": False, "error": f"Run {tool.lower()} init first"}
+        if broken.get("stale_lock"):
+            return {"ok": False, "error": "Error: state lock held — run force-unlock first", "output": "Error acquiring the state lock\n\nLock ID: fixitlab-lock\n"}
         has_instance = "aws_instance" in files.get("main.tf", "")
+        has_vm = "vsphere_virtual_machine" in files.get("main.tf", "")
         plan = {
-            "add": 1 if has_instance else 0,
+            "add": 1 if (has_instance or has_vm) else 0,
             "change": 2 if broken.get("drift") else 0,
             "destroy": 0,
-            "summary": f"Plan: {1 if has_instance else 0} to add, {2 if broken.get('drift') else 0} to change, 0 to destroy.",
+            "summary": f"Plan: {1 if (has_instance or has_vm) else 0} to add, {2 if broken.get('drift') else 0} to change, 0 to destroy.",
         }
         tf["last_plan"] = plan
         broken["plan_required"] = False
+        out = _format_plan_output(tool, files, plan, slug)
         state["events"].insert(0, {"time": _now_iso(), "message": plan["summary"], "severity": "info"})
         _save(session_id, entry)
-        return {"ok": True, "plan": plan, "output": plan["summary"]}
+        return {"ok": True, "plan": plan, "output": out}
 
     if action == "terraform_apply":
         if not tf.get("last_plan"):
-            return {"ok": False, "error": "Run terraform plan first"}
+            return {"ok": False, "error": f"Run {tool.lower()} plan first"}
         tf["last_apply"] = _now_iso()
         tf["drift_detected"] = False
         broken.pop("drift", None)
         broken.pop("stale_lock", None)
-        tf["resources"] = [
-            {"type": "aws_instance", "name": "web", "status": "applied"},
-            {"type": "aws_security_group", "name": "web-sg", "status": "applied"},
-        ]
+        main = files.get("main.tf", "")
+        resources = []
+        if "aws_instance" in main:
+            resources.append({"type": "aws_instance", "name": "web", "status": "applied"})
+            resources.append({"type": "aws_security_group", "name": "web-sg", "status": "applied"})
+        if "vsphere_virtual_machine" in main:
+            resources.append({"type": "vsphere_virtual_machine", "name": "clone", "status": "applied"})
+        if not resources:
+            resources = [{"type": "aws_instance", "name": "web", "status": "applied"}]
+        tf["resources"] = resources
+        out = _format_apply_output(tool, tf)
         state["events"].insert(
             0,
-            {
-                "time": _now_iso(),
-                "message": "Apply complete! Resources: 3 added, 0 changed, 0 destroyed.",
-                "severity": "success",
-            },
+            {"time": _now_iso(), "message": "Apply complete! Resources provisioned.", "severity": "success"},
         )
         _save(session_id, entry)
-        return {"ok": True, "message": "Apply complete", "output": "Apply complete! Resources: 3 added, 0 changed, 0 destroyed."}
+        return {"ok": True, "message": "Apply complete", "output": out}
 
     if action == "force_unlock":
         broken.pop("stale_lock", None)

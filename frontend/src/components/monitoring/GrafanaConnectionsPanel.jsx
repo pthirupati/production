@@ -3,6 +3,7 @@ import {
   Database, Plus, Search, CheckCircle2, XCircle, ChevronRight, ArrowLeft,
   Activity, ScrollText, Timer, BarChart3, LineChart, Layers, Cloud, Cylinder,
 } from 'lucide-react'
+import { monitoringApi } from '../../api/monitoring'
 
 /* ── catalog of common data source types shown under "Add data source" ── */
 /* Original copy only — short, neutral descriptions of each backend's role. */
@@ -158,33 +159,116 @@ function DatasourceList({ datasources, onSelect }) {
   )
 }
 
-/* ── read-only catalog grid for "Add data source" ── */
-function AddDatasource() {
-  const [selected, setSelected] = useState(null)
+/* ── multi-step add data source wizard ── */
+function AddDatasourceWizard({ sessionId, onCreated }) {
+  const [step, setStep] = useState(0)
+  const [picked, setPicked] = useState(null)
+  const [form, setForm] = useState({ name: '', url: '', access: 'proxy', is_default: false })
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const defaults = {
+    Prometheus: { url: 'http://prometheus:9090', type: 'prometheus' },
+    Loki: { url: 'http://loki:3100', type: 'loki' },
+    Tempo: { url: 'http://tempo:3200', type: 'tempo' },
+    Graphite: { url: 'http://graphite:8080', type: 'graphite' },
+    InfluxDB: { url: 'http://influxdb:8086', type: 'influxdb' },
+    Elasticsearch: { url: 'http://elasticsearch:9200', type: 'elasticsearch' },
+    MySQL: { url: 'mysql://grafana:secret@mysql:3306/metrics', type: 'mysql' },
+    PostgreSQL: { url: 'postgres://grafana:secret@postgres:5432/metrics', type: 'postgresql' },
+    CloudWatch: { url: 'https://monitoring.amazonaws.com', type: 'cloudwatch' },
+    'Azure Monitor': { url: 'https://management.azure.com', type: 'azure monitor' },
+  }
+
+  const pickType = (type) => {
+    setPicked(type)
+    const d = defaults[type] || { url: '', type: type.toLowerCase() }
+    setForm({ name: type, url: d.url, access: 'proxy', is_default: false })
+    setStep(1)
+  }
+
+  const submit = async () => {
+    if (!sessionId) { setMsg('No lab session — configure via scenario only.'); return }
+    setBusy(true)
+    setMsg('')
+    try {
+      const d = defaults[picked] || { type: picked?.toLowerCase() }
+      const res = await monitoringApi.action(sessionId, 'add_datasource', {
+        name: form.name.trim(),
+        type: d.type,
+        url: form.url.trim(),
+        access: form.access,
+        is_default: form.is_default,
+      })
+      if (res?.ok === false) setMsg(res.error || 'Could not add data source')
+      else {
+        setStep(2)
+        setMsg(res.message || 'Data source added')
+        onCreated?.()
+      }
+    } catch {
+      setMsg('Request failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (step === 2) {
+    return (
+      <div className="mon-card space-y-2">
+        <div className="mon-panel-title flex items-center gap-2"><CheckCircle2 size={16} style={{ color: '#56e0b0' }} /> Data source added</div>
+        <p className="mon-panel-sub">{msg}</p>
+        <button type="button" className="mon-btn-primary !text-xs" onClick={() => { setStep(0); setPicked(null) }}>Add another</button>
+      </div>
+    )
+  }
+
+  if (step === 1 && picked) {
+    return (
+      <div className="mon-card space-y-3">
+        <button type="button" className="mon-tab flex items-center gap-2" onClick={() => setStep(0)}><ArrowLeft size={14} /> Back</button>
+        <div className="mon-panel-title">Configure {picked}</div>
+        <label className="block text-xs text-[#8a93b2]">Name
+          <input className="mon-input w-full mt-1" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+        </label>
+        <label className="block text-xs text-[#8a93b2]">URL
+          <input className="mon-input w-full mt-1 font-mono text-xs" value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))} />
+        </label>
+        <label className="block text-xs text-[#8a93b2]">Access
+          <select className="mon-input w-full mt-1" value={form.access} onChange={(e) => setForm((f) => ({ ...f, access: e.target.value }))}>
+            <option value="proxy">Server (default)</option>
+            <option value="direct">Browser</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-xs text-[#8a93b2]">
+          <input type="checkbox" checked={form.is_default} onChange={(e) => setForm((f) => ({ ...f, is_default: e.target.checked }))} />
+          Set as default
+        </label>
+        {msg && <div className="mon-banner mon-banner-err text-xs">{msg}</div>}
+        <div className="flex gap-2">
+          <button type="button" className="mon-btn-primary !text-xs" disabled={busy || !form.name.trim()} onClick={submit}>
+            {busy ? 'Saving…' : 'Save & test'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 mon-panel-sub">
-        <Search size={14} /> Browse data source types. Connections are provisioned by the lab scenario.
+        <Search size={14} /> Step 1 — choose a data source type
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {CATALOG.map((c) => {
           const Icon = c.icon
-          const active = selected === c.type
           return (
-            <button
-              key={c.type}
-              onClick={() => setSelected(active ? null : c.type)}
-              className={`mon-card text-left space-y-1 ${active ? 'border-[#f7913b]' : 'hover:border-[#f7913b]'}`}
-            >
+            <button key={c.type} type="button" onClick={() => pickType(c.type)}
+              className="mon-card text-left space-y-1 hover:border-[#f7913b]">
               <div className="mon-panel-title flex items-center gap-2">
                 <Icon size={15} style={{ color: '#f7913b' }} /> {c.type}
               </div>
               <div className="mon-panel-sub">{c.blurb}</div>
-              {active && (
-                <div className="mon-panel-sub flex items-center gap-1.5 pt-1" style={{ color: '#f7913b' }}>
-                  <CheckCircle2 size={12} /> Configured via lab scenario
-                </div>
-              )}
             </button>
           )
         })}
@@ -199,7 +283,7 @@ function AddDatasource() {
  * card + echoing Test button) and a read-only catalog for adding new types.
  * Rendered standalone or embedded; resilient to missing/empty props.
  */
-export default function GrafanaConnectionsPanel({ datasources = [] }) {
+export default function GrafanaConnectionsPanel({ datasources = [], sessionId, onReload }) {
   const list = Array.isArray(datasources) ? datasources : []
   const [sub, setSub] = useState('list') // list | add
   const [selected, setSelected] = useState(null)
@@ -232,7 +316,7 @@ export default function GrafanaConnectionsPanel({ datasources = [] }) {
           : <DatasourceList datasources={list} onSelect={setSelected} />
       )}
 
-      {sub === 'add' && <AddDatasource />}
+      {sub === 'add' && <AddDatasourceWizard sessionId={sessionId} onCreated={onReload} />}
     </div>
   )
 }

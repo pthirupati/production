@@ -63,7 +63,7 @@ _TOPIC_KEYWORDS = {
     "linux": ["linux", "systemd", "bash", "shell", "kernel", "process", "disk", "permission"],
 }
 
-MAX_HINTS = 5
+MAX_HINTS = 12
 
 
 def _detect_topic(scenario) -> str | None:

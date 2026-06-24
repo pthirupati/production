@@ -88,6 +88,7 @@ const Certifications = lazyWithRetry(() => import('../pages/certifications/Certi
 const CertificationDetail = lazyWithRetry(() => import('../pages/certifications/CertificationDetail'))
 const Playgrounds = lazyWithRetry(() => import('../pages/playgrounds/Playgrounds'))
 const PlaygroundDetail = lazyWithRetry(() => import('../pages/playgrounds/PlaygroundDetail'))
+const SimulatorLauncher = lazyWithRetry(() => import('../pages/SimulatorLauncher'))
 
 function PageLoader() {
   return (
@@ -170,6 +171,7 @@ export default function AppRouter() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/technologies" element={<Technologies />} />
           <Route path="/technologies/:slug" element={<TechnologyDetail />} />
+          <Route path="/simulators" element={<SimulatorLauncher />} />
           <Route path="/scenarios" element={<Scenarios />} />
           <Route path="/scenarios/:slug" element={<ScenarioDetail />} />
           <Route path="/lab/:sessionId" element={<LabRunner />} />

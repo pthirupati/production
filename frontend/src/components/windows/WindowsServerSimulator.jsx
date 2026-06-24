@@ -3,10 +3,12 @@ import {
   LayoutDashboard, Users, RefreshCw, Settings2, ArrowLeft, StopCircle,
   Lightbulb, XCircle, CheckCircle2, AlertTriangle, Lock, Server,
   ShieldCheck, Network, Globe, HardDrive, Cpu, ChevronRight, Plus,
-  Play, Square, RotateCw, Download, UserCog, FolderTree, Power,
+  Play, Square, RotateCw, Download, UserCog, FolderTree, Power, Trash2,
 } from 'lucide-react'
 import { windowsApi } from '../../api/windows'
 import { LabChromeControls } from '../lab/LabChromeBar'
+import AddRolesWizard from './AddRolesWizard'
+import NewUserWizard from './NewUserWizard'
 
 /* ── Scoped, self-contained Windows Server chrome (no shared CSS). Windows
    blue (#0078D4) accents on a light "Server Manager" surface, a dark taskbar,
@@ -191,7 +193,7 @@ function ServerManager({ state, busy, onAction }) {
   const domain = state.domain || {}
   const summary = state.summary || {}
   const installable = roles.filter(r => !r.installed)
-  const [wizardRole, setWizardRole] = useState(null)
+  const [wizardOpen, setWizardOpen] = useState(false)
 
   return (
     <div>
@@ -238,7 +240,7 @@ function ServerManager({ state, busy, onAction }) {
       <div className="win-card">
         <div className="win-card-head justify-between">
           <span className="flex items-center gap-2"><LayoutDashboard size={15} className="text-[#0078D4]" /> Roles and Features</span>
-          <button className="win-light-btn" onClick={() => setWizardRole(installable[0]?.id || '')} disabled={!installable.length}>
+          <button className="win-light-btn" onClick={() => setWizardOpen(true)} disabled={!installable.length}>
             <Plus size={13} /> Add Roles and Features
           </button>
         </div>
@@ -265,7 +267,7 @@ function ServerManager({ state, busy, onAction }) {
                       <button className="win-light-btn" disabled={busy} onClick={() => onAction('uninstall_role', { role: r.id })}>Remove</button>
                     </div>
                   ) : (
-                    <button className="win-light-btn win-primary !text-white" disabled={busy} onClick={() => setWizardRole(r.id)}>
+                    <button className="win-light-btn win-primary !text-white" disabled={busy} onClick={() => { setWizardOpen(true) }}>
                       <Plus size={12} /> Install
                     </button>
                   )}
@@ -276,31 +278,15 @@ function ServerManager({ state, busy, onAction }) {
         </table>
       </div>
 
-      {/* Add Roles and Features wizard */}
-      {wizardRole !== null && (
-        <div className="win-dialog-backdrop" onClick={() => setWizardRole(null)}>
-          <div className="win-dialog" onClick={e => e.stopPropagation()}>
-            <div className="win-dialog-head">Add Roles and Features Wizard</div>
-            <div className="win-dialog-body">
-              <p className="text-[0.82rem] text-[#616161] mb-3">Select a server role to install on <b>{state.computer_name}</b>.</p>
-              <select className="win-select w-full" value={wizardRole} onChange={e => setWizardRole(e.target.value)}>
-                {installable.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-              </select>
-              {(() => {
-                const r = roles.find(x => x.id === wizardRole)
-                return r?.description ? <p className="text-[0.78rem] text-[#616161] mt-3">{r.description}</p> : null
-              })()}
-            </div>
-            <div className="win-dialog-foot">
-              <button className="win-light-btn" onClick={() => setWizardRole(null)}>Cancel</button>
-              <button className="win-light-btn win-primary !text-white" disabled={busy || !wizardRole}
-                onClick={async () => { await onAction('install_role', { role: wizardRole }); setWizardRole(null) }}>
-                Install
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddRolesWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        installable={installable}
+        roles={roles}
+        computerName={state.computer_name}
+        busy={busy}
+        onInstall={async (roleId) => { await onAction('install_role', { role: roleId }) }}
+      />
     </div>
   )
 }
@@ -314,6 +300,7 @@ function ActiveDirectory({ state, busy, onAction }) {
   const [selectedOu, setSelectedOu] = useState('Users')
   const [selectedUser, setSelectedUser] = useState(null)
   const [groupDialog, setGroupDialog] = useState(null) // { user }
+  const [newUserOpen, setNewUserOpen] = useState(false)
 
   const ouUsers = users.filter(u => (u.ou || 'Users') === selectedOu)
   const active = users.find(u => u.name === selectedUser) || ouUsers[0] || users[0] || null
@@ -321,7 +308,12 @@ function ActiveDirectory({ state, busy, onAction }) {
   return (
     <div>
       <div className="win-h1">Active Directory Users and Computers</div>
-      <div className="win-sub mb-4">{(state.domain || {}).name || 'WORKGROUP'}</div>
+      <div className="win-sub mb-4 flex items-center justify-between gap-2 flex-wrap">
+        <span>{(state.domain || {}).name || 'WORKGROUP'}</span>
+        <button type="button" className="win-light-btn win-primary !text-white" disabled={busy} onClick={() => setNewUserOpen(true)}>
+          <Plus size={12} /> New User
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[230px_1fr_280px] gap-3">
         {/* OU tree */}
@@ -425,6 +417,13 @@ function ActiveDirectory({ state, busy, onAction }) {
           onRemove={(group) => onAction('remove_user_from_group', { user: groupDialog.user, group })}
         />
       )}
+
+      <NewUserWizard open={newUserOpen} onClose={() => setNewUserOpen(false)} ous={ous} busy={busy}
+        onCreate={async (u) => {
+          await onAction('create_ad_user', u)
+          setSelectedOu(u.ou || 'Users')
+          setSelectedUser(u.name)
+        }} />
     </div>
   )
 }
@@ -577,9 +576,137 @@ function ServicesConsole({ state, busy, onAction }) {
   )
 }
 
+/* ── Group Policy Management Editor ── */
+function GroupPolicyEditor({ state, busy, onAction }) {
+  const gp = state?.group_policy || {}
+  const gpos = gp.gpos || []
+  const forest = gp.forest || state?.domain?.name || 'corp.fixitlab.local'
+  const [selectedId, setSelectedId] = useState(() => gpos[0]?.id || null)
+  const [newName, setNewName] = useState('')
+  const [linkTarget, setLinkTarget] = useState(forest)
+  const [draft, setDraft] = useState({ key: '', value: '' })
+
+  const selected = gpos.find((g) => g.id === selectedId) || gpos[0] || null
+
+  return (
+    <div>
+      <div className="win-h1">Group Policy Management</div>
+      <div className="win-sub mb-4 flex items-center justify-between gap-2 flex-wrap">
+        <span>{forest}</span>
+        <div className="flex gap-2 items-center">
+          <input className="win-input !w-44 !text-xs" placeholder="New GPO name" value={newName}
+            onChange={(e) => setNewName(e.target.value)} />
+          <button type="button" className="win-light-btn win-primary !text-white" disabled={busy || !newName.trim()}
+            onClick={async () => { await onAction('create_gpo', { name: newName.trim() }); setNewName('') }}>
+            <Plus size={12} /> New GPO
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-3 min-h-[380px]">
+        <div className="win-card overflow-hidden">
+          <div className="win-card-head"><FolderTree size={14} className="text-[#0078D4]" /> Group Policy Objects</div>
+          <div className="p-1 text-xs">
+            <div className="px-2 py-1 font-semibold text-[#616161]">Forest → {forest}</div>
+            {gpos.length === 0 ? (
+              <div className="px-3 py-4 text-[#616161]">No GPOs defined.</div>
+            ) : gpos.map((g) => (
+              <button key={g.id} type="button" onClick={() => setSelectedId(g.id)}
+                className={`w-full text-left px-3 py-2 rounded flex items-center gap-2 ${selected?.id === g.id ? 'bg-[#eef6fd] font-medium' : 'hover:bg-[#f5f5f5]'}`}>
+                <FolderTree size={12} className="text-[#0078D4] shrink-0" />
+                <span className="truncate">{g.name}</span>
+                <Badge kind={g.status === 'Enabled' ? 'ok' : 'warn'}>{g.status === 'Enabled' ? 'On' : 'Off'}</Badge>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="win-card overflow-hidden">
+          {!selected ? (
+            <div className="p-6 text-[#616161] text-sm">Select a Group Policy Object.</div>
+          ) : (
+            <>
+              <div className="win-card-head flex items-center justify-between gap-2">
+                <span>{selected.name}</span>
+                <div className="flex gap-1">
+                  <button type="button" className="win-light-btn !text-xs" disabled={busy}
+                    onClick={() => onAction(selected.status === 'Enabled' ? 'disable_gpo' : 'enable_gpo', { gpo: selected.id })}>
+                    {selected.status === 'Enabled' ? 'Disable' : 'Enable'}
+                  </button>
+                  {selected.id !== 'default-domain-policy' && (
+                    <button type="button" className="win-light-btn !text-xs text-[#c42b1c]" disabled={busy}
+                      onClick={() => onAction('delete_gpo', { gpo: selected.id })}>
+                      <Trash2 size={11} /> Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="p-3 space-y-3">
+                <div>
+                  <div className="text-[11px] font-semibold text-[#616161] mb-1">Links</div>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {(selected.links || []).length === 0 ? (
+                      <span className="text-xs text-[#999]">Not linked</span>
+                    ) : (selected.links || []).map((l) => (
+                      <span key={l} className="win-badge win-b-info flex items-center gap-1">
+                        {l}
+                        <button type="button" className="hover:text-[#c42b1c]" disabled={busy}
+                          onClick={() => onAction('unlink_gpo', { gpo: selected.id, ou: l })}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input className="win-input flex-1 !text-xs" value={linkTarget} onChange={(e) => setLinkTarget(e.target.value)} />
+                    <button type="button" className="win-light-btn !text-xs" disabled={busy}
+                      onClick={() => onAction('link_gpo', { gpo: selected.id, ou: linkTarget.trim() || forest })}>Link</button>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold text-[#616161] mb-2">Settings</div>
+                  <table className="win-table text-xs">
+                    <thead><tr><th>Setting</th><th>Value</th><th /></tr></thead>
+                    <tbody>
+                      {(selected.settings || []).map((s) => (
+                        <tr key={s.key}>
+                          <td>{s.key}</td>
+                          <td>
+                            {draft.key === s.key ? (
+                              <input className="win-input !text-xs w-full" value={draft.value}
+                                onChange={(e) => setDraft({ key: s.key, value: e.target.value })} />
+                            ) : (
+                              <span className="text-[#0078D4]">{s.value}</span>
+                            )}
+                          </td>
+                          <td className="text-right">
+                            {draft.key === s.key ? (
+                              <button type="button" className="win-light-btn !text-xs" disabled={busy}
+                                onClick={async () => {
+                                  await onAction('update_gpo_setting', { gpo: selected.id, key: s.key, value: draft.value })
+                                  setDraft({ key: '', value: '' })
+                                }}>Save</button>
+                            ) : (
+                              <button type="button" className="win-light-btn !text-xs" disabled={busy}
+                                onClick={() => setDraft({ key: s.key, value: s.value })}>Edit</button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const NAV = [
   { key: 'dashboard', label: 'Server Manager', icon: LayoutDashboard },
   { key: 'ad', label: 'Active Directory', icon: Users },
+  { key: 'gpo', label: 'Group Policy', icon: FolderTree },
   { key: 'update', label: 'Windows Update', icon: Download },
   { key: 'services', label: 'Services', icon: Settings2 },
   { key: 'system', label: 'System (Domain)', icon: Globe },
@@ -635,7 +762,7 @@ function SystemPanel({ state, busy, onAction }) {
  */
 export default function WindowsServerSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
-  hintsLabel, checkDisabled, extendDisabled,
+  hintsLabel, checkDisabled, extendDisabled, embedded = false,
 }) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
@@ -721,7 +848,7 @@ export default function WindowsServerSimulator({
   }), [now])
 
   return (
-    <div className="win-sim min-h-screen relative">
+    <div className={`win-sim relative ${embedded ? 'h-full min-h-0 flex flex-col overflow-hidden' : 'min-h-screen'}`}>
       <style>{SCOPED_CSS}</style>
 
       {/* Title bar — lab chrome lives here (hints / stop / back to lab). */}
@@ -740,7 +867,7 @@ export default function WindowsServerSimulator({
             onCheck={onCheck}
             onExtend={onExtend}
             onStop={onStop}
-            onBackToTerminal={onExit}
+            onBackToTerminal={embedded ? undefined : onExit}
             hintsLabel={hintsLabel || 'Hints'}
             checkDisabled={checkDisabled}
             extendDisabled={extendDisabled}
@@ -787,6 +914,7 @@ export default function WindowsServerSimulator({
             <>
               {view === 'dashboard' && <ServerManager state={state} busy={busy} onAction={runAction} />}
               {view === 'ad' && <ActiveDirectory state={state} busy={busy} onAction={runAction} />}
+              {view === 'gpo' && <GroupPolicyEditor state={state} busy={busy} onAction={runAction} />}
               {view === 'update' && <WindowsUpdate state={state} busy={busy} onAction={runAction} />}
               {view === 'services' && <ServicesConsole state={state} busy={busy} onAction={runAction} />}
               {view === 'system' && <SystemPanel state={state} busy={busy} onAction={runAction} />}

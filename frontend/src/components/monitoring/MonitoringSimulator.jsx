@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell, Gauge, Search, Server, GitBranch,
   AlertTriangle, XCircle, RefreshCw, Play, Layers,
-  Compass, Settings, Plug, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
+  Compass, Settings, Plug, Plus, Trash2, ChevronUp, ChevronDown, Pencil, ChevronRight, Home, GripVertical,
 } from 'lucide-react'
 import { monitoringApi } from '../../api/monitoring'
 import MonitoringLoginGate, { isMonitoringAuthenticated } from './MonitoringLoginGate'
@@ -12,7 +12,16 @@ import GrafanaExplorePanel from './GrafanaExplorePanel'
 import GrafanaAlertingPanel from './GrafanaAlertingPanel'
 import GrafanaConnectionsPanel from './GrafanaConnectionsPanel'
 import GrafanaAdministrationPanel from './GrafanaAdministrationPanel'
+import GrafanaIconSidebar from './GrafanaIconSidebar'
+import PrometheusTopNav from './PrometheusTopNav'
+import {
+  PROMETHEUS_ALERT_GROUPS, PROMETHEUS_CONFIG_YAML, PROMETHEUS_SERVICE_DISCOVERY,
+} from '../../mockData/prometheus'
+import {
+  GRAFANA_FOLDERS, GRAFANA_DASHBOARD_BROWSE, GRAFANA_PLAYLISTS, GRAFANA_SNAPSHOTS, GRAFANA_LIBRARY_PANELS,
+} from '../../mockData/grafana'
 import '../../styles/monitoring-sim.css'
+import { simShellClass } from '../../utils/simLayout'
 
 /* ── tiny inline sparkline driven by a numeric series ── */
 function Sparkline({ values, color = '#56e0b0', height = 56 }) {
@@ -45,7 +54,7 @@ function fmtVal(v, unit) {
 }
 
 /* ── a single dashboard panel: evaluates its expr to a value/series ── */
-function DashPanel({ panel, sessionId, scenario, dashboardUid, noData, editLayout, panelIndex, panelCount, onMutate }) {
+function DashPanel({ panel, sessionId, scenario, dashboardUid, noData, editLayout, panelIndex, panelCount, onMutate, isDragging, isDropTarget }) {
   const [series, setSeries] = useState([])
   const [value, setValue] = useState(null)
   const [empty, setEmpty] = useState(noData)
@@ -81,13 +90,38 @@ function DashPanel({ panel, sessionId, scenario, dashboardUid, noData, editLayou
 
   const color = panel.type === 'gauge' ? '#f5c451' : '#56e0b0'
   return (
-    <div className="mon-card">
+    <div
+      className={`mon-card transition-shadow ${editLayout ? 'cursor-grab active:cursor-grabbing' : ''} ${isDragging ? 'opacity-50 ring-2 ring-[#f7913b]/40' : ''} ${isDropTarget ? 'ring-2 ring-[#f7913b] shadow-lg' : ''}`}
+      draggable={editLayout}
+      onDragStart={(e) => {
+        if (!editLayout) return
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', panel.id)
+        onMutate?.('drag-start')
+      }}
+      onDragOver={(e) => {
+        if (!editLayout) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        onMutate?.('drag-over')
+      }}
+      onDragLeave={() => editLayout && onMutate?.('drag-leave')}
+      onDrop={(e) => {
+        if (!editLayout) return
+        e.preventDefault()
+        onMutate?.('drop')
+      }}
+      onDragEnd={() => editLayout && onMutate?.('drag-end')}
+    >
       <div className="flex items-center justify-between mb-1 gap-2">
         {metaEditing ? (
           <input className="mon-input flex-1 !text-xs font-semibold" value={titleDraft}
             onChange={(e) => setTitleDraft(e.target.value)} />
         ) : (
-          <span className="mon-panel-title">{panel.title}</span>
+          <span className="mon-panel-title flex items-center gap-1.5 min-w-0">
+            {editLayout && <GripVertical size={12} className="text-[#8a93b2] shrink-0" />}
+            <span className="truncate">{panel.title}</span>
+          </span>
         )}
         <div className="flex items-center gap-1 shrink-0">
           {editLayout && (
@@ -168,19 +202,76 @@ function DashPanel({ panel, sessionId, scenario, dashboardUid, noData, editLayou
   )
 }
 
+const GRAFANA_NAV_MAP = {
+  home: 'home',
+  dashboards: 'dashboards',
+  explore: 'explore',
+  alerting: 'alerting',
+  connections: 'connections',
+  admin: 'administration',
+}
+
 /* ── Grafana view ── */
-function GrafanaView({ state, sessionId, scenario, onReload }) {
+function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaChildNav }) {
   const graf = state.grafana || {}
   const [activeDash, setActiveDash] = useState(graf.dashboards?.[0]?.uid || '')
-  const [sub, setSub] = useState('dashboards')
+  const [sub, setSub] = useState(GRAFANA_NAV_MAP[activeNav] || 'dashboards')
   const [editLayout, setEditLayout] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [dragPanelId, setDragPanelId] = useState(null)
+  const [dropPanelId, setDropPanelId] = useState(null)
   const [newPanel, setNewPanel] = useState({ title: 'New panel', expr: 'up', type: 'timeseries' })
   const noDataPanels = new Set(state.broken?.panels_no_data || [])
   const dash = (graf.dashboards || []).find(d => d.uid === activeDash) || graf.dashboards?.[0]
+  const externalNav = activeNav != null
+
+  useEffect(() => {
+    if (activeNav) setSub(GRAFANA_NAV_MAP[activeNav] || 'dashboards')
+  }, [activeNav])
 
   const mutatePanels = async (kind, panelId, extra = {}) => {
     if (!dash) return
+    if (kind === 'drag-start') {
+      setDragPanelId(panelId)
+      return
+    }
+    if (kind === 'drag-over') {
+      setDropPanelId(panelId)
+      return
+    }
+    if (kind === 'drag-leave') {
+      setDropPanelId((prev) => (prev === panelId ? null : prev))
+      return
+    }
+    if (kind === 'drag-end') {
+      setDragPanelId(null)
+      setDropPanelId(null)
+      return
+    }
+    if (kind === 'drop') {
+      const targetId = panelId
+      if (!dragPanelId || dragPanelId === targetId) {
+        setDragPanelId(null)
+        setDropPanelId(null)
+        return
+      }
+      const ids = (dash.panels || []).map((p) => p.id)
+      const fromIdx = ids.indexOf(dragPanelId)
+      const toIdx = ids.indexOf(targetId)
+      if (fromIdx < 0 || toIdx < 0) {
+        setDragPanelId(null)
+        setDropPanelId(null)
+        return
+      }
+      const order = [...ids]
+      order.splice(fromIdx, 1)
+      order.splice(toIdx, 0, dragPanelId)
+      setDragPanelId(null)
+      setDropPanelId(null)
+      await monitoringApi.action(sessionId, 'reorder_panels', { dashboard_uid: dash.uid, order })
+      onReload?.()
+      return
+    }
     if (kind === 'remove') {
       await monitoringApi.action(sessionId, 'remove_panel', { dashboard_uid: dash.uid, panel_id: panelId })
     } else if (kind === 'reorder') {
@@ -208,8 +299,8 @@ function GrafanaView({ state, sessionId, scenario, onReload }) {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4">
-      {/* left rail */}
+    <div className={externalNav ? '' : 'grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4'}>
+      {!externalNav && (
       <div className="space-y-1">
         {[['dashboards', 'Dashboards', Gauge], ['explore', 'Explore', Compass], ['alerting', 'Alerting', Bell],
           ['connections', 'Connections', Plug], ['administration', 'Administration', Settings]].map(([k, label, Icon]) => (
@@ -219,9 +310,95 @@ function GrafanaView({ state, sessionId, scenario, onReload }) {
           </button>
         ))}
       </div>
+      )}
 
       <div>
-        {sub === 'dashboards' && dash && (
+        {sub === 'home' && (
+          <div className="mon-card">
+            <div className="flex items-center gap-2 mb-3">
+              <Home size={20} className="text-[#f7913b]" />
+              <div className="mon-panel-title">Welcome to Grafana</div>
+            </div>
+            <p className="mon-panel-sub mb-4">Use the sidebar to browse dashboards, run Explore queries, review alerting rules, or manage data sources.</p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {[
+                ['Dashboards', `${(graf.dashboards || []).length} provisioned`, Gauge],
+                ['Datasources', `${(graf.datasources || []).length} configured`, Plug],
+                ['Alerts', `${(graf.alert_rules || []).length} rules`, Bell],
+              ].map(([label, val, Icon]) => (
+                <div key={label} className="mon-card !p-3 flex items-center gap-3">
+                  <Icon size={18} className="text-[#f7913b]" />
+                  <div><div className="text-sm font-medium text-[#d8def0]">{label}</div><div className="mon-panel-sub">{val}</div></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {sub === 'dashboards' && grafanaChildNav === 'Browse' && (
+          <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4">
+            <div className="mon-card !p-2">
+              <div className="mon-panel-sub px-2 py-1 mb-1">Folders</div>
+              {GRAFANA_FOLDERS.map((f) => (
+                <button key={f.id} type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-white/5 text-[#d8def0]">
+                  📁 {f.name} <span className="text-[#8a93b2]">({f.dashboards})</span>
+                </button>
+              ))}
+            </div>
+            <div>
+              <div className="mon-panel-title mb-3">Dashboards</div>
+              <table className="w-full text-sm">
+                <thead><tr className="text-[#8a93b2] text-xs border-b border-[#262a45]">
+                  <th className="text-left py-2 px-2">Name</th><th className="text-left py-2">Folder</th><th className="text-left py-2">Tags</th><th className="text-left py-2">Updated</th>
+                </tr></thead>
+                <tbody>
+                  {GRAFANA_DASHBOARD_BROWSE.map((d) => (
+                    <tr key={d.uid} className="border-b border-[#262a45]/50 hover:bg-white/5 cursor-pointer" onClick={() => setActiveDash(d.uid)}>
+                      <td className="py-2 px-2 text-[#f7913b]">{d.title}</td>
+                      <td className="py-2 text-[#8a93b2]">{d.folder}</td>
+                      <td className="py-2">{d.tags.map((t) => <span key={t} className="mon-badge mon-badge-up mr-1 text-[9px]">{t}</span>)}</td>
+                      <td className="py-2 text-[#8a93b2]">{d.updated}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {sub === 'dashboards' && grafanaChildNav === 'Playlists' && (
+          <div className="mon-card">
+            <div className="mon-panel-title mb-3">Playlists</div>
+            {GRAFANA_PLAYLISTS.map((p) => (
+              <div key={p.id} className="flex justify-between py-2 border-b border-[#262a45]/50 text-sm">
+                <span>{p.name}</span><span className="text-[#8a93b2]">{p.dashboards} dashboards · {p.interval}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {sub === 'dashboards' && grafanaChildNav === 'Snapshots' && (
+          <div className="mon-card">
+            {GRAFANA_SNAPSHOTS.map((s) => (
+              <div key={s.id} className="py-2 border-b border-[#262a45]/50 text-sm flex justify-between">
+                <span>{s.name}</span><span className="text-[#8a93b2]">expires {s.expires}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {sub === 'dashboards' && grafanaChildNav === 'Library panels' && (
+          <div className="grid sm:grid-cols-2 gap-3">
+            {GRAFANA_LIBRARY_PANELS.map((p) => (
+              <div key={p.id} className="mon-card !p-3">
+                <div className="font-medium text-sm">{p.name}</div>
+                <div className="text-[10px] text-[#8a93b2] mt-1">{p.type} · {p.datasource}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {sub === 'dashboards' && dash && !['Browse', 'Playlists', 'Snapshots', 'Library panels'].includes(grafanaChildNav) && (
           <>
             <div className="flex items-center gap-2 mb-3 flex-wrap">
               {(graf.dashboards || []).map(d => (
@@ -234,9 +411,12 @@ function GrafanaView({ state, sessionId, scenario, onReload }) {
                 <Pencil size={13} /> {editLayout ? 'Done editing' : 'Edit dashboard'}
               </button>
               {editLayout && (
-                <button type="button" className="mon-btn-primary !text-xs" onClick={() => setAdding(true)}>
-                  <Plus size={13} /> Add panel
-                </button>
+                <>
+                  <span className="text-[10px] text-[#8a93b2] hidden sm:inline">Drag panels to reorder</span>
+                  <button type="button" className="mon-btn-primary !text-xs" onClick={() => setAdding(true)}>
+                    <Plus size={13} /> Add panel
+                  </button>
+                </>
               )}
             </div>
             {adding && (
@@ -274,6 +454,8 @@ function GrafanaView({ state, sessionId, scenario, onReload }) {
                 <DashPanel key={`${dash.uid}-${p.id}`} panel={p} sessionId={sessionId}
                            scenario={scenario} dashboardUid={dash.uid} noData={noDataPanels.has(p.id)}
                            editLayout={editLayout} panelIndex={i} panelCount={(dash.panels || []).length}
+                           isDragging={dragPanelId === p.id}
+                           isDropTarget={dropPanelId === p.id && dragPanelId !== p.id}
                            onMutate={(kind, extra) => {
                              if (kind === 'refresh') { onReload?.(); return }
                              mutatePanels(kind, p.id, extra)
@@ -303,7 +485,7 @@ function GrafanaView({ state, sessionId, scenario, onReload }) {
 
         {sub === 'alerting' && <GrafanaAlertingPanel graf={graf} />}
 
-        {sub === 'connections' && <GrafanaConnectionsPanel datasources={graf.datasources || []} />}
+        {sub === 'connections' && <GrafanaConnectionsPanel datasources={graf.datasources || []} sessionId={sessionId} onReload={onReload} />}
 
         {sub === 'administration' && <GrafanaAdministrationPanel scenario={scenario} />}
       </div>
@@ -311,10 +493,191 @@ function GrafanaView({ state, sessionId, scenario, onReload }) {
   )
 }
 
+/* ── Prometheus alerts (classic UI) ── */
+function PrometheusAlertsPanel({ prom }) {
+  const [openGroups, setOpenGroups] = useState(() => new Set(['instance-health']))
+  const groups = PROMETHEUS_ALERT_GROUPS.map((g) => ({
+    ...g,
+    rules: g.rules.map((r) => {
+      const live = (prom.alerting_rules || []).find((lr) => lr.name === r.name)
+      return live ? { ...r, state: live.state, expr: live.expr || r.expr } : r
+    }),
+  }))
+
+  const toggle = (name) => setOpenGroups((prev) => {
+    const next = new Set(prev)
+    if (next.has(name)) next.delete(name)
+    else next.add(name)
+    return next
+  })
+
+  return (
+    <div className="space-y-2">
+      {groups.map((g) => {
+        const open = openGroups.has(g.name)
+        const firing = g.rules.filter((r) => r.state === 'firing').length
+        return (
+          <div key={g.name} className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
+            <button type="button" onClick={() => toggle(g.name)}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-gray-800 hover:bg-gray-50 border-b border-gray-100">
+              {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <span className="font-mono">{g.name}</span>
+              <span className="ml-auto text-xs font-normal text-gray-500">{g.rules.length} rules · {firing} firing</span>
+            </button>
+            {open && (
+              <table className="w-full text-xs">
+                <thead><tr className="bg-gray-50 text-gray-500">
+                  <th className="px-4 py-2 text-left font-medium">State</th>
+                  <th className="px-4 py-2 text-left font-medium">Alert</th>
+                  <th className="px-4 py-2 text-left font-medium">Summary</th>
+                  <th className="px-4 py-2 text-left font-medium">Active Since</th>
+                </tr></thead>
+                <tbody>
+                  {g.rules.map((r) => (
+                    <tr key={r.name} className="border-t border-gray-100 hover:bg-gray-50">
+                      <td className="px-4 py-2">
+                        <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          r.state === 'firing' ? 'bg-red-100 text-red-700' : r.state === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-700'
+                        }`}>{r.state}</span>
+                      </td>
+                      <td className="px-4 py-2 font-mono text-gray-800">{r.name}</td>
+                      <td className="px-4 py-2 text-gray-600">{r.annotations?.summary || r.expr}</td>
+                      <td className="px-4 py-2 text-gray-400">{r.for || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ── Prometheus status sub-pages ── */
+function PrometheusStatusPanel({ prom, statusSub }) {
+  if (statusSub === 'configuration') {
+    return (
+      <div className="mon-card bg-white !border-gray-200">
+        <div className="px-3 py-2 text-sm font-semibold text-gray-800 border-b border-gray-100">Configuration</div>
+        <pre className="p-4 text-xs font-mono text-gray-700 overflow-x-auto whitespace-pre">{PROMETHEUS_CONFIG_YAML}</pre>
+      </div>
+    )
+  }
+  if (statusSub === 'service-discovery') {
+    return (
+      <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-gray-500 text-xs">
+            <th className="px-3 py-2 text-left">Job</th><th className="px-3 py-2 text-left">Discovered targets</th><th className="px-3 py-2 text-left">Labels</th>
+          </tr></thead>
+          <tbody>
+            {PROMETHEUS_SERVICE_DISCOVERY.map((sd) => (
+              <tr key={sd.job} className="border-t border-gray-100">
+                <td className="px-3 py-2 font-mono">{sd.job}</td>
+                <td className="px-3 py-2">{sd.discovered}</td>
+                <td className="px-3 py-2 font-mono text-xs text-gray-600">{(sd.labels || []).join(', ')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+  if (statusSub === 'runtime') {
+    return (
+      <div className="grid sm:grid-cols-2 gap-3">
+        {[
+          ['Start time', prom.started_at || '2026-06-20 08:00:00 UTC'],
+          ['Version', '2.51.0'],
+          ['Head series', (prom.head_series || 124832).toLocaleString()],
+          ['Retention', prom.retention || '15d'],
+          ['Storage', prom.storage || 'local TSDB'],
+          ['Query engine', 'PromQL'],
+        ].map(([k, v]) => (
+          <div key={k} className="mon-card bg-white !border-gray-200 !p-3">
+            <div className="text-xs text-gray-500">{k}</div>
+            <div className="text-sm font-mono text-gray-800 mt-0.5">{v}</div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  if (statusSub === 'rules') {
+    return (
+      <div className="space-y-3">
+        <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
+          <div className="px-3 py-2 text-xs font-semibold text-gray-600 border-b">Recording rules</div>
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-gray-500 text-xs"><th className="px-3 py-2 text-left">Group</th><th className="px-3 py-2 text-left">Name</th><th className="px-3 py-2 text-left">Expr</th></tr></thead>
+            <tbody>
+              {(prom.recording_rules || []).map((r, i) => (
+                <tr key={i} className="border-t border-gray-100"><td className="px-3 py-2 font-mono">{r.group}</td><td className="px-3 py-2">{r.name}</td><td className="px-3 py-2 font-mono text-xs text-gray-600">{r.expr}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
+          <div className="px-3 py-2 text-xs font-semibold text-gray-600 border-b">Alerting rules</div>
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-gray-500 text-xs"><th className="px-3 py-2 text-left">Group</th><th className="px-3 py-2 text-left">Alert</th><th className="px-3 py-2 text-left">State</th></tr></thead>
+            <tbody>
+              {(prom.alerting_rules || []).map((r, i) => (
+                <tr key={i} className="border-t border-gray-100"><td className="px-3 py-2 font-mono">{r.group}</td><td className="px-3 py-2">{r.name}</td>
+                  <td className="px-3 py-2"><span className={`text-xs font-bold ${r.state === 'firing' ? 'text-red-600' : 'text-green-600'}`}>{r.state}</span></td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+  // targets (default)
+  return (
+    <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
+      <table className="w-full text-sm">
+        <thead><tr className="bg-gray-50 text-gray-500 text-xs"><th className="px-3 py-2 text-left">Job</th><th className="px-3 py-2 text-left">Endpoint</th><th className="px-3 py-2 text-left">State</th><th className="px-3 py-2 text-left">Last scrape</th><th className="px-3 py-2 text-left">Error</th></tr></thead>
+        <tbody>
+          {(prom.targets || []).map((t, i) => (
+            <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+              <td className="px-3 py-2 font-medium">{t.job}</td>
+              <td className="px-3 py-2 font-mono text-xs">{t.scrape_url}</td>
+              <td className="px-3 py-2"><span className={`text-xs font-bold ${t.health === 'down' ? 'text-red-600' : 'text-green-600'}`}>{t.health === 'down' ? 'DOWN' : 'UP'}</span></td>
+              <td className="px-3 py-2 font-mono text-xs text-gray-500">{t.scrape_duration_ms}ms</td>
+              <td className="px-3 py-2 text-xs text-red-600">{t.last_error || ''}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function PromQueryGraph({ result }) {
+  const rows = result?.data?.result || []
+  if (rows.length === 0) return null
+  const values = rows.slice(0, 1).map((r) => Number(r.value[1])).filter((n) => !Number.isNaN(n))
+  const v = values[0] ?? 0
+  const pts = Array.from({ length: 24 }, (_, i) => v * (0.85 + Math.sin(i / 3) * 0.08 + (i / 24) * 0.05))
+  const W = 640, H = 120, min = Math.min(...pts), max = Math.max(...pts), span = max - min || 1
+  const path = pts.map((p, i) => `${(i / (pts.length - 1)) * W},${H - ((p - min) / span) * (H - 12) - 6}`).join(' ')
+  return (
+    <div className="mon-card bg-white !border-gray-200 mb-3">
+      <div className="text-xs text-gray-500 mb-1 px-1">Graph</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block">
+        <polyline points={path} fill="none" stroke="#e6522c" strokeWidth="2" />
+        <polyline points={`0,${H} ${path} ${W},${H}`} fill="rgba(230,82,44,0.12)" stroke="none" />
+      </svg>
+    </div>
+  )
+}
+
 /* ── Prometheus view ── */
-function PrometheusView({ state, sessionId, scenario, defaultExpr }) {
+function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, statusSub = 'targets' }) {
   const prom = state.prometheus || {}
-  const [sub, setSub] = useState('query') // query | targets | rules | alertmanager
+  const externalNav = activeNav != null
+  const [sub, setSub] = useState('query')
   const [expr, setExpr] = useState(defaultExpr || 'up')
   const [result, setResult] = useState(null)
   const [running, setRunning] = useState(false)
@@ -341,8 +704,14 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr }) {
     'prometheus_tsdb_head_series',
   ]
 
+  const showGraph = !externalNav || activeNav === 'graph'
+  const showAlerts = externalNav && activeNav === 'alerts'
+  const showStatus = externalNav && activeNav === 'status'
+  const showHelp = externalNav && activeNav === 'help'
+
   return (
     <div>
+      {!externalNav && (
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         {[['query', 'Graph / PromQL', Search], ['targets', 'Targets', Server],
           ['rules', 'Rules', GitBranch], ['alertmanager', 'Alertmanager', Bell]].map(([k, label, Icon]) => (
@@ -352,15 +721,27 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr }) {
           </button>
         ))}
       </div>
+      )}
 
-      {sub === 'query' && (
+      {showHelp && (
+        <div className="mon-card bg-white !border-gray-200 p-4 text-sm text-gray-700">
+          <p className="font-semibold mb-2">Prometheus Help</p>
+          <p>Use the <b>Graph</b> tab to run PromQL queries. Check <b>Alerts</b> for firing rules and <b>Status → Targets</b> for scrape health.</p>
+        </div>
+      )}
+
+      {showAlerts && <PrometheusAlertsPanel prom={prom} />}
+
+      {showStatus && <PrometheusStatusPanel prom={prom} statusSub={statusSub} />}
+
+      {(showGraph || (!externalNav && sub === 'query')) && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <input className="mon-input flex-1 font-mono" value={expr} spellCheck={false}
+            <input className="mon-input flex-1 font-mono bg-white !text-gray-800 !border-gray-300" value={expr} spellCheck={false}
                    onChange={e => setExpr(e.target.value)}
                    onKeyDown={e => { if (e.key === 'Enter') runQuery() }}
                    placeholder="Enter a PromQL expression…" />
-            <button className="mon-btn-primary" style={{ background: '#e6522c', color: '#1a1206' }}
+            <button className="mon-btn-primary" style={{ background: '#e6522c', color: '#fff' }}
                     disabled={running} onClick={() => runQuery()}>
               {running ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />} Execute
             </button>
@@ -370,28 +751,29 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr }) {
               <button key={s} className="mon-tab !text-[11px] font-mono" onClick={() => { setExpr(s); runQuery(s) }}>{s}</button>
             ))}
           </div>
+          {result && result.status !== 'error' && <PromQueryGraph result={result} />}
           {result && (
-            <div className="mon-card !p-0 overflow-hidden">
+            <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
               {result.status === 'error' ? (
-                <div className="text-[#ffb4b4] text-xs p-3 font-mono">error: {result.error}</div>
+                <div className="text-red-600 text-xs p-3 font-mono">error: {result.error}</div>
               ) : (result.data?.result || []).length === 0 ? (
-                <div className="text-[#f5c451] text-xs p-4 flex items-center gap-2 justify-center">
+                <div className="text-amber-700 text-xs p-4 flex items-center gap-2 justify-center">
                   <AlertTriangle size={14} /> Empty query result — no series match
                 </div>
               ) : (
-                <table className="mon-table">
-                  <thead><tr><th>Series (labels)</th><th className="text-right">Value</th></tr></thead>
+                <table className="w-full text-sm">
+                  <thead><tr className="bg-gray-50 text-gray-500 text-xs"><th className="px-3 py-2 text-left">Series (labels)</th><th className="px-3 py-2 text-right">Value</th></tr></thead>
                   <tbody>
                     {(result.data.result).slice(0, 60).map((row, i) => {
                       const { __name__, ...labels } = row.metric
                       const lbl = Object.entries(labels).map(([k, v]) => `${k}="${v}"`).join(', ')
                       return (
-                        <tr key={i}>
-                          <td className="font-mono">
-                            <span className="text-[#e6a35c]">{__name__ || ''}</span>
-                            <span className="text-[#8a93b2]">{lbl ? `{${lbl}}` : ''}</span>
+                        <tr key={i} className="border-t border-gray-100">
+                          <td className="px-3 py-2 font-mono text-xs">
+                            <span className="text-[#e6522c]">{__name__ || ''}</span>
+                            <span className="text-gray-500">{lbl ? `{${lbl}}` : ''}</span>
                           </td>
-                          <td className="text-right font-mono text-[#56e0b0]">{Number(row.value[1]).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+                          <td className="px-3 py-2 text-right font-mono text-green-700">{Number(row.value[1]).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
                         </tr>
                       )
                     })}
@@ -403,7 +785,7 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr }) {
         </div>
       )}
 
-      {sub === 'targets' && (
+      {!externalNav && sub === 'targets' && (
         <div className="mon-card !p-0 overflow-hidden">
           <table className="mon-table">
             <thead><tr><th>Job</th><th>Endpoint</th><th>State</th><th>Last scrape</th><th>Error</th></tr></thead>
@@ -502,12 +884,17 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr }) {
  * `flavor` selects which view is primary; both are always reachable via the tabs.
  */
 export default function MonitoringSimulator({
-  sessionId, scenario, flavor = 'grafana',
+  sessionId, scenario, flavor = 'grafana', embedded = false,
   onExit, onStop, onHints, onCheck, onExtend, hintsLabel, checkDisabled, extendDisabled,
 }) {
   const [authed, setAuthed] = useState(isMonitoringAuthenticated())
   const [state, setState] = useState(null)
   const [view, setView] = useState(flavor === 'prometheus' ? 'prometheus' : 'grafana')
+  const [grafanaNav, setGrafanaNav] = useState('dashboards')
+  const [grafanaNavExpanded, setGrafanaNavExpanded] = useState(null)
+  const [grafanaChildNav, setGrafanaChildNav] = useState('Browse')
+  const [promNav, setPromNav] = useState('graph')
+  const [promStatusSub, setPromStatusSub] = useState('targets')
   const [error, setError] = useState('')
   const slug = scenario?.slug || ''
   const pollRef = useRef(null)
@@ -533,13 +920,22 @@ export default function MonitoringSimulator({
     // The login gate is the first thing a learner sees when they open the sim.
     // Forward the lab chrome handlers so Hints / Stop / Back to lab work here too
     // (mirrors how the VMware / Nmap sims keep that chrome reachable at all times).
+    const gateProps = {
+      onAuthenticated: () => setAuthed(true),
+      scenario,
+      onExit,
+      onStop,
+      onHints,
+      onCheck,
+      onExtend,
+      hintsLabel,
+      checkDisabled,
+      extendDisabled,
+      embedded,
+    }
     return flavor === 'prometheus'
-      ? <MonitoringLoginGate flavor={flavor} onAuthenticated={() => setAuthed(true)}
-                             onExit={onExit} onStop={onStop} onHints={onHints}
-                             onCheck={onCheck} onExtend={onExtend} hintsLabel={hintsLabel} />
-      : <GrafanaLoginScreen onAuthenticated={() => setAuthed(true)}
-                            scenario={scenario} onExit={onExit} onStop={onStop} onHints={onHints}
-                            onCheck={onCheck} onExtend={onExtend} hintsLabel={hintsLabel} />
+      ? <MonitoringLoginGate flavor={flavor} {...gateProps} />
+      : <GrafanaLoginScreen {...gateProps} />
   }
 
   const accent = flavor === 'prometheus' ? '#e6522c' : '#f7913b'
@@ -547,7 +943,7 @@ export default function MonitoringSimulator({
   const summary = state?.summary || {}
 
   return (
-    <div className="mon-sim mon-shell min-h-screen">
+    <div className={simShellClass(embedded)}>
       <MonitoringLabChrome
         product={product}
         accent={accent}
@@ -566,7 +962,18 @@ export default function MonitoringSimulator({
         <button className="mon-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
       </MonitoringLabChrome>
 
-      <div className="p-4 max-w-[1200px] mx-auto">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {view === 'grafana' && (
+          <GrafanaIconSidebar active={grafanaNav} onSelect={setGrafanaNav}
+            expanded={grafanaNavExpanded} onToggleExpand={(k) => setGrafanaNavExpanded((p) => p === k ? null : k)}
+            onChildSelect={(parent, child) => { setGrafanaNav(parent); setGrafanaChildNav(child) }} />
+        )}
+        <div className={`flex-1 min-h-0 flex flex-col overflow-hidden ${view === 'prometheus' ? 'bg-[#f5f5f5]' : ''}`}>
+          {view === 'prometheus' && (
+            <PrometheusTopNav active={promNav} onSelect={setPromNav}
+              statusSub={promStatusSub} onStatusSelect={setPromStatusSub} />
+          )}
+          <div className="flex-1 min-h-0 overflow-auto p-4 w-full max-w-none">
         {error && <div className="mon-banner mon-banner-err"><XCircle size={15} /> {error}</div>}
 
         {/* fault summary banner so the learner knows what to investigate */}
@@ -595,11 +1002,14 @@ export default function MonitoringSimulator({
         {!state ? (
           <div className="text-center text-[#8a93b2] py-16">Loading {product} state…</div>
         ) : view === 'grafana' ? (
-          <GrafanaView state={state} sessionId={sessionId} scenario={slug} onReload={load} />
+          <GrafanaView state={state} sessionId={sessionId} scenario={slug} onReload={load} activeNav={grafanaNav} grafanaChildNav={grafanaChildNav} />
         ) : (
           <PrometheusView state={state} sessionId={sessionId} scenario={slug}
-                          defaultExpr={summary.targets_down ? 'up == 0' : 'up'} />
+                          defaultExpr={summary.targets_down ? 'up == 0' : 'up'}
+                          activeNav={promNav} statusSub={promStatusSub} />
         )}
+          </div>
+        </div>
       </div>
     </div>
   )
