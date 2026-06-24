@@ -41,6 +41,9 @@ from .views import (
     TerraformSimActionView,
     TerraformSimReleaseView,
     TerraformSimStateView,
+    BaremetalSimActionView,
+    BaremetalSimReleaseView,
+    BaremetalSimStateView,
 )
 
 urlpatterns = [
@@ -101,4 +104,7 @@ urlpatterns = [
     path("terraform/sessions/<uuid:session_id>/", TerraformSimStateView.as_view(), name="terraform-sim-state"),
     path("terraform/sessions/<uuid:session_id>/action/", TerraformSimActionView.as_view(), name="terraform-sim-action"),
     path("terraform/sessions/<uuid:session_id>/release/", TerraformSimReleaseView.as_view(), name="terraform-sim-release"),
+    path("baremetal/sessions/<uuid:session_id>/", BaremetalSimStateView.as_view(), name="baremetal-sim-state"),
+    path("baremetal/sessions/<uuid:session_id>/action/", BaremetalSimActionView.as_view(), name="baremetal-sim-action"),
+    path("baremetal/sessions/<uuid:session_id>/release/", BaremetalSimReleaseView.as_view(), name="baremetal-sim-release"),
 ]

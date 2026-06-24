@@ -1,0 +1,30 @@
+slug: lxd-container-batch-job
+title: Start Stopped LXD Inference Container
+technology: Bare Metal
+category: LXD
+difficulty: easy
+scenario_type: fix
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: baremetal
+infrastructure_type: simulation
+is_free: false
+description: >-
+  The batch-job LXD container is stopped and blocking the inference pipeline.
+  Start it and verify it receives an IP address.
+objectives:
+  - Open the Bare Metal console
+  - Navigate to the LXD tab
+  - Start the batch-job container
+initial_state: LXD container batch-job is Stopped with no IPv4 assigned.
+hints:
+  - order: 1
+    cost: 10
+    content: Open **Bare Metal** → **LXD** tab → find batch-job.
+  - order: 2
+    cost: 15
+    content: Click **Start** and confirm status Running with an IP.
+  - order: 3
+    cost: 20
+    content: Run **Check** to validate.

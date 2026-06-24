@@ -520,6 +520,23 @@ class SimulationProvisioner:
                 return validate_terraform_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "Terraform simulation session not found"
+        _raw_bm_type = sim_type
+        if not _raw_bm_type or _raw_bm_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _bm_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_bm_type = (getattr(_bm_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_bm_type = ""
+        if _raw_bm_type == "baremetal" and any(k in low_slug for k in ("maas", "lxd", "lxc", "kvm", "virsh", "ipmi")):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.baremetal_engine import validate_baremetal_lab, _ensure as bm_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                bm_ensure(str(lab_session.id), slug)
+                return validate_baremetal_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Bare metal simulation session not found"
         script = resolve_simulation_validation_script(slug, validation_script or "")
         if engine and hasattr(engine, "state"):
             return validate_simulation_state(engine.state, script, engine=engine)

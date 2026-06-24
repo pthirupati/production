@@ -648,34 +648,55 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
 
 
 def _merge_lab_hosts(state: dict, session_id: str) -> None:
-    """Inject VMware / lab session hosts as Prometheus scrape targets (cross-tech)."""
+    """Inject lab session hosts + VMware-created VMs as Prometheus scrape targets."""
     try:
         from apps.labs.models import LabSession
 
         session = LabSession.objects.filter(pk=session_id).only("lab_hosts", "scenario_id").first()
-        if not session or not session.lab_hosts:
+        if not session:
             return
         prom = state.setdefault("prometheus", {})
         targets = prom.setdefault("targets", [])
         existing = {t.get("labels", {}).get("instance") for t in targets}
-        for host in session.lab_hosts:
-            name = host.get("name") or host.get("role") or "host"
-            ip = host.get("ip") or host.get("address") or ""
+
+        def add_target(name: str, ip: str, job: str = "node", health: str = "up") -> None:
             instance = f"{ip}:9100" if ip else f"{name}:9100"
             if instance in existing:
-                continue
-            health = "up" if host.get("status", "up") != "down" else "down"
+                return
             targets.append({
-                "labels": {"job": "node", "instance": instance, "host": name},
+                "labels": {"job": job, "instance": instance, "host": name},
                 "health": health,
                 "lastScrape": _now_iso(),
                 "lastError": "" if health == "up" else "connection refused",
             })
             existing.add(instance)
+
+        if session.lab_hosts:
+            for host in session.lab_hosts:
+                name = host.get("name") or host.get("role") or "host"
+                ip = host.get("ip") or host.get("address") or ""
+                health = "up" if host.get("status", "up") != "down" else "down"
+                add_target(name, ip, health=health)
+
+        # Cross-tech: VMware sim VMs created in the same session become scrape targets.
+        try:
+            from apps.vmware_sim.engine import _load_session as vmware_load
+
+            vm_entry = vmware_load(str(session_id))
+            if vm_entry and vm_entry.get("state"):
+                for vm in vm_entry["state"].get("vms", []):
+                    if vm.get("power") != "poweredOn":
+                        continue
+                    name = vm.get("name") or vm.get("id") or "vm"
+                    ip = vm.get("ip") or vm.get("guest_ip") or ""
+                    add_target(name, ip, job="vmware-guest")
+        except Exception:
+            pass
+
         graf = state.setdefault("grafana", {})
         for ds in graf.get("datasources", []):
             if ds.get("type") == "prometheus":
-                ds.setdefault("jsonData", {})["crossTechHosts"] = len(session.lab_hosts)
+                ds.setdefault("jsonData", {})["crossTechHosts"] = len(targets)
     except Exception:
         pass
 
@@ -683,6 +704,7 @@ def _merge_lab_hosts(state: dict, session_id: str) -> None:
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
     state = copy.deepcopy(entry["state"])
+    _merge_lab_hosts(state, session_id)
     graf = state["grafana"]
     prom = state["prometheus"]
     broken = state["broken"]

@@ -40,6 +40,9 @@ from .awx_engine import get_state as awx_get_state
 from .terraform_engine import apply_action as terraform_apply_action
 from .terraform_engine import drop_session as terraform_drop_session
 from .terraform_engine import get_state as terraform_get_state
+from .baremetal_engine import apply_action as baremetal_apply_action
+from .baremetal_engine import drop_session as baremetal_drop_session
+from .baremetal_engine import get_state as baremetal_get_state
 
 
 def _demo_session_id(user) -> str:
@@ -624,4 +627,43 @@ class TerraformSimReleaseView(APIView):
         if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
             return Response({"error": "Session not found"}, status=404)
         terraform_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ── MAAS / LXD / KVM bare-metal simulator ─────────────────────────────────────
+class BaremetalSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else ""
+        return Response(baremetal_get_state(session_id, slug))
+
+
+class BaremetalSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        baremetal_get_state(session_id, slug)
+        result = baremetal_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": baremetal_get_state(session_id, slug)})
+
+
+class BaremetalSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        baremetal_drop_session(session_id)
         return Response({"released": True})

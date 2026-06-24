@@ -151,6 +151,8 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const lastCtx = useRef({ output: '', error: '', tests: [] })
 
   const [fontSize, setFontSize] = useState(13)
+  const [vimMode, setVimMode] = useState(false)
+  const [formatOnSave, setFormatOnSave] = useState(true)
   const editorRef = useRef(null)
   const theme = useThemeStore((s) => s.theme)
   const toggleTheme = useThemeStore((s) => s.toggleTheme)
@@ -508,6 +510,20 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         >
           <Search size={13} /> <span className="hidden sm:inline">Find</span>
         </button>
+        <button
+          onClick={() => setVimMode((v) => !v)}
+          className={`px-2 py-1.5 rounded-md text-xs font-medium border transition-colors ${vimMode ? 'border-accent-amber text-accent-amber bg-accent-amber/10' : 'border-surface-700 text-surface-300'}`}
+          title="Toggle Vim keybindings"
+        >
+          Vim
+        </button>
+        <button
+          onClick={() => editorRef.current?.formatDocument?.()}
+          className="px-2 py-1.5 rounded-md text-xs font-medium border border-surface-700 text-surface-300 hover:border-accent-cyan"
+          title="Format document (Ctrl/Cmd+Shift+F)"
+        >
+          Format
+        </button>
         <div className="hidden sm:flex items-center gap-0.5">
           <button onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="p-1.5 rounded text-surface-400 hover:text-surface-100" title="Zoom out"><ZoomOut size={13} /></button>
           <button onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="p-1.5 rounded text-surface-400 hover:text-surface-100" title="Zoom in"><ZoomIn size={13} /></button>
@@ -592,6 +608,8 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
                 readOnly={solved || readonlyPaths.has(activePath)}
                 onRun={handleRun}
                 fontSize={fontSize}
+                vimMode={vimMode}
+                formatOnSave={formatOnSave}
               />
             ) : (
               <div className="h-full flex items-center justify-center text-surface-600 text-sm">No file open</div>
@@ -600,7 +618,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           {/* VS Code-style status bar */}
           <div className="shrink-0 flex items-center justify-between gap-3 px-3 py-1 bg-[#007acc]/90 text-white text-[10px] font-mono border-t border-surface-800">
             <span className="truncate">{activePath ? fileName(activePath) : 'No file'}</span>
-            <span className="hidden sm:inline">{langLabel} · UTF-8 · Spaces: 4</span>
+            <span className="hidden sm:inline">{langLabel} · UTF-8 · Spaces: 4{vimMode ? ' · VIM' : ''}</span>
             <span className="flex items-center gap-2 shrink-0">
               <span>{fontSize}px</span>
               <span>{solved ? 'Read-only' : 'Editing'}</span>

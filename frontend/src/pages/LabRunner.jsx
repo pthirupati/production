@@ -28,6 +28,7 @@ import WindowsServerSimulator from '../components/windows/WindowsServerSimulator
 import PeopleSoftSimulator from '../components/peoplesoft/PeopleSoftSimulator'
 import AwxSimulator from '../components/awx/AwxSimulator'
 import TerraformSimulator from '../components/terraform/TerraformSimulator'
+import BaremetalSimulator from '../components/baremetal/BaremetalSimulator'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
@@ -137,6 +138,7 @@ export default function LabRunner() {
   const [showPeopleSoftSim, setShowPeopleSoftSim] = useState(false)
   const [showAwxSim, setShowAwxSim] = useState(false)
   const [showTerraformSim, setShowTerraformSim] = useState(false)
+  const [showBaremetalSim, setShowBaremetalSim] = useState(false)
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
@@ -979,6 +981,14 @@ export default function LabRunner() {
     scenario?.simulation_type === 'terraform'
     || scenario?.technology?.slug === 'terraform'
   )
+  const isBaremetalGuiLab = !isCrossTech && (
+    scenario?.simulation_type === 'baremetal'
+    && /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
+  )
+  const isCrossTechMonitoring = isCrossTech && (
+    ['grafana', 'prometheus'].includes(scenario?.technology?.slug)
+    || /monitor|grafana|prometheus/.test((scenario?.slug || '').toLowerCase())
+  )
   // coding_mode scenarios open a browser surface instead of a terminal. Prompt
   // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
   // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
@@ -1592,6 +1602,16 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open VMware (same server)
             </Link>
           )}
+          {isCrossTechMonitoring && (
+            <button
+              type="button"
+              onClick={() => setShowMonitoringSim(true)}
+              title="Open Grafana/Prometheus — VMware-created hosts appear as scrape targets"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#f7913b]/50 text-[#f7913b] bg-[#f7913b]/10 text-[10px] font-semibold"
+            >
+              <ExternalLink size={12} /> Open Grafana (cross-tech)
+            </button>
+          )}
           {isMonitoringLab && (
             <button
               type="button"
@@ -1691,6 +1711,17 @@ export default function LabRunner() {
               style={{ borderColor: 'rgba(124,58,237,.45)', color: '#a78bfa', background: 'rgba(124,58,237,.14)' }}
             >
               <ExternalLink size={12} /> Open Terraform
+            </button>
+          )}
+          {isBaremetalGuiLab && (
+            <button
+              type="button"
+              onClick={() => setShowBaremetalSim(true)}
+              title="Open MAAS / LXD / KVM bare metal console"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(13,148,136,.45)', color: '#2dd4bf', background: 'rgba(13,148,136,.14)' }}
+            >
+              <ExternalLink size={12} /> Open Bare Metal
             </button>
           )}
           {isSimulationLab && (
@@ -1956,7 +1987,7 @@ export default function LabRunner() {
           toolbar. The learner inspects dashboards/panels/targets/alerts + runs
           PromQL here, applies the documented config fix in the terminal, then
           runs Check Solution (which grades via check.sh, never auto-passes). */}
-      {isMonitoringLab && showMonitoringSim && (
+      {(isMonitoringLab || isCrossTechMonitoring) && showMonitoringSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
             <MonitoringSimulator
@@ -2139,7 +2170,20 @@ export default function LabRunner() {
         />
       )}
 
-      {/* Keyboard shortcuts help */}
+      {isBaremetalGuiLab && showBaremetalSim && (
+        <BaremetalSimulator
+          sessionId={sessionId}
+          scenario={scenario}
+          onExit={() => setShowBaremetalSim(false)}
+          onHints={() => { setShowBaremetalSim(false); toggleHints() }}
+          onStop={() => { setShowBaremetalSim(false); setShowStopConfirm(true) }}
+          onCheck={() => { setShowBaremetalSim(false); handleValidate() }}
+          onExtend={() => { setShowBaremetalSim(false); handleExtendLab() }}
+          hintsLabel={`Hints (${hints.hints_used}/${hints.total_hints})`}
+          checkDisabled={validating || solved}
+        />
+      )}
+
       {showShortcuts && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setShowShortcuts(false)}>
           <div className="glass-card p-6 max-w-xs w-full" onClick={e => e.stopPropagation()}>
@@ -2158,7 +2202,7 @@ export default function LabRunner() {
               ].map(([key, action]) => (
                 <div key={key} className="flex items-center justify-between gap-4">
                   <span className="text-surface-400 text-xs">{action}</span>
-                  <kbd className="shrink-0 px-2 py-0.5 bg-surface-800 border border-surface-700 rounded text-xs text-surface-200 font-mono">{key}</kbd>
+                  <kbd className="shrink-0 px-2 py-1 bg-surface-800 border border-surface-700 rounded text-xs text-surface-200 font-mono">{key}</kbd>
                 </div>
               ))}
             </div>

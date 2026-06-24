@@ -1,0 +1,30 @@
+slug: kvm-vm-training-start
+title: Start Shut-Off KVM Training VM
+technology: Bare Metal
+category: KVM
+difficulty: easy
+scenario_type: fix
+time_limit: 900
+max_score: 100
+lab_mode: simulation
+simulation_type: baremetal
+infrastructure_type: simulation
+is_free: false
+description: >-
+  The train-vm-2 KVM guest is shut off after maintenance. Power it on and confirm
+  it is reachable on the libvirt network.
+objectives:
+  - Open Bare Metal console → KVM tab
+  - Start train-vm-2
+  - Verify the VM state is running with an IP
+initial_state: KVM VM train-vm-2 is shut off.
+hints:
+  - order: 1
+    cost: 10
+    content: **Open Bare Metal** → **KVM** → select train-vm-2.
+  - order: 2
+    cost: 15
+    content: Click **Start** and wait for running state.
+  - order: 3
+    cost: 20
+    content: Click **Check**.

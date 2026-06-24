@@ -1,0 +1,189 @@
+import { useCallback, useEffect, useState } from 'react'
+import { baremetalApi } from '../../api/baremetal'
+import toast from 'react-hot-toast'
+import {
+  LogIn, Play, ArrowLeft, Lightbulb, Square, Server, Box, Cpu,
+  CheckCircle2, AlertTriangle, Network, RefreshCw,
+} from 'lucide-react'
+
+const ACCENT = '#0d9488'
+
+const TABS = [
+  { key: 'maas', label: 'MAAS', icon: Server },
+  { key: 'lxd', label: 'LXD', icon: Box },
+  { key: 'kvm', label: 'KVM', icon: Cpu },
+  { key: 'ipmi', label: 'IPMI', icon: Network },
+]
+
+export default function BaremetalSimulator({
+  sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend, hintsLabel, checkDisabled,
+}) {
+  const [state, setState] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState('maas')
+  const [busy, setBusy] = useState(false)
+  const slug = scenario?.slug || ''
+
+  const refresh = useCallback(async () => {
+    const data = await baremetalApi.getState(sessionId, slug)
+    setState(data)
+    setLoading(false)
+  }, [sessionId, slug])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  useEffect(() => {
+    const s = (slug || '').toLowerCase()
+    if (s.includes('lxd') || s.includes('lxc')) setTab('lxd')
+    else if (s.includes('kvm') || s.includes('virsh')) setTab('kvm')
+    else if (s.includes('pxe') || s.includes('ipmi')) setTab('ipmi')
+    else if (s.includes('maas')) setTab('maas')
+  }, [slug])
+
+  const run = async (fn, okMsg) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const res = await fn()
+      if (res?.ok === false) toast.error(res.error || 'Action failed')
+      else if (okMsg) toast.success(res?.message || okMsg)
+      if (res?.state) setState(res.state)
+      else await refresh()
+    } finally { setBusy(false) }
+  }
+
+  const st = state?.state || {}
+  const loggedIn = st?.session?.logged_in
+  const goal = st?.goal || {}
+  const broken = st?.broken || {}
+
+  if (!loading && state && !loggedIn) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]">
+        <div className="bg-white rounded-lg shadow-2xl w-[400px] overflow-hidden">
+          <div className="px-6 py-4 text-white font-semibold" style={{ background: ACCENT }}>Bare Metal Console</div>
+          <div className="p-6 space-y-3">
+            <p className="text-sm text-slate-600">MAAS · LXD · KVM training environment</p>
+            <button onClick={() => run(() => baremetalApi.login(sessionId), 'Signed in')} disabled={busy}
+              className="w-full py-2 rounded text-white font-medium flex items-center justify-center gap-2" style={{ background: ACCENT }}>
+              <LogIn size={16} /> Sign In
+            </button>
+            <div className="flex flex-wrap gap-2 pt-2 border-t">
+              {onHints && <button onClick={onHints} className="text-xs px-2 py-1 border rounded">{hintsLabel || 'Hints'}</button>}
+              {onCheck && <button onClick={onCheck} disabled={checkDisabled} className="text-xs px-2 py-1 border rounded">Check</button>}
+              {onExit && <button onClick={onExit} className="text-xs px-2 py-1 border rounded ml-auto">Back to terminal</button>}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#f1f5f9] text-slate-800">
+      <div className="flex items-center justify-between px-4 h-12 text-white shrink-0" style={{ background: ACCENT }}>
+        <span className="font-semibold">Bare Metal · MAAS / LXD / KVM</span>
+        <div className="flex items-center gap-2 text-xs">
+          {onHints && <button onClick={onHints} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><Lightbulb size={13} /> {hintsLabel || 'Hints'}</button>}
+          {onCheck && <button onClick={onCheck} disabled={checkDisabled} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><CheckCircle2 size={13} /> Check</button>}
+          {onExtend && <button onClick={onExtend} className="px-2 py-1 rounded bg-white/15">+30m</button>}
+          {onStop && <button onClick={onStop} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><Square size={12} /> Stop</button>}
+          {onExit && <button onClick={onExit} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><ArrowLeft size={13} /> Terminal</button>}
+        </div>
+      </div>
+
+      {goal.objective && (
+        <div className="px-4 py-2 text-sm bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+          <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+          <span><strong>{goal.title}:</strong> {goal.objective}</span>
+        </div>
+      )}
+
+      <div className="flex flex-1 min-h-0">
+        <nav className="w-44 bg-slate-800 text-slate-200 shrink-0 py-2">
+          {TABS.map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm ${tab === key ? 'bg-white/10 text-white border-l-2 border-teal-400' : 'hover:bg-white/5'}`}>
+              <Icon size={15} /> {label}
+            </button>
+          ))}
+        </nav>
+        <main className="flex-1 overflow-auto p-5">
+          {tab === 'maas' && (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold">MAAS Machines</h2>
+                <button onClick={refresh} className="text-xs flex items-center gap-1 border px-2 py-1 rounded"><RefreshCw size={12} /> Refresh</button>
+              </div>
+              {(st.maas?.machines || []).map((m) => (
+                <div key={m.id} className="bg-white border rounded p-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-medium">{m.hostname}</div>
+                    <div className="text-xs text-slate-500">{m.status} · {m.ip || 'no IP'} · power {m.power}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    {m.status === 'Failed commissioning' && (
+                      <button onClick={() => run(() => baremetalApi.commission(sessionId, m.id), 'Commissioned')}
+                        className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Commission</button>
+                    )}
+                    {m.status === 'Ready' && (
+                      <button onClick={() => run(() => baremetalApi.deploy(sessionId, m.id), 'Deployed')}
+                        className="px-3 py-1.5 rounded border text-sm">Deploy</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {tab === 'lxd' && (
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold">LXD Containers</h2>
+              {(st.lxd?.containers || []).map((c) => (
+                <div key={c.name} className="bg-white border rounded p-3 flex justify-between items-center">
+                  <div><div className="font-medium">{c.name}</div><div className="text-xs text-slate-500">{c.image} · {c.ipv4 || '—'}</div></div>
+                  {c.status !== 'Running' ? (
+                    <button onClick={() => run(() => baremetalApi.startLxd(sessionId, c.name), 'Started')}
+                      className="px-3 py-1.5 rounded text-white text-sm flex items-center gap-1" style={{ background: ACCENT }}>
+                      <Play size={14} /> Start
+                    </button>
+                  ) : <span className="text-green-600 text-sm">{c.status}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {tab === 'kvm' && (
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold">KVM Virtual Machines</h2>
+              {(st.kvm?.vms || []).map((v) => (
+                <div key={v.name} className="bg-white border rounded p-3 flex justify-between items-center">
+                  <div><div className="font-medium">{v.name}</div><div className="text-xs text-slate-500">{v.vcpu} vCPU · {v.ram_gb} GB · {v.ip || '—'}</div></div>
+                  {v.state !== 'running' ? (
+                    <button onClick={() => run(() => baremetalApi.startKvm(sessionId, v.name), 'Started')}
+                      className="px-3 py-1.5 rounded text-white text-sm flex items-center gap-1" style={{ background: ACCENT }}>
+                      <Play size={14} /> Start
+                    </button>
+                  ) : <span className="text-green-600 text-sm">running</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {tab === 'ipmi' && (
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold">IPMI / BMC</h2>
+              {(st.ipmi?.bmc_hosts || []).map((b) => (
+                <div key={b.name} className="bg-white border rounded p-3 flex justify-between">
+                  <span>{b.name}</span>
+                  <span className={b.reachable ? 'text-green-600' : 'text-red-600'}>{b.reachable ? 'reachable' : 'unreachable'}</span>
+                </div>
+              ))}
+              {broken.pxe_vlan_wrong && (
+                <button onClick={() => run(() => baremetalApi.fixPxeVlan(sessionId), 'PXE fixed')}
+                  className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Fix PXE VLAN</button>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  )
+}

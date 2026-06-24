@@ -1,0 +1,30 @@
+slug: maas-commission-gpu-node
+title: Commission Failed MAAS GPU Node
+technology: Bare Metal
+category: MAAS
+difficulty: medium
+scenario_type: fix
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: baremetal
+infrastructure_type: simulation
+is_free: false
+description: >-
+  A new GPU node failed MAAS commissioning. Use the Bare Metal console to fix BMC
+  connectivity, commission the machine, and deploy Ubuntu.
+objectives:
+  - Open Bare Metal console from the lab toolbar
+  - Commission gpu-node-02 in MAAS
+  - Deploy the machine and verify status is Deployed
+initial_state: MAAS shows gpu-node-02 in Failed commissioning with BMC unreachable.
+hints:
+  - order: 1
+    cost: 10
+    content: Click **Open Bare Metal** → sign in → **MAAS** tab.
+  - order: 2
+    cost: 15
+    content: Click **Commission** on gpu-node-02, then **Deploy** when Ready.
+  - order: 3
+    cost: 20
+    content: Click **Check** when the machine shows Deployed.
