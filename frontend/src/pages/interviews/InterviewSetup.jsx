@@ -65,11 +65,10 @@ export default function InterviewSetup() {
     }).catch(() => {})
   }, [])
 
-  // Re-score on the final step so the card reflects the chosen technology,
-  // role, and level (all known by then). Cheap, deterministic, no paid API.
+  // Re-score on the final step only when a resume file is attached.
   useEffect(() => {
-    if (step === 2 && (resumeScore || resumeFile || form.target_role || form.primary_technology)) {
-      runResumeScore()
+    if (step === 2 && resumeFile) {
+      saveProfile()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
@@ -123,7 +122,8 @@ export default function InterviewSetup() {
         experience_level: form.experience_level || 'mid',
         years_experience: Number(form.years_experience) || 0,
       })
-      if (result) setResumeScore(result)
+      if (result?.has_resume !== false && result?.overall_score != null) setResumeScore(result)
+      else setResumeScore(null)
     } catch {
       /* silentError on the client; leave any prior score in place */
     } finally {
@@ -135,7 +135,11 @@ export default function InterviewSetup() {
     setSaving(true)
     try {
       const saved = await interviewsApi.updateProfile(profilePayload(), resumeFile)
-      if (saved && saved.resume_score) setResumeScore(saved.resume_score)
+      if (saved && saved.resume_score?.has_resume !== false && saved.resume_score?.overall_score != null) {
+        setResumeScore(saved.resume_score)
+      } else if (!resumeFile) {
+        setResumeScore(null)
+      }
       toast.success('Profile saved')
       return true
     } catch (err) {
@@ -209,7 +213,7 @@ export default function InterviewSetup() {
             <a href="/privacy" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">Privacy policy</a>
           </p>
 
-          {(resumeFile || resumeScore) && (
+          {(resumeFile || resumeScore) ? (
             <div className="space-y-3">
               <button
                 type="button"
@@ -221,6 +225,8 @@ export default function InterviewSetup() {
               </button>
               <ResumeScoreCard score={resumeScore} loading={scoringResume} />
             </div>
+          ) : (
+            <ResumeScoreCard score={null} />
           )}
           {voices.length > 0 && (
             <label className="block">
@@ -421,12 +427,16 @@ export default function InterviewSetup() {
             Before each round: enable microphone and camera. Interview exits after 5 minutes if either stays off.
           </div>
 
-          {(resumeScore || scoringResume) && (
+          {resumeFile || (resumeScore?.has_resume !== false && resumeScore?.overall_score != null) ? (
             <div className="pt-2 border-t border-surface-800">
               <p className="text-xs text-surface-400 mb-2">
-                Resume fit for {form.target_role || 'this role'} — questions and difficulty adapt to your profile.
+                Resume fit for {form.target_role || 'this role'} — questions adapt to your uploaded resume.
               </p>
               <ResumeScoreCard score={resumeScore} loading={scoringResume} />
+            </div>
+          ) : (
+            <div className="pt-2 border-t border-surface-800">
+              <ResumeScoreCard score={null} />
             </div>
           )}
         </div>

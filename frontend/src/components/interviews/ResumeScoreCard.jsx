@@ -1,21 +1,9 @@
 /**
- * ResumeScoreCard.jsx
- *
- * Shows a deterministic, locally-computed resume score before the interview
- * starts (Interview Studio P2.5). No paid/LLM API — the score comes from the
- * backend /interviews/profile/resume-score/ heuristic (keyword/skill match vs
- * the chosen technology + level, plus clarity/structure and quantified-impact).
- *
- * Props:
- *   score — {
- *     overall_score, subscores: { skills_match, experience, clarity, keywords },
- *     matched_keywords[], missing_keywords[], vocabulary, tips[], has_resume
- *   }
- *   loading — boolean (optional): show a lightweight loading state.
+ * ResumeScoreCard.jsx — resume score display (only when a resume was uploaded).
  */
 
 import React from 'react'
-import { FileText, Lightbulb, Loader2 } from 'lucide-react'
+import { FileText, Lightbulb, Loader2, Upload } from 'lucide-react'
 
 const SUBSCORE_LABELS = {
   skills_match: 'Skills match',
@@ -80,6 +68,23 @@ function SubBar({ label, score }) {
   )
 }
 
+export function NoResumeUploaded() {
+  return (
+    <div className="rounded-xl border border-dashed border-surface-700 bg-surface-900/30 p-4 flex items-start gap-3">
+      <div className="w-10 h-10 rounded-lg bg-surface-800 border border-surface-700 flex items-center justify-center shrink-0">
+        <Upload size={18} className="text-surface-500" />
+      </div>
+      <div>
+        <p className="text-sm font-medium text-surface-300">No resume uploaded</p>
+        <p className="text-xs text-surface-500 mt-1 leading-relaxed">
+          You skipped the resume — that&apos;s fine. We&apos;ll personalize questions from your career fields.
+          Upload a PDF or DOCX above to see a resume score and improvement tips.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export default function ResumeScoreCard({ score, loading = false }) {
   if (loading) {
     return (
@@ -88,7 +93,10 @@ export default function ResumeScoreCard({ score, loading = false }) {
       </div>
     )
   }
-  if (!score || typeof score.overall_score !== 'number') return null
+
+  if (!score || score.has_resume === false || score.overall_score == null) {
+    return <NoResumeUploaded />
+  }
 
   const subs = score.subscores || {}
   const tips = Array.isArray(score.tips) ? score.tips : []
@@ -106,11 +114,6 @@ export default function ResumeScoreCard({ score, loading = false }) {
             <FileText size={15} className="text-indigo-400" /> Resume score
           </p>
           <p className="text-xs text-surface-400 mt-0.5">{headline}</p>
-          {!score.has_resume && (
-            <p className="text-[11px] text-amber-300/90 mt-1">
-              Estimated from your career inputs — upload a resume for an accurate score.
-            </p>
-          )}
         </div>
       </div>
 

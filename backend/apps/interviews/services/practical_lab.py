@@ -18,8 +18,9 @@ Two ways a candidate proves a practical answer, both 100% free and deterministic
    ``apps.labs.code_exec.grade_submission`` (the exact engine the coding IDE uses).
 
 A successful validation is stamped onto ``round.metadata['practical_validations']``
-keyed by question id, so the next ``/message/`` answer for that question is scored
-with ``command_validated=True`` (the +15 bonus in scoring.py) automatically.
+keyed by question id (banked) or message id (generated), so the next ``/message/``
+answer for that question is scored with ``command_validated=True`` (the +15 bonus
+in scoring.py) automatically.
 """
 
 from __future__ import annotations
@@ -35,29 +36,51 @@ from apps.question_bank.models import Scenario
 logger = logging.getLogger(__name__)
 
 
+def _practical_config_from_message(msg: InterviewMessage | None) -> dict:
+    """Resolve practical_config from message metadata and/or banked question."""
+    if not msg:
+        return {}
+    meta = msg.metadata if isinstance(msg.metadata, dict) else {}
+    config = dict(meta.get("practical_config") or {})
+    if msg.question_id and msg.question:
+        banked = msg.question.practical_config or {}
+        if isinstance(banked, dict):
+            merged = dict(banked)
+            merged.update(config)
+            config = merged
+    return config
+
+
+def _validation_key(msg: InterviewMessage) -> str:
+    if msg.question_id:
+        return str(msg.question_id)
+    return f"msg:{msg.id}"
+
+
 def _current_practical_message(round_obj: InterviewRound) -> InterviewMessage | None:
     """The most recent practical question asked this round (with its config)."""
     msg = (
-        round_obj.messages.filter(message_type="practical", question__isnull=False)
+        round_obj.messages.filter(message_type="practical")
         .select_related("question")
         .order_by("-created_at")
         .first()
     )
-    if not msg:
-        msg = (
-            round_obj.messages.filter(question__category="practical", question__isnull=False)
-            .select_related("question")
-            .order_by("-created_at")
-            .first()
-        )
-    return msg
+    if msg:
+        return msg
+    return (
+        round_obj.messages.filter(question__category="practical", question__isnull=False)
+        .select_related("question")
+        .order_by("-created_at")
+        .first()
+    )
 
 
 def _practical_scenario_slug(round_obj: InterviewRound) -> str | None:
     msg = _current_practical_message(round_obj)
-    if not msg or not msg.question:
+    if not msg:
         return None
-    return (msg.question.practical_config or {}).get("scenario_slug")
+    config = _practical_config_from_message(msg)
+    return config.get("scenario_slug") or None
 
 
 def start_practical_lab(user, round_obj: InterviewRound) -> dict:
@@ -99,7 +122,6 @@ def _session_payload(session: LabSession) -> dict:
 # Inline practical answer validation (P2.4)
 # ---------------------------------------------------------------------------
 
-# Cap accepted inputs so a pathological answer can't blow up grading.
 _MAX_ANSWER_CHARS = 8000
 
 
@@ -108,12 +130,7 @@ def _normalize_cmd(text: str) -> str:
 
 
 def _matches_patterns(answer: str, patterns: list) -> bool:
-    """True if the answer matches ANY configured pattern.
-
-    A pattern is matched if it appears as a normalized substring of the answer,
-    OR (when it looks like a regex / the substring test fails) it matches as a
-    regular expression. Deterministic, free, no shell execution.
-    """
+    """True if the answer matches ANY configured pattern."""
     low = _normalize_cmd(answer)
     if not low:
         return False
@@ -131,36 +148,24 @@ def _matches_patterns(answer: str, patterns: list) -> bool:
     return False
 
 
-def _record_validation(round_obj: InterviewRound, question_id, *, validated: bool, detail: dict) -> None:
-    """Persist the latest validation for this question on round.metadata so the
-    follow-up /message/ answer is scored with command_validated when it passed.
-
-    Uses the existing ``metadata`` JSONField — no migration required.
-    """
+def _record_validation(round_obj: InterviewRound, validation_key, *, validated: bool, detail: dict) -> None:
     meta = round_obj.metadata or {}
     bucket = meta.setdefault("practical_validations", {})
-    bucket[str(question_id)] = {"validated": bool(validated), **detail}
+    bucket[str(validation_key)] = {"validated": bool(validated), **detail}
     round_obj.metadata = meta
     try:
         round_obj.save(update_fields=["metadata"])
-    except Exception:  # noqa: BLE001 - persistence is best-effort, never 500 a live round
+    except Exception:  # noqa: BLE001
         logger.exception("could not persist practical validation round=%s", round_obj.id)
 
 
-def practical_validation_passed(round_obj: InterviewRound, question_id) -> bool:
-    """Was the practical answer for this question already validated as correct?"""
+def practical_validation_passed(round_obj: InterviewRound, validation_key) -> bool:
+    """Was the practical answer for this question/message already validated?"""
     bucket = (round_obj.metadata or {}).get("practical_validations", {})
-    return bool(bucket.get(str(question_id), {}).get("validated"))
+    return bool(bucket.get(str(validation_key), {}).get("validated"))
 
 
 def _grade_command_answer(round_obj: InterviewRound, question, answer: str, config: dict) -> dict:
-    """Validate a typed command answer.
-
-    Order:
-      1. Configured accepted command patterns (no lab needed) — fast, deterministic.
-      2. If a scenario_slug + a live lab session exist, run the SAME simulation
-         validator the labs use against the candidate's command(s).
-    """
     patterns = config.get("expected_commands") or config.get("validate_commands") or []
     if patterns and _matches_patterns(answer, patterns):
         return {
@@ -169,7 +174,6 @@ def _grade_command_answer(round_obj: InterviewRound, question, answer: str, conf
             "feedback": "Correct — that's exactly the command I'd expect here. Nicely done.",
         }
 
-    # Try the real labs simulation validator against the provisioned session.
     slug = config.get("scenario_slug")
     session_id = round_obj.practical_lab_session_id
     if slug and session_id:
@@ -177,7 +181,6 @@ def _grade_command_answer(round_obj: InterviewRound, question, answer: str, conf
         if graded is not None:
             return graded
 
-    # Couldn't prove it. Give actionable, specific feedback (never auto-pass).
     if patterns:
         hint = patterns[0]
         return {
@@ -195,16 +198,6 @@ def _grade_command_answer(round_obj: InterviewRound, question, answer: str, conf
 
 
 def _grade_via_simulation(session_id, slug: str, answer: str) -> dict | None:
-    """Run the candidate's typed command(s) through the labs SIMULATION validator.
-
-    We feed each non-empty line the candidate typed into the lab session's
-    simulation engine (the same engine the terminal labs drive), then run the
-    scenario's validation script against the resulting state — reusing
-    ``run_validation`` so the verdict matches the labs' own ``check.sh`` logic.
-
-    Returns a result dict, or None if this path isn't applicable (so the caller
-    can fall back). Never raises — a grader failure degrades to "unverified".
-    """
     try:
         session = LabSession.objects.select_related("scenario").filter(id=session_id).first()
         if not session or (session.provider or "") != "simulation":
@@ -217,7 +210,6 @@ def _grade_via_simulation(session_id, slug: str, answer: str) -> dict | None:
         if not resource_id:
             return None
 
-        # Replay the candidate's commands into the sim so state reflects their fix.
         entry = None
         try:
             from apps.labs.provisioner.simulation_provisioner import (
@@ -230,10 +222,6 @@ def _grade_via_simulation(session_id, slug: str, answer: str) -> dict | None:
             entry = None
         engine = (entry or {}).get("state", {}).get("engine") if entry else None
         if engine is not None:
-            # Drive each typed line through the SAME line executor the terminal
-            # uses (_handle_shell → RHELShell.run), which mutates engine.state.
-            # run_validation then reads that state, so the verdict matches the
-            # labs' own check.sh logic. Fall back to shell.run if needed.
             runner = None
             if hasattr(engine, "_handle_shell"):
                 runner = engine._handle_shell
@@ -245,7 +233,7 @@ def _grade_via_simulation(session_id, slug: str, answer: str) -> dict | None:
                     if cmd:
                         try:
                             runner(cmd)
-                        except Exception:  # noqa: BLE001 - a bad command shouldn't crash grading
+                        except Exception:  # noqa: BLE001
                             continue
 
         db_script = (session.scenario.validation_script or "").strip()
@@ -277,13 +265,6 @@ def _clean_validator_output(output: str) -> str:
 
 
 def _grade_code_answer(round_obj: InterviewRound, question, answer: str, code_spec: dict) -> dict:
-    """Grade a coding-style practical answer with the labs sandbox grader.
-
-    ``code_spec`` mirrors the labs coding_spec shape:
-        {"language": "python", "tests": [{"name", "code", "hidden"}], "timeout": 8}
-    Reuses ``apps.labs.code_exec.grade_submission`` (the IDE's grader) verbatim —
-    fail-closed: no tests / unsupported language => not validated.
-    """
     try:
         from apps.labs.code_exec import grade_submission
 
@@ -327,23 +308,10 @@ def _grade_code_answer(round_obj: InterviewRound, question, answer: str, code_sp
 
 
 def validate_practical_answer(round_obj: InterviewRound, answer: str) -> dict:
-    """Validate a candidate's inline practical command/code answer.
-
-    Returns:
-        {
-          "validated": bool,
-          "method": "command_pattern" | "simulation" | "code" | "unverified",
-          "feedback": str,
-          "question_id": int | None,
-        }
-
-    Deterministic + free. On success, stamps round.metadata so the candidate's
-    next /message/ answer is scored with the practical (+15) bonus.
-    """
+    """Validate a candidate's inline practical command/code answer."""
     answer = (answer or "")[:_MAX_ANSWER_CHARS]
     msg = _current_practical_message(round_obj)
-    question = msg.question if msg else None
-    if not question:
+    if not msg:
         return {
             "validated": False,
             "method": "unverified",
@@ -352,25 +320,36 @@ def validate_practical_answer(round_obj: InterviewRound, answer: str) -> dict:
             "code": "NO_PRACTICAL",
         }
 
+    config = _practical_config_from_message(msg)
+    if not config:
+        return {
+            "validated": False,
+            "method": "unverified",
+            "feedback": "This practical task has no validation config yet.",
+            "question_id": msg.question_id,
+            "code": "NO_CONFIG",
+        }
+
     if not answer.strip():
         return {
             "validated": False,
             "method": "unverified",
             "feedback": "Type the command or code you'd run, then I'll check it.",
-            "question_id": question.id,
+            "question_id": msg.question_id,
         }
 
-    config = question.practical_config or {}
     code_spec = config.get("code")
     if code_spec and (code_spec.get("tests")):
-        result = _grade_code_answer(round_obj, question, answer, code_spec)
+        result = _grade_code_answer(round_obj, msg.question, answer, code_spec)
     else:
-        result = _grade_command_answer(round_obj, question, answer, config)
+        result = _grade_command_answer(round_obj, msg.question, answer, config)
 
-    result["question_id"] = question.id
+    vkey = _validation_key(msg)
+    result["question_id"] = msg.question_id
+    result["validation_key"] = vkey
     _record_validation(
         round_obj,
-        question.id,
+        vkey,
         validated=result["validated"],
         detail={"method": result.get("method"), "answer": answer[:500]},
     )

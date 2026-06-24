@@ -356,8 +356,9 @@ def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
         .first()
     )
     last_command = ""
-    if last_q_msg is not None and last_q_msg.question_id:
-        last_command = _last_validated_command(round_obj, last_q_msg.question_id)
+    if last_q_msg is not None:
+        vkey = last_q_msg.question_id if last_q_msg.question_id else f"msg:{last_q_msg.id}"
+        last_command = _last_validated_command(round_obj, vkey)
 
     gen = generate_question(
         round_type=round_obj.round_type,
@@ -476,10 +477,12 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     # If the candidate already validated their inline practical command/code for
     # THIS question (P2.4), honour that verified correctness in scoring (+15) even
     # if the typed answer here is a prose recap of what they did.
-    if question is not None and getattr(question, "category", "") == "practical" and not meta.get("command_validated"):
+    if last_q_msg and last_q_msg.message_type == "practical" and not meta.get("command_validated"):
         try:
             from apps.interviews.services.practical_lab import practical_validation_passed
-            if practical_validation_passed(round_obj, question.id):
+
+            vkey = last_q_msg.question_id if last_q_msg.question_id else f"msg:{last_q_msg.id}"
+            if practical_validation_passed(round_obj, vkey):
                 meta["command_validated"] = True
         except Exception:  # noqa: BLE001 - never let the bonus lookup break scoring
             pass

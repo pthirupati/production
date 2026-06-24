@@ -692,6 +692,7 @@ export function useInterviewVoice() {
       minSpeechMs = 1200,         // require this much speech before we arm silence
       maxSilenceMs = 4500,        // upper bound on the dynamic window
       perSentenceMs = 400,        // window growth per sentence boundary
+      minWordsForSilence = 3,     // minimum words before trailing silence auto-submits
       onInterim = null,
       onSilenceCountdown = null,  // (remainingMs|null, totalMs) for the affordance
     } = options
@@ -787,7 +788,7 @@ export function useInterviewVoice() {
         // Require a minimum answer length before auto-submitting on pause — a
         // brief "um" or mid-thought breath should not end the turn.
         const words = bestText().split(/\s+/).filter(Boolean).length
-        if (words < 3 && Date.now() - speechStartedAt < minSpeechMs * 2) return
+        if (words < minWordsForSilence && Date.now() - speechStartedAt < minSpeechMs * 2) return
         if (speechStartedAt && Date.now() - speechStartedAt < minSpeechMs) return
         const total = computeSilenceWindow()
         const startedAt = Date.now()

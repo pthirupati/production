@@ -31,7 +31,7 @@ const SILENCE_SKIP_MS = 45000
 // between-sentence breath never cuts the candidate off; listenLive GROWS this
 // dynamically for longer/multi-sentence answers (up to ~8s) and extends further
 // when they trail off on a connector ("and…", "so…").
-const TURN_SILENCE_MS = 4500
+const TURN_SILENCE_MS = 2200
 // Mic energy (0–1, same scale as the preflight meter) that counts as "speaking"
 // for barge-in. Above this while the bot is talking → interrupt the bot.
 const BARGE_IN_LEVEL = 0.18
@@ -518,6 +518,8 @@ export default function InterviewRoom() {
         setPracticalMode(true)
         if (data.practical_lab_session_id) {
           setPracticalLab({ session_id: data.practical_lab_session_id, lab_url: `/lab/${data.practical_lab_session_id}` })
+        } else {
+          startPracticalLabInline().catch(() => {})
         }
       }
       // Speak the intro (no listen), then the first question and auto-open the
@@ -577,7 +579,12 @@ export default function InterviewRoom() {
       if (advanced) {
         const nextIsPractical = res.next_question?.message_type === 'practical'
         setPracticalMode(nextIsPractical)
-        setPracticalLab(null)
+        if (nextIsPractical) {
+          setPracticalLab(null)
+          startPracticalLabInline().catch(() => {})
+        } else {
+          setPracticalLab(null)
+        }
         // Speak the interviewer reply, then the new question, then re-open the
         // mic so the candidate can answer — continuing the hands-free loop.
         // Practical questions don't auto-listen (the candidate works in the lab).
@@ -628,9 +635,10 @@ export default function InterviewRoom() {
     const result = await listenLive(streamRef.current, {
       locale: profile.locale || 'en-IN',
       silenceMs: TURN_SILENCE_MS,
-      minSpeechMs: 2000,
-      maxSilenceMs: 8000,
-      perSentenceMs: 600,
+      minSpeechMs: 900,
+      maxSilenceMs: 5000,
+      perSentenceMs: 500,
+      minWordsForSilence: 1,
       onInterim: (txt) => setAnswer(txt),
       onSilenceCountdown: (remaining, total) => {
         setSilenceCountdown(remaining == null ? null : { remaining, total })
@@ -646,13 +654,10 @@ export default function InterviewRoom() {
       return
     }
     if (text) {
-      // Route as a question when the candidate explicitly asked, OR when the
-      // captured utterance heuristically reads like one (covers barge-ins where
-      // they interrupt to ask for a repeat/clarification). The backend also
-      // detects questions, but tagging input_type up front makes its intent
-      // handling deterministic.
       const asQuestion = openedAsQuestion || looksLikeQuestion(text)
       await submitAnswer(text, { asQuestion })
+    } else if (result?.reason === 'silence' || result?.reason === 'manual') {
+      setAnswer('')
     } else {
       // Recognizer ended with nothing captured (e.g. the candidate clicked Done
       // before speaking). Don't submit an empty answer here — leave the
@@ -753,6 +758,11 @@ export default function InterviewRoom() {
       }
     }
   }) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!started || !practicalMode || practicalLab?.session_id || labLoading) return
+    startPracticalLabInline().catch(() => {})
+  }, [started, practicalMode, practicalLab?.session_id, labLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hands-free loop: when the interview is live and idle, keep the mic open so
   // the candidate never needs a Send button — speak, pause, auto-submit.
@@ -1401,16 +1411,24 @@ export default function InterviewRoom() {
             >
               <RotateCcw size={14} /> Repeat
             </button>
+            <button
+              type="button"
+              onClick={() => { setTypingAnswer(true); setTimeout(() => document.getElementById('interview-answer-input')?.focus(), 0) }}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium shrink-0 ${typingAnswer ? 'bg-indigo-500/20 text-indigo-200' : 'btn-secondary'}`}
+              title="Type your answer instead of speaking"
+            >
+              Type
+            </button>
             <input
+              id="interview-answer-input"
               value={answer}
-              onChange={e => setAnswer(e.target.value)}
-              onFocus={() => setTypingAnswer(true)}
-              onBlur={() => { if (!answer.trim()) setTypingAnswer(false) }}
-              onKeyDown={e => e.key === 'Enter' && submitAnswer()}
-              placeholder={isListening ? 'Listening… speak naturally' : 'Speak, or tap here to type…'}
-              className="input-field flex-1 text-sm"
+              readOnly={started && !typingAnswer}
+              onChange={e => { setAnswer(e.target.value); if (e.target.value.trim()) setTypingAnswer(true) }}
+              onKeyDown={e => e.key === 'Enter' && typingAnswer && submitAnswer()}
+              placeholder={isListening ? 'Listening… speak naturally' : (typingAnswer ? 'Type your answer…' : 'Live call — speak naturally')}
+              className={`input-field flex-1 text-sm ${isListening ? 'ring-1 ring-emerald-500/40' : ''}`}
             />
-            {(typingAnswer || answer.trim()) && (
+            {typingAnswer && answer.trim() && (
               <button type="button" onClick={() => submitAnswer()} className="btn-primary px-4 text-sm shrink-0" title="Send typed answer">
                 Send
               </button>

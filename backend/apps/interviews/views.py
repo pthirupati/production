@@ -47,12 +47,29 @@ from apps.interviews.services.resume_parser import (
 from common.throttles import InterviewRateThrottle, StrictAnonRateThrottle
 
 
-def _profile_resume_score(profile, *, target_technology="", target_role="", experience_level=""):
-    """Score a candidate profile's resume against its (or override) targets.
+def _profile_has_resume(profile) -> bool:
+    return bool(
+        profile.resume_file
+        or (profile.resume_text or "").strip()
+        or (profile.resume_parsed or {}).get("has_resume")
+    )
 
-    Deterministic + local (no paid API). Used by the profile PUT response and
-    the dedicated resume-score endpoint so the setup UI can show score + tips.
-    """
+
+def _profile_resume_score(profile, *, target_technology="", target_role="", experience_level=""):
+    """Score a candidate profile's resume against its (or override) targets."""
+    if not _profile_has_resume(profile):
+        return {
+            "has_resume": False,
+            "overall_score": None,
+            "subscores": {},
+            "matched_keywords": [],
+            "missing_keywords": [],
+            "tips": [
+                "Upload a resume (PDF or DOCX) to see your resume score and get tailored improvement tips.",
+            ],
+            "message": "No resume uploaded",
+            "vocabulary": "",
+        }
     tech_name = target_technology
     if not tech_name and getattr(profile, "primary_technology_id", None):
         tech_name = getattr(profile.primary_technology, "name", "") or ""
@@ -195,14 +212,19 @@ class CandidateProfileView(APIView):
             )
             profile.save(update_fields=["resume_parsed"])
         payload = CandidateProfileSerializer(profile).data
-        # Surface a deterministic, local resume score + tips so the setup UI
-        # can show the candidate how their resume aligns with the chosen role.
-        try:
-            payload["resume_score"] = _profile_resume_score(profile)
-        except Exception:  # noqa: BLE001 - scoring is best-effort, never 500 a save
-            import logging
+        if _profile_has_resume(profile):
+            try:
+                payload["resume_score"] = _profile_resume_score(profile)
+            except Exception:  # noqa: BLE001
+                import logging
 
-            logging.getLogger(__name__).exception("resume scoring failed for user %s", request.user.pk)
+                logging.getLogger(__name__).exception("resume scoring failed for user %s", request.user.pk)
+        else:
+            payload["resume_score"] = {
+                "has_resume": False,
+                "overall_score": None,
+                "message": "No resume uploaded",
+            }
         return Response(payload)
 
 
@@ -223,6 +245,22 @@ class CandidateResumeScoreView(APIView):
 
     def post(self, request):
         profile, _ = CandidateProfile.objects.get_or_create(user=request.user)
+        inline_text = request.data.get("resume_text")
+        if inline_text:
+            resume_text = str(inline_text)[:20000]
+            parsed = parse_resume_text(resume_text)
+        elif not _profile_has_resume(profile):
+            return Response({
+                "has_resume": False,
+                "overall_score": None,
+                "message": "No resume uploaded",
+                "tips": [
+                    "Upload a resume (PDF or DOCX) to see your resume score and get tailored improvement tips.",
+                ],
+            })
+        else:
+            parsed = profile.resume_parsed or {}
+            resume_text = profile.resume_text or ""
         tech_name = (request.data.get("target_technology") or "").strip()
         # Allow passing a primary_technology id (as the setup form holds) and
         # resolve it to the technology name for keyword matching.
@@ -235,12 +273,6 @@ class CandidateResumeScoreView(APIView):
                 tech_name = getattr(tech, "name", "") or ""
             except (TypeError, ValueError):
                 tech_name = ""
-        inline_text = request.data.get("resume_text")
-        parsed = profile.resume_parsed or {}
-        resume_text = profile.resume_text or ""
-        if inline_text:
-            resume_text = str(inline_text)[:20000]
-            parsed = parse_resume_text(resume_text)
         result = score_resume(
             parsed,
             resume_text=resume_text,

@@ -216,8 +216,23 @@ def score_resume(
     low = text.lower()
     has_resume = bool(parsed.get("has_resume")) or len(low) > 50
 
-    detected = [s.lower() for s in (parsed.get("skills_detected") or [])]
     label, vocab = _tech_vocabulary(target_technology, target_role)
+
+    if not has_resume:
+        return {
+            "overall_score": None,
+            "subscores": {},
+            "matched_keywords": [],
+            "missing_keywords": [],
+            "vocabulary": label,
+            "tips": [
+                "Upload a resume (PDF or DOCX) to see your resume score and get tailored improvement tips.",
+            ],
+            "has_resume": False,
+            "message": "No resume uploaded",
+        }
+
+    detected = [s.lower() for s in (parsed.get("skills_detected") or [])]
 
     # --- 1. Skills match: how many of the chosen tech's keywords appear. ---
     pool = (low + " " + " ".join(detected)).strip()

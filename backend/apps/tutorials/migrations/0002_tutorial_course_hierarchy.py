@@ -42,6 +42,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="tutorial",
-            index=models.Index(fields=["course_slug", "module_order"]),
+            index=models.Index(fields=["course_slug", "module_order"], name="tutorials_course_mod_idx"),
         ),
     ]
