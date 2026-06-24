@@ -5,6 +5,7 @@ import {
   ArrowRight, ArrowLeftRight,
 } from 'lucide-react'
 import { wiresharkApi } from '../../api/wireshark'
+import { LabChromeControls } from '../lab/LabChromeBar'
 
 /* ── scoped, self-contained Wireshark-style chrome (no shared CSS) ── */
 const SCOPED_CSS = `
@@ -122,7 +123,10 @@ function rowTint(pkt) {
  * display filter, follows TCP streams, and marks packets, then runs Check Solution
  * (graded by validate_wireshark_lab via the engine).
  */
-export default function WiresharkSimulator({ sessionId, scenario, onExit, onStop, onHints }) {
+export default function WiresharkSimulator({
+  sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
+  hintsLabel, checkDisabled, extendDisabled,
+}) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
   const [error, setError] = useState('')
@@ -237,9 +241,17 @@ export default function WiresharkSimulator({ sessionId, scenario, onExit, onStop
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <button className="ws-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
-          {onHints && <button className="ws-btn" onClick={onHints}><Lightbulb size={13} className="text-[#f5c451]" /> Hints</button>}
-          {onStop && <button className="ws-btn" onClick={onStop}><StopCircle size={13} className="text-[#ff6b6b]" /> Stop</button>}
-          {onExit && <button className="ws-btn" onClick={onExit}><ArrowLeft size={13} /> Back to lab</button>}
+          <LabChromeControls
+            buttonClass="ws-btn"
+            onHints={onHints}
+            onCheck={onCheck}
+            onExtend={onExtend}
+            onStop={onStop}
+            onBackToTerminal={onExit}
+            hintsLabel={hintsLabel || 'Hints'}
+            checkDisabled={checkDisabled}
+            extendDisabled={extendDisabled}
+          />
         </div>
       </div>
 

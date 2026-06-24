@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { awxApi } from '../../api/awx'
 import toast from 'react-hot-toast'
+import LabChromeBar from '../lab/LabChromeBar'
 import {
-  LogIn, Play, RefreshCw, ArrowLeft, Lightbulb, Square, Layers,
-  FolderGit2, Key, ListChecks, Server, CheckCircle2, AlertTriangle,
+  LogIn, Play, RefreshCw, Layers, FolderGit2, Key, ListChecks, Server, AlertTriangle,
 } from 'lucide-react'
 
 const AWX_RED = '#ee0000'
@@ -16,7 +16,10 @@ const NAV = [
   { key: 'credentials', label: 'Credentials', icon: Key },
 ]
 
-export default function AwxSimulator({ sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend, hintsLabel, checkDisabled }) {
+export default function AwxSimulator({
+  sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
+  hintsLabel, checkDisabled, extendDisabled,
+}) {
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(true)
   const [section, setSection] = useState('dashboard')
@@ -46,22 +49,24 @@ export default function AwxSimulator({ sessionId, scenario, onExit, onStop, onHi
   const inv = state?.inventory || {}
   const loggedIn = inv?.session?.logged_in
   const goal = state?.goal || {}
+  const chromeProps = {
+    onHints, onCheck, onExtend, onStop, onBackToTerminal: onExit,
+    hintsLabel, checkDisabled, extendDisabled,
+  }
 
   if (!loading && state && !loggedIn) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1a1a2e]">
-        <div className="bg-white rounded-lg shadow-2xl w-[400px] overflow-hidden">
-          <div className="px-6 py-4 text-white font-semibold" style={{ background: AWX_RED }}>Ansible AWX</div>
-          <div className="p-6 space-y-3">
-            <p className="text-sm text-slate-600">Sign in to Ansible AWX / Tower training instance.</p>
-            <button onClick={() => run(() => awxApi.login(sessionId), 'Signed in')} disabled={busy}
-              className="w-full py-2 rounded text-white font-medium flex items-center justify-center gap-2" style={{ background: AWX_RED }}>
-              <LogIn size={16} /> Sign In
-            </button>
-            <div className="flex flex-wrap gap-2 pt-2 border-t">
-              {onHints && <button onClick={onHints} className="text-xs px-2 py-1 border rounded">{hintsLabel || 'Hints'}</button>}
-              {onCheck && <button onClick={onCheck} disabled={checkDisabled} className="text-xs px-2 py-1 border rounded">Check</button>}
-              {onExit && <button onClick={onExit} className="text-xs px-2 py-1 border rounded ml-auto">Back to terminal</button>}
+      <div className="fixed inset-0 z-[60] flex flex-col bg-[#1a1a2e]">
+        <LabChromeBar title="Ansible AWX" subtitle={scenario?.title || slug} accent={AWX_RED} {...chromeProps} />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-[400px] overflow-hidden">
+            <div className="px-6 py-4 text-white font-semibold" style={{ background: AWX_RED }}>Ansible AWX</div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-slate-600">Sign in to Ansible AWX / Tower training instance.</p>
+              <button onClick={() => run(() => awxApi.login(sessionId), 'Signed in')} disabled={busy}
+                className="w-full py-2 rounded text-white font-medium flex items-center justify-center gap-2" style={{ background: AWX_RED }}>
+                <LogIn size={16} /> Sign In
+              </button>
             </div>
           </div>
         </div>
@@ -70,17 +75,14 @@ export default function AwxSimulator({ sessionId, scenario, onExit, onStop, onHi
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#f4f4f4] text-slate-800">
-      <div className="flex items-center justify-between px-4 h-12 text-white shrink-0" style={{ background: AWX_RED }}>
-        <span className="font-semibold">Ansible AWX · {inv?.summary?.version || 'Tower'}</span>
-        <div className="flex items-center gap-2 text-xs">
-          {onHints && <button onClick={onHints} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><Lightbulb size={13} /> {hintsLabel || 'Hints'}</button>}
-          {onCheck && <button onClick={onCheck} disabled={checkDisabled} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><CheckCircle2 size={13} /> Check</button>}
-          {onExtend && <button onClick={onExtend} className="px-2 py-1 rounded bg-white/15">+30m</button>}
-          {onStop && <button onClick={onStop} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><Square size={12} /> Stop</button>}
-          {onExit && <button onClick={onExit} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><ArrowLeft size={13} /> Terminal</button>}
-        </div>
-      </div>
+    <div className="fixed inset-0 z-[60] flex flex-col bg-[#f4f4f4] text-slate-800">
+      <LabChromeBar
+        title={`Ansible AWX · ${inv?.summary?.version || 'Tower'}`}
+        subtitle={scenario?.title || slug}
+        accent={AWX_RED}
+        className="lab-chrome-bar !bg-[#2c2c54] !border-slate-700"
+        {...chromeProps}
+      />
 
       {goal.objective && (
         <div className="px-4 py-2 text-sm bg-amber-50 border-b border-amber-200 flex items-center gap-2">

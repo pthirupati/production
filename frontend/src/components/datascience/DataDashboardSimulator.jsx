@@ -5,6 +5,7 @@ import {
   Database, CheckCircle2,
 } from 'lucide-react'
 import { datascienceApi } from '../../api/datascience'
+import { LabChromeControls } from '../lab/LabChromeBar'
 
 /* ── scoped, self-contained BI-tool chrome (no shared CSS) ── */
 const SCOPED_CSS = `
@@ -261,7 +262,10 @@ function ChartCanvas({ chartType, dimension, measure, aggregation, series }) {
  * backend recomputes the aggregated series each action and the UI renders it as a
  * chart + result table. The fix is graded via the engine on Check Solution.
  */
-export default function DataDashboardSimulator({ sessionId, scenario, onExit, onStop, onHints }) {
+export default function DataDashboardSimulator({
+  sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
+  hintsLabel, checkDisabled, extendDisabled,
+}) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
   const [error, setError] = useState('')
@@ -344,9 +348,17 @@ export default function DataDashboardSimulator({ sessionId, scenario, onExit, on
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <button className="ds-btn" onClick={load} disabled={busy}><RefreshCw size={13} className={busy ? 'animate-spin' : ''} /> Refresh</button>
           <button className="ds-btn" onClick={() => fire(() => datascienceApi.reset(sessionId))} disabled={busy}><RotateCcw size={13} /> Reset</button>
-          {onHints && <button className="ds-btn" onClick={onHints}><Lightbulb size={13} className="text-[#f5c451]" /> Hints</button>}
-          {onStop && <button className="ds-btn" onClick={onStop}><StopCircle size={13} className="text-[#ff6b6b]" /> Stop</button>}
-          {onExit && <button className="ds-btn" onClick={onExit}><ArrowLeft size={13} /> Back to lab</button>}
+          <LabChromeControls
+            buttonClass="ds-btn"
+            onHints={onHints}
+            onCheck={onCheck}
+            onExtend={onExtend}
+            onStop={onStop}
+            onBackToTerminal={onExit}
+            hintsLabel={hintsLabel || 'Hints'}
+            checkDisabled={checkDisabled}
+            extendDisabled={extendDisabled}
+          />
         </div>
       </div>
 

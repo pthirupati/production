@@ -5,6 +5,7 @@ import {
   LogIn, Server, Users, Workflow, Network, RefreshCw, ArrowLeft,
   Lightbulb, Square, CheckCircle2, AlertTriangle, Lock, Unlock, Play,
 } from 'lucide-react'
+import LabChromeBar from '../lab/LabChromeBar'
 
 // Oracle PeopleSoft PIA-styled full-screen simulator. Free/local; all state lives
 // in the backend peoplesoft_engine (cache-backed). Mirrors the contract of the
@@ -19,7 +20,10 @@ const NAV = [
   { key: 'integration', label: 'Integration Broker', icon: Network },
 ]
 
-export default function PeopleSoftSimulator({ sessionId, scenario, onExit, onStop, onHints }) {
+export default function PeopleSoftSimulator({
+  sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
+  hintsLabel, checkDisabled, extendDisabled,
+}) {
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -56,22 +60,36 @@ export default function PeopleSoftSimulator({ sessionId, scenario, onExit, onSto
   // ── Sign-in gate ──
   if (!loading && state && !loggedIn) {
     return (
-      <div className="absolute inset-0 z-50 flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${PS_BLUE}, #0d2238)` }}>
-        <div className="bg-white rounded-md shadow-2xl w-[380px] overflow-hidden">
-          <div className="px-6 py-4 text-white" style={{ background: PS_RED }}>
-            <div className="text-lg font-semibold">Oracle PeopleSoft</div>
-            <div className="text-xs opacity-90">{summary.env || 'HCM Production'} · PeopleTools {summary.peopletools || '8.60'}</div>
-          </div>
-          <div className="p-6 space-y-3 text-slate-800">
-            <p className="text-sm text-slate-500">Sign in to the PeopleSoft Internet Architecture (PIA).</p>
-            <button
-              onClick={() => run(() => peoplesoftApi.login(sessionId), 'Signed in to PeopleSoft')}
-              disabled={busy}
-              className="w-full py-2 rounded text-white font-medium flex items-center justify-center gap-2"
-              style={{ background: PS_BLUE }}>
-              <LogIn size={16} /> Sign In (PS)
-            </button>
-            <button onClick={onExit} className="w-full py-1.5 text-sm text-slate-500 hover:text-slate-700">Back to lab</button>
+      <div className="absolute inset-0 z-50 flex flex-col" style={{ background: `linear-gradient(135deg, ${PS_BLUE}, #0d2238)` }}>
+        <LabChromeBar
+          title="Oracle PeopleSoft"
+          subtitle={summary.env || scenario?.title || slug}
+          accent={PS_RED}
+          onHints={onHints}
+          onCheck={onCheck}
+          onExtend={onExtend}
+          onStop={onStop}
+          onBackToTerminal={onExit}
+          hintsLabel={hintsLabel}
+          checkDisabled={checkDisabled}
+          extendDisabled={extendDisabled}
+        />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="bg-white rounded-md shadow-2xl w-[380px] overflow-hidden">
+            <div className="px-6 py-4 text-white" style={{ background: PS_RED }}>
+              <div className="text-lg font-semibold">Oracle PeopleSoft</div>
+              <div className="text-xs opacity-90">{summary.env || 'HCM Production'} · PeopleTools {summary.peopletools || '8.60'}</div>
+            </div>
+            <div className="p-6 space-y-3 text-slate-800">
+              <p className="text-sm text-slate-500">Sign in to the PeopleSoft Internet Architecture (PIA).</p>
+              <button
+                onClick={() => run(() => peoplesoftApi.login(sessionId), 'Signed in to PeopleSoft')}
+                disabled={busy}
+                className="w-full py-2 rounded text-white font-medium flex items-center justify-center gap-2"
+                style={{ background: PS_BLUE }}>
+                <LogIn size={16} /> Sign In (PS)
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -81,18 +99,20 @@ export default function PeopleSoftSimulator({ sessionId, scenario, onExit, onSto
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-slate-100 text-slate-800">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 h-12 text-white shrink-0" style={{ background: PS_BLUE }}>
-        <div className="flex items-center gap-2">
-          <span className="font-semibold tracking-wide" style={{ color: '#fff' }}>ORACLE</span>
-          <span className="text-sm opacity-90">PeopleSoft · {summary.env || ''}</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="opacity-90">{summary.current_oprid || 'PS'}</span>
-          <button onClick={onHints} className="px-2 py-1 rounded bg-white/15 hover:bg-white/25 flex items-center gap-1"><Lightbulb size={13} /> Hints</button>
-          <button onClick={onStop} className="px-2 py-1 rounded bg-white/15 hover:bg-white/25 flex items-center gap-1"><Square size={12} /> Stop</button>
-          <button onClick={onExit} className="px-2 py-1 rounded bg-white/15 hover:bg-white/25 flex items-center gap-1"><ArrowLeft size={13} /> Back</button>
-        </div>
-      </div>
+      <LabChromeBar
+        title={`PeopleSoft · ${summary.env || 'PIA'}`}
+        subtitle={summary.current_oprid || scenario?.title || slug}
+        accent={PS_RED}
+        className="lab-chrome-bar !text-white"
+        onHints={onHints}
+        onCheck={onCheck}
+        onExtend={onExtend}
+        onStop={onStop}
+        onBackToTerminal={onExit}
+        hintsLabel={hintsLabel}
+        checkDisabled={checkDisabled}
+        extendDisabled={extendDisabled}
+      />
 
       {/* Objective banner */}
       {goal?.objective && (

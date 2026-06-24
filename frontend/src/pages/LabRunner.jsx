@@ -985,6 +985,18 @@ export default function LabRunner() {
     scenario?.simulation_type === 'baremetal'
     && /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
   )
+  const simOverlayOpen = showMonitoringSim || showNmapSim || showWiresharkSim
+    || showDataDashboardSim || showAgentSim || showWindowsSim || showPeopleSoftSim
+    || showAwxSim || showBaremetalSim || showTerraformSim
+  const simChromeProps = {
+    onHints: () => { setSidebarTab('hints'); setSidebarOpen(true) },
+    onCheck: handleValidate,
+    onStop: () => setShowStopConfirm(true),
+    onExtend: handleExtendLab,
+    hintsLabel: `Hints (${hints.hints_used}/${hints.total_hints})`,
+    checkDisabled: validating || solved,
+    extendDisabled: extending || extensionsUsed >= 2,
+  }
   const isCrossTechMonitoring = isCrossTech && (
     ['grafana', 'prometheus'].includes(scenario?.technology?.slug)
     || /monitor|grafana|prometheus/.test((scenario?.slug || '').toLowerCase())
@@ -1215,7 +1227,7 @@ export default function LabRunner() {
         )}
         <div className={`${
           isMobile
-            ? `fixed inset-y-0 left-0 z-40 w-80 max-w-[85vw] transform transition-transform ${sidebarOpen && !terminalFullscreen ? 'translate-x-0' : '-translate-x-full'}`
+            ? `fixed inset-y-0 left-0 ${simOverlayOpen && sidebarOpen ? 'z-[75]' : 'z-40'} w-80 max-w-[85vw] transform transition-transform ${sidebarOpen && !terminalFullscreen ? 'translate-x-0' : '-translate-x-full'}`
             : `${sidebarOpen && !terminalFullscreen ? 'w-80' : 'w-0'} transition-all duration-300`
         } overflow-hidden border-r border-surface-700/50 bg-surface-900 shrink-0`}
         >
@@ -1846,7 +1858,7 @@ export default function LabRunner() {
                   isMobile={isMobile}
                   blockedCommands={blockedCmds}
                   className="h-full"
-                  layoutKey={sidebarOpen}
+                  layoutKey={`${sidebarOpen}-${showTerraformSim}`}
                 />
               ))}
             </div>
@@ -1862,7 +1874,7 @@ export default function LabRunner() {
               isMobile={isMobile}
               blockedCommands={blockedCmds}
               className="flex-1 min-h-0"
-              layoutKey={sidebarOpen}
+              layoutKey={`${sidebarOpen}-${showTerraformSim}`}
               welcomeHint={terminalHost === 'ssh_client' && sshClientTarget
                 ? `Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`
                 : ''}
@@ -1995,12 +2007,7 @@ export default function LabRunner() {
               scenario={scenario}
               flavor={monitoringFlavor}
               onExit={() => setShowMonitoringSim(false)}
-              onHints={() => { setShowMonitoringSim(false); toggleHints() }}
-              onStop={() => { setShowMonitoringSim(false); setShowStopConfirm(true) }}
-              onCheck={() => { setShowMonitoringSim(false); handleValidate() }}
-              onExtend={() => { setShowMonitoringSim(false); handleExtendLab() }}
-              hintsLabel={`Hints (${hints.hints_used}/${hints.total_hints})`}
-              checkDisabled={validating || solved}
+              {...simChromeProps}
             />
           </div>
         </div>
@@ -2011,20 +2018,12 @@ export default function LabRunner() {
           versions/OS, then runs Check Solution (graded via the engine). */}
       {isNmapLab && showNmapSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
-          <button
-            type="button"
-            onClick={() => setShowNmapSim(false)}
-            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
-          >
-            <XCircle size={14} /> Close simulator
-          </button>
           <div className="h-full overflow-auto">
             <NmapSimulator
               sessionId={sessionId}
               scenario={scenario}
               onExit={() => setShowNmapSim(false)}
-              onHints={() => { setShowNmapSim(false); toggleHints() }}
-              onStop={() => { setShowNmapSim(false); setShowStopConfirm(true) }}
+              {...simChromeProps}
             />
           </div>
         </div>
@@ -2035,20 +2034,12 @@ export default function LabRunner() {
           packets, then runs Check Solution (graded via the engine). */}
       {isWiresharkLab && showWiresharkSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
-          <button
-            type="button"
-            onClick={() => setShowWiresharkSim(false)}
-            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
-          >
-            <XCircle size={14} /> Close simulator
-          </button>
           <div className="h-full overflow-auto">
             <WiresharkSimulator
               sessionId={sessionId}
               scenario={scenario}
               onExit={() => setShowWiresharkSim(false)}
-              onHints={() => { setShowWiresharkSim(false); toggleHints() }}
-              onStop={() => { setShowWiresharkSim(false); setShowStopConfirm(true) }}
+              {...simChromeProps}
             />
           </div>
         </div>
@@ -2060,20 +2051,12 @@ export default function LabRunner() {
           Check Solution (graded via validate_datascience_lab). */}
       {isDataDashboardLab && showDataDashboardSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
-          <button
-            type="button"
-            onClick={() => setShowDataDashboardSim(false)}
-            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
-          >
-            <XCircle size={14} /> Close simulator
-          </button>
           <div className="h-full overflow-auto">
             <DataDashboardSimulator
               sessionId={sessionId}
               scenario={scenario}
               onExit={() => setShowDataDashboardSim(false)}
-              onHints={() => { setShowDataDashboardSim(false); toggleHints() }}
-              onStop={() => { setShowDataDashboardSim(false); setShowStopConfirm(true) }}
+              {...simChromeProps}
             />
           </div>
         </div>
@@ -2086,20 +2069,12 @@ export default function LabRunner() {
           validate_aiml_lab on the engine). */}
       {isAgentLab && showAgentSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
-          <button
-            type="button"
-            onClick={() => setShowAgentSim(false)}
-            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
-          >
-            <XCircle size={14} /> Close simulator
-          </button>
           <div className="h-full overflow-auto">
             <AgentWorkflowSimulator
               sessionId={sessionId}
               scenario={scenario}
               onExit={() => setShowAgentSim(false)}
-              onHints={() => { setShowAgentSim(false); toggleHints() }}
-              onStop={() => { setShowAgentSim(false); setShowStopConfirm(true) }}
+              {...simChromeProps}
             />
           </div>
         </div>
@@ -2111,20 +2086,12 @@ export default function LabRunner() {
           Check Solution (graded via validate_windows_lab on the engine). */}
       {isWindowsGuiLab && showWindowsSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
-          <button
-            type="button"
-            onClick={() => setShowWindowsSim(false)}
-            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
-          >
-            <XCircle size={14} /> Close simulator
-          </button>
           <div className="h-full overflow-auto">
             <WindowsServerSimulator
               sessionId={sessionId}
               scenario={scenario}
               onExit={() => setShowWindowsSim(false)}
-              onHints={() => { setShowWindowsSim(false); toggleHints() }}
-              onStop={() => { setShowWindowsSim(false); setShowStopConfirm(true) }}
+              {...simChromeProps}
             />
           </div>
         </div>
@@ -2136,8 +2103,7 @@ export default function LabRunner() {
             sessionId={sessionId}
             scenario={scenario}
             onExit={() => setShowPeopleSoftSim(false)}
-            onHints={() => { setShowPeopleSoftSim(false); toggleHints() }}
-            onStop={() => { setShowPeopleSoftSim(false); setShowStopConfirm(true) }}
+            {...simChromeProps}
           />
         </div>
       )}
@@ -2147,26 +2113,7 @@ export default function LabRunner() {
           sessionId={sessionId}
           scenario={scenario}
           onExit={() => setShowAwxSim(false)}
-          onHints={() => { setShowAwxSim(false); toggleHints() }}
-          onStop={() => { setShowAwxSim(false); setShowStopConfirm(true) }}
-          onCheck={() => { setShowAwxSim(false); handleValidate() }}
-          onExtend={() => { setShowAwxSim(false); handleExtendLab() }}
-          hintsLabel={`Hints (${hints.hints_used}/${hints.total_hints})`}
-          checkDisabled={validating || solved}
-        />
-      )}
-
-      {isTerraformSimLab && showTerraformSim && (
-        <TerraformSimulator
-          sessionId={sessionId}
-          scenario={scenario}
-          onExit={() => setShowTerraformSim(false)}
-          onHints={() => { setShowTerraformSim(false); toggleHints() }}
-          onStop={() => { setShowTerraformSim(false); setShowStopConfirm(true) }}
-          onCheck={() => { setShowTerraformSim(false); handleValidate() }}
-          onExtend={() => { setShowTerraformSim(false); handleExtendLab() }}
-          hintsLabel={`Hints (${hints.hints_used}/${hints.total_hints})`}
-          checkDisabled={validating || solved}
+          {...simChromeProps}
         />
       )}
 
@@ -2175,12 +2122,20 @@ export default function LabRunner() {
           sessionId={sessionId}
           scenario={scenario}
           onExit={() => setShowBaremetalSim(false)}
-          onHints={() => { setShowBaremetalSim(false); toggleHints() }}
-          onStop={() => { setShowBaremetalSim(false); setShowStopConfirm(true) }}
-          onCheck={() => { setShowBaremetalSim(false); handleValidate() }}
-          onExtend={() => { setShowBaremetalSim(false); handleExtendLab() }}
-          hintsLabel={`Hints (${hints.hints_used}/${hints.total_hints})`}
-          checkDisabled={validating || solved}
+          {...simChromeProps}
+        />
+      )}
+
+      {isTerraformSimLab && showTerraformSim && (
+        <TerraformSimulator
+          sessionId={sessionId}
+          scenario={scenario}
+          terminalSession={terminalSession}
+          terminalHost={terminalHost}
+          blockedCommands={blockedCmds}
+          isMobile={isMobile}
+          onExit={() => setShowTerraformSim(false)}
+          {...simChromeProps}
         />
       )}
 

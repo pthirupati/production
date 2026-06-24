@@ -6,6 +6,7 @@ import {
   Play, Square, RotateCw, Download, UserCog, FolderTree, Power,
 } from 'lucide-react'
 import { windowsApi } from '../../api/windows'
+import { LabChromeControls } from '../lab/LabChromeBar'
 
 /* ── Scoped, self-contained Windows Server chrome (no shared CSS). Windows
    blue (#0078D4) accents on a light "Server Manager" surface, a dark taskbar,
@@ -632,7 +633,10 @@ function SystemPanel({ state, busy, onAction }) {
  * fix the broken state, then runs Check Solution (graded by validate_windows_lab
  * via the engine — never auto-passes).
  */
-export default function WindowsServerSimulator({ sessionId, scenario, onExit, onStop, onHints }) {
+export default function WindowsServerSimulator({
+  sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
+  hintsLabel, checkDisabled, extendDisabled,
+}) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
   const [error, setError] = useState('')
@@ -730,9 +734,17 @@ export default function WindowsServerSimulator({ sessionId, scenario, onExit, on
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <button className="win-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
           <button className="win-btn" onClick={() => runAction('reset', {})} disabled={busy}><RotateCw size={13} /> Reset</button>
-          {onHints && <button className="win-btn" onClick={onHints}><Lightbulb size={13} /> Hints</button>}
-          {onStop && <button className="win-btn" onClick={onStop}><StopCircle size={13} /> Stop</button>}
-          {onExit && <button className="win-btn" onClick={onExit}><ArrowLeft size={13} /> Back to lab</button>}
+          <LabChromeControls
+            buttonClass="win-btn"
+            onHints={onHints}
+            onCheck={onCheck}
+            onExtend={onExtend}
+            onStop={onStop}
+            onBackToTerminal={onExit}
+            hintsLabel={hintsLabel || 'Hints'}
+            checkDisabled={checkDisabled}
+            extendDisabled={extendDisabled}
+          />
         </div>
       </div>
 

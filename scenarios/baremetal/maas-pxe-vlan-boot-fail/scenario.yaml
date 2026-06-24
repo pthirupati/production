@@ -1,0 +1,30 @@
+slug: maas-pxe-vlan-boot-fail
+title: MAAS PXE VLAN Boot Failure
+technology: Bare Metal
+category: MAAS
+difficulty: medium
+scenario_type: fix
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: baremetal
+infrastructure_type: simulation
+is_free: false
+description: >-
+  New machines cannot PXE boot because the provisioning VLAN tag is wrong. Use the
+  Bare Metal console to fix PXE VLAN settings and verify discovery.
+objectives:
+  - Open Bare Metal console from the lab toolbar
+  - Fix PXE VLAN configuration in the IPMI/MAAS view
+  - Verify machines can enter commissioning
+initial_state: PXE discovery fails — wrong VLAN tag on the provisioning fabric.
+hints:
+  - order: 1
+    cost: 10
+    content: Open **Bare Metal** → sign in → **IPMI** tab.
+  - order: 2
+    cost: 15
+    content: Click **Fix PXE VLAN** when the VLAN mismatch banner appears.
+  - order: 3
+    cost: 20
+    content: Run **Check** after PXE discovery succeeds.

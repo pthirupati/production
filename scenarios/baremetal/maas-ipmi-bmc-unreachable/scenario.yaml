@@ -1,0 +1,30 @@
+slug: maas-ipmi-bmc-unreachable
+title: MAAS IPMI BMC Unreachable
+technology: Bare Metal
+category: MAAS
+difficulty: medium
+scenario_type: fix
+time_limit: 1200
+max_score: 100
+lab_mode: simulation
+simulation_type: baremetal
+infrastructure_type: simulation
+is_free: false
+description: >-
+  MAAS cannot power-manage gpu-node-02 because the BMC is unreachable. Restore IPMI
+  connectivity and commission the machine.
+objectives:
+  - Open Bare Metal console
+  - Restore BMC / IPMI reachability
+  - Commission the failed GPU node
+initial_state: BMC unreachable on gpu-node-02; commissioning failed.
+hints:
+  - order: 1
+    cost: 10
+    content: **IPMI** tab shows BMC unreachable — use **IPMI power on / restore BMC**.
+  - order: 2
+    cost: 15
+    content: **MAAS** tab → **Commission** gpu-node-02.
+  - order: 3
+    cost: 20
+    content: **Deploy** when status is Ready, then **Check**.

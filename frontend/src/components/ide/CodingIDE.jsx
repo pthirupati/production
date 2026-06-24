@@ -300,7 +300,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     } finally {
       if (mountedRef.current) { setRunning(false); setPyLoading(false) }
       lastCtx.current = { output: stdout, error: stderr, tests: lastCtx.current.tests }
-      setDebugText(tsLine(`Run · lang=${language} · stdout=${stdout.length}b · stderr=${stderr.length}b`))
+      const lineCount = composedSource().split('\n').length
+      setDebugText(tsLine(
+        `Run · lang=${language} · file=${entrypoint} · lines=${lineCount} · stdout=${stdout.length}b · stderr=${stderr.length}b`
+      ))
     }
   }, [running, checking, composedSource, isPython, isJs, language, entrypoint, appendTerminal])
 
@@ -364,8 +367,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       // Feed the mentor's context from the authoritative grade.
       lastCtx.current = { output: result.stdout || '', error: result.error || '', tests }
       setDebugText(tsLine(
-        `Check · passed=${result.passed_count ?? 0}/${result.total_count ?? 0}` +
-        ` · hidden=${spec?.hidden_test_count || 0} · verdict=${result.passed ? 'PASS' : result.needs_review ? 'NEEDS_REVIEW' : 'FAIL'}`
+        `Check · file=${entrypoint} · passed=${result.passed_count ?? 0}/${result.total_count ?? 0}` +
+        ` · hidden=${spec?.hidden_test_count || 0} · verdict=${result.passed ? 'PASS' : result.needs_review ? 'NEEDS_REVIEW' : 'FAIL'}` +
+        (result.error ? ` · err=${String(result.error).slice(0, 120)}` : '')
       ))
 
       if (result.needs_review) {

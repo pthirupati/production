@@ -79,6 +79,15 @@ def _apply_preset(state: dict, slug: str) -> None:
     elif "pxe" in slug:
         state["goal"] = {"title": "PXE boot", "objective": "Fix VLAN tagging so PXE discovery succeeds."}
         state["broken"] = {"pxe_vlan_wrong": True}
+    elif "ipmi" in slug and "unreachable" in slug:
+        state["goal"] = {"title": "IPMI unreachable", "objective": "Restore BMC connectivity and verify IPMI responds."}
+        state["broken"] = {"bmc_unreachable": True, "machine_needs_commission": 2}
+    elif "thermal" in slug or "gpu" in slug and "commission" in slug:
+        state["goal"] = {"title": "GPU thermal commission", "objective": "Clear thermal alert and complete MAAS commissioning."}
+        state["broken"] = {"thermal_alert": True, "machine_needs_commission": 2}
+    elif "commission" in slug and "stuck" in slug:
+        state["goal"] = {"title": "Commission stuck", "objective": "Reset stuck commissioning state and redeploy the node."}
+        state["broken"] = {"commission_stuck": 2}
 
 
 def _ensure(session_id: str, slug: str = "") -> dict:
@@ -170,6 +179,33 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         broken.pop("pxe_vlan_wrong", None)
         _save(session_id, entry)
         return {"ok": True, "message": "PXE VLAN corrected"}
+
+    if action == "ipmi_power_on":
+        for b in state["ipmi"]["bmc_hosts"]:
+            b["reachable"] = True
+            b["power"] = "on"
+        broken.pop("bmc_unreachable", None)
+        state["events"].insert(0, {"time": _now_iso(), "message": "BMC reachable via IPMI", "severity": "success"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "BMC power on — IPMI reachable"}
+
+    if action == "clear_thermal_alert":
+        broken.pop("thermal_alert", None)
+        state["events"].insert(0, {"time": _now_iso(), "message": "Thermal alert cleared", "severity": "success"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Thermal threshold restored"}
+
+    if action == "reset_commission":
+        mid = int(payload.get("machine_id") or broken.get("commission_stuck") or 2)
+        for m in state["maas"]["machines"]:
+            if m["id"] == mid:
+                m["status"] = "Ready"
+                m["power"] = "on"
+                m["ip"] = m.get("ip") or f"10.10.1.{10 + mid}"
+        broken.pop("commission_stuck", None)
+        broken.pop("machine_needs_commission", None)
+        _save(session_id, entry)
+        return {"ok": True, "message": "Commission reset complete"}
 
     if action == "create_lxd":
         name = payload.get("name") or "new-svc"

@@ -2,7 +2,7 @@ import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
-import { indentUnit, indentOnInput, bracketMatching, foldGutter } from '@codemirror/language'
+import { indentUnit, indentOnInput, bracketMatching, foldGutter, StreamLanguage } from '@codemirror/language'
 import { searchKeymap, highlightSelectionMatches, openSearchPanel } from '@codemirror/search'
 import { autocompletion, completeFromList } from '@codemirror/autocomplete'
 import { linter, lintGutter } from '@codemirror/lint'
@@ -15,6 +15,31 @@ import { markdown } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useThemeStore } from '../../store/themeStore'
 
+const hclLanguage = StreamLanguage.define({
+  startState: () => ({}),
+  token(stream) {
+    if (stream.eatSpace()) return null
+    if (stream.match('//') || stream.match('#')) {
+      stream.skipToEnd()
+      return 'comment'
+    }
+    if (stream.match('/*')) {
+      stream.eatWhile((ch) => ch !== '*' || stream.peek() !== '/')
+      stream.match('*/', false)
+      stream.match('*/')
+      return 'comment'
+    }
+    if (stream.match(/"(?:[^\\"]|\\.)*"/)) return 'string'
+    if (stream.match(/\b(resource|variable|output|provider|terraform|module|data|locals|required_providers|backend)\b/)) {
+      return 'keyword'
+    }
+    if (stream.match(/\b(true|false|null)\b/)) return 'atom'
+    if (stream.match(/[a-zA-Z_][\w-]*/)) return 'variable'
+    stream.next()
+    return null
+  },
+})
+
 function languageExtension(language) {
   const lang = (language || '').toLowerCase()
   if (lang === 'python' || lang === 'py') return python()
@@ -24,6 +49,7 @@ function languageExtension(language) {
   if (lang === 'tsx') return javascript({ jsx: true, typescript: true })
   if (lang === 'json') return json()
   if (lang === 'yaml' || lang === 'yml') return yaml()
+  if (lang === 'hcl' || lang === 'terraform' || lang === 'tf') return hclLanguage
   if (lang === 'markdown' || lang === 'md') return markdown()
   return []
 }

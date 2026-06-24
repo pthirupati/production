@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { baremetalApi } from '../../api/baremetal'
 import toast from 'react-hot-toast'
 import {
-  LogIn, Play, ArrowLeft, Lightbulb, Square, Server, Box, Cpu,
-  CheckCircle2, AlertTriangle, Network, RefreshCw,
+  LogIn, Play, Server, Box, Cpu,
+  AlertTriangle, Network, RefreshCw,
 } from 'lucide-react'
+import LabChromeBar from '../lab/LabChromeBar'
 
 const ACCENT = '#0d9488'
 
@@ -16,7 +17,8 @@ const TABS = [
 ]
 
 export default function BaremetalSimulator({
-  sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend, hintsLabel, checkDisabled,
+  sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
+  hintsLabel, checkDisabled, extendDisabled,
 }) {
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -57,21 +59,24 @@ export default function BaremetalSimulator({
   const goal = st?.goal || {}
   const broken = st?.broken || {}
 
+  const chromeProps = {
+    onHints, onCheck, onExtend, onStop, onBackToTerminal: onExit,
+    hintsLabel, checkDisabled, extendDisabled,
+  }
+
   if (!loading && state && !loggedIn) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]">
-        <div className="bg-white rounded-lg shadow-2xl w-[400px] overflow-hidden">
-          <div className="px-6 py-4 text-white font-semibold" style={{ background: ACCENT }}>Bare Metal Console</div>
-          <div className="p-6 space-y-3">
-            <p className="text-sm text-slate-600">MAAS · LXD · KVM training environment</p>
-            <button onClick={() => run(() => baremetalApi.login(sessionId), 'Signed in')} disabled={busy}
-              className="w-full py-2 rounded text-white font-medium flex items-center justify-center gap-2" style={{ background: ACCENT }}>
-              <LogIn size={16} /> Sign In
-            </button>
-            <div className="flex flex-wrap gap-2 pt-2 border-t">
-              {onHints && <button onClick={onHints} className="text-xs px-2 py-1 border rounded">{hintsLabel || 'Hints'}</button>}
-              {onCheck && <button onClick={onCheck} disabled={checkDisabled} className="text-xs px-2 py-1 border rounded">Check</button>}
-              {onExit && <button onClick={onExit} className="text-xs px-2 py-1 border rounded ml-auto">Back to terminal</button>}
+      <div className="fixed inset-0 z-[60] flex flex-col bg-[#0f172a]">
+        <LabChromeBar title="Bare Metal Console" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-[400px] overflow-hidden">
+            <div className="px-6 py-4 text-white font-semibold" style={{ background: ACCENT }}>Bare Metal Console</div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-slate-600">MAAS · LXD · KVM training environment</p>
+              <button onClick={() => run(() => baremetalApi.login(sessionId), 'Signed in')} disabled={busy}
+                className="w-full py-2 rounded text-white font-medium flex items-center justify-center gap-2" style={{ background: ACCENT }}>
+                <LogIn size={16} /> Sign In
+              </button>
             </div>
           </div>
         </div>
@@ -80,17 +85,8 @@ export default function BaremetalSimulator({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#f1f5f9] text-slate-800">
-      <div className="flex items-center justify-between px-4 h-12 text-white shrink-0" style={{ background: ACCENT }}>
-        <span className="font-semibold">Bare Metal · MAAS / LXD / KVM</span>
-        <div className="flex items-center gap-2 text-xs">
-          {onHints && <button onClick={onHints} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><Lightbulb size={13} /> {hintsLabel || 'Hints'}</button>}
-          {onCheck && <button onClick={onCheck} disabled={checkDisabled} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><CheckCircle2 size={13} /> Check</button>}
-          {onExtend && <button onClick={onExtend} className="px-2 py-1 rounded bg-white/15">+30m</button>}
-          {onStop && <button onClick={onStop} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><Square size={12} /> Stop</button>}
-          {onExit && <button onClick={onExit} className="px-2 py-1 rounded bg-white/15 flex items-center gap-1"><ArrowLeft size={13} /> Terminal</button>}
-        </div>
-      </div>
+    <div className="fixed inset-0 z-[60] flex flex-col bg-[#f1f5f9] text-slate-800">
+      <LabChromeBar title="Bare Metal · MAAS / LXD / KVM" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
 
       {goal.objective && (
         <div className="px-4 py-2 text-sm bg-amber-50 border-b border-amber-200 flex items-center gap-2">
@@ -171,14 +167,26 @@ export default function BaremetalSimulator({
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">IPMI / BMC</h2>
               {(st.ipmi?.bmc_hosts || []).map((b) => (
-                <div key={b.name} className="bg-white border rounded p-3 flex justify-between">
+                <div key={b.name} className="bg-white border rounded p-3 flex justify-between items-center gap-3">
                   <span>{b.name}</span>
                   <span className={b.reachable ? 'text-green-600' : 'text-red-600'}>{b.reachable ? 'reachable' : 'unreachable'}</span>
                 </div>
               ))}
+              {broken.bmc_unreachable && (
+                <button onClick={() => run(() => baremetalApi.ipmiPowerOn(sessionId), 'BMC online')}
+                  className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>IPMI power on / restore BMC</button>
+              )}
               {broken.pxe_vlan_wrong && (
                 <button onClick={() => run(() => baremetalApi.fixPxeVlan(sessionId), 'PXE fixed')}
                   className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Fix PXE VLAN</button>
+              )}
+              {broken.thermal_alert && (
+                <button onClick={() => run(() => baremetalApi.clearThermal(sessionId), 'Thermal cleared')}
+                  className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Clear thermal alert</button>
+              )}
+              {broken.commission_stuck && (
+                <button onClick={() => run(() => baremetalApi.resetCommission(sessionId, broken.commission_stuck), 'Commission reset')}
+                  className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Reset stuck commission</button>
               )}
             </div>
           )}

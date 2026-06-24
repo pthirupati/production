@@ -5,6 +5,7 @@ import {
   History, Network, Crosshair,
 } from 'lucide-react'
 import { nmapApi } from '../../api/nmap'
+import { LabChromeControls } from '../lab/LabChromeBar'
 
 /* ── scoped, self-contained "security tool" chrome (no shared CSS) ── */
 const SCOPED_CSS = `
@@ -105,7 +106,10 @@ function StateBadge({ state }) {
  * crafts scans (targets + flags), reads back discovered hosts / ports / versions
  * / OS, then runs Check Solution (graded by validate_nmap_lab via the engine).
  */
-export default function NmapSimulator({ sessionId, scenario, onExit, onStop, onHints }) {
+export default function NmapSimulator({
+  sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
+  hintsLabel, checkDisabled, extendDisabled,
+}) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
   const [error, setError] = useState('')
@@ -225,9 +229,18 @@ export default function NmapSimulator({ sessionId, scenario, onExit, onStop, onH
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <button className="nm-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
           <button className="nm-btn" onClick={resetSession}><History size={13} /> Reset</button>
-          {onHints && <button className="nm-btn" onClick={onHints}><Lightbulb size={13} className="text-[#f5c451]" /> Hints</button>}
-          {onStop && <button className="nm-btn" onClick={onStop}><StopCircle size={13} className="text-[#ff6b6b]" /> Stop</button>}
-          {onExit && <button className="nm-btn" onClick={onExit}><ArrowLeft size={13} /> Back to lab</button>}
+          <LabChromeControls
+            buttonClass="nm-btn"
+            primaryClass="nm-btn nm-btn-primary"
+            onHints={onHints}
+            onCheck={onCheck}
+            onExtend={onExtend}
+            onStop={onStop}
+            onBackToTerminal={onExit}
+            hintsLabel={hintsLabel || 'Hints'}
+            checkDisabled={checkDisabled}
+            extendDisabled={extendDisabled}
+          />
         </div>
       </div>
 

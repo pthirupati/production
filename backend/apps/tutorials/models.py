@@ -22,6 +22,13 @@ class Tutorial(models.Model):
         ("intermediate", "Intermediate"),
         ("advanced", "Advanced"),
     ]
+    LEVEL_TRACK_CHOICES = [
+        ("beginner", "Beginner"),
+        ("intermediate", "Intermediate"),
+        ("advanced", "Advanced"),
+        ("expert", "Expert"),
+        ("enterprise", "Enterprise"),
+    ]
 
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     title = models.CharField(max_length=200)
@@ -34,6 +41,13 @@ class Tutorial(models.Model):
     topic = models.CharField(max_length=60, db_index=True)
     difficulty = models.CharField(
         max_length=20, choices=DIFFICULTY_CHOICES, default="beginner"
+    )
+    # Course hierarchy (optional — flat tutorials leave these blank).
+    course_slug = models.SlugField(max_length=120, blank=True, db_index=True)
+    course_title = models.CharField(max_length=200, blank=True)
+    module_order = models.PositiveIntegerField(default=0)
+    level_track = models.CharField(
+        max_length=20, choices=LEVEL_TRACK_CHOICES, default="beginner", blank=True, db_index=True
     )
     estimated_minutes = models.PositiveIntegerField(default=10)
 
@@ -64,6 +78,7 @@ class Tutorial(models.Model):
         indexes = [
             models.Index(fields=["is_published", "order"]),
             models.Index(fields=["topic", "is_published"]),
+            models.Index(fields=["course_slug", "module_order"]),
         ]
 
     def __str__(self):

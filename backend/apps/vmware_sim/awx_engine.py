@@ -71,9 +71,18 @@ def _apply_preset(state: dict, slug: str) -> None:
         state["goal"] = {"title": "Create job template", "objective": "Create a job template from the synced project and launch it."}
         state["broken"] = {"missing_template": True}
         state["job_templates"] = state["job_templates"][:1]
+    elif "launch" in slug or "job" in slug:
+        state["goal"] = {"title": "Launch job", "objective": "Launch the failed job template and verify success."}
+        state["broken"] = {"failed_template_id": 11}
+    elif "sync" in slug or "project" in slug:
+        state["goal"] = {"title": "Sync project", "objective": "Sync the failing SCM project before launching templates."}
+        state["broken"] = {"project_sync_failed": True}
     elif "credential" in slug:
         state["goal"] = {"title": "Fix credentials", "objective": "Attach the Machine credential to the failing template."}
         state["broken"] = {"credential_missing": True}
+    elif "ha" in slug or "tower" in slug:
+        state["goal"] = {"title": "Tower HA", "objective": "Verify AWX/Tower HA endpoints and re-sync the config project."}
+        state["broken"] = {"project_sync_failed": True}
 
 
 def _ensure(session_id: str, slug: str = "") -> dict:

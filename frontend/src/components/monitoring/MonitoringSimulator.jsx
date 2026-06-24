@@ -45,10 +45,15 @@ function fmtVal(v, unit) {
 }
 
 /* ── a single dashboard panel: evaluates its expr to a value/series ── */
-function DashPanel({ panel, sessionId, scenario, noData }) {
+function DashPanel({ panel, sessionId, scenario, dashboardUid, noData }) {
   const [series, setSeries] = useState([])
   const [value, setValue] = useState(null)
   const [empty, setEmpty] = useState(noData)
+  const [editing, setEditing] = useState(false)
+  const [exprDraft, setExprDraft] = useState(panel.expr)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { setExprDraft(panel.expr) }, [panel.expr])
 
   useEffect(() => {
     let live = true
@@ -90,7 +95,31 @@ function DashPanel({ panel, sessionId, scenario, noData }) {
           <div className="mon-panel-sub mt-1">{value == null ? '—' : fmtVal(value, panel.unit)}</div>
         </>
       )}
-      <div className="mon-code mt-2 !text-[10px] !py-1.5 opacity-80">{panel.expr}</div>
+      <div className="mon-code mt-2 !text-[10px] !py-1.5 opacity-80">
+        {editing ? (
+          <div className="space-y-1">
+            <input className="mon-input w-full font-mono !text-[10px]" value={exprDraft}
+              onChange={(e) => setExprDraft(e.target.value)} />
+            <div className="flex gap-1">
+              <button type="button" className="mon-btn !text-[10px] !py-0.5" disabled={saving}
+                onClick={async () => {
+                  setSaving(true)
+                  try {
+                    await monitoringApi.action(sessionId, 'update_panel', {
+                      dashboard_uid: dashboardUid, panel_id: panel.id, expr: exprDraft,
+                    })
+                    setEditing(false)
+                  } finally { setSaving(false) }
+                }}>Save query</button>
+              <button type="button" className="mon-btn !text-[10px] !py-0.5" onClick={() => setEditing(false)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" className="text-left w-full hover:text-white" onClick={() => setEditing(true)} title="Edit panel query">
+            {panel.expr}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -141,7 +170,7 @@ function GrafanaView({ state, sessionId, scenario }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {(dash.panels || []).map(p => (
                 <DashPanel key={`${dash.uid}-${p.id}`} panel={p} sessionId={sessionId}
-                           scenario={scenario} noData={noDataPanels.has(p.id)} />
+                           scenario={scenario} dashboardUid={dash.uid} noData={noDataPanels.has(p.id)} />
               ))}
             </div>
           </>
@@ -367,7 +396,7 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr }) {
  */
 export default function MonitoringSimulator({
   sessionId, scenario, flavor = 'grafana',
-  onExit, onStop, onHints, onCheck, onExtend, hintsLabel, checkDisabled,
+  onExit, onStop, onHints, onCheck, onExtend, hintsLabel, checkDisabled, extendDisabled,
 }) {
   const [authed, setAuthed] = useState(isMonitoringAuthenticated())
   const [state, setState] = useState(null)
@@ -423,6 +452,7 @@ export default function MonitoringSimulator({
         onExtend={onExtend}
         hintsLabel={hintsLabel}
         checkDisabled={checkDisabled}
+        extendDisabled={extendDisabled}
       >
         <button className={`mon-tab ${view === 'grafana' ? 'mon-tab-active' : ''}`} onClick={() => setView('grafana')}>Grafana</button>
         <button className={`mon-tab ${view === 'prometheus' ? 'mon-tab-active' : ''}`} onClick={() => setView('prometheus')}>Prometheus</button>

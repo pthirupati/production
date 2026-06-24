@@ -1,0 +1,78 @@
+/* Shared lab chrome for every simulator overlay (Hints / Check / +30m / Stop / Timer). */
+.lab-chrome-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  background: #0d1024;
+  border-bottom: 1px solid #262a45;
+  flex-shrink: 0;
+}
+.lab-chrome-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+.lab-chrome-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lab-chrome-sub {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lab-chrome-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.lab-chrome-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 6px;
+  padding: 0.38rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e2e8f0;
+  transition: background 0.12s;
+}
+.lab-chrome-btn:hover:not(:disabled) { background: #334155; }
+.lab-chrome-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.lab-chrome-btn-primary {
+  border: none;
+  background: #0891b2;
+  color: #fff;
+}
+.lab-chrome-btn-primary:hover:not(:disabled) { background: #0e7490; }
+.lab-chrome-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #cbd5e1;
+}
+.lab-chrome-timer-low { color: #fbbf24; border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.08); }
+.lab-chrome-timer-critical { color: #f87171; border-color: rgba(248,113,113,.4); background: rgba(248,113,113,.12); animation: lab-chrome-pulse 1.5s ease-in-out infinite; }
+@keyframes lab-chrome-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.75; } }

@@ -5,6 +5,7 @@ import {
   CheckCircle2, Target, Trash2, Plus, Link2, Settings2, Activity, X, ChevronRight,
 } from 'lucide-react'
 import { aimlApi } from '../../api/aiml'
+import { LabChromeControls } from '../lab/LabChromeBar'
 
 /* ── scoped, self-contained n8n-style automation chrome (no shared CSS) ── */
 const SCOPED_CSS = `
@@ -285,7 +286,10 @@ function NodeCard({ node, selected, connectSrc, runStatus, onSelect, onDragStart
  * runs the workflow to see a deterministic execution trace + final output, and
  * runs Check Solution in the lab (graded via validate_aiml_lab on the engine).
  */
-export default function AgentWorkflowSimulator({ sessionId, scenario, onExit, onStop, onHints }) {
+export default function AgentWorkflowSimulator({
+  sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
+  hintsLabel, checkDisabled, extendDisabled,
+}) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
   const [error, setError] = useState('')
@@ -484,9 +488,17 @@ export default function AgentWorkflowSimulator({ sessionId, scenario, onExit, on
           </button>
           <button className="ag-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
           <button className="ag-btn" onClick={resetGraph} disabled={busy}><RefreshCw size={13} /> Reset</button>
-          {onHints && <button className="ag-btn" onClick={onHints}><Lightbulb size={13} className="text-[#f5c451]" /> Hints</button>}
-          {onStop && <button className="ag-btn" onClick={onStop}><StopCircle size={13} className="text-[#ff6b6b]" /> Stop</button>}
-          {onExit && <button className="ag-btn" onClick={onExit}><ArrowLeft size={13} /> Back to lab</button>}
+          <LabChromeControls
+            buttonClass="ag-btn"
+            onHints={onHints}
+            onCheck={onCheck}
+            onExtend={onExtend}
+            onStop={onStop}
+            onBackToTerminal={onExit}
+            hintsLabel={hintsLabel || 'Hints'}
+            checkDisabled={checkDisabled}
+            extendDisabled={extendDisabled}
+          />
         </div>
       </div>
 

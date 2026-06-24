@@ -113,6 +113,9 @@ function LabTerminal({
       const shellReadyRef = { current: false }
       const readyFiredRef = { current: false }
       const reconnectMsgShown = { current: false }
+      const connectingRef = { current: false }
+      const connectionStableAtRef = { current: null }
+      const pauseUntilVisibleRef = { current: false }
       const resizeDebounceRef = { current: null }
 
       const fireReady = () => {
@@ -120,6 +123,10 @@ function LabTerminal({
           readyFiredRef.current = true
           onReady?.()
         }
+      }
+
+      const markStable = () => {
+        connectionStableAtRef.current = Date.now()
       }
 
       const sendResize = () => {
@@ -164,26 +171,49 @@ function LabTerminal({
         })
       }
 
-      const connectWs = () => {
+      const scheduleReconnect = (delayMs, message) => {
         if (disposed) return
+        if (document.hidden) {
+          pauseUntilVisibleRef.current = true
+          return
+        }
+        if (message && !reconnectMsgShown.current) {
+          reconnectMsgShown.current = true
+          term.write(message)
+        }
+        reconnectTimerRef.current = setTimeout(connectWs, delayMs)
+      }
+
+      const connectWs = () => {
+        if (disposed || connectingRef.current) return
+        if (document.hidden) {
+          pauseUntilVisibleRef.current = true
+          return
+        }
+        pauseUntilVisibleRef.current = false
+        connectingRef.current = true
         if (reconnectTimerRef.current) {
           clearTimeout(reconnectTimerRef.current)
           reconnectTimerRef.current = null
         }
-        if (wsRef.current) {
-          wsRef.current.onclose = null
-          wsRef.current.close(1000)
+        const prev = wsRef.current
+        if (prev) {
+          prev.onclose = null
+          prev.onmessage = null
+          if (prev._readyFallback) clearTimeout(prev._readyFallback)
+          if (prev.readyState === WebSocket.OPEN || prev.readyState === WebSocket.CONNECTING) {
+            prev.close(1000)
+          }
         }
         const ws = new WebSocket(buildWsUrl())
         wsRef.current = ws
         ws.onopen = () => {
+          connectingRef.current = false
           reconnectAttempts.current = 0
           reconnectMsgShown.current = false
           shellReadyRef.current = false
-          readyFiredRef.current = false
-          // Fallback if shell_ready is delayed (Docker exec attach).
-          const readyFallback = setTimeout(fireReady, isSimulation ? 400 : 5000)
-          ws._readyFallback = readyFallback
+          const fallbackMs = isSimulation ? 800 : isCloud ? 8000 : 1500
+          ws._readyFallback = setTimeout(fireReady, fallbackMs)
         }
         ws.onmessage = (event) => {
           try {
@@ -197,15 +227,21 @@ function LabTerminal({
             }
             if (data.type === 'shell_ready') {
               shellReadyRef.current = true
+              markStable()
               if (ws._readyFallback) clearTimeout(ws._readyFallback)
               scheduleResize()
               fireReady()
               return
             }
-            if (data.output) term.write(data.output)
+            if (data.output) {
+              markStable()
+              term.write(data.output)
+            }
           } catch { term.write(event.data) }
         }
         ws.onclose = (e) => {
+          connectingRef.current = false
+          if (ws._readyFallback) clearTimeout(ws._readyFallback)
           if (disposed || e.code === 1000) return
           if (WS_NO_RECONNECT.has(e.code)) {
             term.write(WS_CLOSE_MESSAGES[e.code] || '\r\n\x1b[1;31mConnection closed.\x1b[0m\r\n')
@@ -214,43 +250,41 @@ function LabTerminal({
             }
             return
           }
-          const isSim = session?.provider === 'simulation'
-          const max1006Retries = isSim ? 5 : 8
-          if (e.code === 1006 && reconnectAttempts.current < max1006Retries) {
-            reconnectAttempts.current++
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 8000)
-            if (reconnectAttempts.current >= max1006Retries) {
-              bindEnterRetry('\r\n\x1b[1;33mConnection paused — press Enter to reconnect\x1b[0m\r\n')
-              return
-            }
-            if (!reconnectMsgShown.current) {
-              reconnectMsgShown.current = true
-              term.write('\r\n\x1b[1;33mConnection interrupted — retrying...\x1b[0m\r\n')
-            }
-            reconnectTimerRef.current = setTimeout(connectWs, delay)
+          const wasStable = connectionStableAtRef.current
+            && (Date.now() - connectionStableAtRef.current) > 8000
+          if (reconnectAttempts.current >= maxReconnectAttempts) {
+            bindEnterRetry('\r\n\x1b[1;31mConnection lost after multiple attempts.\x1b[0m Press Enter to retry.\x1b[0m\r\n')
             return
           }
-          if (reconnectAttempts.current < maxReconnectAttempts) {
-            reconnectAttempts.current++
-            const cap = isSim ? 3 : maxReconnectAttempts
-            if (isSim && reconnectAttempts.current > 3) {
-              bindEnterRetry('\r\n\x1b[1;33mAI Lab shell paused — press Enter to reconnect\x1b[0m\r\n')
-              return
-            }
-            if (reconnectAttempts.current >= cap) {
-              bindEnterRetry('\r\n\x1b[1;31mConnection lost.\x1b[0m Press Enter to retry.\x1b[0m\r\n')
-              return
-            }
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 30000)
-            if (!isSim) {
-              term.write(`\r\n\x1b[1;33mReconnecting in ${Math.round(delay / 1000)}s... (${reconnectAttempts.current}/${maxReconnectAttempts})\x1b[0m\r\n`)
-            }
-            reconnectTimerRef.current = setTimeout(connectWs, delay)
-          } else {
-            bindEnterRetry('\r\n\x1b[1;31mConnection lost after multiple attempts.\x1b[0m\r\n')
+          reconnectAttempts.current++
+          const delay = wasStable
+            ? Math.min(800 + reconnectAttempts.current * 400, 4000)
+            : Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 12000)
+          if (reconnectAttempts.current >= maxReconnectAttempts - 1) {
+            bindEnterRetry('\r\n\x1b[1;33mConnection paused — press Enter to reconnect\x1b[0m\r\n')
+            return
           }
+          const msg = wasStable
+            ? null
+            : `\r\n\x1b[1;33mReconnecting (${reconnectAttempts.current}/${maxReconnectAttempts})...\x1b[0m\r\n`
+          scheduleReconnect(delay, msg)
+        }
+        ws.onerror = () => {
+          connectingRef.current = false
         }
       }
+
+      const onVisibility = () => {
+        if (document.hidden) return
+        if (pauseUntilVisibleRef.current || (wsRef.current?.readyState !== WebSocket.OPEN && !connectingRef.current)) {
+          pauseUntilVisibleRef.current = false
+          reconnectAttempts.current = 0
+          reconnectMsgShown.current = false
+          connectWs()
+        }
+      }
+      document.addEventListener('visibilitychange', onVisibility)
+
       connectWs()
 
       term.onData((data) => {
@@ -304,11 +338,17 @@ function LabTerminal({
 
       cleanup = () => {
         disposed = true
+        document.removeEventListener('visibilitychange', onVisibility)
         if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
         if (resizeDebounceRef.current) clearTimeout(resizeDebounceRef.current)
         ro?.disconnect()
         window.removeEventListener('resize', handleWindowResize)
-        wsRef.current?.close(1000)
+        const ws = wsRef.current
+        if (ws) {
+          if (ws._readyFallback) clearTimeout(ws._readyFallback)
+          ws.onclose = null
+          ws.close(1000)
+        }
         wsRef.current = null
         term.dispose()
         xtermRef.current = null

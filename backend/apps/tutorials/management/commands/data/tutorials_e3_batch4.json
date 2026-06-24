@@ -1,0 +1,1366 @@
+[
+  {
+    "slug": "ai-infra-gpu-fundamentals",
+    "title": "AI Infrastructure: GPU Fundamentals",
+    "summary": "Module 1 — understand GPU architecture, memory hierarchy, and how accelerators differ from CPUs for AI workloads.",
+    "topic": "GPU",
+    "difficulty": "beginner",
+    "estimated_minutes": 40,
+    "playground_slug": "gpu",
+    "scenario_slug": "",
+    "order": 326,
+    "course_slug": "ai-infrastructure-engineering",
+    "course_title": "AI Infrastructure Engineering: Zero to Hero",
+    "module_order": 1,
+    "level_track": "beginner",
+    "seo_title": "GPU Fundamentals for AI Engineers — Architecture, Memory, and Compute",
+    "seo_description": "Learn how GPUs accelerate AI training and inference: SM architecture, VRAM bandwidth, PCIe vs NVLink, and when to choose GPU over CPU.",
+    "seo_keywords": "gpu fundamentals, cuda cores, vram, ai infrastructure, nvidia architecture, tensor cores, gpu vs cpu, hbm",
+    "sections": [
+      [
+        "Why GPUs dominate AI",
+        "Neural networks are matrix-heavy workloads that benefit from massive parallelism. A modern CPU has dozens of cores optimized for low-latency branching; a GPU has thousands of simpler cores optimized for throughput. Training a transformer on CPU-only hardware can take weeks; the same job on eight H100 GPUs may finish in hours. Understanding this throughput-vs-latency tradeoff is the foundation of AI infrastructure engineering.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "GPU architecture basics",
+        "NVIDIA GPUs organize compute into Streaming Multiprocessors (SMs), each containing CUDA cores, Tensor Cores, and shared memory. AMD MI-series GPUs use Compute Units with SIMD lanes. Memory hierarchy matters: registers are fastest, shared memory is fast but limited, and global VRAM is large but high-latency. Effective AI kernels keep hot data in shared memory and minimize global memory round-trips.",
+        "nvidia-smi --query-gpu=name,memory.total,compute_cap --format=csv\nrocminfo | grep -E 'Marketing Name|VRAM'",
+        "bash",
+        "Run on a GPU node to see hardware capabilities."
+      ],
+      [
+        "VRAM and memory bandwidth",
+        "Model weights, activations, and optimizer states all consume VRAM. A 70B parameter model in FP16 needs roughly 140 GB just for weights — exceeding a single GPU. Memory bandwidth (GB/s) often limits inference more than FLOPS. HBM3 on H100 delivers ~3 TB/s; consumer GDDR6 is an order of magnitude slower. Size your fleet by both capacity and bandwidth.",
+        "nvidia-smi --query-gpu=memory.total,memory.used,memory.free --format=csv\nnvidia-smi dmon -s mu -c 5",
+        "bash",
+        "Watch memory utilization during a training step."
+      ],
+      [
+        "Tensor Cores and mixed precision",
+        "Tensor Cores accelerate matrix multiply-accumulate in FP16, BF16, TF32, and INT8. Mixed-precision training (FP16/BF16 weights with FP32 master weights) roughly doubles throughput with minimal accuracy loss. Frameworks like PyTorch enable this via autocast. Know your GPU's supported dtypes before designing training pipelines.",
+        "import torch\nprint(torch.cuda.get_device_capability())\nprint(torch.cuda.is_bf16_supported())",
+        "bash",
+        "BF16 is native on Ampere and newer NVIDIA GPUs."
+      ],
+      [
+        "PCIe, NVLink, and topology",
+        "GPUs communicate over PCIe for host transfers and NVLink/NVSwitch for peer-to-peer within a node. Multi-GPU training performance depends on topology: a DGX-style fully-connected NVSwitch fabric avoids PCIe bottlenecks during all-reduce. Always inspect topology before scheduling large distributed jobs.",
+        "nvidia-smi topo -m\nnvidia-smi nvlink --status",
+        "bash",
+        "NVLink status shows P2P link health between GPUs."
+      ],
+      [
+        "Sizing GPUs for workloads",
+        "Inference favors latency and cost-per-token; training favors aggregate FLOPS and interconnect bandwidth. Use this checklist: (1) fit model in VRAM or plan tensor parallelism, (2) match batch size to memory, (3) verify driver/CUDA compatibility, (4) benchmark with representative data before buying capacity.",
+        "",
+        "text",
+        "Open the GPU playground from the lab toolbar to practice diagnostics."
+      ]
+    ]
+  },
+  {
+    "slug": "ai-infra-cuda-rocm",
+    "title": "AI Infrastructure: CUDA and ROCm",
+    "summary": "Module 2 — install drivers, manage CUDA toolkits, and run workloads on both NVIDIA CUDA and AMD ROCm stacks.",
+    "topic": "GPU",
+    "difficulty": "intermediate",
+    "estimated_minutes": 50,
+    "playground_slug": "gpu",
+    "scenario_slug": "",
+    "order": 327,
+    "course_slug": "ai-infrastructure-engineering",
+    "course_title": "AI Infrastructure Engineering: Zero to Hero",
+    "module_order": 2,
+    "level_track": "intermediate",
+    "seo_title": "CUDA and ROCm for AI Infrastructure — Drivers, Toolkits, and Compatibility",
+    "seo_description": "Install NVIDIA and AMD GPU stacks, match driver versions to CUDA/ROCm, containerize GPU workloads, and debug common compatibility failures.",
+    "seo_keywords": "cuda, rocm, nvidia driver, amd gpu, hip, container toolkit, nvidia-container-runtime, dkms, gpu driver install",
+    "sections": [
+      [
+        "The software stack",
+        "A GPU workload traverses four layers: hardware firmware, kernel driver (nvidia or amdgpu), userspace runtime (CUDA or ROCm/HIP), and the framework (PyTorch, TensorFlow, JAX). Version skew at any layer causes cryptic failures. Pin versions in runbooks and mirror the same stack in dev, CI, and production.",
+        "nvidia-smi\nnvcc --version\npython -c \"import torch; print(torch.version.cuda)\"",
+        "bash",
+        "All three version strings must be mutually compatible."
+      ],
+      [
+        "NVIDIA driver installation",
+        "Production nodes typically install the headless driver via package manager or Ansible, blacklist nouveau, and reboot. DKMS rebuilds the module on kernel upgrades — monitor for failures after patching. Use persistence mode on inference servers to avoid GPU re-init latency.",
+        "sudo apt install nvidia-driver-550\nsudo nvidia-smi -pm 1\nsudo nvidia-smi -pl 400",
+        "bash",
+        "Persistence mode (-pm 1) keeps the driver loaded between jobs."
+      ],
+      [
+        "CUDA toolkit and containers",
+        "Host CUDA toolkit is optional when using containers; the container carries its own CUDA userspace. Install nvidia-container-toolkit so Docker and Kubernetes can inject GPU devices. Match the container base image tag (e.g. cuda12.4) to the host driver's maximum supported CUDA version.",
+        "distribution=$(. /etc/os-release;echo $ID$VERSION_ID)\ncurl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg",
+        "bash",
+        "Verify with: docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi"
+      ],
+      [
+        "AMD ROCm and HIP",
+        "ROCm provides HIP as a CUDA-portable API. Set HSA_OVERRIDE_GFX_VERSION for unsupported consumer cards in lab environments. ROCm containers use --device=/dev/kfd --device=/dev/dri. Mixed-vendor clusters require separate node pools and schedulers.",
+        "rocminfo\nhipcc --version\nexport HIP_VISIBLE_DEVICES=0,1",
+        "bash",
+        "HIP_VISIBLE_DEVICES mirrors CUDA_VISIBLE_DEVICES semantics."
+      ],
+      [
+        "Framework GPU builds",
+        "PyTorch wheels bundle CUDA; verify torch.cuda.is_available() after install. For custom kernels, compile with the same CUDA arch flags as your fleet (e.g. sm_90 for Hopper). JAX and TensorFlow have similar GPU plugin requirements.",
+        "python -c \"import torch; print(torch.cuda.is_available(), torch.cuda.device_count())\"",
+        "bash",
+        ""
+      ],
+      [
+        "Common compatibility failures",
+        "Driver too old for container CUDA → 'CUDA driver version insufficient'. Missing /dev/nvidia-uvm → permission or module not loaded. ROCm user not in render/video groups → permission denied on /dev/kfd. Document fixes in your runbook and automate checks in node provisioning.",
+        "dmesg | grep -iE 'nvidia|amdgpu|xid'\nlsmod | grep -E 'nvidia|amdgpu'",
+        "bash",
+        "Xid errors in dmesg indicate GPU hardware or driver resets."
+      ]
+    ]
+  },
+  {
+    "slug": "ai-infra-multi-gpu-clusters",
+    "title": "AI Infrastructure: Multi-GPU Clusters",
+    "summary": "Module 3 — design rack-scale GPU clusters with InfiniBand, NCCL tuning, and distributed training topology.",
+    "topic": "GPU",
+    "difficulty": "advanced",
+    "estimated_minutes": 55,
+    "playground_slug": "gpu",
+    "scenario_slug": "",
+    "order": 328,
+    "course_slug": "ai-infrastructure-engineering",
+    "course_title": "AI Infrastructure Engineering: Zero to Hero",
+    "module_order": 3,
+    "level_track": "advanced",
+    "seo_title": "Multi-GPU Cluster Design — InfiniBand, NCCL, and Distributed Training",
+    "seo_description": "Build and tune multi-node GPU clusters: InfiniBand fabrics, NCCL environment variables, tensor and pipeline parallelism, and job scheduling patterns.",
+    "seo_keywords": "multi-gpu, nccl, infiniband, distributed training, tensor parallelism, all-reduce, gpu cluster, rdma, slurm gpu",
+    "sections": [
+      [
+        "Cluster anatomy",
+        "A training cluster combines GPU nodes, a high-speed fabric (InfiniBand or RoCE), shared storage, and a scheduler (Slurm, Kubernetes, or proprietary). Each node typically has 4–8 GPUs connected via NVLink/NVSwitch internally and one or two HCAs to the fabric externally. Storage must sustain checkpoint write bandwidth across all nodes simultaneously.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "InfiniBand and RDMA",
+        "RDMA lets GPUs communicate without CPU copies, critical for NCCL all-reduce performance. Verify link state with ibstat and iblinkinfo. Configure IPoIB or RoCEv2 for management; NCCL uses IB verbs directly. Enable GPU Direct RDMA (GDR) so NICs DMA to GPU memory.",
+        "ibstat\niblinkinfo\nnvidia-smi topo -m",
+        "bash",
+        "Look for PIX/PHB/NVL/X paths in the topology matrix."
+      ],
+      [
+        "NCCL tuning",
+        "NCCL auto-detects topology but often needs hints. Set NCCL_IB_HCA to the correct HCA, NCCL_SOCKET_IFNAME to the fabric interface, and NCCL_DEBUG=INFO during benchmarks. Run nccl-tests all_reduce_perf before production jobs to establish baseline bus bandwidth.",
+        "export NCCL_DEBUG=INFO\nexport NCCL_IB_HCA=mlx5_0\nexport NCCL_SOCKET_IFNAME=ib0\n./build/all_reduce_perf -b 8 -e 2G -f 2 -g 8",
+        "bash",
+        "Bus bandwidth should approach line rate on well-tuned fabrics."
+      ],
+      [
+        "Parallelism strategies",
+        "Data parallelism replicates the model and shards batches — simplest but needs all-reduce each step. Tensor parallelism splits layers across GPUs in one node — needs fast NVLink. Pipeline parallelism splits layers across nodes — tolerates slower interconnect but adds bubble overhead. Large models combine all three (3D parallelism).",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Slurm GPU scheduling",
+        "Slurm GRES allocates GPUs per node. Use --gres=gpu:8 and constraint flags for node features. Enforce exclusive node access for large jobs to avoid NCCL interference. Configure prolog scripts to reset GPU state between jobs.",
+        "#SBATCH --gres=gpu:8\n#SBATCH --nodes=4\n#SBATCH --ntasks-per-node=8\nsrun python train.py --world-size 32",
+        "bash",
+        "Match ntasks-per-node to GPU count for one process per GPU."
+      ],
+      [
+        "Network partitions and fault tolerance",
+        "A single slow node drags all-reduce for the entire job. Use NCCL_ASYNC_ERROR_HANDLING and job-level timeouts. Checkpoint frequently to distributed storage. For multi-day training runs, design for node replacement without full restart using elastic training frameworks.",
+        "",
+        "text",
+        "Test failure injection: kill one rank and verify checkpoint recovery."
+      ]
+    ]
+  },
+  {
+    "slug": "ai-infra-vllm-triton",
+    "title": "AI Infrastructure: vLLM and Triton Inference",
+    "summary": "Module 4 — deploy production LLM inference with vLLM, NVIDIA Triton, batching, and KV-cache optimization.",
+    "topic": "GPU",
+    "difficulty": "advanced",
+    "estimated_minutes": 55,
+    "playground_slug": "gpu",
+    "scenario_slug": "",
+    "order": 329,
+    "course_slug": "ai-infrastructure-engineering",
+    "course_title": "AI Infrastructure Engineering: Zero to Hero",
+    "module_order": 4,
+    "level_track": "expert",
+    "seo_title": "vLLM and NVIDIA Triton — Production LLM Inference at Scale",
+    "seo_description": "Deploy LLM inference with vLLM PagedAttention, Triton model ensembles, continuous batching, tensor parallelism, and latency/throughput tuning.",
+    "seo_keywords": "vllm, triton inference server, llm inference, pagedattention, continuous batching, tensor parallel, model serving, kv cache",
+    "sections": [
+      [
+        "Inference vs training economics",
+        "Training is batch-oriented and tolerates hours of runtime; inference is request-driven and measured in p99 latency and tokens/sec/dollar. GPU utilization for inference is often low without batching. The goal is to maximize throughput while meeting SLA latency targets — typically 200–500 ms time-to-first-token for chat.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "vLLM and PagedAttention",
+        "vLLM manages KV-cache memory in non-contiguous pages like OS virtual memory, reducing fragmentation and enabling larger batch sizes. Launch with tensor-parallel-size matching GPU count. Use --max-model-len and --gpu-memory-utilization to tune memory headroom.",
+        "python -m vllm.entrypoints.openai.api_server \\\n  --model meta-llama/Llama-3-8B \\\n  --tensor-parallel-size 2 \\\n  --gpu-memory-utilization 0.90",
+        "bash",
+        "vLLM exposes an OpenAI-compatible API on port 8000."
+      ],
+      [
+        "Continuous batching",
+        "Unlike static batching, continuous batching adds new requests to an in-flight batch as others complete. This dramatically improves GPU utilization for variable-length prompts. Monitor batch size and queue depth; autoscale replicas when queue latency exceeds SLO.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "NVIDIA Triton Inference Server",
+        "Triton supports multiple backends (TensorRT-LLM, ONNX, Python, PyTorch) in one server. Model ensembles chain preprocessing → inference → postprocessing. Use dynamic batching with preferred_batch_size and max_queue_delay_microseconds to balance latency and throughput.",
+        "name: \"llm_ensemble\"\nplatform: \"ensemble\"\nmax_batch_size: 64\ninput [{ name: \"prompt\" data_type: TYPE_STRING dims: [1] }]\noutput [{ name: \"completion\" data_type: TYPE_STRING dims: [1] }]",
+        "yaml",
+        "Define ensemble scheduling in config.pbtxt."
+      ],
+      [
+        "TensorRT-LLM optimization",
+        "TensorRT-LLM compiles models with kernel fusion, FP8 quantization, and inflight batching. Build engines per GPU SKU — an H100 engine is not portable to A100. Benchmark with trtllm-bench before promoting to production.",
+        "trtllm-build --checkpoint_dir ./llama_ckpt \\\n  --output_dir ./llama_engine \\\n  --gemm_plugin float16",
+        "bash",
+        "FP8 quantization requires Hopper or newer GPUs."
+      ],
+      [
+        "Production serving checklist",
+        "Before go-live: (1) load test at 2× expected peak QPS, (2) measure p50/p95/p99 latency, (3) verify graceful degradation under GPU OOM, (4) set up health endpoints and Prometheus metrics, (5) plan model hot-swap without dropping in-flight requests.",
+        "curl http://localhost:8000/v1/completions \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"model\":\"meta-llama/Llama-3-8B\",\"prompt\":\"Hello\",\"max_tokens\":50}'",
+        "bash",
+        ""
+      ]
+    ]
+  },
+  {
+    "slug": "ai-infra-datacenter-design",
+    "title": "AI Infrastructure: Datacenter Design",
+    "summary": "Module 5 — plan power, cooling, rack density, and facility requirements for enterprise AI datacenters.",
+    "topic": "GPU",
+    "difficulty": "advanced",
+    "estimated_minutes": 60,
+    "playground_slug": "gpu",
+    "scenario_slug": "",
+    "order": 330,
+    "course_slug": "ai-infrastructure-engineering",
+    "course_title": "AI Infrastructure Engineering: Zero to Hero",
+    "module_order": 5,
+    "level_track": "enterprise",
+    "seo_title": "AI Datacenter Design — Power, Cooling, Rack Density, and Facility Planning",
+    "seo_description": "Enterprise AI datacenter planning: kW/rack budgets, liquid cooling, PDU sizing, network leaf-spine for GPU fabrics, and TCO modeling.",
+    "seo_keywords": "ai datacenter, gpu datacenter design, liquid cooling, power density, h100 power, rack kW, facility planning, tco gpu cluster",
+    "sections": [
+      [
+        "Power budgeting",
+        "An 8×H100 DGX node draws 10–12 kW under full training load. Traditional datacenter racks were designed for 5–8 kW; AI racks need 30–100 kW with dedicated PDUs and busway drops. Plan for 1.2× nameplate headroom for inrush and cooling overhead. Track actual draw with rack PDUs, not nameplate labels alone.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Cooling strategies",
+        "Air cooling tops out around 40–50 kW/rack; beyond that, direct-to-chip liquid cooling or immersion is required. Monitor inlet temperature — every 1°C above 25°C increases fan power and reduces GPU boost clocks. Hot-aisle/cold-aisle containment is mandatory; recirculation causes thermal throttling cascades.",
+        "nvidia-smi --query-gpu=temperature.gpu,power.draw,clocks.sm --format=csv\nnvidia-smi dmon -s pucvmet -c 10",
+        "bash",
+        "Sustained GPU temps above 85°C trigger clock throttling."
+      ],
+      [
+        "Rack and cable planning",
+        "GPU nodes are depth-heavy (often 38–42 inches) and need rear clearance for cable management. InfiniBand DACs are preferred under 3 m; beyond that use optics. Label every cable end — a mis-cabled fat-tree topology degrades entire jobs silently. Reserve top-of-rack switch capacity for 400G uplinks.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Network fabric for AI",
+        "Training clusters use non-blocking or near-non-blocking fat-tree topologies. A 64-node cluster with 8 GPUs each needs 512 GPU-facing links plus storage and management planes. Leaf switches connect GPUs; spine switches aggregate leaves. Size oversubscription ratio: 1:1 for training, 2:1 acceptable for inference.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Facility integration with Terraform",
+        "Infrastructure-as-code extends to datacenter provisioning: IPAM for GPU fabric subnets, DNS for node hostnames, and config management for OS hardening. Use Terraform providers for network gear and MAAS for bare-metal lifecycle.",
+        "resource \"maas_machine\" \"gpu_node\" {\n  hostname    = \"gpu-${count.index}\"\n  mac_addresses = [var.gpu_macs[count.index]]\n  pool        = maas_resource_pool.gpu.id\n}",
+        "hcl",
+        "Integrate MAAS machine allocation with cluster bootstrap."
+      ],
+      [
+        "TCO and capacity planning",
+        "Model total cost: hardware amortization, power ($/kWh × kW × 8760), cooling overhead (typically 1.3–1.5× IT load), networking, storage, and operations headcount. Right-size for 80% utilization — idle GPUs are the most expensive line item. Plan refresh cycles: GPU generations leap every 18–24 months.",
+        "",
+        "text",
+        "Enterprise teams should maintain a 3-year capacity forecast updated quarterly."
+      ]
+    ]
+  },
+  {
+    "slug": "baremetal-bios-uefi-fundamentals",
+    "title": "Bare Metal: BIOS and UEFI Fundamentals",
+    "summary": "Module 1 — configure firmware settings, Secure Boot, and boot mode for automated bare-metal provisioning.",
+    "topic": "Bare Metal",
+    "difficulty": "beginner",
+    "estimated_minutes": 35,
+    "playground_slug": "baremetal",
+    "scenario_slug": "",
+    "order": 331,
+    "course_slug": "bare-metal-maas-engineering",
+    "course_title": "Bare Metal & MAAS Engineering: Zero to Hero",
+    "module_order": 1,
+    "level_track": "beginner",
+    "seo_title": "BIOS and UEFI for Bare Metal Provisioning — A Practical Guide",
+    "seo_description": "Configure server firmware for PXE boot, disable conflicting settings, understand UEFI vs Legacy BIOS, and prepare hardware for MAAS enrollment.",
+    "seo_keywords": "bios, uefi, secure boot, bare metal, server firmware, pxe boot, ipmi, maas enrollment, boot order",
+    "sections": [
+      [
+        "BIOS vs UEFI",
+        "Legacy BIOS uses MBR partitions and 16-bit initialization; UEFI uses GPT, supports drives over 2 TB, and provides Secure Boot. Modern servers ship UEFI-only. MAAS and PXE workflows require UEFI network stack enabled. Mixing modes (UEFI OS on Legacy PXE) is the most common provisioning failure.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Essential firmware settings",
+        "Before enrolling a server in MAAS: enable UEFI network boot, set boot order to network first for initial provisioning then disk, disable CSM/Legacy mode unless required, enable VT-x/AMD-V and IOMMU for virtualization, and enable SR-IOV if using hardware NIC partitioning.",
+        "",
+        "text",
+        "Access firmware via on-screen prompt (F2/Del) or IPMI virtual console."
+      ],
+      [
+        "Secure Boot considerations",
+        "Secure Boot verifies bootloader signatures. Custom iPXE binaries and unsigned kernels fail unless you enroll Machine Owner Keys (MOK) or use signed shim loaders. Canonical and Red Hat provide signed GRUB chains for MAAS deployments. Document your Secure Boot policy per environment.",
+        "mokutil --sb-state\nmokutil --list-enrolled",
+        "bash",
+        "Run from a live environment to check Secure Boot state."
+      ],
+      [
+        "Storage controller modes",
+        "Set storage to AHCI or RAID-as-HBA mode depending on your OS strategy. Hardware RAID controllers should be configured for JBOD/pass-through when using software RAID or Ceph. NVMe drives may appear behind VMD — ensure the OS installer sees all intended disks.",
+        "lsblk -d -o NAME,SIZE,ROTA,TYPE,TRAN\nnvme list",
+        "bash",
+        ""
+      ],
+      [
+        "Power and thermal defaults",
+        "Set power profile to Maximum Performance for GPU/training nodes. Disable aggressive C-states that cause latency spikes in RDMA workloads. Enable BMC sharing if the management NIC is shared with OS — required for IPMI on many OEM platforms.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Pre-MAAS hardware checklist",
+        "Walk every new server through: (1) firmware updated to vendor baseline, (2) UEFI netboot enabled, (3) BMC IP configured and credentialed, (4) serial number and MAC addresses recorded, (5) burn-in test passed. Only then add the machine to MAAS.",
+        "",
+        "text",
+        "Open the Bare Metal playground to practice enrollment workflows."
+      ]
+    ]
+  },
+  {
+    "slug": "baremetal-pxe-ipxe-boot",
+    "title": "Bare Metal: PXE and iPXE Network Boot",
+    "summary": "Module 2 — build DHCP/TFTP chains, iPXE scripts, and UEFI HTTP boot pipelines for OS deployment.",
+    "topic": "Bare Metal",
+    "difficulty": "intermediate",
+    "estimated_minutes": 45,
+    "playground_slug": "baremetal",
+    "scenario_slug": "",
+    "order": 332,
+    "course_slug": "bare-metal-maas-engineering",
+    "course_title": "Bare Metal & MAAS Engineering: Zero to Hero",
+    "module_order": 2,
+    "level_track": "intermediate",
+    "seo_title": "PXE and iPXE Network Boot — DHCP, TFTP, and HTTP Boot Pipelines",
+    "seo_description": "Configure PXE and iPXE for bare-metal provisioning: DHCP options 66/67, TFTP roots, chainloading, UEFI HTTP boot, and troubleshooting with tcpdump.",
+    "seo_keywords": "pxe, ipxe, network boot, tftp, dhcp options, uefi http boot, dnsmasq, maas pxe, chainloading",
+    "sections": [
+      [
+        "PXE boot sequence",
+        "A blank server broadcasts DHCP DISCOVER. The server responds with an IP lease plus boot options: option 66 (next-server/TFTP IP) and option 67 (boot filename). The NIC ROM downloads the bootloader via TFTP, which loads the kernel and initrd. UEFI uses bootx64.efi or ipxe.efi instead of pxelinux.0.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "dnsmasq PXE configuration",
+        "For lab environments, dnsmasq combines DHCP and TFTP. Set dhcp-boot to chain-load iPXE, then point iPXE to an HTTP URL for large artifacts. Tag DHCP responses by architecture (BIOS vs UEFI) using dhcp-match rules.",
+        "dhcp-range=192.168.100.100,192.168.100.200,12h\ntftp-root=/var/lib/tftpboot\ndhcp-boot=tag:efi-x86_64,ipxe.efi\nenable-tftp",
+        "bash",
+        "MAAS manages this automatically in production deployments."
+      ],
+      [
+        "iPXE chainloading",
+        "iPXE replaces the limited NIC ROM with a full network stack supporting HTTP, HTTPS, and scripting. Chain: PXE ROM → iPXE binary (via TFTP) → iPXE script (via HTTP) → kernel+initrd. This avoids TFTP size limits for large GPU driver initrds.",
+        "#!ipxe\ndhcp\nchain http://boot.example/kernels/ubuntu/vmlinuz initrd=initrd.img \\\n  kernelparams=\"auto=true url=http://boot.example/preseed.cfg\"",
+        "bash",
+        "iPXE scripts use #!ipxe shebang and support variables."
+      ],
+      [
+        "UEFI HTTP boot",
+        "UEFI 2.5+ supports booting directly over HTTP(S), eliminating TFTP for the kernel stage. Configure in firmware or via DHCP option 59 (boot URI). Requires valid TLS certificates for HTTPS boot in Secure Boot environments.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "VLAN and relay gotchas",
+        "PXE broadcasts do not cross routers. Use DHCP relay (ip-helper) on L3 gateways to forward to the MAAS rack controller on the correct VLAN. Each VLAN needs its own subnet declaration in MAAS. Misconfigured relay is the #1 cause of 'machine stuck in commissioning'.",
+        "tcpdump -ni eth0 port 67 or port 69 -vv",
+        "bash",
+        "Capture DHCP (67) and TFTP (69) to debug failed boots."
+      ],
+      [
+        "Troubleshooting boot failures",
+        "Symptom → cause: TFTP timeout (wrong VLAN/firewall), boot loop (bad iPXE script URL), kernel panic (missing initrd or modules), Secure Boot rejection (unsigned binary). Always test boot chains in a VM before rolling to production hardware.",
+        "",
+        "text",
+        ""
+      ]
+    ]
+  },
+  {
+    "slug": "baremetal-maas-architecture",
+    "title": "Bare Metal: MAAS Architecture",
+    "summary": "Module 3 — deploy MAAS region and rack controllers, manage machine lifecycle, and integrate cloud-init.",
+    "topic": "Bare Metal",
+    "difficulty": "advanced",
+    "estimated_minutes": 50,
+    "playground_slug": "baremetal",
+    "scenario_slug": "",
+    "order": 333,
+    "course_slug": "bare-metal-maas-engineering",
+    "course_title": "Bare Metal & MAAS Engineering: Zero to Hero",
+    "module_order": 3,
+    "level_track": "advanced",
+    "seo_title": "MAAS Architecture — Region Controllers, Rack Controllers, and Machine Lifecycle",
+    "seo_description": "Deploy and operate Canonical MAAS: region vs rack controllers, commissioning, testing, deploying Ubuntu with cloud-init, and API-driven automation.",
+    "seo_keywords": "maas, metal as a service, canonical maas, rack controller, region controller, commissioning, cloud-init, bare metal automation",
+    "sections": [
+      [
+        "MAAS components",
+        "MAAS has two controller types: Region controllers (API, database, DNS, proxy, Web UI) and Rack controllers (DHCP, TFTP, HTTP boot per L2 domain). Rack controllers must have L2 adjacency to managed machines. PostgreSQL backs the region database; run it HA in production.",
+        "maas status\nmaas list controllers",
+        "bash",
+        ""
+      ],
+      [
+        "Machine lifecycle states",
+        "New → Commissioning → Ready → Deploying → Deployed → (Release/Recommission). Commissioning runs built-in scripts (network, storage, stress) and custom ones. Testing validates hardware before allocation. Failed commissioning usually means network, storage, or firmware misconfiguration.",
+        "maas machines read\nmaas machine commission <system_id>",
+        "bash",
+        ""
+      ],
+      [
+        "Enrolling machines",
+        "Machines enter MAAS via IPMI power credentials (auto-enlist) or manual enlistment with MAC addresses. MAAS discovers hardware via commissioning scripts and matches kernel drivers. Tag machines with capabilities: gpu, storage, compute for deployment constraints.",
+        "maas $PROFILE machines create \\\n  mac_addresses=52:54:00:12:34:56 \\\n  power_type=ipmi \\\n  power_parameters_power_driver=LAN_2_0",
+        "bash",
+        ""
+      ],
+      [
+        "Cloud-init deployment",
+        "MAAS deploys Ubuntu images with cloud-init user-data for post-install configuration: users, packages, GPU drivers, Kubernetes agents. Store cloud-init templates in version control and reference them via MAAS tags or API at deploy time.",
+        "#cloud-config\npackages:\n  - nvidia-driver-550\n  - docker.io\nruncmd:\n  - nvidia-smi -pm 1",
+        "yaml",
+        "cloud-init runs once on first boot after MAAS deployment."
+      ],
+      [
+        "Networking in MAAS",
+        "MAAS manages subnets, VLANs, static IPs, and DNS records. Configure reserved ranges: dynamic (DHCP), reserved (MAAS-managed static), and unmanaged (external). Fabric topology maps VLANs to rack controllers for multi-rack deployments.",
+        "maas $PROFILE subnets read\nmaas $PROFILE fabrics read",
+        "bash",
+        ""
+      ],
+      [
+        "API and Terraform integration",
+        "Automate fleet operations via the MAAS API or terraform-provider-maas. Common workflows: bulk commission after rack install, auto-deploy on Ready, release and recommission on decommission. Integrate with Ansible for post-deploy configuration.",
+        "resource \"maas_vlan\" \"gpu_vlan\" {\n  fabric = maas_fabric.gpu.id\n  vid    = 100\n}",
+        "hcl",
+        "Pin provider versions and store API tokens in a secrets manager."
+      ]
+    ]
+  },
+  {
+    "slug": "baremetal-ipmi-bmc-management",
+    "title": "Bare Metal: IPMI and BMC Management",
+    "summary": "Module 4 — control server power, serial consoles, and hardware sensors via IPMI, Redfish, and BMC automation.",
+    "topic": "Bare Metal",
+    "difficulty": "advanced",
+    "estimated_minutes": 45,
+    "playground_slug": "baremetal",
+    "scenario_slug": "",
+    "order": 334,
+    "course_slug": "bare-metal-maas-engineering",
+    "course_title": "Bare Metal & MAAS Engineering: Zero to Hero",
+    "module_order": 4,
+    "level_track": "expert",
+    "seo_title": "IPMI and BMC Management — Power Control, Serial Console, and Redfish APIs",
+    "seo_description": "Operate server BMCs with IPMI and Redfish: power cycling, SOL serial console, sensor monitoring, firmware updates, and security hardening.",
+    "seo_keywords": "ipmi, bmc, redfish, ipmitool, sol console, server management, power control, ilo, idrac, xcc",
+    "sections": [
+      [
+        "BMC fundamentals",
+        "The Baseboard Management Controller is an always-on microcontroller with its own NIC (or shared NIC port). It provides out-of-band power control, serial console, hardware monitoring, and virtual media — independent of the host OS. MAAS uses BMC credentials for power management during provisioning.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "IPMI with ipmitool",
+        "IPMI is the legacy but universal protocol. Use ipmitool for power operations, sensor reads, and Serial-over-LAN (SOL) console access. LANplus is the secure cipher suite — disable cipher zero in production.",
+        "ipmitool -I lanplus -H 10.0.0.50 -U admin -P secret chassis power status\nipmitool -I lanplus -H 10.0.0.50 -U admin -P secret sol activate",
+        "bash",
+        "SOL gives you the BIOS/GRUB console remotely."
+      ],
+      [
+        "Redfish modern API",
+        "Redfish is a RESTful successor to IPMI, supported on Dell iDRAC, HPE iLO, and Lenovo XCC. Use it for structured hardware inventory, BIOS settings, and firmware updates. MAAS power drivers increasingly prefer Redfish.",
+        "curl -k -u admin:secret https://10.0.0.50/redfish/v1/Systems/1\n\ncurl -k -u admin:secret -X POST \\\n  https://10.0.0.50/redfish/v1/Systems/1/Actions/ComputerSystem.Reset \\\n  -d '{\"ResetType\":\"ForceRestart\"}'",
+        "bash",
+        ""
+      ],
+      [
+        "Sensor monitoring",
+        "BMCs expose temperature, fan speed, voltage, and power draw sensors. Alert on inlet temp trends, fan failures, and power supply redundancy loss before they cause training job failures. Integrate with Prometheus via IPMI exporters.",
+        "ipmitool -I lanplus -H 10.0.0.50 -U admin -P secret sensor list\nipmitool -I lanplus -H 10.0.0.50 -U admin -P secret sdr elist",
+        "bash",
+        "Watch for 'Critical' or 'Non-Recoverable' sensor states."
+      ],
+      [
+        "Virtual media",
+        "Mount ISO images via BMC virtual media to install OS without PXE or to run diagnostics. Useful for firmware updates and break-glass recovery. Bandwidth is limited — prefer PXE/MAAS for production deployments.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "BMC security hardening",
+        "BMCs are high-value targets. Change default passwords, use dedicated management VLANs with ACLs, disable unused protocols (HTTP, telnet), enable audit logging, and patch BMC firmware on the same cadence as OS patches. Never expose BMC interfaces to the public internet.",
+        "",
+        "text",
+        "Rotate BMC credentials when staff leave or after vendor support sessions."
+      ]
+    ]
+  },
+  {
+    "slug": "baremetal-production-operations",
+    "title": "Bare Metal: Production Operations",
+    "summary": "Module 5 — run MAAS at enterprise scale: SLAs, hardware refresh, failure workflows, and compliance.",
+    "topic": "Bare Metal",
+    "difficulty": "advanced",
+    "estimated_minutes": 55,
+    "playground_slug": "baremetal",
+    "scenario_slug": "",
+    "order": 335,
+    "course_slug": "bare-metal-maas-engineering",
+    "course_title": "Bare Metal & MAAS Engineering: Zero to Hero",
+    "module_order": 5,
+    "level_track": "enterprise",
+    "seo_title": "Bare Metal Production Operations — MAAS at Enterprise Scale",
+    "seo_description": "Operate bare-metal fleets in production: SLAs, automated remediation, hardware refresh, compliance auditing, and integration with Kubernetes and Slurm.",
+    "seo_keywords": "bare metal operations, maas production, hardware refresh, server lifecycle, enterprise provisioning, fleet management, slurm bare metal",
+    "sections": [
+      [
+        "Operational model",
+        "Define clear ownership: platform team runs MAAS and BMC, application teams consume machines via API. SLAs cover time-to-deploy (commission → ready → deployed), mean time to replace failed nodes, and firmware compliance percentage. Track metrics in Grafana dashboards.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Automated remediation",
+        "When a node fails health checks: (1) cordon in scheduler, (2) drain workloads, (3) MAAS release machine, (4) recommission with stress tests, (5) redeploy or RMA hardware. Automate steps 1–4 with watchdog scripts triggered by GPU Xid errors or SMART disk failures.",
+        "maas machine release <system_id>\nmaas machine commission <system_id>",
+        "bash",
+        "Recommission runs all test scripts before returning to Ready."
+      ],
+      [
+        "Hardware refresh cycles",
+        "Plan 3–5 year refresh for compute, 5–7 for storage. Batch new rack arrivals: firmware baseline → burn-in → MAAS enlist → tag → deploy golden image. Decommission old nodes: secure wipe (NIST 800-88), MAAS release, asset tracking update.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Compliance and auditing",
+        "Enable MAAS audit logging and retain deploy logs. Enforce disk encryption via cloud-init LUKS for sensitive environments. Maintain firmware allowlists — block deployment on nodes below minimum BMC/BIOS versions. Run periodic CIS benchmark scripts via commissioning.",
+        "#cloud-config\ndisk_setup:\n  /dev/sda:\n    table_type: gpt\n    layout: true\n    overwrite: true",
+        "yaml",
+        "Combine with curtin storage config for encrypted root."
+      ],
+      [
+        "Integration with orchestrators",
+        "Kubernetes Cluster API Provider MAAS (CAPMAAS) or custom controllers register MAAS machines as nodes. Slurm uses MAAS-deployed nodes as compute partitions. Maintain node labels matching MAAS tags for GPU, zone, and rack affinity.",
+        "resource \"maas_machine\" \"k8s_worker\" {\n  allocate {\n    tags = [\"gpu\", \"rack-a\"]\n  }\n}",
+        "hcl",
+        ""
+      ],
+      [
+        "Incident response playbook",
+        "Document runbooks for: mass PXE failure (DHCP/relay), BMC credential lockout, rack power event, storage controller failure, and network partition. Run quarterly game days simulating rack loss and measure recovery time against SLA targets.",
+        "",
+        "text",
+        "Enterprise teams should maintain on-call rotation with BMC console access."
+      ]
+    ]
+  },
+  {
+    "slug": "vyos-installation-fundamentals",
+    "title": "VyOS: Installation and Fundamentals",
+    "summary": "Module 1 — install VyOS, navigate the CLI, and configure basic interfaces for lab and production edge routers.",
+    "topic": "Networking",
+    "difficulty": "beginner",
+    "estimated_minutes": 35,
+    "playground_slug": "networking",
+    "scenario_slug": "",
+    "order": 336,
+    "course_slug": "vyos-enterprise-networking",
+    "course_title": "VyOS Enterprise Networking: Zero to Hero",
+    "module_order": 1,
+    "level_track": "beginner",
+    "seo_title": "VyOS Installation and CLI Fundamentals — Getting Started",
+    "seo_description": "Install VyOS on bare metal or VM, learn the JunOS-like CLI, configure interfaces, set hostnames, and persist configuration with commit and save.",
+    "seo_keywords": "vyos, vyos install, vyos cli, network os, configure interfaces, commit save, edge router, debian network",
+    "sections": [
+      [
+        "What is VyOS",
+        "VyOS is an open-source network operating system based on Debian Linux with a declarative CLI modeled after Juniper JunOS. It runs on bare metal, VMs, and cloud instances as a router, firewall, VPN gateway, and BGP speaker. In AI datacenters, VyOS handles edge routing between GPU racks and upstream ISP links.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Installation methods",
+        "Install via ISO (bare metal/VM), image copy to disk, or cloud marketplace AMI. The live installer prompts for image location (local disk or network). For VMs, allocate two NICs minimum: one WAN, one LAN. Default login is vyos/vyos — change immediately.",
+        "install image\n# Select target disk, set GRUB password, confirm",
+        "bash",
+        "Run from the VyOS live environment console."
+      ],
+      [
+        "CLI modes",
+        "VyOS has operational mode (show commands, ping) and configuration mode (set/delete). Enter configure, make changes, then commit to activate and save to write to /config/config.boot. compare shows pending changes; discard aborts.",
+        "configure\nset system host-name edge-r1\nset interfaces ethernet eth0 address dhcp\ncommit\nsave\nexit",
+        "bash",
+        "commit applies changes live; save survives reboot."
+      ],
+      [
+        "Interface configuration",
+        "Name interfaces by type: ethernet eth0, loopback lo, bonding bond0, vti for VPN tunnels. Assign IPv4/IPv6 addresses, descriptions, and MTU. Use show interfaces for status and counters.",
+        "set interfaces ethernet eth1 address 10.10.1.1/24\nset interfaces ethernet eth1 description 'GPU-RACK-01'\nset interfaces ethernet eth1 mtu 9000",
+        "bash",
+        "MTU 9000 (jumbo frames) is common on GPU storage networks."
+      ],
+      [
+        "DNS and NTP",
+        "Configure system name servers and NTP for accurate timestamps — critical for BGP and logging correlation. Point to internal DNS for management hosts and public DNS for WAN.",
+        "set system name-server 10.0.0.53\nset system ntp server time.google.com",
+        "bash",
+        ""
+      ],
+      [
+        "Initial verification",
+        "After basic setup: ping upstream gateway, verify default route, check DNS resolution, and confirm config.boot was saved. Snapshot the config before making routing protocol changes.",
+        "show ip route\nshow interfaces\nping 8.8.8.8 count 4",
+        "bash",
+        "Open the Networking playground to practice VyOS commands."
+      ]
+    ]
+  },
+  {
+    "slug": "vyos-routing-firewall",
+    "title": "VyOS: Routing and Firewall",
+    "summary": "Module 2 — configure static routes, policy routing, NAT, and zone-based firewalls on VyOS.",
+    "topic": "Networking",
+    "difficulty": "intermediate",
+    "estimated_minutes": 45,
+    "playground_slug": "networking",
+    "scenario_slug": "",
+    "order": 337,
+    "course_slug": "vyos-enterprise-networking",
+    "course_title": "VyOS Enterprise Networking: Zero to Hero",
+    "module_order": 2,
+    "level_track": "intermediate",
+    "seo_title": "VyOS Routing and Firewall — Static Routes, NAT, and Zone Policies",
+    "seo_description": "Configure VyOS static routing, policy-based routing, source NAT, and zone-based firewall rules for AI cluster edge networks.",
+    "seo_keywords": "vyos routing, vyos firewall, nat, static route, policy routing, zone firewall, edge router, gpu network",
+    "sections": [
+      [
+        "Static routing",
+        "Add routes for internal subnets and a default route pointing to the upstream gateway. Use next-hop for point-to-point links and interface for directly connected networks. show ip route verifies the FIB.",
+        "set protocols static route 0.0.0.0/0 next-hop 203.0.113.1\nset protocols static route 10.20.0.0/16 next-hop 10.10.1.2\nshow ip route",
+        "bash",
+        ""
+      ],
+      [
+        "Policy-based routing",
+        "Route traffic from specific source subnets via alternate gateways — useful for splitting management and data-plane traffic. Define a PBR route-map matching source prefix, then set table and next-hop.",
+        "set policy route PBR-GPU rule 10 source address 10.20.0.0/16\nset policy route PBR-GPU rule 10 set table 100",
+        "bash",
+        "Create table 100 static routes separately."
+      ],
+      [
+        "Source NAT",
+        "GPU nodes on private RFC1918 subnets need SNAT to reach the internet for package downloads and model hub access. Match outbound interface and apply masquerade or static source IP.",
+        "set nat source rule 100 outbound-interface eth0\nset nat source rule 100 source address 10.20.0.0/16\nset nat source rule 100 translation address masquerade",
+        "bash",
+        ""
+      ],
+      [
+        "Zone-based firewall",
+        "Assign interfaces to zones (LAN, WAN, DMZ) and define inter-zone policies. Default-deny WAN inbound; allow established/related return traffic. Log dropped packets for security monitoring.",
+        "set firewall name WAN default-action drop\nset firewall name WAN rule 10 action accept\nset firewall name WAN rule 10 state established related",
+        "bash",
+        "Attach firewall to interface: set interfaces ethernet eth0 firewall in name WAN"
+      ],
+      [
+        "ACLs for management access",
+        "Restrict SSH and SNMP to management subnets. Use address-groups for reusable prefix lists. Rate-limit SSH to mitigate brute force.",
+        "set firewall group address-group MGMT network 10.0.0.0/24\nset firewall name WAN rule 20 action accept\nset firewall name WAN rule 20 destination port 22\nset firewall name WAN rule 20 source group address-group MGMT",
+        "bash",
+        ""
+      ],
+      [
+        "Verification and troubleshooting",
+        "Use monitor traffic interface for live packet capture, show nat source rules for hit counts, and show firewall statistics for drop counters. Test from both sides of the firewall after every change.",
+        "monitor traffic interface eth0 filter icmp\ntraceroute 8.8.8.8",
+        "bash",
+        ""
+      ]
+    ]
+  },
+  {
+    "slug": "vyos-bgp-ospf",
+    "title": "VyOS: BGP and OSPF",
+    "summary": "Module 3 — implement OSPF for internal routing and BGP for upstream ISP and multi-site connectivity.",
+    "topic": "Networking",
+    "difficulty": "advanced",
+    "estimated_minutes": 50,
+    "playground_slug": "networking",
+    "scenario_slug": "",
+    "order": 338,
+    "course_slug": "vyos-enterprise-networking",
+    "course_title": "VyOS Enterprise Networking: Zero to Hero",
+    "module_order": 3,
+    "level_track": "advanced",
+    "seo_title": "VyOS BGP and OSPF — Internal and External Routing for AI Datacenters",
+    "seo_description": "Configure OSPF for GPU rack routing and BGP for ISP peering on VyOS: neighbors, route maps, prefix lists, and MD5 authentication.",
+    "seo_keywords": "vyos bgp, vyos ospf, bgp peering, route map, prefix list, md5 authentication, ai datacenter routing, isp connectivity",
+    "sections": [
+      [
+        "OSPF for internal routing",
+        "OSPF dynamically distributes routes between VyOS routers and top-of-rack switches in the GPU fabric. Assign interfaces to areas; area 0 is the backbone. Use passive-interface on LAN ports that should be advertised but not send hellos.",
+        "set protocols ospf area 0 network 10.10.0.0/16\nset protocols ospf interface eth1 area 0\nshow ip ospf neighbor",
+        "bash",
+        "Neighbors should reach Full state within 40 seconds."
+      ],
+      [
+        "OSPF tuning for GPU networks",
+        "Set interface cost to influence path selection — prefer paths with jumbo frame support and lower latency. Use point-to-point network type on /30 and /31 links. Enable MD5 authentication on OSPF interfaces in production.",
+        "set protocols ospf interface eth1 authentication md5\nset protocols ospf interface eth1 authentication md5 key-id 1 md5-key 'secret'",
+        "bash",
+        ""
+      ],
+      [
+        "BGP fundamentals on VyOS",
+        "BGP exchanges prefix reachability with upstream ISPs and peer datacenters. Configure local AS number, router-id, and neighbor statements. Use eBGP for external peers with multihop only when required.",
+        "set protocols bgp 64512 parameters router-id 203.0.113.2\nset protocols bgp 64512 neighbor 203.0.113.1 remote-as 64500\nset protocols bgp 64512 neighbor 203.0.113.1 address-family ipv4-unicast",
+        "bash",
+        ""
+      ],
+      [
+        "Route maps and prefix lists",
+        "Control what you advertise and accept with prefix lists and route-maps. Advertise only owned prefixes; filter bogons inbound. Set local-pref on inbound routes to prefer primary ISP.",
+        "set policy prefix-list ANNOUNCE rule 10 action permit\nset policy prefix-list ANNOUNCE rule 10 prefix 203.0.113.0/24",
+        "bash",
+        "Apply to neighbor: set protocols bgp neighbor ... address-family ipv4-unicast prefix-list export ANNOUNCE"
+      ],
+      [
+        "BGP multipath and failover",
+        "Enable multipath for load balancing across equal-cost ISP links. Track BGP session state for automated failover — when primary ISP drops, traffic shifts to secondary via local-pref or route-map changes.",
+        "show bgp summary\nshow bgp neighbors 203.0.113.1 advertised-routes",
+        "bash",
+        ""
+      ],
+      [
+        "Troubleshooting routing",
+        "BGP stuck in Active: check TCP 179 reachability and AS number. OSPF stuck in ExStart: MTU mismatch. Missing routes: verify network statements, route-maps, and redistribution. Always check show ip route and traceroute from affected hosts.",
+        "",
+        "text",
+        ""
+      ]
+    ]
+  },
+  {
+    "slug": "vyos-isp-scenarios",
+    "title": "VyOS: ISP and Multi-Site Scenarios",
+    "summary": "Module 4 — design production ISP edge topologies, VPN interconnects, and DDoS mitigation on VyOS.",
+    "topic": "Networking",
+    "difficulty": "advanced",
+    "estimated_minutes": 55,
+    "playground_slug": "networking",
+    "scenario_slug": "",
+    "order": 339,
+    "course_slug": "vyos-enterprise-networking",
+    "course_title": "VyOS Enterprise Networking: Zero to Hero",
+    "module_order": 4,
+    "level_track": "expert",
+    "seo_title": "VyOS ISP Scenarios — Multi-Site, VPN, and Edge Security at Scale",
+    "seo_description": "Enterprise VyOS deployments: dual-ISP failover, site-to-site IPsec VPN, GRE tunnels, flow accounting, and DDoS mitigation for AI datacenter edges.",
+    "seo_keywords": "vyos isp, dual isp failover, ipsec vpn, site to site vpn, gre tunnel, ddos mitigation, enterprise networking, multi-site",
+    "sections": [
+      [
+        "Dual-ISP edge design",
+        "Connect to two ISPs for redundancy. Use BGP with different local-pref values: primary ISP routes preferred (local-pref 200), secondary as backup (local-pref 100). Announce the same /24 or /48 from both links if ISPs support anycast or use DNS failover for inbound.",
+        "set policy route-map PREFER-PRIMARY rule 10 set local-preference 200\nset protocols bgp neighbor 198.51.100.1 address-family ipv4-unicast route-map import PREFER-PRIMARY",
+        "bash",
+        ""
+      ],
+      [
+        "Site-to-site IPsec VPN",
+        "Connect remote datacenters or cloud VPCs with IPsec. VyOS supports IKEv2 with pre-shared keys or certificates. Define interesting traffic with ACLs, configure IKE and ESP proposals, and bind to a tunnel interface.",
+        "set vpn ipsec site-to-site peer 198.51.100.50 authentication mode pre-shared-secret\nset vpn ipsec site-to-site peer 198.51.100.50 authentication pre-shared-secret 'longsecret'\nset vpn ipsec esp-group AES256GCM lifetime 3600",
+        "bash",
+        "Verify with show vpn ipsec sa."
+      ],
+      [
+        "GRE and tunnel overlays",
+        "GRE tunnels encapsulate traffic over IP for simple point-to-point links when IPsec overhead is unnecessary on trusted backbones. Combine GRE inside IPsec for encrypted overlay networks spanning GPU clusters.",
+        "set interfaces tunnel tun0 encapsulation gre\nset interfaces tunnel tun0 source-address 203.0.113.2\nset interfaces tunnel tun0 remote 198.51.100.50\nset interfaces tunnel tun0 address 172.16.0.1/30",
+        "bash",
+        ""
+      ],
+      [
+        "Traffic shaping and QoS",
+        "Prioritize RDMA control traffic and latency-sensitive inference API calls over bulk storage replication. Use traffic policy with shapers and priority queues on WAN interfaces.",
+        "set traffic policy shaper WAN default bandwidth 10gbit\nset traffic policy shaper WAN class 10 priority high",
+        "bash",
+        ""
+      ],
+      [
+        "Flow accounting and monitoring",
+        "Enable sFlow or NetFlow export to collectors for traffic analysis. Correlate flow data with GPU job schedules to identify bandwidth contention. Integrate VyOS syslog with centralized SIEM.",
+        "set system sflow agent-address 10.0.0.1\nset system sflow server 10.0.0.100 port 6343",
+        "bash",
+        ""
+      ],
+      [
+        "Enterprise edge checklist",
+        "Before production cutover: (1) dual-ISP BGP converges in under 30 seconds on link failure, (2) IPsec tunnels auto-rekey, (3) firewall default-deny verified, (4) NTP synchronized across all edge routers, (5) config backed up to git, (6) runbook tested in maintenance window.",
+        "",
+        "text",
+        "Document RTO/RPO targets for each edge failure scenario."
+      ]
+    ]
+  },
+  {
+    "slug": "gpu-dc-nvidia-drivers",
+    "title": "GPU Datacenter Ops: NVIDIA Drivers",
+    "summary": "Module 1 — install, validate, and maintain NVIDIA drivers across a GPU datacenter fleet.",
+    "topic": "GPU",
+    "difficulty": "beginner",
+    "estimated_minutes": 40,
+    "playground_slug": "gpu",
+    "scenario_slug": "",
+    "order": 340,
+    "course_slug": "gpu-datacenter-operations",
+    "course_title": "GPU Datacenter Operations: Zero to Hero",
+    "module_order": 1,
+    "level_track": "beginner",
+    "seo_title": "NVIDIA Driver Management in GPU Datacenters — Install, Validate, Maintain",
+    "seo_description": "Fleet-wide NVIDIA driver installation: version pinning, DKMS, persistence mode, MIG configuration, and automated validation in node provisioning.",
+    "seo_keywords": "nvidia driver, datacenter gpu, dkms, persistence mode, mig, nvidia-smi, driver fleet management, gpu node provisioning",
+    "sections": [
+      [
+        "Driver selection",
+        "NVIDIA publishes driver branches tied to CUDA versions and hardware generations. Standardize on one production branch (e.g. 550.x) across the fleet. Newer drivers support newer GPUs but may drop older card support. Maintain a compatibility matrix: GPU SKU × driver × CUDA × framework version.",
+        "nvidia-smi --query-gpu=driver_version,name --format=csv",
+        "bash",
+        ""
+      ],
+      [
+        "Automated installation",
+        "Use cloud-init or Ansible to install drivers during MAAS deployment. Blacklist nouveau before first install. On Ubuntu, ubuntu-drivers or pinned apt packages work; on RHEL, use CUDA repo RPMs or DKMS packages.",
+        "echo 'blacklist nouveau' | sudo tee /etc/modprobe.d/blacklist-nouveau.conf\nsudo update-initramfs -u\nsudo apt install nvidia-driver-550",
+        "bash",
+        ""
+      ],
+      [
+        "DKMS and kernel upgrades",
+        "DKMS rebuilds the nvidia kernel module on every kernel update. Monitor /var/log/dkms.log after patching. A failed DKMS build leaves nodes without GPU access — automate a post-reboot nvidia-smi health check and alert on failure.",
+        "dkms status\nsudo dkms install nvidia/550.90.07 -k $(uname -r)",
+        "bash",
+        ""
+      ],
+      [
+        "Persistence mode and compute mode",
+        "Enable persistence mode on inference nodes to eliminate driver initialization latency between requests. Set compute mode to Default (shared) or Exclusive_Process for multi-tenant isolation.",
+        "sudo nvidia-smi -pm 1\nsudo nvidia-smi -c EXCLUSIVE_PROCESS",
+        "bash",
+        "Persistence mode adds ~1W idle power per GPU — acceptable for production."
+      ],
+      [
+        "MIG for inference partitioning",
+        "Multi-Instance GPU (A100/H100) splits one physical GPU into isolated instances with dedicated compute and memory. Configure MIG profiles via nvidia-smi, then expose instances to containers individually.",
+        "sudo nvidia-smi -mig 1\nsudo nvidia-smi mig -cgi 19,19,19,19 -C",
+        "bash",
+        "MIG mode requires resetting all GPU processes."
+      ],
+      [
+        "Fleet validation script",
+        "Run on every node after provisioning: check driver loaded, correct version, all GPUs visible, ECC status, and no Xid errors in dmesg. Fail provisioning if any check fails.",
+        "nvidia-smi -L | wc -l  # expect 8\nnvidia-smi --query-gpu=ecc.mode.current --format=csv\ndmesg | grep -i xid",
+        "bash",
+        "Integrate into MAAS commissioning scripts."
+      ]
+    ]
+  },
+  {
+    "slug": "gpu-dc-thermal-throttling",
+    "title": "GPU Datacenter Ops: Thermal Management",
+    "summary": "Module 2 — monitor GPU thermals, diagnose throttling, and optimize rack airflow for sustained AI workloads.",
+    "topic": "GPU",
+    "difficulty": "intermediate",
+    "estimated_minutes": 45,
+    "playground_slug": "gpu",
+    "scenario_slug": "",
+    "order": 341,
+    "course_slug": "gpu-datacenter-operations",
+    "course_title": "GPU Datacenter Operations: Zero to Hero",
+    "module_order": 2,
+    "level_track": "intermediate",
+    "seo_title": "GPU Thermal Management — Throttling, Airflow, and Power Limits",
+    "seo_description": "Diagnose and prevent GPU thermal throttling: temperature monitoring, power limits, fan curves, rack airflow, and liquid cooling operations.",
+    "seo_keywords": "gpu thermal, thermal throttling, nvidia-smi temperature, power limit, gpu cooling, datacenter airflow, gpu fan, liquid cooling",
+    "sections": [
+      [
+        "Thermal throttling mechanics",
+        "GPUs reduce clock speeds when junction temperature exceeds safe limits (typically 83–87°C for data center SKUs). Throttling shows in nvidia-smi as SW power cap, HW slowdown, or GPU Max Operating Temp. Sustained throttling can double training time — treat it as a P1 incident.",
+        "nvidia-smi -q -d PERFORMANCE,CLOCK,TEMPERATURE",
+        "bash",
+        "Check Performance State — P0 is full speed; P2 indicates throttling."
+      ],
+      [
+        "Real-time monitoring",
+        "Use nvidia-smi dmon for continuous sampling of power, utilization, temperature, and clocks. Export metrics via DCGM exporter to Prometheus. Alert when any GPU exceeds 80°C for more than 5 minutes.",
+        "nvidia-smi dmon -s pucvmet -d 5 -c 12",
+        "bash",
+        "DCGM fields: DCGM_FI_DEV_GPU_TEMP, DCGM_FI_DEV_POWER_USAGE"
+      ],
+      [
+        "Power limiting as a mitigation",
+        "Temporarily cap power draw with nvidia-smi -pl to reduce heat while fixing airflow. A 10–15% power reduction often drops temps 5–8°C with only 5% performance loss — preferable to uncontrolled throttling.",
+        "nvidia-smi -pl 350  # watts\nnvidia-smi -q -d POWER | grep -i limit",
+        "bash",
+        "Power limits reset on driver reload unless persisted."
+      ],
+      [
+        "Rack airflow optimization",
+        "Hot-aisle/cold-aisle containment prevents recirculation. Use blanking panels in empty U-spaces. GPU servers pull massive airflow — ensure adequate CFM per rack. Rear-door heat exchangers help in legacy facilities.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Liquid cooling operations",
+        "Direct-to-chip cooling loops require monitoring coolant temperature, flow rate, and leak detection. Maintain supply temp below 45°C. Schedule coolant quality checks and hose inspections per vendor schedule.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Thermal incident playbook",
+        "On mass throttle event: (1) identify affected rack via monitoring, (2) check CRAC/CRAH status, (3) reduce job power limits fleet-wide, (4) inspect for fan failures via IPMI, (5) migrate jobs to cool racks, (6) open facility ticket. Document root cause within 24 hours.",
+        "",
+        "text",
+        ""
+      ]
+    ]
+  },
+  {
+    "slug": "gpu-dc-monitoring",
+    "title": "GPU Datacenter Ops: Monitoring",
+    "summary": "Module 3 — deploy DCGM, Prometheus, and Grafana for comprehensive GPU fleet observability.",
+    "topic": "GPU",
+    "difficulty": "advanced",
+    "estimated_minutes": 50,
+    "playground_slug": "gpu",
+    "scenario_slug": "",
+    "order": 342,
+    "course_slug": "gpu-datacenter-operations",
+    "course_title": "GPU Datacenter Operations: Zero to Hero",
+    "module_order": 3,
+    "level_track": "advanced",
+    "seo_title": "GPU Datacenter Monitoring — DCGM, Prometheus, and Grafana Dashboards",
+    "seo_description": "Build GPU observability stacks: NVIDIA DCGM exporter, Prometheus scraping, Grafana dashboards, alerting rules, and SLI/SLO tracking for AI workloads.",
+    "seo_keywords": "dcgm, gpu monitoring, prometheus gpu, grafana gpu dashboard, nvidia dcgm exporter, gpu metrics, observability, slo gpu",
+    "sections": [
+      [
+        "What to monitor",
+        "Golden signals for GPUs: utilization (SM and memory), temperature, power draw, ECC errors, NVLink throughput, Xid errors, and PCIe replay counts. For inference add: batch size, queue depth, tokens/sec, and p99 latency. For training: all-reduce bandwidth and step time.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "DCGM exporter setup",
+        "NVIDIA DCGM (Data Center GPU Manager) exposes detailed telemetry. Run dcgm-exporter as a DaemonSet on Kubernetes or systemd service on bare metal. It serves Prometheus metrics on port 9400.",
+        "docker run -d --gpus all --cap-add SYS_ADMIN \\\n  -p 9400:9400 nvcr.io/nvidia/k8s/dcgm-exporter:3.3.5-3.4.0-ubuntu22.04",
+        "bash",
+        ""
+      ],
+      [
+        "Prometheus configuration",
+        "Scrape dcgm-exporter on every GPU node. Use relabel_configs to add rack, zone, and node labels. Set scrape_interval to 15s for training jobs, 30s for inference.",
+        "scrape_configs:\n  - job_name: 'dcgm'\n    static_configs:\n      - targets: ['gpu-node-01:9400', 'gpu-node-02:9400']",
+        "yaml",
+        "Prefer Kubernetes service discovery in K8s environments."
+      ],
+      [
+        "Grafana dashboards",
+        "Import NVIDIA DCGM dashboard (ID 12239) as a starting point. Add panels for: GPU util heatmap by rack, power draw stacked chart, temperature max by node, ECC error counter, and NVLink bandwidth. Template variables for cluster and rack.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Alerting rules",
+        "Critical alerts: GPU temp > 85°C for 5m, Xid error detected, ECC double-bit error, GPU lost from nvidia-smi, power supply redundancy lost. Warning: util < 20% for 1h (waste), memory util > 95%, PCIe replay increasing.",
+        "groups:\n  - name: gpu\n    rules:\n      - alert: GPUTempHigh\n        expr: DCGM_FI_DEV_GPU_TEMP > 85\n        for: 5m",
+        "yaml",
+        "Route critical GPU alerts to hardware on-call."
+      ],
+      [
+        "SLI/SLO for GPU services",
+        "Define SLOs: inference p99 latency < 500ms, training job success rate > 99%, GPU availability > 99.9%. Track error budgets and gate deployments when budget is exhausted.",
+        "",
+        "text",
+        ""
+      ]
+    ]
+  },
+  {
+    "slug": "gpu-dc-incident-response",
+    "title": "GPU Datacenter Ops: Incident Response",
+    "summary": "Module 4 — respond to GPU hardware failures, driver crashes, and fleet-wide outages with structured runbooks.",
+    "topic": "GPU",
+    "difficulty": "advanced",
+    "estimated_minutes": 55,
+    "playground_slug": "gpu",
+    "scenario_slug": "",
+    "order": 343,
+    "course_slug": "gpu-datacenter-operations",
+    "course_title": "GPU Datacenter Operations: Zero to Hero",
+    "module_order": 4,
+    "level_track": "expert",
+    "seo_title": "GPU Datacenter Incident Response — Hardware Failures and Fleet Outages",
+    "seo_description": "Structured GPU incident response: Xid error triage, GPU reset procedures, RMA workflows, NCCL hang debugging, and post-incident reviews.",
+    "seo_keywords": "gpu incident response, xid error, gpu failure, nccl hang, gpu reset, rma workflow, datacenter on-call, postmortem",
+    "sections": [
+      [
+        "Incident classification",
+        "P1: Multiple nodes lost, training job data at risk. P2: Single node/GPU failure with job impact. P3: Degraded performance (throttling). P4: Predictive alert (rising ECC errors). Classify within 5 minutes and assign hardware vs software vs facility owner.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Xid error triage",
+        "Xid errors in dmesg indicate GPU exceptions. Common codes: Xid 13 (graphics exception), Xid 48 (double bit ECC), Xid 79 (GPU fallen off bus). Collect nvidia-bug-report.sh output before resetting. Single Xid may be transient; repeated Xids require hardware RMA.",
+        "dmesg | grep -i xid\nsudo nvidia-bug-report.sh --output-file /tmp/nvidia-bug.log",
+        "bash",
+        ""
+      ],
+      [
+        "GPU reset procedures",
+        "Soft reset: kill processes and reload driver. Hard reset: nvidia-smi -r (requires GPU idle). Node-level: reboot via IPMI. Always drain workloads from the scheduler before reset to avoid data corruption.",
+        "sudo nvidia-smi -i 0 -r\nsudo rmmod nvidia_uvm nvidia_drm nvidia_modeset nvidia\nsudo modprobe nvidia",
+        "bash",
+        "GPU reset may take 30–60 seconds."
+      ],
+      [
+        "NCCL hang debugging",
+        "Distributed training hangs often trace to a single slow or dead rank. Set NCCL_DEBUG=INFO and TORCH_DISTRIBUTED_DEBUG=DETAIL. Identify the stuck rank, isolate the node, and check GPU/NIC health. Timeout and restart from checkpoint if unresolved in 15 minutes.",
+        "export NCCL_DEBUG=INFO\nexport TORCH_NCCL_BLOCKING_WAIT=1",
+        "bash",
+        ""
+      ],
+      [
+        "RMA and hardware replacement",
+        "Document serial number, error logs, and bug report for vendor RMA. Maintain spare nodes for hot-swap replacement. Target < 4 hour replacement for P1 nodes. Track RMA turnaround and failure rates by batch for quality feedback.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Post-incident review",
+        "Within 48 hours: timeline, root cause, blast radius, what worked in response, action items with owners. Update runbooks and monitoring. Track MTTR trend quarterly. Share learnings across platform and ML teams.",
+        "",
+        "text",
+        "Blameless postmortems improve fleet reliability over time."
+      ]
+    ]
+  },
+  {
+    "slug": "k8s-prod-architecture",
+    "title": "Kubernetes Production: Architecture",
+    "summary": "Module 1 — design production-grade Kubernetes clusters for AI workloads with control plane HA and node pools.",
+    "topic": "Kubernetes",
+    "difficulty": "beginner",
+    "estimated_minutes": 45,
+    "playground_slug": "kubernetes",
+    "scenario_slug": "",
+    "order": 344,
+    "course_slug": "kubernetes-production-zero-to-hero",
+    "course_title": "Kubernetes Production: Zero to Hero",
+    "module_order": 1,
+    "level_track": "beginner",
+    "seo_title": "Production Kubernetes Architecture — Control Plane, Node Pools, and HA Design",
+    "seo_description": "Design production Kubernetes clusters: control plane HA, etcd topology, node pool strategy, GPU taints, and cluster lifecycle management.",
+    "seo_keywords": "kubernetes architecture, production k8s, control plane ha, etcd, node pools, cluster design, k8s gpu, kubernetes production",
+    "sections": [
+      [
+        "Cluster components",
+        "A Kubernetes cluster has a control plane (API server, etcd, scheduler, controller-manager) and worker nodes (kubelet, kube-proxy, container runtime). For production, run 3 or 5 control plane nodes across failure domains. etcd requires odd-member quorum and fast SSD storage.",
+        "kubectl get componentstatuses\nkubectl get nodes -o wide",
+        "bash",
+        ""
+      ],
+      [
+        "Control plane HA",
+        "Load-balance the API server across control plane nodes with a health-checked VIP or cloud LB. Stack etcd on control plane nodes (kubeadm stacked) or run dedicated etcd cluster (external) for large deployments. Never run etcd on network storage.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "Node pool strategy",
+        "Separate node pools by workload: system (tainted for kube-system), general compute, GPU (nvidia.com/gpu resource), and high-memory. Use labels and taints to prevent GPU workloads from landing on CPU nodes and vice versa.",
+        "kubectl label node gpu-node-01 accelerator=nvidia-h100\nkubectl taint node gpu-node-01 nvidia.com/gpu=true:NoSchedule",
+        "bash",
+        ""
+      ],
+      [
+        "Container runtime",
+        "containerd is the default runtime. Configure systemd cgroup driver to match kubelet. For GPU nodes, install nvidia-container-toolkit and set it as the default runtime or use RuntimeClass.",
+        "cat /etc/containerd/config.toml | grep -A5 nvidia",
+        "bash",
+        ""
+      ],
+      [
+        "Cluster add-ons",
+        "Essential add-ons: CNI (Calico/Cilium), CoreDNS, metrics-server, ingress controller, cert-manager, and external-dns. For GPU clusters add NVIDIA GPU Operator or device plugin and DCGM exporter DaemonSet.",
+        "kubectl get pods -n kube-system\nhelm list -A",
+        "bash",
+        ""
+      ],
+      [
+        "Upgrade strategy",
+        "Upgrade control plane first, then worker nodes one AZ at a time. Drain nodes before upgrade: kubectl drain --ignore-daemonsets. Test on a staging cluster matching production version skew policy (n-1 supported).",
+        "kubectl drain gpu-node-01 --ignore-daemonsets --delete-emptydir-data",
+        "bash",
+        "Open the Kubernetes playground to practice cluster commands."
+      ]
+    ]
+  },
+  {
+    "slug": "k8s-prod-networking-storage",
+    "title": "Kubernetes Production: Networking and Storage",
+    "summary": "Module 2 — implement CNI networking, ingress, persistent storage, and high-throughput data pipelines on Kubernetes.",
+    "topic": "Kubernetes",
+    "difficulty": "intermediate",
+    "estimated_minutes": 50,
+    "playground_slug": "kubernetes",
+    "scenario_slug": "",
+    "order": 345,
+    "course_slug": "kubernetes-production-zero-to-hero",
+    "course_title": "Kubernetes Production: Zero to Hero",
+    "module_order": 2,
+    "level_track": "intermediate",
+    "seo_title": "Kubernetes Networking and Storage — CNI, Ingress, PVs, and CSI for AI",
+    "seo_description": "Production Kubernetes networking with Cilium/Calico, ingress controllers, persistent volumes, CSI drivers, and high-throughput storage for AI training data.",
+    "seo_keywords": "kubernetes networking, cni, cilium, calico, ingress, persistent volume, csi, storage class, k8s storage, network policy",
+    "sections": [
+      [
+        "CNI selection",
+        "CNI plugins provide pod networking and network policies. Cilium offers eBPF-based performance and Hubble observability. Calico is mature with BGP peering to top-of-rack. For GPU RDMA workloads, choose a CNI supporting SR-IOV or MACVLAN secondary networks.",
+        "kubectl get pods -n kube-system -l k8s-app=cilium\ncilium status",
+        "bash",
+        ""
+      ],
+      [
+        "Network policies",
+        "Default-deny all traffic, then allow explicitly. Isolate training namespaces from inference and management. GPU jobs often need east-west traffic only within the namespace.",
+        "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: deny-all\nspec:\n  podSelector: {}\n  policyTypes: [Ingress, Egress]",
+        "yaml",
+        "Apply deny-all first, then add allow rules incrementally."
+      ],
+      [
+        "Ingress and load balancing",
+        "Expose inference APIs via Ingress with TLS termination. Use NGINX or Envoy Gateway. For high-throughput gRPC inference, consider a dedicated LoadBalancer Service per model with connection draining.",
+        "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: llm-api\nspec:\n  rules:\n    - host: api.example.com\n      http:\n        paths:\n          - path: /\n            pathType: Prefix\n            backend:\n              service:\n                name: vllm-svc\n                port:\n                  number: 8000",
+        "yaml",
+        ""
+      ],
+      [
+        "Persistent storage with CSI",
+        "Use CSI drivers for cloud disks (EBS, GCE PD) or on-prem (Ceph RBD, NFS, Lustre). StorageClasses define provisioner, reclaim policy, and performance tier. Training checkpoints need high-IOPS SSD or parallel filesystems.",
+        "apiVersion: storage.k8s.io/v1\nkind: StorageClass\nmetadata:\n  name: fast-ssd\nprovisioner: ceph.com/rbd\nparameters:\n  pool: k8s-ssd",
+        "yaml",
+        ""
+      ],
+      [
+        "Volume strategies for AI",
+        "Model weights: read-only PVC or init-container download from object storage. Training data: prefer object storage (S3) with fsspec over PVC for large datasets. Checkpoints: PVC with high IOPS or direct-to-S3 via checkpoint callbacks.",
+        "",
+        "text",
+        ""
+      ],
+      [
+        "DNS and service discovery",
+        "CoreDNS resolves service.namespace.svc.cluster.local. Headless services return pod IPs for StatefulSets (useful for distributed training masters). Verify DNS latency — slow resolution impacts microservice inference chains.",
+        "kubectl run -it --rm debug --image=busybox -- nslookup kubernetes.default",
+        "bash",
+        ""
+      ]
+    ]
+  },
+  {
+    "slug": "k8s-prod-security",
+    "title": "Kubernetes Production: Security",
+    "summary": "Module 3 — harden Kubernetes clusters with RBAC, Pod Security, secrets management, and supply chain security.",
+    "topic": "Kubernetes",
+    "difficulty": "advanced",
+    "estimated_minutes": 50,
+    "playground_slug": "kubernetes",
+    "scenario_slug": "",
+    "order": 346,
+    "course_slug": "kubernetes-production-zero-to-hero",
+    "course_title": "Kubernetes Production: Zero to Hero",
+    "module_order": 3,
+    "level_track": "advanced",
+    "seo_title": "Kubernetes Production Security — RBAC, Pod Security, and Secrets Management",
+    "seo_description": "Harden production Kubernetes: RBAC least privilege, Pod Security Standards, secrets encryption, admission controllers, image scanning, and audit logging.",
+    "seo_keywords": "kubernetes security, rbac, pod security standards, secrets management, admission controller, image scanning, k8s hardening, audit log",
+    "sections": [
+      [
+        "RBAC least privilege",
+        "Define Roles (namespace-scoped) and ClusterRoles (cluster-scoped) with minimal verbs. Bind to ServiceAccounts, not user accounts directly. Avoid cluster-admin bindings except for break-glass accounts.",
+        "apiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: pod-reader\nrules:\n  - apiGroups: [\"\"]\n    resources: [\"pods\"]\n    verbs: [\"get\", \"list\"]",
+        "yaml",
+        "Audit RBAC with kubectl auth can-i --list."
+      ],
+      [
+        "Pod Security Standards",
+        "Enforce restricted profile on application namespaces: no privileged containers, no host namespaces, drop all capabilities, run as non-root. GPU workloads may need privileged for driver access — isolate in dedicated namespaces with baseline profile.",
+        "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: inference\n  labels:\n    pod-security.kubernetes.io/enforce: restricted",
+        "yaml",
+        ""
+      ],
+      [
+        "Secrets management",
+        "Encrypt secrets at rest (KMS provider for etcd). Prefer External Secrets Operator pulling from Vault or cloud KMS over native Secrets for rotation. Never commit secrets to git; use sealed-secrets or SOPS.",
+        "apiVersion: external-secrets.io/v1beta1\nkind: ExternalSecret\nmetadata:\n  name: db-credentials\nspec:\n  secretStoreRef:\n    name: vault-backend\n    kind: ClusterSecretStore",
+        "yaml",
+        ""
+      ],
+      [
+        "Admission controllers",
+        "Deploy OPA Gatekeeper or Kyverno to enforce policies: require resource limits, block latest image tags, mandate labels, and deny privileged pods in restricted namespaces.",
+        "apiVersion: kyverno.io/v1\nkind: ClusterPolicy\nmetadata:\n  name: require-limits\nspec:\n  validationFailureAction: Enforce",
+        "yaml",
+        ""
+      ],
+      [
+        "Supply chain security",
+        "Scan images with Trivy or Grype in CI. Sign images with cosign and verify in admission. Use digest-pinned images in production manifests, not floating tags.",
+        "cosign verify --certificate-identity-regexp .* --certificate-oidc-issuer-regexp .* ghcr.io/org/image@sha256:abc123",
+        "bash",
+        ""
+      ],
+      [
+        "Audit logging",
+        "Enable API server audit logging with policy filtering sensitive resources. Ship logs to SIEM. Monitor for: secret access anomalies, RBAC changes, privileged pod creation, and exec/attach to running pods.",
+        "",
+        "text",
+        "Review audit logs weekly for unauthorized access patterns."
+      ]
+    ]
+  },
+  {
+    "slug": "k8s-prod-gpu-scheduling",
+    "title": "Kubernetes Production: GPU Scheduling",
+    "summary": "Module 4 — schedule GPU workloads on Kubernetes with device plugins, MIG, quotas, and the NVIDIA GPU Operator.",
+    "topic": "Kubernetes",
+    "difficulty": "advanced",
+    "estimated_minutes": 55,
+    "playground_slug": "kubernetes",
+    "scenario_slug": "",
+    "order": 347,
+    "course_slug": "kubernetes-production-zero-to-hero",
+    "course_title": "Kubernetes Production: Zero to Hero",
+    "module_order": 4,
+    "level_track": "expert",
+    "seo_title": "Kubernetes GPU Scheduling — Device Plugins, MIG, and GPU Operator",
+    "seo_description": "Schedule GPU workloads on Kubernetes: NVIDIA device plugin, GPU Operator, MIG partitioning, resource quotas, gang scheduling, and multi-instance inference.",
+    "seo_keywords": "kubernetes gpu, nvidia device plugin, gpu operator, mig kubernetes, gpu scheduling, gpu resource quota, gang scheduling, k8s inference",
+    "sections": [
+      [
+        "GPU resource model",
+        "Kubernetes exposes GPUs as extended resources (nvidia.com/gpu). Pods request GPUs in resource limits. The scheduler assigns pods to nodes with available GPUs. Fractional GPUs require MIG or time-slicing — not native fractional resources.",
+        "resources:\n  limits:\n    nvidia.com/gpu: 2",
+        "yaml",
+        "Requests and limits should match for GPUs."
+      ],
+      [
+        "NVIDIA GPU Operator",
+        "GPU Operator deploys driver (optional), container toolkit, device plugin, DCGM exporter, and GPU Feature Discovery as a Helm chart. It automates GPU node bring-up — preferred over manual driver install on K8s.",
+        "helm repo add nvidia https://helm.ngc.nvidia.com/nvidia\nhelm install gpu-operator nvidia/gpu-operator -n gpu-operator --create-namespace",
+        "bash",
+        ""
+      ],
+      [
+        "Device plugin and MIG",
+        "The device plugin advertises GPUs to kubelet. With MIG enabled, it exposes nvidia.com/mig-1g.10gb style resources. Configure MIG strategy in GPU Operator ClusterPolicy.",
+        "apiVersion: v1\nkind: Pod\nmetadata:\n  name: inference-mig\nspec:\n  containers:\n    - name: model\n      image: vllm/vllm-openai\n      resources:\n        limits:\n          nvidia.com/mig-1g.10gb: 1",
+        "yaml",
+        ""
+      ],
+      [
+        "Taints, tolerations, and node affinity",
+        "Taint GPU nodes to prevent non-GPU workloads from consuming them. Training jobs use node affinity to select H100 vs A100 pools. Spread inference replicas across racks with topologySpreadConstraints.",
+        "tolerations:\n  - key: nvidia.com/gpu\n    operator: Exists\n    effect: NoSchedule",
+        "yaml",
+        ""
+      ],
+      [
+        "Resource quotas and fair sharing",
+        "Set ResourceQuota per namespace: nvidia.com/gpu: 16. Use LimitRange to cap per-pod GPU count. For multi-tenant fairness, integrate Kueue or Volcano for gang scheduling and queue management.",
+        "apiVersion: v1\nkind: ResourceQuota\nmetadata:\n  name: gpu-quota\nspec:\n  hard:\n    requests.nvidia.com/gpu: 8\n    limits.nvidia.com/gpu: 8",
+        "yaml",
+        ""
+      ],
+      [
+        "Production GPU checklist",
+        "Before launching GPU workloads: (1) GPU Operator healthy on all GPU nodes, (2) device plugin registers expected GPU count, (3) DCGM metrics flowing, (4) test pod completes nvidia-smi, (5) network policy allows required traffic, (6) checkpoint storage mounted and writable.",
+        "kubectl run gpu-test --rm -it --restart=Never \\\n  --image=nvidia/cuda:12.4.0-base-ubuntu22.04 \\\n  --limits=nvidia.com/gpu=1 -- nvidia-smi",
+        "bash",
+        ""
+      ]
+    ]
+  }
+]

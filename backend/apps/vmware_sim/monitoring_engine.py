@@ -771,6 +771,24 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "Silence created"}
 
+    if action == "update_panel":
+        dash_uid = payload.get("dashboard_uid")
+        panel_id = int(payload.get("panel_id") or 0)
+        new_expr = (payload.get("expr") or "").strip()
+        if not dash_uid or not panel_id or not new_expr:
+            return {"ok": False, "error": "dashboard_uid, panel_id, and expr required"}
+        for dash in state["grafana"]["dashboards"]:
+            if dash.get("uid") == dash_uid:
+                for panel in dash.get("panels") or []:
+                    if panel.get("id") == panel_id:
+                        panel["expr"] = new_expr
+                        no_data = broken.get("panels_no_data") or []
+                        if panel_id in no_data:
+                            broken["panels_no_data"] = [p for p in no_data if p != panel_id]
+                        _save_session(str(session_id), entry)
+                        return {"ok": True, "message": "Panel query updated", "panel": panel}
+        return {"ok": False, "error": "panel not found"}
+
     if action == "mark_fix_applied":
         # The Linux/terminal fix step (rewriting the broken config + FIXED-OK)
         # is what actually grades the lab. The UI may call this so panels redraw

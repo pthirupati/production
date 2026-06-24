@@ -468,6 +468,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 self._sim_stream_key = getattr(self.raw_socket, "_stream_key", None)
             if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
                 await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
+            self._shell_ready = True
+            await self._safe_send(json.dumps({"type": "shell_ready"}))
             return True
         except Exception as exc:
             logger.warning(
@@ -515,7 +517,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 if not data:
                     empty_reads += 1
                     if self.provider_type == "simulation":
-                        if empty_reads > 25:
+                        if empty_reads > 80:
                             logger.info(
                                 "Simulation stream EOF for session %s — respawning shell",
                                 self.lab_session.id,

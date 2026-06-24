@@ -200,10 +200,19 @@ export default function TutorialDetail() {
           <div className="flex flex-wrap items-center gap-2 text-sm text-surface-500 mb-6">
             <Link to="/tutorials" className="hover:text-accent-cyan transition-colors">Tutorials</Link>
             <span>/</span>
-            <Link to={`/tutorials?topic=${encodeURIComponent(tutorial.topic)}`} className="hover:text-accent-cyan transition-colors">
-              {tutorial.topic}
-            </Link>
-            <span>/</span>
+            {tutorial.course_slug ? (
+              <>
+                <span className="text-surface-400">{tutorial.course_title || tutorial.course_slug}</span>
+                <span>/</span>
+              </>
+            ) : (
+              <>
+                <Link to={`/tutorials?topic=${encodeURIComponent(tutorial.topic)}`} className="hover:text-accent-cyan transition-colors">
+                  {tutorial.topic}
+                </Link>
+                <span>/</span>
+              </>
+            )}
             <span className="text-surface-300 truncate max-w-[200px]">{tutorial.title}</span>
           </div>
 
@@ -232,7 +241,7 @@ export default function TutorialDetail() {
                           : 'text-surface-500 hover:text-surface-300'
                       }`}
                     >
-                      {String(i + 1).padStart(2, '0')}. {p.title}
+                      {p.level_track ? `${String(i + 1).padStart(2, '0')}. [${p.level_track}] ` : `${String(i + 1).padStart(2, '0')}. `}{p.title}
                     </Link>
                   ))}
                 </div>
@@ -251,7 +260,10 @@ export default function TutorialDetail() {
             <article>
               <header className="mb-8 fx-panel p-6 sm:p-8 border-accent-cyan/10 bg-gradient-to-br from-surface-900/80 via-surface-900/40 to-accent-cyan/[0.03]">
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-accent-cyan">{tutorial.topic}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-accent-cyan">{tutorial.course_title || tutorial.topic}</span>
+                  {tutorial.level_track && (
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-accent-purple/30 text-accent-purple capitalize">{tutorial.level_track}</span>
+                  )}
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border capitalize ${DIFFICULTY_CLASS[tutorial.difficulty] || DIFFICULTY_CLASS.beginner}`}>
                     {tutorial.difficulty}
                   </span>

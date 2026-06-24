@@ -39,6 +39,54 @@ function TutorialCard({ t }) {
   )
 }
 
+function CourseTrack({ course, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <section className="fx-panel overflow-hidden border-accent-purple/20 bg-gradient-to-br from-accent-purple/[0.04] to-transparent">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-4 p-5 text-left hover:bg-surface-800/30 transition-colors"
+      >
+        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-accent-purple/25 to-accent-cyan/10 border border-accent-purple/25 flex items-center justify-center shrink-0">
+          <Layers size={20} className="text-accent-purple" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-accent-purple mb-0.5">{course.topic}</p>
+          <h2 className="font-display font-bold text-white text-lg">{course.course_title}</h2>
+          <p className="text-xs text-surface-400 mt-0.5">
+            {course.module_count} modules · {course.total_sections} topics · structured zero-to-hero course
+          </p>
+        </div>
+        {open ? <ChevronDown size={18} className="text-surface-500 shrink-0" /> : <ChevronRight size={18} className="text-surface-500 shrink-0" />}
+      </button>
+      {open && (
+        <div className="px-5 pb-5 pt-0 space-y-2 border-t border-surface-800/60">
+          {course.modules.map((t, i) => (
+            <Link
+              key={t.slug}
+              to={`/tutorials/${t.slug}`}
+              className="group flex items-center gap-3 p-3 rounded-lg border border-surface-800/80 hover:border-accent-purple/30 hover:bg-surface-900/50 transition-colors"
+            >
+              <span className="shrink-0 w-8 h-8 rounded-lg bg-surface-800 border border-surface-700 flex items-center justify-center text-xs font-mono text-surface-400 group-hover:text-accent-purple">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate group-hover:text-accent-cyan">{t.title}</p>
+                <p className="text-[11px] text-surface-500 truncate">{t.summary}</p>
+              </div>
+              {t.level_track && (
+                <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full border border-surface-700 text-surface-500 capitalize">{t.level_track}</span>
+              )}
+              <ArrowRight size={14} className="text-surface-600 group-hover:text-accent-cyan shrink-0" />
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function TechnologyTrack({ track, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
@@ -71,6 +119,7 @@ function TechnologyTrack({ track, defaultOpen }) {
 export default function Tutorials() {
   const [searchParams] = useSearchParams()
   const [curriculum, setCurriculum] = useState([])
+  const [courses, setCourses] = useState([])
   const [topics, setTopics] = useState([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -91,11 +140,32 @@ export default function Tutorials() {
       .then(([cur, list]) => {
         if (cancelled) return
         setCurriculum(cur?.curriculum || [])
+        setCourses(cur?.courses || [])
         setTopics(list?.topics || [])
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+
+  const filteredCourses = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q && !topicParam) return courses
+    return courses
+      .map((course) => ({
+        ...course,
+        modules: course.modules.filter((t) => {
+          if (topicParam && t.topic !== topicParam) return false
+          if (q && !(`${t.title} ${t.summary} ${course.course_title} ${t.topic}`.toLowerCase().includes(q))) return false
+          return true
+        }),
+      }))
+      .filter((course) => course.modules.length > 0)
+      .map((course) => ({
+        ...course,
+        module_count: course.modules.length,
+        total_sections: course.modules.reduce((n, t) => n + (t.section_count || 0), 0),
+      }))
+  }, [courses, query, topicParam])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -171,16 +241,35 @@ export default function Tutorials() {
               <div key={i} className="fx-panel h-32 animate-pulse bg-surface-900/40" />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : filtered.length === 0 && filteredCourses.length === 0 ? (
           <div className="text-center py-16 text-surface-500">
             <BookOpen size={32} className="mx-auto mb-3 opacity-50" />
             <p>No tutorials match your search yet.</p>
           </div>
         ) : (
           <div className="space-y-5">
-            {filtered.map((track, i) => (
-              <TechnologyTrack key={track.topic} track={track} defaultOpen={!topicParam || topicParam === track.topic || i === 0} />
-            ))}
+            {filteredCourses.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-sm font-semibold text-surface-300 flex items-center gap-2">
+                  <Layers size={16} className="text-accent-purple" /> Zero-to-hero courses
+                </h2>
+                {filteredCourses.map((course, i) => (
+                  <CourseTrack key={course.course_slug} course={course} defaultOpen={i === 0 && !topicParam} />
+                ))}
+              </div>
+            )}
+            {filtered.length > 0 && (
+              <>
+                {filteredCourses.length > 0 && (
+                  <h2 className="text-sm font-semibold text-surface-300 flex items-center gap-2 pt-2">
+                    <GraduationCap size={16} className="text-accent-cyan" /> All technology tracks
+                  </h2>
+                )}
+                {filtered.map((track, i) => (
+                  <TechnologyTrack key={track.topic} track={track} defaultOpen={!topicParam || topicParam === track.topic || (filteredCourses.length === 0 && i === 0)} />
+                ))}
+              </>
+            )}
           </div>
         )}
       </MarketingPageShell>

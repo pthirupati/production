@@ -1,0 +1,30 @@
+slug: maas-gpu-thermal-commission-stuck
+title: GPU Node Thermal Alert — Commission Stuck
+technology: Bare Metal
+category: MAAS
+difficulty: hard
+scenario_type: fix
+time_limit: 1500
+max_score: 100
+lab_mode: simulation
+simulation_type: baremetal
+infrastructure_type: simulation
+is_free: false
+description: >-
+  A GPU training node hit a thermal threshold during MAAS commissioning. Clear the
+  thermal alert, reset stuck commissioning, and deploy the node.
+objectives:
+  - Clear thermal alert in Bare Metal console
+  - Reset stuck commissioning state
+  - Deploy the GPU node successfully
+initial_state: Thermal alert active; MAAS commission stuck on gpu-node-02.
+hints:
+  - order: 1
+    cost: 10
+    content: **IPMI** tab → **Clear thermal alert**.
+  - order: 2
+    cost: 15
+    content: **Reset stuck commission** then **Commission** on the MAAS tab.
+  - order: 3
+    cost: 20
+    content: **Deploy** and run **Check**.

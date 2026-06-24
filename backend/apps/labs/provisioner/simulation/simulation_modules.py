@@ -52,6 +52,10 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
         state.hostname = "gitlab-runner"
     elif sim_type == "networking" or "bgp" in slug or "ntp-drift" in slug:
         state.hostname = "core-router"
+    elif sim_type == "terraform" or slug.startswith("terraform-"):
+        state.hostname = "terraform-ws"
+        state.cwd = "/root/terraform"
+        state._mkdir("/root/terraform")
 
     if "unbound" in slug:
         state._mkdir("/opt/scripts")
@@ -110,15 +114,19 @@ def register_modules(engine: "UnifiedSimulationEngine", shell: RHELShell | None 
         _register_devops(engine, sh)
     if "networking" in modules:
         _register_networking(engine, sh)
+    if "terraform" in modules:
+        _register_terraform(engine, sh)
 
 
 def _modules_for_type(sim_type: str) -> set[str]:
     if sim_type == "generic":
-        return {"gpu", "kubernetes", "ansible", "baremetal", "database", "docker", "devops", "networking"}
+        return {"gpu", "kubernetes", "ansible", "baremetal", "database", "docker", "devops", "networking", "terraform"}
     if sim_type == "devops":
-        return {"devops", "docker"}
+        return {"devops", "docker", "terraform"}
     if sim_type == "networking":
         return {"networking"}
+    if sim_type == "terraform":
+        return {"terraform", "docker"}
     return {sim_type, "docker"} if sim_type == "rhel" else {sim_type}
 
 
@@ -1121,6 +1129,51 @@ def _handle_nmcli(engine: "UnifiedSimulationEngine", parts: list[str], line: str
         return ""
 
     return "nmcli: OK"
+
+
+def _register_terraform(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
+    """Bridge terminal terraform/aws commands to terraform_engine Redis state."""
+
+    def handler(parts: list[str], line: str) -> str | None:
+        low = line.strip().lower()
+        if not (low.startswith("terraform") or low.startswith("aws ")):
+            return None
+        sid = getattr(shell.state, "session_id", "") or ""
+        if not sid:
+            return "terraform: lab session not linked"
+        from apps.vmware_sim import terraform_engine as te
+
+        slug = engine.scenario_slug or getattr(shell.state, "scenario_slug", "") or ""
+        te._ensure(sid, slug)
+
+        if low.startswith("terraform init"):
+            res = te.apply_action(sid, "terraform_init")
+        elif "force-unlock" in low:
+            res = te.apply_action(sid, "force_unlock")
+        elif low.startswith("terraform plan"):
+            res = te.apply_action(sid, "terraform_plan")
+        elif low.startswith("terraform apply"):
+            res = te.apply_action(sid, "terraform_apply")
+        elif low.startswith("terraform validate"):
+            res = {"ok": True, "output": "Success! The configuration is valid."}
+        elif low.startswith("aws "):
+            res = te.apply_action(sid, "aws_cli", {"command": line.strip()})
+        else:
+            return (
+                "Usage: terraform init | plan | apply | force-unlock\n"
+                "       aws <service> <command> …\n"
+                "(state synced with Terraform IDE simulator)"
+            )
+
+        if not res.get("ok"):
+            shell.state.last_exit_code = 1
+            return res.get("error") or "Error"
+        shell.state.last_exit_code = 0
+        ok, _msg = te.validate_terraform_lab(sid, slug)
+        shell.state.terraform_fixed = ok
+        return res.get("output") or res.get("message") or ""
+
+    shell.register_handler(handler)
 
 
 def _uuid() -> str:

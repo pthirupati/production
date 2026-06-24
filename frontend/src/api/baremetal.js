@@ -28,4 +28,13 @@ export const baremetalApi = {
   fixPxeVlan(sessionId) {
     return baremetalApi.action(sessionId, 'fix_pxe_vlan', {})
   },
+  ipmiPowerOn(sessionId) {
+    return baremetalApi.action(sessionId, 'ipmi_power_on', {})
+  },
+  clearThermal(sessionId) {
+    return baremetalApi.action(sessionId, 'clear_thermal_alert', {})
+  },
+  resetCommission(sessionId, machineId) {
+    return baremetalApi.action(sessionId, 'reset_commission', { machine_id: machineId })
+  },
 }
