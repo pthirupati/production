@@ -57,7 +57,7 @@ export default function CertificationsSection({ isAuthenticated }) {
                   <span className="text-xs font-mono text-surface-500 uppercase">{track.vendor || 'Cert'}</span>
                 </div>
                 <h3 className="font-semibold text-white group-hover:text-amber-200 transition-colors">{track.name}</h3>
-                <p className="text-xs text-surface-500 mt-2 line-clamp-2">{track.description || track.exam_code}</p>
+                <p className="text-xs text-surface-500 mt-2 line-clamp-2">{track.description || track.code}</p>
                 <div className="flex items-center gap-3 mt-4 text-[11px] text-surface-400">
                   <span>{track.scenario_count || 0} cert labs</span>
                   {track.is_free && (

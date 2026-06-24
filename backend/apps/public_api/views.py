@@ -296,7 +296,7 @@ class TechnologyDetailView(APIView):
         from apps.certifications.models import CertificationTrack
         cert_tracks = list(
             CertificationTrack.objects.filter(technology=tech, is_active=True)
-            .values("slug", "name", "vendor", "exam_code", "is_free")
+            .values("slug", "name", "vendor", "code", "is_free")
         )
 
         if not request.user.is_authenticated:

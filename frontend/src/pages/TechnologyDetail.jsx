@@ -499,7 +499,7 @@ export default function TechnologyDetail() {
                         to={`/certifications/${ct.slug}`}
                         className="block text-sm px-3 py-2 rounded-lg border border-amber-500/25 bg-amber-500/5 text-amber-200 hover:bg-amber-500/10 transition-colors"
                       >
-                        {ct.name} {ct.exam_code ? <span className="text-white/40 font-mono text-xs">({ct.exam_code})</span> : null}
+                        {ct.name} {ct.code ? <span className="text-white/40 font-mono text-xs">({ct.code})</span> : null}
                       </Link>
                     ))}
                   </div>
