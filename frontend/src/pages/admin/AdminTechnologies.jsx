@@ -13,7 +13,7 @@ const COLOR_OPTIONS = [
   { value: 'blue', label: 'Blue', class: 'bg-blue-500' },
 ]
 
-const EMPTY_FORM = { name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, order: 0, is_active: true, coming_soon: false }
+const EMPTY_FORM = { name: '', slug: '', icon: '', description: '', color: 'cyan', price: 499, is_free: false, order: 0, is_active: true, coming_soon: false }
 
 export default function AdminTechnologies() {
   const [technologies, setTechnologies] = useState([])
@@ -68,7 +68,7 @@ export default function AdminTechnologies() {
   }
 
   const handleEdit = (tech) => {
-    setForm({ name: tech.name, slug: tech.slug || '', icon: tech.icon, description: tech.description, color: tech.color || 'cyan', price: tech.price || 499, order: tech.order || 0, is_active: tech.is_active, coming_soon: tech.coming_soon || false })
+    setForm({ name: tech.name, slug: tech.slug || '', icon: tech.icon, description: tech.description, color: tech.color || 'cyan', price: tech.is_free ? 0 : (tech.price || 499), is_free: tech.is_free || false, order: tech.order || 0, is_active: tech.is_active, coming_soon: tech.coming_soon || false })
     setEditingId(tech.id); setShowForm(true)
   }
 
@@ -219,9 +219,22 @@ export default function AdminTechnologies() {
                     <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Price (INR)</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500">₹</span>
-                      <input type="number" min="0" step="1" value={form.price} onChange={(e) => setForm(f => ({ ...f, price: Number(e.target.value) }))} className="input-field pl-7" placeholder="499" />
+                      <input type="number" min="0" step="1" value={form.price} disabled={form.is_free}
+                        onChange={(e) => setForm(f => ({ ...f, price: Number(e.target.value) }))}
+                        className="input-field pl-7 disabled:opacity-50 disabled:cursor-not-allowed" placeholder="499" />
                     </div>
+                    {form.is_free && <p className="text-[11px] text-accent-green mt-1">Free — no subscription required</p>}
                   </div>
+                  <label className="flex items-center justify-between p-3 rounded-xl bg-surface-800/60 border border-surface-700/40 cursor-pointer">
+                    <div>
+                      <p className="text-sm font-medium text-white">Make technology free</p>
+                      <p className="text-xs text-surface-500 mt-0.5">All labs in this technology open to everyone (forces price to ₹0)</p>
+                    </div>
+                    <div className={`relative w-11 h-6 rounded-full transition-all ${form.is_free ? 'bg-accent-green' : 'bg-surface-700'}`}
+                      onClick={() => setForm(f => ({ ...f, is_free: !f.is_free, price: !f.is_free ? 0 : (f.price || 499) }))}>
+                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${form.is_free ? 'left-5' : 'left-0.5'}`} />
+                    </div>
+                  </label>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Color</label>
@@ -400,8 +413,14 @@ export default function AdminTechnologies() {
                   {tech.slug && <p className="text-xs text-surface-600 font-mono">/{tech.slug}</p>}
                   <p className="text-sm text-surface-400 mt-1 line-clamp-2">{tech.description || 'No description'}</p>
                   <div className="mt-2">
-                    <span className="text-sm font-semibold text-accent-green">₹{Number(tech.price || 0).toLocaleString('en-IN')}</span>
-                    <span className="text-xs text-surface-500 ml-1">/ subscription</span>
+                    {tech.is_free ? (
+                      <span className="text-sm font-semibold text-accent-green">Free</span>
+                    ) : (
+                      <>
+                        <span className="text-sm font-semibold text-accent-green">₹{Number(tech.price || 0).toLocaleString('en-IN')}</span>
+                        <span className="text-xs text-surface-500 ml-1">/ subscription</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-surface-700/50">
                     <span className="text-xs text-surface-500">{tech.scenario_count} scenarios ({tech.active_scenarios} active)</span>

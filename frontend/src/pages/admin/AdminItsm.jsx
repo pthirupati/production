@@ -72,6 +72,7 @@ export default function AdminItsm() {
   const [teamFilter, setTeamFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedId, setSelectedId] = useState(null)
+  const [creating, setCreating] = useState(false)
 
   const loadTickets = useCallback(async () => {
     setLoading(true)
@@ -113,7 +114,12 @@ export default function AdminItsm() {
         title="ITSM Tickets"
         subtitle={`${stats.open_count} open · ${stats.closed_count} closed · ${stats.total} total${stats.sla_breached_count ? ` · ${stats.sla_breached_count} SLA breached` : ''}`}
         actions={
-          <button onClick={loadTickets} className="btn-secondary flex items-center gap-2 text-sm">Refresh</button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setCreating(true)} className="btn-primary flex items-center gap-2 text-sm">
+              <Plus size={15} /> Create ticket
+            </button>
+            <button onClick={loadTickets} className="btn-secondary flex items-center gap-2 text-sm">Refresh</button>
+          </div>
         }
       />
 
@@ -199,6 +205,126 @@ export default function AdminItsm() {
           onChanged={loadTickets}
         />
       )}
+
+      {creating && (
+        <CreateTicketModal
+          meta={meta}
+          onClose={() => setCreating(false)}
+          onCreated={(ticket) => {
+            setCreating(false)
+            loadTickets()
+            if (ticket?.id) setSelectedId(ticket.id)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function CreateTicketModal({ meta, onClose, onCreated }) {
+  const ticketTypes = meta.ticket_types || []
+  const priorities = meta.priorities || []
+  const teams = meta.teams || []
+  const [form, setForm] = useState({
+    short_description: '',
+    description: '',
+    ticket_type: ticketTypes[0]?.value || 'incident',
+    // Default to a Moderate (3) priority when present, else the first option.
+    priority: (priorities.find(p => p.value === '3') || priorities[0])?.value || '3',
+    assignment_group: teams[0]?.value || 'service_desk',
+  })
+  const [busy, setBusy] = useState(false)
+
+  const update = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  const submit = async (e) => {
+    e.preventDefault()
+    const short = form.short_description.trim()
+    if (!short) { toast.error('A short description is required'); return }
+    setBusy(true)
+    try {
+      const ticket = await adminApi.createItsmTicket({
+        short_description: short,
+        description: form.description.trim(),
+        ticket_type: form.ticket_type,
+        priority: form.priority,
+        assignment_group: form.assignment_group,
+      })
+      toast.success(`Created ${ticket.number || 'ticket'}`)
+      onCreated?.(ticket)
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to create ticket')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="glass-card w-full max-w-lg max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <form onSubmit={submit} className="p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Plus size={18} className="text-accent-cyan" /> Create ITSM ticket
+            </h2>
+            <button type="button" onClick={onClose} className="text-surface-400 hover:text-white p-1 rounded-md hover:bg-surface-800/60 shrink-0">
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-wide text-surface-500">Short description *</label>
+            <input
+              type="text"
+              autoFocus
+              value={form.short_description}
+              onChange={update('short_description')}
+              placeholder="Brief summary of the issue or request"
+              className="input-field w-full text-sm"
+              maxLength={255}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-wide text-surface-500">Description</label>
+            <textarea
+              rows={4}
+              value={form.description}
+              onChange={update('description')}
+              placeholder="Full details, steps, impact…"
+              className="input-field w-full text-sm resize-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-wide text-surface-500">Type</label>
+              <select value={form.ticket_type} onChange={update('ticket_type')} className="input-field w-full text-sm">
+                {ticketTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-wide text-surface-500">Priority</label>
+              <select value={form.priority} onChange={update('priority')} className="input-field w-full text-sm">
+                {priorities.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-wide text-surface-500">Assignment group</label>
+              <select value={form.assignment_group} onChange={update('assignment_group')} className="input-field w-full text-sm">
+                {teams.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/[0.06]">
+            <button type="button" onClick={onClose} className="btn-secondary px-4 py-1.5 text-sm">Cancel</button>
+            <button type="submit" disabled={busy || !form.short_description.trim()} className="btn-primary px-4 py-1.5 text-sm disabled:opacity-50 inline-flex items-center gap-1.5">
+              {busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Create ticket
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

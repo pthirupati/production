@@ -48,6 +48,7 @@ const AdminDashboard = lazyWithRetry(() => import('../pages/admin/AdminDashboard
 const AdminScenarios = lazyWithRetry(() => import('../pages/admin/AdminScenarios'))
 const AdminLabProvisioning = lazyWithRetry(() => import('../pages/admin/AdminLabProvisioning'))
 const AdminTechnologies = lazyWithRetry(() => import('../pages/admin/AdminTechnologies'))
+const AdminCertifications = lazyWithRetry(() => import('../pages/admin/AdminCertifications'))
 const AdminUsers = lazyWithRetry(() => import('../pages/admin/AdminUsers'))
 const AdminLabs = lazyWithRetry(() => import('../pages/admin/AdminLabs'))
 const AdminSubscriptions = lazyWithRetry(() => import('../pages/admin/AdminSubscriptions'))
@@ -85,6 +86,8 @@ const Tutorials = lazyWithRetry(() => import('../pages/tutorials/Tutorials'))
 const TutorialDetail = lazyWithRetry(() => import('../pages/tutorials/TutorialDetail'))
 const Certifications = lazyWithRetry(() => import('../pages/certifications/Certifications'))
 const CertificationDetail = lazyWithRetry(() => import('../pages/certifications/CertificationDetail'))
+const Playgrounds = lazyWithRetry(() => import('../pages/playgrounds/Playgrounds'))
+const PlaygroundDetail = lazyWithRetry(() => import('../pages/playgrounds/PlaygroundDetail'))
 
 function PageLoader() {
   return (
@@ -153,6 +156,8 @@ export default function AppRouter() {
         <Route path="/tutorials/:slug" element={<TutorialDetail />} />
         <Route path="/certifications" element={<Certifications />} />
         <Route path="/certifications/:slug" element={<CertificationDetail />} />
+        <Route path="/playgrounds" element={<Playgrounds />} />
+        <Route path="/playgrounds/:slug" element={<PlaygroundDetail />} />
         <Route path="/interviews/invite/:token" element={<InterviewInvite />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
         <Route path="/jira/:issueKey" element={<ProtectedRoute><JiraTicketPage /></ProtectedRoute>} />
@@ -194,6 +199,7 @@ export default function AppRouter() {
           <Route path="/admin/scenarios" element={<AdminScenarios />} />
           <Route path="/admin/lab-provisioning" element={<AdminLabProvisioning />} />
           <Route path="/admin/technologies" element={<AdminTechnologies />} />
+          <Route path="/admin/certifications" element={<AdminCertifications />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/labs" element={<AdminLabs />} />
           <Route path="/admin/monitoring" element={<AdminMonitoring />} />

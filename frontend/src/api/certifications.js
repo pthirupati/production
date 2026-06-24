@@ -39,4 +39,28 @@ export const certApi = {
     })
     return data
   },
+
+  /** Authenticated dashboard panel — progress + active exams per track. */
+  async dashboard() {
+    const { data } = await api.get('/certifications/dashboard/')
+    return data // { tracks: [...] }
+  },
+}
+
+/** Admin (IsPlatformAdmin) certification-track management — mirrors adminApi.*Technology. */
+export const certAdminApi = {
+  async getTracks() {
+    const { data } = await api.get('/certifications/admin/tracks/')
+    return data // { tracks: [...] }
+  },
+
+  async updateTrack(id, payload) {
+    const { data } = await api.put(`/certifications/admin/tracks/${id}/`, payload)
+    return data
+  },
+
+  async getTrackScenarios(id) {
+    const { data } = await api.get(`/certifications/admin/tracks/${id}/scenarios/`)
+    return data // { track, scenario_count, objectives: [...] }
+  },
 }

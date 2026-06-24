@@ -267,6 +267,13 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
             self._shell_ready = False
 
+            # Simulation streams emit a welcome banner synchronously on attach;
+            # mark the shell ready immediately so the client doesn't reconnect-loop
+            # waiting for shell_ready while the reader is still spinning up.
+            if is_simulation:
+                self._shell_ready = True
+                await self._safe_send(json.dumps({"type": "shell_ready"}))
+
             # Start reading output
             self.reader_task = asyncio.create_task(self._read_output_safe())
             self._ping_task = asyncio.create_task(self._ping_loop())

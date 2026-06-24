@@ -37,6 +37,7 @@ from .views import (
     AdminJiraCreateView,
     AdminItsmTicketsView,
     AdminItsmMetaView,
+    AdminItsmTicketCreateView,
     AdminItsmTicketDetailView,
     AdminItsmTicketActionView,
     AdminConfigView,
@@ -179,6 +180,7 @@ urlpatterns = [
     # ITSM / ServiceNow tickets
     path("itsm/meta/", AdminItsmMetaView.as_view()),
     path("itsm/tickets/", AdminItsmTicketsView.as_view()),
+    path("itsm/tickets/create/", AdminItsmTicketCreateView.as_view()),
     path("itsm/tickets/<uuid:ticket_id>/", AdminItsmTicketDetailView.as_view()),
     path("itsm/tickets/<uuid:ticket_id>/action/", AdminItsmTicketActionView.as_view()),
 

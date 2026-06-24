@@ -16,7 +16,7 @@ class TechnologySerializer(serializers.ModelSerializer):
         model = Technology
         fields = [
             "id", "name", "slug", "icon", "color", "description",
-            "price", "is_active", "coming_soon", "order", "scenario_count",
+            "price", "is_free", "is_active", "coming_soon", "order", "scenario_count",
             "learning_path", "created_at",
             "maintenance_enabled", "maintenance_message",
             "maintenance_scheduled_start", "maintenance_scheduled_end",

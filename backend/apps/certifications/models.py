@@ -41,6 +41,24 @@ class CertificationTrack(models.Model):
     validity_months = models.PositiveIntegerField(
         default=36, help_text="Months the issued certificate stays valid"
     )
+    # Admin-managed commercial settings, mirroring question_bank.Technology so a
+    # track can be priced / gated / put into maintenance from the admin panel.
+    price = models.PositiveIntegerField(
+        default=0,
+        help_text="Standalone price (INR) — full cert prep + mock exam without buying the base technology separately",
+    )
+    addon_price = models.PositiveIntegerField(
+        default=0,
+        help_text="Addon price (INR) on top of the linked technology subscription (0 = use standalone price only)",
+    )
+    is_free = models.BooleanField(
+        default=True, help_text="Available without a paid subscription"
+    )
+    coming_soon = models.BooleanField(default=False)
+    maintenance_enabled = models.BooleanField(default=False)
+    maintenance_message = models.TextField(blank=True, default="")
+    maintenance_scheduled_start = models.DateTimeField(null=True, blank=True)
+    maintenance_scheduled_end = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -50,6 +68,40 @@ class CertificationTrack(models.Model):
 
     def __str__(self):
         return self.code
+
+
+class CertificationTrackSubscription(models.Model):
+    """Paid access to a certification track's labs + timed mock exam."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="cert_track_subscriptions",
+    )
+    track = models.ForeignKey(
+        CertificationTrack,
+        on_delete=models.CASCADE,
+        related_name="subscriptions",
+    )
+    subscription_id = models.CharField(max_length=200, unique=True)
+    is_active = models.BooleanField(default=True)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "track")
+        indexes = [
+            models.Index(fields=["user", "is_active"], name="cert_sub_user_active_idx"),
+        ]
+
+    def __str__(self):
+        return self.subscription_id
+
+    @classmethod
+    def generate_subscription_id(cls, track_code, username, year=None):
+        year = year or timezone.now().year
+        safe_user = (username or "user")[:40].upper().replace(" ", "-")
+        return f"CERT-{track_code.upper()}-{safe_user}-{year}-FIXITLAB"
 
 
 class CertObjective(models.Model):

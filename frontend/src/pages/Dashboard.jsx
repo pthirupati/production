@@ -19,6 +19,7 @@ import ActivityHeatmap from '../components/ActivityHeatmap'
 import OnboardingTour from '../components/OnboardingTour'
 import { FixitPanel, FixitStatCard } from '../components/design'
 import { DailyChallengeCard, StreakWidget, XpLevelCard } from '../components/engagement'
+import CertDashboardPanel from '../components/certifications/CertDashboardPanel'
 
 function OnboardingChecklist({ subscriptions, progress, jiraTickets, interviewEntitlement }) {
   const [dismissed, setDismissed] = useState(
@@ -496,6 +497,8 @@ export default function Dashboard() {
       )}
 
       <div className="bg-gradient-stripe rounded-full" />
+
+      <CertDashboardPanel />
 
       {/* ═══ MY SUBSCRIPTIONS ═══ */}
       <FixitPanel className="relative overflow-hidden">

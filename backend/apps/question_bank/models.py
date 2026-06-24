@@ -10,6 +10,10 @@ class Technology(models.Model):
     color = models.CharField(max_length=20, blank=True, default="cyan", help_text="Theme color key")
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=8, decimal_places=2, default=499, help_text="Price in INR for technology subscription")
+    is_free = models.BooleanField(
+        default=False,
+        help_text="Make the whole technology (and all its labs) free — no subscription required. Forces price to 0.",
+    )
     is_active = models.BooleanField(default=True)
     coming_soon = models.BooleanField(
         default=False,
@@ -37,6 +41,13 @@ class Technology(models.Model):
         if not self.slug:
             from django.utils.text import slugify
             self.slug = slugify(self.name)
+        # A free technology is, by definition, ₹0. Keep price in sync so any
+        # price==0 free-access checks elsewhere agree with the explicit flag,
+        # and treat a ₹0 price as free so the two never disagree.
+        if self.is_free:
+            self.price = 0
+        elif self.price == 0:
+            self.is_free = True
         super().save(*args, **kwargs)
 
     def __str__(self):

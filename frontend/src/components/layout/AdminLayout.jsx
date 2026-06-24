@@ -23,6 +23,7 @@ const NAV_GROUPS = [
       { path: '/admin/scenarios', icon: Target, label: 'Scenarios' },
       { path: '/admin/lab-provisioning', icon: Boxes, label: 'Lab Provisioning' },
       { path: '/admin/technologies', icon: Cpu, label: 'Technologies' },
+      { path: '/admin/certifications', icon: Award, label: 'Certifications' },
       { path: '/admin/jira', icon: Ticket, label: 'Jira Tickets' },
       { path: '/admin/itsm', icon: LifeBuoy, label: 'ITSM Tickets' },
       { path: '/admin/interviews', icon: Mic2, label: 'Interviews' },

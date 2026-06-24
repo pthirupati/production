@@ -81,13 +81,18 @@ def _lab_infra_type(scenario):
     return getattr(scenario, "infrastructure_type", "docker") or "docker"
 
 
-def _mark_accessible(scenario_data_list, subscribed_tech_ids):
+def _mark_accessible(scenario_data_list, subscribed_tech_ids, user=None):
     """Add is_accessible flag to serialized scenario data.
 
     `subscribed_tech_ids` is None for staff/admin (full access), or a set of
     technology IDs the user is subscribed to (empty set for anonymous users).
     Defensive against malformed items so listing endpoints never 500.
     """
+    from apps.certifications.services.access import user_has_cert_scenario_access
+    from apps.question_bank.models import Scenario
+
+    cert_cache = {}
+
     for item in scenario_data_list or []:
         if not isinstance(item, dict):
             continue
@@ -97,6 +102,14 @@ def _mark_accessible(scenario_data_list, subscribed_tech_ids):
         elif item.get("is_free"):
             item["is_accessible"] = True
         else:
+            sc_id = item.get("id")
+            if sc_id and user:
+                if sc_id not in cert_cache:
+                    cert_cache[sc_id] = Scenario.objects.filter(id=sc_id).first()
+                sc = cert_cache[sc_id]
+                if sc and user_has_cert_scenario_access(user, sc):
+                    item["is_accessible"] = True
+                    continue
             tech = item.get("technology")
             tech_id = tech.get("id") if isinstance(tech, dict) else tech
             item["is_accessible"] = tech_id in subscribed_tech_ids
@@ -272,7 +285,7 @@ class TechnologyDetailView(APIView):
 
             scenario_data = ScenarioListSerializer(scenarios, many=True).data
             subscribed_anon = _get_subscribed_tech_ids(None)
-            _mark_accessible(scenario_data, subscribed_anon)
+            _mark_accessible(scenario_data, subscribed_anon, user=None)
 
             base = {"technology": tech_data, "scenarios": scenario_data}
             cache.set(cache_key, base, 60)  # 60s for anonymous base
@@ -301,7 +314,7 @@ class TechnologyDetailView(APIView):
             .values_list("scenario_id", flat=True)
         )
         subscribed = _get_subscribed_tech_ids(request.user)
-        _mark_accessible(scenario_data, subscribed)
+        _mark_accessible(scenario_data, subscribed, user=request.user if request.user.is_authenticated else None)
 
         for item in scenario_data:
             item["user_progress"] = progress_map.get(item["id"])
@@ -412,7 +425,7 @@ class ScenariosListView(APIView):
 
         # Mark subscription access
         subscribed = _get_subscribed_tech_ids(request.user if request.user.is_authenticated else None)
-        _mark_accessible(data, subscribed)
+        _mark_accessible(data, subscribed, user=request.user if request.user.is_authenticated else None)
 
         if paginator is not None:
             response = paginator.get_paginated_response(data)
@@ -462,7 +475,12 @@ class ScenarioDetailView(APIView):
         elif scenario.is_free:
             data["is_accessible"] = True
         else:
-            data["is_accessible"] = scenario.technology_id in subscribed
+            from apps.certifications.services.access import user_has_cert_scenario_access
+
+            if request.user.is_authenticated and user_has_cert_scenario_access(request.user, scenario):
+                data["is_accessible"] = True
+            else:
+                data["is_accessible"] = scenario.technology_id in subscribed
 
         # Hide solution unless user completed it
         if request.user.is_authenticated:
@@ -605,6 +623,9 @@ class StartLabView(APIView):
         )
 
         if not scenario.is_free and not user_has_complimentary_access(request.user):
+            from apps.certifications.services.access import user_has_cert_scenario_access
+
+            cert_ok = user_has_cert_scenario_access(request.user, scenario)
             sub = TechnologySubscription.objects.filter(
                 user=request.user,
                 technology=scenario.technology,
@@ -623,7 +644,7 @@ class StartLabView(APIView):
                     status=403,
                 )
             has_sub = sub and is_tech_subscription_active(sub)
-            if not has_sub:
+            if not has_sub and not cert_ok:
                 return Response(
                     {
                         "error": "Subscription required. Purchase access to this technology first.",

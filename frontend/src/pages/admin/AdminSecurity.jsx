@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
-import { Shield, AlertTriangle, Lock, CreditCard, RotateCcw, Mail, KeyRound, Ban, Globe, X, ChevronRight } from 'lucide-react'
+import { Shield, AlertTriangle, Lock, CreditCard, RotateCcw, Mail, KeyRound, Ban, Globe, X, ChevronRight, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+// `clear` is the backend action key that resets/deletes the records behind the
+// metric. Metrics without a `clear` action (e.g. successful logins) get no button.
 const METRIC_KEYS = [
-  { key: 'login_failed', label: 'Failed logins', icon: Lock, color: 'text-red-400' },
+  { key: 'login_failed', label: 'Failed logins', icon: Lock, color: 'text-red-400', clear: 'clear_failed_logins' },
   { key: 'login_success', label: 'Successful logins', icon: Shield, color: 'text-green-400' },
-  { key: 'otp_failed', label: 'OTP failures', icon: KeyRound, color: 'text-orange-400' },
-  { key: 'payment_failed', label: 'Payment failures', icon: CreditCard, color: 'text-orange-400' },
-  { key: 'email_failed', label: 'Email failures', icon: Mail, color: 'text-red-300' },
-  { key: 'rate_limit_hits', label: 'Rate limit hits', icon: AlertTriangle, color: 'text-amber-400' },
-  { key: 'lab_resets', label: 'Lab resets', icon: RotateCcw, color: 'text-amber-400' },
-  { key: 'security_alerts', label: 'Security alerts', icon: AlertTriangle, color: 'text-purple-400' },
+  { key: 'otp_failed', label: 'OTP failures', icon: KeyRound, color: 'text-orange-400', clear: 'clear_otp_failures' },
+  { key: 'payment_failed', label: 'Payment failures', icon: CreditCard, color: 'text-orange-400', clear: 'clear_payment_failures' },
+  { key: 'email_failed', label: 'Email failures', icon: Mail, color: 'text-red-300', clear: 'clear_delivery_failures' },
+  { key: 'rate_limit_hits', label: 'Rate limit hits', icon: AlertTriangle, color: 'text-amber-400', clear: 'clear_rate_limit_hits' },
+  { key: 'lab_resets', label: 'Lab resets', icon: RotateCcw, color: 'text-amber-400', clear: 'clear_lab_resets' },
+  { key: 'security_alerts', label: 'Security alerts', icon: AlertTriangle, color: 'text-purple-400', clear: 'clear_security_alerts' },
 ]
 
 export default function AdminSecurity() {
@@ -22,6 +24,7 @@ export default function AdminSecurity() {
   const [detail, setDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [clearingEmails, setClearingEmails] = useState(false)
+  const [clearingMetric, setClearingMetric] = useState(null)
   const [blockIp, setBlockIp] = useState('')
   const [blockUserEmail, setBlockUserEmail] = useState('')
   const [blockCountry, setBlockCountry] = useState('')
@@ -48,6 +51,26 @@ export default function AdminSecurity() {
       setBlockUserEmail('')
     } catch {
       toast.error('User action failed')
+    }
+  }
+
+  // Clear/reset the records behind a single metric (or all metrics).
+  const clearMetric = async (action, label) => {
+    const isAll = action === 'clear_all'
+    const msg = isAll
+      ? 'Clear ALL security metrics? This permanently deletes the underlying failed-login, OTP, payment, email, rate-limit, lab-reset, and alert records.'
+      : `Clear "${label}"? This permanently deletes the underlying records and cannot be undone.`
+    if (!confirm(msg)) return
+    setClearingMetric(action)
+    try {
+      const res = await adminApi.clearSecurityMetric(action)
+      toast.success(`Cleared ${res.cleared ?? 0} record(s)`)
+      setDetail(null)
+      await loadData()
+    } catch {
+      toast.error('Clear failed')
+    } finally {
+      setClearingMetric(null)
     }
   }
 
@@ -149,21 +172,44 @@ export default function AdminSecurity() {
         </button>
       </div>
 
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          disabled={clearingMetric === 'clear_all'}
+          onClick={() => clearMetric('clear_all', 'all metrics')}
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-accent-red/10 text-accent-red hover:bg-accent-red/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Trash2 size={13} /> {clearingMetric === 'clear_all' ? 'Clearing…' : 'Clear all metrics'}
+        </button>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {METRIC_KEYS.map(({ key, label, icon: Icon, color }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => openDetail(key)}
-            className="fx-stat-card p-4 text-left group"
-          >
-            <Icon size={18} className={`${color} mb-2`} />
-            <p className="text-2xl font-bold text-white">{metrics[key] ?? 0}</p>
-            <p className="text-xs text-surface-400 mt-1 flex items-center justify-between">
-              {label}
-              <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-            </p>
-          </button>
+        {METRIC_KEYS.map(({ key, label, icon: Icon, color, clear }) => (
+          <div key={key} className="fx-stat-card p-4 group relative flex flex-col">
+            <button
+              type="button"
+              onClick={() => openDetail(key)}
+              className="text-left"
+            >
+              <Icon size={18} className={`${color} mb-2`} />
+              <p className="text-2xl font-bold text-white">{metrics[key] ?? 0}</p>
+              <p className="text-xs text-surface-400 mt-1 flex items-center justify-between">
+                {label}
+                <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+              </p>
+            </button>
+            {clear && (
+              <button
+                type="button"
+                disabled={clearingMetric === clear}
+                onClick={() => clearMetric(clear, label)}
+                title={`Clear ${label}`}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] text-surface-500 hover:text-accent-red transition-colors disabled:opacity-50 disabled:cursor-not-allowed self-start"
+              >
+                <Trash2 size={11} /> {clearingMetric === clear ? 'Clearing…' : 'Clear'}
+              </button>
+            )}
+          </div>
         ))}
       </div>
 
@@ -220,7 +266,17 @@ export default function AdminSecurity() {
 
       {metrics.suspicious_ips?.length > 0 && (
         <div className="glass-card p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Threat IPs (5+ failed logins)</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white">Threat IPs (5+ failed logins)</h2>
+            <button
+              type="button"
+              disabled={clearingMetric === 'clear_lockouts'}
+              onClick={() => clearMetric('clear_lockouts', 'lockouts / threat IPs')}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-accent-red/10 text-accent-red hover:bg-accent-red/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 size={13} /> {clearingMetric === 'clear_lockouts' ? 'Clearing…' : 'Clear lockouts'}
+            </button>
+          </div>
           <div className="space-y-2">
             {metrics.suspicious_ips.map((row, i) => (
               <div key={i} className="flex justify-between items-center text-sm py-2 border-b border-surface-800 last:border-0">

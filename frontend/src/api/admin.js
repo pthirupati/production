@@ -363,6 +363,11 @@ export const adminApi = {
     const { data } = await api.get('/admin/itsm/meta/')
     return data
   },
+  // payload: { short_description, description?, ticket_type?, priority?, assignment_group?, user_id?, scenario_id? }
+  async createItsmTicket(payload) {
+    const { data } = await api.post('/admin/itsm/tickets/create/', payload)
+    return data
+  },
   async getItsmTicket(ticketId) {
     const { data } = await api.get(`/admin/itsm/tickets/${ticketId}/`)
     return data
@@ -435,6 +440,15 @@ export const adminApi = {
 
   async securityAction(payload) {
     const { data } = await api.post('/admin/security/actions/', payload)
+    return data
+  },
+
+  // Clear/reset the records behind a single security metric (or all of them).
+  // action e.g. 'clear_failed_logins', 'clear_otp_failures', 'clear_lockouts',
+  // 'clear_payment_failures', 'clear_email_failures', 'clear_rate_limit_hits',
+  // 'clear_lab_resets', 'clear_security_alerts', 'clear_all'.
+  async clearSecurityMetric(action) {
+    const { data } = await api.post('/admin/security/actions/', { action })
     return data
   },
 

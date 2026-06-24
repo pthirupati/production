@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     CertEarnedCertificate,
     CertificationTrack,
+    CertificationTrackSubscription,
     CertObjective,
     ExamAttempt,
     TrackScenario,
@@ -16,11 +17,22 @@ class CertObjectiveInline(admin.TabularInline):
 
 @admin.register(CertificationTrack)
 class CertificationTrackAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "vendor", "is_active", "order")
-    list_filter = ("is_active", "vendor")
+    list_display = (
+        "code", "name", "vendor", "price", "addon_price", "is_free",
+        "is_active", "coming_soon", "maintenance_enabled", "order",
+    )
+    list_filter = ("is_active", "is_free", "coming_soon", "maintenance_enabled", "vendor")
+    list_editable = ("price", "addon_price", "is_free", "is_active", "coming_soon")
     search_fields = ("code", "name", "slug")
     prepopulated_fields = {"slug": ("code",)}
     inlines = [CertObjectiveInline]
+
+
+@admin.register(CertificationTrackSubscription)
+class CertificationTrackSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ("subscription_id", "user", "track", "is_active", "expires_at", "created_at")
+    list_filter = ("is_active", "track")
+    search_fields = ("subscription_id", "user__email", "track__code")
 
 
 @admin.register(CertObjective)

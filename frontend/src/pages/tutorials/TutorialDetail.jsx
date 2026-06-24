@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Clock, Layers, ChevronLeft, Terminal, FlaskConical, ArrowRight, Copy, Check, BookOpen,
 } from 'lucide-react'
@@ -7,6 +7,8 @@ import PublicLayout from '../../components/layout/PublicLayout'
 import { FixitPanel } from '../../components/design'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import { tutorialApi } from '../../api/tutorials'
+import { tutorialPlaygroundHref } from '../../utils/playgroundLinks'
+import { useAuthStore } from '../../store/authStore'
 
 const DIFFICULTY_CLASS = {
   beginner: 'text-accent-green bg-accent-green/10 border-accent-green/20',
@@ -59,6 +61,8 @@ function Body({ text }) {
 
 export default function TutorialDetail() {
   const { slug } = useParams()
+  const navigate = useNavigate()
+  const { isAuthenticated } = useAuthStore()
   const [tutorial, setTutorial] = useState(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -123,6 +127,18 @@ export default function TutorialDetail() {
   const sections = tutorial.sections || []
   const hasPlayground = Boolean(tutorial.playground_slug)
   const hasScenario = Boolean(tutorial.scenario_slug)
+  const playgroundHref = hasPlayground
+    ? tutorialPlaygroundHref(tutorial.playground_slug, tutorial.scenario_slug)
+    : null
+
+  const openPlayground = (e) => {
+    if (!playgroundHref) return
+    // Technology + scenario pages require login — send there via login redirect.
+    if (!isAuthenticated && playgroundHref.startsWith('/technologies')) {
+      e.preventDefault()
+      navigate('/login', { state: { from: playgroundHref } })
+    }
+  }
 
   return (
     <PublicLayout>
@@ -157,7 +173,7 @@ export default function TutorialDetail() {
               </p>
               <div className="flex gap-2 shrink-0">
                 {hasPlayground && (
-                  <Link to={`/playgrounds/${tutorial.playground_slug}`} className="btn-primary text-sm inline-flex items-center gap-1.5">
+                  <Link to={playgroundHref} onClick={openPlayground} className="btn-primary text-sm inline-flex items-center gap-1.5">
                     <Terminal size={14} /> Try it now
                   </Link>
                 )}
@@ -193,7 +209,7 @@ export default function TutorialDetail() {
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {hasPlayground && (
-                  <Link to={`/playgrounds/${tutorial.playground_slug}`} className="btn-primary text-sm inline-flex items-center gap-1.5">
+                  <Link to={playgroundHref} onClick={openPlayground} className="btn-primary text-sm inline-flex items-center gap-1.5">
                     <Terminal size={14} /> Open the playground
                   </Link>
                 )}

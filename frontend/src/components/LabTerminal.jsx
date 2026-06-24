@@ -203,7 +203,11 @@ function LabTerminal({
           const max1006Retries = isSim ? 4 : 3
           if (e.code === 1006 && reconnectAttempts.current < max1006Retries) {
             reconnectAttempts.current++
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 30000)
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 8000)
+            if (reconnectAttempts.current >= max1006Retries) {
+              bindEnterRetry('\r\n\x1b[1;33mConnection paused — press Enter to reconnect\x1b[0m\r\n')
+              return
+            }
             term.write('\r\n\x1b[1;33mConnection interrupted — retrying...\x1b[0m\r\n')
             reconnectTimerRef.current = setTimeout(connectWs, delay)
             return

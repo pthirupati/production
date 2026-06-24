@@ -136,7 +136,13 @@ export default function CertificationDetail() {
       if (data.resumed) toast('Resumed your in-progress exam.')
       else toast.success('Timed mock exam started — complete the labs before time runs out.')
     } catch (err) {
-      toast.error(err?.response?.data?.error || 'Could not start the exam.')
+      const data = err?.response?.data
+      if (data?.code === 'CERT_SUBSCRIPTION_REQUIRED') {
+        toast.error('Purchase cert track access to start the mock exam')
+        navigate(data.payment_url || `/payment?cert=${slug}`)
+      } else {
+        toast.error(data?.error || 'Could not start the exam.')
+      }
     } finally {
       setBusy(false)
     }
@@ -190,6 +196,13 @@ export default function CertificationDetail() {
               <p className="text-sm text-surface-400">
                 {detail.overall_percent}% of objective labs complete · pass mark {detail.passing_score}% ·
                 {' '}{detail.exam_duration_minutes} min exam
+                {!detail.is_free && (
+                  <span className="block mt-1 text-xs text-surface-500">
+                    {detail.addon_price > 0 && detail.technology_name
+                      ? `From ₹${detail.bundled_price} (${detail.technology_name} + cert addon) · standalone ₹${detail.standalone_price}`
+                      : `Access from ₹${detail.standalone_price || detail.price}`}
+                  </span>
+                )}
               </p>
             </div>
             <div className="shrink-0">
@@ -227,8 +240,8 @@ export default function CertificationDetail() {
             <ul className="space-y-2">
               {exam.scenarios.map((s) => (
                 <li key={s.slug}>
-                  <a
-                    href={`/scenarios/${s.slug}`}
+                  <Link
+                    to={`/scenarios/${s.slug}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-surface-900 border border-surface-800 hover:border-accent-cyan/40 text-sm"
@@ -237,7 +250,7 @@ export default function CertificationDetail() {
                     <span className="text-accent-cyan inline-flex items-center gap-1 text-xs">
                       Open <ExternalLink size={12} />
                     </span>
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -262,7 +275,17 @@ export default function CertificationDetail() {
           </FixitPanel>
         ) : null}
 
-        {/* Objectives */}
+        {/* Certification scenarios — a distinct, certification-scoped group.
+            Every lab below is flagged is_certification by the API; the same lab
+            may also live under its normal technology, but here it is presented
+            as part of this track's certification path, grouped by objective. */}
+        <div className="flex items-center gap-2 mb-3 mt-2">
+          <Award size={15} className="text-accent-amber" />
+          <h2 className="font-display font-semibold text-white text-sm uppercase tracking-wider">
+            Certification scenarios
+          </h2>
+          <span className="text-xs text-surface-500">· grouped by exam objective</span>
+        </div>
         <div className="space-y-4">
           {detail.objectives.map((o) => (
             <FixitPanel key={o.code} padding="p-5">

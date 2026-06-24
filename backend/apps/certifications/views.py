@@ -20,6 +20,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.adminpanel.permissions import IsPlatformAdmin
 from apps.progress.models import UserScenarioProgress
 
 from common.throttles import StrictAnonRateThrottle
@@ -28,7 +29,12 @@ from .models import (
     CertificationTrack,
     ExamAttempt,
 )
-from .serializers import CertificateSerializer, TrackListSerializer
+from .serializers import (
+    AdminTrackSerializer,
+    CertificateSerializer,
+    TrackListSerializer,
+)
+from .services.access import effective_cert_prices, user_has_cert_track_access
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +83,13 @@ def _track_objectives_payload(track, user):
                     "title": sc.title,
                     "difficulty": sc.difficulty,
                     "completed": is_done,
+                    # Flag so the UI can render these in a dedicated
+                    # "Certification scenarios" group, visually separated from
+                    # the lab's normal technology listing (the same lab can also
+                    # appear under its regular technology — this just marks the
+                    # certification context).
+                    "is_certification": True,
+                    "in_exam_pool": ts.in_exam_pool,
                 }
             )
         total = len(scenarios)
@@ -126,6 +139,67 @@ class TrackListView(APIView):
         return Response({"tracks": TrackListSerializer(tracks, many=True).data})
 
 
+class MyCertDashboardView(APIView):
+    """GET /api/certifications/dashboard/ — learner panel: progress + active exams."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        tracks = (
+            CertificationTrack.objects.filter(is_active=True)
+            .select_related("technology")
+            .order_by("order", "name")
+        )
+        rows = []
+        for track in tracks:
+            objectives, overall = _track_objectives_payload(track, request.user)
+            attempt = (
+                ExamAttempt.objects.filter(
+                    user=request.user, track=track, status="in_progress"
+                )
+                .order_by("-started_at")
+                .first()
+            )
+            active = None
+            if attempt and not attempt.is_expired:
+                remaining = int((attempt.expires_at - timezone.now()).total_seconds())
+                active = {
+                    "id": str(attempt.id),
+                    "seconds_remaining": max(0, remaining),
+                    "scenario_count": len(attempt.results.get("scenarios", [])),
+                }
+            cert = (
+                CertEarnedCertificate.objects.filter(user=request.user, track=track)
+                .order_by("-issued_at")
+                .first()
+            )
+            pricing = effective_cert_prices(track)
+            rows.append(
+                {
+                    "slug": track.slug,
+                    "code": track.code,
+                    "name": track.name,
+                    "vendor": track.vendor,
+                    "overall_percent": overall,
+                    "passing_score": track.passing_score,
+                    "exam_duration_minutes": track.exam_duration_minutes,
+                    "is_free": track.is_free,
+                    "price": track.price,
+                    "addon_price": track.addon_price,
+                    **pricing,
+                    "has_track_access": user_has_cert_track_access(request.user, track),
+                    "active_exam": active,
+                    "earned_certificate": (
+                        {"certificate_id": cert.certificate_id, "issued_at": cert.issued_at}
+                        if cert
+                        else None
+                    ),
+                    "objective_count": len(objectives),
+                }
+            )
+        return Response({"tracks": rows})
+
+
 class TrackDetailView(APIView):
     """GET /api/certifications/<slug>/ — track + objectives + per-user progress."""
 
@@ -165,6 +239,9 @@ class TrackDetailView(APIView):
             if cert:
                 earned = {"certificate_id": cert.certificate_id, "issued_at": cert.issued_at}
 
+        pricing = effective_cert_prices(track)
+        has_access = user_has_cert_track_access(user, track) if user else track.is_free
+
         return Response(
             {
                 "slug": track.slug,
@@ -174,7 +251,22 @@ class TrackDetailView(APIView):
                 "description": track.description,
                 "exam_duration_minutes": track.exam_duration_minutes,
                 "passing_score": track.passing_score,
+                "price": track.price,
+                "addon_price": track.addon_price,
+                "is_free": track.is_free,
+                "technology_slug": track.technology.slug if track.technology_id else None,
+                "technology_name": track.technology.name if track.technology_id else None,
+                **pricing,
+                "has_track_access": has_access,
+                "maintenance_enabled": track.maintenance_enabled,
+                "maintenance_message": track.maintenance_message,
                 "overall_percent": overall,
+                # The track's scenarios are a DISTINCT, certification-scoped
+                # group: every entry under `objectives[].scenarios` is flagged
+                # is_certification=True so the UI renders them in their own
+                # "Certification scenarios" section, separate from the same
+                # labs' normal technology listing.
+                "scenario_group": "certification",
                 "objectives": objectives,
                 "active_attempt": active_attempt,
                 "earned_certificate": earned,
@@ -192,6 +284,27 @@ class ExamStartView(APIView):
             track = CertificationTrack.objects.get(slug=slug, is_active=True)
         except CertificationTrack.DoesNotExist:
             return Response({"error": "Track not found"}, status=404)
+
+        if track.maintenance_enabled:
+            return Response(
+                {"error": track.maintenance_message or "This certification track is under maintenance."},
+                status=503,
+            )
+
+        if not user_has_cert_track_access(request.user, track):
+            pricing = effective_cert_prices(track)
+            return Response(
+                {
+                    "error": "Certification track subscription required.",
+                    "code": "CERT_SUBSCRIPTION_REQUIRED",
+                    "track_slug": track.slug,
+                    "standalone_price": pricing["standalone_price"],
+                    "addon_price": pricing["addon_price"],
+                    "bundled_price": pricing["bundled_price"],
+                    "payment_url": f"/payment?cert={track.slug}",
+                },
+                status=403,
+            )
 
         # Reuse an existing live attempt instead of stacking duplicates.
         existing = (
@@ -385,6 +498,121 @@ class MyCertificatesView(APIView):
     def get(self, request):
         certs = CertEarnedCertificate.objects.filter(user=request.user).select_related("track")
         return Response({"certificates": CertificateSerializer(certs, many=True).data})
+
+
+# ─── Admin certification-track management ────────────────────────────────
+#
+# Mirrors how ``adminpanel`` manages ``Technology``: staff (IsPlatformAdmin) can
+# list every track (including inactive ones) and edit each track's commercial /
+# exam settings — active toggle, maintenance, pricing, free flag, passing score,
+# exam duration, coming-soon. These live in the certifications app (not in
+# adminpanel) so the cert domain owns its own admin surface.
+
+
+class AdminTrackListView(APIView):
+    """GET /api/certifications/admin/tracks/ — every track, with counts."""
+
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        tracks = (
+            CertificationTrack.objects.annotate(
+                objective_count=Count("objectives", distinct=True),
+                scenario_count=Count(
+                    "objectives__track_scenarios__scenario", distinct=True
+                ),
+            )
+            .select_related("technology")
+            .order_by("order", "name")
+        )
+        return Response({"tracks": AdminTrackSerializer(tracks, many=True).data})
+
+
+class AdminTrackDetailView(APIView):
+    """GET/PUT /api/certifications/admin/tracks/<pk>/ — read + update settings."""
+
+    permission_classes = [IsPlatformAdmin]
+
+    def _get_track(self, pk):
+        return (
+            CertificationTrack.objects.annotate(
+                objective_count=Count("objectives", distinct=True),
+                scenario_count=Count(
+                    "objectives__track_scenarios__scenario", distinct=True
+                ),
+            )
+            .select_related("technology")
+            .get(pk=pk)
+        )
+
+    def get(self, request, pk):
+        try:
+            track = self._get_track(pk)
+        except CertificationTrack.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+        return Response(AdminTrackSerializer(track).data)
+
+    def put(self, request, pk):
+        try:
+            track = self._get_track(pk)
+        except CertificationTrack.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+        serializer = AdminTrackSerializer(track, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            # Re-read with counts so the response carries the annotated fields.
+            return Response(AdminTrackSerializer(self._get_track(pk)).data)
+        return Response(serializer.errors, status=400)
+
+
+class AdminTrackScenariosView(APIView):
+    """GET /api/certifications/admin/tracks/<pk>/scenarios/ — the labs mapped
+    into a track, grouped by objective (the admin's view of track membership)."""
+
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request, pk):
+        try:
+            track = CertificationTrack.objects.get(pk=pk)
+        except CertificationTrack.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
+
+        objectives = []
+        total = 0
+        for obj in track.objectives.prefetch_related(
+            "track_scenarios__scenario__technology"
+        ).all():
+            scenarios = []
+            for ts in obj.track_scenarios.all():
+                sc = ts.scenario
+                scenarios.append(
+                    {
+                        "slug": sc.slug,
+                        "title": sc.title,
+                        "difficulty": sc.difficulty,
+                        "technology": getattr(sc.technology, "name", "") if sc.technology_id else "",
+                        "in_exam_pool": ts.in_exam_pool,
+                        "order": ts.order,
+                    }
+                )
+            total += len(scenarios)
+            objectives.append(
+                {
+                    "code": obj.code,
+                    "title": obj.title,
+                    "weight": obj.weight,
+                    "order": obj.order,
+                    "scenario_count": len(scenarios),
+                    "scenarios": scenarios,
+                }
+            )
+        return Response(
+            {
+                "track": {"slug": track.slug, "code": track.code, "name": track.name},
+                "scenario_count": total,
+                "objectives": objectives,
+            }
+        )
 
 
 class CertVerifyView(APIView):

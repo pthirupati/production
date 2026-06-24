@@ -248,6 +248,7 @@ class AdminTechnologiesView(APIView):
                 "color": t.color,
                 "description": t.description,
                 "price": str(t.price),
+                "is_free": t.is_free,
                 "order": t.order,
                 "is_active": t.is_active,
                 "coming_soon": t.coming_soon,
@@ -4466,10 +4467,12 @@ class AdminSecurityActionView(APIView):
             updated = qs.update(is_active=True)
             if not updated:
                 return Response({"error": "User not found"}, status=404)
-        elif action == "clear_email_failures":
+        elif action == "clear_email_failures" or action == "clear_delivery_failures":
             from apps.notifications.models import EmailLog
             deleted, _ = EmailLog.objects.filter(status="failed").delete()
             return Response({"cleared": deleted, "blocked_ips": get_blocked_ips(), "blocked_countries": get_blocked_countries()})
+        elif action in _SECURITY_CLEAR_ACTIONS or action == "clear_all":
+            return self._clear_metrics(action, get_blocked_ips, get_blocked_countries)
         else:
             return Response({"error": "Unknown action"}, status=400)
 
@@ -4477,6 +4480,73 @@ class AdminSecurityActionView(APIView):
             "blocked_ips": get_blocked_ips(),
             "blocked_countries": get_blocked_countries(),
         })
+
+    def _clear_metrics(self, action, get_blocked_ips, get_blocked_countries):
+        """Delete the audit/log records backing one (or all) security metric(s).
+
+        These are admin-only, irreversible resets of the dashboard counters.
+        Each branch deletes the underlying records so the metric drops to 0 on
+        the next refresh — e.g. clearing failed logins also empties the
+        derived "Threat IPs (5+ failed logins)" list, and clearing rate-limit
+        hits removes the rate_limit-tagged security_alert rows.
+        """
+        from apps.audit.models import AuditLog
+
+        def _clear_failed_payment_txns():
+            """Delete failed PaymentTransaction rows (the other half of the
+            payment_failed metric, alongside the payment_failed audit rows)."""
+            try:
+                from apps.billing.models import PaymentTransaction
+                n, _ = PaymentTransaction.objects.filter(status="failed").delete()
+                return n
+            except Exception:
+                return 0
+
+        cleared = 0
+        if action == "clear_all":
+            # Wipe every security-relevant audit action + failed email logs +
+            # failed payment transactions, resetting every dashboard counter.
+            actions = sorted({a for a in _SECURITY_CLEAR_ACTIONS.values() if a})
+            cleared, _ = AuditLog.objects.filter(action__in=actions).delete()
+            try:
+                from apps.notifications.models import EmailLog
+                email_cleared, _ = EmailLog.objects.filter(status="failed").delete()
+                cleared += email_cleared
+            except Exception:
+                pass
+            cleared += _clear_failed_payment_txns()
+        elif action == "clear_rate_limit_hits":
+            cleared, _ = AuditLog.objects.filter(
+                action="security_alert", metadata__contains="rate_limit"
+            ).delete()
+        elif action == "clear_payment_failures":
+            cleared, _ = AuditLog.objects.filter(action="payment_failed").delete()
+            cleared += _clear_failed_payment_txns()
+        else:
+            audit_action = _SECURITY_CLEAR_ACTIONS.get(action)
+            if not audit_action:
+                return Response({"error": "Unknown action"}, status=400)
+            cleared, _ = AuditLog.objects.filter(action=audit_action).delete()
+
+        return Response({
+            "cleared": cleared,
+            "blocked_ips": get_blocked_ips(),
+            "blocked_countries": get_blocked_countries(),
+        })
+
+
+# Maps a security "clear_*" action to the AuditLog.action whose rows it deletes.
+# Driven by AdminSecurityActionView._clear_metrics and re-used by clear_all.
+_SECURITY_CLEAR_ACTIONS = {
+    "clear_failed_logins": "login_failed",
+    "clear_login_success": "login",
+    "clear_otp_failures": "otp_failed",
+    "clear_lockouts": "login_failed",      # threat-IP list is derived from failed logins
+    "clear_payment_failures": "payment_failed",
+    "clear_lab_resets": "lab_reset",
+    "clear_security_alerts": "security_alert",
+    "clear_rate_limit_hits": "security_alert",
+}
 
 
 class AdminTestEmailView(APIView):
@@ -5561,6 +5631,89 @@ class AdminItsmMetaView(APIView):
         ).count()
         payload["total_tickets"] = ItsmTicket.objects.count()
         return Response(payload)
+
+
+class AdminItsmTicketCreateView(APIView):
+    """POST /admin/itsm/tickets/create/ — admin-create a standalone ITSM ticket.
+
+    Mirrors the Jira admin create surface but for the native ITSM sim: an admin can
+    raise a ticket on behalf of any user (or themselves if user_id is omitted). The
+    ticket is a parent ticket (no parent) and reuses apps.itsm.services.open_ticket
+    so numbering, SLA stamping, the opening note and the assignment-group bot ack all
+    fire exactly like a scenario-opened ticket.
+
+    Body: {short_description (required), description?, ticket_type?, priority?,
+           assignment_group?, user_id?, scenario_id?}
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        from apps.itsm import constants as C
+        from apps.itsm.serializers import serialize_ticket
+        from apps.itsm.services import open_ticket
+
+        short_description = (request.data.get("short_description") or "").strip()
+        if not short_description:
+            return Response({"error": "short_description is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        ticket_type = (request.data.get("ticket_type") or C.TYPE_INCIDENT).strip()
+        if ticket_type not in dict(C.TICKET_TYPES):
+            return Response(
+                {"error": f"Invalid ticket_type. Choose one of: {', '.join(k for k, _ in C.TICKET_TYPES)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        priority = (request.data.get("priority") or C.PRIORITY_MODERATE).strip()
+        if priority not in dict(C.PRIORITIES):
+            return Response(
+                {"error": f"Invalid priority. Choose one of: {', '.join(k for k, _ in C.PRIORITIES)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        assignment_group = (request.data.get("assignment_group") or C.TEAM_SERVICE_DESK).strip()
+        if assignment_group not in C.TEAM_LABELS:
+            return Response(
+                {"error": f"Invalid assignment_group. Choose one of: {', '.join(C.TEAM_LABELS)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # The ticket owner: target user_id if given, else the acting admin.
+        target_user = request.user
+        user_id = request.data.get("user_id")
+        if user_id:
+            target_user = User.objects.filter(pk=user_id).first()
+            if not target_user:
+                return Response({"error": "user not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        scenario = None
+        scenario_id = request.data.get("scenario_id")
+        if scenario_id:
+            scenario = Scenario.objects.filter(pk=scenario_id).first()
+            if not scenario:
+                return Response({"error": "scenario not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        ticket = open_ticket(
+            user=target_user,
+            scenario=scenario,
+            ticket_type=ticket_type,
+            short_description=short_description,
+            description=(request.data.get("description") or "").strip(),
+            priority=priority,
+            assignment_group=assignment_group,
+            author_user=request.user,
+        )
+        data = serialize_ticket(ticket, include_notes=True, include_children=True)
+        data["user"] = {
+            "id": ticket.user_id,
+            "username": ticket.user.username,
+            "email": ticket.user.email,
+        }
+        data["scenario"] = ({
+            "id": ticket.scenario_id,
+            "slug": ticket.scenario.slug,
+            "title": ticket.scenario.title,
+        } if ticket.scenario_id else None)
+        return Response(data, status=status.HTTP_201_CREATED)
 
 
 def _admin_get_ticket(ticket_id):
