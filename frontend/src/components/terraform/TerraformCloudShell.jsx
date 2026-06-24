@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  Cloud, Plus, Settings, GitBranch, FileText, Server, Users,
+  Cloud, Plus, Settings, GitBranch, FileText, Server, Users, Terminal, Code2,
 } from 'lucide-react'
 import LabChromeBar from '../lab/LabChromeBar'
 import { simPanelRoot } from '../../utils/simLayout'
@@ -33,9 +33,11 @@ export default function TerraformCloudShell({
   sessionId, scenario, embedded, chromeProps,
   terminalSession, terminalHost, blockedCommands, isMobile,
   state, setState, refresh, busy, run,
+  onToggleTerminal, simTerminalOpen = false,
 }) {
   const [nav, setNav] = useState('workspaces')
-  const [selectedWs, setSelectedWs] = useState(null)
+  const [shellMode, setShellMode] = useState('ide')
+  const [selectedWs, setSelectedWs] = useState(TFC_WORKSPACES.find((w) => w.name === 'lab-workspace') || TFC_WORKSPACES[0])
   const [wsTab, setWsTab] = useState('runs')
   const [selectedRun, setSelectedRun] = useState(null)
   const [showNewWs, setShowNewWs] = useState(false)
@@ -368,10 +370,70 @@ export default function TerraformCloudShell({
     )
   }
 
+  const chromeWithLabel = {
+    ...chromeProps,
+    backLabel: simTerminalOpen ? 'Hide terminal' : 'Terminal',
+  }
+
+  const modeTabs = (
+    <>
+      <button
+        type="button"
+        className={`tfc-tab ${shellMode === 'ide' ? 'tfc-tab-active' : ''}`}
+        onClick={() => setShellMode('ide')}
+      >
+        <Code2 size={13} className="inline mr-1" /> VS Code IDE
+      </button>
+      <button
+        type="button"
+        className={`tfc-tab ${shellMode === 'cloud' ? 'tfc-tab-active' : ''}`}
+        onClick={() => setShellMode('cloud')}
+      >
+        <Cloud size={13} className="inline mr-1" /> Terraform Cloud
+      </button>
+      {onToggleTerminal && (
+        <button
+          type="button"
+          className={`tfc-tab ${simTerminalOpen ? 'tfc-tab-active' : ''}`}
+          onClick={onToggleTerminal}
+        >
+          <Terminal size={13} className="inline mr-1" /> Terminal
+        </button>
+      )}
+    </>
+  )
+
+  if (shellMode === 'ide') {
+    return (
+      <div className={simPanelRoot(embedded, 'tfc-shell sim-product')}>
+        <LabChromeBar icon={Cloud} title={`${iac.label} · VS Code IDE`} subtitle={scenario?.title || slug}
+          accent={iac.accent} className="lab-chrome-bar !bg-[#1a1a2e]" {...chromeWithLabel}>
+          {modeTabs}
+        </LabChromeBar>
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <TerraformWorkspaceIde
+            sessionId={sessionId}
+            scenario={scenario}
+            terminalSession={terminalSession}
+            terminalHost={terminalHost}
+            blockedCommands={blockedCommands}
+            isMobile={isMobile}
+            state={state}
+            setState={setState}
+            onRefresh={refresh}
+            standalone
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={simPanelRoot(embedded, 'tfc-shell sim-product')}>
       <LabChromeBar icon={Cloud} title={iac.cloudTitle} subtitle={scenario?.title || slug}
-        accent={iac.accent} className="lab-chrome-bar !bg-[#1a1a2e]" {...chromeProps} />
+        accent={iac.accent} className="lab-chrome-bar !bg-[#1a1a2e]" {...chromeWithLabel}>
+        {modeTabs}
+      </LabChromeBar>
 
       <div className="tfc-topbar flex items-center justify-between px-4 py-2 shrink-0">
         <SimBreadcrumbs items={breadcrumbs} />

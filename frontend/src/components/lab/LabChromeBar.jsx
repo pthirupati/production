@@ -93,6 +93,7 @@ export default function LabChromeBar({
   extendDisabled,
   timeRemaining,
   showTimer = true,
+  backLabel = 'Terminal',
   children = null,
 }) {
   const backHandler = onBackToTerminal || onExit
@@ -116,6 +117,7 @@ export default function LabChromeBar({
           extendDisabled={extendDisabled}
           timeRemaining={timeRemaining}
           showTimer={showTimer}
+          backLabel={backLabel}
         />
       </div>
     </div>

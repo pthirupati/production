@@ -61,7 +61,7 @@ function CourseTrack({ course, defaultOpen }) {
           <p className="text-[10px] font-bold uppercase tracking-wider text-accent-purple mb-0.5">{course.topic}</p>
           <h2 className="font-display font-bold text-white text-lg">{course.course_title}</h2>
           <p className="text-xs text-surface-400 mt-0.5">
-            {course.module_count} modules · {course.total_sections} topics · structured zero-to-hero course
+            {course.module_count} modules · {course.total_sections} sections · beginner → enterprise · full textbook + notes per module
           </p>
         </div>
         {open ? <ChevronDown size={18} className="text-surface-500 shrink-0" /> : <ChevronRight size={18} className="text-surface-500 shrink-0" />}

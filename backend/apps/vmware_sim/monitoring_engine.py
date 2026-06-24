@@ -885,6 +885,26 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 return {"ok": True, "message": "Panels reordered", "order": order}
         return {"ok": False, "error": "dashboard not found"}
 
+    if action == "add_dashboard":
+        title = (payload.get("title") or "New dashboard").strip()
+        folder = (payload.get("folder") or "General").strip()
+        dashboards = state["grafana"].setdefault("dashboards", [])
+        uids = [d.get("uid") for d in dashboards if d.get("uid")]
+        next_uid = f"custom-{len(dashboards) + 1}"
+        while next_uid in uids:
+            next_uid = f"custom-{len(uids) + 2}"
+        dash = {
+            "uid": next_uid,
+            "title": title,
+            "folder": folder,
+            "tags": ["lab"],
+            "panels": [_panel(1, "Overview", "stat", "up", "short")],
+            "templating": [],
+        }
+        dashboards.append(dash)
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Dashboard created", "dashboard": dash}
+
     if action == "mark_fix_applied":
         # The Linux/terminal fix step (rewriting the broken config + FIXED-OK)
         # is what actually grades the lab. The UI may call this so panels redraw

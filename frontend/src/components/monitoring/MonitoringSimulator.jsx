@@ -3,6 +3,7 @@ import {
   Bell, Gauge, Search, Server, GitBranch,
   AlertTriangle, XCircle, RefreshCw, Play, Layers,
   Compass, Settings, Plug, Plus, Trash2, ChevronUp, ChevronDown, Pencil, ChevronRight, Home, GripVertical,
+  ArrowLeft, Terminal,
 } from 'lucide-react'
 import { monitoringApi } from '../../api/monitoring'
 import MonitoringLoginGate, { isMonitoringAuthenticated } from './MonitoringLoginGate'
@@ -298,6 +299,22 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
     onReload?.()
   }
 
+  const createDashboard = async () => {
+    try {
+      const res = await monitoringApi.action(sessionId, 'add_dashboard', {
+        title: 'New dashboard',
+        folder: 'General',
+      })
+      if (res?.dashboard?.uid) {
+        setActiveDash(res.dashboard.uid)
+        setGrafanaChildNav('View')
+        onReload?.()
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   return (
     <div className={externalNav ? '' : 'grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4'}>
       {!externalNav && (
@@ -346,14 +363,19 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
               ))}
             </div>
             <div>
-              <div className="mon-panel-title mb-3">Dashboards</div>
+              <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                <div className="mon-panel-title">Dashboards</div>
+                <button type="button" className="mon-btn-primary !text-xs flex items-center gap-1" onClick={createDashboard}>
+                  <Plus size={13} /> New dashboard
+                </button>
+              </div>
               <table className="w-full text-sm">
                 <thead><tr className="text-[#8a93b2] text-xs border-b border-[#262a45]">
                   <th className="text-left py-2 px-2">Name</th><th className="text-left py-2">Folder</th><th className="text-left py-2">Tags</th><th className="text-left py-2">Updated</th>
                 </tr></thead>
                 <tbody>
                   {GRAFANA_DASHBOARD_BROWSE.map((d) => (
-                    <tr key={d.uid} className="border-b border-[#262a45]/50 hover:bg-white/5 cursor-pointer" onClick={() => setActiveDash(d.uid)}>
+                    <tr key={d.uid} className="border-b border-[#262a45]/50 hover:bg-white/5 cursor-pointer" onClick={() => { setActiveDash(d.uid); setGrafanaChildNav('View') }}>
                       <td className="py-2 px-2 text-[#f7913b]">{d.title}</td>
                       <td className="py-2 text-[#8a93b2]">{d.folder}</td>
                       <td className="py-2">{d.tags.map((t) => <span key={t} className="mon-badge mon-badge-up mr-1 text-[9px]">{t}</span>)}</td>
@@ -401,6 +423,9 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
         {sub === 'dashboards' && dash && !['Browse', 'Playlists', 'Snapshots', 'Library panels'].includes(grafanaChildNav) && (
           <>
             <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <button type="button" className="mon-tab flex items-center gap-1" onClick={() => { setActiveDash(''); setGrafanaChildNav('Browse') }}>
+                <ArrowLeft size={13} /> Back to dashboards
+              </button>
               {(graf.dashboards || []).map(d => (
                 <button key={d.uid} onClick={() => setActiveDash(d.uid)}
                         className={`mon-tab ${d.uid === activeDash ? 'mon-tab-active' : ''}`}>{d.title}</button>
@@ -886,6 +911,7 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, st
 export default function MonitoringSimulator({
   sessionId, scenario, flavor = 'grafana', embedded = false,
   onExit, onStop, onHints, onCheck, onExtend, hintsLabel, checkDisabled, extendDisabled,
+  onToggleTerminal, simTerminalOpen = false,
 }) {
   const [authed, setAuthed] = useState(isMonitoringAuthenticated())
   const [state, setState] = useState(null)
@@ -956,9 +982,19 @@ export default function MonitoringSimulator({
         hintsLabel={hintsLabel}
         checkDisabled={checkDisabled}
         extendDisabled={extendDisabled}
+        backLabel={simTerminalOpen ? 'Hide terminal' : 'Terminal'}
       >
         <button className={`mon-tab ${view === 'grafana' ? 'mon-tab-active' : ''}`} onClick={() => setView('grafana')}>Grafana</button>
         <button className={`mon-tab ${view === 'prometheus' ? 'mon-tab-active' : ''}`} onClick={() => setView('prometheus')}>Prometheus</button>
+        {onToggleTerminal && (
+          <button
+            type="button"
+            className={`mon-tab flex items-center gap-1 ${simTerminalOpen ? 'mon-tab-active' : ''}`}
+            onClick={onToggleTerminal}
+          >
+            <Terminal size={13} /> Terminal
+          </button>
+        )}
         <button className="mon-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
       </MonitoringLabChrome>
 

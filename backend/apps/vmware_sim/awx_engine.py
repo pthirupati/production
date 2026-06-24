@@ -151,14 +151,15 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": True, "message": "Job completed successfully"}
 
     if action == "create_template":
-        if broken.get("missing_template"):
-            state["job_templates"].append(
-                {"id": 99, "name": payload.get("name") or "New Template", "playbook": "site.yml",
-                 "inventory": "Production", "status": "never"}
-            )
-            broken.pop("missing_template", None)
-            _save(session_id, entry)
-            return {"ok": True, "message": "Job template created"}
+        name = (payload.get("name") or "New Template").strip()
+        tid = max((jt.get("id", 0) for jt in state.get("job_templates", [])), default=0) + 1
+        state.setdefault("job_templates", []).append(
+            {"id": tid, "name": name, "playbook": "site.yml", "inventory": "Production", "status": "never"}
+        )
+        broken.pop("missing_template", None)
+        state["events"].insert(0, {"time": _now_iso(), "message": f"Template {name} created", "severity": "success"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Job template created"}
 
     if action == "attach_credential":
         broken.pop("credential_missing", None)
@@ -170,6 +171,41 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["summary"]["installed"] = True
         _save(session_id, entry)
         return {"ok": True, "message": "AWX operator installed"}
+
+    if action == "create_credential":
+        name = (payload.get("name") or "Machine SSH").strip()
+        kind = (payload.get("kind") or "Machine").strip()
+        cred_id = max((c.get("id", 0) for c in state.get("credentials", [])), default=0) + 1
+        state.setdefault("credentials", []).append({"id": cred_id, "name": name, "kind": kind})
+        broken.pop("credential_missing", None)
+        state["events"].insert(0, {"time": _now_iso(), "message": f"Credential {name} created", "severity": "success"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Credential created"}
+
+    if action == "create_project":
+        name = (payload.get("name") or "new-playbooks").strip()
+        pid = max((p.get("id", 0) for p in state.get("projects", [])), default=0) + 1
+        state.setdefault("projects", []).append(
+            {"id": pid, "name": name, "scm_type": "git", "status": "successful"}
+        )
+        state["events"].insert(0, {"time": _now_iso(), "message": f"Project {name} created", "severity": "success"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Project created"}
+
+    if action == "create_inventory":
+        name = (payload.get("name") or "New Inventory").strip()
+        iid = max((i.get("id", 0) for i in state.get("inventories", [])), default=0) + 1
+        state.setdefault("inventories", []).append({"id": iid, "name": name, "hosts": 0, "sources": 0})
+        state["events"].insert(0, {"time": _now_iso(), "message": f"Inventory {name} created", "severity": "success"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Inventory created"}
+
+    if action == "create_schedule":
+        name = (payload.get("name") or "Nightly patch").strip()
+        template = payload.get("template") or "Patch Linux"
+        state["events"].insert(0, {"time": _now_iso(), "message": f"Schedule {name} for {template}", "severity": "info"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Schedule created"}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

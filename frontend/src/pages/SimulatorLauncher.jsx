@@ -6,7 +6,7 @@ import { PageHeader } from '../components/design'
 
 const SIMULATORS = [
   { id: 'terraform', name: 'Terraform Cloud', desc: 'Workspaces, runs, registry, variables, and VS Code–style IDE', icon: Cloud, color: '#5c4ee5', path: '/technologies/terraform' },
-  { id: 'awx', name: 'Ansible AWX / Tower', desc: 'Job templates, inventories, credentials, workflow visualizer', icon: Server, color: '#EE0000', path: '/technologies/ansible-awx' },
+  { id: 'awx', name: 'Ansible AWX / Tower', desc: 'Job templates, inventories, credentials, workflow visualizer', icon: Server, color: '#EE0000', path: '/technologies/ansible' },
   { id: 'grafana', name: 'Grafana', desc: 'Dashboards, Explore, alerting, data sources, administration', icon: Gauge, color: '#f7913b', path: '/technologies/grafana' },
   { id: 'prometheus', name: 'Prometheus', desc: 'PromQL graph, alerts, targets, rules, service discovery', icon: Activity, color: '#e6522c', path: '/technologies/prometheus' },
   { id: 'windows', name: 'Windows Server', desc: 'Server Manager, AD Users & Computers, GPO Editor', icon: Monitor, color: '#0078D4', path: '/technologies/windows' },

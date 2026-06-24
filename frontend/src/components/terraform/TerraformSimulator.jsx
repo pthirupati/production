@@ -13,6 +13,7 @@ export default function TerraformSimulator(props) {
     sessionId, scenario, embedded = false,
     terminalSession, terminalHost, blockedCommands, isMobile,
     onExit, onStop, onHints, onCheck, onExtend, hintsLabel, checkDisabled, extendDisabled,
+    onToggleTerminal, simTerminalOpen,
   } = props
   const slug = scenario?.slug || ''
   const iac = getIacProfile()
@@ -48,6 +49,8 @@ export default function TerraformSimulator(props) {
       refresh={refresh}
       busy={busy}
       run={run}
+      onToggleTerminal={onToggleTerminal}
+      simTerminalOpen={simTerminalOpen}
     />
   )
 }

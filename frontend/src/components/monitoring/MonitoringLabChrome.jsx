@@ -15,6 +15,7 @@ export default function MonitoringLabChrome({
   hintsLabel = 'Hints',
   checkDisabled = false,
   extendDisabled = false,
+  backLabel = 'Terminal',
   children = null,
 }) {
   return (
@@ -32,6 +33,7 @@ export default function MonitoringLabChrome({
       hintsLabel={hintsLabel}
       checkDisabled={checkDisabled}
       extendDisabled={extendDisabled}
+      backLabel={backLabel}
     >
       {children}
     </LabChromeBar>

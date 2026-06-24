@@ -714,6 +714,31 @@ TUTORIALS: list[dict] = [
 ]
 
 
+# Single-page e3 summaries replaced by full 10-module zero-to-hero courses.
+SHALLOW_E3_SLUGS = frozenset({
+    "vmware-zero-to-hero",
+    "grafana-zero-to-hero",
+    "prometheus-zero-to-hero",
+    "terraform-aws-zero-to-hero",
+    "ansible-awx-zero-to-hero",
+    "nmap-security-zero-to-hero",
+    "wireshark-zero-to-hero",
+    "windows-server-zero-to-hero",
+    "rhel-linux-zero-to-hero",
+    "database-sql-zero-to-hero",
+    "peoplesoft-zero-to-hero",
+    "prompt-engineering-zero-to-hero",
+    "javascript-zero-to-hero",
+    "html-css-zero-to-hero",
+    "java-zero-to-hero",
+})
+
+
+def _filter_specs(specs: list) -> list:
+    """Drop shallow duplicate tutorials superseded by course catalog modules."""
+    return [s for s in specs if s.get("slug") not in SHALLOW_E3_SLUGS]
+
+
 class Command(BaseCommand):
     help = "Seed the public Tutorials section with original written content (idempotent)."
 
@@ -795,6 +820,11 @@ class Command(BaseCommand):
             self.stdout.write(f"  + expanded {len(catalog)} tutorials from course_catalog")
         except Exception as exc:
             self.stderr.write(f"  ! could not expand course_catalog: {exc}")
+        specs = _filter_specs(specs)
+        stale = Tutorial.objects.filter(slug__in=SHALLOW_E3_SLUGS).count()
+        if stale:
+            Tutorial.objects.filter(slug__in=SHALLOW_E3_SLUGS).delete()
+            self.stdout.write(self.style.WARNING(f"  - removed {stale} superseded shallow tutorials"))
         for spec in specs:
             sections = spec.pop("sections", [])
             obj, was_created = Tutorial.objects.update_or_create(

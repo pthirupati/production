@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Play, RefreshCw, Layers, FolderGit2, Key, ListChecks, Server, AlertTriangle,
-  Calendar, Activity, CheckSquare, Users, Bell, Settings, Cpu, Package,
+  Calendar, Activity, CheckSquare, Users, Bell, Settings, Cpu, Package, Plus, Terminal,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import {
@@ -33,14 +33,24 @@ const SIDEBAR = AWX_SIDEBAR.map((s) => ({
 export default function AwxSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
   hintsLabel, checkDisabled, extendDisabled, embedded = false,
+  onToggleTerminal, simTerminalOpen = false,
 }) {
   const slug = scenario?.slug || ''
-  const { state, loading, busy, run } = useSimSession(sessionId, slug, awxApi)
+  const { state, loading, busy, run, refresh } = useSimSession(sessionId, slug, awxApi)
   const [nav, setNav] = useState('dashboard')
   const [selectedJob, setSelectedJob] = useState(null)
   const [launchModal, setLaunchModal] = useState(null)
   const [credModal, setCredModal] = useState(false)
   const [credType, setCredType] = useState('machine')
+  const [credName, setCredName] = useState('Machine SSH')
+  const [projectModal, setProjectModal] = useState(false)
+  const [projectName, setProjectName] = useState('ansible-playbooks')
+  const [inventoryModal, setInventoryModal] = useState(false)
+  const [inventoryName, setInventoryName] = useState('Production')
+  const [templateModal, setTemplateModal] = useState(false)
+  const [templateName, setTemplateName] = useState('Site Deploy')
+  const [scheduleModal, setScheduleModal] = useState(false)
+  const [scheduleName, setScheduleName] = useState('Nightly patch')
 
   const inv = state?.inventory || {}
   const loggedIn = inv?.session?.logged_in
@@ -49,6 +59,7 @@ export default function AwxSimulator({
     onHints, onCheck, onExtend, onStop,
     onBackToTerminal: embedded ? undefined : onExit,
     hintsLabel, checkDisabled, extendDisabled,
+    backLabel: simTerminalOpen ? 'Hide terminal' : 'Terminal',
   }
 
   const breadcrumbs = [{ label: inv?.summary?.organization || 'Default', onClick: () => setNav('dashboard') }]
@@ -115,12 +126,17 @@ export default function AwxSimulator({
     if (nav === 'job-templates' || nav === 'templates') {
       return (
         <div className="space-y-3">
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center flex-wrap gap-2">
             <h2 className="text-lg font-semibold">Job Templates</h2>
-            {inv.broken?.missing_template && (
-              <button onClick={() => run(() => awxApi.createTemplate(sessionId, 'Site Deploy'), 'Template created')} className="awx-btn-launch">+ Create</button>
-            )}
+            <button type="button" className="awx-btn-launch flex items-center gap-1" onClick={() => setTemplateModal(true)}>
+              <Plus size={14} /> Create template
+            </button>
           </div>
+          {inv.broken?.missing_template && (
+            <div className="awx-widget text-sm text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded">
+              Scenario requires a job template — click Create template.
+            </div>
+          )}
           <SimDataTable columns={[
             { key: 'name', label: 'Name', sortable: true },
             { key: 'playbook', label: 'Playbook', sortable: true },
@@ -137,7 +153,12 @@ export default function AwxSimulator({
     if (nav === 'projects') {
       return (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Projects</h2>
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Projects</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" onClick={() => setProjectModal(true)}>
+              <Plus size={14} /> Add project
+            </button>
+          </div>
           {(inv.projects || []).map((p) => (
             <div key={p.id} className="awx-widget flex justify-between items-center">
               <div><div className="font-medium">{p.name}</div><div className="text-xs text-slate-500">{p.scm_type} · <SimStatusBadge status={p.status} label={p.status} /></div></div>
@@ -149,11 +170,19 @@ export default function AwxSimulator({
     }
     if (nav === 'inventories') {
       return (
-        <SimDataTable columns={[
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Inventories</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" onClick={() => setInventoryModal(true)}>
+              <Plus size={14} /> Add inventory
+            </button>
+          </div>
+          <SimDataTable columns={[
           { key: 'name', label: 'Inventory', sortable: true },
           { key: 'hosts', label: 'Hosts', sortable: true },
           { key: 'id', label: 'ID' },
-        ]} rows={inv.inventories || []} searchKeys={['name']} />
+          ]} rows={inv.inventories || []} searchKeys={['name']} />
+        </div>
       )
     }
     if (nav === 'hosts') {
@@ -181,11 +210,21 @@ export default function AwxSimulator({
       )
     }
     if (nav === 'schedules') {
-      return <SimDataTable columns={[
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Schedules</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" onClick={() => setScheduleModal(true)}>
+              <Plus size={14} /> Add schedule
+            </button>
+          </div>
+          <SimDataTable columns={[
         { key: 'name', label: 'Schedule', sortable: true },
         { key: 'template', label: 'Template', sortable: true },
         { key: 'nextRun', label: 'Next Run', sortable: true, render: (r) => new Date(r.nextRun).toLocaleString() },
-      ]} rows={AWX_SCHEDULES} searchKeys={['name']} />
+          ]} rows={AWX_SCHEDULES} searchKeys={['name']} />
+        </div>
+      )
     }
     if (nav === 'users') {
       return <SimDataTable columns={[
@@ -313,7 +352,17 @@ export default function AwxSimulator({
   return (
     <div className={simPanelRoot(embedded, 'awx-shell sim-product')}>
       <LabChromeBar title={`Ansible AWX · ${inv?.summary?.version || '24'}`} subtitle={scenario?.title || slug}
-        accent="#EE0000" className="lab-chrome-bar !bg-[#2c2c54]" {...chromeProps} />
+        accent="#EE0000" className="lab-chrome-bar !bg-[#2c2c54]" {...chromeProps}>
+        {onToggleTerminal && (
+          <button
+            type="button"
+            className="lab-chrome-btn flex items-center gap-1"
+            onClick={onToggleTerminal}
+          >
+            <Terminal size={13} /> {simTerminalOpen ? 'Hide terminal' : 'Terminal'}
+          </button>
+        )}
+      </LabChromeBar>
 
       {goal.objective && (
         <div className="px-4 py-2 text-sm bg-amber-50 border-b border-amber-200 flex items-center gap-2">
@@ -343,7 +392,17 @@ export default function AwxSimulator({
       </SimModal>
 
       <SimModal open={credModal} onClose={() => setCredModal(false)} title="Create Credential"
-        footer={<button type="button" className="awx-btn-launch" onClick={() => setCredModal(false)}>Save</button>}>
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setCredModal(false)}>Cancel</button>
+          <button type="button" className="awx-btn-launch" disabled={busy} onClick={() => {
+            run(() => awxApi.createCredential(sessionId, credName, credType), 'Credential created')
+            setCredModal(false)
+            refresh?.()
+          }}>Save</button>
+        </>}>
+        <label className="block text-sm mb-2">Name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={credName} onChange={(e) => setCredName(e.target.value)} />
+        </label>
         <label className="block text-sm mb-2">Credential Type
           <select className="w-full mt-1 border rounded px-2 py-1.5" value={credType} onChange={(e) => setCredType(e.target.value)}>
             {AWX_CREDENTIAL_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
@@ -352,6 +411,61 @@ export default function AwxSimulator({
         {AWX_CREDENTIAL_TYPES.find((t) => t.id === credType)?.fields.map((f) => (
           <input key={f} placeholder={f.replace('_', ' ')} className="w-full mt-2 border rounded px-2 py-1.5 text-sm" />
         ))}
+      </SimModal>
+
+      <SimModal open={templateModal} onClose={() => setTemplateModal(false)} title="Create Job Template"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setTemplateModal(false)}>Cancel</button>
+          <button type="button" className="awx-btn-launch" disabled={busy} onClick={() => {
+            run(() => awxApi.createTemplate(sessionId, templateName), 'Template created')
+            setTemplateModal(false)
+            refresh?.()
+          }}>Create</button>
+        </>}>
+        <label className="block text-sm">Template name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={templateName} onChange={(e) => setTemplateName(e.target.value)} />
+        </label>
+      </SimModal>
+
+      <SimModal open={projectModal} onClose={() => setProjectModal(false)} title="Add Project"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setProjectModal(false)}>Cancel</button>
+          <button type="button" className="awx-btn-launch" disabled={busy} onClick={() => {
+            run(() => awxApi.createProject(sessionId, projectName), 'Project created')
+            setProjectModal(false)
+            refresh?.()
+          }}>Add</button>
+        </>}>
+        <label className="block text-sm">Project name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
+        </label>
+      </SimModal>
+
+      <SimModal open={inventoryModal} onClose={() => setInventoryModal(false)} title="Add Inventory"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setInventoryModal(false)}>Cancel</button>
+          <button type="button" className="awx-btn-launch" disabled={busy} onClick={() => {
+            run(() => awxApi.createInventory(sessionId, inventoryName), 'Inventory created')
+            setInventoryModal(false)
+            refresh?.()
+          }}>Add</button>
+        </>}>
+        <label className="block text-sm">Inventory name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={inventoryName} onChange={(e) => setInventoryName(e.target.value)} />
+        </label>
+      </SimModal>
+
+      <SimModal open={scheduleModal} onClose={() => setScheduleModal(false)} title="Add Schedule"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setScheduleModal(false)}>Cancel</button>
+          <button type="button" className="awx-btn-launch" disabled={busy} onClick={() => {
+            run(() => awxApi.createSchedule(sessionId, scheduleName, 'Patch Linux'), 'Schedule created')
+            setScheduleModal(false)
+          }}>Save</button>
+        </>}>
+        <label className="block text-sm">Schedule name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={scheduleName} onChange={(e) => setScheduleName(e.target.value)} />
+        </label>
       </SimModal>
     </div>
   )

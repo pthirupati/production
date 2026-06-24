@@ -25,6 +25,18 @@ export const awxApi = {
   attachCredential(sessionId) {
     return awxApi.action(sessionId, 'attach_credential', {})
   },
+  createCredential(sessionId, name, kind) {
+    return awxApi.action(sessionId, 'create_credential', { name, kind })
+  },
+  createProject(sessionId, name) {
+    return awxApi.action(sessionId, 'create_project', { name })
+  },
+  createInventory(sessionId, name) {
+    return awxApi.action(sessionId, 'create_inventory', { name })
+  },
+  createSchedule(sessionId, name, template) {
+    return awxApi.action(sessionId, 'create_schedule', { name, template })
+  },
   installAwx(sessionId) {
     return awxApi.action(sessionId, 'install_awx', {})
   },

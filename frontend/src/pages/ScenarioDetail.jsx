@@ -11,11 +11,12 @@ import { useAuthStore } from '../store/authStore'
 import {
   Clock, Target, Lightbulb, Play, CheckCircle2,
   Wrench, Skull, ArrowLeft, BookmarkPlus, Bookmark,
-  Users, BarChart3, Hash, Award, Lock, Eye, Zap, Star, Send
+  Users, BarChart3, Hash, Award, Lock, Eye, Zap, Star, Send, Monitor,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader } from '../components/design'
 import { ScenarioStatsChip } from '../components/engagement'
+import { getScenarioSimInfo } from '../utils/simScenario'
 
 const typeConfig = {
   fix: { icon: Wrench, label: 'Fix', desc: 'Find and fix the broken service' },
@@ -218,6 +219,7 @@ export default function ScenarioDetail() {
     : null
 
   const locked = scenario.is_accessible === false
+  const simInfo = getScenarioSimInfo(scenario)
 
   // When the user isn't subscribed, the scenario stays fully viewable but the
   // "Start" action is replaced by a Subscribe CTA that routes to pricing.
@@ -329,6 +331,15 @@ export default function ScenarioDetail() {
           {scenario.is_free && (
             <span className="bg-accent-green/10 text-accent-green px-2 py-0.5 rounded text-xs border border-accent-green/20">Free</span>
           )}
+          {simInfo && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border font-medium"
+              style={{ borderColor: `${simInfo.accent}55`, color: simInfo.accent, backgroundColor: `${simInfo.accent}14` }}
+              title={`Starts the ${simInfo.label} in-app simulator with optional lab terminal`}
+            >
+              <Monitor size={11} /> Opens {simInfo.short} simulator
+            </span>
+          )}
           {userCompleted && (
             <span className="flex items-center gap-1 text-accent-green bg-accent-green/10 border border-accent-green/20 rounded-lg px-2 py-0.5 text-xs font-semibold ml-auto">
               <CheckCircle2 size={13} /> Solved
@@ -414,6 +425,21 @@ export default function ScenarioDetail() {
       )}
 
       {/* Description */}
+      {simInfo && (
+        <div className="glass-card p-5 border-l-4" style={{ borderLeftColor: simInfo.accent }}>
+          <h2 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+            <Monitor size={16} style={{ color: simInfo.accent }} />
+            In-app simulator
+          </h2>
+          <p className="text-sm text-surface-400 leading-relaxed">
+            This challenge opens the <strong className="text-surface-200">{simInfo.label}</strong> inside the lab.
+            Use the <strong className="text-surface-200">Terminal</strong> button in the simulator toolbar to run shell commands
+            (e.g. <code className="text-accent-cyan">terraform apply</code>, edit configs under <code className="text-accent-cyan">/etc</code>).
+            Terraform labs default to the VS Code IDE with HCL editor and integrated terminal.
+          </p>
+        </div>
+      )}
+
       <div className="glass-card p-6">
         <h2 className="text-base font-semibold text-white mb-3">Description</h2>
         <p className="text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">{scenario.description}</p>

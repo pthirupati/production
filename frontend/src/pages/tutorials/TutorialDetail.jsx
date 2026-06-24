@@ -29,6 +29,7 @@ function sectionTheme(heading) {
   if (h.includes('security')) return 'tutorial-section-security'
   if (h.includes('enterprise') || h.includes('production')) return 'tutorial-section-enterprise'
   if (h.includes('interview') || h.includes('scenario question') || h.includes('assessment') || h.includes('certification')) return 'tutorial-section-interview'
+  if (h.includes('notes') || h.includes('takeaway')) return 'tutorial-section-notes'
   if (h.includes('monitor') || h.includes('performance')) return 'tutorial-section-monitoring'
   return 'tutorial-section-concepts'
 }
@@ -79,9 +80,28 @@ function Body({ text }) {
   if (!text) return null
   return (
     <div className="tutorial-prose space-y-4">
-      {text.split('\n\n').map((para, i) => (
-        <p key={i} className="whitespace-pre-line">{formatInline(para)}</p>
-      ))}
+      {text.split('\n\n').map((para, i) => {
+        if (para.startsWith('## ')) {
+          return (
+            <h3 key={i} className="text-lg font-semibold text-white tracking-tight">
+              {para.slice(3).trim()}
+            </h3>
+          )
+        }
+        if (para.includes('\n- ') || para.startsWith('- ')) {
+          const lines = para.split('\n').filter(Boolean)
+          return (
+            <ul key={i} className="list-disc pl-5 space-y-2 text-surface-300">
+              {lines.map((line, j) => (
+                <li key={j} className="leading-relaxed">{formatInline(line.replace(/^-\s*/, ''))}</li>
+              ))}
+            </ul>
+          )
+        }
+        return (
+          <p key={i} className="whitespace-pre-line leading-relaxed">{formatInline(para)}</p>
+        )
+      })}
     </div>
   )
 }
@@ -298,6 +318,15 @@ export default function TutorialDetail() {
                   {tutorial.title}
                 </h1>
                 <p className="text-lg text-surface-300 leading-relaxed max-w-2xl">{tutorial.summary}</p>
+                <div className="mt-5 p-4 rounded-xl border border-surface-800/80 bg-surface-900/40">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-cyan mb-2">Course content in this lesson</p>
+                  <p className="text-xs text-surface-400 leading-relaxed">
+                    Theory → Architecture → Concepts → Use cases → Labs → Simulations → Projects →
+                    Troubleshooting → Interview & scenario questions → Assessments → Certification prep →
+                    Enterprise examples → Best practices → Security → Performance → Monitoring →
+                    Real incidents → Root cause analysis → **Notes and key takeaways**
+                  </p>
+                </div>
                 <div className="mt-5 flex flex-wrap items-center gap-4 text-xs text-surface-500">
                   <span className="flex items-center gap-1"><Clock size={13} /> {tutorial.estimated_minutes} min read</span>
                   <span className="flex items-center gap-1"><Layers size={13} /> {sections.length} sections</span>

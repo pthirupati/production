@@ -403,173 +403,12 @@ def all_course_definitions() -> list[dict]:
         return list(COURSE_DEFINITIONS)
 
 
-def _sections_for_module(course: dict, module_title: str, level: str) -> list:
+def _sections_for_module(course: dict, module_title: str, level: str, module_order: int = 0) -> list:
     """Full learning-module structure: theory through RCA (enterprise-grade)."""
-    topic = course["topic"]
-    playground = course.get("playground_slug") or topic.lower()
-    t = module_title
-    tl = t.lower()
-    code_sample = (
-        f"# {t} — {topic} ({level})\n"
-        f"# Open the {topic} playground or linked lab scenario\n"
-        f"help 2>/dev/null | head -5 || echo 'Practice {tl} hands-on'"
-    )
-    return [
-        (
-            "Theory",
-            f"**{t}** in {topic} is foundational at the **{level}** tier. "
-            f"Operators use this daily in production: design reviews, change windows, and on-call. "
-            f"Read this section before touching systems — understanding *why* prevents costly mistakes.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Architecture",
-            f"Map the control plane vs data plane for {tl}. "
-            f"Identify upstream dependencies (network, identity, storage) and downstream consumers. "
-            f"Draw a one-page diagram: components, trust boundaries, and failure domains.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Core concepts",
-            f"Key terms for {tl}: lifecycle states, idempotency, blast radius, and rollback paths. "
-            f"At {level} depth you should explain each concept without notes and tie it to a real component.",
-            code_sample,
-            "bash",
-            f"Run in the {topic} playground.",
-        ),
-        (
-            "Use cases",
-            f"Common {topic} scenarios requiring {tl}: greenfield deploys, migrations, incident recovery, "
-            f"compliance audits, and cost optimization. Match each use case to metrics and SLIs.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Hands-on labs",
-            f"Complete the linked FixitLab scenario for {tl}. "
-            f"Follow hints only after attempting diagnosis. Document commands run and outcomes in your runbook.",
-            code_sample,
-            "bash",
-            "Use Check Solution when the lab scenario is linked.",
-        ),
-        (
-            "Interactive simulations",
-            f"Where available, use the {topic} simulator to reproduce {tl} without production risk. "
-            f"Compare simulated metrics/logs to what you would expect on bare metal or cloud.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Projects",
-            f"Capstone: implement {tl} end-to-end in a sandbox — IaC, CI gate, monitoring, and rollback. "
-            f"Deliverables: architecture doc, test evidence, and an operator handoff checklist.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Troubleshooting",
-            f"When {tl} fails: (1) scope impact, (2) collect logs/metrics/traces, (3) bisect recent changes, "
-            f"(4) validate dependencies, (5) execute rollback or mitigation, (6) confirm recovery.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Interview questions",
-            f"Practice explaining {tl} in 2 minutes, then deep-dive on trade-offs. "
-            f"Expect follow-ups on failure modes, security, and how you measured success in past roles.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Scenario questions",
-            f"Situational prompt: \"{t} is degraded in production — walk me through your first 15 minutes.\" "
-            f"Structure: stabilize, communicate, diagnose, fix, verify, postmortem.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Assessments",
-            f"Self-check: can you perform {tl} unaided, teach it to a junior, and defend design choices to security? "
-            f"Score each dimension 1–5; below 4 means repeat the lab and simulation.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Certification exam prep",
-            f"Map this module to vendor objectives (RHCSA/RHCE, CKA/CKAD, AWS SA, etc.) for {topic}. "
-            f"Note objective IDs in your study plan and cross-link FixitLab certification tracks.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Enterprise production examples",
-            f"At enterprise scale, {tl} runs with change advisory boards, automated compliance scans, "
-            f"multi-region failover, and audited break-glass. Review a sanitized runbook from a Fortune-500 pattern.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Best practices",
-            f"Automate {tl}, keep changes small, test in staging that mirrors prod, and maintain golden paths. "
-            f"Prefer GitOps / IaC over snowflake servers.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Security practices",
-            f"Apply least privilege, encrypt data in transit/at rest, rotate credentials, and scan artifacts. "
-            f"Threat-model {tl} for insider abuse and supply-chain tampering.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Performance tuning",
-            f"Profile {tl} under load: CPU, memory, I/O, and latency percentiles. "
-            f"Set baselines; tune only with before/after evidence.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Monitoring",
-            f"Define SLIs/SLOs for {tl}. Dashboards should answer: \"Are we healthy?\" and \"Why not?\" "
-            f"Wire alerts to runbooks — pages must be actionable.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Real incidents",
-            f"Study a public postmortem related to {topic}. Extract signals that would have caught the issue earlier "
-            f"and how {tl} skills would shorten mean time to recovery.",
-            "",
-            "text",
-            "",
-        ),
-        (
-            "Root cause analysis",
-            f"After any {tl} incident: timeline, contributing factors, corrective vs preventive actions, "
-            f"and verification that fixes hold under load. Blameless culture; focus on systems.",
-            "",
-            "text",
-            f"Next module in {course['course_title']} builds on this foundation.",
-        ),
-    ]
+    from .section_content import build_module_sections
+
+    course_ctx = {**course, "_module_order": module_order}
+    return build_module_sections(course_ctx, module_title, level)
 
 
 def build_catalog_specs(base_order: int = 400) -> list[dict]:
@@ -587,10 +426,14 @@ def build_catalog_specs(base_order: int = 400) -> list[dict]:
                 {
                     "slug": slug,
                     "title": f"{course['topic']}: {module_title}",
-                    "summary": f"Module {idx} — {module_title} ({level} track).",
+                    "summary": (
+                        f"Module {idx}/10 — {module_title}. "
+                        f"Complete {level} lesson: theory, architecture, labs, troubleshooting, "
+                        f"interview prep, and enterprise patterns for {course['topic']}."
+                    ),
                     "topic": course["topic"],
                     "difficulty": DIFFICULTY_BY_LEVEL.get(level, "intermediate"),
-                    "estimated_minutes": 35 + (idx * 3),
+                    "estimated_minutes": 55 + (idx * 5),
                     "playground_slug": course.get("playground_slug", ""),
                     "scenario_slug": "",
                     "order": order,
@@ -601,7 +444,7 @@ def build_catalog_specs(base_order: int = 400) -> list[dict]:
                     "seo_title": f"{module_title} — {course['course_title']}",
                     "seo_description": f"Module {idx} of {course['course_title']}: {module_title}. Hands-on {course['topic']} training from zero to hero.",
                     "seo_keywords": f"{course['topic'].lower()}, {module_title.lower()}, zero to hero, devops tutorial, {level}",
-                    "sections": _sections_for_module(course, module_title, level),
+                    "sections": _sections_for_module(course, module_title, level, idx),
                 }
             )
             order += 1

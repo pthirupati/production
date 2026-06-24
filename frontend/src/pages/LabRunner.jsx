@@ -30,6 +30,7 @@ import AwxSimulator from '../components/awx/AwxSimulator'
 import TerraformSimulator from '../components/terraform/TerraformSimulator'
 import { isTerraformLab } from '../utils/iacFlavor'
 import BaremetalSimulator from '../components/baremetal/BaremetalSimulator'
+import { SimWithTerminal } from '../components/sim/shared'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
@@ -149,6 +150,7 @@ export default function LabRunner() {
   const [showPeopleSoftSim, setShowPeopleSoftSim] = useState(false)
   const [showAwxSim, setShowAwxSim] = useState(false)
   const [showTerraformSim, setShowTerraformSim] = useState(false)
+  const [simTerminalOpen, setSimTerminalOpen] = useState(false)
   const [showBaremetalSim, setShowBaremetalSim] = useState(false)
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
@@ -1023,17 +1025,23 @@ export default function LabRunner() {
   const isPromptLab = Boolean(scenario?.coding_mode) && promptKind
   const isCodingLab = Boolean(scenario?.coding_mode) && !isPromptLab
 
-  const primarySimProps = { sessionId, scenario, embedded: true, ...simChromeProps }
+  const primarySimProps = {
+    sessionId,
+    scenario,
+    embedded: true,
+    ...simChromeProps,
+    onExit: () => setSimTerminalOpen((v) => !v),
+    onToggleTerminal: () => setSimTerminalOpen((v) => !v),
+    simTerminalOpen,
+    terminalSession,
+    terminalHost,
+    blockedCommands: blockedCmds,
+    isMobile,
+  }
   const renderPrimarySim = () => {
     if (isTerraformSimLab) {
       return (
-        <TerraformSimulator
-          {...primarySimProps}
-          terminalSession={terminalSession}
-          terminalHost={terminalHost}
-          blockedCommands={blockedCmds}
-          isMobile={isMobile}
-        />
+        <TerraformSimulator {...primarySimProps} />
       )
     }
     if (isAwxLab) return <AwxSimulator {...primarySimProps} />
@@ -1611,7 +1619,16 @@ export default function LabRunner() {
 
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative">
         {isSimPrimaryLab ? (
-          renderPrimarySim()
+          <SimWithTerminal
+            open={simTerminalOpen}
+            onToggle={() => setSimTerminalOpen((v) => !v)}
+            terminalSession={terminalSession}
+            terminalHost={terminalHost}
+            blockedCommands={blockedCmds}
+            isMobile={isMobile}
+          >
+            {renderPrimarySim()}
+          </SimWithTerminal>
         ) : (
         <>
         {isCrossTechMonitoringSplit && (

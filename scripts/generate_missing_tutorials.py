@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Generate zero-to-hero tutorials for technologies missing dedicated courses."""
+"""DEPRECATED: shallow single-page tutorials — use course_catalog.py instead.
+
+Regenerating this file is no longer recommended. Full 10-module courses with
+19 sections each are built programmatically via seed_tutorials → course_catalog.
+"""
 import json
 import os
 
