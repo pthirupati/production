@@ -15,6 +15,26 @@ const DIFFICULTY_CLASS = {
   beginner: 'text-accent-green bg-accent-green/10 border-accent-green/20',
   intermediate: 'text-accent-amber bg-accent-amber/10 border-accent-amber/20',
   advanced: 'text-accent-red bg-accent-red/10 border-accent-red/20',
+  expert: 'text-pink-400 bg-pink-500/10 border-pink-500/20',
+  enterprise: 'text-accent-purple bg-accent-purple/10 border-accent-purple/20',
+}
+
+const SECTION_ACCENT = {
+  Theory: 'tutorial-section-theory',
+  Architecture: 'tutorial-section-architecture',
+  'Hands-on labs': 'tutorial-section-labs',
+  Troubleshooting: 'tutorial-section-troubleshooting',
+  'Security practices': 'tutorial-section-security',
+  'Enterprise production examples': 'tutorial-section-enterprise',
+  'Root cause analysis': 'tutorial-section-enterprise',
+}
+
+const LEVEL_CLASS = {
+  beginner: 'tutorial-level-beginner',
+  intermediate: 'tutorial-level-intermediate',
+  advanced: 'tutorial-level-advanced',
+  expert: 'tutorial-level-expert',
+  enterprise: 'tutorial-level-enterprise',
 }
 
 function CodeBlock({ code, language, caption }) {
@@ -262,7 +282,9 @@ export default function TutorialDetail() {
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-accent-cyan">{tutorial.course_title || tutorial.topic}</span>
                   {tutorial.level_track && (
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-accent-purple/30 text-accent-purple capitalize">{tutorial.level_track}</span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border border-surface-700 capitalize ${LEVEL_CLASS[tutorial.level_track] || 'text-surface-300'}`}>
+                      {tutorial.level_track} track
+                    </span>
                   )}
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border capitalize ${DIFFICULTY_CLASS[tutorial.difficulty] || DIFFICULTY_CLASS.beginner}`}>
                     {tutorial.difficulty}
@@ -302,7 +324,7 @@ export default function TutorialDetail() {
                   <section
                     key={i}
                     id={`section-${s.order}`}
-                    className="scroll-mt-24 fx-panel p-6 sm:p-7 border-surface-800/80 hover:border-accent-cyan/15 transition-colors"
+                    className={`scroll-mt-24 fx-panel p-6 sm:p-7 border-surface-800/80 hover:border-accent-cyan/15 transition-colors ${SECTION_ACCENT[s.heading] || ''}`}
                   >
                     <h2 className="font-display text-xl font-semibold text-white mb-4 flex items-start gap-3">
                       <span className="shrink-0 w-8 h-8 rounded-lg bg-accent-cyan/10 border border-accent-cyan/20 flex items-center justify-center text-accent-cyan text-sm font-mono">

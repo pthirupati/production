@@ -122,6 +122,18 @@ if [ "$RUN_E2E" = "true" ] || [ "$RUN_E2E" = "1" ]; then
   fi
 fi
 
+# ── 5b. Lab UI smoke (frontend ErrorBoundary / TDZ) ──
+echo ""
+echo ">>> [5b/7] Lab UI smoke (Playwright)"
+if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+  env E2E_SKIP_LAB=0 E2E_LAB_UI_SCENARIOS=2 SITE_URL="$SITE_URL" E2E_SKIP_CLEANUP=1 \
+  python /scripts/e2e_lab_ui_smoke.py 2>&1; then
+  echo "  ✓ Lab UI smoke OK"
+else
+  echo "ERROR: Lab UI smoke failed — frontend lab page may be broken"
+  fail=1
+fi
+
 # ── 6. Full E2E API suite ──
 echo ""
 echo ">>> [6/7] Full E2E API tests"

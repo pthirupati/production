@@ -988,6 +988,8 @@ export default function LabRunner() {
   const simOverlayOpen = showMonitoringSim || showNmapSim || showWiresharkSim
     || showDataDashboardSim || showAgentSim || showWindowsSim || showPeopleSoftSim
     || showAwxSim || showBaremetalSim || showTerraformSim
+  const solved = validationResult?.passed
+  const expired = validationResult?.expired
   const simChromeProps = {
     onHints: () => { setSidebarTab('hints'); setSidebarOpen(true) },
     onCheck: handleValidate,
@@ -1043,8 +1045,6 @@ export default function LabRunner() {
     setTerminalHost('ssh_client')
     toast(`SSH client terminal — connect with: ssh ${host.ssh_user || 'root'}@${host.ip}`, { ...TOAST, duration: 8000 })
   }
-  const solved = validationResult?.passed
-  const expired = validationResult?.expired
 
   // The CodingIDE grades on the backend through the SAME completion path as
   // ValidateLabView, so when it reports solved the scenario is already complete.
@@ -1858,7 +1858,7 @@ export default function LabRunner() {
                   isMobile={isMobile}
                   blockedCommands={blockedCmds}
                   className="h-full"
-                  layoutKey={`${sidebarOpen}-${showTerraformSim}`}
+                  layoutKey={`${session?.status}-${session?.container_id || ''}-${sidebarOpen}-${showTerraformSim}`}
                 />
               ))}
             </div>
@@ -1874,7 +1874,7 @@ export default function LabRunner() {
               isMobile={isMobile}
               blockedCommands={blockedCmds}
               className="flex-1 min-h-0"
-              layoutKey={`${sidebarOpen}-${showTerraformSim}`}
+              layoutKey={`${session?.status}-${session?.container_id || ''}-${sidebarOpen}-${showTerraformSim}`}
               welcomeHint={terminalHost === 'ssh_client' && sshClientTarget
                 ? `Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`
                 : ''}

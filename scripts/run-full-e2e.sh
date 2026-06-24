@@ -85,6 +85,13 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
   python /scripts/e2e_all_scenarios_labs.py \
   2>&1 | tee "$LOG_DIR/e2e-all-scenarios.log" || ALL_SCENARIOS_FAIL=1
 
+echo ""
+echo ">>> [5b/7] Lab UI smoke (Playwright — catches frontend render crashes)"
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+  env E2E_SKIP_LAB="${E2E_SKIP_LAB:-0}" E2E_LAB_UI_SCENARIOS=2 SITE_URL="$SITE_URL" E2E_SKIP_CLEANUP=1 \
+  python /scripts/e2e_lab_ui_smoke.py \
+  2>&1 | tee "$LOG_DIR/e2e-lab-ui.log" || LAB_UI_FAIL=1
+
 # ── 6. E2E API tests (tabs, features, admin) ──
 echo ""
 echo ">>> [6/7] E2E API tests (all tabs & features)"
@@ -115,6 +122,7 @@ echo "Logs saved to: $LOG_DIR"
 EXIT=0
 [ "${UNIT_FAIL:-0}" = "1" ] && EXIT=1 && echo "UNIT TESTS: FAILED"
 [ "${ALL_SCENARIOS_FAIL:-0}" = "1" ] && EXIT=1 && echo "ALL SCENARIOS E2E: FAILED"
+[ "${LAB_UI_FAIL:-0}" = "1" ] && EXIT=1 && echo "LAB UI SMOKE: FAILED"
 [ "${E2E_INTERNAL_FAIL:-0}" = "1" ] && EXIT=1 && echo "E2E INTERNAL: FAILED"
 [ "${E2E_EXTERNAL_FAIL:-0}" = "1" ] && EXIT=1 && echo "E2E EXTERNAL: FAILED"
 [ "${INTERVIEW_E2E_FAIL:-0}" = "1" ] && EXIT=1 && echo "INTERVIEW E2E: FAILED"

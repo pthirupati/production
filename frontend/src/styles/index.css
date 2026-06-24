@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&family=JetBrains+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -3897,4 +3897,28 @@ body::after {
     animation: none !important;
   }
 }
+
+/* ── Tutorial reader typography (distinct from marketing pages) ── */
+.tutorial-prose p {
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-size: 1.0625rem;
+  line-height: 1.85;
+  color: rgb(226 232 240);
+  letter-spacing: 0.01em;
+}
+.tutorial-prose p strong {
+  color: rgb(248 250 252);
+  font-weight: 600;
+}
+.tutorial-section-theory { border-left: 3px solid rgb(56 189 248); }
+.tutorial-section-architecture { border-left: 3px solid rgb(129 140 248); }
+.tutorial-section-labs { border-left: 3px solid rgb(52 211 153); }
+.tutorial-section-troubleshooting { border-left: 3px solid rgb(251 191 36); }
+.tutorial-section-security { border-left: 3px solid rgb(248 113 113); }
+.tutorial-section-enterprise { border-left: 3px solid rgb(192 132 252); }
+.tutorial-level-beginner { color: rgb(74 222 128); }
+.tutorial-level-intermediate { color: rgb(251 191 36); }
+.tutorial-level-advanced { color: rgb(248 113 113); }
+.tutorial-level-expert { color: rgb(244 114 182); }
+.tutorial-level-enterprise { color: rgb(192 132 252); }
 

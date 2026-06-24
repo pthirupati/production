@@ -11,6 +11,8 @@ const DIFFICULTY_CLASS = {
   beginner: 'text-accent-green bg-accent-green/10 border-accent-green/20',
   intermediate: 'text-accent-amber bg-accent-amber/10 border-accent-amber/20',
   advanced: 'text-accent-red bg-accent-red/10 border-accent-red/20',
+  expert: 'text-pink-400 bg-pink-500/10 border-pink-500/20',
+  enterprise: 'text-accent-purple bg-accent-purple/10 border-accent-purple/20',
 }
 
 function TutorialCard({ t }) {

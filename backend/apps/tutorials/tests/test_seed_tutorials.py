@@ -11,8 +11,8 @@ class SeedTutorialsTest(TestCase):
     def test_seed_loads_builtin_and_extra(self):
         call_command("seed_tutorials")
         # 8 built-in + 32 original (data/tutorials_extra.json).
-        self.assertGreaterEqual(Tutorial.objects.count(), 40)
-        self.assertGreater(TutorialSection.objects.count(), 200)
+        self.assertGreaterEqual(Tutorial.objects.count(), 400)
+        self.assertGreater(TutorialSection.objects.count(), 5000)
 
     def test_extra_tutorial_has_sections(self):
         call_command("seed_tutorials")
