@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { BookOpen, Clock, ArrowRight, Layers, Terminal, Search } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { BookOpen, Clock, ArrowRight, Layers, Terminal, Search, GraduationCap, ChevronDown, ChevronRight } from 'lucide-react'
 import PublicLayout from '../../components/layout/PublicLayout'
 import MarketingPageShell from '../../components/MarketingPageShell'
 import { FixitPanel } from '../../components/design'
@@ -17,74 +17,113 @@ function TutorialCard({ t }) {
   return (
     <Link
       to={`/tutorials/${t.slug}`}
-      className="group fx-panel p-5 flex flex-col hover:border-accent-cyan/40 transition-colors"
+      className="group fx-panel p-5 flex flex-col hover:border-accent-cyan/40 transition-all hover:shadow-lg hover:shadow-accent-cyan/5"
     >
       <div className="flex items-center justify-between gap-2 mb-3">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-accent-cyan">{t.topic}</span>
         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border capitalize ${DIFFICULTY_CLASS[t.difficulty] || DIFFICULTY_CLASS.beginner}`}>
           {t.difficulty}
         </span>
+        <span className="text-[10px] text-surface-600">{t.section_count} topics</span>
       </div>
-      <h3 className="font-display font-semibold text-white text-lg leading-snug mb-2 group-hover:text-accent-cyan transition-colors">
+      <h3 className="font-display font-semibold text-white text-base leading-snug mb-2 group-hover:text-accent-cyan transition-colors">
         {t.title}
       </h3>
-      <p className="text-sm text-surface-400 leading-relaxed flex-1">{t.summary}</p>
+      <p className="text-sm text-surface-400 leading-relaxed flex-1 line-clamp-2">{t.summary}</p>
       <div className="mt-4 pt-3 border-t border-surface-800 flex items-center justify-between text-xs text-surface-500">
-        <span className="flex items-center gap-3">
-          <span className="flex items-center gap-1"><Clock size={12} /> {t.estimated_minutes} min</span>
-          <span className="flex items-center gap-1"><Layers size={12} /> {t.section_count} steps</span>
-        </span>
+        <span className="flex items-center gap-1"><Clock size={12} /> {t.estimated_minutes} min</span>
         <span className="flex items-center gap-1 text-accent-cyan opacity-0 group-hover:opacity-100 transition-opacity">
-          Read <ArrowRight size={12} />
+          Start <ArrowRight size={12} />
         </span>
       </div>
     </Link>
   )
 }
 
+function TechnologyTrack({ track, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <section className="fx-panel overflow-hidden border-surface-800/80">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-4 p-5 text-left hover:bg-surface-800/30 transition-colors"
+      >
+        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-accent-cyan/20 to-accent-purple/10 border border-accent-cyan/20 flex items-center justify-center shrink-0">
+          <GraduationCap size={20} className="text-accent-cyan" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-display font-bold text-white text-lg">{track.topic}</h2>
+          <p className="text-xs text-surface-400 mt-0.5">
+            {track.tutorial_count} tutorials · {track.total_sections} topics · zero to hero learning path
+          </p>
+        </div>
+        {open ? <ChevronDown size={18} className="text-surface-500 shrink-0" /> : <ChevronRight size={18} className="text-surface-500 shrink-0" />}
+      </button>
+      {open && (
+        <div className="px-5 pb-5 pt-0 grid sm:grid-cols-2 lg:grid-cols-3 gap-4 border-t border-surface-800/60">
+          {track.tutorials.map((t) => <TutorialCard key={t.slug} t={t} />)}
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function Tutorials() {
-  const [tutorials, setTutorials] = useState([])
+  const [searchParams] = useSearchParams()
+  const [curriculum, setCurriculum] = useState([])
   const [topics, setTopics] = useState([])
-  const [activeTopic, setActiveTopic] = useState('')
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
+  const topicParam = searchParams.get('topic') || ''
 
   usePageTitle(
     'Free Tech Tutorials',
-    'Original, hands-on tutorials on Linux, Git, Docker, Kubernetes, Python, Bash, SQL, and Ansible — each with a free playground to try it.',
+    'Original, hands-on tutorials on Linux, Git, Docker, Kubernetes, Python, and more — organized by technology with step-by-step topics from zero to hero.',
   )
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    tutorialApi.list()
-      .then((data) => {
+    Promise.all([
+      tutorialApi.curriculum().catch(() => ({ curriculum: [] })),
+      tutorialApi.list().catch(() => ({ topics: [] })),
+    ])
+      .then(([cur, list]) => {
         if (cancelled) return
-        setTutorials(data?.tutorials || [])
-        setTopics(data?.topics || [])
+        setCurriculum(cur?.curriculum || [])
+        setTopics(list?.topics || [])
       })
-      .catch((err) => { if (!cancelled) console.error('Failed to load tutorials', err) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return tutorials.filter((t) => {
-      if (activeTopic && t.topic !== activeTopic) return false
-      if (q && !(`${t.title} ${t.summary} ${t.topic}`.toLowerCase().includes(q))) return false
-      return true
-    })
-  }, [tutorials, activeTopic, query])
+    if (!q && !topicParam) return curriculum
+    return curriculum
+      .map((track) => ({
+        ...track,
+        tutorials: track.tutorials.filter((t) => {
+          if (topicParam && t.topic !== topicParam) return false
+          if (q && !(`${t.title} ${t.summary} ${t.topic}`.toLowerCase().includes(q))) return false
+          return true
+        }),
+      }))
+      .filter((track) => track.tutorials.length > 0)
+      .map((track) => ({
+        ...track,
+        tutorial_count: track.tutorials.length,
+        total_sections: track.tutorials.reduce((n, t) => n + (t.section_count || 0), 0),
+      }))
+  }, [curriculum, query, topicParam])
 
   return (
     <PublicLayout>
       <MarketingPageShell
         eyebrow="Learn by doing"
-        title="Free Tutorials"
-        subtitle="Concise, original guides on the tools that run modern infrastructure. Every tutorial ends with a free, no-signup playground or lab so you can try it immediately."
+        title="Technology Tutorials"
+        subtitle="Complete learning paths organized by technology — each tutorial breaks down into topics and subtopics with hands-on practice. Start at lesson 1 and follow the path to mastery."
       >
-        {/* Controls */}
         <div className="mb-8 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
           <div className="relative w-full sm:max-w-xs">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500" />
@@ -97,41 +136,39 @@ export default function Tutorials() {
             />
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => setActiveTopic('')}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${activeTopic === '' ? 'border-accent-cyan/50 text-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400 hover:text-surface-200'}`}
+            <Link
+              to="/tutorials"
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${!topicParam ? 'border-accent-cyan/50 text-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400 hover:text-surface-200'}`}
             >
-              All
-            </button>
+              All technologies
+            </Link>
             {topics.map((topic) => (
-              <button
+              <Link
                 key={topic}
-                onClick={() => setActiveTopic(topic)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${activeTopic === topic ? 'border-accent-cyan/50 text-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400 hover:text-surface-200'}`}
+                to={`/tutorials?topic=${encodeURIComponent(topic)}`}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${topicParam === topic ? 'border-accent-cyan/50 text-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400 hover:text-surface-200'}`}
               >
                 {topic}
-              </button>
+              </Link>
             ))}
           </div>
         </div>
 
-        {/* Certification cross-link */}
         <FixitPanel className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4" padding="p-5">
           <div className="flex items-start gap-3">
             <Terminal size={20} className="text-accent-purple mt-0.5 shrink-0" />
             <div>
               <h2 className="font-display font-semibold text-white">Preparing for a certification?</h2>
-              <p className="text-sm text-surface-400">Follow an objective-mapped track (RHCSA, CKA, and more) with hands-on labs and a timed mock exam.</p>
+              <p className="text-sm text-surface-400">Follow an objective-mapped track with hands-on labs and a timed mock exam.</p>
             </div>
           </div>
           <Link to="/certifications" className="btn-secondary text-sm shrink-0">Browse Certifications</Link>
         </FixitPanel>
 
-        {/* Grid */}
         {loading ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="fx-panel p-5 h-44 animate-pulse bg-surface-900/40" />
+          <div className="space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="fx-panel h-32 animate-pulse bg-surface-900/40" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -140,8 +177,10 @@ export default function Tutorials() {
             <p>No tutorials match your search yet.</p>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((t) => <TutorialCard key={t.slug} t={t} />)}
+          <div className="space-y-5">
+            {filtered.map((track, i) => (
+              <TechnologyTrack key={track.topic} track={track} defaultOpen={!topicParam || topicParam === track.topic || i === 0} />
+            ))}
           </div>
         )}
       </MarketingPageShell>

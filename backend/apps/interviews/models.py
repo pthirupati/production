@@ -273,6 +273,34 @@ class InterviewQuestion(models.Model):
         return self.slug
 
 
+class InterviewAnswerCorpus(models.Model):
+    """Admin-uploaded reference answers for a technology (plain-text file).
+
+    Parsed into lines/keywords so the free interview engine can cross-check
+    candidate answers against expected concepts without any paid LLM.
+    """
+
+    technology = models.ForeignKey(
+        "question_bank.Technology",
+        on_delete=models.CASCADE,
+        related_name="interview_answer_corpora",
+    )
+    title = models.CharField(max_length=200, blank=True, default="")
+    raw_text = models.TextField(blank=True, default="")
+    # Each entry: { "line": "...", "keywords": ["a", "b"] }
+    entries = models.JSONField(default=list, blank=True)
+    is_active = models.BooleanField(default=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        verbose_name_plural = "Interview answer corpora"
+
+    def __str__(self):
+        return self.title or f"{self.technology_id} corpus"
+
+
 class InterviewMessage(models.Model):
     """Transcript entry for a round."""
 

@@ -230,6 +230,98 @@ class AdminInterviewQuestionDetailView(APIView):
         return Response(status=204)
 
 
+class AdminInterviewAnswerCorpusView(APIView):
+    """List / upload reference-answer text files per technology."""
+
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        from apps.interviews.models import InterviewAnswerCorpus
+
+        tech_id = request.query_params.get("technology")
+        qs = InterviewAnswerCorpus.objects.select_related("technology").order_by("-updated_at")
+        if tech_id:
+            qs = qs.filter(technology_id=tech_id)
+        data = [
+            {
+                "id": c.id,
+                "technology_id": c.technology_id,
+                "technology_name": c.technology.name if c.technology_id else "",
+                "technology_slug": c.technology.slug if c.technology_id else "",
+                "title": c.title,
+                "entry_count": len(c.entries or []),
+                "is_active": c.is_active,
+                "uploaded_at": c.uploaded_at,
+                "updated_at": c.updated_at,
+            }
+            for c in qs[:100]
+        ]
+        return Response({"corpora": data})
+
+    def post(self, request):
+        from apps.interviews.models import InterviewAnswerCorpus
+        from apps.interviews.services.answer_corpus import parse_answer_text
+        from apps.question_bank.models import Technology
+
+        tech_id = request.data.get("technology_id") or request.data.get("technology")
+        if not tech_id:
+            return Response({"error": "technology_id is required"}, status=400)
+        try:
+            tech = Technology.objects.get(pk=tech_id)
+        except Technology.DoesNotExist:
+            return Response({"error": "Technology not found"}, status=404)
+
+        raw = ""
+        upload = request.FILES.get("file")
+        if upload:
+            raw = upload.read().decode("utf-8", errors="replace")
+        else:
+            raw = request.data.get("raw_text") or request.data.get("content") or ""
+
+        if not raw.strip():
+            return Response({"error": "Upload a .txt file or paste raw_text"}, status=400)
+
+        entries = parse_answer_text(raw)
+        title = (request.data.get("title") or upload.name if upload else "") or f"{tech.name} answers"
+        corpus = InterviewAnswerCorpus.objects.create(
+            technology=tech,
+            title=title[:200],
+            raw_text=raw,
+            entries=entries,
+            is_active=True,
+        )
+        return Response(
+            {
+                "id": corpus.id,
+                "title": corpus.title,
+                "entry_count": len(entries),
+                "technology_slug": tech.slug,
+            },
+            status=201,
+        )
+
+
+class AdminInterviewAnswerCorpusDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def delete(self, request, pk):
+        from apps.interviews.models import InterviewAnswerCorpus
+
+        InterviewAnswerCorpus.objects.filter(pk=pk).delete()
+        return Response(status=204)
+
+    def put(self, request, pk):
+        from apps.interviews.models import InterviewAnswerCorpus
+
+        corpus = InterviewAnswerCorpus.objects.get(pk=pk)
+        if "is_active" in request.data:
+            corpus.is_active = bool(request.data["is_active"])
+        if "title" in request.data:
+            corpus.title = str(request.data["title"])[:200]
+        corpus.save()
+        return Response({"id": corpus.id, "is_active": corpus.is_active, "title": corpus.title})
+
+
 class AdminInterviewTiersView(APIView):
     permission_classes = [IsPlatformAdmin]
 

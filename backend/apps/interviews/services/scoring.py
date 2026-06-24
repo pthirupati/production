@@ -80,6 +80,13 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
 
     round_type = meta.get("round_type", "technical")
     keywords = list(question.expected_keywords) if question and question.expected_keywords else []
+    if question and question.technology_id:
+        from apps.interviews.services.answer_corpus import corpus_keywords_for_technology
+
+        corpus_kw = corpus_keywords_for_technology(question.technology_id)
+        if corpus_kw:
+            merged = list(dict.fromkeys([*(keywords or []), *corpus_kw]))
+            keywords = merged
 
     breakdown = compute_answer_scores(
         candidate_answer=text,

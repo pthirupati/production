@@ -784,6 +784,10 @@ export function useInterviewVoice() {
       const armSilence = () => {
         clearSilence()
         if (!hadSpeech || !hadFinal || !bestText()) return
+        // Require a minimum answer length before auto-submitting on pause — a
+        // brief "um" or mid-thought breath should not end the turn.
+        const words = bestText().split(/\s+/).filter(Boolean).length
+        if (words < 3 && Date.now() - speechStartedAt < minSpeechMs * 2) return
         if (speechStartedAt && Date.now() - speechStartedAt < minSpeechMs) return
         const total = computeSilenceWindow()
         const startedAt = Date.now()

@@ -3,7 +3,7 @@ import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
 import {
   BarChart3, Users, MessageSquare, CreditCard, Settings, CalendarClock, Mic,
-  Gift, DollarSign, Eye, Plus, Trash2,
+  Gift, DollarSign, Eye, Plus, Trash2, Upload, FileText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -32,6 +32,36 @@ export default function AdminInterviews() {
   const [grantEmail, setGrantEmail] = useState('')
   const [saving, setSaving] = useState(false)
   const [qForm, setQForm] = useState({ question_text: '', category: 'technical', difficulty: 'medium', technology: '' })
+  const [corpora, setCorpora] = useState([])
+  const [corpusTech, setCorpusTech] = useState('')
+  const [corpusFile, setCorpusFile] = useState(null)
+
+  const loadCorpora = () => {
+    adminApi.getInterviewAnswerCorpora(corpusTech).then((d) => setCorpora(d.corpora || [])).catch(() => setCorpora([]))
+  }
+
+  const uploadCorpus = async () => {
+    if (!corpusTech) { toast.error('Enter technology ID'); return }
+    if (!corpusFile) { toast.error('Choose a .txt file'); return }
+    setSaving(true)
+    try {
+      const res = await adminApi.uploadInterviewAnswerCorpus({ technology_id: corpusTech, file: corpusFile })
+      toast.success(`Uploaded ${res.entry_count} answer lines`)
+      setCorpusFile(null)
+      loadCorpora()
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Upload failed')
+    } finally { setSaving(false) }
+  }
+
+  const deleteCorpus = async (c) => {
+    if (!window.confirm(`Delete corpus "${c.title}"?`)) return
+    try {
+      await adminApi.deleteInterviewAnswerCorpus(c.id)
+      toast.success('Corpus deleted')
+      loadCorpora()
+    } catch { toast.error('Delete failed') }
+  }
 
   const addQuestion = async () => {
     if (!qForm.question_text.trim()) { toast.error('Question text is required'); return }
@@ -72,6 +102,7 @@ export default function AdminInterviews() {
     adminApi.getInterviewOverview().then(setOverview).catch(() => {})
     adminApi.getInterviewCampaigns().then(d => setCampaigns(d.campaigns || [])).catch(() => {})
     adminApi.getInterviewQuestions().then(d => setQuestions(d.questions || [])).catch(() => {})
+    loadCorpora()
     adminApi.getInterviewSettings().then(setSettings).catch(() => {})
     adminApi.getInterviewTiers().then(d => setTiers(d.tiers || [])).catch(() => {})
     adminApi.getInterviewVoices().then(d => setVoices(d.voices || [])).catch(() => {})
@@ -531,6 +562,47 @@ export default function AdminInterviews() {
 
       {tab === 'questions' && (
         <div className="space-y-3">
+          {/* Reference answer corpus upload */}
+          <div className="glass-card p-4 border border-accent-purple/20 space-y-3">
+            <div className="text-sm font-semibold flex items-center gap-2">
+              <Upload size={15} className="text-accent-purple" /> Upload reference answers (.txt)
+            </div>
+            <p className="text-xs text-surface-500">
+              One answer per line. The interview engine cross-checks candidate answers against keywords extracted from this file for the selected technology.
+            </p>
+            <div className="flex flex-wrap gap-2 items-end">
+              <div className="flex-1 min-w-[140px]">
+                <label className="text-[10px] text-surface-500 uppercase tracking-wider">Technology ID</label>
+                <input value={corpusTech} onChange={(e) => setCorpusTech(e.target.value)}
+                  placeholder="e.g. 3" className="input-field text-sm w-full mt-1" />
+              </div>
+              <div className="flex-1 min-w-[180px]">
+                <label className="text-[10px] text-surface-500 uppercase tracking-wider">Answer file</label>
+                <input type="file" accept=".txt,text/plain" onChange={(e) => setCorpusFile(e.target.files?.[0] || null)}
+                  className="input-field text-sm w-full mt-1" />
+              </div>
+              <button type="button" onClick={uploadCorpus} disabled={saving} className="btn-primary text-sm flex items-center gap-1">
+                <Upload size={14} /> Upload
+              </button>
+            </div>
+            {corpora.length > 0 && (
+              <div className="space-y-1.5 pt-2 border-t border-surface-800">
+                {corpora.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between gap-2 text-xs p-2 rounded bg-surface-900/50">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <FileText size={12} className="text-accent-purple shrink-0" />
+                      <span className="text-surface-300 truncate">{c.title}</span>
+                      <span className="text-surface-600">· {c.technology_name || c.technology_slug} · {c.entry_count} lines</span>
+                    </div>
+                    <button type="button" onClick={() => deleteCorpus(c)} className="text-surface-500 hover:text-accent-red shrink-0">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Add a question to the bank */}
           <div className="glass-card p-4 border border-surface-800 space-y-2">
             <div className="text-sm font-semibold flex items-center gap-2"><Plus size={15} /> Add interview question</div>

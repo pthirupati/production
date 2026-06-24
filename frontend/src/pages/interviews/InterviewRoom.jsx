@@ -25,13 +25,13 @@ import toast from 'react-hot-toast'
 
 // How long (ms) of continuous silence on an open question before the bot moves
 // on, so the fixed round time covers the planned material (skip-on-silence).
-const SILENCE_SKIP_MS = 20000
+const SILENCE_SKIP_MS = 45000
 // BASE trailing silence (ms) after the candidate stops talking before we
-// AUTO-SUBMIT their answer (FIX 1 — no send button). WS1: raised from 1900 so a
-// normal between-sentence breath never cuts the candidate off; listenLive then
-// GROWS this dynamically for longer/multi-sentence answers (up to ~4.5s) and
-// extends further when they trail off on a connector ("and…", "so…").
-const TURN_SILENCE_MS = 3000
+// AUTO-SUBMIT their answer (FIX 1 — no send button). WS1: raised so a normal
+// between-sentence breath never cuts the candidate off; listenLive GROWS this
+// dynamically for longer/multi-sentence answers (up to ~8s) and extends further
+// when they trail off on a connector ("and…", "so…").
+const TURN_SILENCE_MS = 4500
 // Mic energy (0–1, same scale as the preflight meter) that counts as "speaking"
 // for barge-in. Above this while the bot is talking → interrupt the bot.
 const BARGE_IN_LEVEL = 0.18
@@ -614,6 +614,9 @@ export default function InterviewRoom() {
     const result = await listenLive(streamRef.current, {
       locale: profile.locale || 'en-IN',
       silenceMs: TURN_SILENCE_MS,
+      minSpeechMs: 2000,
+      maxSilenceMs: 8000,
+      perSentenceMs: 600,
       onInterim: (txt) => setAnswer(txt),
       onSilenceCountdown: (remaining, total) => {
         setSilenceCountdown(remaining == null ? null : { remaining, total })

@@ -481,6 +481,26 @@ export const adminApi = {
     await api.delete(`/admin/interviews/questions/${id}/`)
     return { deleted: true }
   },
+  async getInterviewAnswerCorpora(technologyId = '') {
+    const params = technologyId ? { technology: technologyId } : undefined
+    const { data } = await api.get('/admin/interviews/answer-corpora/', { params })
+    return data
+  },
+  async uploadInterviewAnswerCorpus({ technology_id, file, title, raw_text }) {
+    const form = new FormData()
+    form.append('technology_id', String(technology_id))
+    if (file) form.append('file', file)
+    if (title) form.append('title', title)
+    if (raw_text) form.append('raw_text', raw_text)
+    const { data } = await api.post('/admin/interviews/answer-corpora/', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+  async deleteInterviewAnswerCorpus(id) {
+    await api.delete(`/admin/interviews/answer-corpora/${id}/`)
+    return { deleted: true }
+  },
   async grantInterviewEntitlement(payload) {
     const { data } = await api.post('/admin/interviews/entitlements/', payload)
     return data

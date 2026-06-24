@@ -16,4 +16,9 @@ export const tutorialApi = {
     const { data } = await api.get(`/tutorials/${slug}/`, { silentError: true })
     return data
   },
+
+  async curriculum() {
+    const { data } = await api.get('/tutorials/curriculum/', { silentError: true })
+    return data // { curriculum: [{ topic, tutorial_count, total_sections, tutorials }] }
+  },
 }

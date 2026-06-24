@@ -597,6 +597,15 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
               <div className="h-full flex items-center justify-center text-surface-600 text-sm">No file open</div>
             )}
           </div>
+          {/* VS Code-style status bar */}
+          <div className="shrink-0 flex items-center justify-between gap-3 px-3 py-1 bg-[#007acc]/90 text-white text-[10px] font-mono border-t border-surface-800">
+            <span className="truncate">{activePath ? fileName(activePath) : 'No file'}</span>
+            <span className="hidden sm:inline">{langLabel} · UTF-8 · Spaces: 4</span>
+            <span className="flex items-center gap-2 shrink-0">
+              <span>{fontSize}px</span>
+              <span>{solved ? 'Read-only' : 'Editing'}</span>
+            </span>
+          </div>
 
           {/* Bottom panel: Terminal / Output / Logs / Test Results / Debug Console */}
           <div className="shrink-0 h-56 flex flex-col border-t border-surface-800 bg-surface-950">
