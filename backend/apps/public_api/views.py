@@ -267,9 +267,12 @@ class TechnologyDetailView(APIView):
         cache_key = f"tech_detail_anon:{slug}"
         base = cache.get(cache_key)
         if base is None:
+            from apps.certifications.services.scenario_groups import certification_scenario_ids
+
+            cert_ids = certification_scenario_ids()
             scenarios = Scenario.objects.filter(
                 technology=tech, is_active=True
-            ).select_related("technology").prefetch_related("tags")
+            ).exclude(id__in=cert_ids).select_related("technology").prefetch_related("tags")
 
             tech_data = TechnologySerializer(tech).data
             tech_data["scenario_count"] = scenarios.count()
@@ -290,8 +293,14 @@ class TechnologyDetailView(APIView):
             base = {"technology": tech_data, "scenarios": scenario_data}
             cache.set(cache_key, base, 60)  # 60s for anonymous base
 
+        from apps.certifications.models import CertificationTrack
+        cert_tracks = list(
+            CertificationTrack.objects.filter(technology=tech, is_active=True)
+            .values("slug", "name", "vendor", "exam_code", "is_free")
+        )
+
         if not request.user.is_authenticated:
-            return Response({**base, "projects": _serialize_projects(tech, None)})
+            return Response({**base, "projects": _serialize_projects(tech, None), "cert_tracks": cert_tracks})
 
         # Deep-copy to avoid mutating the cached dict
         import copy
@@ -322,7 +331,7 @@ class TechnologyDetailView(APIView):
 
         # Include projects
         projects = _serialize_projects(tech, request.user if request.user.is_authenticated else None)
-        return Response({"technology": tech_data, "scenarios": scenario_data, "projects": projects})
+        return Response({"technology": tech_data, "scenarios": scenario_data, "projects": projects, "cert_tracks": cert_tracks})
 
 
 class ScenariosListView(APIView):
@@ -381,7 +390,15 @@ class ScenariosListView(APIView):
         if is_free:
             qs = qs.filter(is_free=True)
 
-        # Annotate bookmarks if authed
+        # Certification labs are listed under /certifications only unless explicitly requested.
+        scenario_group = (request.query_params.get("scenario_group") or "").strip().lower()
+        from apps.certifications.services.scenario_groups import certification_scenario_ids
+
+        cert_ids = certification_scenario_ids()
+        if scenario_group == "certification":
+            qs = qs.filter(id__in=cert_ids)
+        elif request.query_params.get("include_cert") not in ("1", "true", "yes"):
+            qs = qs.exclude(id__in=cert_ids)
         if request.user.is_authenticated:
             qs = qs.annotate(
                 is_bookmarked=Exists(

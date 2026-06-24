@@ -365,7 +365,10 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr }) {
  * monitoring labs (simulation_type grafana/prometheus/monitoring) — no new route.
  * `flavor` selects which view is primary; both are always reachable via the tabs.
  */
-export default function MonitoringSimulator({ sessionId, scenario, flavor = 'grafana', onExit, onStop, onHints }) {
+export default function MonitoringSimulator({
+  sessionId, scenario, flavor = 'grafana',
+  onExit, onStop, onHints, onCheck, onExtend, hintsLabel, checkDisabled,
+}) {
   const [authed, setAuthed] = useState(isMonitoringAuthenticated())
   const [state, setState] = useState(null)
   const [view, setView] = useState(flavor === 'prometheus' ? 'prometheus' : 'grafana')
@@ -396,9 +399,11 @@ export default function MonitoringSimulator({ sessionId, scenario, flavor = 'gra
     // (mirrors how the VMware / Nmap sims keep that chrome reachable at all times).
     return flavor === 'prometheus'
       ? <MonitoringLoginGate flavor={flavor} onAuthenticated={() => setAuthed(true)}
-                             onExit={onExit} onStop={onStop} onHints={onHints} />
+                             onExit={onExit} onStop={onStop} onHints={onHints}
+                             onCheck={onCheck} onExtend={onExtend} hintsLabel={hintsLabel} />
       : <GrafanaLoginScreen onAuthenticated={() => setAuthed(true)}
-                            scenario={scenario} onExit={onExit} onStop={onStop} onHints={onHints} />
+                            scenario={scenario} onExit={onExit} onStop={onStop} onHints={onHints}
+                            onCheck={onCheck} onExtend={onExtend} hintsLabel={hintsLabel} />
   }
 
   const accent = flavor === 'prometheus' ? '#e6522c' : '#f7913b'
@@ -414,6 +419,10 @@ export default function MonitoringSimulator({ sessionId, scenario, flavor = 'gra
         onExit={onExit}
         onStop={onStop}
         onHints={onHints}
+        onCheck={onCheck}
+        onExtend={onExtend}
+        hintsLabel={hintsLabel}
+        checkDisabled={checkDisabled}
       >
         <button className={`mon-tab ${view === 'grafana' ? 'mon-tab-active' : ''}`} onClick={() => setView('grafana')}>Grafana</button>
         <button className={`mon-tab ${view === 'prometheus' ? 'mon-tab-active' : ''}`} onClick={() => setView('prometheus')}>Prometheus</button>

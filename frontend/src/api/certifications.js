@@ -45,6 +45,21 @@ export const certApi = {
     const { data } = await api.get('/certifications/dashboard/')
     return data // { tracks: [...] }
   },
+
+  async createRazorpayOrder(trackSlug) {
+    const { data } = await api.post('/certifications/billing/razorpay/order/', { track_slug: trackSlug })
+    return data
+  },
+
+  async verifyRazorpayPayment({ track_slug, razorpay_order_id, razorpay_payment_id, razorpay_signature }) {
+    const { data } = await api.post('/certifications/billing/razorpay/verify/', {
+      track_slug,
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    })
+    return data
+  },
 }
 
 /** Admin (IsPlatformAdmin) certification-track management — mirrors adminApi.*Technology. */

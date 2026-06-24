@@ -260,6 +260,7 @@ export default function TechnologyDetail() {
   const tech = techDetail.technology
   const projects = techDetail.projects || []
   const scenarios = techDetail.scenarios || []
+  const certTracks = techDetail.cert_tracks || []
   const hasProjects = projects.length > 0
   const hasScenarios = scenarios.length > 0
   const popularScenarios = [...scenarios].slice(0, 8)
@@ -486,15 +487,36 @@ export default function TechnologyDetail() {
               <h3 className="font-display font-bold text-[15px] text-white m-0 mb-1.5 flex items-center gap-2">
                 <Award size={16} className="text-accent-amber" /> Certification
               </h3>
-              <p className="text-[12.5px] text-white/50 m-0 mb-3.5 leading-relaxed">
-                Complete all {stats?.total || 0} labs to earn the {tech.name} certificate.
-              </p>
-              <div className="h-[7px] rounded bg-white/[0.06] overflow-hidden mb-2">
-                <div className="h-full rounded bg-gradient-to-r from-accent-amber to-orange-400" style={{ width: `${progressPct}%` }} />
-              </div>
-              <p className="text-[11.5px] text-white/45 m-0">
-                {(stats?.total || 0) - (stats?.completed || 0)} labs to go
-              </p>
+              {certTracks.length > 0 ? (
+                <>
+                  <p className="text-[12.5px] text-white/50 m-0 mb-3 leading-relaxed">
+                    Vendor certification labs for {tech.name} live in a separate track — not mixed with regular scenarios.
+                  </p>
+                  <div className="space-y-2">
+                    {certTracks.map((ct) => (
+                      <Link
+                        key={ct.slug}
+                        to={`/certifications/${ct.slug}`}
+                        className="block text-sm px-3 py-2 rounded-lg border border-amber-500/25 bg-amber-500/5 text-amber-200 hover:bg-amber-500/10 transition-colors"
+                      >
+                        {ct.name} {ct.exam_code ? <span className="text-white/40 font-mono text-xs">({ct.exam_code})</span> : null}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-[12.5px] text-white/50 m-0 mb-3.5 leading-relaxed">
+                    Complete all {stats?.total || 0} labs to earn the {tech.name} platform certificate.
+                  </p>
+                  <div className="h-[7px] rounded bg-white/[0.06] overflow-hidden mb-2">
+                    <div className="h-full rounded bg-gradient-to-r from-accent-amber to-orange-400" style={{ width: `${progressPct}%` }} />
+                  </div>
+                  <p className="text-[11.5px] text-white/45 m-0">
+                    {(stats?.total || 0) - (stats?.completed || 0)} labs to go
+                  </p>
+                </>
+              )}
             </FxPanel>
 
             {skills.length > 0 && (

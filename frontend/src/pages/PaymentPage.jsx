@@ -14,6 +14,7 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { subscriptionApi } from '../api/subscriptions'
 import { interviewsApi } from '../api/interviews'
+import { certApi } from '../api/certifications'
 import api from '../api/client'
 import { PlatformBanners } from '../components/PlatformBanners'
 import {
@@ -123,6 +124,8 @@ export default function PaymentPage() {
   const orgSlug = searchParams.get('org_slug')
   const productType = searchParams.get('product')
   const interviewPlan = searchParams.get('interview_plan')
+  const certSlugParam = searchParams.get('cert')
+  const isCertProduct = !!certSlugParam
   const isInterviewProduct = productType === 'interview' && !!interviewPlan
   const existingOrderId = searchParams.get('order_id')
   const existingRazorpayKey = searchParams.get('razorpay_key')
@@ -132,13 +135,15 @@ export default function PaymentPage() {
 
   const [renewBootstrap, setRenewBootstrap] = useState(null)
   const [renewLoading, setRenewLoading] = useState(isRenewFlow)
+  const [certBootstrap, setCertBootstrap] = useState(null)
+  const [certLoading, setCertLoading] = useState(isCertProduct)
 
-  const techName = techNameParam || renewBootstrap?.techName
-  const amountINR = amountINRParam || renewBootstrap?.amountINR
-  const techId = techIdParam || renewBootstrap?.techId
-  const paymentTokenResolved = paymentToken || renewBootstrap?.orderId
-  const orderIdResolved = existingOrderId || renewBootstrap?.orderId
-  const razorpayKeyResolved = existingRazorpayKey || renewBootstrap?.razorpayKey
+  const techName = techNameParam || renewBootstrap?.techName || certBootstrap?.trackName
+  const amountINR = amountINRParam || renewBootstrap?.amountINR || certBootstrap?.amountINR
+  const techId = techIdParam || renewBootstrap?.techId || certBootstrap?.techId
+  const paymentTokenResolved = paymentToken || renewBootstrap?.orderId || certBootstrap?.orderId
+  const orderIdResolved = existingOrderId || renewBootstrap?.orderId || certBootstrap?.orderId
+  const razorpayKeyResolved = existingRazorpayKey || renewBootstrap?.razorpayKey || certBootstrap?.razorpayKey
 
   const [step, setStep] = useState('summary') // summary -> processing -> success -> failed
   const [selectedMethod, setSelectedMethod] = useState('upi')
@@ -246,6 +251,37 @@ export default function PaymentPage() {
     return () => { cancelled = true }
   }, [isRenewFlow, renewSlug, user, navigate])
 
+  // Certification track checkout: /payment?cert=rhcsa
+  useEffect(() => {
+    if (!isCertProduct || !certSlugParam) return
+    if (!user) {
+      navigate(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`, { replace: true })
+      return
+    }
+    let cancelled = false
+    setCertLoading(true)
+    Promise.all([certApi.detail(certSlugParam), certApi.createRazorpayOrder(certSlugParam)])
+      .then(([track, order]) => {
+        if (cancelled) return
+        if (!order?.order_id) {
+          navigate(`/certifications/${certSlugParam}`, { replace: true })
+          return
+        }
+        const pricing = track?.pricing || {}
+        setCertBootstrap({
+          trackName: track?.name || certSlugParam,
+          trackSlug: certSlugParam,
+          techId: track?.technology_id ? String(track.technology_id) : '',
+          amountINR: String(order.amount || pricing.standalone_price || pricing.bundled_price || 0),
+          orderId: order.order_id,
+          razorpayKey: order.razorpay_key_id,
+        })
+      })
+      .catch(() => { if (!cancelled) navigate(`/certifications/${certSlugParam}`, { replace: true }) })
+      .finally(() => { if (!cancelled) setCertLoading(false) })
+    return () => { cancelled = true }
+  }, [isCertProduct, certSlugParam, user, navigate])
+
   // Block checkout when payment gateway is not configured
   useEffect(() => {
     subscriptionApi.getGatewayStatus()
@@ -260,16 +296,17 @@ export default function PaymentPage() {
 
   // Redirect if missing required checkout params (after renewal bootstrap)
   useEffect(() => {
-    if (renewLoading) return
+    if (renewLoading || certLoading) return
     if (isRenewFlow && !renewBootstrap && !techNameParam) return
-    if (!paymentToken && !orderIdResolved && !isRenewFlow) {
+    if (isCertProduct && !certBootstrap && !techNameParam) return
+    if (!paymentToken && !orderIdResolved && !isRenewFlow && !isCertProduct) {
       navigate('/pricing', { replace: true })
       return
     }
     if (!techName || !amountINR) {
-      if (!isRenewFlow) navigate('/pricing', { replace: true })
+      if (!isRenewFlow && !isCertProduct) navigate('/pricing', { replace: true })
     }
-  }, [paymentToken, orderIdResolved, techName, amountINR, navigate, renewLoading, isRenewFlow, renewBootstrap, techNameParam])
+  }, [paymentToken, orderIdResolved, techName, amountINR, navigate, renewLoading, certLoading, isRenewFlow, isCertProduct, renewBootstrap, certBootstrap, techNameParam])
 
   // 3D tilt effect on card
   useEffect(() => {
@@ -331,10 +368,12 @@ export default function PaymentPage() {
       if (!orderId) {
         const orderData = isInterviewProduct
           ? await interviewsApi.createRazorpayOrder(interviewPlan)
-          : await subscriptionApi.createRazorpayOrder(
-              parseInt(techId),
-              appliedCoupon?.code || couponCode.trim() || '',
-            )
+          : isCertProduct
+            ? await certApi.createRazorpayOrder(certSlugParam)
+            : await subscriptionApi.createRazorpayOrder(
+                parseInt(techId),
+                appliedCoupon?.code || couponCode.trim() || '',
+              )
 
         if (!orderData.order_id && !orderData.demo_mode) {
           setError(orderData.error || 'Payment gateway is unavailable.')
@@ -364,7 +403,9 @@ export default function PaymentPage() {
         name: 'FixitLab',
         description: isInterviewProduct
           ? `${techName} — Monthly Interview Plan`
-          : `${techName} \u2014 1-Year Access`,
+          : isCertProduct
+            ? `${techName} — Certification Track (1 year)`
+            : `${techName} \u2014 1-Year Access`,
         order_id: orderId,
         prefill: {
           name: user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : user?.username,
@@ -402,10 +443,15 @@ export default function PaymentPage() {
                     ...verifyPayload,
                     plan_code: interviewPlan,
                   })
-                : await subscriptionApi.verifyRazorpayPayment({
-                    ...verifyPayload,
-                    technology_id: parseInt(techId),
-                  })
+                : isCertProduct
+                  ? await certApi.verifyRazorpayPayment({
+                      ...verifyPayload,
+                      track_slug: certSlugParam,
+                    })
+                  : await subscriptionApi.verifyRazorpayPayment({
+                      ...verifyPayload,
+                      technology_id: parseInt(techId),
+                    })
             setPaymentResult(verifyResult)
             setStep('success')
             toast.success(
@@ -413,7 +459,9 @@ export default function PaymentPage() {
                 ? 'Organization seats updated!'
                 : isInterviewProduct
                   ? 'Interview plan activated!'
-                  : 'Payment verified successfully!',
+                  : isCertProduct
+                    ? 'Certification track unlocked!'
+                    : 'Payment verified successfully!',
             )
           } catch (err) {
             setError(err?.response?.data?.error || 'Payment verification failed. Contact support.')
@@ -435,7 +483,7 @@ export default function PaymentPage() {
     }
   }
 
-  if (renewLoading) {
+  if (renewLoading || certLoading) {
     return (
       <div className="min-h-screen bg-surface-950 flex items-center justify-center">
         <Loader2 size={32} className="text-accent-cyan animate-spin" />

@@ -111,7 +111,16 @@ function LabTerminal({
 
       const isCloud = session?.provider === 'aws_ec2' || session?.provider === 'digitalocean'
       const shellReadyRef = { current: false }
+      const readyFiredRef = { current: false }
+      const reconnectMsgShown = { current: false }
       const resizeDebounceRef = { current: null }
+
+      const fireReady = () => {
+        if (!readyFiredRef.current) {
+          readyFiredRef.current = true
+          onReady?.()
+        }
+      }
 
       const sendResize = () => {
         if (!isCloud || !shellReadyRef.current) return
@@ -169,8 +178,12 @@ function LabTerminal({
         wsRef.current = ws
         ws.onopen = () => {
           reconnectAttempts.current = 0
+          reconnectMsgShown.current = false
           shellReadyRef.current = false
-          onReady?.()
+          readyFiredRef.current = false
+          // Fallback if shell_ready is delayed (Docker exec attach).
+          const readyFallback = setTimeout(fireReady, isSimulation ? 400 : 5000)
+          ws._readyFallback = readyFallback
         }
         ws.onmessage = (event) => {
           try {
@@ -184,7 +197,9 @@ function LabTerminal({
             }
             if (data.type === 'shell_ready') {
               shellReadyRef.current = true
+              if (ws._readyFallback) clearTimeout(ws._readyFallback)
               scheduleResize()
+              fireReady()
               return
             }
             if (data.output) term.write(data.output)
@@ -200,7 +215,7 @@ function LabTerminal({
             return
           }
           const isSim = session?.provider === 'simulation'
-          const max1006Retries = isSim ? 4 : 3
+          const max1006Retries = isSim ? 5 : 8
           if (e.code === 1006 && reconnectAttempts.current < max1006Retries) {
             reconnectAttempts.current++
             const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 8000)
@@ -208,7 +223,10 @@ function LabTerminal({
               bindEnterRetry('\r\n\x1b[1;33mConnection paused — press Enter to reconnect\x1b[0m\r\n')
               return
             }
-            term.write('\r\n\x1b[1;33mConnection interrupted — retrying...\x1b[0m\r\n')
+            if (!reconnectMsgShown.current) {
+              reconnectMsgShown.current = true
+              term.write('\r\n\x1b[1;33mConnection interrupted — retrying...\x1b[0m\r\n')
+            }
             reconnectTimerRef.current = setTimeout(connectWs, delay)
             return
           }

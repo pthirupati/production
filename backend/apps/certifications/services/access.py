@@ -8,7 +8,16 @@ subscription, or they already have the base technology subscription.
 
 from django.utils import timezone
 
+from apps.billing.subscription_utils import get_subscribed_technology_ids
 from apps.certifications.models import CertificationTrack, CertificationTrackSubscription, TrackScenario
+
+
+def _user_has_technology_sub(user, technology_id) -> bool:
+    if not user or not user.is_authenticated or not technology_id:
+        return False
+    if getattr(user, "is_staff", False):
+        return True
+    return int(technology_id) in get_subscribed_technology_ids(user)
 
 
 def tracks_for_scenario(scenario_id):
@@ -37,12 +46,19 @@ def user_has_cert_scenario_access(user, scenario) -> bool:
         return False
 
     now = timezone.now()
-    return CertificationTrackSubscription.objects.filter(
+    if CertificationTrackSubscription.objects.filter(
         user=user,
         track_id__in=track_ids,
         is_active=True,
         expires_at__gt=now,
-    ).exists()
+    ).exists():
+        return True
+
+    # Base technology subscription unlocks cert-mapped labs for linked tracks.
+    for track in tracks:
+        if track.technology_id and _user_has_technology_sub(user, track.technology_id):
+            return True
+    return False
 
 
 def user_has_cert_track_access(user, track) -> bool:
@@ -56,12 +72,18 @@ def user_has_cert_track_access(user, track) -> bool:
     if getattr(user, "is_staff", False):
         return True
     now = timezone.now()
-    return CertificationTrackSubscription.objects.filter(
+    if CertificationTrackSubscription.objects.filter(
         user=user,
         track=track,
         is_active=True,
         expires_at__gt=now,
-    ).exists()
+    ).exists():
+        return True
+
+    # Linked technology subscription includes cert labs + mock exam (addon bundled at subscribe).
+    if track.technology_id and _user_has_technology_sub(user, track.technology_id):
+        return True
+    return False
 
 
 def effective_cert_prices(track):

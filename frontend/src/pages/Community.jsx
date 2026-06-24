@@ -283,7 +283,7 @@ export default function Community() {
         <div className="flex flex-wrap gap-2 mt-2">
           {reply.attachments.map(att => (
             <a key={att.id} href={resolveMediaUrl(att.url)} target="_blank" rel="noreferrer" className="block">
-              <img src={resolveMediaUrl(att.url)} alt={att.original_name || 'attachment'} className="max-h-48 max-w-full rounded-lg border border-surface-700 object-contain bg-surface-900/50" onError={(e) => { e.currentTarget.classList.add('opacity-40') }} />
+              <img src={`${resolveMediaUrl(att.url)}?v=${att.id}`} alt={att.original_name || 'attachment'} className="max-h-48 max-w-full rounded-lg border border-surface-700 object-contain bg-surface-900/50" loading="lazy" onError={(e) => { e.currentTarget.classList.add('opacity-40') }} />
             </a>
           ))}
         </div>
@@ -584,7 +584,7 @@ export default function Community() {
                 <div className="flex flex-wrap gap-2">
                   {selectedThread.attachments.map(att => (
                     <a key={att.id} href={resolveMediaUrl(att.url)} target="_blank" rel="noreferrer">
-                      <img src={resolveMediaUrl(att.url)} alt={att.original_name || 'Screenshot'} className="max-h-56 max-w-full rounded-xl border border-surface-700 object-contain bg-surface-900/50" onError={(e) => { e.currentTarget.classList.add('opacity-40') }} />
+                      <img src={`${resolveMediaUrl(att.url)}?v=${att.id}`} alt={att.original_name || 'Screenshot'} className="max-h-56 max-w-full rounded-xl border border-surface-700 object-contain bg-surface-900/50" loading="lazy" onError={(e) => { e.currentTarget.classList.add('opacity-40') }} />
                     </a>
                   ))}
                 </div>

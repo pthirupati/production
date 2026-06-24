@@ -12,6 +12,7 @@ import HeroSection from './sections/HeroSection'
 import TechMarqueeSection from './sections/TechMarqueeSection'
 import ChallengeModesSection from './sections/ChallengeModesSection'
 import TechnologiesSection from './sections/TechnologiesSection'
+import CertificationsSection from './sections/CertificationsSection'
 import InterviewSection from './sections/InterviewSection'
 import VMwareSection from './sections/VMwareSection'
 import FeaturesSection from './sections/FeaturesSection'
@@ -55,6 +56,7 @@ export default function HomePage() {
       <TechMarqueeSection technologies={technologies} />
       <ChallengeModesSection />
       <TechnologiesSection technologies={technologies} isAuthenticated={isAuthenticated} />
+      <CertificationsSection isAuthenticated={isAuthenticated} />
       <InterviewSection isAuthenticated={isAuthenticated} />
       <VMwareSection isAuthenticated={isAuthenticated} />
       <FeaturesSection />

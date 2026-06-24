@@ -1923,13 +1923,6 @@ export default function LabRunner() {
           runs Check Solution (which grades via check.sh, never auto-passes). */}
       {isMonitoringLab && showMonitoringSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
-          <button
-            type="button"
-            onClick={() => setShowMonitoringSim(false)}
-            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
-          >
-            <XCircle size={14} /> Close simulator
-          </button>
           <div className="h-full overflow-auto">
             <MonitoringSimulator
               sessionId={sessionId}
@@ -1938,6 +1931,10 @@ export default function LabRunner() {
               onExit={() => setShowMonitoringSim(false)}
               onHints={() => { setShowMonitoringSim(false); toggleHints() }}
               onStop={() => { setShowMonitoringSim(false); setShowStopConfirm(true) }}
+              onCheck={() => { setShowMonitoringSim(false); handleValidate() }}
+              onExtend={() => { setShowMonitoringSim(false); handleExtendLab() }}
+              hintsLabel={`Hints (${hints.hints_used}/${hints.total_hints})`}
+              checkDisabled={validating || solved}
             />
           </div>
         </div>

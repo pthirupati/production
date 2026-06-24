@@ -1,5 +1,6 @@
 from django.urls import path
 
+from .billing_views import CertRazorpayOrderView, CertRazorpayVerifyView
 from .views import (
     AdminTrackDetailView,
     AdminTrackListView,
@@ -19,6 +20,8 @@ urlpatterns = [
     path("dashboard/", MyCertDashboardView.as_view(), name="cert-dashboard"),
     path("certificates/", MyCertificatesView.as_view(), name="cert-my-certificates"),
     path("certificate/verify/", CertVerifyView.as_view(), name="cert-verify"),
+    path("billing/razorpay/order/", CertRazorpayOrderView.as_view(), name="cert-razorpay-order"),
+    path("billing/razorpay/verify/", CertRazorpayVerifyView.as_view(), name="cert-razorpay-verify"),
     # Admin (IsPlatformAdmin) — track management. Listed before the <slug>
     # catch-all so "admin" is never mistaken for a track slug.
     path("admin/tracks/", AdminTrackListView.as_view(), name="cert-admin-track-list"),
