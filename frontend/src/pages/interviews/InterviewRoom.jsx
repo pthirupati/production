@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import { adminApi } from '../../api/admin'
-import { useInterviewVoice } from '../../hooks/useInterviewVoice'
+import { useInterviewVoice, unlockSpeech } from '../../hooks/useInterviewVoice'
 import {
   getMediaErrorMessage,
   isMediaDevicesSupported,
@@ -48,11 +48,29 @@ const _QUESTION_PHRASES = /\b(repeat that|say that again|come again|can you repe
 function looksLikeQuestion(text) {
   const t = (text || '').trim()
   if (!t) return false
-  if (t.endsWith('?')) return true
+  const words = t.split(/\s+/).length
+  // Explicit meta-phrases always count.
   if (_QUESTION_PHRASES.test(t)) return true
-  // Short opener that starts with an interrogative (e.g. "what was the question")
-  // but isn't a long declarative that merely happens to start with "is/do".
-  return _QUESTION_LEADS.test(t) && t.split(/\s+/).length <= 14
+  // Long spoken answers are answers — not interruptions — even if they end with '?'.
+  if (words > 20) return false
+  if (/^(what is |what's |what are )/i.test(t)) return true
+  if (t.endsWith('?') && words <= 16 && _QUESTION_LEADS.test(t)) return true
+  return _QUESTION_LEADS.test(t) && words <= 12
+}
+
+function assessTranscriptClarity(text, result) {
+  const t = (text || '').trim()
+  if (!t) {
+    return result?.had_speech ? 'unclear' : 'empty'
+  }
+  const conf = result?.confidence
+  if (typeof conf === 'number' && conf > 0 && conf < 0.42) return 'unclear'
+  const words = t.split(/\s+/).filter(Boolean)
+  if (result?.had_speech && words.length <= 1 && !/^(yes|no|ok|okay)$/i.test(t)) return 'unclear'
+  if (result?.reason === 'error' && result?.had_speech) return 'unclear'
+  const alpha = (t.match(/[a-zA-Z]/g) || []).length
+  if (t.length > 8 && alpha / t.length < 0.55) return 'unclear'
+  return 'ok'
 }
 
 export default function InterviewRoom() {
@@ -500,6 +518,8 @@ export default function InterviewRoom() {
       toast.error('Enable microphone and camera first')
       return
     }
+    // User gesture — prime audio/TTS so the first interviewer line is heard.
+    unlockSpeech()
     setPreflight(false)
     try {
       const data = await interviewsApi.startRound(roundId)
@@ -546,10 +566,15 @@ export default function InterviewRoom() {
   // (res.advanced === false) instead of scoring + advancing. We read res.advanced
   // to decide whether a new question landed: when it's false we keep the current
   // question on screen and don't treat the turn as progress.
-  const submitAnswer = async (text, { asQuestion = false } = {}) => {
-    const isSkip = text === ''
-    const ans = isSkip ? '' : (text ?? answer).trim()
-    if (!isSkip && !ans) return
+  const submitAnswer = async (text, {
+    asQuestion = false,
+    forceAdvance = false,
+    audioUnclear = false,
+    transcriptionConfidence = null,
+  } = {}) => {
+    const isSkip = text === '' && !forceAdvance
+    const ans = (text === '' && forceAdvance) ? '' : (isSkip ? '' : (text ?? answer).trim())
+    if (!forceAdvance && !audioUnclear && !isSkip && !ans) return
     // A candidate question is never a skip — guard so '' can't be sent as one.
     const isQuestion = asQuestion && !isSkip && !!ans
     // An answer (or skip) arrived — stop the silence countdown for this turn.
@@ -563,6 +588,10 @@ export default function InterviewRoom() {
       const res = await interviewsApi.sendMessage(roundId, ans, {
         input_type: isQuestion ? 'question' : 'answer',
         practice: practiceMode,
+        force_advance: forceAdvance,
+        user_skip: forceAdvance,
+        audio_unclear: audioUnclear,
+        transcription_confidence: transcriptionConfidence,
       })
       // advanced === false → the interviewer clarified / re-asked the SAME
       // question (a candidate question, a re-ask of a thin answer, or no new
@@ -654,6 +683,14 @@ export default function InterviewRoom() {
       return
     }
     if (text) {
+      const clarity = assessTranscriptClarity(text, result)
+      if (clarity === 'unclear' && !openedAsQuestion) {
+        await submitAnswer(text, {
+          audioUnclear: true,
+          transcriptionConfidence: result?.confidence ?? null,
+        })
+        return
+      }
       const asQuestion = openedAsQuestion || looksLikeQuestion(text)
       await submitAnswer(text, { asQuestion })
     } else if (result?.reason === 'silence' || result?.reason === 'manual') {
@@ -690,13 +727,18 @@ export default function InterviewRoom() {
   // Speak a bot line, then automatically open the mic for the candidate's reply.
   // This is the heart of the hands-free voice loop.
   const speakThenListen = async (text, { autoListen = true, voiceId } = {}) => {
-    if (!text) return
+    if (!text) {
+      if (autoListen && !observerMode && !practicalMode && !isListeningRef.current) {
+        voiceAnswer()
+      }
+      return
+    }
     bargedInRef.current = false
-    // Surface the bot's line as a live caption on its tile while it speaks.
     setAiCaption(text)
-    await speak(text, voiceId ?? round?.persona_voice_id)
-    // speak() resolves when TTS finishes (or was cancelled). If the candidate
-    // barged in, voiceAnswer() is already listening — don't double-start.
+    const { spoken } = await speak(text, voiceId ?? round?.persona_voice_id) || {}
+    if (spoken === false) {
+      toast('Voice unavailable — read the caption, then tap the mic when ready.', { icon: '🔊' })
+    }
     if (autoListen && !observerMode && !isListeningRef.current && !bargedInRef.current) {
       voiceAnswer()
     }
@@ -723,16 +765,20 @@ export default function InterviewRoom() {
       if (captured) return // they're mid-answer — let it finish naturally
       stopListening()
       toast('No response — moving on', { icon: '⏭️' })
-      submitAnswer('') // engine treats empty as skipped and advances
+      submitAnswer('', { forceAdvance: true })
     }, SILENCE_SKIP_MS)
   }
 
-  const skipQuestion = () => {
+  const nextQuestion = () => {
+    if (observerMode) return
     clearSilenceTimer()
     stopListening()
     cancelSpeech()
-    submitAnswer('')
+    toast('Moving to next question', { icon: '⏭️' })
+    submitAnswer('', { forceAdvance: true })
   }
+
+  const skipQuestion = nextQuestion
 
   // In-room voice switch: persist the choice (handled by the hook) and give a
   // short spoken preview so the candidate hears the new voice immediately.
@@ -812,7 +858,8 @@ export default function InterviewRoom() {
     URL.revokeObjectURL(url)
   }
 
-  const endInterview = async () => {
+  const endInterview = async (opts = {}) => {
+    const { goNextRound = false } = opts
     clearSilenceTimer()
     awaitingAnswerRef.current = false
     stopListening()
@@ -823,11 +870,22 @@ export default function InterviewRoom() {
     setMediaStream(null)
     try {
       const res = await interviewsApi.endRound(roundId)
+      if (goNextRound && res.next_round?.id) {
+        toast.success('Moving to the next interview round')
+        navigate(`/interviews/room/${res.next_round.id}`)
+        return
+      }
       toast.success(res.passed ? 'Round passed!' : 'Round complete — see report')
       navigate(`/interviews/round/${roundId}/report`, { state: { report: res.report } })
     } catch {
       navigate(`/interviews/campaign/${round?.campaign_id || ''}`)
     }
+  }
+
+  const finishAndNextRound = () => {
+    if (observerMode) return
+    if (!window.confirm('End this round and go to the next one in your campaign?')) return
+    endInterview({ goNextRound: true })
   }
 
   const extend = async () => {
@@ -1063,7 +1121,10 @@ export default function InterviewRoom() {
               </select>
               <button
                 type="button"
-                onClick={() => speak('Hi, this is how I will sound during your interview.', round.persona_voice_id)}
+                onClick={() => {
+                  unlockSpeech()
+                  speak('Hi, this is how I will sound during your interview.', round.persona_voice_id)
+                }}
                 className="btn-secondary text-xs whitespace-nowrap inline-flex items-center gap-1"
                 title="Preview voice"
               >
@@ -1171,8 +1232,26 @@ export default function InterviewRoom() {
           <span className="text-sm font-mono text-amber-400 flex items-center gap-1">
             <Clock size={14} /> {fmt(timeLeft)}
           </span>
+          <div
+            className={`interview-live-call-badge ${isListening ? 'is-your-turn' : isSpeaking ? 'is-speaking' : ''}`}
+            title="Live two-way voice interview"
+          >
+            <span className="interview-live-dot" aria-hidden />
+            <span>Live</span>
+            {isListening && <span className="interview-live-sub">Your turn</span>}
+            {isSpeaking && !isListening && <span className="interview-live-sub">Speaking</span>}
+          </div>
           {!round.is_sample && (
             <>
+              <button
+                type="button"
+                onClick={nextQuestion}
+                disabled={observerMode}
+                className="text-xs text-surface-300 hover:text-white flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-800/80 border border-surface-700"
+                title="Skip to the next question (won't affect your score negatively)"
+              >
+                <SkipForward size={12} /> Next question
+              </button>
               <button type="button" onClick={() => setShowReschedule(s => !s)} className="text-xs text-surface-400 hover:text-white flex items-center gap-1">
                 <Calendar size={12} /> Reschedule
               </button>
@@ -1184,8 +1263,11 @@ export default function InterviewRoom() {
           <button type="button" onClick={cancelInterview} className="p-2 rounded-lg bg-surface-800 text-surface-400 hover:text-white" title="Cancel interview">
             <X size={16} />
           </button>
-          <button type="button" onClick={endInterview} className="p-2 rounded-lg bg-red-500/20 text-red-400" title="End round">
-            <PhoneOff size={16} />
+          <button type="button" onClick={finishAndNextRound} className="text-xs text-indigo-300 hover:text-white flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/25" title="End this round and open the next one">
+            <SkipForward size={12} /> Next round
+          </button>
+          <button type="button" onClick={() => endInterview()} className="px-2 py-1 rounded-lg bg-red-500/20 text-red-400 text-xs inline-flex items-center gap-1" title="End this round and view report">
+            <PhoneOff size={14} /> Finish round
           </button>
           {recordingReady && (
             <button type="button" onClick={downloadRecording}
@@ -1220,6 +1302,7 @@ export default function InterviewRoom() {
                 speaking={isSpeaking}
                 listening={isListening}
                 caption={aiCaption}
+                live
               />
             </div>
 
@@ -1435,11 +1518,12 @@ export default function InterviewRoom() {
             )}
             <button
               type="button"
-              onClick={skipQuestion}
-              className="btn-secondary px-3 shrink-0"
-              title="Skip this question"
+              onClick={nextQuestion}
+              disabled={observerMode}
+              className="btn-secondary px-3 shrink-0 inline-flex items-center gap-1.5 text-xs"
+              title="Skip to the next question"
             >
-              <SkipForward size={16} />
+              <SkipForward size={16} /> Next
             </button>
           </div>
         </div>

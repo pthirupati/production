@@ -30,8 +30,9 @@ export default function InterviewerStage({
   speaking = false,
   listening = false,
   caption = '',
+  live = false,
 }) {
-  const status = speaking ? 'Speaking' : listening ? 'Listening' : 'Ready'
+  const status = speaking ? 'Speaking' : listening ? 'Listening' : live ? 'Connected' : 'Ready'
 
   return (
     <div className="interview-stage-ai">
@@ -69,10 +70,19 @@ export default function InterviewerStage({
         <span>{status}</span>
       </div>
 
-      {/* Free-voice badge (top-right) */}
-      <div className="interview-freevoice-badge">
-        <Volume2 size={11} />
-        <span>AI voice</span>
+      {/* Live call badge (top-right) */}
+      <div className={`interview-freevoice-badge ${live ? 'is-live' : ''}`}>
+        {live ? (
+          <>
+            <span className="interview-live-dot-sm" aria-hidden />
+            <span>Live call</span>
+          </>
+        ) : (
+          <>
+            <Volume2 size={11} />
+            <span>AI voice</span>
+          </>
+        )}
       </div>
 
       {/* Live caption strip */}

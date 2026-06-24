@@ -101,9 +101,10 @@ _REACTIONS = {
         "That's a start. Give me the full picture — what happened before, during, and after.",
     ],
     "skipped": [
-        "No worries — let's move on.",
-        "Okay, we can come back to that later. Next question:",
-        "Got it, let's keep pace —",
+        "No worries — let's keep moving.",
+        "That's fine, we'll circle back if we have time.",
+        "All good — let's keep pace.",
+        "No problem at all — moving on.",
     ],
     "missing_star_s": [
         "Tell me more about the context first. What was the situation — what system, what team size?",
@@ -137,18 +138,16 @@ _VERDICT_REACTIONS = {
         "Good — you nailed the key idea there.",
     ],
     "partial": [
-        "You're on the right track, but not all the way there.",
-        "Partly — you've got the gist, though you're missing a piece.",
-        "That's half of it. There's an important part you skipped.",
-        "Close. You're circling the right idea but haven't landed it.",
-        "Okay, you've got the shape of it — let's tighten it up.",
+        "You're on the right track — there's just one piece I'd want to tighten.",
+        "Good start — you've got part of it, and I want to hear the rest of your thinking.",
+        "Yeah, that's directionally right. Let me see if we can nail the missing bit.",
+        "Okay, you've got the shape of it — let's sharpen one detail.",
     ],
     "off_base": [
-        "Hmm, that's not quite where I'd go with it.",
-        "I don't think that's it — let me steer you a little.",
-        "That's a bit off-base. Let's reset.",
-        "Not really, no — but let's work toward it.",
-        "I'd actually push back on that.",
+        "I think we might be talking past each other — let me reframe what I'm after.",
+        "That's a fair angle, though not quite the thread I was pulling on.",
+        "Okay — different direction than I had in mind, but let's steer back together.",
+        "Hmm, I may not have been clear — let me put the question another way.",
     ],
     "unknown": [
         "Okay.",
@@ -343,6 +342,20 @@ _TERM_DEFINITIONS = {
     "database": "A database stores and serves structured data; in ops we care about replication, backups, and migration safety.",
     "networking": "Networking covers how packets get from client to service — DNS, routing, firewalls, and the OSI layers in between.",
     "python": "Python is a high-level language widely used for automation, services, and tooling in ops and SRE work.",
+    "iam": "IAM (Identity and Access Management) controls who can do what in a cloud account — users, groups, roles, and the policies attached to them.",
+    "access through association": (
+        "Access through association means you get permissions because you're linked to something else, "
+        "not because a policy is glued directly to you. Real AWS example: developers are in the IAM group "
+        "'Deployers' with AmazonEC2ReadOnlyAccess attached to the group. Alice has no EC2 policy on her user, "
+        "but she can describe instances because group membership associates her with that access. Same idea for "
+        "a role's trust policy letting an EC2 instance assume the role, or an SCP associated to an OU in "
+        "Organizations."
+    ),
+    "role": "An IAM role is an identity with permissions that a trusted principal (user, service, or account) can assume temporarily via STS — common for EC2, Lambda, and cross-account access.",
+    "policy": "An IAM policy is a JSON document listing allowed or denied actions on resources; it attaches to users, groups, roles, or is used inline.",
+    "assume role": "To assume a role is to exchange your current credentials for short-lived STS credentials scoped to that role's permissions — e.g. an EC2 instance assuming a role to reach S3.",
+    "sts": "AWS STS (Security Token Service) issues temporary credentials when you assume a role or federate in — typically 15 minutes to 12 hours.",
+    "scp": "A Service Control Policy (SCP) is an Organizations guardrail: it limits what accounts in an OU can do even if their IAM policies allow it.",
 }
 
 # ---------------------------------------------------------------------------
@@ -447,7 +460,7 @@ def _detect_topic(text: str) -> str | None:
         "nginx": ["nginx", "reverse proxy", "upstream", "ssl termination", "load balance"],
         "linux": ["linux", "systemd", "kernel", "cgroup", "process", "inode", "socket", "file descriptor"],
         "monitoring": ["prometheus", "grafana", "alertmanager", "metrics", "slo", "sli", "error rate"],
-        "aws": ["aws", "ec2", "s3", "rds", "cloudwatch", "iam", "vpc", "lambda", "eks"],
+        "aws": ["aws", "ec2", "s3", "rds", "cloudwatch", "iam", "vpc", "lambda", "eks", "sts", "scp"],
         "terraform": ["terraform", "tfstate", "provider", "resource", "plan apply", "module"],
         "ci_cd": ["ci/cd", "pipeline", "github actions", "jenkins", "gitlab", "argocd", "deployment"],
         "python": ["python", "django", "flask", "fastapi", "asyncio", "pip", "celery"],
@@ -457,31 +470,89 @@ def _detect_topic(text: str) -> str | None:
     }
     scores = {t: sum(1 for k in kws if k in low) for t, kws in topic_keywords.items()}
     best = max(scores, key=lambda t: scores[t])
-    return best if scores[best] >= 2 else None
+    if scores[best] >= 2:
+        return best
+    # A single strong signal (e.g. "kubectl get pods") is enough for short answers.
+    if scores[best] == 1:
+        return best
+    return None
+
+
+_FILLER_ONLY = frozenset({
+    "ok", "okay", "yes", "no", "sure", "idk", "maybe", "nope", "yeah", "yep", "nah",
+    "not sure", "don't know", "dont know", "pass", "skip", "hmm", "um", "uh",
+})
+
+_COMMAND_TOKENS = re.compile(
+    r"\b(kubectl|systemctl|terraform|ansible|docker|aws|az|gcloud|grep|curl|ssh|"
+    r"journalctl|helm|nginx|iptables|ip\s|ping|dig|nslookup|chmod|chown|sed|awk)\b",
+    re.I,
+)
+
+
+def _refine_quality(
+    quality: str,
+    *,
+    correctness: str | None = None,
+    keyword_hit_rate: float = 0.0,
+    topic: str | None = None,
+    word_count: int = 0,
+    has_keywords: bool = False,
+) -> str:
+    """Adjust length-only quality using correctness + on-topic signals.
+
+    A concise but correct answer should read as adequate, not brief/weak."""
+    if quality == "skipped":
+        return quality
+    if correctness == "correct":
+        if quality in ("brief", "weak"):
+            return "adequate"
+    if correctness == "partial":
+        if quality == "weak" and (keyword_hit_rate >= 0.3 or topic):
+            return "brief"
+        if quality == "brief" and keyword_hit_rate >= 0.35:
+            return "adequate"
+    if topic and word_count >= 6 and quality == "weak":
+        if keyword_hit_rate >= 0.2 or not has_keywords:
+            return "adequate"
+    if keyword_hit_rate >= 0.55 and quality in ("brief", "weak"):
+        return "adequate"
+    return quality
 
 
 def _assess_quality(answer: str, question: str = "") -> str:
-    if not answer or len(answer.strip()) < 20:
+    text = (answer or "").strip()
+    if not text:
         return "skipped"
-    word_count = len(answer.split())
-    if word_count < 30:
-        return "brief"
-    low = answer.lower()
+    word_count = len(text.split())
+    low = text.lower()
+    if word_count <= 2 and low.rstrip(".!?") in _FILLER_ONLY:
+        return "skipped"
+
     depth_hits = sum(1 for k in _TECHNICAL_DEPTH if k in low)
     concrete_hits = sum(1 for k in _CONCRETE_EVIDENCE if k in low)
     action_hits = sum(1 for k in _STAR_ACTION if k in low)
     result_hits = sum(1 for k in _STAR_RESULT if k in low)
+    command_like = bool(_COMMAND_TOKENS.search(low))
     score = (
         min(depth_hits, 4) * 2
         + min(concrete_hits, 4) * 2
         + min(action_hits, 5) * 1
         + min(result_hits, 3) * 1.5
-        + min(word_count / 80, 2) * 1
+        + (2 if command_like else 0)
+        + min(word_count / 60, 2) * 1
     )
     if score >= 8:
         return "strong"
     if score >= 4:
         return "adequate"
+    # Concise but substantive (commands, tooling, clear action) — don't punish brevity.
+    if score >= 2 and word_count >= 5:
+        return "adequate"
+    if word_count >= 20 and score >= 1:
+        return "adequate"
+    if word_count < 10 and score < 2:
+        return "brief"
     return "weak"
 
 
@@ -503,6 +574,22 @@ _NOTABLE_BIGRAMS = (
 )
 
 
+# Phrases that read like interviewer prompts — never quote them back from answers.
+_PHRASE_BLOCKLIST = (
+    "access through association", "go deeper", "real example", "concrete example",
+    "walk me through", "step by step", "tell me again", "say that again",
+)
+
+
+def _is_blocked_phrase(phrase: str) -> bool:
+    if not phrase:
+        return True
+    low = phrase.lower()
+    if any(b in low for b in _PHRASE_BLOCKLIST):
+        return True
+    return low in _TERM_DEFINITIONS
+
+
 def _extract_quote_phrase(answer: str) -> str | None:
     """Pull a short, meaningful phrase from the candidate's OWN answer so the
     follow-up can reference it (e.g. 'You touched on "the cache TTL"…').
@@ -519,7 +606,7 @@ def _extract_quote_phrase(answer: str) -> str | None:
     low = answer.lower()
 
     for bigram in _NOTABLE_BIGRAMS:
-        if bigram in low:
+        if bigram in low and not _is_blocked_phrase(bigram):
             return bigram
 
     # Tokenize into alphabetic words, preserving order.
@@ -541,13 +628,15 @@ def _extract_quote_phrase(answer: str) -> str | None:
         else:
             run = []
     if len(best_run) >= 2:
-        return " ".join(best_run).lower()
+        phrase = " ".join(best_run).lower()
+        if not _is_blocked_phrase(phrase):
+            return phrase
 
     # Single longest content word as a last resort.
     content_words = [w for w in words if is_content(w)]
     if content_words:
         longest = max(content_words, key=len)
-        if len(longest) >= 5:
+        if len(longest) >= 5 and not _is_blocked_phrase(longest.lower()):
             return longest.lower()
     return None
 
@@ -806,9 +895,83 @@ def generate_clarify_probe(
         templates = [t.format(phrase=f"“{phrase}”") for t in _CLARIFY_PROBES]
         line = _pick_unused(templates, used, rng)
         if line:
+            q = (question_text or "").strip()
+            if q:
+                return f"{line} So again: {q}"
             return line
     line = _pick_unused(_CLARIFY_PROBES_NO_PHRASE, used, rng)
-    return line or "I want to make sure I follow — can you walk me through that concretely, step by step?"
+    line = line or "I want to make sure I follow — can you walk me through that concretely, step by step?"
+    q = (question_text or "").strip()
+    if q:
+        return f"{line} So again: {q}"
+    return line
+
+
+# ---------------------------------------------------------------------------
+# Force-advance (user skip / next question) + unclear-audio re-asks. Human,
+# empathetic — never frames skip or bad audio as a "wrong answer".
+# ---------------------------------------------------------------------------
+
+_FORCE_ADVANCE_REPLIES = [
+    "No problem — let's move on to the next one.",
+    "Sure thing — keeping us on pace. Here's the next question.",
+    "All good — we'll come back to that if we have time. Next one:",
+    "Absolutely — let's jump to the next question.",
+]
+
+_FORCE_ADVANCE_PARTIAL = [
+    "Got the gist — let's keep moving and come back if we have time.",
+    "Thanks — I'll note that and we'll keep pace with the next question.",
+]
+
+_FORCE_ADVANCE_END = [
+    "No problem — that wraps the questions for this round. Nice work getting through it.",
+    "All good — we're out of questions for this round. Let's wrap up.",
+]
+
+_UNCLEAR_AUDIO_REPLIES = [
+    "Sorry — I didn't catch that clearly. Could be the line or a bit of background noise on my end.",
+    "I'm having trouble hearing you on that one — that's on the audio, not your answer. Could you try once more?",
+    "I lost you there for a second — no worries at all. Mind saying that again?",
+    "The audio cut out a little — I don't want to mark you wrong when I simply didn't hear you. One more time?",
+]
+
+
+def generate_force_advance_reply(
+    *,
+    had_partial_answer: bool = False,
+    has_next_question: bool = True,
+    conversation_tail: list[dict] | None = None,
+) -> str:
+    used = _prior_interviewer_lines(conversation_tail or [])
+    rng = random.Random()
+    if not has_next_question:
+        return _pick_unused(_FORCE_ADVANCE_END, used, rng) or _FORCE_ADVANCE_END[0]
+    if had_partial_answer:
+        return _pick_unused(_FORCE_ADVANCE_PARTIAL, used, rng) or _FORCE_ADVANCE_PARTIAL[0]
+    return _pick_unused(_FORCE_ADVANCE_REPLIES, used, rng) or _FORCE_ADVANCE_REPLIES[0]
+
+
+def generate_unclear_audio_reply(
+    *,
+    question_text: str = "",
+    partial_transcript: str = "",
+    conversation_tail: list[dict] | None = None,
+) -> str:
+    used = _prior_interviewer_lines(conversation_tail or [])
+    rng = random.Random()
+    q = (question_text or "").strip()
+    words = len((partial_transcript or "").split())
+    if words >= 3:
+        lead = (
+            "I caught part of what you said but not the full answer — "
+            "could be the connection. No judgment on the content, I just need to hear you clearly."
+        )
+    else:
+        lead = _pick_unused(_UNCLEAR_AUDIO_REPLIES, used, rng) or _UNCLEAR_AUDIO_REPLIES[0]
+    if q:
+        return f"{lead} Same question: {q}"
+    return lead
 
 
 # ---------------------------------------------------------------------------
@@ -831,8 +994,16 @@ def detect_question_intent(text: str) -> str | None:
     # Repeat / didn't-catch.
     if any(p in low for p in ("repeat", "say that again", "come again", "what was the question", "didn't catch", "did not catch")):
         return "repeat"
-    # Definition ("what is X", "what's a Y", "what do you mean by Z").
-    if low.startswith(("what is", "what's", "what are", "whats ")) or "what do you mean" in low or "what does that mean" in low:
+    # Definition ("what is X", "what's a Y", "what do you mean by Z", "go deeper on X").
+    if (
+        low.startswith(("what is", "what's", "what are", "whats "))
+        or "what do you mean" in low
+        or "what does that mean" in low
+        or "go deeper" in low
+        or "real example" in low
+        or "concrete example" in low
+        or "with an example" in low
+    ):
         return "definition"
     # Scope ("how much detail", "do you want code", "high level or deep").
     if any(p in low for p in ("how much detail", "how deep", "high level", "do you want", "should i", "are you looking for", "in detail")):
@@ -883,7 +1054,7 @@ def generate_clarification_reply(
     if intent == "definition":
         definition = _define_term(candidate_question, question_text)
         if definition:
-            return f"Good question. {definition} With that in mind — {reask}"
+            return f"Good question — here's a concrete take. {definition} With that in mind: {reask}"
         return f"Good question — think of it in plain terms and answer from your own experience. {reask}"
     if intent == "scope":
         return (
@@ -904,17 +1075,44 @@ def generate_clarification_reply(
 def is_candidate_question(text: str, input_type: str | None = None) -> bool:
     """True when the candidate is asking/interrupting rather than answering (WS5).
 
-    Triggers on input_type=='question', a trailing '?', or any known meta
-    pattern ('can you repeat', 'what do you mean', 'clarify', 'can you explain',
-    'what is'…). Free/local."""
+    Deliberately strict: long spoken answers that mention a term or end with '?'
+    are usually still answers. Only short, explicit meta-requests count."""
     if input_type == "question":
         return True
     low = (text or "").strip().lower()
     if not low:
         return False
-    if low.endswith("?"):
+    words = low.split()
+    word_count = len(words)
+
+    # Strong meta openers — even if the candidate spoke a full sentence.
+    strong_meta = (
+        "can you repeat", "could you repeat", "say that again", "repeat the question",
+        "what was the question", "what do you mean", "what does that mean",
+        "can you clarify", "could you clarify", "please clarify",
+        "can you explain", "could you explain",
+        "i don't understand", "didn't understand", "didn't catch", "did not catch",
+        "come again", "one more time",
+    )
+    if any(p in low for p in strong_meta):
         return True
-    return any(p in low for p in _META_QUESTION_PATTERNS)
+
+    # Short interrogatives only — long answers are answers, not interruptions.
+    if word_count > 20:
+        return False
+    if low.startswith(("what is ", "what's ", "what are ", "whats ")):
+        return True
+    if low.endswith("?") and word_count <= 16:
+        if re.match(
+            r"^(what|why|how|when|where|which|who|can|could|would|should|"
+            r"do|does|did|is|are|was|were|will|sorry|pardon|wait)\b",
+            low,
+        ):
+            return True
+    if word_count <= 14:
+        soft_meta = ("clarify", "rephrase", "not sure what you mean")
+        return any(p in low for p in soft_meta)
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -961,6 +1159,15 @@ def compute_answer_scores(
 
     if expected_keywords:
         composite = composite * 0.7 + expected_hit_rate * 100 * 0.3
+
+    has_keywords = bool(expected_keywords)
+    quality = _refine_quality(
+        quality,
+        keyword_hit_rate=expected_hit_rate,
+        topic=topic,
+        word_count=word_count,
+        has_keywords=has_keywords,
+    )
 
     return {
         "quality": quality,

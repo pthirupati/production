@@ -18,7 +18,9 @@ from apps.interviews.services.interview_ai import (
     detect_question_intent,
     generate_clarification_reply,
     generate_clarify_probe,
+    generate_force_advance_reply,
     generate_interviewer_reply,
+    generate_unclear_audio_reply,
     is_candidate_question,
 )
 from apps.interviews.services.question_generator import (
@@ -27,7 +29,15 @@ from apps.interviews.services.question_generator import (
     starting_difficulty,
 )
 from apps.interviews.services.question_selector import round_category_mix, select_next_question
-from apps.interviews.services.scoring import aggregate_round_scores, build_strengths_and_improvements, score_answer
+from apps.interviews.services.scoring import (
+    CORRECTNESS_CORRECT,
+    CORRECTNESS_OFF_BASE,
+    CORRECTNESS_PARTIAL,
+    CORRECTNESS_UNKNOWN,
+    aggregate_round_scores,
+    build_strengths_and_improvements,
+    score_answer,
+)
 
 
 # WS4 — the intro is now GREETING + AGENDA ONLY. It deliberately does NOT carry
@@ -410,6 +420,138 @@ def _recent_tail(round_obj: InterviewRound, limit: int = 6) -> list[dict]:
     )
 
 
+def _should_reprompt_answer(score_result: dict, correctness: str) -> bool:
+    """Re-ask only when the answer genuinely didn't land — not when it's concise but correct."""
+    quality = score_result.get("quality", "")
+    # Skipped / empty answers always advance (user skip, silence timeout, force next).
+    if quality == "skipped":
+        return False
+    if correctness == CORRECTNESS_CORRECT:
+        return False
+    if score_result.get("command_validated"):
+        return False
+    hit_rate = float(score_result.get("keyword_hit_rate") or 0)
+    if hit_rate >= 0.45:
+        return False
+    if correctness == CORRECTNESS_PARTIAL and quality in ("strong", "adequate", "brief"):
+        return False
+    if score_result.get("topic_detected") and quality == "brief" and hit_rate >= 0.25:
+        return False
+    if quality == "weak":
+        return True
+    if quality == "brief":
+        return correctness in (CORRECTNESS_OFF_BASE, CORRECTNESS_UNKNOWN)
+    return False
+
+
+def _submit_force_advance(
+    round_obj: InterviewRound,
+    *,
+    question,
+    question_text: str,
+    answer_text: str,
+    meta: dict,
+) -> dict:
+    """User chose to skip / force-advance — move on without scoring or re-prompt."""
+    partial = (answer_text or "").strip()
+    cand_msg = InterviewMessage.objects.create(
+        round=round_obj,
+        role="candidate",
+        content=partial,
+        message_type="skip" if not partial else "text",
+        question=question,
+        score=None,
+        metadata={"user_skip": True, "force_advance": True},
+    )
+    next_q = None
+    if _should_ask_another(round_obj):
+        try:
+            next_q = ask_next_question(round_obj)
+        except Exception:  # noqa: BLE001
+            next_q = None
+    try:
+        reply = generate_force_advance_reply(
+            had_partial_answer=bool(partial),
+            has_next_question=bool(next_q),
+            conversation_tail=_recent_tail(round_obj),
+        )
+    except Exception:  # noqa: BLE001
+        reply = "No problem — let's move on." if next_q else "No problem — that wraps this round."
+    interviewer_msg = InterviewMessage.objects.create(
+        round=round_obj,
+        role="interviewer",
+        content=reply,
+        message_type="follow_up",
+        metadata={"force_advance": True, "advanced": bool(next_q)},
+    )
+    return {
+        "candidate_message": cand_msg,
+        "interviewer_reply": interviewer_msg,
+        "reply": reply,
+        "advanced": bool(next_q),
+        "correctness": "unknown",
+        "score": None,
+        "next_question": next_q,
+        "coaching": None,
+        "skipped": not partial,
+    }
+
+
+def _submit_unclear_audio(
+    round_obj: InterviewRound,
+    *,
+    question,
+    question_text: str,
+    answer_text: str,
+    meta: dict,
+) -> dict:
+    """Voice/transcription was unclear — re-ask WITHOUT judging the answer wrong."""
+    partial = (answer_text or "").strip()
+    cand_msg = InterviewMessage.objects.create(
+        round=round_obj,
+        role="candidate",
+        content=partial or "[voice unclear]",
+        message_type="text",
+        question=question,
+        score=None,
+        metadata={
+            "audio_unclear": True,
+            "transcription_confidence": meta.get("transcription_confidence"),
+        },
+    )
+    try:
+        reply = generate_unclear_audio_reply(
+            question_text=question_text,
+            partial_transcript=partial,
+            conversation_tail=_recent_tail(round_obj),
+        )
+    except Exception:  # noqa: BLE001
+        q = (question_text or "").strip()
+        reply = (
+            "Sorry — I didn't catch that clearly. Could be the line or background noise. "
+            f"Take your time and try again. Same question: {q}" if q else
+            "Sorry — I didn't catch that clearly. Take your time and try again."
+        )
+    interviewer_msg = InterviewMessage.objects.create(
+        round=round_obj,
+        role="interviewer",
+        content=reply,
+        message_type="follow_up",
+        metadata={"audio_unclear": True, "advanced": False},
+    )
+    return {
+        "candidate_message": cand_msg,
+        "interviewer_reply": interviewer_msg,
+        "reply": reply,
+        "advanced": False,
+        "correctness": "unknown",
+        "score": None,
+        "next_question": None,
+        "coaching": None,
+        "skipped": False,
+    }
+
+
 def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | None = None) -> dict:
     meta = metadata or {}
     # Tell the scorer which round type this is so behavioral/HR answers are
@@ -430,6 +572,26 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     )
     question = last_q_msg.question if last_q_msg else None
     question_text = last_q_msg.content if last_q_msg else ""
+
+    # User explicitly skipped or tapped "Next question" — always advance, never re-prompt.
+    if meta.get("force_advance") or meta.get("user_skip"):
+        return _submit_force_advance(
+            round_obj,
+            question=question,
+            question_text=question_text,
+            answer_text=answer_text,
+            meta=meta,
+        )
+
+    # Voice line was garbled / STT confidence low — empathize and re-ask, don't score as wrong.
+    if meta.get("audio_unclear"):
+        return _submit_unclear_audio(
+            round_obj,
+            question=question,
+            question_text=question_text,
+            answer_text=answer_text,
+            meta=meta,
+        )
 
     # ------------------------------------------------------------------ WS5 ---
     # The candidate is ASKING/interrupting, not answering. ANSWER it (repeat /
@@ -524,9 +686,13 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     warmup_slot = last_q_category in ("intro", "experience", "personal", "casual")
 
     quality = score_result.get("quality", "")
-    thin = quality in ("skipped", "brief", "weak")
     already_reprompted = _reprompt_count(round_obj, question_text) >= 1
-    reprompt_now = thin and not already_reprompted and bool(question_text) and not warmup_slot
+    reprompt_now = (
+        _should_reprompt_answer(score_result, correctness)
+        and not already_reprompted
+        and bool(question_text)
+        and not warmup_slot
+    )
 
     if reprompt_now:
         try:

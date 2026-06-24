@@ -262,6 +262,77 @@ function stopAudio() {
   if (window.speechSynthesis) window.speechSynthesis.cancel()
 }
 
+// Chrome/Safari often start with speechSynthesis paused or stuck until a user
+// gesture primes it. Call this on Join / Begin so the first bot line actually
+// plays instead of only updating the on-screen caption.
+export function unlockSpeech() {
+  if (typeof window === 'undefined') return
+  try {
+    if (window.speechSynthesis?.paused) window.speechSynthesis.resume()
+  } catch { /* non-fatal */ }
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (Ctx) {
+      const ctx = new Ctx()
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+      ctx.close()
+    }
+  } catch { /* non-fatal */ }
+  try {
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance(' ')
+      u.volume = 0
+      window.speechSynthesis.speak(u)
+      window.speechSynthesis.cancel()
+    }
+  } catch { /* non-fatal */ }
+}
+
+async function waitForBrowserVoices(maxMs = 600) {
+  if (!window.speechSynthesis) return
+  const start = Date.now()
+  while (Date.now() - start < maxMs) {
+    if (window.speechSynthesis.getVoices().length) return
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, 60))
+  }
+}
+
+function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
+  return new Promise((resolve) => {
+    let settled = false
+    let started = false
+    const done = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(stuckTimer)
+      resolve(started)
+    }
+    const u = new SpeechSynthesisUtterance(seg)
+    u.lang = (voice && voice.lang) || locale || 'en-US'
+    u.rate = rate
+    u.pitch = pitch
+    if (voice) u.voice = voice
+    u.onstart = () => { started = true }
+    u.onend = done
+    u.onerror = done
+    const stuckTimer = setTimeout(() => {
+      if (!started && window.speechSynthesis?.paused) {
+        try { window.speechSynthesis.resume() } catch { /* */ }
+        try { window.speechSynthesis.speak(u) } catch { done() }
+      } else {
+        done()
+      }
+    }, 350)
+    try {
+      window.speechSynthesis.resume?.()
+      window.speechSynthesis.speak(u)
+    } catch {
+      done()
+    }
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Server TTS call
 // ---------------------------------------------------------------------------
@@ -438,57 +509,47 @@ export function useInterviewVoice() {
   // speak() — server TTS with browser fallback
   // ------------------------------------------------------------------
   const speak = useCallback(async (text, voiceCode) => {
-    if (!text) return
+    if (!text) return { spoken: false }
     setIsSpeaking(true)
+    let spoken = false
 
     try {
+      unlockSpeech()
+
       if (config.uses_server_tts) {
         const profile = resolveVoiceProfile(voiceCode)
         const result = await serverSpeak(text, profile.code).catch(() => null)
 
         if (result?.audio_b64) {
           await playBase64Audio(result.audio_b64, 'audio/mpeg')
-          return
+          spoken = true
+          return { spoken: true }
         }
         // Fall through to browser TTS
       }
 
       // Browser SpeechSynthesis fallback — segmented for a natural cadence.
-      if (!window.speechSynthesis) return
+      if (!window.speechSynthesis) return { spoken: false }
       const profile = resolveVoiceProfile(voiceCode)
+      await waitForBrowserVoices()
       window.speechSynthesis.cancel()
 
-      // Honor the user's in-room voice choice over the admin hint; otherwise
-      // pick the most natural-sounding voice for the accent.
       const voice = pickBrowserVoice(
         profile.browser_voice_hint, profile.locale, selectedVoiceRef.current,
       )
-      // Clamp rate/pitch into the conversational range the brief calls for
-      // (~0.95–1.05 rate). Slightly raise the floor so it never drones.
       const rate = Math.min(1.08, Math.max(0.92, profile.rate ?? 0.98))
       const pitch = Math.min(1.15, Math.max(0.9, profile.pitch ?? 1))
+      const utterOpts = { voice, locale: profile.locale, rate, pitch }
 
       const segments = segmentForSpeech(text)
-      // Tag this utterance run; if cancelSpeech bumps the token we bail out.
       const myToken = ++speakTokenRef.current
 
       for (let i = 0; i < segments.length; i++) {
-        if (speakTokenRef.current !== myToken) break // cancelled / superseded
+        if (speakTokenRef.current !== myToken) break
         const seg = segments[i]
         // eslint-disable-next-line no-await-in-loop
-        await new Promise((resolve) => {
-          const u = new SpeechSynthesisUtterance(seg)
-          u.lang = (voice && voice.lang) || profile.locale || 'en-US'
-          u.rate = rate
-          u.pitch = pitch
-          if (voice) u.voice = voice
-          let settled = false
-          const done = () => { if (settled) return; settled = true; resolve() }
-          u.onend = done
-          u.onerror = done
-          try { window.speechSynthesis.speak(u) } catch { done() }
-        })
-        // Natural beat between sentences (skip the trailing pause on the last).
+        const started = await speakBrowserUtterance(seg, utterOpts)
+        if (started) spoken = true
         if (i < segments.length - 1 && speakTokenRef.current === myToken) {
           const gap = pauseAfter(seg)
           // eslint-disable-next-line no-await-in-loop
@@ -500,6 +561,19 @@ export function useInterviewVoice() {
           })
         }
       }
+
+      // Chrome sometimes resolves utterances instantly without onstart — retry once
+      // as a single block so the candidate still hears the interviewer.
+      if (!spoken && speakTokenRef.current === myToken) {
+        const clean = (text || '').replace(/\s+/g, ' ').trim()
+        if (clean) {
+          unlockSpeech()
+          // eslint-disable-next-line no-await-in-loop
+          spoken = await speakBrowserUtterance(clean.slice(0, 500), utterOpts)
+        }
+      }
+
+      return { spoken }
     } finally {
       setIsSpeaking(false)
     }
@@ -906,6 +980,7 @@ export function useInterviewVoice() {
     isListening,
     interimTranscript,
     speak,
+    unlockSpeech,
     cancelSpeech,
     listen,
     listenLive,

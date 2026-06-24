@@ -673,6 +673,55 @@ body::after {
   color: rgb(var(--s-400));
   backdrop-filter: blur(6px);
 }
+.interview-freevoice-badge.is-live {
+  background: rgb(239 68 68 / 0.15);
+  color: rgb(252 165 165);
+}
+.interview-live-dot-sm {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(239 68 68);
+  animation: interview-live-pulse 1.4s ease-in-out infinite;
+}
+.interview-live-call-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgb(239 68 68 / 0.12);
+  color: rgb(252 165 165);
+  border: 1px solid rgb(239 68 68 / 0.25);
+}
+.interview-live-call-badge.is-your-turn {
+  background: rgb(var(--a-green) / 0.12);
+  color: rgb(var(--a-green));
+  border-color: rgb(var(--a-green) / 0.25);
+}
+.interview-live-call-badge.is-speaking {
+  background: rgb(var(--a-cyan) / 0.12);
+  color: rgb(var(--a-cyan));
+  border-color: rgb(var(--a-cyan) / 0.25);
+}
+.interview-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgb(239 68 68);
+  animation: interview-live-pulse 1.4s ease-in-out infinite;
+}
+.interview-live-sub {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+@keyframes interview-live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
 
 /* Live caption strips (one per tile, bottom-center). */
 .interview-caption {

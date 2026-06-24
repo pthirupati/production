@@ -5,7 +5,7 @@ import { scenarioApi } from '../api/scenarios'
 import {
   ChevronLeft, Target, CheckCircle2, Lock, ChevronRight,
   Wrench, Play, Skull, FolderKanban, Clock, Layers, ChevronDown, ChevronUp,
-  BookOpen, AlertCircle, Circle, Award, PlayCircle,
+  BookOpen, AlertCircle, Circle, Award, PlayCircle, Sparkles,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import TechIcon from '../components/marketing/TechIcon'
@@ -36,6 +36,67 @@ const archLabel = {
 }
 
 const typeIcons = { fix: Wrench, do: Play, hack: Skull }
+
+const DIFF_RANK = { easy: 0, medium: 1, hard: 2 }
+
+/** Free labs first, then difficulty, then title — easy to spot no-cost scenarios. */
+function sortFreeFirst(scenarios) {
+  return [...(scenarios || [])].sort((a, b) => {
+    if (a.is_free !== b.is_free) return Number(b.is_free) - Number(a.is_free)
+    const dr = (DIFF_RANK[a.difficulty] ?? 9) - (DIFF_RANK[b.difficulty] ?? 9)
+    if (dr !== 0) return dr
+    return (a.title || '').localeCompare(b.title || '')
+  })
+}
+
+function FreeLabBadge({ className = '' }) {
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-accent-green/15 text-accent-green border border-accent-green/30 shrink-0 ${className}`}>
+      <Sparkles size={10} /> Free
+    </span>
+  )
+}
+
+function ScenarioListRow({ scenario, className = '' }) {
+  const TypeIcon = typeIcons[scenario.scenario_type] || Wrench
+  const isCompleted = scenario.user_progress?.completed
+  const inProgress = scenario.user_progress?.attempts > 0 && !isCompleted
+  const diff = difficultyConfig[scenario.difficulty] || difficultyConfig.medium
+  const locked = scenario.is_accessible === false
+  return (
+    <Link
+      to={`/scenarios/${scenario.slug}`}
+      className={`flex items-center gap-3.5 py-3 px-3 -mx-3 rounded-[11px] transition-colors group ${
+        scenario.is_free
+          ? 'bg-accent-green/[0.06] border border-accent-green/20 hover:bg-accent-green/[0.1] hover:border-accent-green/35'
+          : 'hover:bg-white/[0.03]'
+      } ${className}`}
+    >
+      <span
+        className="w-[30px] h-[30px] rounded-lg flex items-center justify-center shrink-0"
+        style={{
+          background: scenario.is_free
+            ? 'rgba(86,224,176,.18)'
+            : isCompleted ? 'rgba(86,224,176,.12)' : inProgress ? 'rgba(254,177,85,.12)' : 'rgba(255,255,255,.04)',
+          color: scenario.is_free ? '#56e0b0' : isCompleted ? '#56e0b0' : inProgress ? '#feb155' : 'rgba(255,255,255,.4)',
+        }}
+      >
+        {isCompleted ? <CheckCircle2 size={14} /> : <TypeIcon size={14} />}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-[13.5px] font-semibold text-white m-0 group-hover:text-accent-cyan transition-colors truncate">{scenario.title}</p>
+          {scenario.is_free && <FreeLabBadge />}
+        </div>
+        <p className="text-[11.5px] text-white/40 mt-0.5">{diff.label} · {scenario.max_score || 100} XP</p>
+      </div>
+      <span className="text-[11px] font-semibold shrink-0" style={{ color: isCompleted ? '#56e0b0' : inProgress ? '#feb155' : scenario.is_free ? '#56e0b0' : 'rgba(255,255,255,.35)' }}>
+        {isCompleted ? 'Done' : inProgress ? 'In progress' : locked ? 'Locked' : scenario.is_free ? 'Start free' : 'Start'}
+      </span>
+      {locked && !scenario.is_free && <Lock size={12} className="text-white/30 shrink-0" />}
+    </Link>
+  )
+}
 
 function ProjectCard({ project, onStart }) {
   const [expanded, setExpanded] = useState(false)
@@ -122,7 +183,7 @@ function ProjectCard({ project, onStart }) {
 
 function groupScenariosByCategory(scenarios) {
   const groups = {}
-  for (const s of scenarios) {
+  for (const s of sortFreeFirst(scenarios)) {
     const cat = s.category || 'General'
     if (!groups[cat]) groups[cat] = []
     groups[cat].push(s)
@@ -202,7 +263,7 @@ export default function TechnologyDetail() {
 
   const modules = useMemo(() => {
     if (!techDetail?.scenarios?.length) return []
-    return groupScenariosByCategory(techDetail.scenarios).map(({ name, items }) => {
+    return groupScenariosByCategory(sortFreeFirst(techDetail.scenarios)).map(({ name, items }) => {
       const done = items.filter(s => s.user_progress?.completed).length
       const total = items.length
       const pct = total ? Math.round((done / total) * 100) : 0
@@ -259,14 +320,12 @@ export default function TechnologyDetail() {
 
   const tech = techDetail.technology
   const projects = techDetail.projects || []
-  const scenarios = techDetail.scenarios || []
+  const scenarios = sortFreeFirst(techDetail.scenarios || [])
+  const freeScenarios = scenarios.filter(s => s.is_free)
   const certTracks = techDetail.cert_tracks || []
   const hasProjects = projects.length > 0
   const hasScenarios = scenarios.length > 0
-  const popularScenarios = [...scenarios].slice(0, 8)
-  // "Continue learning" jumps straight into the next scenario IN THIS technology
-  // (first uncompleted, else the first), keeping the user in-context instead of
-  // bouncing out to the global all-scenarios grid.
+  const popularScenarios = scenarios.slice(0, 8)
   const nextScenario = scenarios.find(s => !s.user_progress?.completed) || scenarios[0]
 
   return (
@@ -418,38 +477,47 @@ export default function TechnologyDetail() {
 
       {activeTab === 'scenarios' && (
         <div className="grid lg:grid-cols-[1.6fr_1fr] gap-[22px] items-start">
+          {freeScenarios.length > 0 && (
+            <ScrollReveal variant={fadeUp} className="lg:col-span-2">
+              <div className="rounded-[16px] p-4 sm:p-5 border-2 border-accent-green/35 bg-gradient-to-r from-accent-green/[0.12] via-accent-green/[0.06] to-transparent">
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <Sparkles size={18} className="text-accent-green" />
+                  <h3 className="font-display font-bold text-base text-white m-0">Free labs — start here</h3>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-accent-green/20 text-accent-green border border-accent-green/30">
+                    {freeScenarios.length} free
+                  </span>
+                </div>
+                <p className="text-[13px] text-white/55 m-0 mb-3">
+                  No subscription needed — these scenarios are open for {tech.name}.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {freeScenarios.slice(0, 6).map(scenario => (
+                    <ScenarioListRow key={scenario.id} scenario={scenario} className="!mx-0" />
+                  ))}
+                </div>
+                {freeScenarios.length > 6 && (
+                  <p className="text-[11px] text-accent-green/80 mt-2 mb-0">
+                    +{freeScenarios.length - 6} more free labs below
+                  </p>
+                )}
+              </div>
+            </ScrollReveal>
+          )}
+
           <FxPanel padding="p-6">
-            <h3 className="font-display font-bold text-base text-white m-0 mb-4">Popular scenarios</h3>
+            <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+              <h3 className="font-display font-bold text-base text-white m-0">
+                {freeScenarios.length ? 'All scenarios' : 'Popular scenarios'}
+              </h3>
+              {freeScenarios.length > 0 && (
+                <span className="text-[11px] text-accent-green font-semibold">Free labs listed first</span>
+              )}
+            </div>
             {popularScenarios.length > 0 ? (
               <div className="flex flex-col">
-                {popularScenarios.map(scenario => {
-                  const TypeIcon = typeIcons[scenario.scenario_type] || Wrench
-                  const isCompleted = scenario.user_progress?.completed
-                  const inProgress = scenario.user_progress?.attempts > 0 && !isCompleted
-                  const diff = difficultyConfig[scenario.difficulty] || difficultyConfig.medium
-                  return (
-                    <Link
-                      key={scenario.id}
-                      to={`/scenarios/${scenario.slug}`}
-                      className="flex items-center gap-3.5 py-3 px-3 -mx-3 rounded-[11px] hover:bg-white/[0.03] transition-colors group"
-                    >
-                      <span
-                        className="w-[30px] h-[30px] rounded-lg flex items-center justify-center shrink-0"
-                        style={{ background: isCompleted ? 'rgba(86,224,176,.12)' : inProgress ? 'rgba(254,177,85,.12)' : 'rgba(255,255,255,.04)', color: isCompleted ? '#56e0b0' : inProgress ? '#feb155' : 'rgba(255,255,255,.4)' }}
-                      >
-                        {isCompleted ? <CheckCircle2 size={14} /> : <TypeIcon size={14} />}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13.5px] font-semibold text-white m-0 group-hover:text-accent-cyan transition-colors truncate">{scenario.title}</p>
-                        <p className="text-[11.5px] text-white/40 mt-0.5">{diff.label} · {scenario.max_score || 100} XP</p>
-                      </div>
-                      <span className="text-[11px] font-semibold shrink-0" style={{ color: isCompleted ? '#56e0b0' : inProgress ? '#feb155' : 'rgba(255,255,255,.35)' }}>
-                        {isCompleted ? 'Done' : inProgress ? 'In progress' : scenario.is_accessible === false ? 'Locked' : 'Start'}
-                      </span>
-                      {scenario.is_accessible === false && <Lock size={12} className="text-white/30 shrink-0" />}
-                    </Link>
-                  )
-                })}
+                {popularScenarios.map(scenario => (
+                  <ScenarioListRow key={scenario.id} scenario={scenario} />
+                ))}
               </div>
             ) : (
               <div className="py-12 text-center">
@@ -463,16 +531,25 @@ export default function TechnologyDetail() {
               <div className="mt-6 pt-6 border-t border-white/[0.06]">
                 <h4 className="text-sm font-semibold text-white/70 mb-3">All scenarios by difficulty</h4>
                 {['easy', 'medium', 'hard'].map(difficulty => {
-                  const diffScenarios = scenarios.filter(s => s.difficulty === difficulty)
+                  const diffScenarios = sortFreeFirst(scenarios.filter(s => s.difficulty === difficulty))
                   if (!diffScenarios.length) return null
                   const cfg = difficultyConfig[difficulty]
                   return (
                     <div key={difficulty} className="mb-4 last:mb-0">
                       <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: cfg.color }}>{cfg.label} ({diffScenarios.length})</p>
                       {diffScenarios.map(scenario => (
-                        <Link key={scenario.id} to={`/scenarios/${scenario.slug}`} className="flex items-center gap-2 py-2 text-sm text-white/75 hover:text-accent-cyan transition-colors">
-                          <ChevronRight size={12} className="text-white/25" />
-                          <span className="truncate">{scenario.title}</span>
+                        <Link
+                          key={scenario.id}
+                          to={`/scenarios/${scenario.slug}`}
+                          className={`flex items-center gap-2 py-2 text-sm transition-colors ${
+                            scenario.is_free
+                              ? 'text-accent-green hover:text-accent-green/90'
+                              : 'text-white/75 hover:text-accent-cyan'
+                          }`}
+                        >
+                          <ChevronRight size={12} className={scenario.is_free ? 'text-accent-green/60' : 'text-white/25'} />
+                          <span className="truncate flex-1">{scenario.title}</span>
+                          {scenario.is_free && <FreeLabBadge />}
                         </Link>
                       ))}
                     </div>

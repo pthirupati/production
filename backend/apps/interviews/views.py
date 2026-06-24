@@ -656,6 +656,10 @@ class InterviewRoundMessageView(APIView):
             "input_type": input_type,
             "command_validated": request.data.get("command_validated", False),
             "practice": bool(request.data.get("practice", False)),
+            "force_advance": bool(request.data.get("force_advance")),
+            "user_skip": bool(request.data.get("user_skip")),
+            "audio_unclear": bool(request.data.get("audio_unclear")),
+            "transcription_confidence": request.data.get("transcription_confidence"),
         }
         # The whole answer/score/reply cycle runs on the free rule-based engine.
         # A malformed question (e.g. non-string expected_keywords) or any edge in

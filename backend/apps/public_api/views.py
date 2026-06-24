@@ -272,7 +272,9 @@ class TechnologyDetailView(APIView):
             cert_ids = certification_scenario_ids()
             scenarios = Scenario.objects.filter(
                 technology=tech, is_active=True, certification_only=False,
-            ).exclude(id__in=cert_ids).select_related("technology").prefetch_related("tags")
+            ).exclude(id__in=cert_ids).select_related("technology").prefetch_related("tags").order_by(
+                "-is_free", "difficulty", "title"
+            )
 
             tech_data = TechnologySerializer(tech).data
             tech_data["scenario_count"] = scenarios.count()
@@ -405,6 +407,8 @@ class ScenariosListView(APIView):
                     Bookmark.objects.filter(user=request.user, scenario=OuterRef("pk"))
                 )
             )
+
+        qs = qs.order_by("-is_free", "difficulty", "title")
 
         # Pagination
         from rest_framework.pagination import PageNumberPagination

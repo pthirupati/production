@@ -65,7 +65,7 @@ def correctness_signal(
 
 def score_answer(question, answer_text: str, metadata: dict | None = None) -> dict:
     """Richer scoring using interview_ai.compute_answer_scores — 100% free, no APIs."""
-    from apps.interviews.services.interview_ai import compute_answer_scores
+    from apps.interviews.services.interview_ai import _generate_feedback, _refine_quality, compute_answer_scores
 
     text = (answer_text or "").strip()
     meta = metadata or {}
@@ -95,10 +95,6 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
         expected_keywords=keywords or None,
     )
 
-    score = breakdown["composite_score"]
-    if meta.get("command_validated"):
-        score = min(100, score + 15)
-
     correctness = correctness_signal(
         answer_text=text,
         quality=breakdown["quality"],
@@ -108,11 +104,33 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
         command_validated=bool(meta.get("command_validated")),
     )
 
+    quality = _refine_quality(
+        breakdown["quality"],
+        correctness=correctness,
+        keyword_hit_rate=breakdown["keyword_hit_rate"],
+        topic=breakdown["topic_detected"],
+        word_count=breakdown["word_count"],
+        has_keywords=bool(keywords),
+    )
+
+    score = breakdown["composite_score"]
+    if meta.get("command_validated"):
+        score = min(100, score + 15)
+
+    correctness = correctness_signal(
+        answer_text=text,
+        quality=quality,
+        keyword_hit_rate=breakdown["keyword_hit_rate"],
+        has_keywords=bool(keywords),
+        topic_detected=breakdown["topic_detected"],
+        command_validated=bool(meta.get("command_validated")),
+    )
+
     return {
         "score": round(score, 1),
-        "quality": breakdown["quality"],
+        "quality": quality,
         "correctness": correctness,
-        "feedback": breakdown["feedback"],
+        "feedback": _generate_feedback(quality, breakdown["star_coverage"], breakdown["topic_detected"], round_type),
         "keyword_hits": round(breakdown["keyword_hit_rate"] * len(keywords)) if keywords else 0,
         "keyword_hit_rate": breakdown["keyword_hit_rate"],
         "word_count": breakdown["word_count"],
