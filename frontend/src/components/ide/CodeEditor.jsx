@@ -4,6 +4,7 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLi
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { indentUnit, indentOnInput, bracketMatching, foldGutter } from '@codemirror/language'
 import { searchKeymap, highlightSelectionMatches, openSearchPanel } from '@codemirror/search'
+import { autocompletion, completeFromList } from '@codemirror/autocomplete'
 import { python } from '@codemirror/lang-python'
 import { javascript } from '@codemirror/lang-javascript'
 import { json } from '@codemirror/lang-json'
@@ -32,6 +33,29 @@ function languageExtension(language) {
   if (lang === 'yaml' || lang === 'yml') return yaml()
   if (lang === 'markdown' || lang === 'md') return markdown()
   return []
+}
+
+const PYTHON_KW = completeFromList([
+  'def', 'class', 'import', 'from', 'return', 'if', 'elif', 'else', 'for', 'while',
+  'try', 'except', 'finally', 'with', 'as', 'pass', 'break', 'continue', 'raise',
+  'True', 'False', 'None', 'and', 'or', 'not', 'in', 'is', 'lambda', 'yield',
+  'print', 'len', 'range', 'list', 'dict', 'set', 'tuple', 'str', 'int', 'float',
+])
+
+const JS_KW = completeFromList([
+  'function', 'const', 'let', 'var', 'return', 'if', 'else', 'for', 'while',
+  'try', 'catch', 'finally', 'class', 'extends', 'import', 'export', 'from',
+  'async', 'await', 'new', 'this', 'true', 'false', 'null', 'undefined',
+  'console', 'JSON', 'Array', 'Object', 'String', 'Number', 'Promise',
+])
+
+function autocompleteFor(language) {
+  const lang = (language || '').toLowerCase()
+  if (lang === 'python' || lang === 'py') return [autocompletion({ override: [PYTHON_KW] })]
+  if (['javascript', 'js', 'typescript', 'ts', 'jsx', 'tsx', 'node', 'nodejs'].includes(lang)) {
+    return [autocompletion({ override: [JS_KW] })]
+  }
+  return [autocompletion()]
 }
 
 // A light editor theme so the IDE reads well in the app's light mode. Dark mode
@@ -74,6 +98,7 @@ const CodeEditor = forwardRef(function CodeEditor(
   const onChangeRef = useRef(onChange)
   const onRunRef = useRef(onRun)
   const langCompartment = useRef(new Compartment())
+  const autocompleteCompartment = useRef(new Compartment())
   const themeCompartment = useRef(new Compartment())
   const readOnlyCompartment = useRef(new Compartment())
   const fontCompartment = useRef(new Compartment())
@@ -131,6 +156,7 @@ const CodeEditor = forwardRef(function CodeEditor(
         // defaultKeymap so Tab indents in the editor.
         keymap.of([indentWithTab, ...searchKeymap, ...defaultKeymap, ...historyKeymap]),
         langCompartment.current.of(languageExtension(language)),
+        autocompleteCompartment.current.of(autocompleteFor(language)),
         themeCompartment.current.of(isDark ? oneDark : lightTheme),
         readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
         fontCompartment.current.of(fontTheme(fontSize)),
@@ -157,7 +183,14 @@ const CodeEditor = forwardRef(function CodeEditor(
 
   // Reconfigure language without rebuilding the editor.
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: langCompartment.current.reconfigure(languageExtension(language)) })
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: [
+        langCompartment.current.reconfigure(languageExtension(language)),
+        autocompleteCompartment.current.reconfigure(autocompleteFor(language)),
+      ],
+    })
   }, [language])
 
   // React to theme toggles live.

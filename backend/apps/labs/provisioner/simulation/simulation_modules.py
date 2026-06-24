@@ -660,6 +660,24 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
             return "Manufacturer: HPE\nProduct Name: ProLiant DL380 Gen10"
         if "esxcli" in low:
             return "Host CPU: Intel Xeon Gold 6248R\nMemory: 256 GB"
+        if low.startswith("maas"):
+            if "list" in low and "machines" in low:
+                return "Machine 1: ready (node-01)\nMachine 2: deployed (node-02)\nMachine 3: failed commissioning"
+            if "commission" in low:
+                return "Commissioning started for node-03"
+            if "deploy" in low:
+                return "Deploying Ubuntu 22.04 to node-02"
+            return "MAAS: OK"
+        if low.startswith("lxc") or low.startswith("lxd"):
+            if "list" in low:
+                return "gpu-worker-1 (RUNNING)\nk8s-node-2 (STOPPED)"
+            if "start" in low:
+                return "Instance started"
+            return "LXD: OK"
+        if low.startswith("virsh"):
+            if "list" in low:
+                return " Id   Name         State\n------------------------\n 1    vm-k8s-node  running"
+            return "virsh: OK"
         return f"{line}: OK"
     shell.register_handler(handler)
 

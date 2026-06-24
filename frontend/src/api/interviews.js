@@ -89,6 +89,12 @@ export const interviewsApi = {
   extendRound(id, minutes = 10) {
     return api.post(`/interviews/rounds/${id}/extend/`, { minutes }).then(r => r.data)
   },
+  pauseRound(id) {
+    return api.post(`/interviews/rounds/${id}/pause/`).then(r => r.data)
+  },
+  resumeRound(id) {
+    return api.post(`/interviews/rounds/${id}/resume/`).then(r => r.data)
+  },
   endRound(id, reason = 'completed') {
     return api.post(`/interviews/rounds/${id}/end/`, { reason }).then(r => r.data)
   },

@@ -35,6 +35,12 @@ from .views import (
     PeoplesoftSimActionView,
     PeoplesoftSimReleaseView,
     PeoplesoftSimStateView,
+    AwxSimActionView,
+    AwxSimReleaseView,
+    AwxSimStateView,
+    TerraformSimActionView,
+    TerraformSimReleaseView,
+    TerraformSimStateView,
 )
 
 urlpatterns = [
@@ -89,4 +95,10 @@ urlpatterns = [
     path("peoplesoft/sessions/<uuid:session_id>/", PeoplesoftSimStateView.as_view(), name="peoplesoft-sim-state"),
     path("peoplesoft/sessions/<uuid:session_id>/action/", PeoplesoftSimActionView.as_view(), name="peoplesoft-sim-action"),
     path("peoplesoft/sessions/<uuid:session_id>/release/", PeoplesoftSimReleaseView.as_view(), name="peoplesoft-sim-release"),
+    path("awx/sessions/<uuid:session_id>/", AwxSimStateView.as_view(), name="awx-sim-state"),
+    path("awx/sessions/<uuid:session_id>/action/", AwxSimActionView.as_view(), name="awx-sim-action"),
+    path("awx/sessions/<uuid:session_id>/release/", AwxSimReleaseView.as_view(), name="awx-sim-release"),
+    path("terraform/sessions/<uuid:session_id>/", TerraformSimStateView.as_view(), name="terraform-sim-state"),
+    path("terraform/sessions/<uuid:session_id>/action/", TerraformSimActionView.as_view(), name="terraform-sim-action"),
+    path("terraform/sessions/<uuid:session_id>/release/", TerraformSimReleaseView.as_view(), name="terraform-sim-release"),
 ]

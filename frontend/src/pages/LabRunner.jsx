@@ -26,6 +26,8 @@ import DataDashboardSimulator from '../components/datascience/DataDashboardSimul
 import AgentWorkflowSimulator from '../components/aiml/AgentWorkflowSimulator'
 import WindowsServerSimulator from '../components/windows/WindowsServerSimulator'
 import PeopleSoftSimulator from '../components/peoplesoft/PeopleSoftSimulator'
+import AwxSimulator from '../components/awx/AwxSimulator'
+import TerraformSimulator from '../components/terraform/TerraformSimulator'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
@@ -133,6 +135,8 @@ export default function LabRunner() {
   // Windows Server GUI simulator overlay (opened from the lab toolbar button).
   const [showWindowsSim, setShowWindowsSim] = useState(false)
   const [showPeopleSoftSim, setShowPeopleSoftSim] = useState(false)
+  const [showAwxSim, setShowAwxSim] = useState(false)
+  const [showTerraformSim, setShowTerraformSim] = useState(false)
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
@@ -966,6 +970,16 @@ export default function LabRunner() {
     || scenario?.technology?.slug === 'peoplesoft'
     || (scenario?.slug || '').startsWith('ps-')
   )
+  const isAwxLab = !isCrossTech && (
+    scenario?.simulation_type === 'ansible-awx'
+    || scenario?.technology?.slug === 'ansible'
+    || (scenario?.slug || '').includes('awx')
+    || (scenario?.slug || '').includes('tower')
+  )
+  const isTerraformSimLab = !isCrossTech && (
+    scenario?.simulation_type === 'terraform'
+    || scenario?.technology?.slug === 'terraform'
+  )
   // coding_mode scenarios open a browser surface instead of a terminal. Prompt
   // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
   // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
@@ -1651,11 +1665,33 @@ export default function LabRunner() {
             <button
               type="button"
               onClick={() => setShowPeopleSoftSim(true)}
-              title="Open the in-app Oracle PeopleSoft (PIA): sign in, then use Process Monitor, Security, and Integration Broker to perform the fix, then Check Solution."
+              title="Open Oracle PeopleSoft PIA"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(199,70,52,.45)', color: '#e07a5f', background: 'rgba(199,70,52,.14)' }}
             >
               <ExternalLink size={12} /> Open PeopleSoft
+            </button>
+          )}
+          {isAwxLab && (
+            <button
+              type="button"
+              onClick={() => setShowAwxSim(true)}
+              title="Open Ansible AWX / Tower"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(238,0,0,.45)', color: '#ff6b6b', background: 'rgba(238,0,0,.12)' }}
+            >
+              <ExternalLink size={12} /> Open AWX
+            </button>
+          )}
+          {isTerraformSimLab && (
+            <button
+              type="button"
+              onClick={() => setShowTerraformSim(true)}
+              title="Open Terraform + AWS CLI simulator"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(124,58,237,.45)', color: '#a78bfa', background: 'rgba(124,58,237,.14)' }}
+            >
+              <ExternalLink size={12} /> Open Terraform
             </button>
           )}
           {isSimulationLab && (
@@ -2065,24 +2101,43 @@ export default function LabRunner() {
       )}
 
       {isPeopleSoftLab && showPeopleSoftSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950">
-          <button
-            type="button"
-            onClick={() => setShowPeopleSoftSim(false)}
-            className="absolute top-3 right-3 z-[70] inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-surface-600 bg-surface-900/90 text-surface-200 hover:bg-surface-800 text-xs font-medium"
-          >
-            <XCircle size={14} /> Close simulator
-          </button>
-          <div className="h-full overflow-auto">
-            <PeopleSoftSimulator
-              sessionId={sessionId}
-              scenario={scenario}
-              onExit={() => setShowPeopleSoftSim(false)}
-              onHints={() => { setShowPeopleSoftSim(false); toggleHints() }}
-              onStop={() => { setShowPeopleSoftSim(false); setShowStopConfirm(true) }}
-            />
-          </div>
+        <div className="fixed inset-0 z-[60]">
+          <PeopleSoftSimulator
+            sessionId={sessionId}
+            scenario={scenario}
+            onExit={() => setShowPeopleSoftSim(false)}
+            onHints={() => { setShowPeopleSoftSim(false); toggleHints() }}
+            onStop={() => { setShowPeopleSoftSim(false); setShowStopConfirm(true) }}
+          />
         </div>
+      )}
+
+      {isAwxLab && showAwxSim && (
+        <AwxSimulator
+          sessionId={sessionId}
+          scenario={scenario}
+          onExit={() => setShowAwxSim(false)}
+          onHints={() => { setShowAwxSim(false); toggleHints() }}
+          onStop={() => { setShowAwxSim(false); setShowStopConfirm(true) }}
+          onCheck={() => { setShowAwxSim(false); handleValidate() }}
+          onExtend={() => { setShowAwxSim(false); handleExtendLab() }}
+          hintsLabel={`Hints (${hints.hints_used}/${hints.total_hints})`}
+          checkDisabled={validating || solved}
+        />
+      )}
+
+      {isTerraformSimLab && showTerraformSim && (
+        <TerraformSimulator
+          sessionId={sessionId}
+          scenario={scenario}
+          onExit={() => setShowTerraformSim(false)}
+          onHints={() => { setShowTerraformSim(false); toggleHints() }}
+          onStop={() => { setShowTerraformSim(false); setShowStopConfirm(true) }}
+          onCheck={() => { setShowTerraformSim(false); handleValidate() }}
+          onExtend={() => { setShowTerraformSim(false); handleExtendLab() }}
+          hintsLabel={`Hints (${hints.hints_used}/${hints.total_hints})`}
+          checkDisabled={validating || solved}
+        />
       )}
 
       {/* Keyboard shortcuts help */}

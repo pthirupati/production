@@ -34,6 +34,12 @@ from .windows_engine import get_state as windows_get_state
 from .peoplesoft_engine import apply_action as peoplesoft_apply_action
 from .peoplesoft_engine import drop_session as peoplesoft_drop_session
 from .peoplesoft_engine import get_state as peoplesoft_get_state
+from .awx_engine import apply_action as awx_apply_action
+from .awx_engine import drop_session as awx_drop_session
+from .awx_engine import get_state as awx_get_state
+from .terraform_engine import apply_action as terraform_apply_action
+from .terraform_engine import drop_session as terraform_drop_session
+from .terraform_engine import get_state as terraform_get_state
 
 
 def _demo_session_id(user) -> str:
@@ -540,4 +546,82 @@ class PeoplesoftSimReleaseView(APIView):
         if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
             return Response({"error": "Session not found"}, status=404)
         peoplesoft_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ── Ansible AWX / Tower simulator ─────────────────────────────────────────────
+class AwxSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else ""
+        return Response(awx_get_state(session_id, slug))
+
+
+class AwxSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        awx_get_state(session_id, slug)
+        result = awx_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": awx_get_state(session_id, slug)})
+
+
+class AwxSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        awx_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ── Terraform + AWS CLI simulator ─────────────────────────────────────────────
+class TerraformSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else ""
+        return Response(terraform_get_state(session_id, slug))
+
+
+class TerraformSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        terraform_get_state(session_id, slug)
+        result = terraform_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": terraform_get_state(session_id, slug)})
+
+
+class TerraformSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        terraform_drop_session(session_id)
         return Response({"released": True})

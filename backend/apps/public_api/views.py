@@ -271,7 +271,7 @@ class TechnologyDetailView(APIView):
 
             cert_ids = certification_scenario_ids()
             scenarios = Scenario.objects.filter(
-                technology=tech, is_active=True
+                technology=tech, is_active=True, certification_only=False,
             ).exclude(id__in=cert_ids).select_related("technology").prefetch_related("tags")
 
             tech_data = TechnologySerializer(tech).data
@@ -398,7 +398,7 @@ class ScenariosListView(APIView):
         if scenario_group == "certification":
             qs = qs.filter(id__in=cert_ids)
         elif request.query_params.get("include_cert") not in ("1", "true", "yes"):
-            qs = qs.exclude(id__in=cert_ids)
+            qs = qs.exclude(id__in=cert_ids).filter(certification_only=False)
         if request.user.is_authenticated:
             qs = qs.annotate(
                 is_bookmarked=Exists(

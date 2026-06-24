@@ -1,0 +1,26 @@
+title: Optimize wireshark connectivity (lab 47)
+slug: wireshark-lab-47
+technology: wireshark
+category: Wireshark
+description: 'Hands-on wireshark scenario: optimize connectivity in a simulated environment.'
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: wireshark
+coding_mode: false
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- 'Hands-on wireshark scenario: optimize connectivity in a simulated environment.'
+initial_state: 'Hands-on wireshark scenario: optimize connectivity in a simulated
+  environment.'
+hints:
+- order: 1
+  cost: 10
+  content: Read the scenario objective and inspect logs or config in the terminal.
+- order: 2
+  cost: 20
+  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'

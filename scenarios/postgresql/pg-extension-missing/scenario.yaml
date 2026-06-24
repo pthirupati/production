@@ -1,0 +1,39 @@
+title: Install required extension
+slug: pg-extension-missing
+technology: postgresql
+category: Postgresql
+description: 'Query fails: extension uuid-ossp not installed.'
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+coding_mode: true
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- 'Query fails: extension uuid-ossp not installed.'
+initial_state: 'Query fails: extension uuid-ossp not installed.'
+hints:
+- order: 1
+  cost: 10
+  content: Read the scenario objective and inspect logs or config in the terminal.
+- order: 2
+  cost: 20
+  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: fix
+  instructions: 'Query fails: extension uuid-ossp not installed.'
+  files:
+  - path: solution.py
+    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    readonly: false
+  visible_tests:
+  - name: placeholder
+    code: assert callable(solution)
+  hidden_tests: []
+  timeout: 8

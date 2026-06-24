@@ -666,6 +666,29 @@ def _should_ask_another(round_obj: InterviewRound) -> bool:
     return asked < baseline * 2
 
 
+def pause_round(round_obj: InterviewRound) -> bool:
+    """Freeze the countdown while the candidate is away (tab hidden / left room)."""
+    if round_obj.status != "in_progress" or round_obj.paused_at:
+        return False
+    round_obj.paused_at = timezone.now()
+    round_obj.save(update_fields=["paused_at"])
+    return True
+
+
+def resume_round(round_obj: InterviewRound) -> bool:
+    """Extend ends_at by the paused duration and clear the pause flag."""
+    if round_obj.status != "in_progress":
+        return False
+    if not round_obj.paused_at:
+        return True
+    if round_obj.ends_at:
+        delta = timezone.now() - round_obj.paused_at
+        round_obj.ends_at = round_obj.ends_at + delta
+    round_obj.paused_at = None
+    round_obj.save(update_fields=["ends_at", "paused_at"])
+    return True
+
+
 def extend_round(round_obj: InterviewRound, minutes: int = 10) -> bool:
     if getattr(round_obj.campaign, "is_sample", False):
         return False

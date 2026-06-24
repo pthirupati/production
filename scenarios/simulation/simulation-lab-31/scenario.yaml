@@ -1,0 +1,25 @@
+title: Refactor simulation logging (lab 31)
+slug: simulation-lab-31
+technology: simulation
+category: Simulation
+description: 'Hands-on simulation scenario: refactor logging in a simulated environment.'
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+coding_mode: false
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- 'Hands-on simulation scenario: refactor logging in a simulated environment.'
+initial_state: 'Hands-on simulation scenario: refactor logging in a simulated environment.'
+hints:
+- order: 1
+  cost: 10
+  content: Read the scenario objective and inspect logs or config in the terminal.
+- order: 2
+  cost: 20
+  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'

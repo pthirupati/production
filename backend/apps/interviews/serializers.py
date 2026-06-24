@@ -107,7 +107,7 @@ class InterviewRoundSerializer(serializers.ModelSerializer):
         fields = (
             "id", "campaign_id", "round_number", "round_type", "title", "duration_minutes",
             "extension_minutes", "max_extension_minutes", "status", "scheduled_at",
-            "schedule_deadline", "started_at", "ended_at", "ends_at", "pass_threshold",
+            "schedule_deadline", "started_at", "ended_at", "ends_at", "paused_at", "pass_threshold",
             "overall_score", "persona_name", "persona_voice_id", "invite_token",
             "questions_asked", "difficulty_level", "practical_lab_session_id", "is_sample",
             "mode", "last_practical_submission", "messages", "report",

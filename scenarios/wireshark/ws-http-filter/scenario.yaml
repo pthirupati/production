@@ -1,0 +1,25 @@
+title: Filter HTTP traffic to API host
+slug: ws-http-filter
+technology: wireshark
+category: Wireshark
+description: Isolate API calls in a busy capture.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: wireshark
+coding_mode: false
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Isolate API calls in a busy capture.
+initial_state: Isolate API calls in a busy capture.
+hints:
+- order: 1
+  cost: 10
+  content: Read the scenario objective and inspect logs or config in the terminal.
+- order: 2
+  cost: 20
+  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'

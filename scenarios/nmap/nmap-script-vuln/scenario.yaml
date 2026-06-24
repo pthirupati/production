@@ -1,0 +1,25 @@
+title: Run NSE vulnerability scripts
+slug: nmap-script-vuln
+technology: nmap
+category: Nmap
+description: Identify vulnerable service versions with --script vuln.
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: nmap
+coding_mode: false
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Identify vulnerable service versions with --script vuln.
+initial_state: Identify vulnerable service versions with --script vuln.
+hints:
+- order: 1
+  cost: 10
+  content: Read the scenario objective and inspect logs or config in the terminal.
+- order: 2
+  cost: 20
+  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'

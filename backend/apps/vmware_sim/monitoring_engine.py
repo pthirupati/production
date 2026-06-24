@@ -639,11 +639,45 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
     entry = _load_session(key)
     if entry is None:
         state = _base_inventory()
+        _merge_lab_hosts(state, session_id)
         _apply_preset(state, scenario_slug)
         entry = {"session_id": key, "scenario_slug": scenario_slug, "state": state,
                  "created_at": _now_iso()}
         _save_session(key, entry)
     return entry
+
+
+def _merge_lab_hosts(state: dict, session_id: str) -> None:
+    """Inject VMware / lab session hosts as Prometheus scrape targets (cross-tech)."""
+    try:
+        from apps.labs.models import LabSession
+
+        session = LabSession.objects.filter(pk=session_id).only("lab_hosts", "scenario_id").first()
+        if not session or not session.lab_hosts:
+            return
+        prom = state.setdefault("prometheus", {})
+        targets = prom.setdefault("targets", [])
+        existing = {t.get("labels", {}).get("instance") for t in targets}
+        for host in session.lab_hosts:
+            name = host.get("name") or host.get("role") or "host"
+            ip = host.get("ip") or host.get("address") or ""
+            instance = f"{ip}:9100" if ip else f"{name}:9100"
+            if instance in existing:
+                continue
+            health = "up" if host.get("status", "up") != "down" else "down"
+            targets.append({
+                "labels": {"job": "node", "instance": instance, "host": name},
+                "health": health,
+                "lastScrape": _now_iso(),
+                "lastError": "" if health == "up" else "connection refused",
+            })
+            existing.add(instance)
+        graf = state.setdefault("grafana", {})
+        for ds in graf.get("datasources", []):
+            if ds.get("type") == "prometheus":
+                ds.setdefault("jsonData", {})["crossTechHosts"] = len(session.lab_hosts)
+    except Exception:
+        pass
 
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:

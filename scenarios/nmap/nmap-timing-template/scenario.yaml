@@ -1,0 +1,25 @@
+title: Tune scan timing for stealth
+slug: nmap-timing-template
+technology: nmap
+category: Nmap
+description: Aggressive scan triggers IDS; use -T2 timing.
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: nmap
+coding_mode: false
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Aggressive scan triggers IDS; use -T2 timing.
+initial_state: Aggressive scan triggers IDS; use -T2 timing.
+hints:
+- order: 1
+  cost: 10
+  content: Read the scenario objective and inspect logs or config in the terminal.
+- order: 2
+  cost: 20
+  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'

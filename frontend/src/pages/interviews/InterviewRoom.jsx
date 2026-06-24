@@ -408,13 +408,27 @@ export default function InterviewRoom() {
   }, [roundId, started, observerMode])
 
   useEffect(() => {
-    if (!endsAt) return
+    if (!endsAt || round?.paused_at) return
     const t = setInterval(() => {
       const left = Math.max(0, Math.floor((endsAt - Date.now()) / 1000))
       setTimeLeft(left)
     }, 1000)
     return () => clearInterval(t)
-  }, [endsAt])
+  }, [endsAt, round?.paused_at])
+
+  // Pause timer when tab is hidden; resume (extends ends_at) when user returns.
+  useEffect(() => {
+    if (!roundId || !started || observerMode) return
+    const onVis = () => {
+      if (document.hidden) {
+        interviewsApi.pauseRound(roundId).then((r) => setRound((prev) => ({ ...prev, ...r }))).catch(() => {})
+      } else {
+        interviewsApi.resumeRound(roundId).then((r) => setRound((prev) => ({ ...prev, ...r }))).catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [roundId, started, observerMode])
 
   const cancelInterview = async () => {
     if (!window.confirm('Cancel this interview round?')) return

@@ -188,6 +188,11 @@ class InterviewRound(models.Model):
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
     ends_at = models.DateTimeField(null=True, blank=True)
+    paused_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When set, the round timer is frozen until resume.",
+    )
     pass_threshold = models.FloatField(default=65.0)
     overall_score = models.FloatField(null=True, blank=True)
     persona_name = models.CharField(max_length=80, blank=True, default="Alex")

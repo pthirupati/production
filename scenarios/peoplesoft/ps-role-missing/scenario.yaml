@@ -1,0 +1,25 @@
+title: Assign missing security role
+slug: ps-role-missing
+technology: peoplesoft
+category: Peoplesoft
+description: User cannot access Component after role change.
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: peoplesoft
+coding_mode: false
+jira_priority: Medium
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- User cannot access Component after role change.
+initial_state: User cannot access Component after role change.
+hints:
+- order: 1
+  cost: 10
+  content: Read the scenario objective and inspect logs or config in the terminal.
+- order: 2
+  cost: 20
+  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'

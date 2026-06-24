@@ -736,6 +736,35 @@ class InterviewRoundExtendView(APIView):
         return Response(InterviewRoundSerializer(round_obj).data)
 
 
+class InterviewRoundPauseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, round_id):
+        round_obj = get_object_or_404(
+            InterviewRound.objects.select_related("campaign"),
+            id=round_id,
+            campaign__user=request.user,
+        )
+        if not engine.pause_round(round_obj):
+            return Response({"error": "Cannot pause this round"}, status=400)
+        round_obj.refresh_from_db()
+        return Response(InterviewRoundSerializer(round_obj).data)
+
+
+class InterviewRoundResumeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, round_id):
+        round_obj = get_object_or_404(
+            InterviewRound.objects.select_related("campaign"),
+            id=round_id,
+            campaign__user=request.user,
+        )
+        engine.resume_round(round_obj)
+        round_obj.refresh_from_db()
+        return Response(InterviewRoundSerializer(round_obj).data)
+
+
 class InterviewRoundEndView(APIView):
     permission_classes = [IsAuthenticated]
 

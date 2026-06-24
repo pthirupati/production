@@ -1,0 +1,38 @@
+[
+  {
+    "slug": "gpu-nvidia-zero-to-hero",
+    "title": "GPU & NVIDIA: Zero to Hero for AI Engineering",
+    "summary": "From bare-metal GPU discovery through driver install, CUDA, thermal tuning, and multi-GPU training clusters.",
+    "topic": "GPU",
+    "difficulty": "beginner",
+    "estimated_minutes": 45,
+    "playground_slug": "gpu",
+    "order": 300,
+    "sections": [
+      ["Why GPUs matter for AI", "Modern deep learning is matrix math at scale. CPUs handle control flow; GPUs provide thousands of cores for parallel tensor operations. Before writing PyTorch code, you must know how to discover GPUs, install the correct driver, verify CUDA, and read thermal/power limits.", "", "text", ""],
+      ["Discover hardware", "On Linux use lspci and nvidia-smi. In FixitLab GPU labs the simulator exposes the same outputs. A missing device usually means driver not loaded or GPU in persistence-off state.", "lspci | grep -i nvidia\nnvidia-smi\nnvidia-smi -q -d TEMPERATURE,POWER", "bash", "Check temperature before long training jobs."],
+      ["Driver install pitfalls", "Match driver branch to CUDA toolkit required by your framework. Wrong kernel module version causes NVRM errors. Always blacklist nouveau on RHEL/CentOS before installing NVIDIA.", "dnf install kernel-devel-$(uname -r)\n# blacklist nouveau in /etc/modprobe.d/blacklist-nouveau.conf\ndracut --force", "bash", ""],
+      ["Thermal and power issues", "Data-center GPUs throttle above ~83°C. Use nvidia-smi dmon or DCGM in production. Fix airflow, replace thermal paste on legacy nodes, or cap power with nvidia-smi -pl.", "nvidia-smi -q -d TEMPERATURE\nnvidia-smi -pl 250", "bash", "Thermal shutdown protects silicon — treat alerts seriously."],
+      ["AMD ROCm path", "AMD MI-series uses ROCm instead of CUDA. rocminfo lists agents; HIP is the CUDA-like API. Mixed clusters need separate node pools per vendor.", "rocminfo | grep Name", "bash", ""],
+      ["Multi-GPU and MIG", "Use NCCL for distributed training. MIG partitions A100/H100 for inference tenants. Set CUDA_VISIBLE_DEVICES per job.", "export CUDA_VISIBLE_DEVICES=0,1", "bash", ""]
+    ]
+  },
+  {
+    "slug": "baremetal-ipmi-maas-zero-to-hero",
+    "title": "Bare Metal, IPMI & MAAS: Zero to Hero",
+    "summary": "Commission machines with MAAS, manage BMC/IPMI power, PXE boot, RAID, and hand off to Kubernetes.",
+    "topic": "Bare Metal",
+    "difficulty": "intermediate",
+    "estimated_minutes": 50,
+    "playground_slug": "baremetal",
+    "order": 301,
+    "sections": [
+      ["Bare metal vs VMs", "VMs share a hypervisor; bare metal gives full hardware for latency-sensitive AI and storage workloads. You own firmware, RAID, NIC firmware, and BMC.", "", "text", ""],
+      ["IPMI and BMC basics", "The BMC is an out-of-band management controller. ipmitool talks to it for power, sensors, and SOL console even when the OS is down.", "ipmitool -I lanplus -H bmc.example -U admin -P pass power status", "bash", ""],
+      ["MAAS lifecycle", "MAAS: enlist → commission (hardware tests) → deploy (curtin/cloud-init). Failed commissioning often means bad DNS, blocked PXE, or missing drivers.", "maas machines list\nmaas machine commission <id>", "bash", "Use MAAS simulator in FixitLab baremetal labs."],
+      ["PXE and VLAN", "PXE needs DHCP option 66/67 or iPXE chain. VLAN tags on trunk ports must match MAAS fabric settings.", "", "text", ""],
+      ["LXD and KVM on metal", "After OS deploy, use LXD for system containers or KVM for full VMs on the same node. virsh list shows KVM guests; lxc list shows LXD.", "virsh list --all\nlxc list", "bash", "Cross-tech labs chain MAAS deploy → KVM → monitoring."],
+      ["VyOS routing", "VyOS provides router/firewall/VPN on bare metal edges. Configure interfaces, OSPF, and BGP before multi-rack AI clusters.", "", "text", ""]
+    ]
+  }
+]
