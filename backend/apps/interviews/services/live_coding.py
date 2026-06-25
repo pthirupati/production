@@ -210,15 +210,17 @@ def generate_followup(
 
 
 def grade_by_signals(answer: str, expected_signals: list[str]) -> dict:
+    """Low-confidence signal check — never marks an answer fully validated alone."""
     hits = _signals_in_text(answer, expected_signals)
     rate = signal_hit_rate(answer, expected_signals)
     if rate >= 0.5:
         return {
-            "validated": True,
+            "validated": False,
+            "partial_signals": True,
             "method": "code_signals",
             "feedback": (
-                f"Nice — I see the right building blocks ({', '.join(hits[:4])}). "
-                "Let's pressure-test it further."
+                f"I see pieces of the right approach ({', '.join(hits[:4])}) — "
+                "run it or paste working code so we can verify execution."
             ),
         }
     if rate >= 0.25:

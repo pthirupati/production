@@ -10,6 +10,7 @@ catalogue can grow over time without code changes, mirroring how BlogPost and
 the question_bank already work.
 """
 
+from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 
@@ -116,6 +117,8 @@ class TutorialSection(models.Model):
     code_language = models.CharField(max_length=30, blank=True, default="bash")
     # Short caption shown beneath the code block (e.g. "Expected output").
     code_caption = models.CharField(max_length=200, blank=True)
+    # Optional checkpoint quiz: { question, options[], answer, explanation }
+    quiz_json = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ["order", "id"]
@@ -123,3 +126,32 @@ class TutorialSection(models.Model):
 
     def __str__(self):
         return f"{self.tutorial.slug} · {self.order}. {self.heading}"
+
+
+class TutorialProgress(models.Model):
+    """Per-user read progress for a tutorial (section checkpoints + completion)."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tutorial_progress",
+    )
+    tutorial = models.ForeignKey(
+        Tutorial,
+        on_delete=models.CASCADE,
+        related_name="user_progress",
+    )
+    completed_sections = models.JSONField(default=list, blank=True)
+    last_section_order = models.PositiveIntegerField(default=0)
+    completed = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [("user", "tutorial")]
+        indexes = [
+            models.Index(fields=["user", "-updated_at"]),
+            models.Index(fields=["user", "completed"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} · {self.tutorial.slug}"

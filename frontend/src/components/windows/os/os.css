@@ -1,0 +1,201 @@
+/* ───────────────────────────────────────────────────────────────────────
+   Windows Server 2022 desktop simulation — fully scoped under .winos
+   ─────────────────────────────────────────────────────────────────────── */
+.winos {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: #1b1b1b;
+  user-select: none;
+  background: #0a3d62;
+  --accent: #0078d4;
+  --accent-dark: #005a9e;
+}
+.winos *, .winos *::before, .winos *::after { box-sizing: border-box; }
+
+/* desktop */
+.winos-desktop {
+  position: absolute;
+  inset: 0 0 40px 0;
+  background:
+    radial-gradient(120% 120% at 70% 80%, rgba(0,0,0,0.45), transparent 60%),
+    linear-gradient(135deg, #0b3a66 0%, #0a2a4a 55%, #07203b 100%);
+  overflow: hidden;
+}
+.winos-desktop::after {
+  content: 'Windows Server 2022';
+  position: absolute; right: 26px; bottom: 14px;
+  color: rgba(255,255,255,0.28); font-size: 26px; font-weight: 300; letter-spacing: 1px;
+  pointer-events: none;
+}
+.winos-icons { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; flex-wrap: wrap; gap: 4px; max-height: calc(100% - 28px); }
+.winos-icon {
+  width: 84px; padding: 8px 4px; border-radius: 4px; text-align: center; cursor: default;
+  border: 1px solid transparent;
+}
+.winos-icon:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.18); }
+.winos-icon.sel { background: rgba(0,120,212,0.35); border-color: rgba(120,190,255,0.6); }
+.winos-icon .ic { display: flex; justify-content: center; margin-bottom: 4px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+.winos-icon .lbl { color: #fff; font-size: 11px; line-height: 1.2; text-shadow: 0 1px 2px rgba(0,0,0,0.8); word-break: break-word; }
+
+/* windows */
+.winos-win {
+  position: absolute; display: flex; flex-direction: column;
+  background: #f3f3f3; border: 1px solid #2b2b2b;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  min-width: 360px; min-height: 200px;
+}
+.winos-win.active { box-shadow: 0 18px 56px rgba(0,0,0,0.62); }
+.winos-titlebar {
+  height: 32px; flex: none; display: flex; align-items: center; gap: 8px;
+  padding: 0 0 0 10px; background: #e8e8e8; border-bottom: 1px solid #d6d6d6;
+  cursor: default;
+}
+.winos-win.active .winos-titlebar { background: #ffffff; }
+.winos-title { flex: 1; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 7px; }
+.winos-title .twin-icon { display: inline-flex; }
+.winos-caption { display: flex; height: 100%; }
+.winos-cap-btn { width: 46px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: default; color: #1b1b1b; }
+.winos-cap-btn:hover { background: rgba(0,0,0,0.08); }
+.winos-cap-btn.close:hover { background: #c42b1c; color: #fff; }
+.winos-body { flex: 1; min-height: 0; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
+
+/* resize handles */
+.winos-rz { position: absolute; z-index: 5; }
+.winos-rz.n { top: -3px; left: 6px; right: 6px; height: 6px; cursor: ns-resize; }
+.winos-rz.s { bottom: -3px; left: 6px; right: 6px; height: 6px; cursor: ns-resize; }
+.winos-rz.e { right: -3px; top: 6px; bottom: 6px; width: 6px; cursor: ew-resize; }
+.winos-rz.w { left: -3px; top: 6px; bottom: 6px; width: 6px; cursor: ew-resize; }
+.winos-rz.ne { top: -3px; right: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
+.winos-rz.nw { top: -3px; left: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
+.winos-rz.se { bottom: -3px; right: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
+.winos-rz.sw { bottom: -3px; left: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
+
+/* taskbar */
+.winos-taskbar {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 40px; z-index: 9000;
+  display: flex; align-items: center; background: #1b1b1b; color: #fff; padding: 0 6px; gap: 2px;
+}
+.winos-start { width: 46px; height: 40px; display: inline-flex; align-items: center; justify-content: center; cursor: default; }
+.winos-start:hover, .winos-start.on { background: rgba(255,255,255,0.12); }
+.winos-tasks { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; overflow: hidden; }
+.winos-taskbtn {
+  height: 36px; min-width: 44px; max-width: 200px; padding: 0 10px; display: inline-flex; align-items: center; gap: 7px;
+  background: transparent; border: none; color: #e8e8e8; cursor: default; position: relative; border-radius: 2px;
+  font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.winos-taskbtn:hover { background: rgba(255,255,255,0.1); }
+.winos-taskbtn.active { background: rgba(255,255,255,0.18); }
+.winos-taskbtn .ul { position: absolute; bottom: 2px; left: 12px; right: 12px; height: 2px; background: #4fc3f7; border-radius: 2px; }
+.winos-tray { display: flex; align-items: center; gap: 2px; padding-left: 6px; }
+.winos-tray-btn { height: 40px; padding: 0 7px; display: inline-flex; align-items: center; gap: 6px; color: #e8e8e8; cursor: default; border: none; background: transparent; font-size: 11.5px; }
+.winos-tray-btn:hover { background: rgba(255,255,255,0.12); }
+.winos-clock { line-height: 1.15; text-align: right; font-size: 11.5px; }
+
+/* flyouts */
+.winos-flyout {
+  position: absolute; bottom: 46px; right: 6px; z-index: 9500; width: 320px;
+  background: #2b2b2b; color: #fff; border: 1px solid #3a3a3a; border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6); padding: 14px;
+}
+.winos-flyout.left { right: auto; left: 6px; }
+
+/* start menu */
+.winos-startmenu {
+  position: absolute; bottom: 46px; left: 6px; z-index: 9500; width: 620px; height: 560px; max-height: calc(100% - 56px);
+  background: #1f1f1f; color: #fff; border: 1px solid #3a3a3a; border-radius: 8px;
+  box-shadow: 0 16px 60px rgba(0,0,0,0.7); display: flex; overflow: hidden;
+}
+.winos-sm-left { width: 56px; flex: none; background: #181818; display: flex; flex-direction: column; align-items: center; padding: 10px 0; }
+.winos-sm-left .sp { flex: 1; }
+.winos-sm-btn { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; color: #d8d8d8; border-radius: 4px; cursor: default; }
+.winos-sm-btn:hover { background: rgba(255,255,255,0.12); }
+.winos-sm-main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 14px 16px; overflow: hidden; }
+.winos-sm-search { background: #2b2b2b; border: 1px solid #3a3a3a; border-radius: 4px; padding: 7px 10px; color: #fff; font-size: 12px; margin-bottom: 12px; }
+.winos-sm-scroll { flex: 1; overflow-y: auto; }
+.winos-sm-section { font-size: 11px; color: #9a9a9a; text-transform: uppercase; letter-spacing: 0.5px; margin: 10px 2px 6px; }
+.winos-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.winos-tile { background: var(--accent); border-radius: 4px; padding: 10px; height: 84px; display: flex; flex-direction: column; justify-content: space-between; cursor: default; }
+.winos-tile:hover { filter: brightness(1.12); outline: 1px solid rgba(255,255,255,0.4); }
+.winos-tile.sm { height: 56px; }
+.winos-tile .tt { font-size: 11px; line-height: 1.15; }
+.winos-applist .ai { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 4px; cursor: default; font-size: 12.5px; }
+.winos-applist .ai:hover { background: rgba(255,255,255,0.1); }
+.winos-applist .ltr { font-size: 13px; color: #9ad1ff; padding: 8px 8px 2px; font-weight: 600; }
+
+/* context menu */
+.winos-ctx {
+  position: fixed; z-index: 11000; min-width: 220px; background: #fbfbfb; border: 1px solid #c8c8c8;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.3); padding: 4px; border-radius: 6px; font-size: 12.5px;
+}
+.winos-ctx-item { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 4px; cursor: default; position: relative; white-space: nowrap; }
+.winos-ctx-item:hover { background: var(--accent); color: #fff; }
+.winos-ctx-item.disabled { color: #aaa; pointer-events: none; }
+.winos-ctx-item .chev { margin-left: auto; }
+.winos-ctx-sep { height: 1px; background: #e2e2e2; margin: 4px 8px; }
+.winos-ctx-sub { position: absolute; left: 100%; top: -5px; }
+
+/* generic app chrome */
+.winos-app { display: flex; flex-direction: column; height: 100%; min-height: 0; background: #fff; }
+.winos-toolbar { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid #e2e2e2; background: #f7f7f7; flex-wrap: wrap; }
+.winos-btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; font-size: 12px; border: 1px solid #c8c8c8; background: #fff; border-radius: 4px; cursor: default; }
+.winos-btn:hover { background: #f0f7ff; border-color: var(--accent); }
+.winos-btn:disabled { opacity: 0.45; }
+.winos-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.winos-btn.primary:hover { background: var(--accent-dark); }
+.winos-input { border: 1px solid #c8c8c8; border-radius: 4px; padding: 5px 8px; font-size: 12px; }
+.winos-input:focus { outline: none; border-color: var(--accent); }
+.winos-split { display: flex; flex: 1; min-height: 0; }
+.winos-tree { width: 250px; flex: none; border-right: 1px solid #e2e2e2; overflow: auto; background: #fafafa; padding: 4px 0; }
+.winos-main { flex: 1; min-width: 0; overflow: auto; }
+.winos-tree-row { display: flex; align-items: center; gap: 4px; padding: 3px 8px; cursor: default; font-size: 12.5px; white-space: nowrap; }
+.winos-tree-row:hover { background: #eef5fd; }
+.winos-tree-row.sel { background: #cfe6fb; }
+
+/* tables */
+.winos-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.winos-table th { text-align: left; font-weight: 600; padding: 6px 10px; background: #f3f3f3; border-bottom: 1px solid #d8d8d8; position: sticky; top: 0; cursor: default; }
+.winos-table td { padding: 5px 10px; border-bottom: 1px solid #efefef; white-space: nowrap; }
+.winos-table tr:hover td { background: #f4f9ff; }
+.winos-table tr.sel td { background: #cfe6fb; }
+
+/* status bar */
+.winos-status { flex: none; height: 24px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; border-top: 1px solid #e2e2e2; background: #f7f7f7; font-size: 11px; color: #555; }
+
+/* dialog */
+.winos-dlg-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.25); z-index: 50; display: flex; align-items: center; justify-content: center; }
+.winos-dlg { background: #f0f0f0; border: 1px solid #888; box-shadow: 0 14px 50px rgba(0,0,0,0.5); min-width: 420px; max-width: 90%; max-height: 90%; display: flex; flex-direction: column; }
+.winos-dlg-title { background: #fff; padding: 9px 12px; font-weight: 600; font-size: 12.5px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; justify-content: space-between; }
+.winos-dlg-body { padding: 14px; overflow: auto; }
+.winos-dlg-foot { padding: 10px 14px; display: flex; gap: 8px; justify-content: flex-end; border-top: 1px solid #e0e0e0; background: #f0f0f0; }
+.winos-tabs { display: flex; gap: 2px; border-bottom: 1px solid #c8c8c8; padding: 0 6px; background: #ececec; }
+.winos-tab { padding: 6px 12px; font-size: 12px; border: 1px solid transparent; border-bottom: none; cursor: default; }
+.winos-tab.active { background: #fff; border-color: #c8c8c8; border-radius: 4px 4px 0 0; margin-bottom: -1px; }
+
+/* badges */
+.winos-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.winos-badge.ok { background: #dff6dd; color: #107c10; }
+.winos-badge.warn { background: #fff4ce; color: #9d5d00; }
+.winos-badge.err { background: #fde7e9; color: #c42b1c; }
+
+/* terminal */
+.winos-term { flex: 1; min-height: 0; background: #012456; color: #eee; font-family: Consolas, 'Cascadia Mono', monospace; font-size: 13px; padding: 8px 10px; overflow: auto; white-space: pre-wrap; word-break: break-word; line-height: 1.35; }
+.winos-term.cmd { background: #000; color: #ccc; }
+.winos-term .pr { color: #fff; }
+.winos-term .err { color: #ff6b6b; }
+.winos-term .ok { color: #56e0b0; }
+.winos-term .warn { color: #f5c451; }
+.winos-term input { background: transparent; border: none; outline: none; color: inherit; font: inherit; flex: 1; }
+
+/* alt-tab */
+.winos-alttab { position: absolute; inset: 0; z-index: 12000; display: flex; align-items: center; justify-content: center; background: rgba(20,30,50,0.6); }
+.winos-alttab-grid { display: flex; gap: 14px; flex-wrap: wrap; max-width: 80%; justify-content: center; background: rgba(40,40,40,0.85); padding: 22px; border-radius: 10px; }
+.winos-alttab-card { width: 200px; height: 140px; background: #2b2b2b; border: 2px solid transparent; border-radius: 6px; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.winos-alttab-card.sel { border-color: #4fc3f7; }
+
+.winos-scroll { overflow: auto; }
+.winos-grid2 { display: grid; grid-template-columns: 200px 1fr; gap: 6px 16px; align-items: center; font-size: 12.5px; }
+.winos-card { border: 1px solid #e2e2e2; border-radius: 6px; background: #fff; }
+.winos-card-h { padding: 8px 12px; font-weight: 600; border-bottom: 1px solid #eee; font-size: 12.5px; }

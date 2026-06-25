@@ -4,12 +4,13 @@ import {
   Lightbulb, XCircle, CheckCircle2, AlertTriangle, Lock, Server,
   ShieldCheck, Network, Globe, HardDrive, Cpu, ChevronRight, Plus,
   Play, Square, RotateCw, Download, UserCog, FolderTree, Power, Trash2,
-  FolderOpen, Wifi, Monitor, Terminal, Settings,
+  FolderOpen, Wifi, Monitor, Terminal, Settings, User, KeyRound,
 } from 'lucide-react'
 import { windowsApi } from '../../api/windows'
 import { LabChromeControls } from '../lab/LabChromeBar'
 import AddRolesWizard from './AddRolesWizard'
 import NewUserWizard from './NewUserWizard'
+import WindowsServer2022 from './os/WindowsServer2022'
 
 /* ── Scoped, self-contained Windows Server chrome (no shared CSS). Windows
    blue (#0078D4) accents on a light "Server Manager" surface, a dark taskbar,
@@ -159,6 +160,25 @@ const SCOPED_CSS = `
   display: grid; place-items: center; margin-bottom: 1rem; border: 2px solid rgba(255,255,255,.3);
 }
 .win-sim .win-event { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.78rem; padding: 0.35rem 0; }
+.win-sim .win-lock-field {
+  display: flex; align-items: center; gap: 0.5rem; width: 260px;
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28);
+  border-radius: 4px; padding: 0.5rem 0.65rem; color: #fff; margin-bottom: 0.6rem;
+}
+.win-sim .win-lock-field:focus-within { border-color: #fff; background: rgba(255,255,255,.22); }
+.win-sim .win-lock-input {
+  flex: 1; min-width: 0; background: transparent; border: 0; outline: none;
+  color: #fff; font-size: 0.85rem;
+}
+.win-sim .win-lock-input::placeholder { color: rgba(255,255,255,.6); }
+.win-sim .win-lock-error {
+  width: 260px; font-size: 0.72rem; color: #fff; background: rgba(232,17,35,.35);
+  border: 1px solid rgba(255,255,255,.35); border-radius: 4px; padding: 0.4rem 0.55rem; margin-bottom: 0.6rem;
+}
+.win-sim .win-lock-hint {
+  width: 260px; font-size: 0.7rem; color: rgba(255,255,255,.7); text-align: center; margin-top: 0.4rem;
+}
+.win-sim .win-lock-hint b { color: #fff; font-weight: 600; }
 `
 
 function Badge({ kind, children }) {
@@ -166,23 +186,88 @@ function Badge({ kind, children }) {
   return <span className={`win-badge ${cls}`}>{children}</span>
 }
 
-/* ── Login / lock gate — Windows-style sign-in screen ── */
+/* ── Lab sign-in credentials (consistent with the other simulators:
+   lab_<product> / lab_<product>@123). The built-in CORP\Administrator is also
+   accepted with the same lab password so domain-flavoured scenarios still work. ── */
+const WIN_LAB_USER = 'lab_windows'
+const WIN_LAB_PASS = 'lab_windows@123'
+
+/* ── Login / lock gate — Windows-style sign-in screen with real credentials ── */
 function LockScreen({ locked, currentUser, onSignIn, signing }) {
+  const [user, setUser] = useState('')
+  const [pass, setPass] = useState('')
+  const [error, setError] = useState('')
+
+  // Accept the lab user, or the built-in administrator (with the lab password),
+  // with or without the CORP\ domain prefix.
+  const normalize = (u) => (u || '').includes('\\') ? u.split('\\').pop() : u
+
+  const submit = (e) => {
+    e.preventDefault()
+    if (signing) return
+    const u = normalize(user).trim().toLowerCase()
+    const ok = (u === WIN_LAB_USER && pass === WIN_LAB_PASS)
+      || (u === 'administrator' && pass === WIN_LAB_PASS)
+    if (ok) {
+      setError('')
+      onSignIn()
+    } else {
+      setError(`Invalid credentials. Use ${WIN_LAB_USER} / ${WIN_LAB_PASS} for training labs.`)
+    }
+  }
+
   return (
     <div className="win-lock">
       <div className="win-avatar"><UserCog size={42} /></div>
       <div className="text-lg font-semibold mb-0.5">{currentUser || 'CORP\\Administrator'}</div>
       <div className="text-sm opacity-80 mb-5">{locked ? 'This workstation is locked' : 'Windows Server 2022'}</div>
-      <button
-        className="win-btn !bg-white !text-[#0078D4] !border-white px-6 py-2 text-sm"
-        onClick={onSignIn}
-        disabled={signing}
-      >
-        {signing ? <RefreshCw size={14} className="animate-spin" /> : <ChevronRight size={15} />}
-        {locked ? 'Unlock' : 'Sign in'}
-      </button>
-      <div className="text-[11px] opacity-60 mt-8 flex items-center gap-1.5">
-        <Lock size={12} /> Press Sign in to administer this server
+
+      <form onSubmit={submit} className="flex flex-col items-center">
+        <div className="win-lock-field">
+          <User size={15} className="opacity-80" />
+          <input
+            className="win-lock-input"
+            value={user}
+            onChange={(e) => setUser(e.target.value)}
+            placeholder="lab_windows"
+            autoComplete="username"
+            autoFocus
+          />
+        </div>
+        <div className="win-lock-field">
+          <KeyRound size={15} className="opacity-80" />
+          <input
+            type="password"
+            className="win-lock-input"
+            value={pass}
+            onChange={(e) => setPass(e.target.value)}
+            placeholder="Password"
+            autoComplete="current-password"
+          />
+        </div>
+        {error && <div className="win-lock-error">{error}</div>}
+        <button
+          type="submit"
+          className="win-btn !bg-white !text-[#0078D4] !border-white px-6 py-2 text-sm"
+          style={{ width: 260, justifyContent: 'center' }}
+          disabled={signing}
+        >
+          {signing ? <RefreshCw size={14} className="animate-spin" /> : <ChevronRight size={15} />}
+          {locked ? 'Unlock' : 'Sign in'}
+        </button>
+        <button
+          type="button"
+          className="win-btn px-4 py-1.5 text-xs mt-2"
+          style={{ width: 260, justifyContent: 'center', background: 'rgba(255,255,255,.14)', color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}
+          onClick={() => { setUser(WIN_LAB_USER); setPass(WIN_LAB_PASS); setError('') }}
+        >
+          Use lab credentials (autofill)
+        </button>
+      </form>
+
+      <div className="win-lock-hint">
+        <Lock size={11} className="inline mb-0.5 mr-1" />
+        Training credentials: <b>{WIN_LAB_USER}</b> / <b>{WIN_LAB_PASS}</b>
       </div>
     </div>
   )
@@ -980,7 +1065,7 @@ function SystemPanel({ state, busy, onAction }) {
 export default function WindowsServerSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
   hintsLabel, checkDisabled, extendDisabled, embedded = false,
-  onToggleTerminal, simTerminalOpen = false,
+  onToggleTerminal, simTerminalOpen = false, vmwareHref = null,
 }) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
@@ -989,6 +1074,7 @@ export default function WindowsServerSimulator({
   const [signing, setSigning] = useState(false)
   const [busy, setBusy] = useState(false)
   const [view, setView] = useState('dashboard')
+  const [desktopMode, setDesktopMode] = useState(true)
   const [flash, setFlash] = useState(null) // { kind, message }
   const [now, setNow] = useState(new Date())
   const pollRef = useRef(null)
@@ -1066,7 +1152,7 @@ export default function WindowsServerSimulator({
   }), [now])
 
   return (
-    <div className={`win-sim relative ${embedded ? 'h-full min-h-0 flex flex-col overflow-hidden' : 'min-h-screen'}`}>
+    <div className={`win-sim relative ${embedded ? 'h-full min-h-0 flex flex-col overflow-hidden' : (desktopMode ? 'h-screen flex flex-col overflow-hidden' : 'min-h-screen')}`}>
       <style>{SCOPED_CSS}</style>
 
       {/* Title bar — lab chrome lives here (hints / stop / back to lab). */}
@@ -1077,6 +1163,9 @@ export default function WindowsServerSimulator({
           <span className="text-[11px] opacity-80 hidden sm:inline truncate">{scenario?.title || slug}</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
+          <button type="button" className={`win-btn ${desktopMode ? 'ring-2 ring-white/60' : ''}`} onClick={() => setDesktopMode((d) => !d)}>
+            <Monitor size={13} /> {desktopMode ? 'Lab view' : 'Full Desktop'}
+          </button>
           <button className="win-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
           <button className="win-btn" onClick={() => runAction('reset', {})} disabled={busy}><RotateCw size={13} /> Reset</button>
           {onToggleTerminal && (
@@ -1086,6 +1175,7 @@ export default function WindowsServerSimulator({
           )}
           <LabChromeControls
             buttonClass="win-btn"
+            vmwareHref={vmwareHref}
             onHints={onHints}
             onCheck={onCheck}
             onExtend={onExtend}
@@ -1099,7 +1189,16 @@ export default function WindowsServerSimulator({
         </div>
       </div>
 
-      {/* Desktop: nav + content + taskbar */}
+      {/* Full pixel-perfect Windows Server 2022 desktop (client-side OS) */}
+      {desktopMode && signedIn && !locked && (
+        <div className="flex-1 relative min-h-0 overflow-hidden">
+          <WindowsServer2022 backendState={state} />
+        </div>
+      )}
+
+      {/* Lab view: nav + content + taskbar (graded backend panels) */}
+      {!desktopMode && (
+      <>
       <div className="win-body">
         <div className="win-nav">
           {NAV.map(({ key, label, icon: Icon }) => (
@@ -1181,6 +1280,8 @@ export default function WindowsServerSimulator({
           <div>{clock.date}</div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Login / lock gate — sits above everything until the admin signs in. */}
       {(!signedIn || locked) && (

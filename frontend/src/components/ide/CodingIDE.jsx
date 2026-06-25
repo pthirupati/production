@@ -32,6 +32,17 @@ function tsLine(text) {
 // localStorage key for per-session autosaved drafts. Keyed by lab session so a
 // reload (or accidental navigation) restores the exact in-progress files.
 const draftKey = (sessionId) => `fixitlab:ide-draft:${sessionId}`
+const IDE_LAB_USER = 'lab_ide'
+const IDE_LAB_PASS = 'lab_ide@123'
+const IDE_AUTH_KEY = 'fixitlab_ide_auth'
+
+function isIdeAuthenticated() {
+  try {
+    return sessionStorage.getItem(IDE_AUTH_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 function loadDraft(sessionId) {
   try {
@@ -118,6 +129,10 @@ function TestRow({ name, passed, message, hidden }) {
  *   solved      boolean — externally controlled solved state (locks the editor)
  */
 export default function CodingIDE({ sessionId, scenario, onSolved, solved: solvedProp = false }) {
+  const [authenticated, setAuthenticated] = useState(isIdeAuthenticated)
+  const [loginUser, setLoginUser] = useState('')
+  const [loginPass, setLoginPass] = useState('')
+  const [loginError, setLoginError] = useState('')
   const [spec, setSpec] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -437,6 +452,62 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   }, [sessionId, language, composedSource])
 
   const handleUnlockReference = useCallback(() => askMentor('all', { unlock: true }), [askMentor])
+
+  if (!authenticated) {
+    const submitLogin = (e) => {
+      e.preventDefault()
+      const ok = loginUser.trim().toLowerCase() === IDE_LAB_USER && loginPass === IDE_LAB_PASS
+      if (ok) {
+        try { sessionStorage.setItem(IDE_AUTH_KEY, '1') } catch { /* ignore */ }
+        setLoginError('')
+        setAuthenticated(true)
+      } else {
+        setLoginError(`Invalid credentials. Use ${IDE_LAB_USER} / ${IDE_LAB_PASS} for training labs.`)
+      }
+    }
+
+    return (
+      <div className="flex-1 min-h-0 bg-[#1e1e1e] text-[#cccccc] flex flex-col">
+        <div className="h-9 bg-[#2d2d30] border-b border-[#3e3e42] flex items-center px-4 text-xs">
+          <span className="font-semibold text-white">FixitLab IDE</span>
+          <span className="ml-2 text-[#858585]">{scenario?.title || 'Coding Lab'}</span>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-sm bg-[#252526] border border-[#3e3e42] shadow-2xl rounded overflow-hidden">
+            <div className="px-5 py-4 bg-[#007acc] text-white font-semibold flex items-center gap-2">
+              <FileCode size={18} /> VS Code Workbench
+            </div>
+            <form onSubmit={submitLogin} className="p-5 space-y-4">
+              <p className="text-sm text-[#cccccc]">Sign in to the multi-language IDE training environment.</p>
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#969696] mb-1">Username</label>
+                <input value={loginUser} onChange={(e) => setLoginUser(e.target.value)} autoFocus autoComplete="username"
+                  placeholder={IDE_LAB_USER}
+                  className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#007acc]" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#969696] mb-1">Password</label>
+                <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} autoComplete="current-password"
+                  className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#007acc]" />
+              </div>
+              {loginError && <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{loginError}</p>}
+              <button type="submit" className="w-full py-2 rounded bg-[#007acc] text-white font-semibold">
+                Sign In
+              </button>
+              <button type="button"
+                onClick={() => { setLoginUser(IDE_LAB_USER); setLoginPass(IDE_LAB_PASS); setLoginError('') }}
+                className="w-full py-1.5 text-xs text-[#cccccc] border border-[#3e3e42] rounded hover:bg-[#2d2d30]">
+                Use lab credentials (autofill)
+              </button>
+              <p className="text-[10px] text-[#969696] text-center pt-2 border-t border-[#3e3e42]">
+                Training credentials: <span className="font-mono text-white">{IDE_LAB_USER}</span> / <span className="font-mono text-white">{IDE_LAB_PASS}</span>
+              </p>
+            </form>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (

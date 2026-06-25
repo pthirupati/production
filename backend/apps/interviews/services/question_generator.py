@@ -1125,6 +1125,65 @@ def generate_question(
     substantive = bool(last_answer) and last_answer_quality not in ("skipped", "brief", "")
     phrase = _extract_quote_phrase(last_answer) if substantive else None
 
+    # --- CONVERSATIONAL ENGINE — grounded follow-ups from the candidate's words. ---
+    if substantive and not intro_slot and not behavioral_slot and last_answer:
+        from apps.interviews.services.conversation import (
+            analyze_answer,
+            decide_next_move,
+            generate_follow_up_question,
+        )
+        from apps.interviews.services.conversation.memory import CampaignMemory
+        from apps.interviews.services.conversation.policy import NextMove
+
+        last_q_text = ""
+        for turn in reversed(conversation_tail):
+            if turn.get("role") == "interviewer":
+                last_q_text = turn.get("content") or ""
+                break
+
+        analysis = analyze_answer(answer_text=last_answer, question_text=last_q_text)
+        camp_mem = CampaignMemory.from_dict(mem.get("campaign_memory") or mem)
+        brief_streak = int(mem.get("brief_streak", 0))
+        if last_answer_quality in ("brief", "weak"):
+            brief_streak += 1
+        else:
+            brief_streak = 0
+
+        decision = decide_next_move(
+            analysis=analysis,
+            memory=camp_mem,
+            strong_streak=strong_streak,
+            brief_streak=brief_streak,
+        )
+        if decision.move != NextMove.NEW_TOPIC:
+            ack, follow_q = generate_follow_up_question(
+                analysis=analysis,
+                decision=decision,
+                used_texts=used,
+                rng=rng,
+            )
+            if follow_q:
+                text = f"{ack} {follow_q}".strip()
+                if time_stitch:
+                    text = f"{time_stitch} {text}".strip()
+                kind_map = {
+                    NextMove.DRILL_DOWN: "conversational_drill",
+                    NextMove.CLARIFY: "conversational_clarify",
+                    NextMove.CHALLENGE: "conversational_challenge",
+                    NextMove.SCENARIO_ESCALATE: "conversational_escalate",
+                    NextMove.EASE_REDIRECT: "conversational_ease",
+                    NextMove.HINT_THEN_MOVE: "conversational_hint",
+                    NextMove.ANSWER_CANDIDATE: "conversational_answer",
+                    NextMove.THREAD_BACK: "conversational_thread",
+                }
+                return GeneratedQuestion(
+                    text=_finalize(text),
+                    category="troubleshooting",
+                    topic=current_topic,
+                    difficulty=eff_difficulty,
+                    kind=kind_map.get(decision.move, "conversational"),
+                )
+
     # --- 0a. CONVERSATION MEMORY — thread back to earlier phrases/claims (~20%). ---
     if not intro_slot and questions_asked >= 3 and rng.random() < 0.22:
         if answer_mode == "deep" or int(mem.get("strong_streak", 0)) >= 2:

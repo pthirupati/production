@@ -161,6 +161,32 @@ export default function InterviewRoom() {
   const [practiceMode, setPracticalCoaching] = useState(false)
   const [coaching, setCoaching] = useState(null)
   const [typingAnswer, setTypingAnswer] = useState(false)
+  const [speechSupported, setSpeechSupported] = useState(true)
+  const [audioDevices, setAudioDevices] = useState([])
+  const [videoDevices, setVideoDevices] = useState([])
+  const [selectedAudioId, setSelectedAudioId] = useState('')
+  const [selectedVideoId, setSelectedVideoId] = useState('')
+  useEffect(() => {
+    const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
+    const supported = !!SR
+    setSpeechSupported(supported)
+    if (!supported) setTypingAnswer(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isMediaDevicesSupported()) return
+    const refresh = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        setAudioDevices(devices.filter(d => d.kind === 'audioinput'))
+        setVideoDevices(devices.filter(d => d.kind === 'videoinput'))
+      } catch { /* ignore */ }
+    }
+    refresh()
+    navigator.mediaDevices?.addEventListener?.('devicechange', refresh)
+    return () => navigator.mediaDevices?.removeEventListener?.('devicechange', refresh)
+  }, [micOn, cameraOn])
+
   // WS1 — visible "still listening — take your time" countdown. When the
   // trailing-silence window is running, this holds { remaining, total } in ms so
   // the candidate sees they have a beat before auto-submit; null when idle.
@@ -349,9 +375,12 @@ export default function InterviewRoom() {
     if (mediaInFlightRef.current) return mediaInFlightRef.current
 
     const constraints =
-      type === 'audio' ? { audio: true, video: false } :
-      type === 'video' ? { audio: false, video: true } :
-      { audio: true, video: true }
+      type === 'audio' ? { audio: selectedAudioId ? { deviceId: { exact: selectedAudioId } } : true, video: false } :
+      type === 'video' ? { audio: false, video: selectedVideoId ? { deviceId: { exact: selectedVideoId } } : true } :
+      {
+        audio: selectedAudioId ? { deviceId: { exact: selectedAudioId } } : true,
+        video: selectedVideoId ? { deviceId: { exact: selectedVideoId } } : true,
+      }
 
     const run = async () => {
       // Camera/microphone access requires HTTPS (or localhost).
@@ -896,6 +925,11 @@ export default function InterviewRoom() {
       },
     })
     setSilenceCountdown(null)
+    if (result?.reason === 'unsupported') {
+      setTypingAnswer(true)
+      toast('Voice input is not supported in this browser — switched to Type mode', { icon: '⌨️' })
+      return
+    }
     const text = (result?.transcript || result?.filtered_text || '').trim()
     // If the skip-silence timer (or a manual skip / barge-in) already resolved
     // this turn, awaitingAnswerRef is false — don't submit again even if late
@@ -1568,6 +1602,12 @@ export default function InterviewRoom() {
         {round.is_sample && (
           <p className="text-xs text-cyan-400 font-medium -mt-4">Free sample — {round.duration_minutes} minutes only</p>
         )}
+        {!speechSupported && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status">
+            <strong>Voice input unavailable</strong> — Firefox, Safari, and some mobile browsers do not support
+            live speech recognition. Type mode is enabled automatically; you can still hear the interviewer.
+          </div>
+        )}
         <ul className="text-xs text-surface-400 space-y-2 list-disc pl-4">
           <li>Quiet room, headphones recommended</li>
           <li>Microphone and camera must stay on</li>
@@ -1630,6 +1670,40 @@ export default function InterviewRoom() {
                 )
               })}
             </div>
+          </div>
+        )}
+        {(audioDevices.length > 1 || videoDevices.length > 1) && (
+          <div className="grid sm:grid-cols-2 gap-2">
+            {audioDevices.length > 1 && (
+              <label className="text-xs text-surface-400 space-y-1">
+                <span className="flex items-center gap-1"><Mic size={12} /> Microphone</span>
+                <select
+                  value={selectedAudioId}
+                  onChange={e => { setSelectedAudioId(e.target.value); if (micOn) acquireMedia('audio') }}
+                  className="input-field text-xs w-full"
+                >
+                  <option value="">System default</option>
+                  {audioDevices.map(d => (
+                    <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0, 6)}`}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {videoDevices.length > 1 && (
+              <label className="text-xs text-surface-400 space-y-1">
+                <span className="flex items-center gap-1"><Video size={12} /> Camera</span>
+                <select
+                  value={selectedVideoId}
+                  onChange={e => { setSelectedVideoId(e.target.value); if (cameraOn) acquireMedia('video') }}
+                  className="input-field text-xs w-full"
+                >
+                  <option value="">System default</option>
+                  {videoDevices.map(d => (
+                    <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.slice(0, 6)}`}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
         )}
         {mediaError && (

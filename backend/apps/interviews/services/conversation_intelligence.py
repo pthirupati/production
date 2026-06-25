@@ -340,7 +340,10 @@ def claim_cross_question(memory: dict[str, Any], used: set[str], rng) -> str | N
 
 
 _OPPOSITE_PAIRS = (
-    (("always", "never"), ("must", "avoid"), ("only", "never"), ("require", "skip")),
+    ("always", "never"),
+    ("must", "avoid"),
+    ("only", "never"),
+    ("require", "skip"),
 )
 
 

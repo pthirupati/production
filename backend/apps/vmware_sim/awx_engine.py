@@ -39,6 +39,12 @@ def _base_state() -> dict:
             {"id": 1, "name": "Production", "hosts": 12, "sources": 1},
             {"id": 2, "name": "Staging", "hosts": 6, "sources": 1},
         ],
+        "hosts": [
+            {"id": "h1", "name": "web01.fixitlab.local", "inventory": "Production", "enabled": True, "status": "ok", "source": "Static"},
+            {"id": "h2", "name": "web02.fixitlab.local", "inventory": "Production", "enabled": True, "status": "ok", "source": "Static"},
+            {"id": "h3", "name": "db01.fixitlab.local", "inventory": "Production", "enabled": True, "status": "failed", "source": "Static"},
+            {"id": "h4", "name": "lab-worker-01", "inventory": "Training", "enabled": True, "status": "ok", "source": "Static"},
+        ],
         "projects": [
             {"id": 1, "name": "ansible-playbooks", "scm_type": "git", "status": "successful"},
             {"id": 2, "name": "tower-config", "scm_type": "git", "status": "error"},
@@ -95,9 +101,53 @@ def _ensure(session_id: str, slug: str = "") -> dict:
     return entry
 
 
+def _merge_vmware_hosts(state: dict, session_id: str) -> None:
+    """Expose powered-on VMware VMs as AWX inventory hosts for cross-tool labs."""
+    try:
+        from apps.vmware_sim.engine import _load_session as vmware_load
+
+        vm_entry = vmware_load(str(session_id))
+        if not vm_entry or not vm_entry.get("state"):
+            return
+
+        hosts = state.setdefault("hosts", [])
+        existing = {str(h.get("name") or "").lower() for h in hosts}
+        production = next((i for i in state.setdefault("inventories", []) if i.get("name") == "Production"), None)
+        if not production:
+            production = {"id": 1, "name": "Production", "hosts": 0, "sources": 0}
+            state["inventories"].append(production)
+
+        added = 0
+        for vm in vm_entry["state"].get("vms", []):
+            if vm.get("power") != "poweredOn":
+                continue
+            name = vm.get("hostname") or vm.get("name") or vm.get("id")
+            if not name or str(name).lower() in existing:
+                continue
+            hosts.append({
+                "id": f"vmware-{vm.get('id') or name}",
+                "name": name,
+                "inventory": "Production",
+                "enabled": True,
+                "status": "ok",
+                "source": "VMware",
+                "ip": vm.get("ip") or "",
+                "guest_os": vm.get("guest_os_version") or vm.get("guest_os") or "",
+            })
+            existing.add(str(name).lower())
+            added += 1
+
+        if added:
+            production["hosts"] = max(int(production.get("hosts") or 0), len([h for h in hosts if h.get("inventory") == "Production"]))
+            production["sources"] = max(int(production.get("sources") or 0), 2)
+    except Exception:
+        return
+
+
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
     state = copy.deepcopy(entry["state"])
+    _merge_vmware_hosts(state, session_id)
     return {
         "session_id": str(session_id),
         "scenario_slug": entry.get("scenario_slug") or scenario_slug,

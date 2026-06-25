@@ -218,6 +218,86 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
     shell.register_handler(handler)
 
 
+def bootstrap_standalone_cli_modules(shell: RHELShell) -> None:
+    """Optional explicit bootstrap — RHELShell._cmd_kubectl/_cmd_aws delegate by default."""
+    _register_aws_cli(shell)
+
+
+def _register_aws_cli(shell: RHELShell) -> None:
+    """AWS CLI in RHEL terminals — session-linked when available, else local simulation."""
+
+    def handler(parts: list[str], line: str) -> str | None:
+        low = line.strip().lower()
+        if not low.startswith("aws "):
+            return None
+        sid = getattr(shell.state, "session_id", "") or ""
+        if sid:
+            try:
+                from apps.vmware_sim import terraform_engine as te
+
+                slug = getattr(shell.state, "scenario_slug", "") or ""
+                te._ensure(sid, slug)
+                res = te.apply_action(sid, "aws_cli", {"command": line.strip()})
+                if not res.get("ok"):
+                    shell.state.last_exit_code = 1
+                    return res.get("error") or "Error"
+                shell.state.last_exit_code = 0
+                return res.get("output") or ""
+            except Exception:  # noqa: BLE001
+                pass
+        return _handle_aws_cli_local(line.strip())
+
+    shell.register_handler(handler)
+
+
+def _handle_aws_cli_local(command: str) -> str:
+    """Offline AWS CLI simulation when no lab session is linked."""
+    import json
+
+    low = command.lower()
+    if low.startswith("aws sts get-caller-identity"):
+        return json.dumps(
+            {
+                "UserId": "AIDAIOSFODNN7EXAMPLE",
+                "Account": "123456789012",
+                "Arn": "arn:aws:iam::123456789012:user/training",
+            },
+            indent=2,
+        )
+    if "s3 ls" in low:
+        return "2024-01-15 10:00:00 app-logs-prod\n2024-06-01 08:30:00 fixitlab-artifacts"
+    if "s3api get-bucket-policy" in low or "s3api get-bucket-acl" in low:
+        return json.dumps({"Version": "2012-10-17", "Statement": []}, indent=2)
+    if "ec2 describe-instances" in low:
+        return (
+            "-----------------------------------------------------------------\n"
+            "|                     DescribeInstances                         |\n"
+            "-----------------------------------------------------------------\n"
+            "i-0abc123def4567890  t3.medium  running  ap-south-1a"
+        )
+    if "ec2 describe-vpcs" in low:
+        return "vpc-0abc123  10.0.0.0/16  available"
+    if "ec2 describe-security-groups" in low:
+        return "sg-0abc123  web-sg  vpc-0abc123"
+    if "iam list-users" in low:
+        return "Users:\n- training\n- automation"
+    if "iam get-user" in low:
+        return json.dumps({"User": {"UserName": "training", "UserId": "AIDAIOSFODNN7EXAMPLE"}}, indent=2)
+    if "eks list-clusters" in low:
+        return "fixitlab-training"
+    if "eks describe-cluster" in low:
+        return json.dumps({"cluster": {"name": "fixitlab-training", "status": "ACTIVE"}}, indent=2)
+    if "lambda list-functions" in low:
+        return "Functions:\n- fixitlab-handler"
+    if "cloudwatch describe-alarms" in low:
+        return "ALARM_NAME  STATE\nhigh-cpu    OK"
+    if "logs describe-log-groups" in low:
+        return "logGroupName\n/aws/lambda/fixitlab-handler"
+    if "autoscaling describe-auto-scaling-groups" in low:
+        return "AutoScalingGroupName  DesiredCapacity  MinSize  MaxSize\nweb-asg  2  2  6"
+    return f"(simulated) {command}"
+
+
 def _register_k8s(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
     sid = getattr(getattr(shell, "state", None), "session_id", "") or ""
     if not engine.cluster:

@@ -31,7 +31,21 @@ def extract_text_from_upload(uploaded_file) -> str:
             return raw.decode("utf-8", errors="ignore")[:20000]
 
     if name.endswith((".doc", ".docx")):
-        return raw.decode("utf-8", errors="ignore")[:20000]
+        try:
+            import io
+
+            from docx import Document
+
+            doc = Document(io.BytesIO(raw))
+            parts = [p.text for p in doc.paragraphs if p.text and p.text.strip()]
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        if cell.text and cell.text.strip():
+                            parts.append(cell.text.strip())
+            return "\n".join(parts).strip()[:20000]
+        except Exception:
+            return raw.decode("utf-8", errors="ignore")[:20000]
 
     try:
         return raw.decode("utf-8", errors="ignore")[:20000]

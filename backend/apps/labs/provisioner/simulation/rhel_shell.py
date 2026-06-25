@@ -165,6 +165,7 @@ class RHELShell:
             "rpm": self._cmd_rpm,
             "docker": self._cmd_docker,
             "kubectl": self._cmd_kubectl,
+            "aws": self._cmd_aws,
             "mysql": self._cmd_mysql,
             "psql": self._cmd_psql,
             "python3": self._cmd_python3,
@@ -1300,20 +1301,39 @@ class RHELShell:
         return f"docker {sub}: OK (simulation)"
 
     def _cmd_kubectl(self, p: list[str]) -> str:
-        if len(p) < 2:
-            return "kubectl: missing command"
-        sub = p[1]
-        if sub == "get" and "pods" in p:
-            return "NAME                     READY   STATUS             RESTARTS   AGE\nnginx-7d4b8c9f-xk2m1      0/1     CrashLoopBackOff   5          10m\napi-5f8c7d6b-abc12        1/1     Running            0          1h"
-        if sub == "get" and "nodes" in p:
-            return "NAME       STATUS   ROLES           AGE   VERSION\nmaster-1   Ready    control-plane   30d   v1.28.2\nworker-1   Ready    <none>          30d   v1.28.2"
-        if sub == "describe" and "pod" in p:
-            return "Events:\n  Warning  Failed     kubelet  Error: ImagePullBackOff"
-        if sub == "logs":
-            return "Error from server: container not found (CrashLoopBackOff)"
-        if sub == "apply":
-            return "deployment.apps/api configured"
-        return f"kubectl {' '.join(p[1:])}: OK (simulation)"
+        from .k8s_cluster import K8sCluster
+        from .simulation_modules import _handle_kubectl
+
+        if not hasattr(self, "_k8s_cluster"):
+            slug = getattr(self.state, "scenario_slug", "") or ""
+            sid = getattr(self.state, "session_id", "") or ""
+            self._k8s_cluster = K8sCluster(slug, session_id=sid)
+        cluster = self._k8s_cluster
+        if sid := getattr(self.state, "session_id", "") or "":
+            cluster.session_id = sid
+            cluster.sync_from_vmware_bridge()
+        line = " ".join(p)
+        out = _handle_kubectl(cluster, p, line, self)
+        return out if out is not None else f"kubectl {' '.join(p[1:])}: OK (simulation)"
+
+    def _cmd_aws(self, p: list[str]) -> str:
+        from .simulation_modules import _handle_aws_cli_local
+
+        line = " ".join(p)
+        sid = getattr(self.state, "session_id", "") or ""
+        if sid:
+            try:
+                from apps.vmware_sim import terraform_engine as te
+
+                slug = getattr(self.state, "scenario_slug", "") or ""
+                te._ensure(sid, slug)
+                res = te.apply_action(sid, "aws_cli", {"command": line.strip()})
+                if res.get("ok"):
+                    return res.get("output") or ""
+                return res.get("error") or "Error"
+            except Exception:  # noqa: BLE001
+                pass
+        return _handle_aws_cli_local(line.strip())
 
     def _cmd_mysql(self, p: list[str]) -> str:
         if "-e" in p:

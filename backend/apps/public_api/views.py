@@ -533,6 +533,23 @@ class ScenarioDetailView(APIView):
             data["user_progress"] = None
             data["solution_explanation"] = None
 
+        try:
+            from apps.tutorials.models import Tutorial
+            from apps.tutorials.serializers import TutorialListSerializer
+
+            related_tutorials = list(
+                Tutorial.objects.filter(is_published=True, scenario_slug=scenario.slug)
+                .order_by("order", "title")[:4]
+            )
+            if not related_tutorials and scenario.technology:
+                related_tutorials = list(
+                    Tutorial.objects.filter(is_published=True, topic__iexact=scenario.technology.name)
+                    .order_by("order", "title")[:4]
+                )
+            data["related_tutorials"] = TutorialListSerializer(related_tutorials, many=True).data
+        except Exception:
+            data["related_tutorials"] = []
+
         return Response(data)
 
 

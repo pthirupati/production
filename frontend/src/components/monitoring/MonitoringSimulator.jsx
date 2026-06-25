@@ -755,7 +755,18 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
         <tbody>
           {(prom.targets || []).map((t, i) => (
             <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
-              <td className="px-3 py-2 font-medium">{t.job}</td>
+              <td className="px-3 py-2 font-medium">
+                {t.job}
+                {t.job === 'vmware-guest' && (
+                  <span
+                    className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                    style={{ background: 'rgba(79,167,232,0.12)', color: '#4fa7e8', border: '1px solid rgba(79,167,232,0.35)' }}
+                    title="Discovered from VMware vCenter in this lab session"
+                  >
+                    VMware
+                  </span>
+                )}
+              </td>
               <td className="px-3 py-2 font-mono text-xs">{t.scrape_url}</td>
               <td className="px-3 py-2"><span className={`text-xs font-bold ${t.health === 'down' ? 'text-red-600' : 'text-green-600'}`}>{t.health === 'down' ? 'DOWN' : 'UP'}</span></td>
               <td className="px-3 py-2 font-mono text-xs text-gray-500">{t.scrape_duration_ms}ms</td>
@@ -948,7 +959,7 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, st
 export default function MonitoringSimulator({
   sessionId, scenario, flavor = 'grafana', embedded = false,
   onExit, onStop, onHints, onCheck, onExtend, hintsLabel, checkDisabled, extendDisabled,
-  onToggleTerminal, simTerminalOpen = false,
+  onToggleTerminal, simTerminalOpen = false, vmwareHref = null,
 }) {
   const [authed, setAuthed] = useState(isMonitoringAuthenticated())
   const [state, setState] = useState(null)
@@ -995,6 +1006,7 @@ export default function MonitoringSimulator({
       checkDisabled,
       extendDisabled,
       embedded,
+      vmwareHref,
     }
     return flavor === 'prometheus'
       ? <MonitoringLoginGate flavor={flavor} {...gateProps} />
@@ -1020,6 +1032,7 @@ export default function MonitoringSimulator({
         checkDisabled={checkDisabled}
         extendDisabled={extendDisabled}
         backLabel={simTerminalOpen ? 'Hide terminal' : 'Terminal'}
+        vmwareHref={vmwareHref}
       >
         <button className={`mon-tab ${view === 'grafana' ? 'mon-tab-active' : ''}`} onClick={() => setView('grafana')}>Grafana</button>
         <button className={`mon-tab ${view === 'prometheus' ? 'mon-tab-active' : ''}`} onClick={() => setView('prometheus')}>Prometheus</button>

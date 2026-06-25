@@ -816,6 +816,28 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         question_topic=_detect_topic_from_meta(last_q_msg),
     )
     conv["memory"] = memory
+    try:
+        from apps.interviews.services.conversation import analyze_answer, update_campaign_memory
+        from apps.interviews.services.conversation.memory import CampaignMemory
+
+        analysis = analyze_answer(answer_text=answer_text, question_text=question_text)
+        camp_mem = CampaignMemory.from_dict(conv.get("campaign_memory") or {})
+        camp_mem = update_campaign_memory(
+            camp_mem,
+            analysis=analysis,
+            question_text=question_text,
+            topic=score_result.get("topic_detected"),
+            score=float(score_result.get("score") or 0),
+        )
+        conv["campaign_memory"] = camp_mem.to_dict()
+        q = score_result.get("quality")
+        if q in ("brief", "weak"):
+            memory["brief_streak"] = int(memory.get("brief_streak", 0)) + 1
+        else:
+            memory["brief_streak"] = 0
+        conv["memory"] = memory
+    except Exception:  # noqa: BLE001
+        pass
     score_result["memory_tone"] = memory.get("tone")
     try:
         round_obj.save(update_fields=["metadata"])
@@ -1132,7 +1154,23 @@ def end_round(round_obj: InterviewRound, reason: str = "completed") -> dict:
         scores = list(
             round_obj.messages.filter(role="candidate", score__isnull=False).values_list("score", flat=True)
         )
-        agg = aggregate_round_scores(scores, round_type=round_obj.round_type)
+        answer_rows = list(
+            round_obj.messages.filter(role="candidate", score__isnull=False).values(
+                "content", "score", "metadata"
+            )
+        )
+        for row in answer_rows:
+            meta = row.get("metadata") or {}
+            for key in ("depth_score", "concrete_score", "star_score", "keyword_hit_rate", "relevance_score", "quality"):
+                if key in meta and key not in row:
+                    row[key] = meta[key]
+        snap = round_obj.campaign.profile_snapshot if round_obj.campaign_id else {}
+        agg = aggregate_round_scores(
+            scores,
+            round_type=round_obj.round_type,
+            answer_rows=answer_rows,
+            resume_snapshot=snap if isinstance(snap, dict) else {},
+        )
         passed = agg["overall_score"] >= round_obj.pass_threshold and reason != "av_timeout"
         strengths, improvements = build_strengths_and_improvements(
             [{"score": s} for s in scores],

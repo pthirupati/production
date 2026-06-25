@@ -17,6 +17,7 @@ import ItsmTicketPanel from '../components/itsm/ItsmTicketPanel'
 import { itsmApi } from '../api/itsm'
 import JiraTicketLink from '../components/JiraTicketLink'
 import LabTerminal from '../components/LabTerminal'
+import { LabBackendTerminalStatusBar } from '../components/linux/LinuxTerminalChrome'
 import CodingIDE from '../components/ide/CodingIDE'
 import PromptPlayground from '../components/promptlab/PromptPlayground'
 import MonitoringSimulator from '../components/monitoring/MonitoringSimulator'
@@ -35,6 +36,7 @@ import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
 import SimLabQuickActions from '../components/SimLabQuickActions'
 import SimLabWizard from '../components/SimLabWizard'
+import LabJourneyStrip from '../components/lab/LabJourneyStrip'
 import useLabShortcuts from '../hooks/useLabShortcuts'
 import { useIsMobile } from '../hooks/useMediaQuery'
 
@@ -1025,6 +1027,29 @@ export default function LabRunner() {
   const isPromptLab = Boolean(scenario?.coding_mode) && promptKind
   const isCodingLab = Boolean(scenario?.coding_mode) && !isPromptLab
 
+  // Linux server and other VM-backed terminal labs reach the terminal action bar.
+  const VM_BACKED_TERMINAL_TECHS = new Set([
+    'linux', 'kubernetes', 'docker', 'database', 'networking', 'ansible', 'devops',
+    'security', 'shell-script', 'bash', 'rhel', 'ubuntu',
+  ])
+  const isVmBackedTerminalLab = !isCrossTech && !isVmwareLab
+    && VM_BACKED_TERMINAL_TECHS.has(scenario?.technology?.slug)
+  // VM-backed labs (Linux shells, Windows Server, AWX, Grafana/Prometheus) also
+  // live on a VMware-managed server, so we surface a vCenter link that lets the
+  // learner perform hypervisor-side steps (add a disk, snapshot, reboot) and
+  // then return here to rescan. The backend field currently defaults to false,
+  // so infer known VM-backed families here instead of requiring every scenario
+  // YAML to opt in one-by-one.
+  const scenarioSlug = scenario?.slug || ''
+  const explicitVmwareScenario = scenario?.vmware_link === true || /vmware|vcenter|vsphere/i.test(scenarioSlug)
+  const vmwareServerHref = `/vmware/${sessionId}?scenario=${scenario?.slug || ''}`
+  const showSimVmwareLink = isAwxLab || isMonitoringLab || isWindowsGuiLab || (isTerraformSimLab && explicitVmwareScenario)
+  const showTerminalVmwareLink = isVmBackedTerminalLab || (!isCrossTech && !isVmwareLab && explicitVmwareScenario)
+  const showCrossTechVmwareLink = isCrossTech
+  const vmwareWorkflowHint = showTerminalVmwareLink || showCrossTechVmwareLink
+    ? 'Use vCenter for hypervisor steps, then return here and rescan/reboot.'
+    : ''
+
   const primarySimProps = {
     sessionId,
     scenario,
@@ -1037,6 +1062,7 @@ export default function LabRunner() {
     terminalHost,
     blockedCommands: blockedCmds,
     isMobile,
+    vmwareHref: showSimVmwareLink ? vmwareServerHref : null,
   }
   const renderPrimarySim = () => {
     if (isTerraformSimLab) {
@@ -1657,6 +1683,22 @@ export default function LabRunner() {
         )}
         {/* Terminal action bar — above xterm */}
         <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-2 bg-surface-900 border-b border-surface-800 text-[10px] sm:text-xs">
+          {(showTerminalVmwareLink || showCrossTechVmwareLink || isVmwareLab || isMonitoringLab || isAwxLab) && (
+            <LabJourneyStrip
+              sessionId={sessionId}
+              scenarioSlug={scenario?.slug}
+              showTerminal
+              terminalActive={!isSimPrimaryLab || simTerminalOpen}
+              showVmware={showTerminalVmwareLink || showCrossTechVmwareLink || isVmwareLab}
+              vmwareHref={isVmwareLab ? `/vmware/${sessionId}` : vmwareServerHref}
+              showGrafana={(isMonitoringLab && !isSimPrimaryLab) || (isCrossTechMonitoring && !isCrossTechMonitoringSplit)}
+              onOpenGrafana={() => setShowMonitoringSim(true)}
+              showAwx={isAwxLab && !isSimPrimaryLab}
+              onOpenAwx={() => setShowAwxSim(true)}
+              guideText={vmwareWorkflowHint}
+              className="mr-1"
+            />
+          )}
           {useDualPane && (
             <span className="text-accent-purple font-medium mr-1">Dual terminal</span>
           )}
@@ -1670,15 +1712,28 @@ export default function LabRunner() {
               <ExternalLink size={12} /> vCenter Simulator
             </Link>
           )}
-          {isCrossTech && (scenario?.vmware_link !== false) && (
+          {showCrossTechVmwareLink && (
             <Link
               to={`/vmware/${sessionId}?scenario=${scenario?.slug || ''}`}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => toast('After changing VMware hardware, return to the terminal and rescan or reboot so the guest sees it.', { icon: 'i', duration: 7000, ...TOAST })}
               title="This server also lives in VMware. Open the vCenter simulator to perform the hypervisor-side step (e.g. add a disk), then return here and rescan/reboot."
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#4fa7e8]/50 text-[#4fa7e8] bg-[#4fa7e8]/10 hover:bg-[#4fa7e8]/20 text-[10px] font-semibold"
             >
               <ExternalLink size={12} /> Open VMware (same server)
+            </Link>
+          )}
+          {showTerminalVmwareLink && (
+            <Link
+              to={vmwareServerHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => toast('After changing VMware hardware, return to the terminal and rescan or reboot so the guest sees it.', { icon: 'i', duration: 7000, ...TOAST })}
+              title="This server is hosted in VMware. Open the vCenter simulator to perform hypervisor-side steps (add a disk, snapshot, reboot), then return here and rescan."
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#4fa7e8]/40 text-[#4fa7e8] bg-[#4fa7e8]/10 hover:bg-[#4fa7e8]/20 text-[10px] font-medium"
+            >
+              <ExternalLink size={12} /> VMware Server
             </Link>
           )}
           {isCrossTechMonitoring && !isCrossTechMonitoringSplit && (
@@ -1971,6 +2026,12 @@ export default function LabRunner() {
                 welcomeHint={`Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`}
               />
             </div>
+          )}
+          {!isSimPrimaryLab && (
+            <LabBackendTerminalStatusBar
+              host={labHosts.find(h => h.name === terminalHost) || labHosts[0]}
+              hint={useDualPane ? 'Dual terminal — shared lab state' : '↑/↓ history · Tab completion · VMware disk labs: rescan after vCenter add'}
+            />
           )}
         </div>
         </>

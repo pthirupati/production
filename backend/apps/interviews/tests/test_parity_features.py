@@ -450,17 +450,22 @@ class TranscriptMappingTest(TestCase):
 # ---------------------------------------------------------------------------
 
 class NoPaidApiTest(TestCase):
-    def test_new_services_have_no_paid_api(self):
+    def test_interviews_app_has_no_paid_api(self):
         import re
+        from pathlib import Path
 
-        modules = [
-            "scorecard", "analytics", "templates", "invitations",
-            "async_video", "coaching",
-        ]
-        for name in modules:
-            mod = __import__(f"apps.interviews.services.{name}", fromlist=["x"])
-            src = open(mod.__file__).read()
+        root = Path(__file__).resolve().parents[1]
+        forbidden = (
+            "import anthropic", "from anthropic",
+            "import openai", "from openai",
+            "import elevenlabs", "from elevenlabs",
+            "elevenlabs.api",
+        )
+        for path in root.rglob("*.py"):
+            if path.name.startswith("test_"):
+                continue
+            src = path.read_text(encoding="utf-8", errors="ignore")
             code = re.sub(r'""".*?"""', "", src, flags=re.DOTALL)
             code = "\n".join(line.split("#", 1)[0] for line in code.splitlines()).lower()
-            for forbidden in ("import anthropic", "import openai", "api_key", "elevenlabs"):
-                self.assertNotIn(forbidden, code, f"{name}: paid-API usage {forbidden!r}")
+            for token in forbidden:
+                self.assertNotIn(token, code, f"{path.name}: paid-API usage {token!r}")

@@ -23,6 +23,98 @@
 
 const HUMAN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+/** Per-VM shared guest state (VFS, packages, disk flags) — all terminal tabs share this. */
+const sharedGuestState = new Map()
+
+function guestStateKey(vm) {
+  return String(vm?.id || vm?.name || 'default')
+}
+
+function formatUptime(ms) {
+  const s = Math.floor(ms / 1000)
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  if (d > 0) return `${d}d ${h}h ${m}m`
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m`
+}
+
+function getOrCreateGuestShared(vm) {
+  const key = guestStateKey(vm)
+  if (!sharedGuestState.has(key)) {
+    const family = guestOsFamily(vm)
+    const isRhel = family === 'rhel'
+    const diskGb = vm?.disk_gb || 40
+    const vfs = createVFS((api) => seedFilesystem(vm, api))
+    sharedGuestState.set(key, {
+      vfs,
+      services: seedServices(),
+      pkgs: createPkgDb(isRhel),
+      selinuxMode: isRhel ? 'Enforcing' : 'Disabled',
+      diskRescanned: !vm?.guest_disk_hidden,
+      diskFormatted: !!vm?.guest_disk_formatted,
+      diskMounted: !!vm?.guest_disk_mounted,
+      moduleLoaded: !vm?.kernel_module_missing,
+      lvm: createLvmState(diskGb),
+      bootEpoch: Date.now() - (14 * 86400 + 3 * 3600 + 22 * 60) * 1000,
+    })
+  }
+  const shared = sharedGuestState.get(key)
+  // Reconcile VMware engine flags when the guest object updates (disk add/rescan flow).
+  if (vm?.guest_disk_rescanned || vm?.guest_disk_visible) shared.diskRescanned = true
+  if (vm?.guest_disk_formatted) shared.diskFormatted = true
+  if (vm?.guest_disk_mounted) shared.diskMounted = true
+  if (vm?.kernel_module_missing === false) shared.moduleLoaded = true
+  return shared
+}
+
+function createLvmState(diskGb) {
+  const rootPvGb = Math.max(1, diskGb - 1)
+  const swapGb = 2
+  const rootGb = Math.max(8, diskGb - 5)
+  return {
+    rootPvGb,
+    swapGb,
+    rootLvGb: rootGb,
+    rootFsGb: rootGb,
+    extraPvGb: 20,
+    extraPvDevice: null,
+    extraPvInVg: false,
+    vgFreeGb: 0,
+  }
+}
+
+function fmtGb(n, opts = {}) {
+  const v = Number(n) || 0
+  const body = `${v.toFixed(2)}g`
+  return opts.lt ? `<${body}` : body
+}
+
+function visibleGuestDisk(vm, shared) {
+  return !vm?.guest_disk_hidden || shared.diskRescanned
+}
+
+function normalizeDevName(dev = '') {
+  if (!dev) return ''
+  if (dev.includes('/mapper/rootvg-root')) return '/dev/rootvg/root'
+  if (dev.includes('/rootvg/root')) return '/dev/rootvg/root'
+  return dev.replace(/\/+$/, '')
+}
+
+function parseSizeGb(args, freeGb) {
+  const joined = args.join(' ')
+  if (/\+?100%FREE/i.test(joined)) return freeGb
+  const m = joined.match(/\+?(\d+(?:\.\d+)?)([gGtTmMkK]?)/)
+  if (!m) return freeGb || 0
+  const n = Number(m[1]) || 0
+  const unit = (m[2] || 'g').toLowerCase()
+  if (unit === 't') return n * 1024
+  if (unit === 'm') return n / 1024
+  if (unit === 'k') return n / (1024 * 1024)
+  return n
+}
+
 function guestOsFamily(vm) {
   const g = (vm?.guest_os || vm?.guest_os_version || '').toLowerCase()
   if (g.includes('red hat') || g.includes('rhel') || g.includes('centos') || g.includes('rocky') || g.includes('alma') || g.includes('fedora')) return 'rhel'
@@ -146,7 +238,8 @@ function createVFS(seedFn) {
 function seedFilesystem(vm, fs) {
   const family = guestOsFamily(vm)
   const isRhel = family === 'rhel'
-  const hostname = vm?.hostname || vm?.name || (isRhel ? 'rhel-app01' : 'ubuntu-app01')
+  const hostname = vm?.hostname || vm?.name || (isRhel ? 'rhel-server-01' : 'ubuntu-server-01')
+  const kernel = isRhel ? '5.14.0-362.8.1.el9_3.x86_64' : '5.15.0-91-generic'
   const ip = vm?.ip || '10.20.30.41'
   const gw = ip.split('.').slice(0, 3).join('.') + '.1'
   const cidr = ip.split('.').slice(0, 3).join('.')
@@ -162,7 +255,11 @@ function seedFilesystem(vm, fs) {
     '/etc', '/etc/ssh', '/etc/nginx/conf.d', '/etc/nginx/sites-enabled', '/etc/systemd/system',
     '/etc/systemd/system/multi-user.target.wants', '/etc/security', '/etc/pam.d', '/etc/cron.d',
     '/etc/cron.daily', '/etc/logrotate.d', '/etc/sudoers.d', '/etc/profile.d', '/etc/skel',
-    '/etc/default', '/home', '/home/devops', '/home/devops/.ssh', '/media', '/mnt', '/opt',
+    '/etc/default', '/home', '/home/devops', '/home/devops/.ssh',
+    '/home/labuser', '/home/labuser/.ssh', '/home/labuser/.config/htop',
+    '/home/labuser/projects', '/home/labuser/projects/web-app',
+    '/home/labuser/projects/scripts', '/home/labuser/projects/configs',
+    '/home/labuser/tmp', '/media', '/mnt', '/mnt/backup', '/mnt/data', '/opt',
     '/opt/app', '/proc', '/proc/sys/kernel', '/proc/sys/net/ipv4', '/proc/sys/vm', '/root',
     '/root/.ssh', '/run', '/srv', '/sys', '/tmp', '/var', '/var/cache', '/var/lib',
     '/var/lib/docker', '/var/lib/mysql', '/var/log', '/var/log/nginx', '/var/log/journal',
@@ -170,10 +267,12 @@ function seedFilesystem(vm, fs) {
   ]
   if (isRhel) {
     dirs.push('/etc/yum.repos.d', '/etc/sysconfig', '/etc/sysconfig/network-scripts',
-      '/etc/selinux', '/etc/dnf', '/etc/httpd/conf', '/etc/httpd/conf.d')
+      '/etc/selinux', '/etc/selinux/targeted', '/etc/dnf', '/etc/firewalld',
+      '/etc/firewalld/zones', '/etc/firewalld/services', '/etc/httpd/conf', '/etc/httpd/conf.d',
+      '/var/log/audit')
   } else {
     dirs.push('/etc/apt', '/etc/apt/sources.list.d', '/etc/network', '/etc/netplan',
-      '/etc/apache2/sites-enabled')
+      '/etc/apache2/sites-enabled', '/etc/ufw')
   }
   dirs.forEach(d => fs.ensureDir(d))
 
@@ -195,6 +294,7 @@ CPE_NAME="cpe:/o:redhat:enterprise_linux:9::baseos"
 HOME_URL="https://www.redhat.com/"
 `)
     W('/etc/redhat-release', 'Red Hat Enterprise Linux release 9.3 (Plow)\n')
+    W('/etc/rhel-release', 'Red Hat Enterprise Linux release 9.3 (Plow)\n')
     W('/etc/system-release', 'Red Hat Enterprise Linux release 9.3 (Plow)\n')
   } else {
     W('/etc/os-release',
@@ -251,6 +351,9 @@ GATEWAY=${gw}
 DNS1=${cidr}.2
 `)
     W('/etc/sysconfig/selinux', 'SELINUX=enforcing\nSELINUXTYPE=targeted\n')
+    W('/etc/NetworkManager/NetworkManager.conf', '[main]\nplugins=keyfile,ifcfg-rh\n\n[ifupdown]\nmanaged=false\n')
+    W('/etc/firewalld/firewalld.conf', 'DefaultZone=public\nCleanupOnExit=yes\nLockdown=no\nIPv6_rpfilter=yes\n')
+    W('/etc/firewalld/zones/public.xml', '<zone><short>Public</short><service name="ssh"/><service name="http"/></zone>\n')
   } else {
     W('/etc/network/interfaces',
 `# interfaces(5) file
@@ -276,6 +379,7 @@ iface eth0 inet static
       nameservers:
         addresses: [${cidr}.2, 8.8.8.8]
 `)
+    W('/etc/ufw/ufw.conf', 'ENABLED=yes\nLOGLEVEL=low\n')
   }
 
   // ---- fstab / mtab ----
@@ -305,19 +409,25 @@ nginx:x:990:990:Nginx web server:/var/lib/nginx:/sbin/nologin
 mysql:x:27:27:MySQL Server:/var/lib/mysql:/sbin/nologin
 chrony:x:993:992:chrony:/var/lib/chrony:/sbin/nologin
 devops:x:1000:1000:DevOps Engineer:/home/devops:/bin/bash
+labuser:x:1001:1001:Lab User:/home/labuser:/bin/bash
+jsmith:x:1002:1002:John Smith:/home/jsmith:/bin/bash
+deploy:x:1003:1003:Deploy User:/home/deploy:/bin/bash
 `)
   W('/etc/group',
 `root:x:0:
 bin:x:1:
 daemon:x:2:
 sys:x:3:
-adm:x:4:devops
-wheel:x:10:devops
+adm:x:4:devops,labuser
+wheel:x:10:devops,labuser
 sshd:x:74:
 nginx:x:990:
 mysql:x:27:
-sudo:x:27:devops
+sudo:x:27:devops,labuser
 devops:x:1000:
+labuser:x:1001:
+jsmith:x:1002:
+deploy:x:1003:
 `)
   W('/etc/shadow',
 `root:$6$Xy9Lk2/QpR$jT0HqW.bK7sZ1m8nO3pVcdeFgHiJ.kLmNoPqRsTuVwXyZ012345aBcDeFg/:19800:0:99999:7:::
@@ -327,6 +437,7 @@ sshd:!!:19800::::::
 nginx:!!:19800::::::
 mysql:!!:19800::::::
 devops:$6$aBcDeF$gHiJkLmNoPqRsTuVwXyZ0123456789.AbCdEfGhIjKlMnOpQrStUvWx/:19800:0:99999:7:::
+labuser:$6$labUsr$labuser.training.hash.placeholder.for.simulation/:19800:0:99999:7:::
 `, '0000')
   W('/etc/gshadow', 'root:::\nwheel:::devops\nsudo:!::devops\n', '0000')
   W('/etc/login.defs', 'PASS_MAX_DAYS\t99999\nPASS_MIN_DAYS\t0\nUID_MIN\t\t1000\nGID_MIN\t\t1000\nUMASK\t\t022\n')
@@ -523,9 +634,79 @@ ip addr
   W('/home/devops/.bashrc', '# .bashrc\nalias ll=\'ls -l\'\nexport PS1=\'[\\u@\\h \\W]\\$ \'\n', '0644', 1000, 1000)
   W('/home/devops/README.txt', 'Lab host. Use sudo for privileged commands.\n', '0644', 1000, 1000)
 
+  // ---- labuser home (primary training account) ----
+  W('/home/labuser/.bashrc',
+`# ~/.bashrc — labuser
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+alias grep='grep --color=auto'
+export PS1='\\u@\\h:\\w\\$ '
+export EDITOR=vim
+export VISUAL=vim
+`, '0644', 1001, 1001)
+  W('/home/labuser/.profile', '# ~/.profile\nif [ -n "$BASH_VERSION" ]; then\n    [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"\nfi\n', '0644', 1001, 1001)
+  W('/home/labuser/.bash_logout', '# ~/.bash_logout\n', '0644', 1001, 1001)
+  W('/home/labuser/.vimrc', 'set number\nset expandtab\nset tabstop=4\nsyntax on\n', '0644', 1001, 1001)
+  W('/home/labuser/.sudo_as_admin_successful', '', '0644', 1001, 1001)
+  W('/home/labuser/.bash_history',
+`sudo apt update
+systemctl status nginx
+df -h
+lsblk
+cd projects/scripts
+./health-check.sh
+tail -f /var/log/nginx/access.log
+`, '0600', 1001, 1001)
+  W('/home/labuser/.ssh/authorized_keys',
+`ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7labuser-key-1 labuser@workstation
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIlabuser-deploy-key deploy@ci
+`, '0600', 1001, 1001)
+  W('/home/labuser/.ssh/config',
+`Host *
+    StrictHostKeyChecking accept-new
+    IdentityFile ~/.ssh/id_rsa
+`, '0600', 1001, 1001)
+  W('/home/labuser/.config/htop/htoprc', '# htop configuration\nfields=0 48 17 18 38 39 40 2 46 47 49 1\n', '0644', 1001, 1001)
+  W('/home/labuser/projects/web-app/app.py',
+`#!/usr/bin/env python3
+from flask import Flask, jsonify
+app = Flask(__name__)
+
+@app.route('/health')
+def health():
+    return jsonify(status='ok', version='2.4.1')
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+`, '0644', 1001, 1001)
+  W('/home/labuser/projects/web-app/requirements.txt', 'flask==3.0.0\ngunicorn==21.2.0\n', '0644', 1001, 1001)
+  W('/home/labuser/projects/scripts/health-check.sh',
+`#!/bin/bash
+# Health check — run from cron every 5 minutes
+SERVICES=(nginx mysql redis-server postgresql)
+for svc in "\${SERVICES[@]}"; do
+  systemctl is-active --quiet "$svc" || echo "WARN: $svc not active"
+done
+`, '0755', 1001, 1001)
+  W('/home/labuser/projects/scripts/backup.sh', '#!/bin/bash\n# Backup script — see /var/log/backup.log\n', '0755', 1001, 1001)
+  W('/home/labuser/projects/scripts/deploy.sh', '#!/bin/bash\nset -euo pipefail\necho "Deploying application..."\n', '0755', 1001, 1001)
+  W('/home/labuser/projects/configs/nginx-site.conf',
+`server {
+    listen 80;
+    server_name app.lab.local;
+    root /var/www/html;
+}
+`, '0644', 1001, 1001)
+  W('/var/spool/cron/labuser',
+`# m h  dom mon dow   command
+*/5 * * * * /home/labuser/projects/scripts/health-check.sh >> /var/log/healthcheck.log 2>&1
+0 2 * * * /home/labuser/projects/scripts/backup.sh
+`, '0600', 1001, 1001)
+
   // ---- /proc (basics, runtime-ish) ----
-  W('/proc/version', `Linux version 5.15.0-91-generic (build@fixitlab) (gcc 11.4.0) #101-Ubuntu SMP\n`, '0444')
-  W('/proc/cmdline', 'BOOT_IMAGE=/boot/vmlinuz-5.15.0-91-generic root=UUID=8f3b2c1a-0e4d-4c6b-9a7f-1d2e3f4a5b6c ro quiet\n', '0444')
+  W('/proc/version', `Linux version ${kernel} (build@fixitlab) (gcc ${isRhel ? '11.4.1' : '11.4.0'}) #1 SMP PREEMPT_DYNAMIC x86_64\n`, '0444')
+  W('/proc/cmdline', `BOOT_IMAGE=/boot/vmlinuz-${kernel} root=UUID=8f3b2c1a-0e4d-4c6b-9a7f-1d2e3f4a5b6c ro quiet\n`, '0444')
   W('/proc/uptime', '1216843.55 4827361.20\n', '0444')
   W('/proc/loadavg', '0.08 0.12 0.09 1/482 18342\n', '0444')
   W('/proc/cpuinfo', Array.from({ length: cpu }).map((_, i) =>
@@ -547,32 +728,45 @@ SwapFree:       2097148 kB
 
   // ---- boot ----
   W('/boot/grub2/grub.cfg', '# GRUB config (generated)\nset default="0"\nset timeout=5\nmenuentry "Red Hat Enterprise Linux" { linux /vmlinuz root=UUID=8f3b... }\n', '0600')
-  W('/boot/config-5.15.0-91-generic', 'CONFIG_LOCALVERSION=""\nCONFIG_SMP=y\nCONFIG_X86_64=y\n')
+  W(`/boot/config-${kernel}`, 'CONFIG_LOCALVERSION=""\nCONFIG_SMP=y\nCONFIG_X86_64=y\nCONFIG_BLK_DEV_SD=y\nCONFIG_VMXNET3=m\n')
 
   // ---- logs ----
   const today = new Date()
   const ds = `${HUMAN_MONTHS[today.getMonth()]} ${String(today.getDate()).padStart(2, ' ')}`
-  W('/var/log/messages',
-`${ds} 00:00:01 ${hostname} systemd[1]: Started Daily Cleanup of Temporary Directories.
-${ds} 02:00:11 ${hostname} CROND[1842]: (root) CMD (/usr/local/bin/backup.sh)
-${ds} 06:25:30 ${hostname} run-parts(/etc/cron.daily)[2010]: starting logrotate
-${ds} 09:14:22 ${hostname} kernel: [1216000.1] eth0: link up, 10000 Mbps, full duplex
-${ds} 11:02:48 ${hostname} systemd[1]: nginx.service: Failed with result 'exit-code'.
-${ds} 11:02:48 ${hostname} nginx[3122]: nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
-`)
-  W('/var/log/secure',
-`${ds} 08:01:12 ${hostname} sshd[1201]: Accepted password for root from ${gw} port 51022 ssh2
-${ds} 08:01:12 ${hostname} sshd[1201]: pam_unix(sshd:session): session opened for user root(uid=0)
-${ds} 08:44:55 ${hostname} sudo: devops : TTY=pts/1 ; PWD=/home/devops ; USER=root ; COMMAND=/bin/systemctl restart nginx
-${ds} 09:15:02 ${hostname} sshd[1450]: Failed password for invalid user admin from 203.0.113.7 port 40122 ssh2
-`)
-  W('/var/log/auth.log', `${ds} 08:01:12 ${hostname} sshd[1201]: Accepted publickey for devops from ${gw} port 50122 ssh2\n`)
-  W('/var/log/syslog', `${ds} 00:00:01 ${hostname} systemd[1]: Starting Daily apt download activities...\n`)
-  W('/var/log/dmesg', '[    0.000000] Linux version 5.15.0-91-generic\n[    1.234567] systemd[1]: Reached target Multi-User System.\n')
+  const systemLines = [
+    `${ds} 00:00:01 ${hostname} systemd[1]: Started Daily Cleanup of Temporary Directories.`,
+    `${ds} 00:05:01 ${hostname} systemd[1]: Started Run anacron jobs.`,
+    `${ds} 02:00:11 ${hostname} CROND[1842]: (root) CMD (/usr/local/bin/backup.sh)`,
+    `${ds} 06:25:30 ${hostname} run-parts(/etc/cron.daily)[2010]: starting logrotate`,
+    `${ds} 09:14:22 ${hostname} kernel: [1216000.1] eth0: link up, 10000 Mbps, full duplex`,
+    `${ds} 09:15:23 ${hostname} sshd[1823]: Server listening on 0.0.0.0 port 22.`,
+    `${ds} 10:00:01 ${hostname} kernel: [1234567.123] EXT4-fs (sdb1): mounted filesystem with ordered data mode`,
+    `${ds} 11:02:48 ${hostname} systemd[1]: nginx.service: Failed with result 'exit-code'.`,
+    `${ds} 11:02:48 ${hostname} nginx[3122]: nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)`,
+  ]
+  const authLines = [
+    `${ds} 08:01:12 ${hostname} sshd[1201]: Accepted password for root from ${gw} port 51022 ssh2`,
+    `${ds} 08:01:12 ${hostname} sshd[1201]: pam_unix(sshd:session): session opened for user root(uid=0)`,
+    `${ds} 08:44:55 ${hostname} sudo: labuser : TTY=pts/1 ; PWD=/home/labuser ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx`,
+    `${ds} 09:15:02 ${hostname} sshd[1450]: Failed password for invalid user admin from 203.0.113.7 port 40122 ssh2`,
+    `${ds} 09:15:04 ${hostname} sshd[1450]: Failed password for invalid user root from 203.0.113.7 port 40123 ssh2`,
+  ]
+  const accessLines = Array.from({ length: 80 }, (_, i) => {
+    const minute = String(10 + (i % 50)).padStart(2, '0')
+    const status = i % 17 === 0 ? 404 : i % 13 === 0 ? 500 : 200
+    const path = status === 404 ? '/wp-admin' : i % 5 === 0 ? '/api/health' : '/'
+    return `${gw} - - [${String(today.getDate()).padStart(2, '0')}/${HUMAN_MONTHS[today.getMonth()]}/${today.getFullYear()}:09:${minute}:01 +0000] "GET ${path} HTTP/1.1" ${status} ${status === 200 ? 612 : 162} "-" "curl/7.81.0"`
+  })
+  W('/var/log/messages', `${systemLines.join('\n')}\n`)
+  W('/var/log/secure', `${authLines.join('\n')}\n`)
+  W('/var/log/auth.log', `${authLines.join('\n')}\n`)
+  W('/var/log/syslog', `${systemLines.join('\n')}\n`)
+  W('/var/log/dmesg', `[    0.000000] Linux version ${kernel}\n[    1.234567] systemd[1]: Reached target Multi-User System.\n[    2.100000] sd 2:0:0:0: [sda] Attached SCSI disk\n`)
   W('/var/log/boot.log', '[  OK  ] Reached target Multi-User System.\n[  OK  ] Started OpenSSH server daemon.\n')
   W('/var/log/cron', `${ds} 02:00:01 ${hostname} CROND[1842]: (root) CMD (/usr/local/bin/backup.sh)\n`)
-  W('/var/log/nginx/access.log', `${gw} - - [${String(today.getDate()).padStart(2, '0')}/${HUMAN_MONTHS[today.getMonth()]}/${today.getFullYear()}:09:14:01 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.76.1"\n`)
+  W('/var/log/nginx/access.log', `${accessLines.join('\n')}\n`)
   W('/var/log/nginx/error.log', `${today.getFullYear()}/06/18 11:02:48 [emerg] 3122#3122: bind() to 0.0.0.0:80 failed (98: Address already in use)\n`)
+  W('/var/log/audit/audit.log', `type=AVC msg=audit(${Math.floor(Date.now() / 1000)}.456:4522): avc: denied { write } for pid=901 comm="mysqld" name="mysql" scontext=system_u:system_r:mysqld_t:s0 tcontext=system_u:object_r:var_t:s0 tclass=dir permissive=0\n`)
   W('/var/log/wtmp', '', '0664')
   W('/var/log/lastlog', '', '0644')
 }
@@ -583,7 +777,7 @@ ${ds} 09:15:02 ${hostname} sshd[1450]: Failed password for invalid user admin fr
 function seedServices() {
   return {
     sshd: { active: 'active', enabled: 'enabled', desc: 'OpenSSH server daemon', pid: 1201, since: '8h ago' },
-    nginx: { active: 'failed', enabled: 'enabled', desc: 'The nginx HTTP and reverse proxy server', pid: null, since: 'failed' },
+    nginx: { active: 'active', enabled: 'enabled', desc: 'The nginx HTTP and reverse proxy server', pid: 3300, since: '8h ago' },
     httpd: { active: 'inactive', enabled: 'disabled', desc: 'The Apache HTTP Server', pid: null, since: 'dead' },
     mysqld: { active: 'active', enabled: 'enabled', desc: 'MySQL Server', pid: 1502, since: '8h ago' },
     docker: { active: 'active', enabled: 'enabled', desc: 'Docker Application Container Engine', pid: 1610, since: '8h ago' },
@@ -606,10 +800,10 @@ function permString(node) {
   return t + bits
 }
 function userName(uid) {
-  return ({ 0: 'root', 27: 'mysql', 74: 'sshd', 990: 'nginx', 1000: 'devops' })[uid] || String(uid)
+  return ({ 0: 'root', 27: 'mysql', 74: 'sshd', 990: 'nginx', 1000: 'devops', 1001: 'labuser', 1002: 'jsmith', 1003: 'deploy' })[uid] || String(uid)
 }
 function groupName(gid) {
-  return ({ 0: 'root', 12: 'mail', 27: 'mysql', 74: 'sshd', 990: 'nginx', 1000: 'devops' })[gid] || String(gid)
+  return ({ 0: 'root', 12: 'mail', 27: 'mysql', 74: 'sshd', 990: 'nginx', 1000: 'devops', 1001: 'labuser', 1002: 'jsmith', 1003: 'deploy' })[gid] || String(gid)
 }
 
 /* ------------------------------------------------------------------ *
@@ -846,37 +1040,94 @@ function aptProgressChunks(pkgs, action = 'install') {
   return chunks
 }
 
-export function createLinuxShell(vm) {
+export function createLinuxShell(vm, opts = {}) {
   const family = guestOsFamily(vm)
   const isRhel = family === 'rhel'
-  const hostname = vm?.hostname || vm?.name || (isRhel ? 'rhel-app01' : 'ubuntu-app01')
+  const kernel = isRhel ? '5.14.0-362.8.1.el9_3.x86_64' : '5.15.0-91-generic'
+  const hostname = vm?.hostname || vm?.name || (isRhel ? 'rhel-server-01' : 'ubuntu-server-01')
   const ip = vm?.ip || '10.20.30.41'
   const gw = ip.split('.').slice(0, 3).join('.') + '.1'
   const diskGb = vm?.disk_gb || 40
   const memMb = vm?.memory_mb || 4096
   const cpu = vm?.cpu || 2
 
-  const cwd = { path: '/root' }
+  const shared = getOrCreateGuestShared(vm)
+  const { vfs, services, pkgs } = shared
+  const lvm = shared.lvm || (shared.lvm = createLvmState(diskGb))
+  let selinuxMode = shared.selinuxMode
+
+  const sessionUser = opts.user || 'root'
+  let home = sessionUser === 'root' ? '/root' : `/home/${sessionUser}`
+  const cwd = { path: home }
   const env = {
-    USER: 'root', LOGNAME: 'root', HOME: '/root', SHELL: '/bin/bash',
+    USER: sessionUser,
+    LOGNAME: sessionUser,
+    HOME: home,
+    SHELL: '/bin/bash',
     PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-    LANG: 'en_US.UTF-8', TERM: 'xterm-256color', PWD: '/root', HOSTNAME: hostname,
+    LANG: 'en_US.UTF-8',
+    TERM: 'xterm-256color',
+    PWD: home,
+    HOSTNAME: hostname,
+    EDITOR: 'vim',
+    VISUAL: 'vim',
+    HISTSIZE: '1000',
+    HISTFILESIZE: '2000',
+  }
+  const aliases = {
+    ll: 'ls -alF',
+    la: 'ls -A',
+    l: 'ls -CF',
+    grep: 'grep --color=auto',
+    fgrep: 'fgrep --color=auto',
+    egrep: 'egrep --color=auto',
   }
   const history = []
-  const vfs = createVFS((api) => seedFilesystem(vm, api))
-  const services = seedServices()
-  const pkgs = createPkgDb(isRhel)  // stateful rpm/dpkg DB (install/remove/query)
-  let selinuxMode = isRhel ? 'Enforcing' : 'Disabled'
   let nextPid = 19000
 
-  // Guest-repair side-effect state (preserved integration)
-  let diskRescanned = !vm?.guest_disk_hidden
-  let diskFormatted = !!vm?.guest_disk_formatted
-  let diskMounted = !!vm?.guest_disk_mounted
-  let moduleLoaded = !vm?.kernel_module_missing
+  const prompt = () => {
+    const shortHost = hostname.split('.')[0]
+    const shortPath = cwd.path === env.HOME ? '~' : cwd.path
+    const userPrefix = env.USER === 'root' ? 'root' : env.USER
+    return env.USER === 'root'
+      ? `[root@${shortHost} ${shortPath === '~' ? '~' : basename(shortPath)}]# `
+      : `${userPrefix}@${shortHost}:${cwd.path}$ `
+  }
+  const abs = (p) => {
+    if (!p) return cwd.path
+    let expanded = p
+    if (expanded.startsWith('~')) expanded = expanded.replace(/^~(?=\/|$)/, env.HOME)
+    return normalizePath(cwd.path, expanded)
+  }
 
-  const prompt = () => `[root@${hostname.split('.')[0]} ${cwd.path === '/root' ? '~' : basename(cwd.path)}]# `
-  const abs = (p) => normalizePath(cwd.path, p)
+  const switchUser = (user) => {
+    const uhome = user === 'root' ? '/root' : `/home/${user}`
+    env.USER = user
+    env.LOGNAME = user
+    env.HOME = uhome
+    home = uhome
+    cwd.path = uhome
+    env.PWD = uhome
+  }
+
+  const getStatus = () => {
+    const usedGb = Math.max(1, Math.round(diskGb * 0.21))
+    const memUsedGb = (memMb * 0.2 / 1024).toFixed(1)
+    const memTotalGb = (memMb / 1024).toFixed(1)
+    const uptimeMs = Date.now() - shared.bootEpoch
+    return {
+      hostname: hostname.split('.')[0],
+      user: env.USER,
+      cwd: cwd.path,
+      load: '0.23 0.18 0.12',
+      mem: `${memUsedGb}G/${memTotalGb}G`,
+      disk: `${usedGb}G/${diskGb}G`,
+      uptime: formatUptime(uptimeMs),
+      clock: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      os: isRhel ? 'RHEL 9.3' : 'Ubuntu 22.04',
+      sessionId: opts.sessionId || 'default',
+    }
+  }
 
   /* ----- editor save hook (used by VmwareConsole overlay) ----- */
   const saveFile = (path, content) => {
@@ -887,6 +1138,92 @@ export function createLinuxShell(vm) {
   const readFile = (path) => {
     const node = vfs.resolveNode(abs(path))
     return node && node.type === 'file' ? node.content : null
+  }
+
+  const applyPipeStage = (stage, inputLines) => {
+    const stageParts = stage.trim().split(/\s+/).filter(Boolean)
+    const pcmd = (stageParts[0] || '').toLowerCase()
+    const pargs = stageParts.slice(1)
+    const ppos = pargs.filter(a => !a.startsWith('-'))
+    const joined = inputLines.join('\n')
+    if (!pcmd) return inputLines
+    if (pcmd === 'grep' || pcmd === 'egrep' || pcmd === 'fgrep') {
+      const ignore = pargs.includes('-i')
+      const invert = pargs.includes('-v')
+      const count = pargs.includes('-c')
+      const numbered = pargs.includes('-n')
+      const pat = ppos[0]?.replace(/^["']|["']$/g, '') || ''
+      let re
+      try { re = new RegExp(pat, ignore ? 'i' : '') } catch { re = new RegExp(pat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), ignore ? 'i' : '') }
+      const filtered = inputLines.filter(l => re.test(l) !== invert)
+      if (count) return [String(filtered.length)]
+      return numbered ? filtered.map((l, i) => `${i + 1}:${l}`) : filtered
+    }
+    if (pcmd === 'awk' || pcmd === 'gawk') {
+      const script = pargs.join(' ')
+      const fieldSep = (script.match(/-F\s*['"]?([^'"\s]+)['"]?/) || [])[1] || /\s+/
+      const printMatch = script.match(/print\s+\\?\$?([0-9]+)/)
+      const wantLineNo = /NR/.test(script)
+      const idx = printMatch ? Math.max(0, parseInt(printMatch[1], 10) - 1) : null
+      return inputLines.map((l, i) => {
+        const cols = typeof fieldSep === 'string' ? l.split(fieldSep) : l.trim().split(fieldSep)
+        if (wantLineNo && idx !== null) return `${i + 1}: ${cols[idx] || ''}`
+        if (idx !== null) return cols[idx] || ''
+        return l
+      }).filter(Boolean)
+    }
+    if (pcmd === 'cut') {
+      const dIdx = pargs.indexOf('-d')
+      const fIdx = pargs.indexOf('-f')
+      const cIdx = pargs.indexOf('-c')
+      const delim = dIdx >= 0 ? pargs[dIdx + 1]?.replace(/^["']|["']$/g, '') : '\t'
+      if (fIdx >= 0) {
+        const field = Math.max(1, parseInt(pargs[fIdx + 1], 10) || 1) - 1
+        return inputLines.map(l => (l.split(delim)[field] || ''))
+      }
+      if (cIdx >= 0) {
+        const n = Math.max(1, parseInt(pargs[cIdx + 1], 10) || 1)
+        return inputLines.map(l => l.slice(n - 1, n))
+      }
+      return inputLines
+    }
+    if (pcmd === 'head' || pcmd === 'tail') {
+      const nIdx = pargs.indexOf('-n')
+      const inline = pargs.find(a => /^-\d+$/.test(a))
+      const count = nIdx >= 0 ? parseInt(pargs[nIdx + 1], 10) : inline ? parseInt(inline.slice(1), 10) : 10
+      return pcmd === 'head' ? inputLines.slice(0, count) : inputLines.slice(-count)
+    }
+    if (pcmd === 'wc') {
+      if (pargs.includes('-l')) return [String(inputLines.filter(Boolean).length)]
+      if (pargs.includes('-w')) return [String(joined.trim() ? joined.trim().split(/\s+/).length : 0)]
+      if (pargs.includes('-c')) return [String(joined.length)]
+      return [`${String(inputLines.length).padStart(7)} ${String(joined.trim() ? joined.trim().split(/\s+/).length : 0).padStart(7)} ${String(joined.length).padStart(7)}`]
+    }
+    if (pcmd === 'sort') return [...inputLines].sort()
+    if (pcmd === 'uniq') return inputLines.filter((l, i) => l !== inputLines[i - 1])
+    if (pcmd === 'tr') {
+      if (pargs.includes('[:lower:]') && pargs.includes('[:upper:]')) return [joined.toUpperCase()]
+      if (pargs[0] === '-d') return [joined.replace(new RegExp(`[${(pargs[1] || '').replace(/^["']|["']$/g, '')}]`, 'g'), '')]
+      return inputLines
+    }
+    if (pcmd === 'sed') {
+      const script = pargs.find(a => /^['"]?s[/:|]/.test(a) || /^['"]?\/.*\/d['"]?$/.test(a))?.replace(/^["']|["']$/g, '') || ''
+      if (/^s(.).*\1.*\1/.test(script)) {
+        const sep = script[1]
+        const [, oldVal = '', newVal = '', flags = ''] = script.split(sep)
+        const re = new RegExp(oldVal, flags.includes('g') ? 'g' : '')
+        return inputLines.map(l => l.replace(re, newVal))
+      }
+      if (script === '/^#/d') return inputLines.filter(l => !l.trim().startsWith('#'))
+      return inputLines
+    }
+    if (pcmd === 'tee') {
+      const target = ppos[0]
+      if (target) vfs.writeFile(abs(target), joined + (joined ? '\n' : ''))
+      return inputLines
+    }
+    if (pcmd === 'xargs') return inputLines
+    return inputLines
   }
 
   /* ----- argument parsing ----- */
@@ -901,10 +1238,35 @@ export function createLinuxShell(vm) {
     return { flags, positional, has: (f) => flags.has(f) }
   }
 
-  const run = (raw) => {
+  // Value-aware parser for CLIs like kubectl/aws that use `-n ns`, `-o wide`,
+  // `--region r`, `--key=value`. Returns cleaned positionals (flag values
+  // removed) plus value/boolean lookups.
+  const CLI_VALUE_FLAGS = new Set(['-n', '--namespace', '-o', '--output', '--region', '--name', '-f', '--filename', '--context', '--image', '--cluster'])
+  const cliParse = (argv) => {
+    const pos = []
+    const fval = {}
+    for (let i = 0; i < argv.length; i++) {
+      const a = argv[i]
+      if (a.startsWith('-')) {
+        const eq = a.indexOf('=')
+        if (eq !== -1) { fval[a.slice(0, eq)] = a.slice(eq + 1); continue }
+        if (CLI_VALUE_FLAGS.has(a) && argv[i + 1] !== undefined) { fval[a] = argv[i + 1]; i++; continue }
+        fval[a] = true
+        continue
+      }
+      pos.push(a)
+    }
+    return {
+      pos,
+      fv: (...names) => { for (const n of names) if (fval[n] !== undefined) return fval[n]; return undefined },
+      fhas: (n) => fval[n] !== undefined,
+    }
+  }
+
+  const run = (raw, opts = {}) => {
     const line = raw.trim()
     if (!line) return { lines: [''], prompt: prompt() }
-    history.push(line)
+    if (!opts.noHistory) history.push(line)
 
     // Handle redirection: cmd > file  /  cmd >> file
     let redirect = null
@@ -915,10 +1277,57 @@ export function createLinuxShell(vm) {
       work = line.slice(0, redirMatch.index).trim()
     }
 
+    const hasPipeline = /(^|[^|])\|([^|]|$)/.test(work)
+    if ((/(^|\s)(&&|\|\|)(\s|$)/.test(work) || work.includes(';')) && !hasPipeline) {
+      const tokens = work.split(/(\s+&&\s+|\s+\|\|\s+|\s*;\s*)/).filter(Boolean)
+      let op = ';'
+      let collected = []
+      let lastHadError = false
+      for (const token of tokens) {
+        const trimmed = token.trim()
+        if (trimmed === '&&' || trimmed === '||' || trimmed === ';') { op = trimmed; continue }
+        const shouldRun = op === ';' || (op === '&&' && !lastHadError) || (op === '||' && lastHadError)
+        if (!shouldRun) continue
+        const res = run(trimmed, { noHistory: true })
+        if (res.editor || res.confirm || res.stream || res.reboot || res.poweroff || res.exit || res.clear) return res
+        collected = collected.concat(res.lines || [])
+        lastHadError = (res.lines || []).some(l => /No such file|not found|failed|error/i.test(l))
+      }
+      if (redirect) {
+        const target = abs(redirect.path)
+        const node = vfs.resolveNode(target)
+        const existing = node && node.type === 'file' ? node.content : ''
+        const payload = collected.join('\n')
+        vfs.writeFile(target, redirect.append ? existing + payload + '\n' : payload + (payload ? '\n' : ''))
+        collected = ['']
+      }
+      return { lines: collected.length ? collected : [''], prompt: prompt() }
+    }
+
+    if (hasPipeline) {
+      const stages = work.split('|').map(s => s.trim()).filter(Boolean)
+      const first = run(stages[0], { noHistory: true })
+      if (first.editor || first.confirm || first.stream || first.reboot || first.poweroff || first.exit || first.clear) return first
+      let pipeOut = first.lines || ['']
+      stages.slice(1).forEach(stage => { pipeOut = applyPipeStage(stage, pipeOut) })
+      if (redirect) {
+        const target = abs(redirect.path)
+        const node = vfs.resolveNode(target)
+        const existing = node && node.type === 'file' ? node.content : ''
+        const payload = pipeOut.join('\n')
+        vfs.writeFile(target, redirect.append ? existing + payload + '\n' : payload + (payload ? '\n' : ''))
+        pipeOut = ['']
+      }
+      return { lines: pipeOut.length ? pipeOut : [''], prompt: prompt(), sideEffect: first.sideEffect }
+    }
+
     const parts = work.split(/\s+/)
     const cmd = parts[0]
     const lc = cmd.toLowerCase()
-    const args = parts.slice(1)
+    let args = parts.slice(1)
+    if (!['awk', 'gawk', 'sed'].includes(lc)) {
+      args = args.map(a => a.replace(/\$\{?(\w+)\}?/g, (m, k) => (env[k] !== undefined ? env[k] : m)))
+    }
     const { flags, positional, has } = parseArgs(args)
     const out = []
     let sideEffect = null
@@ -928,9 +1337,11 @@ export function createLinuxShell(vm) {
     const emit = (s) => { if (Array.isArray(s)) out.push(...s); else String(s).split('\n').forEach(l => out.push(l)) }
 
     /* =================== file system =================== */
-    if (lc === 'pwd') emit(cwd.path)
+    if (!isRhel && ['dnf', 'yum', 'rpm', 'firewall-cmd'].includes(lc)) emit(`bash: ${cmd}: command not found`)
+    else if (isRhel && ['apt', 'apt-get', 'apt-cache', 'dpkg', 'dpkg-query', 'ufw'].includes(lc)) emit(`bash: ${cmd}: command not found`)
+    else if (lc === 'pwd') emit(cwd.path)
     else if (lc === 'cd') {
-      const dest = abs(positional[0] || '/root')
+      const dest = abs(positional[0] || env.HOME)
       const node = vfs.resolveNode(dest)
       if (!node) emit(`bash: cd: ${positional[0]}: No such file or directory`)
       else if (node.type !== 'dir') emit(`bash: cd: ${positional[0]}: Not a directory`)
@@ -993,8 +1404,8 @@ export function createLinuxShell(vm) {
     else if (lc === 'echo') {
       // guest disk rescan side-effect: echo "- - -" > /sys/class/scsi_host/.../scan
       if (line.includes('scsi_host') && line.includes('scan')) {
-        if (vm?.guest_disk_hidden && !diskRescanned) {
-          diskRescanned = true
+        if (vm?.guest_disk_hidden && !shared.diskRescanned) {
+          shared.diskRescanned = true
           sideEffect = { action: 'guest_rescan_scsi', vm_id: vm?.id }
         }
         out.push('')
@@ -1242,18 +1653,19 @@ export function createLinuxShell(vm) {
     }
     else if (lc === 'df') {
       const h = has('-h') || has('-H')
-      const used = Math.round(diskGb * 0.31)
-      const avail = diskGb - used
+      const rootSize = Math.max(1, Math.round(lvm.rootFsGb || diskGb))
+      const used = Math.max(1, Math.round(rootSize * 0.31))
+      const avail = Math.max(0, rootSize - used)
       if (h) emit([
         'Filesystem      Size  Used Avail Use% Mounted on',
-        `/dev/sda1        ${diskGb}G  ${used}G   ${avail}G  31% /`,
+        `/dev/mapper/rootvg-root  ${rootSize}G  ${used}G   ${avail}G  31% /`,
         'tmpfs           ' + Math.round(memMb / 2) + 'M     0  ' + Math.round(memMb / 2) + 'M   0% /dev/shm',
-        ...(diskMounted ? ['/dev/sdb1         20G  1.2G   19G   6% /data'] : []),
+        ...(shared.diskMounted ? ['/dev/sdb1         20G  1.2G   19G   6% /data'] : []),
       ])
       else emit([
         'Filesystem     1K-blocks    Used Available Use% Mounted on',
-        `/dev/sda1      ${diskGb * 1024 * 1024} ${used * 1024 * 1024} ${avail * 1024 * 1024}  31% /`,
-        ...(diskMounted ? [`/dev/sdb1       20971520 1258291  19713229   6% /data`] : []),
+        `/dev/mapper/rootvg-root ${rootSize * 1024 * 1024} ${used * 1024 * 1024} ${avail * 1024 * 1024}  31% /`,
+        ...(shared.diskMounted ? [`/dev/sdb1       20971520 1258291  19713229   6% /data`] : []),
       ])
     }
 
@@ -1272,12 +1684,18 @@ export function createLinuxShell(vm) {
     }
 
     /* =================== system info =================== */
-    else if (lc === 'whoami') emit('root')
+    else if (lc === 'whoami') emit(env.USER)
     else if (lc === 'id') {
-      if (positional[0] && positional[0] !== 'root') emit(`uid=1000(${positional[0]}) gid=1000(${positional[0]}) groups=1000(${positional[0]})`)
-      else emit('uid=0(root) gid=0(root) groups=0(root)')
+      const target = positional[0] || env.USER
+      if (target !== 'root') {
+        const uid = target === 'labuser' ? 1001 : 1000
+        emit(`uid=${uid}(${target}) gid=${uid}(${target}) groups=${uid}(${target}),${isRhel ? '10(wheel)' : '27(sudo)'}`)
+      } else emit('uid=0(root) gid=0(root) groups=0(root)')
     }
-    else if (lc === 'groups') emit(positional[0] ? `${positional[0] === 'root' ? 'root' : positional[0] + ' : ' + positional[0]}` : 'root')
+    else if (lc === 'groups') {
+      const target = positional[0] || env.USER
+      emit(target === 'root' ? 'root' : `${target} : ${target} ${isRhel ? 'wheel' : 'sudo'} adm`)
+    }
     else if (lc === 'hostname') {
       if (positional[0]) { emit('') } else emit(has('-f') || has('--fqdn') ? `${hostname}.lab.fixitlab.local` : hostname.split('.')[0])
     }
@@ -1287,12 +1705,12 @@ export function createLinuxShell(vm) {
       `           Chassis: vm`,
       `        Machine ID: a1b2c3d4e5f60718293a4b5c6d7e8f90`,
       `  Operating System: ${isRhel ? 'Red Hat Enterprise Linux 9.3 (Plow)' : 'Ubuntu 22.04.4 LTS'}`,
-      `            Kernel: Linux 5.15.0-91-generic`,
+      `            Kernel: Linux ${kernel}`,
       `      Architecture: x86-64`,
     ])
     else if (lc === 'uname') {
-      if (has('-a')) emit(`Linux ${hostname.split('.')[0]} 5.15.0-91-generic #101-Ubuntu SMP Tue Nov 14 18:10:51 UTC 2023 x86_64 x86_64 x86_64 GNU/Linux`)
-      else if (has('-r')) emit('5.15.0-91-generic')
+      if (has('-a')) emit(`Linux ${hostname.split('.')[0]} ${kernel} #101 SMP PREEMPT_DYNAMIC Tue Nov 14 18:10:51 UTC 2023 x86_64 x86_64 x86_64 GNU/Linux`)
+      else if (has('-r')) emit(kernel)
       else if (has('-n')) emit(hostname.split('.')[0])
       else if (has('-m')) emit('x86_64')
       else emit('Linux')
@@ -1318,14 +1736,15 @@ export function createLinuxShell(vm) {
 
     /* =================== process & memory =================== */
     else if (lc === 'ps') {
-      const wide = has('-e') || has('-ef') || has('-aux') || has('aux') || has('-A')
-      if (wide && (has('-ef') || has('ef'))) {
+      const wide = has('-e') || has('-f') || has('-a') || has('-u') || has('-x') || has('-A') || positional.includes('aux') || positional.includes('ax')
+      if (wide && (has('-f') || positional.includes('ef'))) {
         emit([
           'UID          PID    PPID  C STIME TTY          TIME CMD',
           'root           1       0  0 Jun04 ?        00:00:14 /usr/lib/systemd/systemd --system',
           'root         890       1  0 Jun04 ?        00:00:01 /usr/sbin/sshd -D',
           'root        1201     890  0 08:01 ?        00:00:00 sshd: root@pts/0',
           'mysql       1502       1  0 Jun04 ?        00:01:42 /usr/sbin/mysqld',
+          ...(services.nginx.active === 'active' ? ['nginx       3300       1  0 Jun04 ?        00:00:02 nginx: master process /usr/sbin/nginx'] : []),
           'root        1610       1  0 Jun04 ?        00:02:11 /usr/bin/dockerd',
           'devops      1820       1  0 Jun04 ?        00:00:53 node /opt/app/server.js',
           'root       18342    1201  0 14:22 pts/0    00:00:00 ps -ef',
@@ -1336,6 +1755,7 @@ export function createLinuxShell(vm) {
           'root           1  0.0  0.1 169324 12876 ?        Ss   Jun04   0:14 /usr/lib/systemd/systemd',
           'root         890  0.0  0.1  15852  9012 ?        Ss   Jun04   0:01 sshd: /usr/sbin/sshd -D',
           'mysql       1502  0.3  4.2 1820544 ' + Math.round(memMb * 42) + ' ?      Sl   Jun04   1:42 /usr/sbin/mysqld',
+          ...(services.nginx.active === 'active' ? ['nginx       3300  0.1  0.2  55240  8800 ?        Ss   Jun04   0:02 nginx: master process /usr/sbin/nginx'] : []),
           'devops      1820  0.1  1.8 998244 ' + Math.round(memMb * 18) + ' ?       Ssl  Jun04   0:53 node /opt/app/server.js',
         ])
       } else {
@@ -1538,11 +1958,11 @@ export function createLinuxShell(vm) {
     }
     else if (lc === 'dmesg') {
       emit([
-        '[    0.000000] Linux version 5.15.0-91-generic (build@fixitlab) #101 SMP',
-        '[    0.000000] Command line: BOOT_IMAGE=/boot/vmlinuz root=UUID=8f3b... ro quiet',
+        `[    0.000000] Linux version ${kernel} (build@fixitlab) #101 SMP`,
+        `[    0.000000] Command line: BOOT_IMAGE=/boot/vmlinuz-${kernel} root=UUID=8f3b... ro quiet`,
         '[    1.234567] systemd[1]: Reached target Multi-User System.',
         '[    2.100000] sd 2:0:0:0: [sda] Attached SCSI disk',
-        ...(diskRescanned && vm?.guest_disk_hidden ? ['[ 1284.55] sd 2:0:1:0: [sdb] Attached SCSI disk'] : []),
+        ...(shared.diskRescanned && vm?.guest_disk_hidden ? ['[ 1284.55] sd 2:0:1:0: [sdb] Attached SCSI disk'] : []),
         '[    8.442000] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready',
       ])
     }
@@ -1735,7 +2155,16 @@ export function createLinuxShell(vm) {
       if (positional[0] && positional[0] !== 'root') emit(`Changing password for user ${positional[0]}.\npasswd: all authentication tokens updated successfully.`)
       else emit('Changing password for user root.\npasswd: all authentication tokens updated successfully.')
     }
-    else if (lc === 'su') emit('')
+    else if (lc === 'su') {
+      const target = positional[0] || 'root'
+      const uhome = target === 'root' ? '/root' : `/home/${target}`
+      const node = vfs.resolveNode(uhome)
+      if (!node && target !== 'root') emit(`su: user ${target} does not exist`)
+      else {
+        switchUser(target)
+        emit('')
+      }
+    }
     else if (lc === 'sudo') {
       // strip leading sudo options (-i, -u user, -s, -E) then run the rest verbatim (flags preserved)
       let rest = args.slice()
@@ -1745,9 +2174,9 @@ export function createLinuxShell(vm) {
       else { const r = run(cmdline); return { ...r, prompt: prompt() } }
     }
     else if (lc === 'last' || lc === 'lastlog' || lc === 'who' || lc === 'w') {
-      if (lc === 'w') emit(['14:22:01 up 14 days,  3:22,  1 user,  load average: 0.08, 0.12, 0.09', 'USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT', `root     pts/0    ${gw}      08:01    0.00s  0.04s  0.00s w`])
-      else if (lc === 'who') emit(`root     pts/0        ${new Date().toISOString().slice(0, 16).replace('T', ' ')} (${gw})`)
-      else emit([`root     pts/0        ${gw}    ${nowStamp()}   still logged in`, '', `wtmp begins ${nowStamp()}`])
+      if (lc === 'w') emit(['14:22:01 up 14 days,  3:22,  1 user,  load average: 0.08, 0.12, 0.09', 'USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT', `${env.USER.padEnd(8)} pts/0    ${gw}      08:01    0.00s  0.04s  0.00s w`])
+      else if (lc === 'who') emit(`${env.USER.padEnd(8)} pts/0        ${new Date().toISOString().slice(0, 16).replace('T', ' ')} (${gw})`)
+      else emit([`${env.USER.padEnd(8)} pts/0        ${gw}    ${nowStamp()}   still logged in`, '', `wtmp begins ${nowStamp()}`])
     }
 
     /* =================== storage =================== */
@@ -1756,10 +2185,13 @@ export function createLinuxShell(vm) {
         'NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS',
         `sda      8:0    0   ${diskGb}G  0 disk`,
         `├─sda1   8:1    0    1G  0 part /boot`,
-        `└─sda2   8:2    0  ${diskGb - 1}G  0 part /`,
-        ...((diskRescanned || !vm?.guest_disk_hidden) && vm?.guest_disk_hidden ? [
+        `└─sda2   8:2    0  ${diskGb - 1}G  0 part`,
+        `  ├─rootvg-root 253:0 0 ${Math.round(lvm.rootLvGb)}G  0 lvm  /`,
+        `  └─rootvg-swap 253:1 0  ${lvm.swapGb}G  0 lvm  [SWAP]`,
+        ...(visibleGuestDisk(vm, shared) ? [
           `sdb      8:16   0   20G  0 disk`,
-          ...(diskMounted ? ['└─sdb1   8:17   0   20G  0 part /data'] : []),
+          ...(lvm.extraPvInVg ? [`└─rootvg-root 253:0 0 ${Math.round(lvm.rootLvGb)}G  0 lvm  /`] : []),
+          ...(!lvm.extraPvInVg && shared.diskFormatted ? [`└─sdb1   8:17   0   20G  0 part${shared.diskMounted ? ' /data' : ''}`] : []),
         ] : []),
         'sr0     11:0    1 1024M  0 rom',
       ])
@@ -1768,7 +2200,8 @@ export function createLinuxShell(vm) {
       emit([
         '/dev/sda1: UUID="1a2b3c4d-5e6f-7081-92a3-b4c5d6e7f809" TYPE="xfs" PARTUUID="000a1b2c-01"',
         '/dev/sda2: UUID="8f3b2c1a-0e4d-4c6b-9a7f-1d2e3f4a5b6c" TYPE="xfs" PARTUUID="000a1b2c-02"',
-        ...(diskFormatted ? ['/dev/sdb1: UUID="deadc0de-1234-5678-9abc-def012345678" TYPE="ext4"'] : []),
+        ...(lvm.extraPvDevice ? [`${lvm.extraPvDevice}: UUID="lvm-pv-deadc0de" TYPE="LVM2_member"`] : []),
+        ...(!lvm.extraPvDevice && shared.diskFormatted ? ['/dev/sdb1: UUID="deadc0de-1234-5678-9abc-def012345678" TYPE="ext4"'] : []),
       ])
     }
     else if (lc === 'fdisk' || lc === 'parted' || lc === 'sfdisk' || lc === 'gdisk') {
@@ -1779,17 +2212,17 @@ export function createLinuxShell(vm) {
           'Device     Boot   Start      End  Sectors Size Type',
           '/dev/sda1  *       2048  2099199  2097152   1G Linux filesystem',
           `/dev/sda2       2099200 ${diskGb * 2 * 1024 * 1024} ... ${diskGb - 1}G Linux filesystem`,
-          ...(diskRescanned && vm?.guest_disk_hidden ? ['', `Disk /dev/sdb: 20 GiB, 21474836480 bytes`, diskFormatted ? '/dev/sdb1       2048  41943039  41940992  20G Linux filesystem' : 'Disk /dev/sdb doesn\'t contain a valid partition table'] : []),
+          ...(visibleGuestDisk(vm, shared) ? ['', `Disk /dev/sdb: 20 GiB, 21474836480 bytes`, shared.diskFormatted ? '/dev/sdb1       2048  41943039  41940992  20G Linux filesystem' : 'Disk /dev/sdb doesn\'t contain a valid partition table'] : []),
         ])
       } else emit(`Welcome to fdisk (util-linux 2.37.4).\nCommand (m for help): (simulated — use 'fdisk -l' to list, or mkfs to format /dev/sdb)`)
     }
     else if (lc === 'mkfs' || lc.startsWith('mkfs.') || lc === 'mke2fs' || lc === 'mkswap') {
       const dev = positional.find(a => a.includes('/dev/')) || positional[0] || ''
-      if (dev.includes('sdb') && diskRescanned && !diskFormatted) {
-        diskFormatted = true
+      if (dev.includes('sdb') && shared.diskRescanned && !shared.diskFormatted) {
+        shared.diskFormatted = true
         emit([`mke2fs 1.46.5 (30-Dec-2021)`, `Creating filesystem with 5242880 4k blocks and 1310720 inodes`, `Filesystem UUID: deadc0de-1234-5678-9abc-def012345678`, `Writing superblocks and filesystem accounting information: done`])
         sideEffect = { action: 'guest_format_disk', vm_id: vm?.id }
-      } else if (dev.includes('sdb') && diskFormatted) {
+      } else if (dev.includes('sdb') && shared.diskFormatted) {
         emit(`mke2fs 1.46.5 (30-Dec-2021)\n/dev/sdb contains a ext4 file system\nProceed anyway? (y,N) (simulated — already formatted)`)
       } else if (!dev.includes('sdb') && dev.includes('sd')) emit(`mkfs.ext4: will not make a filesystem on '${dev}' — it is mounted`)
       else emit('Usage: mkfs.ext4 /dev/sdb')
@@ -1799,22 +2232,83 @@ export function createLinuxShell(vm) {
       const mnt = positional[1] || '/data'
       if (!positional.length) {
         emit(['/dev/sda2 on / type xfs (rw,relatime,seclabel)', '/dev/sda1 on /boot type xfs (rw,relatime)', 'proc on /proc type proc (rw,nosuid,nodev,noexec)', 'tmpfs on /dev/shm type tmpfs (rw,nosuid,nodev)',
-          ...(diskMounted ? ['/dev/sdb1 on /data type ext4 (rw,relatime)'] : [])])
-      } else if (dev.includes('sdb') && diskFormatted && !diskMounted) {
-        diskMounted = true
+          ...(shared.diskMounted ? ['/dev/sdb1 on /data type ext4 (rw,relatime)'] : [])])
+      } else if (dev.includes('sdb') && shared.diskFormatted && !shared.diskMounted) {
+        shared.diskMounted = true
         vfs.ensureDir(mnt.startsWith('/') ? mnt : '/data')
         emit('')
         sideEffect = { action: 'guest_mount_disk', vm_id: vm?.id }
-      } else if (dev.includes('sdb') && !diskFormatted) emit(`mount: ${mnt}: wrong fs type, bad option, bad superblock on ${dev}. (run mkfs.ext4 ${dev} first)`)
-      else if (dev.includes('sdb') && diskMounted) emit(`mount: ${dev} already mounted on /data.`)
+      } else if (dev.includes('sdb') && !shared.diskFormatted) emit(`mount: ${mnt}: wrong fs type, bad option, bad superblock on ${dev}. (run mkfs.ext4 ${dev} first)`)
+      else if (dev.includes('sdb') && shared.diskMounted) emit(`mount: ${dev} already mounted on /data.`)
       else emit('')
     }
     else if (lc === 'umount') emit('')
     else if (lc === 'swapon' || lc === 'swapoff') emit(lc === 'swapon' ? 'NAME      TYPE      SIZE USED PRIO\n/dev/sda3 partition   2G   0B   -2' : '')
-    else if (lc === 'pvs' || lc === 'pvdisplay') emit(['  PV         VG     Fmt  Attr PSize   PFree', `  /dev/sda2  rootvg lvm2 a--  <${diskGb - 1}.00g  0`])
-    else if (lc === 'vgs' || lc === 'vgdisplay') emit(['  VG     #PV #LV #SN Attr   VSize   VFree', `  rootvg   1   2   0 wz--n- <${diskGb - 1}.00g    0`])
-    else if (lc === 'lvs' || lc === 'lvdisplay') emit(['  LV     VG     Attr       LSize   Pool Origin', `  root   rootvg -wi-ao---- <${diskGb - 5}.00g`, '  swap   rootvg -wi-ao----   2.00g'])
-    else if (lc === 'pvcreate' || lc === 'vgcreate' || lc === 'lvcreate' || lc === 'lvextend' || lc === 'vgextend' || lc === 'resize2fs' || lc === 'xfs_growfs') emit(`${lc}: simulated — operation completed`)
+    else if (lc === 'pvs' || lc === 'pvdisplay') {
+      emit([
+        '  PV         VG     Fmt  Attr PSize   PFree',
+        `  /dev/sda2  rootvg lvm2 a--  ${fmtGb(lvm.rootPvGb, { lt: true })}  0`,
+        ...(lvm.extraPvDevice ? [`  ${lvm.extraPvDevice.padEnd(10)} ${lvm.extraPvInVg ? 'rootvg' : ''} lvm2 a--  ${fmtGb(lvm.extraPvGb)}  ${lvm.extraPvInVg ? fmtGb(lvm.vgFreeGb) : fmtGb(lvm.extraPvGb)}`] : []),
+      ])
+    }
+    else if (lc === 'vgs' || lc === 'vgdisplay') {
+      emit(['  VG     #PV #LV #SN Attr   VSize   VFree', `  rootvg   ${lvm.extraPvInVg ? 2 : 1}   2   0 wz--n- ${fmtGb(lvm.rootPvGb + (lvm.extraPvInVg ? lvm.extraPvGb : 0), { lt: true })} ${fmtGb(lvm.vgFreeGb)}`])
+    }
+    else if (lc === 'lvs' || lc === 'lvdisplay') emit(['  LV     VG     Attr       LSize   Pool Origin', `  root   rootvg -wi-ao---- ${fmtGb(lvm.rootLvGb, { lt: true })}`, `  swap   rootvg -wi-ao----   ${fmtGb(lvm.swapGb)}`])
+    else if (lc === 'pvcreate') {
+      const dev = normalizeDevName(positional.find(a => a.includes('/dev/')) || positional[0] || '')
+      if (!dev) emit('pvcreate: Please enter a physical volume path')
+      else if (!visibleGuestDisk(vm, shared) || !dev.includes('sdb')) emit(`  Device ${dev} not found.`)
+      else if (lvm.extraPvDevice) emit(`  Physical volume "${lvm.extraPvDevice}" is already initialized.`)
+      else {
+        lvm.extraPvDevice = dev
+        shared.diskFormatted = false
+        shared.diskMounted = false
+        emit(`  Physical volume "${dev}" successfully created.`)
+      }
+    }
+    else if (lc === 'vgextend') {
+      const vg = positional[0] || 'rootvg'
+      const dev = normalizeDevName(positional.find(a => a.includes('/dev/')) || positional[1] || '')
+      if (!vg || !dev) emit('vgextend: missing argument')
+      else if (vg !== 'rootvg') emit(`  Volume group "${vg}" not found`)
+      else if (!lvm.extraPvDevice || dev !== lvm.extraPvDevice) emit(`  Physical volume "${dev}" not found`)
+      else if (lvm.extraPvInVg) emit(`  Physical volume "${dev}" is already in volume group "rootvg"`)
+      else {
+        lvm.extraPvInVg = true
+        lvm.vgFreeGb += lvm.extraPvGb
+        emit(`  Volume group "rootvg" successfully extended`)
+      }
+    }
+    else if (lc === 'lvextend') {
+      const lv = normalizeDevName(positional.find(a => a.includes('/dev/')) || positional[positional.length - 1] || '')
+      const growFs = args.includes('-r') || args.includes('--resizefs')
+      const requested = parseSizeGb(args, lvm.vgFreeGb)
+      const growBy = Math.min(lvm.vgFreeGb, requested || lvm.vgFreeGb)
+      if (!lv || !lv.includes('root')) emit('  Logical volume rootvg/root not found')
+      else if (growBy <= 0) emit('  Insufficient free space: 0 extents available')
+      else {
+        lvm.rootLvGb += growBy
+        lvm.vgFreeGb = Math.max(0, lvm.vgFreeGb - growBy)
+        if (growFs) lvm.rootFsGb = lvm.rootLvGb
+        emit([
+          `  Size of logical volume rootvg/root changed from ${fmtGb(lvm.rootLvGb - growBy, { lt: true })} to ${fmtGb(lvm.rootLvGb, { lt: true })}.`,
+          '  Logical volume rootvg/root successfully resized.',
+          ...(growFs ? [`meta-data=/dev/mapper/rootvg-root isize=512 agcount=4, agsize=... blks`, `data blocks changed to ${Math.round(lvm.rootFsGb * 262144)}`] : []),
+        ])
+      }
+    }
+    else if (lc === 'resize2fs' || lc === 'xfs_growfs') {
+      if (lvm.rootFsGb >= lvm.rootLvGb) emit(lc === 'xfs_growfs' ? 'data size unchanged, skipping' : 'The filesystem is already the requested size.')
+      else {
+        const before = lvm.rootFsGb
+        lvm.rootFsGb = lvm.rootLvGb
+        emit(lc === 'xfs_growfs'
+          ? [`meta-data=/dev/mapper/rootvg-root isize=512 agcount=4, agsize=... blks`, `data blocks changed from ${Math.round(before * 262144)} to ${Math.round(lvm.rootFsGb * 262144)}`]
+          : [`resize2fs 1.46.5 (30-Dec-2021)`, `The filesystem on /dev/mapper/rootvg-root is now ${Math.round(lvm.rootFsGb * 262144)} (4k) blocks long.`])
+      }
+    }
+    else if (lc === 'vgcreate' || lc === 'lvcreate') emit(`${lc}: simulated — operation completed`)
 
     /* =================== kernel modules =================== */
     else if (lc === 'lsmod') {
@@ -1822,7 +2316,7 @@ export function createLinuxShell(vm) {
         'Module                  Size  Used by',
         'xfs                   987136  2',
         'overlay               151552  1',
-        ...(moduleLoaded ? ['nf_conntrack          172032  2 nf_nat,xt_state', 'br_netfilter           32768  0'] : []),
+        ...(shared.moduleLoaded ? ['nf_conntrack          172032  2 nf_nat,xt_state', 'br_netfilter           32768  0'] : []),
         'vmw_balloon            24576  0',
         'vmxnet3                65536  0',
       ])
@@ -1830,8 +2324,8 @@ export function createLinuxShell(vm) {
     else if (lc === 'modprobe' || lc === 'insmod' || lc === 'modinfo') {
       const mod = positional[0] || ''
       if (lc === 'modinfo') emit(`filename:       /lib/modules/5.15.0-91/kernel/net/${mod}.ko\nlicense:        GPL\ndescription:    ${mod} kernel module`)
-      else if (vm?.kernel_module_missing && !moduleLoaded && (mod.includes('nf_conntrack') || mod.includes('br_netfilter') || mod.includes('bridge') || mod.includes('overlay'))) {
-        moduleLoaded = true
+      else if (vm?.kernel_module_missing && !shared.moduleLoaded && (mod.includes('nf_conntrack') || mod.includes('br_netfilter') || mod.includes('bridge') || mod.includes('overlay'))) {
+        shared.moduleLoaded = true
         emit('')
         sideEffect = { action: 'guest_load_module', vm_id: vm?.id, module: mod }
       } else emit('')
@@ -1990,15 +2484,128 @@ export function createLinuxShell(vm) {
     }
     else if (lc === 'podman') emit('CONTAINER ID  IMAGE   COMMAND  CREATED  STATUS  PORTS  NAMES')
     else if (lc === 'kubectl' || lc === 'k') {
-      const sub = positional[0]
+      // Local re-parse: `parseArgs` only tracks boolean flags and dumps flag
+      // VALUES into positional, so capture `-n ns` / `-o wide` here.
+      const { pos, fv, fhas } = cliParse(args)
+      const sub = pos[0]
+      const ns = fv('-n', '--namespace') || 'default'
+      const oFmt = fv('-o', '--output')
       if (sub === 'get') {
-        const res = positional[1]
-        if (res === 'nodes') emit(['NAME            STATUS   ROLES           AGE   VERSION', 'node01          Ready    control-plane   14d   v1.29.2', 'node02          Ready    <none>          14d   v1.29.2'])
-        else if (res === 'pods' || res === 'po') emit(['NAME                    READY   STATUS    RESTARTS   AGE', 'web-7d9f8c6b5-x2k9p     1/1     Running   0          2h', 'db-0                    1/1     Running   0          2h'])
-        else emit(`No resources found in default namespace.`)
-      } else if (sub === 'version') emit('Client Version: v1.29.2\nServer Version: v1.29.2')
-      else if (sub === 'cluster-info') emit('Kubernetes control plane is running at https://10.0.0.1:6443')
-      else emit('kubectl controls the Kubernetes cluster manager.')
+        const res = (pos[1] || '').replace(/s$/, '')
+        const wide = oFmt === 'wide'
+        if (res === 'node' || res === 'no') {
+          if (wide) emit(['NAME       STATUS   ROLES           AGE   VERSION   INTERNAL-IP   OS-IMAGE', 'node01     Ready    control-plane   14d   v1.29.2   10.0.0.1      Red Hat Enterprise Linux 9.3', 'node02     Ready    <none>          14d   v1.29.2   10.0.0.2      Red Hat Enterprise Linux 9.3'])
+          else emit(['NAME       STATUS   ROLES           AGE   VERSION', 'node01     Ready    control-plane   14d   v1.29.2', 'node02     Ready    <none>          14d   v1.29.2'])
+        }
+        else if (res === 'pod' || res === 'po') {
+          if (wide) emit(['NAME                   READY   STATUS    RESTARTS   AGE   IP            NODE', 'web-7d9f8c6b5-x2k9p    1/1     Running   0          2h    10.244.1.7    node02', 'db-0                   1/1     Running   0          2h    10.244.0.5    node01'])
+          else emit(['NAME                   READY   STATUS    RESTARTS   AGE', 'web-7d9f8c6b5-x2k9p    1/1     Running   0          2h', 'db-0                   1/1     Running   0          2h'])
+        }
+        else if (res === 'deployment' || res === 'deploy') emit(['NAME   READY   UP-TO-DATE   AVAILABLE   AGE', 'web    3/3     3            3           5d', 'api    2/2     2            2           5d'])
+        else if (res === 'svc' || res === 'service') emit(['NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE', 'kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP   14d', 'web          ClusterIP   10.96.12.40     <none>        80/TCP    5d'])
+        else if (res === 'ns' || res === 'namespace') emit(['NAME          STATUS   AGE', 'default       Active   14d', 'kube-system   Active   14d', 'kube-public   Active   14d'])
+        else if (res === 'event') emit(['LAST SEEN   TYPE     REASON      OBJECT           MESSAGE', '2m          Normal   Scheduled   pod/web-7d9f8c   Successfully assigned default/web to node02'])
+        else if (res === 'cm' || res === 'configmap') emit(['NAME               DATA   AGE', 'kube-root-ca.crt   1      14d', 'app-config         3      5d'])
+        else if (res === 'secret') emit(['NAME       TYPE     DATA   AGE', 'db-creds   Opaque   2      5d'])
+        else if (res === 'pvc') emit(['NAME      STATUS   VOLUME      CAPACITY   ACCESS MODES   STORAGECLASS   AGE', 'db-data   Bound    pvc-8a1f2   10Gi       RWO            standard       5d'])
+        else if (oFmt === 'json') emit('{\n    "apiVersion": "v1",\n    "kind": "List",\n    "items": []\n}')
+        else if (oFmt === 'yaml') emit('apiVersion: v1\nkind: List\nitems: []')
+        else emit(`No resources found in ${ns} namespace.`)
+      }
+      else if (sub === 'version') emit(fhas('--short') ? 'Client Version: v1.29.2\nServer Version: v1.29.2' : 'Client Version: version.Info{Major:"1", Minor:"29", GitVersion:"v1.29.2"}\nServer Version: version.Info{Major:"1", Minor:"29", GitVersion:"v1.29.2"}')
+      else if (sub === 'cluster-info') emit('Kubernetes control plane is running at https://10.0.0.1:6443\nCoreDNS is running at https://10.0.0.1:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy')
+      else if (sub === 'config') {
+        if (pos[1] === 'current-context') emit('kubernetes-admin@kubernetes')
+        else if (pos[1] === 'get-contexts') emit(['CURRENT   NAME                          CLUSTER      AUTHINFO', '*         kubernetes-admin@kubernetes   kubernetes   kubernetes-admin'])
+        else if (pos[1] === 'view') emit('apiVersion: v1\nkind: Config\nclusters:\n- cluster:\n    server: https://10.0.0.1:6443\n  name: kubernetes')
+        else emit('Modify kubeconfig files using the subcommands like "kubectl config set-context".')
+      }
+      else if (sub === 'describe') {
+        const res = pos[1] || 'pod'
+        const name = pos[2] || 'web-7d9f8c6b5-x2k9p'
+        emit([`Name:             ${name}`, `Namespace:        ${ns}`, 'Status:           Running', 'IP:               10.244.1.7', 'Containers:', `  ${res}:`, '    State:          Running', '    Ready:          True', '    Restart Count:  0', 'Events:           <none>'])
+      }
+      else if (sub === 'logs') emit([`[info] starting ${pos[1] || 'web'} on :8080`, '[info] connected to database', '[info] ready to accept connections'])
+      else if (sub === 'exec') emit(pos.includes('--') ? '' : 'error: you must specify at least one command for the container')
+      else if (sub === 'apply') emit(`${(fv('-f', '--filename') || 'resource')} configured`)
+      else if (sub === 'create') emit(`${pos[1] || 'resource'}/${pos[2] || 'new'} created`)
+      else if (sub === 'delete') emit(`${pos[1] || 'resource'} "${pos[2] || 'name'}" deleted`)
+      else if (sub === 'scale') emit(`deployment.apps/${(pos[1] || 'web').replace('deployment/', '')} scaled`)
+      else if (sub === 'rollout') {
+        if (pos[1] === 'status') emit(`deployment "${(pos[2] || 'web').replace('deployment/', '')}" successfully rolled out`)
+        else if (pos[1] === 'restart') emit(`deployment.apps/${(pos[2] || 'web').replace('deployment/', '')} restarted`)
+        else if (pos[1] === 'undo') emit(`deployment.apps/${(pos[2] || 'web').replace('deployment/', '')} rolled back`)
+        else if (pos[1] === 'history') emit(['REVISION  CHANGE-CAUSE', '1         <none>', '2         kubectl set image'])
+        else emit('Manage the rollout of one or more resources.')
+      }
+      else if (sub === 'top') {
+        if (pos[1] === 'nodes' || pos[1] === 'node') emit(['NAME       CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%', 'node01     220m         11%    1421Mi          37%', 'node02     180m         9%     1198Mi          31%'])
+        else emit(['NAME                   CPU(cores)   MEMORY(bytes)', 'web-7d9f8c6b5-x2k9p    12m          84Mi', 'db-0                   45m          312Mi'])
+      }
+      else if (sub === 'api-resources') emit(['NAME          SHORTNAMES   APIVERSION   NAMESPACED   KIND', 'pods          po           v1           true         Pod', 'services      svc          v1           true         Service', 'deployments   deploy       apps/v1      true         Deployment'])
+      else if (sub === 'explain') emit(`KIND:     ${pos[1] || 'Pod'}\nVERSION:  v1\n\nDESCRIPTION:\n     ${pos[1] || 'Pod'} is a collection of containers that can run on a host.`)
+      else if (sub === 'set' && pos[1] === 'image') emit(`deployment.apps/${(pos[2] || 'web').replace('deployment/', '')} image updated`)
+      else emit('kubectl controls the Kubernetes cluster manager.\n\nFind more information at: https://kubernetes.io/docs/reference/kubectl/')
+    }
+    else if (lc === 'aws') {
+      const { pos, fv, fhas } = cliParse(args)
+      const svc = pos[0]
+      const op = pos[1]
+      const region = fv('--region') || 'us-east-1'
+      const outFmt = fv('--output') || 'json'
+      const jblock = (obj) => emit(outFmt === 'text' ? obj.text : obj.json)
+      if (!svc || fhas('help')) {
+        emit('usage: aws [options] <command> <subcommand> [<subcommand> ...] [parameters]\nTo see help text, you can run:\n  aws help\n  aws <command> help')
+      }
+      else if (svc === '--version' || svc === 'version') emit('aws-cli/2.15.30 Python/3.11.8 Linux/5.14.0 exe/x86_64.rhel.9')
+      else if (svc === 'configure') {
+        if (op === 'list') emit(['      Name                    Value             Type    Location', '      ----                    -----             ----    --------', '   access_key     ****************WXYZ shared-credentials-file', '       region                us-east-1      config-file    ~/.aws/config'])
+        else emit('')
+      }
+      else if (svc === 'sts' && op === 'get-caller-identity') {
+        jblock({
+          json: '{\n    "UserId": "AIDAEXAMPLE1234567890",\n    "Account": "123456789012",\n    "Arn": "arn:aws:iam::123456789012:user/devops"\n}',
+          text: 'AIDAEXAMPLE1234567890\t123456789012\tarn:aws:iam::123456789012:user/devops',
+        })
+      }
+      else if (svc === 'ec2') {
+        if (op === 'describe-instances') jblock({
+          json: '{\n    "Reservations": [\n        {\n            "Instances": [\n                {\n                    "InstanceId": "i-0abcd1234efgh5678",\n                    "InstanceType": "t3.medium",\n                    "State": { "Name": "running" },\n                    "PrivateIpAddress": "10.0.1.25"\n                }\n            ]\n        }\n    ]\n}',
+          text: 'i-0abcd1234efgh5678\tt3.medium\trunning\t10.0.1.25',
+        })
+        else if (op === 'describe-instance-status') emit('{\n    "InstanceStatuses": [\n        { "InstanceId": "i-0abcd1234efgh5678", "InstanceState": { "Name": "running" } }\n    ]\n}')
+        else if (op === 'start-instances') emit('{\n    "StartingInstances": [\n        { "InstanceId": "i-0abcd1234efgh5678", "CurrentState": { "Name": "pending" } }\n    ]\n}')
+        else if (op === 'stop-instances') emit('{\n    "StoppingInstances": [\n        { "InstanceId": "i-0abcd1234efgh5678", "CurrentState": { "Name": "stopping" } }\n    ]\n}')
+        else if (op === 'describe-regions') emit('{\n    "Regions": [\n        { "RegionName": "us-east-1" },\n        { "RegionName": "us-west-2" },\n        { "RegionName": "eu-west-1" }\n    ]\n}')
+        else emit(`aws: ec2: simulated (${op || 'no subcommand'}) in ${region}`)
+      }
+      else if (svc === 's3') {
+        if (op === 'ls') {
+          if (pos[2]) emit(['2024-05-01 10:22:14       1024 index.html', '2024-05-01 10:22:15       4096 app.tar.gz'])
+          else emit(['2024-04-12 09:00:00 my-app-bucket', '2024-04-20 14:30:00 backups-prod'])
+        }
+        else if (op === 'cp') emit(`upload: ${pos[2] || './file'} to ${pos[3] || 's3://bucket/file'}`)
+        else if (op === 'sync') emit(`Completed sync to ${pos[3] || pos[2] || 's3://bucket'}`)
+        else if (op === 'mb') emit(`make_bucket: ${(pos[2] || 's3://bucket').replace('s3://', '')}`)
+        else if (op === 'rb') emit(`remove_bucket: ${(pos[2] || 's3://bucket').replace('s3://', '')}`)
+        else if (op === 'rm') emit(`delete: ${pos[2] || 's3://bucket/file'}`)
+        else emit('usage: aws s3 <ls|cp|mv|rm|sync|mb|rb> ...')
+      }
+      else if (svc === 's3api' && op === 'list-buckets') emit('{\n    "Buckets": [\n        { "Name": "my-app-bucket", "CreationDate": "2024-04-12T09:00:00Z" }\n    ]\n}')
+      else if (svc === 'iam') {
+        if (op === 'list-users') emit('{\n    "Users": [\n        { "UserName": "devops", "Arn": "arn:aws:iam::123456789012:user/devops" }\n    ]\n}')
+        else if (op === 'get-user') emit('{\n    "User": { "UserName": "devops", "UserId": "AIDAEXAMPLE1234567890" }\n}')
+        else if (op === 'list-roles') emit('{\n    "Roles": [\n        { "RoleName": "eks-node-role", "Arn": "arn:aws:iam::123456789012:role/eks-node-role" }\n    ]\n}')
+        else emit(`aws: iam: simulated (${op || 'no subcommand'})`)
+      }
+      else if (svc === 'eks') {
+        if (op === 'list-clusters') emit('{\n    "clusters": [\n        "prod-cluster"\n    ]\n}')
+        else if (op === 'update-kubeconfig') emit(`Updated context arn:aws:eks:${region}:123456789012:cluster/${fv('--name') || 'prod-cluster'} in ~/.kube/config`)
+        else if (op === 'describe-cluster') emit('{\n    "cluster": { "name": "prod-cluster", "status": "ACTIVE", "version": "1.29" }\n}')
+        else emit(`aws: eks: simulated (${op || 'no subcommand'})`)
+      }
+      else if (svc === 'logs' && op === 'describe-log-groups') emit('{\n    "logGroups": [\n        { "logGroupName": "/aws/eks/prod-cluster/cluster" }\n    ]\n}')
+      else emit(`aws: ${svc}: simulated (${[op, ...pos.slice(2)].filter(Boolean).join(' ') || 'no subcommand'}) in ${region}`)
     }
     else if (lc === 'helm') emit('NAME\tNAMESPACE\tREVISION\tSTATUS\tCHART')
     else if (['ansible', 'ansible-playbook', 'terraform', 'packer', 'vagrant', 'git'].includes(lc)) {
@@ -2045,6 +2652,10 @@ export function createLinuxShell(vm) {
     // Stateful package DB queries (used by tests + any future programmatic checks).
     isInstalled: (name) => pkgs.has(name),
     installedPackages: () => pkgs.rpmList(),
+    getStatus,
+    getCwd: () => cwd.path,
+    getUser: () => env.USER,
+    switchUser,
   }
 }
 

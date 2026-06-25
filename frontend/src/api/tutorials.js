@@ -21,4 +21,19 @@ export const tutorialApi = {
     const { data } = await api.get('/tutorials/curriculum/', { silentError: true })
     return data // { curriculum: [{ topic, tutorial_count, total_sections, tutorials }] }
   },
+
+  async getProgress() {
+    const { data } = await api.get('/tutorials/progress/', { silentError: true })
+    return data?.progress || []
+  },
+
+  async getContinue() {
+    const { data } = await api.get('/tutorials/progress/continue/', { silentError: true })
+    return data?.continue || []
+  },
+
+  async updateProgress(slug, payload) {
+    const { data } = await api.post(`/tutorials/${slug}/progress/`, payload, { silentError: true })
+    return data
+  },
 }

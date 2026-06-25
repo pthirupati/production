@@ -47,6 +47,7 @@ function GrafanaOrb({ size = 52 }) {
 export default function GrafanaLoginScreen({
   onAuthenticated, scenario, onExit, onStop, onHints,
   onCheck, onExtend, hintsLabel, checkDisabled, extendDisabled, embedded = false,
+  vmwareHref = null,
 }) {
   const [user, setUser] = useState('')
   const [pass, setPass] = useState('')
@@ -93,6 +94,7 @@ export default function GrafanaLoginScreen({
         hintsLabel={hintsLabel}
         checkDisabled={checkDisabled}
         extendDisabled={extendDisabled}
+        vmwareHref={vmwareHref}
       />
 
       {/* ambient accent glow */}

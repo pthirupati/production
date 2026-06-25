@@ -40,12 +40,17 @@ existing rule-based `interview_ai.py` (no LLM cost).
 - `services/voice_service.py` — **FREE voice config** (`voice_config_payload`, 9): `stt_provider="browser"`, `tts_provider="browser"`, `uses_paid_apis: False`, returns admin voices or 6 defaults (India/UK/US × M/F).
 - `services/notify.py`, `services/entitlements.py`, `services/interview_settings.py`, `services/interview_types.py` (rich persona addenda + eval weights for behavioral/system_design/live_coding/devops_debug/sre_oncall — **defined but only consumed by the unused LLM path**).
 
-**Unused PAID scaffolding (dormant, key-gated, never wired into views):**
-- `services/llm.py` — deprecated shim → re-exports the free reply.
-- `services/llm_engine.py` — **Anthropic Claude** path (`generate_interviewer_reply`/`generate_follow_up_question`/`generate_ai_scorecard`/`evaluate_star_response`). Falls back to free path when `ANTHROPIC_API_KEY` absent. **Not imported by `views.py`.** `anthropic` SDK is **not in requirements.txt**, so this is permanently dormant.
-- `services/engine_v2.py` — Claude-wired clone of engine.py. **Not referenced anywhere** (grep: zero hits). `views.py` imports `services.engine` only (line 40).
-- `services/tts_service.py` — **ElevenLabs + AWS Polly** (key-gated; falls back to `provider="browser"`). `services/stt_service.py` — **OpenAI Whisper API** (`OPENAI_API_KEY`-gated; falls back to `provider="browser"`). `boto3` is in requirements but `openai`/`elevenlabs` are not. With no keys set, **both correctly return the free browser provider.**
-- `tts_views.py` / `stt_views.py` — REST endpoints over those services (config + synthesize/transcribe). Wired in `urls.py` (65–68) but resolve to browser-mode when unkeyed.
+**Removed paid scaffolding (Phase 0 — deleted/hard-disabled):**
+- `services/llm.py` — deprecated shim → re-exports the free `interview_ai.generate_interviewer_reply`.
+- ~~`services/llm_engine.py`~~ / ~~`services/engine_v2.py`~~ — **deleted.** No Anthropic path remains.
+- `services/tts_service.py` / `services/stt_service.py` — always return `provider="browser"` unless `INTERVIEW_STT_ENGINE=vosk` (optional local hook, default off). No ElevenLabs/Polly/Whisper API calls.
+- `services/conversation/` — **new free conversational engine** (spaCy + sklearn TF-IDF + rule policy): `normalize` → `analyze_answer` → `decide_next_move` → `generate_follow_up_question`. Wired into `question_generator` and `engine.submit_answer` campaign memory.
+
+**Conversational engine stack (100% offline):**
+- STT repair dictionary (`conversation/normalize.py`) before analysis.
+- `AnswerAnalysis` via spaCy `en_core_web_sm` (optional) + TF-IDF relevance.
+- `CampaignMemory` persisted in `round.metadata["conversation"]["campaign_memory"]`.
+- Anti-gaming semantic scorer in `conversation/scorer.py` (capped length reward).
 
 **Routing / API** (`urls.py`): sample, plans, entitlement, profile (+resume), voices, campaigns, rounds (schedule/start/message/av/extend/end/practical-lab/ical), join-by-token, cert verify, billing, GDPR export/delete, admin observer join-requests, tts/stt config+exec.
 

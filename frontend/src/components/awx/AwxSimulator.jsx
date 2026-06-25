@@ -17,6 +17,11 @@ import {
 } from '../../mockData/awx'
 import '../../styles/sim-products.css'
 
+// Lab sign-in credentials, consistent with the other simulators
+// (lab_<product> / lab_<product>@123). The AWX default admin/admin is also accepted.
+const AWX_LAB_USER = 'lab_awx'
+const AWX_LAB_PASS = 'lab_awx@123'
+
 const NAV_ICONS = {
   dashboard: Layers, jobs: Play, schedules: Calendar, activity: Activity, approvals: CheckSquare,
   credentials: Key, projects: FolderGit2, inventories: Server, hosts: Server, organizations: Users,
@@ -33,7 +38,7 @@ const SIDEBAR = AWX_SIDEBAR.map((s) => ({
 export default function AwxSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
   hintsLabel, checkDisabled, extendDisabled, embedded = false,
-  onToggleTerminal, simTerminalOpen = false,
+  onToggleTerminal, simTerminalOpen = false, vmwareHref = null,
 }) {
   const slug = scenario?.slug || ''
   const { state, loading, busy, run, refresh } = useSimSession(sessionId, slug, awxApi)
@@ -51,6 +56,9 @@ export default function AwxSimulator({
   const [templateName, setTemplateName] = useState('Site Deploy')
   const [scheduleModal, setScheduleModal] = useState(false)
   const [scheduleName, setScheduleName] = useState('Nightly patch')
+  const [loginUser, setLoginUser] = useState('')
+  const [loginPass, setLoginPass] = useState('')
+  const [loginError, setLoginError] = useState('')
 
   const inv = state?.inventory || {}
   const loggedIn = inv?.session?.logged_in
@@ -60,25 +68,63 @@ export default function AwxSimulator({
     onBackToTerminal: embedded ? undefined : onExit,
     hintsLabel, checkDisabled, extendDisabled,
     backLabel: simTerminalOpen ? 'Hide terminal' : 'Terminal',
+    vmwareHref,
   }
 
   const breadcrumbs = [{ label: inv?.summary?.organization || 'Default', onClick: () => setNav('dashboard') }]
   if (nav !== 'dashboard') breadcrumbs.push({ label: AWX_SIDEBAR.find((s) => s.key === nav || s.items?.some((i) => i.key === nav))?.label || nav.replace(/-/g, ' ') })
 
   if (!loading && state && !loggedIn) {
+    const submitLogin = (e) => {
+      e.preventDefault()
+      if (busy) return
+      const u = loginUser.trim().toLowerCase()
+      const ok = (u === AWX_LAB_USER && loginPass === AWX_LAB_PASS)
+        || (u === 'admin' && loginPass === 'admin')
+      if (ok) {
+        setLoginError('')
+        run(() => awxApi.login(sessionId), 'Signed in')
+      } else {
+        setLoginError(`Invalid credentials. Use ${AWX_LAB_USER} / ${AWX_LAB_PASS} for training labs.`)
+      }
+    }
     return (
       <div className={simPanelRoot(embedded, 'bg-[#1a1a2e]')}>
         <LabChromeBar title="Ansible AWX" subtitle={scenario?.title || slug} accent="#EE0000" {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-2xl w-[400px] overflow-hidden">
-            <div className="px-6 py-4 text-white font-semibold bg-[#EE0000]">Ansible AWX</div>
-            <div className="p-6 space-y-3">
-              <p className="text-sm text-slate-600">Sign in to Ansible AWX / Tower training instance.</p>
-              <button onClick={() => run(() => awxApi.login(sessionId), 'Signed in')} disabled={busy}
+            <div className="px-6 py-4 text-white font-semibold bg-[#EE0000] flex items-center gap-2">
+              <Layers size={18} /> Ansible AWX
+            </div>
+            <form onSubmit={submitLogin} className="p-6 space-y-4">
+              <p className="text-sm text-slate-600">Sign in to the Ansible AWX / Tower training instance.</p>
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">Username</label>
+                <input value={loginUser} onChange={(e) => setLoginUser(e.target.value)} autoFocus autoComplete="username"
+                  placeholder={AWX_LAB_USER}
+                  className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#EE0000]" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">Password</label>
+                <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} autoComplete="current-password"
+                  className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#EE0000]" />
+              </div>
+              {loginError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{loginError}</p>
+              )}
+              <button type="submit" disabled={busy}
                 className="awx-btn-launch w-full py-2 flex items-center justify-center gap-2">
                 <LogIn size={16} /> Sign In
               </button>
-            </div>
+              <button type="button"
+                onClick={() => { setLoginUser(AWX_LAB_USER); setLoginPass(AWX_LAB_PASS); setLoginError('') }}
+                className="w-full py-1.5 text-xs text-slate-600 border border-slate-300 rounded hover:bg-slate-50">
+                Use lab credentials (autofill)
+              </button>
+              <p className="text-[10px] text-slate-500 text-center pt-2 border-t border-slate-100">
+                Training credentials: <span className="font-mono text-slate-700">{AWX_LAB_USER}</span> / <span className="font-mono text-slate-700">{AWX_LAB_PASS}</span>
+              </p>
+            </form>
           </div>
         </div>
       </div>
@@ -190,7 +236,9 @@ export default function AwxSimulator({
         { key: 'name', label: 'Host', sortable: true },
         { key: 'inventory', label: 'Inventory', sortable: true },
         { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status} /> },
-      ]} rows={AWX_HOSTS} searchKeys={['name']} />
+        { key: 'source', label: 'Source', sortable: true },
+        { key: 'ip', label: 'IP' },
+      ]} rows={inv.hosts || AWX_HOSTS} searchKeys={['name', 'inventory', 'source', 'ip']} />
     }
     if (nav === 'credentials') {
       return (

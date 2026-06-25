@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createLinuxShell, POST_LINES, buildGrubEntries, buildBootStages } from './linuxShell'
 import { createWindowsShell, WIN_BOOT_SEQUENCE, WIN_LOGIN_HINT } from './windowsShell'
+import { LinuxTerminalTabs, LinuxTerminalStatusBar } from '../linux/LinuxTerminalChrome'
+import { useLinuxTerminalTabs } from '../linux/useLinuxTerminalTabs'
 
-const LOGIN_HINT = 'Hint: username root, password root13'
+const LOGIN_HINT = 'Hint: root/root13 or labuser/labuser@123'
 const GRUB_TIMEOUT = 8 // seconds the GRUB menu counts down before auto-booting
 
 function isWindowsGuest(vm) {
@@ -29,9 +31,11 @@ function loginBanner(vm) {
 
 export default function VmwareConsole({ vm, onClose, onGuestAction }) {
   const isWin = isWindowsGuest(vm)
-  const shell = useMemo(() => (
-    isWin ? createWindowsShell(vm) : createLinuxShell(vm)
+  const winShell = useMemo(() => (
+    isWin ? createWindowsShell(vm) : null
   ), [isWin, vm?.id, vm?.hostname, vm?.ip, vm?.disk_gb, vm?.memory_mb, vm?.cpu, vm?.guest_disk_hidden, vm?.kernel_module_missing])
+  const linuxTabs = useLinuxTerminalTabs(vm, { enabled: !isWin })
+  const shell = isWin ? winShell : (linuxTabs.activeShell || linuxTabs.getShell(linuxTabs.activeId))
   const grubEntries = useMemo(() => buildGrubEntries(vm), [vm?.id, vm?.guest_os, vm?.guest_os_version])
 
   const [lines, setLines] = useState([])
@@ -66,6 +70,32 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
   const inputRef = useRef(null)
   const overlayRef = useRef(null)
   const timersRef = useRef([]) // all pending setTimeouts, cleared on unmount / phase change
+  const prevTabRef = useRef(null)
+
+  // Persist / restore per-tab terminal output when switching tabs (shared VFS, independent sessions).
+  useEffect(() => {
+    if (isWin || (phase !== 'shell' && phase !== 'rescue') || !linuxTabs.activeId) return
+    const prev = prevTabRef.current
+    if (prev && prev !== linuxTabs.activeId) {
+      linuxTabs.persistTabUi(prev, { lines, cmd, histIdx })
+      const loaded = linuxTabs.getTabUi(linuxTabs.activeId)
+      if (loaded) {
+        setLines(loaded.lines)
+        setCmd(loaded.cmd)
+        setHistIdx(loaded.histIdx)
+      } else {
+        const idx = Math.max(0, linuxTabs.tabs.findIndex((t) => t.id === linuxTabs.activeId))
+        const seed = [`Last login: ${new Date().toUTCString()} on pts/${idx}`, '']
+        linuxTabs.persistTabUi(linuxTabs.activeId, { lines: seed, cmd: '', histIdx: -1 })
+        setLines(seed)
+        setCmd('')
+        setHistIdx(-1)
+      }
+    } else if (!prev) {
+      linuxTabs.persistTabUi(linuxTabs.activeId, { lines, cmd, histIdx })
+    }
+    prevTabRef.current = linuxTabs.activeId
+  }, [linuxTabs.activeId, phase, isWin]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- timer bookkeeping (interruptible, no leaks) ---
   const clearTimers = useCallback(() => {
@@ -282,13 +312,21 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
   }, [append, handleClose, later, onGuestAction, startPost, streamChunks, vm?.name])
 
   const runCmd = useCallback((raw) => {
+    if (!shell) return
     const result = shell.run(raw)
     handleResult(result)
+    if (result?.editor && linuxTabs.activeId) {
+      const tool = result.editor.tool === 'nano' ? 'nano' : 'vim'
+      linuxTabs.renameTab(linuxTabs.activeId, tool)
+    }
+    if (raw.trim().startsWith('htop') && linuxTabs.activeId) {
+      linuxTabs.renameTab(linuxTabs.activeId, 'htop')
+    }
     // legacy boot_failure repair path (fsck / exit / reboot from rescue)
     if (vm?.boot_failure && (raw.includes('fsck') || raw.includes('exit') || raw.includes('reboot'))) {
       onGuestAction?.({ action: 'guest_fix_boot', vm_id: vm.id })
     }
-  }, [handleResult, onGuestAction, shell, vm?.boot_failure, vm?.id])
+  }, [handleResult, linuxTabs, onGuestAction, shell, vm?.boot_failure, vm?.id])
 
   // ------------------------------------------------------------------ *
   // Login
@@ -308,6 +346,15 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
       ])
       setPhase('shell')
       setCmd('')
+    } else if (!isWin && loginUser === 'labuser' && loginPass === 'labuser@123') {
+      shell?.switchUser?.('labuser')
+      append([
+        `Last login: ${new Date().toUTCString()} on pts/0 from 192.168.10.1`,
+        `Welcome to Ubuntu 22.04 LTS — GNU/Linux`,
+        '',
+      ])
+      setPhase('shell')
+      setCmd('')
     } else if (isWin && loginUser === 'Administrator' && loginPass === 'P@ssw0rd123') {
       append([WIN_LOGIN_HINT, `Welcome to ${vm?.guest_os_version || 'Windows Server'}.`, ''])
       setPhase('shell')
@@ -318,7 +365,7 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
       setLoginUser('')
       setLoginPass('')
     }
-  }, [append, isWin, loginPass, loginStep, loginUser, vm])
+  }, [append, isWin, loginPass, loginStep, loginUser, shell, vm])
 
   // ------------------------------------------------------------------ *
   // Editor (vi / nano) — real save back into the VFS
@@ -469,6 +516,17 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
             <span className="hidden sm:inline">Close</span>
           </button>
         </div>
+
+        {!isWin && (phase === 'shell' || phase === 'rescue') && (
+          <LinuxTerminalTabs
+            tabs={linuxTabs.tabs}
+            activeId={linuxTabs.activeId}
+            onSelect={linuxTabs.setActiveId}
+            onClose={linuxTabs.closeTab}
+            onNew={() => linuxTabs.addTab('shell')}
+          />
+        )}
+
         <div
           ref={scrollRef}
           className="flex-1 overflow-y-auto p-4 font-mono text-[12.5px] leading-relaxed bg-[#05090f] cursor-text"
@@ -549,8 +607,14 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
           />
         )}
 
-        <div className="shrink-0 px-3.5 py-2 bg-[#1B2A3B] border-t border-[#2D3A4A] text-[10.5px] text-[#8FA5B8] font-mono">
-          {footerHint}
+        <div className="shrink-0">
+          {!isWin && (phase === 'shell' || phase === 'rescue') ? (
+            <LinuxTerminalStatusBar status={linuxTabs.status} hint={footerHint} />
+          ) : (
+            <div className="px-3.5 py-2 bg-[#1B2A3B] border-t border-[#2D3A4A] text-[10.5px] text-[#8FA5B8] font-mono">
+              {footerHint}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -20,6 +20,8 @@ import OnboardingTour from '../components/OnboardingTour'
 import { FixitPanel, FixitStatCard } from '../components/design'
 import { DailyChallengeCard, StreakWidget, XpLevelCard } from '../components/engagement'
 import CertDashboardPanel from '../components/certifications/CertDashboardPanel'
+import { tutorialApi } from '../api/tutorials'
+import { listLocalContinue, progressPct } from '../utils/tutorialProgress'
 
 function OnboardingChecklist({ subscriptions, progress, jiraTickets, interviewEntitlement }) {
   const [dismissed, setDismissed] = useState(
@@ -139,7 +141,7 @@ function OnboardingChecklist({ subscriptions, progress, jiraTickets, interviewEn
 }
 
 export default function Dashboard() {
-  const { user } = useAuthStore()
+  const { user, isAuthenticated } = useAuthStore()
   const [progress, setProgress] = useState(null)
   const [achievements, setAchievements] = useState([])
   const [activeLabs, setActiveLabs] = useState([])
@@ -153,6 +155,7 @@ export default function Dashboard() {
   const [bookmarks, setBookmarks] = useState([])
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [interviewEntitlement, setInterviewEntitlement] = useState(null)
+  const [tutorialContinue, setTutorialContinue] = useState([])
 
   useEffect(() => {
     Promise.all([
@@ -164,7 +167,9 @@ export default function Dashboard() {
       scenarioApi.getBookmarks().catch(() => []),
       api.get('/notifications/', { silentError: true }).catch(() => ({ data: { notifications: [] } })),
       import('../api/interviews').then(m => m.interviewsApi.getEntitlement()).catch(() => null),
-    ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes, interviewEnt]) => {
+      tutorialApi.list().catch(() => ({ tutorials: [] })),
+      isAuthenticated ? tutorialApi.getContinue().catch(() => []) : Promise.resolve([]),
+    ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes, interviewEnt, tutListRes, tutContinue]) => {
       if (!prog) setLoadError(true)
       setProgress(prog)
       setAchievements(ach)
@@ -176,8 +181,30 @@ export default function Dashboard() {
       const notifs = notifRes?.data?.notifications || notifRes?.data?.results || []
       setUnreadNotifications(Array.isArray(notifs) ? notifs.filter(n => !(n.read ?? n.is_read)).length : 0)
       setInterviewEntitlement(interviewEnt)
+      const tutorialsBySlug = Object.fromEntries(
+        (tutListRes?.tutorials || []).map((t) => [t.slug, t]),
+      )
+      let continueItems = []
+      if (isAuthenticated && Array.isArray(tutContinue) && tutContinue.length) {
+        continueItems = tutContinue
+      } else {
+        continueItems = listLocalContinue().map((p) => {
+          const meta = tutorialsBySlug[p.tutorial_slug] || {}
+          const sectionCount = meta.section_count || p.completed_sections?.length || 0
+          return {
+            ...p,
+            tutorial_title: meta.title || p.tutorial_slug,
+            topic: meta.topic,
+            section_count: sectionCount,
+            progress_pct: p.progress_pct || progressPct(p.completed_sections, sectionCount),
+          }
+        })
+      }
+      setTutorialContinue(
+        continueItems.filter((i) => !i.completed && (i.progress_pct ?? 0) < 100).slice(0, 4),
+      )
     }).finally(() => setLoading(false))
-  }, [])
+  }, [isAuthenticated])
 
   const handleCancelSubscription = async (sub) => {
     setCancelling(true)
@@ -412,6 +439,31 @@ export default function Dashboard() {
                 </Link>
               )
             })}
+          </div>
+        </FixitPanel>
+      )}
+
+      {tutorialContinue.length > 0 && (
+        <FixitPanel className="border-accent-purple/20">
+          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <BookOpen size={18} className="text-accent-purple" /> Continue Tutorials
+          </h2>
+          <div className="space-y-2">
+            {tutorialContinue.map((item) => (
+              <Link
+                key={item.tutorial_slug}
+                to={`/tutorials/${item.tutorial_slug}`}
+                className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 hover:bg-surface-800 transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{item.tutorial_title}</p>
+                  <p className="text-xs text-surface-500">
+                    {item.topic || 'Tutorial'} · {item.progress_pct ?? 0}% read
+                  </p>
+                </div>
+                <ArrowRight size={14} className="text-accent-purple shrink-0" />
+              </Link>
+            ))}
           </div>
         </FixitPanel>
       )}

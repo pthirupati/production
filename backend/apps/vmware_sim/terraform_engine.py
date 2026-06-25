@@ -411,29 +411,18 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     if action == "aws_cli":
         cmd = (payload.get("command") or "").strip()
+        from apps.labs.provisioner.simulation.simulation_modules import _handle_aws_cli_local
+
         low = cmd.lower()
         if low.startswith("aws sts get-caller-identity"):
-            return {"ok": True, "output": json.dumps({"Account": "123456789012", "Arn": state["aws"]["caller_identity"]}, indent=2)}
-        if "s3 ls" in low:
-            buckets = "\n".join(
-                f"2024-01-15 10:00:00 {r['id']}" for r in state["aws"]["resources"] if r.get("type") == "aws_s3_bucket"
-            ) or "2024-01-15 10:00:00 app-logs-prod"
-            return {"ok": True, "output": buckets}
-        if "s3api get-bucket-policy" in low or "s3api get-bucket-acl" in low:
-            return {"ok": True, "output": json.dumps({"Version": "2012-10-17", "Statement": []}, indent=2)}
-        if "ec2 describe-instances" in low:
-            return {"ok": True, "output": "i-0abc123  running  t3.medium  ap-south-1a"}
-        if "ec2 describe-vpcs" in low:
-            return {"ok": True, "output": "vpc-0abc123  10.0.0.0/16  available"}
-        if "iam list-users" in low:
-            return {"ok": True, "output": "training\nautomation"}
-        if "iam get-user" in low:
-            return {"ok": True, "output": json.dumps({"User": {"UserName": "training"}}, indent=2)}
-        if "eks list-clusters" in low:
-            return {"ok": True, "output": "fixitlab-training"}
-        if "lambda list-functions" in low:
-            return {"ok": True, "output": "fixitlab-handler"}
-        return {"ok": True, "output": f"(simulated) {cmd}"}
+            return {"ok": True, "output": _handle_aws_cli_local(cmd)}
+        if any(x in low for x in (
+            "s3 ls", "s3api", "ec2 describe", "iam list", "iam get-user",
+            "eks list", "eks describe", "lambda list", "cloudwatch describe",
+            "logs describe", "autoscaling describe",
+        )):
+            return {"ok": True, "output": _handle_aws_cli_local(cmd)}
+        return {"ok": True, "output": _handle_aws_cli_local(cmd)}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

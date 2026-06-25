@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createLinuxShell } from './linuxShell'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { LinuxTerminalTabs, LinuxTerminalStatusBar } from '../linux/LinuxTerminalChrome'
+import { useLinuxTerminalTabs } from '../linux/useLinuxTerminalTabs'
 import { ViNanoEditor } from './VmwareConsole'
 
 /**
@@ -13,7 +14,8 @@ import { ViNanoEditor } from './VmwareConsole'
  * viewport — not a cramped inline box.
  */
 export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
-  const shell = useMemo(() => createLinuxShell(vm), [vm?.id, vm?.hostname, vm?.ip, vm?.disk_gb, vm?.memory_mb, vm?.cpu])
+  const linuxTabs = useLinuxTerminalTabs(vm, { enabled: true })
+  const shell = linuxTabs.activeShell || linuxTabs.getShell(linuxTabs.activeId)
   const ip = vm?.ip || vm?.hostname || vm?.name || 'guest'
   const [lines, setLines] = useState([
     `$ ssh root@${ip}`,
@@ -27,6 +29,7 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
     ] : []),
   ])
   const [phase, setPhase] = useState(sshOk ? 'password' : 'failed') // password | shell | editor | closed
+  const [loginUser, setLoginUser] = useState('root')
   const [password, setPassword] = useState('')
   const [cmd, setCmd] = useState('')
   const [histIdx, setHistIdx] = useState(-1)
@@ -43,6 +46,31 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
   const inputRef = useRef(null)
   const scrollRef = useRef(null)
   const timersRef = useRef([])
+  const prevTabRef = useRef(null)
+
+  useEffect(() => {
+    if (phase !== 'shell' || !linuxTabs.activeId) return
+    const prev = prevTabRef.current
+    if (prev && prev !== linuxTabs.activeId) {
+      linuxTabs.persistTabUi(prev, { lines, cmd, histIdx })
+      const loaded = linuxTabs.getTabUi(linuxTabs.activeId)
+      if (loaded) {
+        setLines(loaded.lines)
+        setCmd(loaded.cmd)
+        setHistIdx(loaded.histIdx)
+      } else {
+        const idx = Math.max(0, linuxTabs.tabs.findIndex((t) => t.id === linuxTabs.activeId))
+        const seed = [`Last login: ${new Date().toUTCString()} on pts/${idx}`, '']
+        linuxTabs.persistTabUi(linuxTabs.activeId, { lines: seed, cmd: '', histIdx: -1 })
+        setLines(seed)
+        setCmd('')
+        setHistIdx(-1)
+      }
+    } else if (!prev) {
+      linuxTabs.persistTabUi(linuxTabs.activeId, { lines, cmd, histIdx })
+    }
+    prevTabRef.current = linuxTabs.activeId
+  }, [linuxTabs.activeId, phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const clearTimers = useCallback(() => { timersRef.current.forEach(clearTimeout); timersRef.current = [] }, [])
   const later = useCallback((fn, ms) => { const id = setTimeout(fn, ms); timersRef.current.push(id); return id }, [])
@@ -124,8 +152,15 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
     if (phase === 'password') {
       if (e.key === 'Enter') {
         e.preventDefault()
-        if (password === 'root13') {
-          append(['', `Last login: ${new Date().toUTCString()} from 10.20.30.1`, `Welcome to ${vm?.guest_os_version || 'Linux'} (SSH session).`, ''])
+        const okRoot = loginUser === 'root' && password === 'root13'
+        const okLab = loginUser === 'labuser' && password === 'labuser@123'
+        if (okRoot || okLab) {
+          if (okLab) shell?.switchUser?.('labuser')
+          const welcome = ['', `Last login: ${new Date().toUTCString()} from 10.20.30.1`, `Welcome to ${vm?.guest_os_version || 'Linux'} (SSH session).`, '']
+          append(welcome)
+          if (linuxTabs.activeId) {
+            linuxTabs.persistTabUi(linuxTabs.activeId, { lines: [...lines, ...welcome], cmd: '', histIdx: -1 })
+          }
           setPhase('shell')
           setPassword('')
         } else {
@@ -142,8 +177,17 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
     }
     if (e.key === 'Enter') {
       e.preventDefault()
+      const raw = cmd
       append(`${shell.prompt()} ${cmd}`)
-      handleResult(shell.run(cmd))
+      const result = shell.run(cmd)
+      if (result?.editor && linuxTabs.activeId) {
+        const tool = result.editor.tool === 'nano' ? 'nano' : 'vim'
+        linuxTabs.renameTab(linuxTabs.activeId, tool)
+      }
+      if (raw.trim().startsWith('htop') && linuxTabs.activeId) {
+        linuxTabs.renameTab(linuxTabs.activeId, 'htop')
+      }
+      handleResult(result)
       setCmd('')
       setHistIdx(-1)
     } else if (e.key === 'ArrowUp') {
@@ -184,7 +228,7 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
   const footerHint = editor
     ? (editor.tool === 'nano' ? 'nano - ^O save / ^X exit / ^C cancel' : 'vi - i/a/o insert / Esc command mode / :wq save / :q! quit')
     : confirm ? 'Type y to proceed or n to abort, then Enter'
-    : phase === 'password' ? 'Hint: password root13'
+    : phase === 'password' ? 'Hint: root/root13 or labuser/labuser@123'
     : phase === 'shell' ? 'Connected over SSH / same shell as the console / vi & nano edit & save / arrow keys for history'
     : phase === 'closed' ? 'Session closed - close this window or reconnect from the SSH panel'
     : phase === 'failed' ? 'Connection failed - verify the guest is up and the IP/VLAN is correct'
@@ -208,7 +252,7 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
             <span className="w-[11px] h-[11px] rounded-full bg-[#5DB85D]" />
           </div>
           <span className="font-mono text-xs text-[#8FA5B8]">SSH - root@{vm?.hostname || vm?.name} ({ip})</span>
-          <span className="text-[10px] text-[#8FA5B8] ml-2 hidden sm:inline">Hint: password root13</span>
+          <span className="text-[10px] text-[#8FA5B8] ml-2 hidden sm:inline">Hint: root/root13 or labuser/labuser@123</span>
           <div className="flex-1" />
           <button
             type="button"
@@ -242,6 +286,16 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
           )}
         </div>
 
+        {phase === 'shell' && (
+          <LinuxTerminalTabs
+            tabs={linuxTabs.tabs}
+            activeId={linuxTabs.activeId}
+            onSelect={linuxTabs.setActiveId}
+            onClose={linuxTabs.closeTab}
+            onNew={() => linuxTabs.addTab('shell')}
+          />
+        )}
+
         <div
           ref={scrollRef}
           className="flex-1 overflow-y-auto p-4 font-mono text-[12.5px] leading-relaxed bg-[#05090f] cursor-text"
@@ -252,10 +306,16 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
           ))}
 
           {phase === 'password' && (
-            <div className="flex items-center gap-1 text-[#5DB85D] mt-1">
-              <span>Password:</span>
-              <input ref={inputRef} autoFocus type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={onKeyDown} className="flex-1 bg-transparent border-none outline-none text-[#E8EDF2] font-mono caret-[#5DB85D]" />
-            </div>
+            <>
+              <div className="flex items-center gap-1 text-[#5DB85D] mt-1">
+                <span>{loginUser || 'root'}@{ip}&apos;s password:</span>
+                <input ref={inputRef} autoFocus type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={onKeyDown} className="flex-1 bg-transparent border-none outline-none text-[#E8EDF2] font-mono caret-[#5DB85D]" />
+              </div>
+              <div className="flex items-center gap-1 text-[#8FA5B8] mt-2 text-[11px]">
+                <span>login as:</span>
+                <input value={loginUser} onChange={e => setLoginUser(e.target.value)} onKeyDown={onKeyDown} className="w-32 bg-transparent border-b border-[#2D3A4A] outline-none text-[#E8EDF2] font-mono" spellCheck={false} />
+              </div>
+            </>
           )}
 
           {phase === 'shell' && confirm && !busy && (
@@ -291,9 +351,13 @@ export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
           />
         )}
 
-        <div className="shrink-0 px-3.5 py-2 bg-[#1B2A3B] border-t border-[#2D3A4A] text-[10.5px] text-[#8FA5B8] font-mono">
-          {footerHint}
-        </div>
+        {phase === 'shell' ? (
+          <LinuxTerminalStatusBar status={linuxTabs.status} hint={footerHint} />
+        ) : (
+          <div className="shrink-0 px-3.5 py-2 bg-[#1B2A3B] border-t border-[#2D3A4A] text-[10.5px] text-[#8FA5B8] font-mono">
+            {footerHint}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -6,6 +6,16 @@ import toast from 'react-hot-toast'
 import { PageHeader } from '../../components/design'
 import CompetencyScorecard from '../../components/interviews/CompetencyScorecard'
 import ConfidenceAnalysis from '../../components/interviews/ConfidenceAnalysis'
+import AIScorecard from '../../components/interviews/AIScorecard'
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
 
 export default function InterviewReport() {
   const { roundId } = useParams()
@@ -48,10 +58,10 @@ export default function InterviewReport() {
 
   const printReport = () => {
     const comp = (r.competency_ratings || [])
-      .map(c => `<tr><td>${c.name}</td><td style="text-align:right">${Math.round(c.score || 0)}</td><td>${c.rating}</td></tr>`)
+      .map(c => `<tr><td>${escapeHtml(c.name)}</td><td style="text-align:right">${Math.round(c.score || 0)}</td><td>${escapeHtml(c.rating)}</td></tr>`)
       .join('')
     const conf = r.confidence_analysis || {}
-    const recLabel = r.recommendation_label || ''
+    const recLabel = escapeHtml(r.recommendation_label || '')
     const html = `<!DOCTYPE html><html><head><title>Interview Scorecard</title>
 <style>body{font-family:system-ui,sans-serif;padding:40px;color:#111;max-width:760px;margin:auto}
 h1{font-size:24px;margin-bottom:4px}h3{margin-top:24px;border-bottom:1px solid #eee;padding-bottom:4px}
@@ -63,23 +73,23 @@ table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
 td,th{padding:6px 8px;border-bottom:1px solid #eee;text-align:left}
 ul{padding-left:20px;font-size:14px;line-height:1.6}.muted{color:#666;font-size:12px}</style></head><body>
 <h1>FixitLab Interview Scorecard</h1>
-<p class="muted">${round?.title || ''} · ${r.passed ? 'Passed' : 'Complete'} · Overall ${Math.round(r.overall_score || 0)}/100</p>
+<p class="muted">${escapeHtml(round?.title || '')} · ${r.passed ? 'Passed' : 'Complete'} · Overall ${Math.round(r.overall_score || 0)}/100</p>
 ${recLabel ? `<div class="rec">Recommendation: ${recLabel}</div>` : ''}
 <div class="grid">
 ${[['Overall', r.overall_score], ['Technical', r.technical_score], ['Communication', r.communication_score],
   ['Problem solving', r.problem_solving_score], ['Practical', r.practical_score], ['Presence', r.presence_score]]
-  .map(([l, v]) => `<div class="card"><div class="label">${l}</div><div class="score">${Math.round(v || 0)}</div></div>`).join('')}
+  .map(([l, v]) => `<div class="card"><div class="label">${escapeHtml(l)}</div><div class="score">${Math.round(v || 0)}</div></div>`).join('')}
 </div>
-<p>${r.summary || ''}</p>
+<p>${escapeHtml(r.summary || '')}</p>
 ${comp ? `<h3>Competency scorecard</h3><table><tr><th>Competency</th><th style="text-align:right">Score</th><th>Rating</th></tr>${comp}</table>` : ''}
-${conf.confidence_score != null ? `<h3>Communication & confidence (heuristic)</h3><p>${conf.summary || ''}</p>
+${conf.confidence_score != null ? `<h3>Communication & confidence (heuristic)</h3><p>${escapeHtml(conf.summary || '')}</p>
 <p class="muted">Confidence ${conf.confidence_score}/100 · ${conf.filler_per_100_words ?? 0} fillers/100 words · ${conf.avg_answer_words ?? 0} avg words/answer</p>` : ''}
-${conf.round_narrative ? `<h3>Round narrative</h3><p>${conf.round_narrative}</p>` : ''}
-${conf.phrase_coaching?.phrases_referenced?.length ? `<h3>Phrases from your answers</h3><p class="muted">${conf.phrase_coaching.summary_line || ''}</p><ul>${conf.phrase_coaching.phrases_referenced.map(p => `<li>${p}</li>`).join('')}</ul>` : ''}
-${conf.phrase_coaching?.improvements?.length ? `<h3>Phrase-level coaching</h3><ul>${conf.phrase_coaching.improvements.map(s => `<li>${s}</li>`).join('')}</ul>` : ''}
-<h3>Strengths</h3><ul>${(r.strengths || []).map(s => `<li>${s}</li>`).join('')}</ul>
-<h3>Areas to improve</h3><ul>${(r.improvements || []).map(s => `<li>${s}</li>`).join('')}</ul>
-${(transcript?.transcript || []).length ? `<h3>Transcript</h3>${transcript.transcript.filter(m => m.role !== 'system').map(m => `<p style="font-size:13px"><b>${m.role === 'candidate' ? 'You' : 'Interviewer'}:</b> ${m.content}</p>`).join('')}` : ''}
+${conf.round_narrative ? `<h3>Round narrative</h3><p>${escapeHtml(conf.round_narrative)}</p>` : ''}
+${conf.phrase_coaching?.phrases_referenced?.length ? `<h3>Phrases from your answers</h3><p class="muted">${escapeHtml(conf.phrase_coaching.summary_line || '')}</p><ul>${conf.phrase_coaching.phrases_referenced.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>` : ''}
+${conf.phrase_coaching?.improvements?.length ? `<h3>Phrase-level coaching</h3><ul>${conf.phrase_coaching.improvements.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>` : ''}
+<h3>Strengths</h3><ul>${(r.strengths || []).map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+<h3>Areas to improve</h3><ul>${(r.improvements || []).map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+${(transcript?.transcript || []).length ? `<h3>Transcript</h3>${transcript.transcript.filter(m => m.role !== 'system').map(m => `<p style="font-size:13px"><b>${m.role === 'candidate' ? 'You' : 'Interviewer'}:</b> ${escapeHtml(m.content)}</p>`).join('')}` : ''}
 </body></html>`
     const w = window.open('', '_blank')
     if (!w) { toast.error('Allow pop-ups to print PDF'); return }
@@ -144,6 +154,9 @@ ${(transcript?.transcript || []).length ? `<h3>Transcript</h3>${transcript.trans
           </p>
         )}
       </div>
+
+      {/* Per-answer STAR gauges + dimension breakdown */}
+      <AIScorecard report={r} round={round} />
 
       {/* Parity: hiring recommendation + per-competency scorecard */}
       <CompetencyScorecard

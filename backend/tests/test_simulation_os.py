@@ -72,6 +72,25 @@ class RHELShellCommandTests(SimpleTestCase):
         self.assertEqual(companion.hostname, "web1")
         self.assertIn("/etc/nginx/sites-enabled/default", companion.vfs)
 
+    def test_standalone_kubectl_uses_full_cluster_engine(self):
+        shell = RHELShell(scenario_slug="pod-crashloop")
+        out = shell.run("kubectl get pods")
+        self.assertIn("NAME", out)
+        self.assertIn("READY", out)
+        self.assertTrue(
+            "CrashLoopBackOff" in out or "Running" in out,
+            f"expected realistic pod statuses, got: {out!r}",
+        )
+        nodes = shell.run("kubectl get nodes")
+        self.assertIn("Ready", nodes)
+
+    def test_standalone_aws_cli(self):
+        shell = RHELShell()
+        out = shell.run("aws sts get-caller-identity")
+        self.assertIn("123456789012", out)
+        s3 = shell.run("aws s3 ls")
+        self.assertIn("fixitlab", s3.lower())
+
 
 class ValidationTests(SimpleTestCase):
     NGINX_CHECK = """#!/bin/bash

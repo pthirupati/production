@@ -1,4 +1,4 @@
-import { Activity, CheckCircle2, Clock, Lightbulb, StopCircle, Terminal, Timer } from 'lucide-react'
+import { Activity, CheckCircle2, Clock, Lightbulb, Server, StopCircle, Terminal, Timer } from 'lucide-react'
 import { useLabStore } from '../../store/labStore'
 import '../../styles/lab-chrome.css'
 
@@ -39,10 +39,24 @@ export function LabChromeControls({
   timeRemaining,
   buttonClass = 'lab-chrome-btn',
   primaryClass = 'lab-chrome-btn lab-chrome-btn-primary',
+  vmwareHref = null,
+  vmwareLabel = 'VMware Server',
 }) {
   return (
     <>
       {showTimer && <LabChromeTimer timeRemaining={timeRemaining} />}
+      {vmwareHref && (
+        <a
+          href={vmwareHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonClass}
+          style={{ textDecoration: 'none', color: 'inherit' }}
+          title="This server also lives in VMware. Open the vCenter simulator to perform hypervisor-side steps (add a disk, snapshot, reboot), then return here and rescan."
+        >
+          <Server size={13} className="text-[#4fa7e8]" /> {vmwareLabel}
+        </a>
+      )}
       {onHints && (
         <button type="button" className={buttonClass} onClick={onHints}>
           <Lightbulb size={13} className="text-[#F5A623]" /> {hintsLabel}
@@ -94,6 +108,8 @@ export default function LabChromeBar({
   timeRemaining,
   showTimer = true,
   backLabel = 'Terminal',
+  vmwareHref = null,
+  vmwareLabel = 'VMware Server',
   children = null,
 }) {
   const backHandler = onBackToTerminal || onExit
@@ -118,6 +134,8 @@ export default function LabChromeBar({
           timeRemaining={timeRemaining}
           showTimer={showTimer}
           backLabel={backLabel}
+          vmwareHref={vmwareHref}
+          vmwareLabel={vmwareLabel}
         />
       </div>
     </div>

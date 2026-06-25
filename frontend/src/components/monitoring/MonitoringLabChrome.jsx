@@ -16,6 +16,7 @@ export default function MonitoringLabChrome({
   checkDisabled = false,
   extendDisabled = false,
   backLabel = 'Terminal',
+  vmwareHref = null,
   children = null,
 }) {
   return (
@@ -34,6 +35,7 @@ export default function MonitoringLabChrome({
       checkDisabled={checkDisabled}
       extendDisabled={extendDisabled}
       backLabel={backLabel}
+      vmwareHref={vmwareHref}
     >
       {children}
     </LabChromeBar>

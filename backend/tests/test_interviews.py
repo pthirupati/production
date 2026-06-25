@@ -138,24 +138,10 @@ class InterviewStudioTests(TestCase):
         self.assertTrue(body["intro"]["content"].strip())
 
     def test_start_returns_200_and_engine_produces_question_no_api(self):
-        """End-to-end guarantee for the FREE interview path:
-
-        1. The start endpoint returns 200 (never a 500 "Server error") with NO
-           ANTHROPIC_API_KEY and NO pre-existing CandidateProfile.
-        2. The LLM engine falls back to the rule-based free engine (no client)
-           and still produces a non-empty interviewer reply — i.e. the live
-           interview NEVER depends on a paid API.
-        3. The question engine produces a question. The adaptive selector uses a
-           JSON ``contains`` lookup that SQLite cannot run locally; on CI/Postgres
-           it works, so we assert a question is produced there and only tolerate
-           the documented SQLite ``NotSupportedError`` on the local backend.
-        """
-        import os
-        from unittest import mock
-
+        """End-to-end guarantee for the FREE interview path (no paid APIs)."""
         from django.db.utils import NotSupportedError
 
-        from apps.interviews.services import llm_engine
+        from apps.interviews.services.interview_ai import generate_interviewer_reply
 
         campaign = InterviewCampaign.objects.create(
             user=self.user,
@@ -163,46 +149,35 @@ class InterviewStudioTests(TestCase):
             round_count=3,
             status="scheduled",
             primary_technology=self.tech,
-            profile_snapshot={},  # no profile at all
+            profile_snapshot={},
             experience_level="mid",
         )
         create_campaign_rounds(campaign)
         r1 = campaign.rounds.get(round_number=1)
 
-        env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
-        with mock.patch.dict(os.environ, env, clear=True):
-            # Drop any cached Anthropic client so the no-key state is observed.
-            llm_engine._get_client.cache_clear()
-            # (1) start endpoint must be 200, not 500.
-            res = self.client.post(f"/api/interviews/rounds/{r1.id}/start/", {}, format="json")
-            self.assertEqual(res.status_code, 200, res.content)
+        res = self.client.post(f"/api/interviews/rounds/{r1.id}/start/", {}, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
 
-            # (2) No paid client, yet the engine still replies (free fallback).
-            self.assertIsNone(llm_engine._get_client(), "must have no paid LLM client without a key")
-            reply = llm_engine.generate_interviewer_reply(
-                persona_name="Alex",
-                round_type="technical",
-                question_text="How do you debug high CPU?",
-                candidate_answer="I'd run top, then ps, then check recent deploys.",
-                score_hint={"quality": "strong", "score": 80},
-                profile_snapshot={},
-                conversation_tail=[],
-                strong_streak=1,
-            )
-            self.assertTrue(reply and reply.strip(), "free engine must produce a reply")
+        reply = generate_interviewer_reply(
+            persona_name="Alex",
+            round_type="technical",
+            question_text="How do you debug high CPU?",
+            candidate_answer="I'd run top, then ps, then check recent deploys.",
+            score_hint={"quality": "strong", "score": 80},
+            profile_snapshot={},
+            conversation_tail=[],
+            strong_streak=1,
+        )
+        self.assertTrue(reply and reply.strip(), "free engine must produce a reply")
 
-            # (3) Question engine produces a question (Postgres/CI); the SQLite
-            #     JSON-contains limitation is documented and tolerated locally.
-            r1.refresh_from_db()
-            try:
-                q = ask_next_question(r1)
-            except NotSupportedError:
-                self.skipTest("JSON contains lookup unsupported on local SQLite (works on CI Postgres)")
-            else:
-                self.assertIsNotNone(q, "free engine must select a question")
-                self.assertTrue(q.content.strip())
-        # Restore the client cache state for subsequent tests.
-        llm_engine._get_client.cache_clear()
+        r1.refresh_from_db()
+        try:
+            q = ask_next_question(r1)
+        except NotSupportedError:
+            self.skipTest("JSON contains lookup unsupported on local SQLite (works on CI Postgres)")
+        else:
+            self.assertIsNotNone(q, "free engine must select a question")
+            self.assertTrue(q.content.strip())
 
     def test_voice_config_free_browser(self):
         res = self.client.get("/api/interviews/voice/config/")

@@ -29,6 +29,7 @@ export function clearMonitoringAuth() {
 export default function MonitoringLoginGate({
   flavor = 'grafana', onAuthenticated, scenario, onExit, onStop, onHints,
   onCheck, onExtend, hintsLabel, checkDisabled, extendDisabled, embedded = false,
+  vmwareHref = null,
 }) {
   const cfg = CREDS[flavor] || CREDS.grafana
   const isGrafana = flavor === 'grafana'
@@ -79,6 +80,7 @@ export default function MonitoringLoginGate({
         hintsLabel={hintsLabel}
         checkDisabled={checkDisabled}
         extendDisabled={extendDisabled}
+        vmwareHref={vmwareHref}
       />
 
       <div className="flex-1 flex items-stretch">

@@ -11,7 +11,7 @@ import { useAuthStore } from '../store/authStore'
 import {
   Clock, Target, Lightbulb, Play, CheckCircle2,
   Wrench, Skull, ArrowLeft, BookmarkPlus, Bookmark,
-  Users, BarChart3, Hash, Award, Lock, Eye, Zap, Star, Send, Monitor,
+  Users, BarChart3, Hash, Award, Lock, Eye, Zap, Star, Send, Monitor, BookOpen,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader } from '../components/design'
@@ -444,6 +444,38 @@ export default function ScenarioDetail() {
         <h2 className="text-base font-semibold text-white mb-3">Description</h2>
         <p className="text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">{scenario.description}</p>
       </div>
+
+      {scenario.related_tutorials?.length > 0 && (
+        <div className="glass-card p-6 border-accent-purple/15">
+          <h2 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
+            <BookOpen size={16} className="text-accent-purple" /> Related tutorials
+          </h2>
+          <p className="text-xs text-surface-500 mb-4">Study these lessons before or after this lab.</p>
+          <div className="space-y-2">
+            {scenario.related_tutorials.map((t) => (
+              <Link
+                key={t.slug}
+                to={`/tutorials/${t.slug}`}
+                className="flex items-center justify-between p-3 rounded-lg bg-surface-800/40 border border-surface-700/40 hover:border-accent-purple/30 transition-colors group"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white group-hover:text-accent-purple truncate">{t.title}</p>
+                  <p className="text-xs text-surface-500">
+                    {t.topic} · {t.estimated_minutes || '?'} min · {t.section_count || 0} sections
+                  </p>
+                </div>
+                <span className={`text-[10px] px-2 py-0.5 rounded border capitalize shrink-0 ml-2 ${
+                  t.difficulty === 'advanced' ? 'border-accent-red/30 text-accent-red'
+                    : t.difficulty === 'intermediate' ? 'border-accent-amber/30 text-accent-amber'
+                      : 'border-accent-green/30 text-accent-green'
+                }`}>
+                  {t.difficulty || 'beginner'}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Expected outcome */}
       {objectives.length > 0 && (

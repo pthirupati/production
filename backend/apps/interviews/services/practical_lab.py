@@ -375,8 +375,8 @@ def validate_practical_answer(round_obj: InterviewRound, answer: str) -> dict:
                 from apps.interviews.services.live_coding import grade_by_signals
 
                 sig = grade_by_signals(answer, signals)
-                if sig.get("validated") or result.get("method") == "code":
-                    result = sig
+                if sig.get("partial_signals"):
+                    result = {**result, **sig, "validated": False}
     elif config.get("expected_signals") and config.get("kind") == "code":
         from apps.interviews.services.live_coding import grade_by_signals
 

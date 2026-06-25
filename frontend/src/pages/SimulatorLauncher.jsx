@@ -45,7 +45,7 @@ export default function SimulatorLauncher() {
         })}
       </div>
       <p className="text-xs text-surface-500 mt-8 text-center">
-        Simulators open inside lab sessions with Hints, Check, +30m, and Stop controls. VMware vCenter is available from cross-tech scenarios only.
+        Simulators open inside lab sessions with Hints, Check, +30m, and Stop controls. VMware vCenter is available from VM-backed labs (Linux, Windows, monitoring, AWX, Terraform, and cross-tech scenarios).
       </p>
     </div>
   )

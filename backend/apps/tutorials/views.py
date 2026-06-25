@@ -4,21 +4,50 @@ Both endpoints are ``AllowAny`` (these are public marketing/SEO pages, like the
 blog) and rate-limited per-IP via ``StrictAnonRateThrottle``. They are written
 to degrade gracefully — a DB hiccup returns an empty list / 404 rather than a
 500 that would blank the public page.
+
+Authenticated users can persist tutorial read progress via
+``/api/tutorials/progress/`` and ``/api/tutorials/<slug>/progress/``.
 """
 
 import logging
 
 from django.db.models import Count
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.throttles import StrictAnonRateThrottle
 
-from .models import Tutorial
-from .serializers import TutorialDetailSerializer, TutorialListSerializer
+from .models import Tutorial, TutorialProgress
+from .serializers import (
+    TutorialDetailSerializer,
+    TutorialListSerializer,
+    TutorialProgressSerializer,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _scenario_brief(scenario_slug: str) -> dict | None:
+    if not scenario_slug:
+        return None
+    try:
+        from apps.question_bank.models import Scenario
+
+        sc = Scenario.objects.filter(slug=scenario_slug, is_active=True).only(
+            "slug", "title", "difficulty", "technology_id"
+        ).select_related("technology").first()
+        if not sc:
+            return None
+        return {
+            "slug": sc.slug,
+            "title": sc.title,
+            "difficulty": sc.difficulty,
+            "technology": sc.technology.name if sc.technology else "",
+            "technology_slug": sc.technology.slug if sc.technology else "",
+        }
+    except Exception:
+        return None
 
 
 class TutorialListView(APIView):
@@ -123,7 +152,6 @@ class TutorialDetailView(APIView):
             logger.exception("TutorialDetailView failed for slug=%s", slug)
             return Response({"error": "Tutorial not found"}, status=404)
 
-        # "Related" cards: same topic, excluding the current tutorial.
         try:
             related = list(
                 Tutorial.objects.filter(is_published=True, topic=tutorial.topic)
@@ -135,9 +163,18 @@ class TutorialDetailView(APIView):
 
         data = TutorialDetailSerializer(tutorial).data
         data["related"] = TutorialListSerializer(related, many=True).data
+        data["linked_scenario"] = _scenario_brief(tutorial.scenario_slug)
 
-        # Ordered learning path within the same technology/topic — powers prev/next
-        # navigation and the sidebar curriculum on the detail page.
+        if tutorial.scenario_slug:
+            try:
+                data["related_scenarios"] = [
+                    b for b in [_scenario_brief(tutorial.scenario_slug)] if b
+                ]
+            except Exception:
+                data["related_scenarios"] = []
+        else:
+            data["related_scenarios"] = []
+
         try:
             if tutorial.course_slug:
                 siblings = list(
@@ -173,4 +210,89 @@ class TutorialDetailView(APIView):
                 "path": [],
             }
 
+        if request.user.is_authenticated:
+            try:
+                prog = TutorialProgress.objects.filter(user=request.user, tutorial=tutorial).first()
+                if prog:
+                    data["user_progress"] = TutorialProgressSerializer(prog).data
+            except Exception:
+                pass
+
         return Response(data)
+
+
+class TutorialProgressListView(APIView):
+    """GET /api/tutorials/progress/ — current user's tutorial progress rows."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            rows = (
+                TutorialProgress.objects.filter(user=request.user)
+                .select_related("tutorial")
+                .prefetch_related("tutorial__sections")
+                .order_by("-updated_at")[:50]
+            )
+            return Response({
+                "progress": TutorialProgressSerializer(rows, many=True).data,
+            })
+        except Exception:
+            logger.exception("TutorialProgressListView failed")
+            return Response({"progress": []})
+
+
+class TutorialContinueView(APIView):
+    """GET /api/tutorials/progress/continue/ — in-progress tutorials to resume."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            rows = (
+                TutorialProgress.objects.filter(user=request.user, completed=False)
+                .select_related("tutorial")
+                .prefetch_related("tutorial__sections")
+                .order_by("-updated_at")[:6]
+            )
+            return Response({
+                "continue": TutorialProgressSerializer(rows, many=True).data,
+            })
+        except Exception:
+            logger.exception("TutorialContinueView failed")
+            return Response({"continue": []})
+
+
+class TutorialProgressUpdateView(APIView):
+    """POST /api/tutorials/<slug>/progress/ — update section progress."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, slug):
+        try:
+            tutorial = Tutorial.objects.filter(is_published=True).prefetch_related("sections").get(slug=slug)
+        except Tutorial.DoesNotExist:
+            return Response({"error": "Tutorial not found"}, status=404)
+
+        section_order = int(request.data.get("section_order") or 0)
+        mark_complete = bool(request.data.get("mark_complete"))
+        completed_sections = request.data.get("completed_sections")
+
+        prog, _ = TutorialProgress.objects.get_or_create(user=request.user, tutorial=tutorial)
+        if isinstance(completed_sections, list):
+            prog.completed_sections = sorted({int(x) for x in completed_sections if str(x).isdigit()})
+        elif section_order and section_order not in prog.completed_sections:
+            prog.completed_sections = sorted(set(prog.completed_sections or []) | {section_order})
+
+        if section_order:
+            prog.last_section_order = max(prog.last_section_order or 0, section_order)
+
+        total = tutorial.sections.count()
+        if mark_complete or (total and len(prog.completed_sections) >= total):
+            prog.completed = True
+            prog.completed_sections = sorted(
+                tutorial.sections.values_list("order", flat=True)
+            )
+
+        prog.save()
+        return Response({"ok": True, "progress": TutorialProgressSerializer(prog).data})

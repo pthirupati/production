@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Clock, Layers, ChevronLeft, ChevronRight, FlaskConical,
-  Copy, Check, BookOpen, ListTree, GraduationCap,
+  Copy, Check, BookOpen, ListTree, GraduationCap, Terminal,
 } from 'lucide-react'
 import PublicLayout from '../../components/layout/PublicLayout'
 import { FixitPanel } from '../../components/design'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import { tutorialApi } from '../../api/tutorials'
 import { useAuthStore } from '../../store/authStore'
+import TutorialQuiz from '../../components/tutorials/TutorialQuiz'
+import { tutorialPlaygroundHref } from '../../utils/playgroundLinks'
+import { getLocalTutorialProgress, markLocalSection, progressPct, setLocalTutorialProgress } from '../../utils/tutorialProgress'
 
 const DIFFICULTY_CLASS = {
   beginner: 'text-accent-green bg-accent-green/10 border-accent-green/20',
@@ -134,6 +137,8 @@ export default function TutorialDetail() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [activeSection, setActiveSection] = useState(null)
+  const [completedSections, setCompletedSections] = useState([])
+  const [readProgressPct, setReadProgressPct] = useState(0)
 
   usePageTitle(tutorial?.meta_title || 'Tutorial', tutorial?.meta_description || '')
 
@@ -146,11 +151,48 @@ export default function TutorialDetail() {
         if (cancelled) return
         if (!data || data.error) { setNotFound(true); return }
         setTutorial(data)
+        const prog = data.user_progress
+        if (prog?.completed_sections) {
+          setCompletedSections(prog.completed_sections)
+          setReadProgressPct(prog.progress_pct || progressPct(prog.completed_sections, data.sections?.length))
+        } else {
+          const local = getLocalTutorialProgress(slug)
+          setCompletedSections(local.completed_sections || [])
+          setReadProgressPct(progressPct(local.completed_sections, data.sections?.length))
+        }
       })
       .catch(() => { if (!cancelled) setNotFound(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [slug])
+
+  const persistSectionProgress = (sectionOrder) => {
+    if (!tutorial || !sectionOrder) return
+    const total = tutorial.sections?.length || 0
+    setCompletedSections((prev) => {
+      if (prev.includes(sectionOrder)) return prev
+      const next = [...prev, sectionOrder].sort((a, b) => a - b)
+      setReadProgressPct(progressPct(next, total))
+      if (isAuthenticated) {
+        tutorialApi.updateProgress(slug, { section_order: sectionOrder, completed_sections: next }).catch(() => {})
+      } else {
+        markLocalSection(slug, sectionOrder, total)
+      }
+      return next
+    })
+  }
+
+  const markTutorialComplete = () => {
+    const total = tutorial.sections?.length || 0
+    const allOrders = (tutorial.sections || []).map((s) => s.order)
+    setCompletedSections(allOrders)
+    setReadProgressPct(100)
+    if (isAuthenticated) {
+      tutorialApi.updateProgress(slug, { mark_complete: true, completed_sections: allOrders }).catch(() => {})
+    } else {
+      setLocalTutorialProgress(slug, { completed_sections: allOrders, completed: true, last_section_order: total })
+    }
+  }
 
   useEffect(() => {
     if (!tutorial?.seo_keywords) return
@@ -170,7 +212,10 @@ export default function TutorialDetail() {
         const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)
         if (visible[0]?.target?.id) {
           const order = Number(visible[0].target.id.replace('section-', ''))
-          if (!Number.isNaN(order)) setActiveSection(order)
+          if (!Number.isNaN(order)) {
+            setActiveSection(order)
+            persistSectionProgress(order)
+          }
         }
       },
       { rootMargin: '-20% 0px -60% 0px', threshold: [0, 0.25, 0.5] },
@@ -213,8 +258,10 @@ export default function TutorialDetail() {
 
   const sections = tutorial.sections || []
   const curriculum = tutorial.curriculum || {}
-  const hasScenario = Boolean(tutorial.scenario_slug)
-  const progressPct = curriculum.total_in_topic
+  const hasScenario = Boolean(tutorial.scenario_slug || tutorial.linked_scenario)
+  const linkedScenario = tutorial.linked_scenario
+  const readingPct = readProgressPct || progressPct(completedSections, sections.length)
+  const progressPctTrack = curriculum.total_in_topic
     ? Math.round((curriculum.position / curriculum.total_in_topic) * 100)
     : 0
 
@@ -254,9 +301,10 @@ export default function TutorialDetail() {
                 <p className="text-[10px] text-surface-500 mb-2">
                   Lesson {curriculum.position} of {curriculum.total_in_topic}
                 </p>
-                <div className="h-1.5 bg-surface-800 rounded-full overflow-hidden mb-3">
-                  <div className="h-full bg-accent-cyan rounded-full transition-all" style={{ width: `${progressPct}%` }} />
+                <div className="h-1.5 bg-surface-800 rounded-full overflow-hidden mb-1">
+                  <div className="h-full bg-accent-cyan rounded-full transition-all" style={{ width: `${progressPctTrack}%` }} />
                 </div>
+                <p className="text-[10px] text-surface-500 mb-3">Reading progress: {readingPct}%</p>
                 <div className="space-y-0.5 max-h-40 overflow-y-auto">
                   {(curriculum.path || []).map((p, i) => (
                     <Link
@@ -281,6 +329,37 @@ export default function TutorialDetail() {
                 </div>
                 <SectionNav sections={sections} activeOrder={activeSection} />
               </FixitPanel>
+
+              {(linkedScenario || (tutorial.related_scenarios || []).length > 0) && (
+                <FixitPanel padding="p-4" className="border-accent-cyan/10">
+                  <div className="flex items-center gap-2 mb-3">
+                    <FlaskConical size={14} className="text-accent-cyan" />
+                    <p className="tutorial-sidebar-title">Practice labs</p>
+                  </div>
+                  <div className="space-y-2">
+                    {linkedScenario && (
+                      <Link
+                        to={`/scenarios/${linkedScenario.slug}`}
+                        className="block text-[11px] py-2 px-2 rounded border border-accent-cyan/20 bg-accent-cyan/5 text-accent-cyan hover:bg-accent-cyan/10"
+                      >
+                        <span className="font-medium">{linkedScenario.title || linkedScenario.slug}</span>
+                        <span className="block text-[10px] text-surface-500 mt-0.5">Primary lab for this lesson</span>
+                      </Link>
+                    )}
+                    {(tutorial.related_scenarios || [])
+                      .filter((s) => s.slug !== linkedScenario?.slug && s.slug !== tutorial.scenario_slug)
+                      .map((s) => (
+                        <Link
+                          key={s.slug}
+                          to={`/scenarios/${s.slug}`}
+                          className="block text-[11px] py-1.5 px-2 rounded text-surface-400 hover:text-surface-200 hover:bg-surface-800/50 truncate"
+                        >
+                          {s.title || s.slug}
+                        </Link>
+                      ))}
+                  </div>
+                </FixitPanel>
+              )}
             </aside>
 
             <article>
@@ -318,18 +397,37 @@ export default function TutorialDetail() {
                   <span className="flex items-center gap-1"><Clock size={13} /> {tutorial.estimated_minutes} min read</span>
                   <span className="flex items-center gap-1"><Layers size={13} /> {sections.length} sections</span>
                 </div>
-                {hasScenario && (
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <Link to={`/scenarios/${tutorial.scenario_slug}`} className="btn-primary text-sm inline-flex items-center gap-1.5">
-                      <FlaskConical size={14} /> Start lab
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {hasScenario && (
+                    <Link to={`/scenarios/${tutorial.scenario_slug || linkedScenario?.slug}`} className="btn-primary text-sm inline-flex items-center gap-1.5">
+                      <FlaskConical size={14} /> Start matching lab
                     </Link>
-                  </div>
-                )}
+                  )}
+                  {tutorial.playground_slug && (
+                    <Link
+                      to={tutorialPlaygroundHref(tutorial.playground_slug, tutorial.scenario_slug)}
+                      className="btn-secondary text-sm inline-flex items-center gap-1.5"
+                    >
+                      <Terminal size={14} /> Try in playground
+                    </Link>
+                  )}
+                  {readingPct < 100 && (
+                    <button type="button" onClick={markTutorialComplete} className="text-sm px-3 py-2 rounded-lg border border-surface-700 text-surface-300 hover:text-white hover:border-surface-500">
+                      Mark lesson complete
+                    </button>
+                  )}
+                  {readingPct >= 100 && (
+                    <span className="text-xs text-accent-green flex items-center gap-1 px-2 py-2">
+                      <GraduationCap size={14} /> Lesson completed
+                    </span>
+                  )}
+                </div>
               </header>
 
               <div className="space-y-5">
                 {sections.map((s, i) => {
                   const theme = sectionTheme(s.heading)
+                  const done = completedSections.includes(s.order)
                   return (
                     <section
                       key={i}
@@ -337,7 +435,9 @@ export default function TutorialDetail() {
                       className={`tutorial-section-card scroll-mt-24 ${theme}`}
                     >
                       <div className="tutorial-section-head">
-                        <span className="tutorial-section-num">{String(i + 1).padStart(2, '0')}</span>
+                        <span className={`tutorial-section-num ${done ? 'text-accent-green' : ''}`}>
+                          {done ? '✓' : String(i + 1).padStart(2, '0')}
+                        </span>
                         <div>
                           <h2 className="tutorial-section-title">{s.heading}</h2>
                           <span className="tutorial-section-badge">{s.heading}</span>
@@ -345,6 +445,12 @@ export default function TutorialDetail() {
                       </div>
                       <Body text={s.body} />
                       {s.code && <CodeBlock code={s.code} language={s.code_language} caption={s.code_caption} />}
+                      {s.quiz && (
+                        <TutorialQuiz
+                          quiz={s.quiz}
+                          onPassed={() => persistSectionProgress(s.order)}
+                        />
+                      )}
                     </section>
                   )
                 })}
