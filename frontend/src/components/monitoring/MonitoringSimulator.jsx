@@ -226,6 +226,19 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
   const dash = (graf.dashboards || []).find(d => d.uid === activeDash) || graf.dashboards?.[0]
   const externalNav = activeNav != null
 
+  const browseDashboards = useMemo(() => {
+    const fromState = (graf.dashboards || []).map((d) => ({
+      uid: d.uid,
+      title: d.title,
+      folder: d.folder || 'General',
+      tags: d.tags || ['lab'],
+      updated: 'Just now',
+    }))
+    const stateUids = new Set(fromState.map((d) => d.uid))
+    const extras = GRAFANA_DASHBOARD_BROWSE.filter((d) => !stateUids.has(d.uid))
+    return [...fromState, ...extras]
+  }, [graf.dashboards])
+
   useEffect(() => {
     if (activeNav) setSub(GRAFANA_NAV_MAP[activeNav] || 'dashboards')
   }, [activeNav])
@@ -374,8 +387,15 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
                   <th className="text-left py-2 px-2">Name</th><th className="text-left py-2">Folder</th><th className="text-left py-2">Tags</th><th className="text-left py-2">Updated</th>
                 </tr></thead>
                 <tbody>
-                  {GRAFANA_DASHBOARD_BROWSE.map((d) => (
-                    <tr key={d.uid} className="border-b border-[#262a45]/50 hover:bg-white/5 cursor-pointer" onClick={() => { setActiveDash(d.uid); setGrafanaChildNav('View') }}>
+                  {browseDashboards.map((d) => (
+                    <tr key={d.uid} className="border-b border-[#262a45]/50 hover:bg-white/5 cursor-pointer" onClick={() => {
+                      if ((graf.dashboards || []).some((gd) => gd.uid === d.uid)) {
+                        setActiveDash(d.uid)
+                        setGrafanaChildNav('View')
+                      } else {
+                        setGrafanaChildNav('Browse')
+                      }
+                    }}>
                       <td className="py-2 px-2 text-[#f7913b]">{d.title}</td>
                       <td className="py-2 text-[#8a93b2]">{d.folder}</td>
                       <td className="py-2">{d.tags.map((t) => <span key={t} className="mon-badge mon-badge-up mr-1 text-[9px]">{t}</span>)}</td>
@@ -417,6 +437,17 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
                 <div className="text-[10px] text-[#8a93b2] mt-1">{p.type} · {p.datasource}</div>
               </div>
             ))}
+          </div>
+        )}
+
+        {sub === 'dashboards' && !dash && !['Browse', 'Playlists', 'Snapshots', 'Library panels'].includes(grafanaChildNav) && (
+          <div className="mon-card text-center py-14">
+            <Gauge size={36} className="mx-auto text-[#f7913b] mb-3 opacity-80" />
+            <div className="mon-panel-title mb-2">No dashboards yet</div>
+            <p className="mon-panel-sub mb-4">Create a dashboard to start building panels and visualizations.</p>
+            <button type="button" className="mon-btn-primary inline-flex items-center gap-1" onClick={createDashboard}>
+              <Plus size={14} /> New dashboard
+            </button>
           </div>
         )}
 
@@ -581,7 +612,36 @@ function PrometheusAlertsPanel({ prom }) {
 }
 
 /* ── Prometheus status sub-pages ── */
-function PrometheusStatusPanel({ prom, statusSub }) {
+function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
+  const [newTarget, setNewTarget] = useState({ job: 'node', url: 'http://localhost:9100/metrics' })
+  const [newRule, setNewRule] = useState({ group: 'lab', name: '', expr: 'up == 0', for: '5m' })
+  const [busy, setBusy] = useState(false)
+
+  const addTarget = async () => {
+    if (!sessionId || !newTarget.url.trim()) return
+    setBusy(true)
+    try {
+      await monitoringApi.action(sessionId, 'add_scrape_target', {
+        job: newTarget.job.trim(),
+        scrape_url: newTarget.url.trim(),
+      })
+      onReload?.()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const addRule = async () => {
+    if (!sessionId || !newRule.name.trim()) return
+    setBusy(true)
+    try {
+      await monitoringApi.action(sessionId, 'add_alert_rule', newRule)
+      onReload?.()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (statusSub === 'configuration') {
     return (
       <div className="mon-card bg-white !border-gray-200">
@@ -632,6 +692,21 @@ function PrometheusStatusPanel({ prom, statusSub }) {
   if (statusSub === 'rules') {
     return (
       <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="text-sm font-semibold text-gray-800">Alerting rules</div>
+          <button type="button" className="mon-btn-primary !text-xs flex items-center gap-1" style={{ background: '#e6522c' }}
+            disabled={busy || !newRule.name.trim()} onClick={addRule}>
+            <Plus size={13} /> New alert rule
+          </button>
+        </div>
+        <div className="mon-card bg-white !border-gray-200 p-3 grid sm:grid-cols-4 gap-2">
+          <input className="mon-input bg-white !text-gray-800" placeholder="Group" value={newRule.group}
+            onChange={(e) => setNewRule((p) => ({ ...p, group: e.target.value }))} />
+          <input className="mon-input bg-white !text-gray-800" placeholder="Alert name" value={newRule.name}
+            onChange={(e) => setNewRule((p) => ({ ...p, name: e.target.value }))} />
+          <input className="mon-input bg-white !text-gray-800 font-mono text-xs sm:col-span-2" placeholder="PromQL expr" value={newRule.expr}
+            onChange={(e) => setNewRule((p) => ({ ...p, expr: e.target.value }))} />
+        </div>
         <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
           <div className="px-3 py-2 text-xs font-semibold text-gray-600 border-b">Recording rules</div>
           <table className="w-full text-sm">
@@ -660,7 +735,21 @@ function PrometheusStatusPanel({ prom, statusSub }) {
   }
   // targets (default)
   return (
-    <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-sm font-semibold text-gray-800">Scrape targets</div>
+        <button type="button" className="mon-btn-primary !text-xs flex items-center gap-1" style={{ background: '#e6522c' }}
+          disabled={busy || !newTarget.url.trim()} onClick={addTarget}>
+          <Plus size={13} /> Add target
+        </button>
+      </div>
+      <div className="mon-card bg-white !border-gray-200 p-3 grid sm:grid-cols-3 gap-2">
+        <input className="mon-input bg-white !text-gray-800" placeholder="Job" value={newTarget.job}
+          onChange={(e) => setNewTarget((p) => ({ ...p, job: e.target.value }))} />
+        <input className="mon-input bg-white !text-gray-800 font-mono text-xs sm:col-span-2" placeholder="http://host:port/metrics"
+          value={newTarget.url} onChange={(e) => setNewTarget((p) => ({ ...p, url: e.target.value }))} />
+      </div>
+      <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
       <table className="w-full text-sm">
         <thead><tr className="bg-gray-50 text-gray-500 text-xs"><th className="px-3 py-2 text-left">Job</th><th className="px-3 py-2 text-left">Endpoint</th><th className="px-3 py-2 text-left">State</th><th className="px-3 py-2 text-left">Last scrape</th><th className="px-3 py-2 text-left">Error</th></tr></thead>
         <tbody>
@@ -675,6 +764,7 @@ function PrometheusStatusPanel({ prom, statusSub }) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
@@ -699,7 +789,7 @@ function PromQueryGraph({ result }) {
 }
 
 /* ── Prometheus view ── */
-function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, statusSub = 'targets' }) {
+function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, statusSub = 'targets', onReload }) {
   const prom = state.prometheus || {}
   const externalNav = activeNav != null
   const [sub, setSub] = useState('query')
@@ -757,7 +847,7 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, st
 
       {showAlerts && <PrometheusAlertsPanel prom={prom} />}
 
-      {showStatus && <PrometheusStatusPanel prom={prom} statusSub={statusSub} />}
+      {showStatus && <PrometheusStatusPanel prom={prom} statusSub={statusSub} sessionId={sessionId} onReload={onReload} />}
 
       {(showGraph || (!externalNav && sub === 'query')) && (
         <div className="space-y-3">
@@ -811,67 +901,14 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, st
       )}
 
       {!externalNav && sub === 'targets' && (
-        <div className="mon-card !p-0 overflow-hidden">
-          <table className="mon-table">
-            <thead><tr><th>Job</th><th>Endpoint</th><th>State</th><th>Last scrape</th><th>Error</th></tr></thead>
-            <tbody>
-              {(prom.targets || []).map((t, i) => (
-                <tr key={i}>
-                  <td className="font-medium text-[#d8def0]">{t.job}</td>
-                  <td className="font-mono opacity-80">{t.scrape_url}</td>
-                  <td>
-                    <span className={`mon-badge ${t.health === 'down' ? 'mon-badge-down' : 'mon-badge-up'}`}>
-                      {t.health === 'down' ? 'DOWN' : 'UP'}
-                    </span>
-                  </td>
-                  <td className="font-mono opacity-70">{t.scrape_duration_ms}ms</td>
-                  <td className="text-[#ffb4b4] text-xs">{t.last_error || ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <PrometheusStatusPanel prom={prom} statusSub="targets" sessionId={sessionId} onReload={onReload} />
       )}
 
-      {sub === 'rules' && (
-        <div className="space-y-3">
-          <div className="mon-card !p-0 overflow-hidden">
-            <div className="px-3 py-2 mon-panel-sub border-b border-[#262a45] flex items-center gap-2"><Layers size={13} /> Recording rules</div>
-            <table className="mon-table">
-              <thead><tr><th>Group</th><th>Name</th><th>Expr</th><th>Health</th></tr></thead>
-              <tbody>
-                {(prom.recording_rules || []).map((r, i) => (
-                  <tr key={i}>
-                    <td className="font-mono">{r.group}</td>
-                    <td className="font-medium text-[#d8def0]">{r.name}</td>
-                    <td className="font-mono text-xs opacity-80">{r.expr}</td>
-                    <td><span className={`mon-badge ${r.health === 'err' ? 'mon-badge-down' : 'mon-badge-up'}`}>{r.health}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mon-card !p-0 overflow-hidden">
-            <div className="px-3 py-2 mon-panel-sub border-b border-[#262a45] flex items-center gap-2"><Bell size={13} /> Alerting rules</div>
-            <table className="mon-table">
-              <thead><tr><th>Group</th><th>Alert</th><th>Expr</th><th>For</th><th>State</th></tr></thead>
-              <tbody>
-                {(prom.alerting_rules || []).map((r, i) => (
-                  <tr key={i}>
-                    <td className="font-mono">{r.group}</td>
-                    <td className="font-medium text-[#d8def0]">{r.name}</td>
-                    <td className="font-mono text-xs opacity-80">{r.expr}</td>
-                    <td className="font-mono">{r.for}</td>
-                    <td><span className={`mon-badge ${r.state === 'firing' ? 'mon-badge-down' : r.state === 'pending' ? 'mon-badge-warn' : 'mon-badge-up'}`}>{r.state}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {!externalNav && sub === 'rules' && (
+        <PrometheusStatusPanel prom={prom} statusSub="rules" sessionId={sessionId} onReload={onReload} />
       )}
 
-      {sub === 'alertmanager' && prom.alertmanager && (
+      {!externalNav && sub === 'alertmanager' && prom.alertmanager && (
         <div className="space-y-3">
           <div className="mon-card">
             <div className="mon-panel-title mb-1">Routing tree</div>
@@ -1042,7 +1079,7 @@ export default function MonitoringSimulator({
         ) : (
           <PrometheusView state={state} sessionId={sessionId} scenario={slug}
                           defaultExpr={summary.targets_down ? 'up == 0' : 'up'}
-                          activeNav={promNav} statusSub={promStatusSub} />
+                          activeNav={promNav} statusSub={promStatusSub} onReload={load} />
         )}
           </div>
         </div>

@@ -905,6 +905,60 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "Dashboard created", "dashboard": dash}
 
+    if action == "add_scrape_target":
+        job = (payload.get("job") or "custom").strip()
+        url = (payload.get("url") or payload.get("scrape_url") or "").strip()
+        if not url:
+            return {"ok": False, "error": "scrape_url is required"}
+        targets = state["prometheus"].setdefault("targets", [])
+        if any(t.get("scrape_url") == url for t in targets):
+            return {"ok": False, "error": f"Target {url} already exists"}
+        target = {
+            "job": job,
+            "scrape_url": url,
+            "health": payload.get("health", "unknown"),
+            "scrape_duration_ms": int(payload.get("scrape_duration_ms") or 0),
+            "last_error": payload.get("last_error") or "",
+        }
+        targets.append(target)
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Added scrape target {url}", "target": target}
+
+    if action == "add_alert_rule":
+        group = (payload.get("group") or "lab").strip()
+        name = (payload.get("name") or payload.get("alert") or "").strip()
+        expr = (payload.get("expr") or "up == 0").strip()
+        if not name:
+            return {"ok": False, "error": "alert name is required"}
+        rules = state["prometheus"].setdefault("alerting_rules", [])
+        if any(r.get("name") == name for r in rules):
+            return {"ok": False, "error": f"Alert rule '{name}' already exists"}
+        rule = {
+            "group": group,
+            "name": name,
+            "expr": expr,
+            "for": payload.get("for") or "5m",
+            "state": payload.get("state") or "inactive",
+            "annotations": payload.get("annotations") or {"summary": name},
+        }
+        rules.append(rule)
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Added alert rule {name}", "rule": rule}
+
+    if action == "add_recording_rule":
+        group = (payload.get("group") or "lab").strip()
+        name = (payload.get("name") or "").strip()
+        expr = (payload.get("expr") or "").strip()
+        if not name or not expr:
+            return {"ok": False, "error": "name and expr are required"}
+        rules = state["prometheus"].setdefault("recording_rules", [])
+        if any(r.get("name") == name for r in rules):
+            return {"ok": False, "error": f"Recording rule '{name}' already exists"}
+        rule = {"group": group, "name": name, "expr": expr, "health": "ok"}
+        rules.append(rule)
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Added recording rule {name}", "rule": rule}
+
     if action == "mark_fix_applied":
         # The Linux/terminal fix step (rewriting the broken config + FIXED-OK)
         # is what actually grades the lab. The UI may call this so panels redraw

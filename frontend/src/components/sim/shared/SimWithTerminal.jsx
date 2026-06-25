@@ -19,7 +19,7 @@ export default function SimWithTerminal({
       <div className={`flex flex-col min-h-0 overflow-hidden ${open ? 'flex-1' : 'flex-1'}`}>
         {children}
       </div>
-      {open && terminalSession && (
+      {open && (
         <div className="shrink-0 flex flex-col border-t border-surface-700 bg-surface-950 h-[min(42vh,400px)] min-h-[180px]">
           <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-1.5 bg-surface-900 border-b border-surface-800">
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-surface-300">
@@ -35,12 +35,18 @@ export default function SimWithTerminal({
             </button>
           </div>
           <div className="flex-1 min-h-0">
-            <LabTerminal
-              session={terminalSession}
-              host={terminalHost}
-              blockedCommands={blockedCommands}
-              isMobile={isMobile}
-            />
+            {terminalSession ? (
+              <LabTerminal
+                session={terminalSession}
+                host={terminalHost}
+                blockedCommands={blockedCommands}
+                isMobile={isMobile}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center px-4 text-center text-sm text-surface-500">
+                Waiting for lab terminal — provisioning may still be in progress.
+              </div>
+            )}
           </div>
         </div>
       )}

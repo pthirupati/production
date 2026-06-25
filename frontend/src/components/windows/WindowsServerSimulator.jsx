@@ -4,6 +4,7 @@ import {
   Lightbulb, XCircle, CheckCircle2, AlertTriangle, Lock, Server,
   ShieldCheck, Network, Globe, HardDrive, Cpu, ChevronRight, Plus,
   Play, Square, RotateCw, Download, UserCog, FolderTree, Power, Trash2,
+  FolderOpen, Wifi, Monitor, Terminal, Settings,
 } from 'lucide-react'
 import { windowsApi } from '../../api/windows'
 import { LabChromeControls } from '../lab/LabChromeBar'
@@ -705,12 +706,228 @@ function GroupPolicyEditor({ state, busy, onAction }) {
 
 const NAV = [
   { key: 'dashboard', label: 'Server Manager', icon: LayoutDashboard },
+  { key: 'explorer', label: 'File Explorer', icon: FolderOpen },
+  { key: 'storage', label: 'Disk Management', icon: HardDrive },
+  { key: 'network', label: 'Network', icon: Wifi },
+  { key: 'devices', label: 'Device Manager', icon: Monitor },
+  { key: 'settings', label: 'Settings', icon: Settings },
   { key: 'ad', label: 'Active Directory', icon: Users },
   { key: 'gpo', label: 'Group Policy', icon: FolderTree },
   { key: 'update', label: 'Windows Update', icon: Download },
   { key: 'services', label: 'Services', icon: Settings2 },
   { key: 'system', label: 'System (Domain)', icon: Globe },
 ]
+
+function FileExplorerPanel({ state }) {
+  const explorer = state.explorer || {}
+  const [path, setPath] = useState('C:\\')
+  const folders = explorer.folders?.[path] || []
+  const drives = explorer.drives || []
+  return (
+    <div>
+      <div className="win-h1">File Explorer</div>
+      <div className="win-sub mb-4">Browse local disks and folders on {state.computer_name}</div>
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4">
+        <div className="win-card !p-2">
+          <div className="win-card-head text-xs">This PC</div>
+          {drives.map((d) => (
+            <button key={d.path} type="button" className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-[#f3f3f3] ${path === d.path ? 'bg-[#e8f4fc] font-medium' : ''}`}
+              onClick={() => setPath(d.path)}>
+              <HardDrive size={14} className="inline mr-2 text-[#0078D4]" /> {d.label} ({d.path})
+            </button>
+          ))}
+        </div>
+        <div className="win-card">
+          <div className="win-card-head flex items-center gap-2">
+            <FolderOpen size={14} className="text-[#0078D4]" />
+            <span className="font-mono text-sm">{path}</span>
+          </div>
+          <div className="p-3 grid sm:grid-cols-2 gap-2">
+            {path !== 'C:\\' && (
+              <button type="button" className="win-light-btn text-left" onClick={() => setPath(path.replace(/\\[^\\]+$/, '') || 'C:\\')}>
+                <ArrowLeft size={13} /> ..
+              </button>
+            )}
+            {folders.map((f) => (
+              <button key={f} type="button" className="win-light-btn text-left"
+                onClick={() => setPath(path.endsWith('\\') ? `${path}${f}` : `${path}\\${f}`)}>
+                <FolderOpen size={13} className="text-[#f4b400]" /> {f}
+              </button>
+            ))}
+            {folders.length === 0 && <p className="text-sm text-[#616161] col-span-2">This folder is empty.</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StoragePanel({ state, busy, onAction }) {
+  const storage = state.storage || {}
+  const disks = storage.disks || []
+  const volumes = storage.volumes || []
+  const [letter, setLetter] = useState('D:')
+  const [label, setLabel] = useState('Data')
+  const rawDisk = disks.find((d) => d.partition_style === 'RAW')
+  return (
+    <div>
+      <div className="win-h1">Disk Management</div>
+      <div className="win-sub mb-4">Manage disks and volumes — VMware hot-added disks appear after rescan</div>
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button className="win-light-btn win-primary !text-white" disabled={busy} onClick={() => onAction('rescan_disks', {})}>
+          <RefreshCw size={13} /> Rescan disks
+        </button>
+        {rawDisk && (
+          <button className="win-light-btn" disabled={busy} onClick={() => onAction('initialize_disk', { disk_id: rawDisk.id })}>
+            Initialize disk {rawDisk.number}
+          </button>
+        )}
+      </div>
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="win-card !p-0 overflow-hidden">
+          <div className="win-card-head">Disks</div>
+          <table className="w-full text-sm">
+            <thead><tr className="text-[#616161] text-xs border-b"><th className="px-3 py-2 text-left">Disk</th><th className="px-3 py-2 text-left">Size</th><th className="px-3 py-2 text-left">Style</th><th className="px-3 py-2 text-left">Status</th></tr></thead>
+            <tbody>
+              {disks.map((d) => (
+                <tr key={d.id} className="border-b border-[#f3f3f3]">
+                  <td className="px-3 py-2">Disk {d.number}<div className="text-[11px] text-[#616161]">{d.model}</div></td>
+                  <td className="px-3 py-2">{d.size_gb} GB</td>
+                  <td className="px-3 py-2 font-mono text-xs">{d.partition_style}</td>
+                  <td className="px-3 py-2"><Badge kind={d.status === 'Online' ? 'ok' : 'warn'}>{d.status}</Badge></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="win-card !p-0 overflow-hidden">
+          <div className="win-card-head">Volumes</div>
+          <table className="w-full text-sm">
+            <thead><tr className="text-[#616161] text-xs border-b"><th className="px-3 py-2 text-left">Drive</th><th className="px-3 py-2 text-left">Label</th><th className="px-3 py-2 text-left">FS</th><th className="px-3 py-2 text-left">Free</th></tr></thead>
+            <tbody>
+              {volumes.map((v) => (
+                <tr key={v.letter} className="border-b border-[#f3f3f3]">
+                  <td className="px-3 py-2 font-medium">{v.letter}</td>
+                  <td className="px-3 py-2">{v.label}</td>
+                  <td className="px-3 py-2">{v.fs}</td>
+                  <td className="px-3 py-2">{v.free_gb} / {v.size_gb} GB</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rawDisk && (
+            <div className="p-3 border-t flex flex-wrap gap-2 items-end">
+              <div><label className="text-[11px] text-[#616161]">Letter</label><input className="win-input w-20" value={letter} onChange={(e) => setLetter(e.target.value)} /></div>
+              <div><label className="text-[11px] text-[#616161]">Label</label><input className="win-input" value={label} onChange={(e) => setLabel(e.target.value)} /></div>
+              <button className="win-light-btn win-primary !text-white" disabled={busy}
+                onClick={() => onAction('create_volume', { disk_id: rawDisk.id, letter, label, size_gb: rawDisk.size_gb })}>
+                <Plus size={13} /> New simple volume
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function NetworkPanel({ state, busy, onAction }) {
+  const net = state.network || {}
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState({ ipv4: '', mask: '255.255.255.0', gw: '', dhcp: false })
+  const startEdit = (a) => { setEditing(a.id); setForm({ ipv4: a.ipv4, mask: a.mask, gw: a.gw, dhcp: a.dhcp }) }
+  return (
+    <div>
+      <div className="win-h1">Network &amp; Internet</div>
+      <div className="win-sub mb-4">Hostname: {net.hostname || state.computer_name}</div>
+      {(net.adapters || []).map((a) => (
+        <div key={a.id} className="win-card mb-3">
+          <div className="win-card-head flex justify-between items-center">
+            <span>{a.name} — {a.desc}</span>
+            <Badge kind={a.status === 'Connected' ? 'ok' : 'warn'}>{a.status}</Badge>
+          </div>
+          <div className="p-4 text-sm space-y-1">
+            <div><span className="text-[#616161] w-24 inline-block">MAC</span><span className="font-mono">{a.mac}</span></div>
+            <div><span className="text-[#616161] w-24 inline-block">IPv4</span>{a.dhcp ? 'DHCP' : (a.ipv4 || '—')}</div>
+            {!a.dhcp && a.ipv4 && <div><span className="text-[#616161] w-24 inline-block">Gateway</span>{a.gw || '—'}</div>}
+            {editing === a.id ? (
+              <div className="pt-3 space-y-2 border-t mt-2">
+                <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.dhcp} onChange={(e) => setForm((p) => ({ ...p, dhcp: e.target.checked }))} /> Obtain IP automatically (DHCP)</label>
+                {!form.dhcp && (
+                  <>
+                    <input className="win-input w-full" placeholder="IPv4" value={form.ipv4} onChange={(e) => setForm((p) => ({ ...p, ipv4: e.target.value }))} />
+                    <input className="win-input w-full" placeholder="Subnet mask" value={form.mask} onChange={(e) => setForm((p) => ({ ...p, mask: e.target.value }))} />
+                    <input className="win-input w-full" placeholder="Gateway" value={form.gw} onChange={(e) => setForm((p) => ({ ...p, gw: e.target.value }))} />
+                  </>
+                )}
+                <div className="flex gap-2">
+                  <button className="win-light-btn win-primary !text-white" disabled={busy}
+                    onClick={() => { onAction('set_adapter_ip', { adapter_id: a.id, ...form }); setEditing(null) }}>Save</button>
+                  <button className="win-light-btn" onClick={() => setEditing(null)}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button className="win-light-btn mt-2" disabled={busy} onClick={() => startEdit(a)}>Edit IP settings</button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DevicesPanel({ state, busy, onAction }) {
+  const devices = state.devices || []
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+        <div><div className="win-h1">Device Manager</div><div className="win-sub">Drivers and hardware devices</div></div>
+        <button className="win-light-btn" disabled={busy} onClick={() => onAction('scan_devices', {})}><RefreshCw size={13} /> Scan for hardware changes</button>
+      </div>
+      <div className="win-card !p-0 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="text-[#616161] text-xs border-b"><th className="px-3 py-2 text-left">Device</th><th className="px-3 py-2 text-left">Class</th><th className="px-3 py-2 text-left">Driver</th><th className="px-3 py-2 text-left">Status</th></tr></thead>
+          <tbody>
+            {devices.map((d) => (
+              <tr key={d.id} className="border-b border-[#f3f3f3]">
+                <td className="px-3 py-2">{d.name}</td>
+                <td className="px-3 py-2 text-[#616161]">{d.class}</td>
+                <td className="px-3 py-2 font-mono text-xs">{d.driver}</td>
+                <td className="px-3 py-2"><Badge kind={d.status === 'OK' ? 'ok' : 'warn'}>{d.status}</Badge></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function SettingsPanel({ state }) {
+  const settings = state.settings || {}
+  return (
+    <div>
+      <div className="win-h1">Settings</div>
+      <div className="win-sub mb-4">System configuration for {state.computer_name}</div>
+      <div className="grid sm:grid-cols-2 gap-3 max-w-2xl">
+        {[
+          ['Edition', settings.edition || state.os],
+          ['Build', settings.build || '20348'],
+          ['Activation', settings.activated ? 'Activated' : 'Not activated'],
+          ['Time zone', settings.time_zone || 'UTC'],
+          ['Remote Desktop', settings.remote_desktop ? 'Enabled' : 'Disabled'],
+          ['Computer name', state.computer_name],
+          ['Domain', state.domain?.joined ? state.domain.name : 'WORKGROUP'],
+        ].map(([k, v]) => (
+          <div key={k} className="win-card p-3">
+            <div className="text-[11px] text-[#616161]">{k}</div>
+            <div className="font-medium text-sm mt-0.5">{v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 /* ── System Properties (domain join) panel ── */
 function SystemPanel({ state, busy, onAction }) {
@@ -763,6 +980,7 @@ function SystemPanel({ state, busy, onAction }) {
 export default function WindowsServerSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
   hintsLabel, checkDisabled, extendDisabled, embedded = false,
+  onToggleTerminal, simTerminalOpen = false,
 }) {
   const slug = scenario?.slug || ''
   const [state, setState] = useState(null)
@@ -861,6 +1079,11 @@ export default function WindowsServerSimulator({
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <button className="win-btn" onClick={load}><RefreshCw size={13} /> Refresh</button>
           <button className="win-btn" onClick={() => runAction('reset', {})} disabled={busy}><RotateCw size={13} /> Reset</button>
+          {onToggleTerminal && (
+            <button type="button" className={`win-btn ${simTerminalOpen ? 'ring-2 ring-white/60' : ''}`} onClick={onToggleTerminal}>
+              <Terminal size={13} /> {simTerminalOpen ? 'Hide terminal' : 'Terminal'}
+            </button>
+          )}
           <LabChromeControls
             buttonClass="win-btn"
             onHints={onHints}
@@ -868,6 +1091,7 @@ export default function WindowsServerSimulator({
             onExtend={onExtend}
             onStop={onStop}
             onBackToTerminal={embedded ? undefined : onExit}
+            backLabel={simTerminalOpen ? 'Hide terminal' : 'Terminal'}
             hintsLabel={hintsLabel || 'Hints'}
             checkDisabled={checkDisabled}
             extendDisabled={extendDisabled}
@@ -913,6 +1137,11 @@ export default function WindowsServerSimulator({
           ) : (
             <>
               {view === 'dashboard' && <ServerManager state={state} busy={busy} onAction={runAction} />}
+              {view === 'explorer' && <FileExplorerPanel state={state} />}
+              {view === 'storage' && <StoragePanel state={state} busy={busy} onAction={runAction} />}
+              {view === 'network' && <NetworkPanel state={state} busy={busy} onAction={runAction} />}
+              {view === 'devices' && <DevicesPanel state={state} busy={busy} onAction={runAction} />}
+              {view === 'settings' && <SettingsPanel state={state} />}
               {view === 'ad' && <ActiveDirectory state={state} busy={busy} onAction={runAction} />}
               {view === 'gpo' && <GroupPolicyEditor state={state} busy={busy} onAction={runAction} />}
               {view === 'update' && <WindowsUpdate state={state} busy={busy} onAction={runAction} />}

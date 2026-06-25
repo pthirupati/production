@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  Clock, Layers, ChevronLeft, ChevronRight, Terminal, FlaskConical,
+  Clock, Layers, ChevronLeft, ChevronRight, FlaskConical,
   Copy, Check, BookOpen, ListTree, GraduationCap,
 } from 'lucide-react'
 import PublicLayout from '../../components/layout/PublicLayout'
 import { FixitPanel } from '../../components/design'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import { tutorialApi } from '../../api/tutorials'
-import { tutorialPlaygroundHref } from '../../utils/playgroundLinks'
 import { useAuthStore } from '../../store/authStore'
 
 const DIFFICULTY_CLASS = {
@@ -214,22 +213,10 @@ export default function TutorialDetail() {
 
   const sections = tutorial.sections || []
   const curriculum = tutorial.curriculum || {}
-  const hasPlayground = Boolean(tutorial.playground_slug)
   const hasScenario = Boolean(tutorial.scenario_slug)
-  const playgroundHref = hasPlayground
-    ? tutorialPlaygroundHref(tutorial.playground_slug, tutorial.scenario_slug)
-    : null
   const progressPct = curriculum.total_in_topic
     ? Math.round((curriculum.position / curriculum.total_in_topic) * 100)
     : 0
-
-  const openPlayground = (e) => {
-    if (!playgroundHref) return
-    if (!isAuthenticated && playgroundHref.startsWith('/technologies')) {
-      e.preventDefault()
-      navigate('/login', { state: { from: playgroundHref } })
-    }
-  }
 
   return (
     <PublicLayout>
@@ -331,18 +318,11 @@ export default function TutorialDetail() {
                   <span className="flex items-center gap-1"><Clock size={13} /> {tutorial.estimated_minutes} min read</span>
                   <span className="flex items-center gap-1"><Layers size={13} /> {sections.length} sections</span>
                 </div>
-                {(hasPlayground || hasScenario) && (
+                {hasScenario && (
                   <div className="mt-5 flex flex-wrap gap-2">
-                    {hasPlayground && (
-                      <Link to={playgroundHref} onClick={openPlayground} className="btn-primary text-sm inline-flex items-center gap-1.5">
-                        <Terminal size={14} /> Try hands-on
-                      </Link>
-                    )}
-                    {hasScenario && (
-                      <Link to={`/scenarios/${tutorial.scenario_slug}`} className="btn-secondary text-sm inline-flex items-center gap-1.5">
-                        <FlaskConical size={14} /> Start lab
-                      </Link>
-                    )}
+                    <Link to={`/scenarios/${tutorial.scenario_slug}`} className="btn-primary text-sm inline-flex items-center gap-1.5">
+                      <FlaskConical size={14} /> Start lab
+                    </Link>
                   </div>
                 )}
               </header>

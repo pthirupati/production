@@ -248,6 +248,55 @@ def _base_world() -> dict:
                 ], links=[]),
             ],
         },
+        "storage": {
+            "disks": [
+                {"id": "disk0", "number": 0, "model": "VMware Virtual disk SCSI Disk Device",
+                 "size_gb": 80, "partition_style": "GPT", "status": "Online", "bus": "SCSI"},
+            ],
+            "volumes": [
+                {"letter": "C:", "label": "Windows", "fs": "NTFS", "size_gb": 78,
+                 "free_gb": 42, "health": "Healthy", "disk_id": "disk0"},
+            ],
+        },
+        "network": {
+            "hostname": "WIN-SRV-APP01",
+            "adapters": [
+                {"id": "eth0", "name": "Ethernet0",
+                 "desc": "Intel(R) 82574L Gigabit Network Connection",
+                 "mac": "00:50:56:9a:12:34", "status": "Connected",
+                 "ipv4": "10.0.1.15", "mask": "255.255.255.0", "gw": "10.0.1.1",
+                 "dns": ["10.0.1.10", "10.0.1.11"], "dhcp": False},
+                {"id": "eth1", "name": "Ethernet1",
+                 "desc": "Intel(R) 82574L Gigabit Network Connection",
+                 "mac": "00:50:56:9a:56:78", "status": "Disconnected",
+                 "ipv4": "", "mask": "", "gw": "", "dns": [], "dhcp": True},
+            ],
+        },
+        "devices": [
+            {"id": "dev0", "name": "Microsoft Hyper-V Virtual Machine Bus Provider",
+             "class": "System devices", "status": "OK", "driver": "vmbusr.sys"},
+            {"id": "dev1", "name": "VMware VMXNET3 Ethernet Adapter",
+             "class": "Network adapters", "status": "OK", "driver": "vmxnet3.sys"},
+            {"id": "dev2", "name": "VMware Virtual disk SCSI Disk Device",
+             "class": "Disk drives", "status": "OK", "driver": "disk.sys"},
+        ],
+        "explorer": {
+            "drives": [
+                {"path": "C:\\", "label": "Windows", "type": "Local Disk"},
+            ],
+            "folders": {
+                "C:\\": ["Windows", "Users", "Program Files", "Program Files (x86)", "inetpub"],
+                "C:\\Users": ["Administrator", "Public"],
+                "C:\\Users\\Administrator": ["Desktop", "Documents", "Downloads"],
+            },
+        },
+        "settings": {
+            "edition": "Windows Server 2022 Datacenter",
+            "build": "20348.2487",
+            "activated": True,
+            "time_zone": "UTC",
+            "remote_desktop": True,
+        },
     }
 
 
@@ -490,10 +539,55 @@ def _event(state: dict, message: str) -> None:
     state["events"] = state["events"][:60]
 
 
+def _overlay_vmware_bridge(world: dict, session_id: str) -> None:
+    """Merge VMware hot-added disks into Windows Disk Management (offline until rescan)."""
+    try:
+        from apps.labs.provisioner.simulation.vmware_bridge import _load
+
+        data = _load(str(session_id))
+        disks = world.setdefault("storage", {}).setdefault("disks", [])
+        known = {d.get("bridge_dev") for d in disks if d.get("bridge_dev")}
+        for disk in data.get("pending", []):
+            dev = disk.get("dev", "")
+            if not dev or dev in known:
+                continue
+            disks.append({
+                "id": f"bridge-{len(disks)}",
+                "number": len(disks),
+                "model": "VMware Virtual disk SCSI Disk Device",
+                "size_gb": int(disk.get("size_gb") or 50),
+                "partition_style": "RAW",
+                "status": "Offline",
+                "bus": "SCSI",
+                "bridge_dev": dev,
+                "requires_reboot": bool(disk.get("requires_reboot")),
+                "visible": True,
+            })
+            known.add(dev)
+        for dev in data.get("revealed", []):
+            if dev in known:
+                continue
+            disks.append({
+                "id": f"bridge-{len(disks)}",
+                "number": len(disks),
+                "model": "VMware Virtual disk SCSI Disk Device",
+                "size_gb": 50,
+                "partition_style": "RAW",
+                "status": "Online",
+                "bus": "SCSI",
+                "bridge_dev": dev,
+                "visible": True,
+            })
+            known.add(dev)
+    except Exception:
+        pass
+
+
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
     state = copy.deepcopy(entry["state"])
     world = state["world"]
+    _overlay_vmware_bridge(world, session_id)
     goal = state.get("goal", {})
 
     installed_roles = sum(1 for r in world["roles"] if r["installed"])
@@ -512,6 +606,11 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "services": world["services"],
         "session": world["session"],
         "group_policy": world.get("group_policy", {}),
+        "storage": world.get("storage", {}),
+        "network": world.get("network", {}),
+        "devices": world.get("devices", []),
+        "explorer": world.get("explorer", {}),
+        "settings": world.get("settings", {}),
         # Human-readable goal (objective/title) — never leaks the answer beyond
         # what the objective already tells the learner.
         "goal": {
@@ -547,6 +646,7 @@ def drop_session(session_id: str) -> None:
 
 def apply_action(session_id: str, action: str, payload: dict | None = None) -> dict:
     payload = payload or {}
+    payload.setdefault("session_id", str(session_id))
     entry = _load_session(str(session_id))
     if not entry:
         return {"ok": False, "error": "Windows Server simulation session not found"}
@@ -898,6 +998,102 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
             gpo["status"] = "Disabled" if gpo.get("status") == "Enabled" else "Enabled"
         _event(state, f"Set GPO {gpo['name']} to {gpo['status']}")
         return {"ok": True, "message": f"GPO {gpo['name']} is now {gpo['status']}"}
+
+    if act in ("rescan_disks", "rescan_storage"):
+        try:
+            from apps.labs.provisioner.simulation.vmware_bridge import consume_revealed_disks
+
+            revealed = consume_revealed_disks(str(payload.get("session_id") or ""))
+        except Exception:
+            revealed = []
+        disks = world.setdefault("storage", {}).setdefault("disks", [])
+        for disk in disks:
+            if disk.get("bridge_dev") and not disk.get("visible"):
+                if not disk.get("requires_reboot") or payload.get("after_reboot"):
+                    disk["visible"] = True
+                    disk["status"] = "Online"
+        for rd in revealed:
+            dev = rd.get("dev")
+            if not any(d.get("bridge_dev") == dev for d in disks):
+                disks.append({
+                    "id": f"bridge-{len(disks)}",
+                    "number": len(disks),
+                    "model": "VMware Virtual disk SCSI Disk Device",
+                    "size_gb": int(rd.get("size_gb") or 50),
+                    "partition_style": "RAW",
+                    "status": "Online",
+                    "bus": "SCSI",
+                    "bridge_dev": dev,
+                    "visible": True,
+                })
+        _event(state, "Rescanned disks — new volumes may appear in Disk Management")
+        return {"ok": True, "message": "Disk rescan complete", "revealed": len(revealed)}
+
+    if act in ("initialize_disk",):
+        disk_id = payload.get("disk_id") or payload.get("id")
+        disk = next((d for d in world.get("storage", {}).get("disks", []) if d.get("id") == disk_id), None)
+        if not disk:
+            return {"ok": False, "error": "Disk not found"}
+        if disk.get("partition_style") not in ("RAW", ""):
+            return {"ok": True, "message": f"Disk {disk_id} is already initialized"}
+        disk["partition_style"] = payload.get("style") or "GPT"
+        disk["status"] = "Online"
+        _event(state, f"Initialized disk {disk.get('number', disk_id)} as {disk['partition_style']}")
+        return {"ok": True, "message": "Disk initialized", "disk": disk}
+
+    if act in ("create_volume", "new_volume"):
+        letter = (payload.get("letter") or "D:").strip().upper()
+        if not letter.endswith(":"):
+            letter = f"{letter}:"
+        label = (payload.get("label") or "New Volume").strip()
+        size_gb = int(payload.get("size_gb") or 50)
+        disk_id = payload.get("disk_id")
+        volumes = world.setdefault("storage", {}).setdefault("volumes", [])
+        if any(v.get("letter", "").upper() == letter for v in volumes):
+            return {"ok": False, "error": f"Drive letter {letter} is already in use"}
+        vol = {
+            "letter": letter,
+            "label": label,
+            "fs": payload.get("fs") or "NTFS",
+            "size_gb": size_gb,
+            "free_gb": size_gb,
+            "health": "Healthy",
+            "disk_id": disk_id,
+        }
+        volumes.append(vol)
+        explorer = world.setdefault("explorer", {})
+        drives = explorer.setdefault("drives", [])
+        path = f"{letter}\\"
+        if not any(d.get("path") == path for d in drives):
+            drives.append({"path": path, "label": label, "type": "Local Disk"})
+        _event(state, f"Created volume {letter} ({label})")
+        return {"ok": True, "message": f"Volume {letter} created", "volume": vol}
+
+    if act in ("set_adapter_ip", "configure_adapter"):
+        adapter_id = payload.get("adapter_id") or payload.get("id")
+        adapters = world.get("network", {}).get("adapters", [])
+        adapter = next((a for a in adapters if a.get("id") == adapter_id), None)
+        if not adapter:
+            return {"ok": False, "error": "Network adapter not found"}
+        if payload.get("dhcp"):
+            adapter["dhcp"] = True
+            adapter["ipv4"] = ""
+            adapter["mask"] = ""
+            adapter["gw"] = ""
+        else:
+            adapter["dhcp"] = False
+            adapter["ipv4"] = (payload.get("ipv4") or adapter.get("ipv4") or "").strip()
+            adapter["mask"] = (payload.get("mask") or adapter.get("mask") or "255.255.255.0").strip()
+            adapter["gw"] = (payload.get("gw") or adapter.get("gw") or "").strip()
+            if payload.get("dns"):
+                adapter["dns"] = payload["dns"]
+        adapter["status"] = "Connected" if adapter.get("ipv4") or adapter.get("dhcp") else adapter.get("status")
+        _event(state, f"Updated network settings for {adapter.get('name')}")
+        return {"ok": True, "message": "Network adapter updated", "adapter": adapter}
+
+    if act in ("scan_devices", "refresh_devices"):
+        _event(state, "Refreshed Device Manager")
+        return {"ok": True, "message": "Device scan complete", "devices": world.get("devices", [])}
 
     if act in ("reset",):
         # Re-break the world from the preset (a fresh start for the learner).

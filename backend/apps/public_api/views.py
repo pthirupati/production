@@ -229,18 +229,25 @@ class TechnologiesListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        cached = cache.get("technologies_list")
+        cache_key = "technologies_list_v2"
+        cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
         # Public bootstrap endpoint — must never 500 the page. On any DB/serialize
         # error, log and return an empty list so the frontend falls back to its
         # static catalog instead of showing "Server error".
         try:
+            from apps.certifications.services.scenario_groups import certification_scenario_ids
+
+            cert_ids = certification_scenario_ids()
+            count_filter = Q(scenarios__is_active=True) & Q(scenarios__certification_only=False)
+            if cert_ids:
+                count_filter &= ~Q(scenarios__id__in=cert_ids)
             techs = Technology.objects.filter(is_active=True).annotate(
-                scenario_count=Count("scenarios", filter=Q(scenarios__is_active=True))
+                scenario_count=Count("scenarios", filter=count_filter)
             ).order_by("order", "name")
             data = TechnologySerializer(techs, many=True).data
-            cache.set("technologies_list", data, 300)  # 5 min
+            cache.set(cache_key, data, 300)  # 5 min
             return Response(data)
         except Exception:
             logger.exception("TechnologiesListView failed — returning empty list")

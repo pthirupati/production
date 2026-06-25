@@ -41,6 +41,9 @@ export default function TerraformCloudShell({
   const [wsTab, setWsTab] = useState('runs')
   const [selectedRun, setSelectedRun] = useState(null)
   const [showNewWs, setShowNewWs] = useState(false)
+  const [newWsName, setNewWsName] = useState('lab-workspace')
+  const [extraWorkspaces, setExtraWorkspaces] = useState([])
+  const allWorkspaces = useMemo(() => [...TFC_WORKSPACES, ...extraWorkspaces], [extraWorkspaces])
   const [showApply, setShowApply] = useState(false)
   const [showVarModal, setShowVarModal] = useState(false)
   const slug = scenario?.slug || ''
@@ -222,7 +225,7 @@ export default function TerraformCloudShell({
               <Plus size={14} /> New Workspace
             </button>
           </div>
-          <SimDataTable columns={workspaceColumns} rows={TFC_WORKSPACES} searchKeys={['name', 'project', 'status']}
+          <SimDataTable columns={workspaceColumns} rows={allWorkspaces} searchKeys={['name', 'project', 'status']}
             onRowClick={(ws) => { setSelectedWs(ws); setWsTab('runs') }} />
         </div>
       )
@@ -358,7 +361,7 @@ export default function TerraformCloudShell({
         <div className="p-5">
           <h1 className="text-xl font-semibold text-white mb-2 capitalize">{nav.replace(/-/g, ' ')}</h1>
           <p className="text-sm text-slate-500 mb-4">Browse {nav.includes('registry') ? 'registry modules and providers' : 'projects and workspace hierarchy'}.</p>
-          <SimDataTable columns={workspaceColumns} rows={TFC_WORKSPACES.slice(0, 4)} searchKeys={['name']} onRowClick={(ws) => { setSelectedWs(ws); setWsTab('runs') }} />
+          <SimDataTable columns={workspaceColumns} rows={allWorkspaces.slice(0, 6)} searchKeys={['name']} onRowClick={(ws) => { setSelectedWs(ws); setWsTab('runs') }} />
         </div>
       )
     }
@@ -448,9 +451,16 @@ export default function TerraformCloudShell({
       </div>
 
       <SimModal open={showNewWs} onClose={() => setShowNewWs(false)} title="Create Workspace"
-        footer={<><button type="button" className="text-sm text-slate-400 px-3 py-1.5" onClick={() => setShowNewWs(false)}>Cancel</button><button type="button" className="tfc-btn-primary" onClick={() => { setShowNewWs(false); setSelectedWs(TFC_WORKSPACES[6]); setWsTab('ide') }}>Create</button></>}>
+        footer={<><button type="button" className="text-sm text-slate-400 px-3 py-1.5" onClick={() => setShowNewWs(false)}>Cancel</button><button type="button" className="tfc-btn-primary" onClick={() => {
+          const name = (newWsName || 'lab-workspace').trim()
+          const ws = { id: `ws-${Date.now()}`, name, project: 'Training', status: 'ready', terraform: '1.7.5', updated: 'Just now' }
+          setExtraWorkspaces((prev) => [...prev, ws])
+          setShowNewWs(false)
+          setSelectedWs(ws)
+          setWsTab('ide')
+        }}>Create</button></>}>
         <div className="space-y-3 text-sm">
-          <label className="block"><span className="text-slate-400 text-xs">Name</span><input className="w-full mt-1 px-3 py-2 rounded bg-slate-900 border border-slate-600" defaultValue="lab-workspace" /></label>
+          <label className="block"><span className="text-slate-400 text-xs">Name</span><input className="w-full mt-1 px-3 py-2 rounded bg-slate-900 border border-slate-600" value={newWsName} onChange={(e) => setNewWsName(e.target.value)} /></label>
           <label className="block"><span className="text-slate-400 text-xs">Project</span><select className="w-full mt-1 px-3 py-2 rounded bg-slate-900 border border-slate-600"><option>Training</option></select></label>
         </div>
       </SimModal>
