@@ -53,7 +53,7 @@ function DefaultIllustration() {
           <span className="ml-2 font-mono text-[11px] text-white/35">terminal</span>
         </div>
         <div className="font-mono text-[12.5px] leading-relaxed">
-          <p className="m-0"><span className="text-accent-green">$</span> <span className="text-white/75">ssh lab@fixitlab.com</span></p>
+          <p className="m-0"><span className="text-accent-green">$</span> <span className="text-white/75">ssh lab@fixitlab.in</span></p>
           <p className="m-0 text-white/45">Connected to scenario: <span className="text-accent-blue">broken-nginx</span></p>
           <p className="m-0"><span className="text-accent-green">root@lab</span><span className="text-white/40">:</span><span className="text-accent-blue">~</span># <span className="inline-block w-2 h-3.5 bg-accent-green align-[-2px] animate-[fxBlink_1s_step-end_infinite]" /></p>
         </div>

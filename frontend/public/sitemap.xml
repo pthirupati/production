@@ -1,57 +1,57 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://fixitlab.com/</loc>
+    <loc>https://fixitlab.in/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://fixitlab.com/scenarios</loc>
+    <loc>https://fixitlab.in/scenarios</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://fixitlab.com/leaderboard</loc>
+    <loc>https://fixitlab.in/leaderboard</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://fixitlab.com/pricing</loc>
+    <loc>https://fixitlab.in/pricing</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://fixitlab.com/blog</loc>
+    <loc>https://fixitlab.in/blog</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://fixitlab.com/faq</loc>
+    <loc>https://fixitlab.in/faq</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://fixitlab.com/mock-interviews</loc>
+    <loc>https://fixitlab.in/mock-interviews</loc>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
-    <loc>https://fixitlab.com/verify-certificate</loc>
+    <loc>https://fixitlab.in/verify-certificate</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://fixitlab.com/contact</loc>
+    <loc>https://fixitlab.in/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://fixitlab.com/about</loc>
+    <loc>https://fixitlab.in/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://fixitlab.com/register</loc>
+    <loc>https://fixitlab.in/register</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>

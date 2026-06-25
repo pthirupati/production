@@ -40,7 +40,7 @@ variable "db_instance_class" {
 }
 
 variable "domain_name" {
-  default = "fixitlab.com"
+  default = "fixitlab.in"
 }
 
 # ──── VPC ───────────────────────────────────────────────────

@@ -177,7 +177,7 @@ export default function InterviewLanding() {
                   <div className="w-3 h-3 rounded-full bg-amber-400/70" />
                   <div className="w-3 h-3 rounded-full bg-emerald-400/70" />
                   <div className="flex-1 mx-4 bg-surface-700/60 rounded px-3 py-1 text-[10px] text-surface-400 text-center">
-                    app.fixitlab.com/interviews/session/INT-1042
+                    fixitlab.in/interviews/session/INT-1042
                   </div>
                   <div className="w-6 h-6 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center">
                     <div className="w-2 h-2 rounded-full bg-red-400/80 animate-pulse" />

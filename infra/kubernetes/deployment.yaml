@@ -324,10 +324,10 @@ metadata:
 spec:
   ingressClassName: nginx
   tls:
-    - hosts: [fixitlab.com]
+    - hosts: [fixitlab.in]
       secretName: fixitlab-tls
   rules:
-    - host: fixitlab.com
+    - host: fixitlab.in
       http:
         paths:
           - path: /api

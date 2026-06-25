@@ -1,7 +1,7 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://fixitlab.com/sitemap.xml
+Sitemap: https://fixitlab.in/sitemap.xml
 
 # Disallow admin and API
 Disallow: /admin/
