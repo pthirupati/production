@@ -312,6 +312,7 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
     u.lang = (voice && voice.lang) || locale || 'en-US'
     u.rate = rate
     u.pitch = pitch
+    u.volume = 1
     if (voice) u.voice = voice
     u.onstart = () => { started = true }
     u.onend = done
@@ -516,16 +517,19 @@ export function useInterviewVoice() {
     try {
       unlockSpeech()
 
+      // Optional server TTS (paid providers). Fully guarded — any failure here
+      // must NEVER throw out of speak() or the hands-free loop stalls silently.
+      // FixitLab runs free by default (no keys → uses_server_tts is false), so
+      // this branch is skipped and we always use free browser SpeechSynthesis.
       if (config.uses_server_tts) {
-        const profile = resolveVoiceProfile(voiceCode)
-        const result = await serverSpeak(text, profile.code).catch(() => null)
-
-        if (result?.audio_b64) {
-          await playBase64Audio(result.audio_b64, 'audio/mpeg')
-          spoken = true
-          return { spoken: true }
-        }
-        // Fall through to browser TTS
+        try {
+          const profile = resolveVoiceProfile(voiceCode)
+          const result = await serverSpeak(text, profile.code).catch(() => null)
+          if (result?.audio_b64) {
+            await playBase64Audio(result.audio_b64, 'audio/mpeg')
+            return { spoken: true }
+          }
+        } catch { /* fall through to free browser TTS */ }
       }
 
       // Browser SpeechSynthesis fallback — segmented for a natural cadence.
@@ -548,36 +552,49 @@ export function useInterviewVoice() {
       const segments = segmentForSpeech(text)
       const myToken = ++speakTokenRef.current
 
-      for (let i = 0; i < segments.length; i++) {
-        if (speakTokenRef.current !== myToken) break
-        const seg = segments[i]
-        // eslint-disable-next-line no-await-in-loop
-        const started = await speakBrowserUtterance(seg, utterOpts)
-        if (started) spoken = true
-        if (i < segments.length - 1 && speakTokenRef.current === myToken) {
-          const last = seg.trim().slice(-1)
-          let gap = pauseAfter(seg)
-          if (last === '?' && pauseOverrides.question) gap = pauseOverrides.question
-          else if (last === '.' && pauseOverrides.period) gap = pauseOverrides.period
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise((resolve) => {
-            speakPauseTimerRef.current = setTimeout(() => {
-              speakPauseTimerRef.current = null
-              resolve()
-            }, gap)
-          })
-        }
-      }
+      // Chrome silences speech after ~15s and sometimes pauses the queue between
+      // utterances. A low-frequency resume() keep-alive guarantees every segment
+      // actually plays. Cleared in finally.
+      const keepAlive = setInterval(() => {
+        try {
+          if (window.speechSynthesis?.paused) window.speechSynthesis.resume()
+        } catch { /* non-fatal */ }
+      }, 5000)
 
-      // Chrome sometimes resolves utterances instantly without onstart — retry once
-      // as a single block so the candidate still hears the interviewer.
-      if (!spoken && speakTokenRef.current === myToken) {
-        const clean = (text || '').replace(/\s+/g, ' ').trim()
-        if (clean) {
-          unlockSpeech()
+      try {
+        for (let i = 0; i < segments.length; i++) {
+          if (speakTokenRef.current !== myToken) break
+          const seg = segments[i]
           // eslint-disable-next-line no-await-in-loop
-          spoken = await speakBrowserUtterance(clean.slice(0, 500), utterOpts)
+          const started = await speakBrowserUtterance(seg, utterOpts)
+          if (started) spoken = true
+          if (i < segments.length - 1 && speakTokenRef.current === myToken) {
+            const last = seg.trim().slice(-1)
+            let gap = pauseAfter(seg)
+            if (last === '?' && pauseOverrides.question) gap = pauseOverrides.question
+            else if (last === '.' && pauseOverrides.period) gap = pauseOverrides.period
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise((resolve) => {
+              speakPauseTimerRef.current = setTimeout(() => {
+                speakPauseTimerRef.current = null
+                resolve()
+              }, gap)
+            })
+          }
         }
+
+        // Chrome sometimes resolves utterances instantly without onstart — retry
+        // once as a single block so the candidate still hears the interviewer.
+        if (!spoken && speakTokenRef.current === myToken) {
+          const clean = (text || '').replace(/\s+/g, ' ').trim()
+          if (clean) {
+            unlockSpeech()
+            // eslint-disable-next-line no-await-in-loop
+            spoken = await speakBrowserUtterance(clean.slice(0, 500), utterOpts)
+          }
+        }
+      } finally {
+        clearInterval(keepAlive)
       }
 
       return { spoken }

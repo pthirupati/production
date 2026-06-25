@@ -18,7 +18,7 @@ import CoachingTip from '../../components/interviews/CoachingTip'
 import { PageHeader } from '../../components/design'
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Clock, MessageSquare, Terminal,
-  Volume2, Plus, ExternalLink, Loader2, ArrowLeft, Calendar, X, SkipForward,
+  Volume2, VolumeX, Plus, ExternalLink, Loader2, ArrowLeft, Calendar, X, SkipForward,
   CheckCircle2, HelpCircle, RotateCcw, Star,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -132,6 +132,10 @@ export default function InterviewRoom() {
   const [answer, setAnswer] = useState('')
   const [micOn, setMicOn] = useState(false)
   const [cameraOn, setCameraOn] = useState(false)
+  // "Mute interviewer" — silences TTS output while keeping the live caption and
+  // the hands-free loop intact (candidate reads the question, then answers).
+  const [interviewerMuted, setInterviewerMuted] = useState(false)
+  const interviewerMutedRef = useRef(false)
   const [timeLeft, setTimeLeft] = useState(null)
   const [started, setStarted] = useState(false)
   const [practicalMode, setPracticalMode] = useState(false)
@@ -965,6 +969,15 @@ export default function InterviewRoom() {
       setIsThinking(false)
     }
     setAiCaption(text)
+    // Interviewer muted — skip TTS entirely, but keep the loop human: show the
+    // caption, give the candidate a beat to read it, then open the mic.
+    if (interviewerMutedRef.current) {
+      await new Promise(r => setTimeout(r, Math.min(4000, 900 + text.length * 28)))
+      if (autoListen && !observerMode && !isListeningRef.current && !bargedInRef.current) {
+        voiceAnswer()
+      }
+      return
+    }
     const speechOpts = sp ? {
       rate: sp.rate,
       pitch: sp.pitch,
@@ -978,6 +991,19 @@ export default function InterviewRoom() {
     if (autoListen && !observerMode && !isListeningRef.current && !bargedInRef.current) {
       voiceAnswer()
     }
+  }
+
+  // Toggle interviewer TTS. When muting mid-sentence, cut the current utterance.
+  const toggleInterviewerMute = () => {
+    setInterviewerMuted((prev) => {
+      const next = !prev
+      interviewerMutedRef.current = next
+      if (next) cancelSpeech()
+      toast(next ? 'Interviewer muted — captions still show' : 'Interviewer voice on', {
+        icon: next ? '🔇' : '🔊',
+      })
+      return next
+    })
   }
 
   // Candidate: sync admin/host messages (founder join, manual questions, AI resume).
@@ -1784,6 +1810,19 @@ export default function InterviewRoom() {
               </button>
             </>
           )}
+          <button
+            type="button"
+            onClick={toggleInterviewerMute}
+            className={`text-xs flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${
+              interviewerMuted
+                ? 'bg-red-500/20 text-red-300 border-red-500/30'
+                : 'bg-surface-800/80 text-surface-300 border-surface-700 hover:text-white'
+            }`}
+            title={interviewerMuted ? 'Unmute interviewer voice' : 'Mute interviewer voice (captions stay on)'}
+          >
+            {interviewerMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+            {interviewerMuted ? 'Unmute' : 'Mute'} interviewer
+          </button>
           <button type="button" onClick={cancelInterview} className="p-2 rounded-lg bg-surface-800 text-surface-400 hover:text-white" title="Cancel interview">
             <X size={16} />
           </button>

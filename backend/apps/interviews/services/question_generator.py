@@ -310,6 +310,166 @@ _COMMAND_CROSS_TEMPLATES = [
     "You used `{cmd}`. What's the blast radius if you'd targeted the wrong host or namespace?",
 ]
 
+# Tool/entity-aware drills (free cross-questioning) — when the candidate NAMES a
+# specific tool/technology in their answer, the interviewer drills into THAT exact
+# tool ("You mentioned Ansible — how did you structure your playbooks?"). This is
+# what makes the bot feel like it actually heard them. 100% deterministic/local.
+# Each entry: canonical tool -> pointed, experience-probing questions.
+_TOOL_DRILLS: dict[str, list[str]] = {
+    "ansible": [
+        "You mentioned Ansible — how did you structure your playbooks and roles?",
+        "With Ansible, how did you keep tasks idempotent across reruns?",
+        "How did you handle secrets and inventory in your Ansible setup?",
+    ],
+    "terraform": [
+        "You brought up Terraform — how did you manage state and locking across the team?",
+        "With Terraform, how did you structure modules so teams could move independently?",
+        "How did you test Terraform changes before applying them to production?",
+    ],
+    "kubernetes": [
+        "You mentioned Kubernetes — walk me through how you debugged a failing pod.",
+        "With Kubernetes, how did you handle rollouts and rollbacks safely?",
+        "How did you set resource requests and limits to avoid noisy-neighbor issues?",
+    ],
+    "docker": [
+        "You mentioned Docker — how did you keep your images small and secure?",
+        "With Docker, how did you debug a container that exited right after start?",
+    ],
+    "prometheus": [
+        "You mentioned Prometheus — what metrics did you actually alert on, and why?",
+        "With Prometheus, how did you deal with metric cardinality?",
+    ],
+    "grafana": [
+        "You mentioned Grafana — what did your most-used dashboard actually show?",
+        "How did you decide what belonged on a dashboard versus an alert?",
+    ],
+    "jenkins": [
+        "You mentioned Jenkins — how was your pipeline structured, and where did it get slow?",
+        "With Jenkins, how did you keep secrets out of build logs?",
+    ],
+    "git": [
+        "You mentioned Git — what branching/merge strategy did your team actually use?",
+        "Tell me about a nasty merge or rebase situation you had to untangle.",
+    ],
+    "nginx": [
+        "You mentioned nginx — how did you reload config without dropping requests?",
+        "Walk me through how you debugged a 502 behind nginx.",
+    ],
+    "redis": [
+        "You mentioned Redis — what did you use it for, and how did you handle eviction?",
+        "How did you reason about Redis persistence and failover?",
+    ],
+    "postgres": [
+        "You mentioned Postgres — how did you find and fix a slow query in production?",
+        "How did you run a schema migration without downtime?",
+    ],
+    "kafka": [
+        "You mentioned Kafka — how did you handle consumer lag and rebalancing?",
+        "How did you reason about partitioning and ordering guarantees?",
+    ],
+    "aws": [
+        "You mentioned AWS — which services specifically, and what did you own there?",
+        "How did you keep AWS costs and IAM sprawl under control?",
+    ],
+    "python": [
+        "You mentioned Python — what did you build with it, and how did you test it?",
+        "Tell me about debugging a memory or performance issue in a Python service.",
+    ],
+    "bash": [
+        "You mentioned shell scripting — walk me through the trickiest script you wrote.",
+        "How did you make your shell scripts safe to rerun and fail loudly?",
+    ],
+    "helm": [
+        "You mentioned Helm — how did you manage chart versions and upgrades safely?",
+    ],
+    "argocd": [
+        "You mentioned ArgoCD — how did your GitOps sync and rollback flow work?",
+    ],
+    "vault": [
+        "You mentioned Vault — how did services actually authenticate and fetch secrets?",
+    ],
+    "elk": [
+        "You mentioned the ELK/logging stack — how did you control log volume and cost?",
+    ],
+    "datadog": [
+        "You mentioned Datadog — what did you actually monitor, and how did you tame the bill?",
+        "How did you cut alert noise in Datadog without missing real incidents?",
+    ],
+    "splunk": [
+        "You mentioned Splunk — walk me through a query you leaned on during an incident.",
+    ],
+    "mongodb": [
+        "You mentioned MongoDB — how did you handle schema design and indexing for it?",
+        "How did you reason about replica sets and failover in Mongo?",
+    ],
+    "mysql": [
+        "You mentioned MySQL — how did you find and fix a slow query in production?",
+        "How did you handle replication lag under heavy writes?",
+    ],
+    "rabbitmq": [
+        "You mentioned RabbitMQ — how did you handle dead letters and retries?",
+        "How did you reason about acknowledgements and at-least-once delivery?",
+    ],
+    "istio": [
+        "You mentioned Istio — what did the service mesh actually buy you, and what did it cost?",
+        "How did you debug a request failing somewhere inside the mesh?",
+    ],
+    "cicd": [
+        "You mentioned your CI/CD pipeline — walk me through its stages and where it got slow.",
+        "How did you make a bad release roll back automatically?",
+        "How did you keep secrets out of the pipeline and its logs?",
+    ],
+    "golang": [
+        "You mentioned Go — how did you handle concurrency with goroutines and channels there?",
+        "Tell me about debugging a goroutine leak or a race in a Go service.",
+    ],
+    "java": [
+        "You mentioned Java — how did you diagnose a GC or heap problem in production?",
+        "How did you reason about thread pools and back-pressure in your Java service?",
+    ],
+    "nodejs": [
+        "You mentioned Node — how did you keep the event loop from blocking under load?",
+        "Tell me about debugging a memory leak in a long-running Node process.",
+    ],
+    "flux": [
+        "You mentioned Flux — how did your GitOps reconciliation and rollback flow work?",
+    ],
+}
+
+# Alias -> canonical tool. Detection scans the candidate's answer for these.
+_TOOL_ALIASES: dict[str, str] = {
+    "ansible": "ansible", "playbook": "ansible", "playbooks": "ansible",
+    "terraform": "terraform", "tofu": "terraform", "opentofu": "terraform",
+    "kubernetes": "kubernetes", "k8s": "kubernetes", "kubectl": "kubernetes", "eks": "kubernetes", "gke": "kubernetes", "aks": "kubernetes",
+    "docker": "docker", "dockerfile": "docker", "containerd": "docker",
+    "prometheus": "prometheus", "promql": "prometheus", "alertmanager": "prometheus",
+    "grafana": "grafana",
+    "jenkins": "jenkins",
+    "git": "git", "github": "git", "gitlab": "git",
+    "nginx": "nginx",
+    "redis": "redis",
+    "postgres": "postgres", "postgresql": "postgres", "psql": "postgres",
+    "kafka": "kafka",
+    "aws": "aws", "ec2": "aws", "s3": "aws", "lambda": "aws", "cloudwatch": "aws",
+    "python": "python", "django": "python", "flask": "python", "fastapi": "python",
+    "bash": "bash", "shell script": "bash", "shell scripting": "bash",
+    "helm": "helm",
+    "argocd": "argocd", "argo cd": "argocd",
+    "vault": "vault",
+    "elk": "elk", "elasticsearch": "elk", "logstash": "elk", "kibana": "elk",
+    "datadog": "datadog",
+    "splunk": "splunk",
+    "mongodb": "mongodb", "mongo": "mongodb",
+    "mysql": "mysql", "mariadb": "mysql",
+    "rabbitmq": "rabbitmq", "rabbit mq": "rabbitmq",
+    "istio": "istio", "service mesh": "istio", "linkerd": "istio",
+    "github actions": "cicd", "gitlab ci": "cicd", "circleci": "cicd",
+    "golang": "golang", "go lang": "golang",
+    "java": "java", "jvm": "java",
+    "nodejs": "nodejs", "node.js": "nodejs", "node js": "nodejs",
+    "flux": "flux", "fluxcd": "flux",
+}
+
 # Topic-drill scaffolds — go deeper on the topic the candidate is clearly in,
 # without necessarily quoting a phrase.
 _TOPIC_DRILL_TEMPLATES = [
@@ -676,6 +836,43 @@ def _command_cross_question(
     return text
 
 
+def _detect_mentioned_tools(text: str) -> list[str]:
+    """Return canonical tools the candidate NAMED in their answer, in the order
+    they appear, de-duped. Free/local — word-boundary alias matching."""
+    if not text:
+        return []
+    low = f" {text.lower()} "
+    found: list[str] = []
+    for alias, canonical in _TOOL_ALIASES.items():
+        # Word-boundary match so 'aws' doesn't fire inside 'awesome'.
+        if re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", low):
+            if canonical not in found:
+                found.append(canonical)
+    return found
+
+
+def _tool_cross_question(
+    last_answer: str, used: set[str], rng: random.Random
+) -> tuple[str, str] | None:
+    """Pick a pointed drill question about a SPECIFIC tool the candidate just
+    named (e.g. 'You mentioned Ansible — how did you structure your playbooks?').
+
+    Returns (question_text, canonical_tool) or None. Honors ``used`` so we never
+    repeat a drill, and naturally rotates to a different tool once one's drills
+    are exhausted."""
+    tools = _detect_mentioned_tools(last_answer)
+    if not tools:
+        return None
+    # Slight shuffle so two answers naming the same tools don't always drill the
+    # first one — but keep it deterministic via the seeded rng.
+    rng.shuffle(tools)
+    for tool in tools:
+        q = _pick(_TOOL_DRILLS.get(tool, []), used, rng)
+        if q:
+            return q, tool
+    return None
+
+
 def _seed_from(conversation_tail: list[dict], questions_asked: int) -> int:
     """Deterministic seed: stable for a given conversation state so output is
     repeatable (tests) but varies turn-to-turn (not robotic)."""
@@ -1006,6 +1203,27 @@ def generate_question(
                 difficulty=eff_difficulty,
                 kind="cross",
             )
+
+    # --- 1a. TOOL-AWARE CROSS-QUESTION (strongest "I heard you" move). ---
+    # If the candidate NAMED a specific tool (Ansible, Terraform, Prometheus…),
+    # drill into THAT exact tool by name before any generic phrase-based cross.
+    # Guaranteed on the first follow-up after a substantive answer; probabilistic
+    # afterwards so we don't drill tools every single turn.
+    if substantive and not behavioral_slot and not intro_slot:
+        first_followup = turns_since_last_cross >= 1
+        if first_followup or rng.random() < (0.7 if last_answer_quality == "strong" else 0.5):
+            tool_cq = _tool_cross_question(last_answer, used, rng)
+            if tool_cq:
+                text, tool = tool_cq
+                stitch = _maybe_stitch(last_answer_quality, rng)
+                text = f"{stitch} {text}".strip() if stitch else text
+                return GeneratedQuestion(
+                    text=_finalize(text),
+                    category="troubleshooting",
+                    topic=_SKILL_TO_TOPIC.get(tool) or current_topic,
+                    difficulty=eff_difficulty,
+                    kind="cross",
+                )
 
     # --- 1. CROSS-QUESTION the candidate's own answer (primary human move). ---
     # WS3: when we have a quotable phrase in a technical-ish slot, ALWAYS cross
