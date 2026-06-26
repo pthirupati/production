@@ -2,7 +2,10 @@ title: Restore simulation networking (lab 22)
 slug: simulation-lab-22
 technology: simulation
 category: Simulation
-description: 'Hands-on simulation scenario: restore networking in a simulated environment.'
+description: 'Hands-on simulation scenario: restore networking in a simulated environment.
+  This FixitLab simulation scenario focuses on simulation: Restore simulation networking
+  (lab 22). Read the environment, form a hypothesis, apply a minimal fix, and verify
+  behavior before closing the ticket.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -14,7 +17,10 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- 'Hands-on simulation scenario: restore networking in a simulated environment.'
+- Understand the current failure mode affecting Restore simulation networking (lab
+  22)
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: 'Hands-on simulation scenario: restore networking in a simulated environment.'
 hints:
 - order: 1
@@ -23,3 +29,6 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.

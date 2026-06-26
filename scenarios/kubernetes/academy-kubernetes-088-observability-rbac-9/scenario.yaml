@@ -1,0 +1,34 @@
+title: 'Kubernetes: Role-Based Access Control — Observability Practice'
+slug: academy-kubernetes-088-observability-rbac-9
+technology: Kubernetes
+category: Observability
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Observability task: make role-based access control visible in logs,
+  metrics, or traces. On-call should answer ''what is broken?'' quickly using signals
+  from roles, bindings, least privilege, and auditability.'
+objectives:
+- Day-2 role-based access control work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The system runs, but role-based access control lacks useful telemetry.
+  Dashboards/alerts are blank or noisy — improve signal quality.
+hints:
+- order: 1
+  cost: 10
+  content: 'Find existing signals: RBAC policy objects, role assignments, and effective
+    permissions. Identify what is missing for fast triage.'
+- order: 2
+  cost: 15
+  content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.
+- order: 3
+  cost: 20
+  content: Trigger a test event and confirm it appears where on-call looks. Complete
+    via `/opt/fixitlab/academy/academy-kubernetes-088-observability-rbac-9.conf`.

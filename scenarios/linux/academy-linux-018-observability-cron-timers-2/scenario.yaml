@@ -1,0 +1,34 @@
+title: 'Linux Administration: Systemd Timers — Observability Practice'
+slug: academy-linux-018-observability-cron-timers-2
+technology: Linux Administration
+category: Observability
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Observability task: make systemd timers visible in logs, metrics, or
+  traces. On-call should answer ''what is broken?'' quickly using signals from OnCalendar,
+  monotonic timers, and Persistent.'
+objectives:
+- Day-2 systemd timers work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The system runs, but systemd timers lacks useful telemetry. Dashboards/alerts
+  are blank or noisy — improve signal quality.
+hints:
+- order: 1
+  cost: 10
+  content: 'Find existing signals: `systemctl list-timers`, unit files, and journals.
+    Identify what is missing for fast triage.'
+- order: 2
+  cost: 15
+  content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.
+- order: 3
+  cost: 20
+  content: Trigger a test event and confirm it appears where on-call looks. Complete
+    via `/opt/fixitlab/academy/academy-linux-018-observability-cron-timers-2.conf`.

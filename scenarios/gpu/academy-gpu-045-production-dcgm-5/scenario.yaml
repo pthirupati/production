@@ -1,0 +1,36 @@
+title: 'GPU & NVIDIA: Nvidia Dcgm — Production Readiness'
+slug: academy-gpu-045-production-dcgm-5
+technology: GPU & NVIDIA
+category: Production
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for NVIDIA DCGM. Harden, document, and validate
+  GPU telemetry, health watches, and field groups so the change is safe to run during
+  a maintenance window.
+objectives:
+- Day-2 NVIDIA DCGM work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but NVIDIA DCGM is not production ready
+  — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    NVIDIA DCGM.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: DCGM exports health metrics and triggers
+    on XID errors. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-gpu-045-production-dcgm-5.conf`
+    when complete.'

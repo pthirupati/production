@@ -1,0 +1,35 @@
+title: 'Simulation Labs: Terraform State — Daily Operations'
+slug: academy-simulation-083-operate-state-9
+technology: Simulation Labs
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine Terraform state task safely in Simulation
+  Labs. Follow change control — inspect, change, verify — while working with local
+  vs remote state, locking, drift, and resource addressing.'
+objectives:
+- Day-2 Terraform state work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The simulation sandbox is healthy enough for scheduled work on Terraform
+  state. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: `terraform state list`, `terraform show`, and backend config.
+    Confirm backups or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: state accurately reflects deployed resources. Add `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-simulation-083-operate-state-9.conf` and run
+    Check Solution.'

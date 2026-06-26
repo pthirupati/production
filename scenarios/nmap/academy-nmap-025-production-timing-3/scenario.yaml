@@ -1,0 +1,36 @@
+title: 'Nmap Network Scanning: Nmap Timing — Production Readiness'
+slug: academy-nmap-025-production-timing-3
+technology: Nmap Network Scanning
+category: Production
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: nmap
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for Nmap timing. Harden, document, and validate
+  T0-T5, parallelism, and RTT tuning so the change is safe to run during a maintenance
+  window.
+objectives:
+- Day-2 Nmap timing work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but Nmap timing is not production ready
+  — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    Nmap timing.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: timing template matches network sensitivity.
+    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-nmap-025-production-timing-3.conf`
+    when complete.'

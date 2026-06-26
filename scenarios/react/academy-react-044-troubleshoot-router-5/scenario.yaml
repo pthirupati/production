@@ -1,0 +1,37 @@
+title: 'React Development: React Router — Troubleshooting Drill'
+slug: academy-react-044-troubleshoot-router-5
+technology: React Development
+category: Troubleshooting
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Production alert: deep links 404 or back button breaks state. You are
+  on call for React Development and must troubleshoot React Router methodically —
+  triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+objectives:
+- 'The incident symptom is clear: deep links 404 or back button breaks state'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The React application is degraded. Deep links 404 or back button breaks
+  state. Recent changes may exist around React Router, but do not restart blindly
+  — gather evidence first.
+hints:
+- order: 1
+  cost: 10
+  content: 'Triage: router devtools, URL bar, and navigation events. Capture timestamps,
+    error messages, and what still works.'
+- order: 2
+  cost: 15
+  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
+    the noisy log line.
+- order: 3
+  cost: 20
+  content: 'Verify recovery: routes match URLs and preserve expected navigation state.
+    Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-react-044-troubleshoot-router-5.conf`,
+    and rerun Check Solution.'

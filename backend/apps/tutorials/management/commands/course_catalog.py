@@ -448,4 +448,6 @@ def build_catalog_specs(base_order: int = 400) -> list[dict]:
                 }
             )
             order += 1
-    return specs
+    from apps.question_bank.technology_catalog import enrich_catalog_specs
+
+    return enrich_catalog_specs(specs)

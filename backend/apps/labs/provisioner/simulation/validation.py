@@ -379,10 +379,43 @@ def _run_line_check(
             failures.append("nginx service inactive")
         return True
 
-    if "getent passwd" in stripped and "appuser" in stripped:
-        passwd = state.read_file("/etc/passwd") or ""
-        if "appuser" not in passwd:
-            failures.append("appuser not in /etc/passwd")
+    if "getent passwd" in stripped:
+        parts = stripped.split()
+        user = parts[-1] if parts else ""
+        if user in ("passwd", "group", "shadow"):
+            user = ""
+        if not user:
+            for tok in parts:
+                if tok not in ("getent", "passwd", "group", "shadow") and not tok.startswith("-"):
+                    user = tok
+                    break
+        if user:
+            passwd = state.read_file("/etc/passwd") or ""
+            if not any(line.startswith(f"{user}:") for line in passwd.splitlines()):
+                failures.append(f"user '{user}' not found — complete the lab objective")
+            return True
+
+    if stripped.startswith("test -f ") or stripped.startswith("test -d "):
+        is_dir = stripped.startswith("test -d ")
+        path = stripped.split(maxsplit=2)[-1].strip()
+        node = state.vfs.get(path)
+        if node is None:
+            failures.append(f"{'directory' if is_dir else 'file'} {path} does not exist yet")
+            return True
+        if is_dir and not isinstance(node, dict):
+            failures.append(f"{path} is not a directory")
+        elif not is_dir and isinstance(node, dict):
+            failures.append(f"{path} is a directory, expected a file")
+        return True
+
+    if "[ -f " in stripped or "[ -d " in stripped:
+        is_dir = "[ -d " in stripped
+        path = stripped.split("[ -", 1)[-1].split("]", 1)[0]
+        path = path.lstrip("fd ").strip()
+        node = state.vfs.get(path)
+        if node is None:
+            failures.append(f"{'directory' if is_dir else 'file'} {path} does not exist yet")
+            return True
         return True
 
     if "pwck" in stripped:

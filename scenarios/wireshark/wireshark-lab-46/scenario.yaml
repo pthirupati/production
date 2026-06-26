@@ -2,7 +2,10 @@ title: Harden wireshark replication (lab 46)
 slug: wireshark-lab-46
 technology: wireshark
 category: Wireshark
-description: 'Hands-on wireshark scenario: harden replication in a simulated environment.'
+description: 'Hands-on wireshark scenario: harden replication in a simulated environment.
+  This packet analysis scenario focuses on wireshark: Harden wireshark replication
+  (lab 46). Read the environment, form a hypothesis, apply a minimal fix, and verify
+  behavior before closing the ticket.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -14,7 +17,10 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- 'Hands-on wireshark scenario: harden replication in a simulated environment.'
+- Understand the current failure mode affecting Harden wireshark replication (lab
+  46)
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: 'Hands-on wireshark scenario: harden replication in a simulated environment.'
 hints:
 - order: 1
@@ -23,3 +29,6 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.

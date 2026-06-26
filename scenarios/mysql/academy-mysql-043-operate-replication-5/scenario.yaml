@@ -1,0 +1,35 @@
+title: 'MySQL: Database Replication — Daily Operations'
+slug: academy-mysql-043-operate-replication-5
+technology: MySQL
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: database
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine database replication task safely
+  in MySQL. Follow change control — inspect, change, verify — while working with primary/replica
+  topology, lag, failover, and consistency.'
+objectives:
+- Day-2 database replication work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The MySQL instance is healthy enough for scheduled work on database
+  replication. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: replication status views, `SHOW REPLICA STATUS`, or `pg_stat_replication`.
+    Confirm backups or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: replication is streaming, lag is within SLO, and read routing
+    works. Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-mysql-043-operate-replication-5.conf`
+    and run Check Solution.'

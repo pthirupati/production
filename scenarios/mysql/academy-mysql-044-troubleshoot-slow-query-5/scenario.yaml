@@ -1,0 +1,37 @@
+title: 'MySQL: Slow Queries — Troubleshooting Drill'
+slug: academy-mysql-044-troubleshoot-slow-query-5
+technology: MySQL
+category: Troubleshooting
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: database
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Production alert: API timeouts correlate with database load spikes.
+  You are on call for MySQL and must troubleshoot slow queries methodically — triage
+  symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+objectives:
+- 'The incident symptom is clear: API timeouts correlate with database load spikes'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The MySQL instance is degraded. Api timeouts correlate with database
+  load spikes. Recent changes may exist around slow queries, but do not restart blindly
+  — gather evidence first.
+hints:
+- order: 1
+  cost: 10
+  content: 'Triage: slow query log, EXPLAIN, and performance_schema/pg_stat_statements.
+    Capture timestamps, error messages, and what still works.'
+- order: 2
+  cost: 15
+  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
+    the noisy log line.
+- order: 3
+  cost: 20
+  content: 'Verify recovery: target queries use efficient plans and p95 latency improves.
+    Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-mysql-044-troubleshoot-slow-query-5.conf`,
+    and rerun Check Solution.'

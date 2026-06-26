@@ -1,0 +1,37 @@
+title: 'GPU & NVIDIA: Nvidia Mig — Troubleshooting Drill'
+slug: academy-gpu-084-troubleshoot-mig-9
+technology: GPU & NVIDIA
+category: Troubleshooting
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Production alert: workloads cannot see allocated MIG slice. You are
+  on call for GPU & NVIDIA and must troubleshoot NVIDIA MIG methodically — triage
+  symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+objectives:
+- 'The incident symptom is clear: workloads cannot see allocated MIG slice'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The GPU node is degraded. Workloads cannot see allocated mig slice.
+  Recent changes may exist around NVIDIA MIG, but do not restart blindly — gather
+  evidence first.
+hints:
+- order: 1
+  cost: 10
+  content: 'Triage: `nvidia-smi mig -lgi`, kube device plugin logs. Capture timestamps,
+    error messages, and what still works.'
+- order: 2
+  cost: 15
+  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
+    the noisy log line.
+- order: 3
+  cost: 20
+  content: 'Verify recovery: MIG instances match requested profile and persist. Document
+    the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-gpu-084-troubleshoot-mig-9.conf`,
+    and rerun Check Solution.'

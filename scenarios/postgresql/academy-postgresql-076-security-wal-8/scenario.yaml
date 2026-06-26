@@ -1,0 +1,36 @@
+title: 'PostgreSQL: Write-Ahead Logging — Security Practice'
+slug: academy-postgresql-076-security-wal-8
+technology: PostgreSQL
+category: Security
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: database
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security review: harden write-ahead logging on this PostgreSQL system.
+  Close unsafe defaults, enforce least privilege, and ensure WAL archiving, replication
+  slots, and PITR cannot be abused — without breaking legitimate use.'
+objectives:
+- Unsafe defaults related to write-ahead logging are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around write-ahead
+  logging. Assume an auditor or pen test is next week — tighten controls with evidence.
+hints:
+- order: 1
+  cost: 10
+  content: 'Baseline current exposure: pg_wal directory, `pg_stat_wal`, or SQLite
+    WAL mode. Note world-readable files, open ports, or excessive roles.'
+- order: 2
+  cost: 15
+  content: Apply least privilege incrementally. Prefer explicit allows over broad
+    wildcards.
+- order: 3
+  cost: 20
+  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
+    in `/opt/fixitlab/academy/academy-postgresql-076-security-wal-8.conf` and Check
+    Solution.

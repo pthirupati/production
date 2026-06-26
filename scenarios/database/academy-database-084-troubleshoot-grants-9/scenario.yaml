@@ -1,0 +1,37 @@
+title: 'Database Administration: Database Grants — Troubleshooting Drill'
+slug: academy-database-084-troubleshoot-grants-9
+technology: Database Administration
+category: Troubleshooting
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: database
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Production alert: apps connect as superuser or lack needed SELECT. You
+  are on call for Database Administration and must troubleshoot database grants methodically
+  — triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+objectives:
+- 'The incident symptom is clear: apps connect as superuser or lack needed SELECT'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The database server is degraded. Apps connect as superuser or lack
+  needed select. Recent changes may exist around database grants, but do not restart
+  blindly — gather evidence first.
+hints:
+- order: 1
+  cost: 10
+  content: 'Triage: `SHOW GRANTS`, `pg_roles`, and privilege catalogs. Capture timestamps,
+    error messages, and what still works.'
+- order: 2
+  cost: 15
+  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
+    the noisy log line.
+- order: 3
+  cost: 20
+  content: 'Verify recovery: roles grant minimal rights required for the workload.
+    Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-database-084-troubleshoot-grants-9.conf`,
+    and rerun Check Solution.'

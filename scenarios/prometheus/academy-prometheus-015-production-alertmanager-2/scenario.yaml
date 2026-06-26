@@ -1,0 +1,36 @@
+title: 'Prometheus Monitoring: Alertmanager — Production Readiness'
+slug: academy-prometheus-015-production-alertmanager-2
+technology: Prometheus Monitoring
+category: Production
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for Alertmanager. Harden, document, and validate
+  grouping, inhibition, silences, and receiver routes so the change is safe to run
+  during a maintenance window.
+objectives:
+- Day-2 Alertmanager work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but Alertmanager is not production ready
+  — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    Alertmanager.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: routes deliver one clear notification per
+    incident with correct severity. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-prometheus-015-production-alertmanager-2.conf`
+    when complete.'

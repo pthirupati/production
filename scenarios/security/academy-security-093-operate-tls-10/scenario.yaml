@@ -1,0 +1,35 @@
+title: 'Security: Tls Configuration — Daily Operations'
+slug: academy-security-093-operate-tls-10
+technology: Security
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine TLS configuration task safely in
+  Security. Follow change control — inspect, change, verify — while working with certificates,
+  chains, ciphers, renewal, and mTLS.'
+objectives:
+- Day-2 TLS configuration work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The hardening lab is healthy enough for scheduled work on TLS configuration.
+  Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: `openssl s_client`, cert file paths, and ingress/listener config.
+    Confirm backups or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: handshakes succeed with a trusted chain and modern ciphers.
+    Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-security-093-operate-tls-10.conf`
+    and run Check Solution.'

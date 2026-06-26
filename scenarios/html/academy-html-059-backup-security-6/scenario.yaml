@@ -1,0 +1,34 @@
+title: 'HTML & Web Servers: Platform Security Hardening — Backup and Recovery'
+slug: academy-html-059-backup-security-6
+technology: HTML & Web Servers
+category: Backup & Recovery
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Backup and recovery drill for platform security hardening. Ensure backups
+  run on schedule, retention is correct, and you can restore least privilege, patching,
+  secrets handling, and exposure reduction within the lab RTO.
+objectives:
+- Backup coverage for platform security hardening is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+initial_state: Backup jobs exist but reliability is uncertain for platform security
+  hardening. Leadership wants proof that restore works — not just that backup scripts
+  exit zero.
+hints:
+- order: 1
+  cost: 10
+  content: Inspect backup schedules, last success time, and destination free space.
+- order: 2
+  cost: 15
+  content: Run or repair the backup job, then perform a controlled restore to a scratch
+    location.
+- order: 3
+  cost: 20
+  content: Compare restored data to source. Complete the lab via `# FIXED-OK` in `/opt/fixitlab/academy/academy-html-059-backup-security-6.conf`.

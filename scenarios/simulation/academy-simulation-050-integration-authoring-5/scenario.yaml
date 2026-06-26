@@ -1,0 +1,36 @@
+title: 'Simulation Labs: Lab Authoring — Integration Lab'
+slug: academy-simulation-050-integration-authoring-5
+technology: Simulation Labs
+category: Cross-Technology
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Integration lab: connect lab authoring with an adjacent platform in
+  the Simulation Labs stack. Validate authentication, data handoff, and failure behavior
+  for scenario structure, validation hooks, and learner UX.'
+objectives:
+- lab authoring is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+initial_state: Two systems are deployed but not fully wired together for lab authoring.
+  Downstream consumers are waiting on this integration path.
+hints:
+- order: 1
+  cost: 10
+  content: 'Map the contract: which endpoints, queues, files, or CRDs connect the
+    systems?'
+- order: 2
+  cost: 15
+  content: Configure credentials and networking first, then test a minimal happy-path
+    transaction.
+- order: 3
+  cost: 20
+  content: Run an end-to-end check plus one failure case. Mark `/opt/fixitlab/academy/academy-simulation-050-integration-authoring-5.conf`
+    with `# FIXED-OK` when green.
+cross_technology: true

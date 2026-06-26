@@ -1,0 +1,36 @@
+title: 'Nmap Network Scanning: Safe Scanning Practices — Integration Lab'
+slug: academy-nmap-030-integration-safe-scans-3
+technology: Nmap Network Scanning
+category: Cross-Technology
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: nmap
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Integration lab: connect safe scanning practices with an adjacent platform
+  in the Nmap Network Scanning stack. Validate authentication, data handoff, and failure
+  behavior for scope approval, rate limits, and timing templates.'
+objectives:
+- safe scanning practices is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+initial_state: Two systems are deployed but not fully wired together for safe scanning
+  practices. Downstream consumers are waiting on this integration path.
+hints:
+- order: 1
+  cost: 10
+  content: 'Map the contract: which endpoints, queues, files, or CRDs connect the
+    systems?'
+- order: 2
+  cost: 15
+  content: Configure credentials and networking first, then test a minimal happy-path
+    transaction.
+- order: 3
+  cost: 20
+  content: Run an end-to-end check plus one failure case. Mark `/opt/fixitlab/academy/academy-nmap-030-integration-safe-scans-3.conf`
+    with `# FIXED-OK` when green.
+cross_technology: true

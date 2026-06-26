@@ -1,0 +1,35 @@
+title: 'Wireshark Packet Analysis: Dns — Daily Operations'
+slug: academy-wireshark-013-operate-dns-2
+technology: Wireshark Packet Analysis
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: wireshark
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine DNS task safely in Wireshark Packet
+  Analysis. Follow change control — inspect, change, verify — while working with name
+  resolution, records, forward/reverse lookups, and resolver config.'
+objectives:
+- Day-2 DNS work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The capture lab is healthy enough for scheduled work on DNS. Complete
+  the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: `dig`, `nslookup`, or `Resolve-DnsName` plus zone/config files.
+    Confirm backups or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: queries return the expected records from the intended resolver.
+    Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-wireshark-013-operate-dns-2.conf`
+    and run Check Solution.'

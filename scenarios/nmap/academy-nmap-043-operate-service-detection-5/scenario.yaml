@@ -1,0 +1,35 @@
+title: 'Nmap Network Scanning: Nmap Service Detection — Daily Operations'
+slug: academy-nmap-043-operate-service-detection-5
+technology: Nmap Network Scanning
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: nmap
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine Nmap service detection task safely
+  in Nmap Network Scanning. Follow change control — inspect, change, verify — while
+  working with -sV versions, probes, and false positives.'
+objectives:
+- Day-2 Nmap service detection work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The scanning lab is healthy enough for scheduled work on Nmap service
+  detection. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: `nmap -sV --version-intensity`, output review. Confirm backups
+    or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: detected services match banner evidence. Add `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-nmap-043-operate-service-detection-5.conf` and
+    run Check Solution.'

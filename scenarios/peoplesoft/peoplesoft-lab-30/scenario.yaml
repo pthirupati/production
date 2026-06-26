@@ -3,7 +3,9 @@ slug: peoplesoft-lab-30
 technology: peoplesoft
 category: Peoplesoft
 description: 'Hands-on peoplesoft scenario: optimize authentication in a simulated
-  environment.'
+  environment. This PeopleSoft administration scenario focuses on peoplesoft: Optimize
+  peoplesoft authentication (lab 30). Read the environment, form a hypothesis, apply
+  a minimal fix, and verify behavior before closing the ticket.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -15,7 +17,10 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- 'Hands-on peoplesoft scenario: optimize authentication in a simulated environment.'
+- Understand the current failure mode affecting Optimize peoplesoft authentication
+  (lab 30)
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: 'Hands-on peoplesoft scenario: optimize authentication in a simulated
   environment.'
 hints:
@@ -25,3 +30,6 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.

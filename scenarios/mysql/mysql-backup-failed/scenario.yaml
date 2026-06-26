@@ -2,7 +2,9 @@ title: Recover from a failed mysqldump
 slug: mysql-backup-failed
 technology: mysql
 category: Mysql
-description: Nightly backup fails on a large table due to lock timeout.
+description: 'Nightly backup fails on a large table due to lock timeout. This MySQL
+  scenario focuses on mysql: Recover from a failed mysqldump. Read the environment,
+  form a hypothesis, apply a minimal fix, and verify behavior before closing the ticket.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -14,7 +16,9 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Nightly backup fails on a large table due to lock timeout.
+- Understand the current failure mode affecting Recover from a failed mysqldump
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: Nightly backup fails on a large table due to lock timeout.
 hints:
 - order: 1
@@ -23,6 +27,9 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.
 coding_spec:
   language: python
   entrypoint: solution.py

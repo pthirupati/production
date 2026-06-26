@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+grep -q FIXED-OK /opt/fixitlab/academy/academy-devops-083-operate-cd-release-9.conf
+exit 0

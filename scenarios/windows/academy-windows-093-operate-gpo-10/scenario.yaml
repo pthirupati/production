@@ -1,0 +1,35 @@
+title: 'Windows Server: Group Policy — Daily Operations'
+slug: academy-windows-093-operate-gpo-10
+technology: Windows Server
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: windows
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine Group Policy task safely in Windows
+  Server. Follow change control — inspect, change, verify — while working with GPO
+  scope, inheritance, and rsop.'
+objectives:
+- Day-2 Group Policy work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The Windows Server host is healthy enough for scheduled work on Group
+  Policy. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: GPMC, `gpresult`, and SYSVOL replication. Confirm backups or
+    snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: rsop shows intended policy on test machines. Add `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-windows-093-operate-gpo-10.conf` and run Check
+    Solution.'

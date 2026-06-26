@@ -2,7 +2,9 @@ title: Spot TCP retransmissions
 slug: ws-tcp-retrans
 technology: wireshark
 category: Wireshark
-description: Find packet loss causing slow downloads.
+description: 'Find packet loss causing slow downloads. This packet analysis scenario
+  focuses on wireshark: Spot TCP retransmissions. Read the environment, form a hypothesis,
+  apply a minimal fix, and verify behavior before closing the ticket.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -14,7 +16,9 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Find packet loss causing slow downloads.
+- Understand the current failure mode affecting Spot TCP retransmissions
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: Find packet loss causing slow downloads.
 hints:
 - order: 1
@@ -23,3 +27,6 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.

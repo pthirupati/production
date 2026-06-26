@@ -1,0 +1,34 @@
+title: 'Oracle PeopleSoft: Peoplesoft Operator Lock — Observability Practice'
+slug: academy-peoplesoft-008-observability-operator-lock
+technology: Oracle PeopleSoft
+category: Observability
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: peoplesoft
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Observability task: make PeopleSoft operator lock visible in logs, metrics,
+  or traces. On-call should answer ''what is broken?'' quickly using signals from
+  locked objects, release, and audit.'
+objectives:
+- Day-2 PeopleSoft operator lock work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The system runs, but PeopleSoft operator lock lacks useful telemetry.
+  Dashboards/alerts are blank or noisy — improve signal quality.
+hints:
+- order: 1
+  cost: 10
+  content: 'Find existing signals: Operator Security and release actions in PIA. Identify
+    what is missing for fast triage.'
+- order: 2
+  cost: 15
+  content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.
+- order: 3
+  cost: 20
+  content: Trigger a test event and confirm it appears where on-call looks. Complete
+    via `/opt/fixitlab/academy/academy-peoplesoft-008-observability-operator-lock.conf`.

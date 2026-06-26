@@ -1,0 +1,37 @@
+title: 'Java Development: Junit Testing — Troubleshooting Drill'
+slug: academy-java-044-troubleshoot-junit-5
+technology: Java Development
+category: Troubleshooting
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: java
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Production alert: flaky tests erode trust in CI. You are on call for
+  Java Development and must troubleshoot JUnit testing methodically — triage symptoms,
+  find root cause, apply the smallest safe fix, and confirm recovery.'
+objectives:
+- 'The incident symptom is clear: flaky tests erode trust in CI'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The Java project is degraded. Flaky tests erode trust in ci. Recent
+  changes may exist around JUnit testing, but do not restart blindly — gather evidence
+  first.
+hints:
+- order: 1
+  cost: 10
+  content: 'Triage: surefire reports, `@Test` lifecycle, and failures. Capture timestamps,
+    error messages, and what still works.'
+- order: 2
+  cost: 15
+  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
+    the noisy log line.
+- order: 3
+  cost: 20
+  content: 'Verify recovery: suite runs deterministically with meaningful assertions.
+    Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-java-044-troubleshoot-junit-5.conf`,
+    and rerun Check Solution.'

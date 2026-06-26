@@ -1,0 +1,36 @@
+title: 'Shell Scripting: Shell Script Arguments — Integration Lab'
+slug: academy-shell-script-020-integration-args-2
+technology: Shell Scripting
+category: Cross-Technology
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Integration lab: connect shell script arguments with an adjacent platform
+  in the Shell Scripting stack. Validate authentication, data handoff, and failure
+  behavior for $1/$@, getopts, defaults, and input validation.'
+objectives:
+- shell script arguments is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+initial_state: Two systems are deployed but not fully wired together for shell script
+  arguments. Downstream consumers are waiting on this integration path.
+hints:
+- order: 1
+  cost: 10
+  content: 'Map the contract: which endpoints, queues, files, or CRDs connect the
+    systems?'
+- order: 2
+  cost: 15
+  content: Configure credentials and networking first, then test a minimal happy-path
+    transaction.
+- order: 3
+  cost: 20
+  content: Run an end-to-end check plus one failure case. Mark `/opt/fixitlab/academy/academy-shell-script-020-integration-args-2.conf`
+    with `# FIXED-OK` when green.
+cross_technology: true

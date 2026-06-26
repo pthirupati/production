@@ -1,0 +1,37 @@
+title: 'Ansible Automation: Ansible Handlers — Troubleshooting Drill'
+slug: academy-ansible-054-troubleshoot-handlers-6
+technology: Ansible Automation
+category: Troubleshooting
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: ansible
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Production alert: service restarts never trigger after config change.
+  You are on call for Ansible Automation and must troubleshoot Ansible handlers methodically
+  — triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+objectives:
+- 'The incident symptom is clear: service restarts never trigger after config change'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The Ansible control node is degraded. Service restarts never trigger
+  after config change. Recent changes may exist around Ansible handlers, but do not
+  restart blindly — gather evidence first.
+hints:
+- order: 1
+  cost: 10
+  content: 'Triage: play recap handler section and `--diff`. Capture timestamps, error
+    messages, and what still works.'
+- order: 2
+  cost: 15
+  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
+    the noisy log line.
+- order: 3
+  cost: 20
+  content: 'Verify recovery: handlers run once at end of play when notified. Document
+    the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-ansible-054-troubleshoot-handlers-6.conf`,
+    and rerun Check Solution.'

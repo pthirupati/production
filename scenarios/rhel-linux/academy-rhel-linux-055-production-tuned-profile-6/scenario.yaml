@@ -1,0 +1,36 @@
+title: 'RHEL Linux: Tuned Profiles — Production Readiness'
+slug: academy-rhel-linux-055-production-tuned-profile-6
+technology: RHEL Linux
+category: Production
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: rhel
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for tuned profiles. Harden, document, and validate
+  throughput vs latency profiles and overrides so the change is safe to run during
+  a maintenance window.
+objectives:
+- Day-2 tuned profiles work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but tuned profiles is not production ready
+  — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    tuned profiles.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: tuned profile matches workload with measurable
+    benefit. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-rhel-linux-055-production-tuned-profile-6.conf`
+    when complete.'

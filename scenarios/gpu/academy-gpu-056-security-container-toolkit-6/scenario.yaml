@@ -1,0 +1,36 @@
+title: 'GPU & NVIDIA: Nvidia Container Toolkit — Security Practice'
+slug: academy-gpu-056-security-container-toolkit-6
+technology: GPU & NVIDIA
+category: Security
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security review: harden NVIDIA container toolkit on this GPU & NVIDIA
+  system. Close unsafe defaults, enforce least privilege, and ensure runtime hooks,
+  device requests, and CDI cannot be abused — without breaking legitimate use.'
+objectives:
+- Unsafe defaults related to NVIDIA container toolkit are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around NVIDIA container
+  toolkit. Assume an auditor or pen test is next week — tighten controls with evidence.
+hints:
+- order: 1
+  cost: 10
+  content: 'Baseline current exposure: `nvidia-ctk`, docker/k8s GPU requests, and
+    logs. Note world-readable files, open ports, or excessive roles.'
+- order: 2
+  cost: 15
+  content: Apply least privilege incrementally. Prefer explicit allows over broad
+    wildcards.
+- order: 3
+  cost: 20
+  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
+    in `/opt/fixitlab/academy/academy-gpu-056-security-container-toolkit-6.conf` and
+    Check Solution.

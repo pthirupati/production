@@ -1,0 +1,36 @@
+title: 'Docker & Containers: Docker Networks — Production Readiness'
+slug: academy-docker-095-production-networks-10
+technology: Docker & Containers
+category: Production
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for Docker networks. Harden, document, and validate
+  bridge/overlay networks, DNS names, published ports, and container-to-container
+  connectivity so the change is safe to run during a maintenance window.
+objectives:
+- Day-2 Docker networks work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but Docker networks is not production ready
+  — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    Docker networks.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: expected containers share the correct network
+    and connectivity works on the service port. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-docker-095-production-networks-10.conf`
+    when complete.'

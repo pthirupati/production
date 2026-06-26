@@ -1,0 +1,36 @@
+title: 'HTML & Web Servers: Web Performance — Production Readiness'
+slug: academy-html-065-production-performance-7
+technology: HTML & Web Servers
+category: Production
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for web performance. Harden, document, and validate
+  LCP, bundle size, caching, and profiling so the change is safe to run during a maintenance
+  window.
+objectives:
+- Day-2 web performance work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but web performance is not production ready
+  — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    web performance.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: core vitals meet budget on target devices.
+    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-html-065-production-performance-7.conf`
+    when complete.'

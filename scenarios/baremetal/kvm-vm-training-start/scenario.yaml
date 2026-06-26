@@ -21,10 +21,10 @@ initial_state: KVM VM train-vm-2 is shut off.
 hints:
   - order: 1
     cost: 10
-    content: **Open Bare Metal** → **KVM** → select train-vm-2.
+    content: "**Open Bare Metal** → **KVM** → select train-vm-2."
   - order: 2
     cost: 15
-    content: Click **Start** and wait for running state.
+    content: "Click **Start** and wait for running state."
   - order: 3
     cost: 20
-    content: Click **Check**.
+    content: "Click **Check**."

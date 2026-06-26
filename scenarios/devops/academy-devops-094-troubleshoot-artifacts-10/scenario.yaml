@@ -1,0 +1,38 @@
+title: 'DevOps: Build Artifacts — Troubleshooting Drill'
+slug: academy-devops-094-troubleshoot-artifacts-10
+technology: DevOps
+category: Troubleshooting
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Production alert: deploys pull the wrong build or artifacts expire mid-release.
+  You are on call for DevOps and must troubleshoot build artifacts methodically —
+  triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+objectives:
+- 'The incident symptom is clear: deploys pull the wrong build or artifacts expire
+  mid-release'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The CI/CD lab is degraded. Deploys pull the wrong build or artifacts
+  expire mid-release. Recent changes may exist around build artifacts, but do not
+  restart blindly — gather evidence first.
+hints:
+- order: 1
+  cost: 10
+  content: 'Triage: artifact repository UI, checksums, and CI publish logs. Capture
+    timestamps, error messages, and what still works.'
+- order: 2
+  cost: 15
+  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
+    the noisy log line.
+- order: 3
+  cost: 20
+  content: 'Verify recovery: the intended version is promoted with verifiable checksums.
+    Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-devops-094-troubleshoot-artifacts-10.conf`,
+    and rerun Check Solution.'

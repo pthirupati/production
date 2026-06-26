@@ -1,0 +1,36 @@
+title: 'Simulation Labs: Lab Hints — Security Practice'
+slug: academy-simulation-086-security-hints-9
+technology: Simulation Labs
+category: Security
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security review: harden lab hints on this Simulation Labs system. Close
+  unsafe defaults, enforce least privilege, and ensure progressive disclosure, costs,
+  and anti-spoilers cannot be abused — without breaking legitimate use.'
+objectives:
+- Unsafe defaults related to lab hints are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around lab hints.
+  Assume an auditor or pen test is next week — tighten controls with evidence.
+hints:
+- order: 1
+  cost: 10
+  content: 'Baseline current exposure: hint usage analytics and learner feedback.
+    Note world-readable files, open ports, or excessive roles.'
+- order: 2
+  cost: 15
+  content: Apply least privilege incrementally. Prefer explicit allows over broad
+    wildcards.
+- order: 3
+  cost: 20
+  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
+    in `/opt/fixitlab/academy/academy-simulation-086-security-hints-9.conf` and Check
+    Solution.

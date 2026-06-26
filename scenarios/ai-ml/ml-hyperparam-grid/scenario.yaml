@@ -2,7 +2,9 @@ title: Tune hyperparameters
 slug: ml-hyperparam-grid
 technology: ai-ml
 category: Ai Ml
-description: Default learning rate causes divergence.
+description: 'Default learning rate causes divergence. This AI/ML workflows scenario
+  focuses on ai ml: Tune hyperparameters. Read the environment, form a hypothesis,
+  apply a minimal fix, and verify behavior before closing the ticket.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -14,7 +16,9 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Default learning rate causes divergence.
+- Understand the current failure mode affecting Tune hyperparameters
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: Default learning rate causes divergence.
 hints:
 - order: 1
@@ -23,6 +27,9 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.
 coding_spec:
   language: python
   entrypoint: solution.py

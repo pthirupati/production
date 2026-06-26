@@ -1,0 +1,38 @@
+title: 'Data Science & Analytics: Datetime Handling — Troubleshooting Drill'
+slug: academy-data-science-074-troubleshoot-datetime-8
+technology: Data Science & Analytics
+category: Troubleshooting
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Production alert: reports shift dates or sort chronologically wrong.
+  You are on call for Data Science & Analytics and must troubleshoot datetime handling
+  methodically — triage symptoms, find root cause, apply the smallest safe fix, and
+  confirm recovery.'
+objectives:
+- 'The incident symptom is clear: reports shift dates or sort chronologically wrong'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The notebook lab is degraded. Reports shift dates or sort chronologically
+  wrong. Recent changes may exist around datetime handling, but do not restart blindly
+  — gather evidence first.
+hints:
+- order: 1
+  cost: 10
+  content: 'Triage: unit tests around DST boundaries and ISO formats. Capture timestamps,
+    error messages, and what still works.'
+- order: 2
+  cost: 15
+  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
+    the noisy log line.
+- order: 3
+  cost: 20
+  content: 'Verify recovery: timestamps normalize to UTC with explicit tz metadata.
+    Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-data-science-074-troubleshoot-datetime-8.conf`,
+    and rerun Check Solution.'

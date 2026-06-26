@@ -1,0 +1,38 @@
+title: 'RHEL Linux: Rhel Subscriptions — Fundamentals Lab'
+slug: academy-rhel-linux-031-learn-subscription-repos-4
+technology: RHEL Linux
+category: Core Skills
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: rhel
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: This beginner-friendly RHEL Linux lab introduces RHEL subscriptions.
+  You will explore entitlements, repos, and candle status on the RHEL practice host.
+  Read the environment first, then complete the guided steps — no prior production
+  experience required.
+objectives:
+- Understand how RHEL subscriptions work in this lab environment
+- Identify the main status and configuration signals for RHEL subscriptions
+- Confirm you can read the current state confidently before changing anything
+initial_state: The RHEL practice host is online with a starter RHEL subscriptions
+  setup. Some pieces are intentionally incomplete so you can learn how the pieces
+  fit together. Nothing is on fire yet — focus on observation and understanding.
+hints:
+- order: 1
+  cost: 10
+  content: 'Orient yourself: `subscription-manager`, `dnf repolist`, and compliance.
+    Write down what looks normal vs missing.'
+- order: 2
+  cost: 15
+  content: Core idea — entitlements, repos, and candle status. Make one small, reversible
+    change at a time and re-check status.
+- order: 3
+  cost: 20
+  content: When the lab objective is done, record completion by adding `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-rhel-linux-031-learn-subscription-repos-4.conf`,
+    then click Check Solution.

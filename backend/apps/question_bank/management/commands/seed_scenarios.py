@@ -29,6 +29,20 @@ TECH_META = {
     "grafana": {"slug": "grafana", "name": "Grafana Observability", "icon": "activity", "color": "orange", "order": 22},
     "prometheus": {"slug": "prometheus", "name": "Prometheus Monitoring", "icon": "activity", "color": "red", "order": 23},
     "prompt-engineering": {"slug": "prompt-engineering", "name": "Prompt Engineering & AI Mastery", "icon": "sparkles", "color": "purple", "order": 1, "price": 0},
+    "javascript": {"slug": "javascript", "name": "JavaScript", "icon": "code", "color": "yellow", "order": 24},
+    "nodejs": {"slug": "nodejs", "name": "Node.js", "icon": "code", "color": "green", "order": 25},
+    "react": {"slug": "react", "name": "React", "icon": "layers", "color": "cyan", "order": 26},
+    "postgresql": {"slug": "postgresql", "name": "PostgreSQL", "icon": "database", "color": "blue", "order": 27},
+    "mysql": {"slug": "mysql", "name": "MySQL", "icon": "database", "color": "blue", "order": 28},
+    "sqlite": {"slug": "sqlite", "name": "SQLite", "icon": "database", "color": "teal", "order": 29},
+    "rhel-linux": {"slug": "rhel-linux", "name": "RHEL Linux", "icon": "terminal", "color": "red", "order": 6},
+    "nmap": {"slug": "nmap", "name": "Nmap Network Scanning", "icon": "globe", "color": "green", "order": 30},
+    "wireshark": {"slug": "wireshark", "name": "Wireshark Packet Analysis", "icon": "activity", "color": "blue", "order": 31},
+    "peoplesoft": {"slug": "peoplesoft", "name": "PeopleSoft Administration", "icon": "server", "color": "orange", "order": 32},
+    "simulation": {"slug": "simulation", "name": "IT Simulation Labs", "icon": "layers", "color": "purple", "order": 33},
+    "ai-ml": {"slug": "ai-ml", "name": "AI & Machine Learning", "icon": "sparkles", "color": "purple", "order": 2},
+    "data-science": {"slug": "data-science", "name": "Data Science", "icon": "activity", "color": "pink", "order": 3},
+    "windows": {"slug": "windows", "name": "Windows Server", "icon": "server", "color": "blue", "order": 9},
 }
 
 

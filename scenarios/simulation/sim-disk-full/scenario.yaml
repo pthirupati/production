@@ -2,7 +2,9 @@ title: Clear disk full on /var
 slug: sim-disk-full
 technology: simulation
 category: Simulation
-description: Logs filled root filesystem.
+description: 'Logs filled root filesystem. This FixitLab simulation scenario focuses
+  on simulation: Clear disk full on /var. Read the environment, form a hypothesis,
+  apply a minimal fix, and verify behavior before closing the ticket.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -14,7 +16,9 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Logs filled root filesystem.
+- Understand the current failure mode affecting Clear disk full on /var
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: Logs filled root filesystem.
 hints:
 - order: 1
@@ -23,3 +27,6 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.

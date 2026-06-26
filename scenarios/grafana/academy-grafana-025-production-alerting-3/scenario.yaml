@@ -1,0 +1,36 @@
+title: 'Grafana Observability: Alerting Rules — Production Readiness'
+slug: academy-grafana-025-production-alerting-3
+technology: Grafana Observability
+category: Production
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for alerting rules. Harden, document, and validate
+  thresholds, burn rates, inhibition, and on-call routing so the change is safe to
+  run during a maintenance window.
+objectives:
+- Day-2 alerting rules work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but alerting rules is not production ready
+  — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    alerting rules.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: alerts fire for real regressions and stay
+    quiet during expected noise. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-grafana-025-production-alerting-3.conf`
+    when complete.'

@@ -1,0 +1,36 @@
+title: 'Nmap Network Scanning: Scan Output Formats — Security Practice'
+slug: academy-nmap-096-security-output-10
+technology: Nmap Network Scanning
+category: Security
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: nmap
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security review: harden scan output formats on this Nmap Network Scanning
+  system. Close unsafe defaults, enforce least privilege, and ensure grepable XML,
+  JSON, and diffing scans cannot be abused — without breaking legitimate use.'
+objectives:
+- Unsafe defaults related to scan output formats are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around scan output
+  formats. Assume an auditor or pen test is next week — tighten controls with evidence.
+hints:
+- order: 1
+  cost: 10
+  content: 'Baseline current exposure: nmap -oA files and parsing scripts. Note world-readable
+    files, open ports, or excessive roles.'
+- order: 2
+  cost: 15
+  content: Apply least privilege incrementally. Prefer explicit allows over broad
+    wildcards.
+- order: 3
+  cost: 20
+  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
+    in `/opt/fixitlab/academy/academy-nmap-096-security-output-10.conf` and Check
+    Solution.

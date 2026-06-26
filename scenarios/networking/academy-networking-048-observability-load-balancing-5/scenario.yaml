@@ -1,0 +1,34 @@
+title: 'Networking: Load Balancing — Observability Practice'
+slug: academy-networking-048-observability-load-balancing-5
+technology: Networking
+category: Observability
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Observability task: make load balancing visible in logs, metrics, or
+  traces. On-call should answer ''what is broken?'' quickly using signals from L4/L7
+  algorithms, health checks, and stickiness.'
+objectives:
+- Day-2 load balancing work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The system runs, but load balancing lacks useful telemetry. Dashboards/alerts
+  are blank or noisy — improve signal quality.
+hints:
+- order: 1
+  cost: 10
+  content: 'Find existing signals: LB config, backend pool status, and access logs.
+    Identify what is missing for fast triage.'
+- order: 2
+  cost: 15
+  content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.
+- order: 3
+  cost: 20
+  content: Trigger a test event and confirm it appears where on-call looks. Complete
+    via `/opt/fixitlab/academy/academy-networking-048-observability-load-balancing-5.conf`.

@@ -2,7 +2,9 @@ title: Enable cluster mode for CPU
 slug: node-cluster-workers
 technology: nodejs
 category: Nodejs
-description: Single process saturates one core under load.
+description: 'Single process saturates one core under load. This Node.js backends
+  scenario focuses on nodejs: Enable cluster mode for CPU. Read the environment, form
+  a hypothesis, apply a minimal fix, and verify behavior before closing the ticket.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -14,7 +16,9 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Single process saturates one core under load.
+- Understand the current failure mode affecting Enable cluster mode for CPU
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: Single process saturates one core under load.
 hints:
 - order: 1
@@ -23,6 +27,9 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.
 coding_spec:
   language: python
   entrypoint: solution.py

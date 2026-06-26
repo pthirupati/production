@@ -1,0 +1,35 @@
+title: 'Prometheus Monitoring: Monitoring Alerts — Daily Operations'
+slug: academy-prometheus-003-operate-alerts
+technology: Prometheus Monitoring
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine monitoring alerts task safely in
+  Prometheus Monitoring. Follow change control — inspect, change, verify — while working
+  with SLO-based alerts, symptom vs cause, and runbook links.'
+objectives:
+- Day-2 monitoring alerts work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The Prometheus stack is healthy enough for scheduled work on monitoring
+  alerts. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: alertmanager/PagerDuty history and rule evaluation logs. Confirm
+    backups or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: each alert maps to a runbook step and reflects user-visible
+    impact. Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-prometheus-003-operate-alerts.conf`
+    and run Check Solution.'

@@ -1,0 +1,33 @@
+title: 'Nmap Network Scanning: Os Fingerprinting — Backup and Recovery'
+slug: academy-nmap-099-backup-os-detect-10
+technology: Nmap Network Scanning
+category: Backup & Recovery
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: nmap
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Backup and recovery drill for OS fingerprinting. Ensure backups run on
+  schedule, retention is correct, and you can restore nmap -O, confidence, and ethics
+  within the lab RTO.
+objectives:
+- Backup coverage for OS fingerprinting is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+initial_state: Backup jobs exist but reliability is uncertain for OS fingerprinting.
+  Leadership wants proof that restore works — not just that backup scripts exit zero.
+hints:
+- order: 1
+  cost: 10
+  content: Inspect backup schedules, last success time, and destination free space.
+- order: 2
+  cost: 15
+  content: Run or repair the backup job, then perform a controlled restore to a scratch
+    location.
+- order: 3
+  cost: 20
+  content: Compare restored data to source. Complete the lab via `# FIXED-OK` in `/opt/fixitlab/academy/academy-nmap-099-backup-os-detect-10.conf`.

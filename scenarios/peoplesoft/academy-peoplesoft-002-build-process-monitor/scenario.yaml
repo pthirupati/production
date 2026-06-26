@@ -1,0 +1,38 @@
+title: 'Oracle PeopleSoft: Peoplesoft Process Monitor — Build From Scratch'
+slug: academy-peoplesoft-002-build-process-monitor
+technology: Oracle PeopleSoft
+category: Build Lab
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: peoplesoft
+time_limit: 900
+max_score: 100
+is_free: true
+infrastructure_type: docker
+jira_priority: Low
+description: Build PeopleSoft Process Monitor from scratch in this Oracle PeopleSoft
+  lab. You start from a minimal environment and must produce a working configuration
+  that demonstrates runnables, traces, and distribution. Treat this like a greenfield
+  task — plan, implement, then prove it works.
+objectives:
+- A working PeopleSoft Process Monitor setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+initial_state: The PeopleSoft app server lab is ready but PeopleSoft Process Monitor
+  is not configured yet. Required packages/tools may already be installed; your job
+  is to create the config and bring the capability online.
+hints:
+- order: 1
+  cost: 10
+  content: 'List prerequisites first: which packages, files, or API objects must exist
+    for PeopleSoft Process Monitor?'
+- order: 2
+  cost: 15
+  content: Implement incrementally — create the smallest working slice of PeopleSoft
+    Process Monitor, validate, then add the remaining pieces.
+- order: 3
+  cost: 20
+  content: 'Prove success: processes complete with expected runtime and status. Mark
+    the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-peoplesoft-002-build-process-monitor.conf`
+    and run Check Solution.'

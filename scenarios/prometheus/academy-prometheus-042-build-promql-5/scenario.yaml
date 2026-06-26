@@ -1,0 +1,38 @@
+title: 'Prometheus Monitoring: Promql Queries — Build From Scratch'
+slug: academy-prometheus-042-build-promql-5
+technology: Prometheus Monitoring
+category: Build Lab
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: Build PromQL queries from scratch in this Prometheus Monitoring lab.
+  You start from a minimal environment and must produce a working configuration that
+  demonstrates metric selectors, rates, aggregations, and alert expressions. Treat
+  this like a greenfield task — plan, implement, then prove it works.
+objectives:
+- A working PromQL queries setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+initial_state: The Prometheus stack is ready but PromQL queries is not configured
+  yet. Required packages/tools may already be installed; your job is to create the
+  config and bring the capability online.
+hints:
+- order: 1
+  cost: 10
+  content: 'List prerequisites first: which packages, files, or API objects must exist
+    for PromQL queries?'
+- order: 2
+  cost: 15
+  content: Implement incrementally — create the smallest working slice of PromQL queries,
+    validate, then add the remaining pieces.
+- order: 3
+  cost: 20
+  content: 'Prove success: expressions return sensible series for the intended window.
+    Mark the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-prometheus-042-build-promql-5.conf`
+    and run Check Solution.'

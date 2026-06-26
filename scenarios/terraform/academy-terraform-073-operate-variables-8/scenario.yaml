@@ -1,0 +1,35 @@
+title: 'Terraform & IaC: Terraform Variables — Daily Operations'
+slug: academy-terraform-073-operate-variables-8
+technology: Terraform & IaC
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine Terraform variables task safely
+  in Terraform & IaC. Follow change control — inspect, change, verify — while working
+  with input variables, defaults, validation, and tfvars layering.'
+objectives:
+- Day-2 Terraform variables work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The Terraform workspace is healthy enough for scheduled work on Terraform
+  variables. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: variables.tf, *.tfvars, and `terraform console`. Confirm backups
+    or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: the correct tfvars set is used and `terraform validate` passes.
+    Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-terraform-073-operate-variables-8.conf`
+    and run Check Solution.'

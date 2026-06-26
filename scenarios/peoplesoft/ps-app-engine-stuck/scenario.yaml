@@ -2,7 +2,9 @@ title: Clear stuck Application Engine
 slug: ps-app-engine-stuck
 technology: peoplesoft
 category: Peoplesoft
-description: AE program blocked in Processing status.
+description: 'AE program blocked in Processing status. This PeopleSoft administration
+  scenario focuses on peoplesoft: Clear stuck Application Engine. Read the environment,
+  form a hypothesis, apply a minimal fix, and verify behavior before closing the ticket.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -14,7 +16,9 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- AE program blocked in Processing status.
+- Understand the current failure mode affecting Clear stuck Application Engine
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: AE program blocked in Processing status.
 hints:
 - order: 1
@@ -23,3 +27,6 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.

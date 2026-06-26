@@ -21,10 +21,10 @@ initial_state: BMC unreachable on gpu-node-02; commissioning failed.
 hints:
   - order: 1
     cost: 10
-    content: **IPMI** tab shows BMC unreachable — use **IPMI power on / restore BMC**.
+    content: "**IPMI** tab shows BMC unreachable — use **IPMI power on / restore BMC**."
   - order: 2
     cost: 15
-    content: **MAAS** tab → **Commission** gpu-node-02.
+    content: "**MAAS** tab → **Commission** gpu-node-02."
   - order: 3
     cost: 20
-    content: **Deploy** when status is Ready, then **Check**.
+    content: "**Deploy** when status is Ready, then **Check**."

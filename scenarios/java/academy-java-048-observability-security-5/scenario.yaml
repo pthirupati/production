@@ -1,0 +1,34 @@
+title: 'Java Development: Platform Security Hardening — Observability Practice'
+slug: academy-java-048-observability-security-5
+technology: Java Development
+category: Observability
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: java
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Observability task: make platform security hardening visible in logs,
+  metrics, or traces. On-call should answer ''what is broken?'' quickly using signals
+  from least privilege, patching, secrets handling, and exposure reduction.'
+objectives:
+- Day-2 platform security hardening work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The system runs, but platform security hardening lacks useful telemetry.
+  Dashboards/alerts are blank or noisy — improve signal quality.
+hints:
+- order: 1
+  cost: 10
+  content: 'Find existing signals: config audits, open-port scans, IAM/role review,
+    and audit logs. Identify what is missing for fast triage.'
+- order: 2
+  cost: 15
+  content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.
+- order: 3
+  cost: 20
+  content: Trigger a test event and confirm it appears where on-call looks. Complete
+    via `/opt/fixitlab/academy/academy-java-048-observability-security-5.conf`.

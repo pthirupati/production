@@ -1,0 +1,38 @@
+title: 'Ansible Automation: Ansible Inventory — Fundamentals Lab'
+slug: academy-ansible-081-learn-inventory-9
+technology: Ansible Automation
+category: Core Skills
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: ansible
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: This beginner-friendly Ansible Automation lab introduces Ansible inventory.
+  You will explore hosts, groups, variables, and connection settings on the Ansible
+  control node. Read the environment first, then complete the guided steps — no prior
+  production experience required.
+objectives:
+- Understand how Ansible inventory work in this lab environment
+- Identify the main status and configuration signals for Ansible inventory
+- Confirm you can read the current state confidently before changing anything
+initial_state: The Ansible control node is online with a starter Ansible inventory
+  setup. Some pieces are intentionally incomplete so you can learn how the pieces
+  fit together. Nothing is on fire yet — focus on observation and understanding.
+hints:
+- order: 1
+  cost: 10
+  content: 'Orient yourself: `ansible-inventory --graph` and group/host vars files.
+    Write down what looks normal vs missing.'
+- order: 2
+  cost: 15
+  content: Core idea — hosts, groups, variables, and connection settings. Make one
+    small, reversible change at a time and re-check status.
+- order: 3
+  cost: 20
+  content: When the lab objective is done, record completion by adding `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-ansible-081-learn-inventory-9.conf`, then click
+    Check Solution.

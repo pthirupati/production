@@ -1,0 +1,35 @@
+title: 'Networking: Host Firewall — Daily Operations'
+slug: academy-networking-073-operate-firewall-8
+technology: Networking
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine host firewall task safely in Networking.
+  Follow change control — inspect, change, verify — while working with allow/deny
+  rules, zones, services, and rule persistence.'
+objectives:
+- Day-2 host firewall work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The network lab is healthy enough for scheduled work on host firewall.
+  Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: `firewall-cmd --list-all`, `iptables -S`, `ufw status`, or
+    Windows firewall cmdlets. Confirm backups or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: only the intended ports and sources are permitted. Add `#
+    FIXED-OK` to `/opt/fixitlab/academy/academy-networking-073-operate-firewall-8.conf`
+    and run Check Solution.'

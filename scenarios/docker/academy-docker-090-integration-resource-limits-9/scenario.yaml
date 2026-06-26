@@ -1,0 +1,36 @@
+title: 'Docker & Containers: Container Resource Limits — Integration Lab'
+slug: academy-docker-090-integration-resource-limits-9
+technology: Docker & Containers
+category: Cross-Technology
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Integration lab: connect container resource limits with an adjacent
+  platform in the Docker & Containers stack. Validate authentication, data handoff,
+  and failure behavior for CPU/memory requests/limits and OOM behavior.'
+objectives:
+- container resource limits is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+initial_state: Two systems are deployed but not fully wired together for container
+  resource limits. Downstream consumers are waiting on this integration path.
+hints:
+- order: 1
+  cost: 10
+  content: 'Map the contract: which endpoints, queues, files, or CRDs connect the
+    systems?'
+- order: 2
+  cost: 15
+  content: Configure credentials and networking first, then test a minimal happy-path
+    transaction.
+- order: 3
+  cost: 20
+  content: Run an end-to-end check plus one failure case. Mark `/opt/fixitlab/academy/academy-docker-090-integration-resource-limits-9.conf`
+    with `# FIXED-OK` when green.
+cross_technology: true

@@ -5,6 +5,13 @@ from apps.labs.provisioner.simulation.ops_state import apply_team_ops_action
 from apps.labs.provisioner.simulation.shell import get_sim_session
 from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
 
+try:
+    from apps.labs.provisioner.simulation.complete_tech_e2e_fixes import (
+        COMPLETE_TECH_MARKER_FIX,
+    )
+except Exception:  # pragma: no cover
+    COMPLETE_TECH_MARKER_FIX = {}
+
 
 # ── Generated maps for real-state scenarios (see scenario_presets.py) ──
 _RS_SERVICE_FIX = {'db-redis-down': 'redis', 'db-mariadb-down': 'mariadb', 'db-mongodb-down': 'mongod', 'db-cassandra-down': 'cassandra', 'db-pgbouncer-down': 'pgbouncer', 'rhel-chronyd-down': 'chronyd', 'rhel-rsyslog-down': 'rsyslog', 'rhel-firewalld-down': 'firewalld', 'rhel-auditd-down': 'auditd', 'rhel-nfs-server-down': 'nfs-server', 'docker-containerd-down': 'containerd', 'linux-haproxy-down': 'haproxy', 'linux-named-down': 'named', 'linux-memcached-down': 'memcached', 'linux-rabbitmq-down': 'rabbitmq-server', 'linux-nginx-stream-proxy-down': 'nginx'}
@@ -302,6 +309,13 @@ def _apply_simulation_fix(session) -> tuple[bool, str]:
                 svc.active = "active"
                 svc.sub_state = "running"
             return True, f"{unit} started"
+        if slug in COMPLETE_TECH_MARKER_FIX:
+            path = COMPLETE_TECH_MARKER_FIX[slug]
+            existing = state.read_file(path) or ""
+            fixed = (existing.replace("# broken configuration", "# corrected configuration")
+                     + "\n# FIXED-OK: completed per full-technology lab objective\n")
+            state.write_file(path, fixed)
+            return True, f"{path} corrected"
         if slug in _RS_MARKER_FIX:
             path = _RS_MARKER_FIX[slug]
             existing = state.read_file(path) or ""

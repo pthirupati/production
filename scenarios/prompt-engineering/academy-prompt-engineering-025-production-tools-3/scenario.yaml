@@ -1,0 +1,36 @@
+title: 'Prompt Engineering & AI Mastery: Llm Tool Calling — Production Readiness'
+slug: academy-prompt-engineering-025-production-tools-3
+technology: Prompt Engineering & AI Mastery
+category: Production
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for LLM tool calling. Harden, document, and validate
+  schemas, auth, timeouts, and result parsing so the change is safe to run during
+  a maintenance window.
+objectives:
+- Day-2 LLM tool calling work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but LLM tool calling is not production
+  ready — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    LLM tool calling.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: tool calls succeed with validated arguments.
+    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-prompt-engineering-025-production-tools-3.conf`
+    when complete.'

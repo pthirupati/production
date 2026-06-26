@@ -1,0 +1,35 @@
+title: 'Java Development: Java Jdbc — Security Practice'
+slug: academy-java-046-security-jdbc-5
+technology: Java Development
+category: Security
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: java
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security review: harden Java JDBC on this Java Development system. Close
+  unsafe defaults, enforce least privilege, and ensure connections, pools, transactions,
+  and SQL injection safety cannot be abused — without breaking legitimate use.'
+objectives:
+- Unsafe defaults related to Java JDBC are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around Java JDBC.
+  Assume an auditor or pen test is next week — tighten controls with evidence.
+hints:
+- order: 1
+  cost: 10
+  content: 'Baseline current exposure: Hikari metrics, SQLException traces, and query
+    logs. Note world-readable files, open ports, or excessive roles.'
+- order: 2
+  cost: 15
+  content: Apply least privilege incrementally. Prefer explicit allows over broad
+    wildcards.
+- order: 3
+  cost: 20
+  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
+    in `/opt/fixitlab/academy/academy-java-046-security-jdbc-5.conf` and Check Solution.

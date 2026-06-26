@@ -861,3 +861,9 @@ class Command(BaseCommand):
                 f"{total_sections} sections total."
             )
         )
+        try:
+            from apps.question_bank.technology_catalog import sync_catalog
+
+            sync_catalog(stdout=self.stdout, style=self.style)
+        except Exception as exc:
+            self.stderr.write(f"  ! technology catalog sync failed: {exc}")

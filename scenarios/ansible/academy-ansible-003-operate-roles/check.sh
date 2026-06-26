@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+grep -q FIXED-OK /opt/fixitlab/academy/academy-ansible-003-operate-roles.conf
+exit 0

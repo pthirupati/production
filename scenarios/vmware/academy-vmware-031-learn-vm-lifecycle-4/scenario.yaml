@@ -1,0 +1,39 @@
+title: 'VMware vSphere: Vm Lifecycle — Fundamentals Lab'
+slug: academy-vmware-031-learn-vm-lifecycle-4
+technology: VMware vSphere
+category: Core Skills
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: vmware
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: This beginner-friendly VMware vSphere lab introduces VM lifecycle. You
+  will explore create, template deploy, power state, and guest tools on the vSphere
+  lab. Read the environment first, then complete the guided steps — no prior production
+  experience required.
+objectives:
+- Understand how VM lifecycle work in this lab environment
+- Identify the main status and configuration signals for VM lifecycle
+- Confirm you can read the current state confidently before changing anything
+initial_state: The vSphere lab is online with a starter VM lifecycle setup. Some pieces
+  are intentionally incomplete so you can learn how the pieces fit together. Nothing
+  is on fire yet — focus on observation and understanding.
+hints:
+- order: 1
+  cost: 10
+  content: 'Orient yourself: vCenter/ESXi VM summary, tasks, and VMware Tools status.
+    Write down what looks normal vs missing.'
+- order: 2
+  cost: 15
+  content: Core idea — create, template deploy, power state, and guest tools. Make
+    one small, reversible change at a time and re-check status.
+- order: 3
+  cost: 20
+  content: When the lab objective is done, record completion by adding `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-vmware-031-learn-vm-lifecycle-4.conf`, then
+    click Check Solution.
+vmware_link: true

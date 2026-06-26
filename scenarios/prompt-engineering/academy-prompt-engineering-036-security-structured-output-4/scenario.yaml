@@ -1,0 +1,37 @@
+title: 'Prompt Engineering & AI Mastery: Structured Llm Output — Security Practice'
+slug: academy-prompt-engineering-036-security-structured-output-4
+technology: Prompt Engineering & AI Mastery
+category: Security
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security review: harden structured LLM output on this Prompt Engineering
+  & AI Mastery system. Close unsafe defaults, enforce least privilege, and ensure
+  JSON schema, function calling, and repair loops cannot be abused — without breaking
+  legitimate use.'
+objectives:
+- Unsafe defaults related to structured LLM output are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around structured
+  LLM output. Assume an auditor or pen test is next week — tighten controls with evidence.
+hints:
+- order: 1
+  cost: 10
+  content: 'Baseline current exposure: schema validators, retry logs, and parse errors.
+    Note world-readable files, open ports, or excessive roles.'
+- order: 2
+  cost: 15
+  content: Apply least privilege incrementally. Prefer explicit allows over broad
+    wildcards.
+- order: 3
+  cost: 20
+  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
+    in `/opt/fixitlab/academy/academy-prompt-engineering-036-security-structured-output-4.conf`
+    and Check Solution.

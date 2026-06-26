@@ -1,0 +1,35 @@
+title: 'Shell Scripting: Shell Loops — Daily Operations'
+slug: academy-shell-script-053-operate-loops-6
+technology: Shell Scripting
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine shell loops task safely in Shell
+  Scripting. Follow change control — inspect, change, verify — while working with
+  for/while, word splitting, and exit codes.'
+objectives:
+- Day-2 shell loops work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The bash practice environment is healthy enough for scheduled work
+  on shell loops. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: `set -e` with loops, `break/continue`, and shellcheck. Confirm
+    backups or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: loops iterate expected items and propagate failures. Add `#
+    FIXED-OK` to `/opt/fixitlab/academy/academy-shell-script-053-operate-loops-6.conf`
+    and run Check Solution.'

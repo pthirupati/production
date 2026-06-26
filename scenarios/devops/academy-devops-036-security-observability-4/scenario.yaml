@@ -1,0 +1,36 @@
+title: 'DevOps: Devops Observability — Security Practice'
+slug: academy-devops-036-security-observability-4
+technology: DevOps
+category: Security
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security review: harden DevOps observability on this DevOps system.
+  Close unsafe defaults, enforce least privilege, and ensure logs, metrics, traces,
+  and SLO dashboards cannot be abused — without breaking legitimate use.'
+objectives:
+- Unsafe defaults related to DevOps observability are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around DevOps observability.
+  Assume an auditor or pen test is next week — tighten controls with evidence.
+hints:
+- order: 1
+  cost: 10
+  content: 'Baseline current exposure: correlated trace IDs across pipeline stages.
+    Note world-readable files, open ports, or excessive roles.'
+- order: 2
+  cost: 15
+  content: Apply least privilege incrementally. Prefer explicit allows over broad
+    wildcards.
+- order: 3
+  cost: 20
+  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
+    in `/opt/fixitlab/academy/academy-devops-036-security-observability-4.conf` and
+    Check Solution.

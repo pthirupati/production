@@ -1,0 +1,35 @@
+title: 'DevOps: Continuous Delivery — Daily Operations'
+slug: academy-devops-073-operate-cd-release-8
+technology: DevOps
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine continuous delivery task safely
+  in DevOps. Follow change control — inspect, change, verify — while working with
+  promotion gates, canaries, and release artifacts.'
+objectives:
+- Day-2 continuous delivery work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The CI/CD lab is healthy enough for scheduled work on continuous delivery.
+  Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: pipeline stages, deployment logs, and feature flags. Confirm
+    backups or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: releases promote through gates with observable health checks.
+    Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-devops-073-operate-cd-release-8.conf`
+    and run Check Solution.'

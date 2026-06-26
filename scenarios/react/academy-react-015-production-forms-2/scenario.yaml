@@ -1,0 +1,36 @@
+title: 'React Development: Html/React Forms — Production Readiness'
+slug: academy-react-015-production-forms-2
+technology: React Development
+category: Production
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for HTML/React forms. Harden, document, and validate
+  controlled inputs, validation, and submit states so the change is safe to run during
+  a maintenance window.
+objectives:
+- Day-2 HTML/React forms work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but HTML/React forms is not production
+  ready — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    HTML/React forms.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: forms validate client-side and show accessible
+    errors. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-react-015-production-forms-2.conf`
+    when complete.'

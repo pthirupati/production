@@ -1,0 +1,35 @@
+title: 'Python Development: Python Http Apis — Daily Operations'
+slug: academy-python-083-operate-http-api-9
+technology: Python Development
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine Python HTTP APIs task safely in
+  Python Development. Follow change control — inspect, change, verify — while working
+  with requests/httpx, timeouts, retries, and schemas.'
+objectives:
+- Day-2 Python HTTP APIs work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The Python project workspace is healthy enough for scheduled work on
+  Python HTTP APIs. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: HTTP traces, status codes, and pydantic validation. Confirm
+    backups or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: API client handles errors and validates payloads. Add `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-python-083-operate-http-api-9.conf` and run
+    Check Solution.'

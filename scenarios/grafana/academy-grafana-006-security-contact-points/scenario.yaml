@@ -1,0 +1,37 @@
+title: 'Grafana Observability: Grafana Contact Points — Security Practice'
+slug: academy-grafana-006-security-contact-points
+technology: Grafana Observability
+category: Security
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security review: harden Grafana contact points on this Grafana Observability
+  system. Close unsafe defaults, enforce least privilege, and ensure receivers, templates,
+  and on-call integrations cannot be abused — without breaking legitimate use.'
+objectives:
+- Unsafe defaults related to Grafana contact points are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around Grafana
+  contact points. Assume an auditor or pen test is next week — tighten controls with
+  evidence.
+hints:
+- order: 1
+  cost: 10
+  content: 'Baseline current exposure: Grafana alerting UI and test notification button.
+    Note world-readable files, open ports, or excessive roles.'
+- order: 2
+  cost: 15
+  content: Apply least privilege incrementally. Prefer explicit allows over broad
+    wildcards.
+- order: 3
+  cost: 20
+  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
+    in `/opt/fixitlab/academy/academy-grafana-006-security-contact-points.conf` and
+    Check Solution.

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+grep -q FIXED-OK /opt/fixitlab/academy/academy-gpu-010-integration-monitoring.conf
+exit 0

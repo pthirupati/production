@@ -1,0 +1,35 @@
+title: 'Data Science & Analytics: Groupby Aggregations — Daily Operations'
+slug: academy-data-science-083-operate-groupby-9
+technology: Data Science & Analytics
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine groupby aggregations task safely
+  in Data Science & Analytics. Follow change control — inspect, change, verify — while
+  working with keys, agg funcs, null groups, and performance.'
+objectives:
+- Day-2 groupby aggregations work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The notebook lab is healthy enough for scheduled work on groupby aggregations.
+  Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: pandas `groupby` sizes, `reset_index`, and explain. Confirm
+    backups or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: groupby results match manual spot checks. Add `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-data-science-083-operate-groupby-9.conf` and
+    run Check Solution.'

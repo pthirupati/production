@@ -1,0 +1,37 @@
+title: 'Simulation Labs: Simulation Gui — Troubleshooting Drill'
+slug: academy-simulation-024-troubleshoot-gui-3
+technology: Simulation Labs
+category: Troubleshooting
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Production alert: learners cannot tell which UI action is required.
+  You are on call for Simulation Labs and must troubleshoot simulation GUI methodically
+  — triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+objectives:
+- 'The incident symptom is clear: learners cannot tell which UI action is required'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The simulation sandbox is degraded. Learners cannot tell which ui action
+  is required. Recent changes may exist around simulation GUI, but do not restart
+  blindly — gather evidence first.
+hints:
+- order: 1
+  cost: 10
+  content: 'Triage: GUI component tree and event logs in sim. Capture timestamps,
+    error messages, and what still works.'
+- order: 2
+  cost: 15
+  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
+    the noisy log line.
+- order: 3
+  cost: 20
+  content: 'Verify recovery: GUI reflects lab state and responds to correct actions.
+    Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-simulation-024-troubleshoot-gui-3.conf`,
+    and rerun Check Solution.'

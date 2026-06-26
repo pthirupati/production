@@ -1,0 +1,33 @@
+title: 'RHEL Linux: Time Sync With Chrony — Backup and Recovery'
+slug: academy-rhel-linux-069-backup-chrony-7
+technology: RHEL Linux
+category: Backup & Recovery
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: rhel
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Backup and recovery drill for time sync with chrony. Ensure backups run
+  on schedule, retention is correct, and you can restore NTP sources, leap seconds,
+  and stratum within the lab RTO.
+objectives:
+- Backup coverage for time sync with chrony is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+initial_state: Backup jobs exist but reliability is uncertain for time sync with chrony.
+  Leadership wants proof that restore works — not just that backup scripts exit zero.
+hints:
+- order: 1
+  cost: 10
+  content: Inspect backup schedules, last success time, and destination free space.
+- order: 2
+  cost: 15
+  content: Run or repair the backup job, then perform a controlled restore to a scratch
+    location.
+- order: 3
+  cost: 20
+  content: Compare restored data to source. Complete the lab via `# FIXED-OK` in `/opt/fixitlab/academy/academy-rhel-linux-069-backup-chrony-7.conf`.

@@ -1,0 +1,36 @@
+title: 'Python Development: Application Logging — Production Readiness'
+slug: academy-python-045-production-logging-5
+technology: Python Development
+category: Production
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for application logging. Harden, document, and validate
+  structured logs, levels, correlation IDs, and rotation so the change is safe to
+  run during a maintenance window.
+objectives:
+- Day-2 application logging work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but application logging is not production
+  ready — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    application logging.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: logs answer who/what/when with traceable
+    request IDs. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-python-045-production-logging-5.conf`
+    when complete.'

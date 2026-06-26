@@ -1,0 +1,37 @@
+title: 'Terraform & IaC: Terraform Remote State — Security Practice'
+slug: academy-terraform-016-security-remote-backend-2
+technology: Terraform & IaC
+category: Security
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security review: harden Terraform remote state on this Terraform & IaC
+  system. Close unsafe defaults, enforce least privilege, and ensure S3/GCS backends,
+  locking, and encryption cannot be abused — without breaking legitimate use.'
+objectives:
+- Unsafe defaults related to Terraform remote state are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around Terraform
+  remote state. Assume an auditor or pen test is next week — tighten controls with
+  evidence.
+hints:
+- order: 1
+  cost: 10
+  content: 'Baseline current exposure: backend config, lock table, and state versioning.
+    Note world-readable files, open ports, or excessive roles.'
+- order: 2
+  cost: 15
+  content: Apply least privilege incrementally. Prefer explicit allows over broad
+    wildcards.
+- order: 3
+  cost: 20
+  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
+    in `/opt/fixitlab/academy/academy-terraform-016-security-remote-backend-2.conf`
+    and Check Solution.

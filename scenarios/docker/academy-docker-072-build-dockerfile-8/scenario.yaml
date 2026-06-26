@@ -1,0 +1,38 @@
+title: 'Docker & Containers: Dockerfiles — Build From Scratch'
+slug: academy-docker-072-build-dockerfile-8
+technology: Docker & Containers
+category: Build Lab
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: Build Dockerfiles from scratch in this Docker & Containers lab. You start
+  from a minimal environment and must produce a working configuration that demonstrates
+  image layers, build context, ENTRYPOINT/CMD, and caching. Treat this like a greenfield
+  task — plan, implement, then prove it works.
+objectives:
+- A working Dockerfiles setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+initial_state: The Docker host is ready but Dockerfiles is not configured yet. Required
+  packages/tools may already be installed; your job is to create the config and bring
+  the capability online.
+hints:
+- order: 1
+  cost: 10
+  content: 'List prerequisites first: which packages, files, or API objects must exist
+    for Dockerfiles?'
+- order: 2
+  cost: 15
+  content: Implement incrementally — create the smallest working slice of Dockerfiles,
+    validate, then add the remaining pieces.
+- order: 3
+  cost: 20
+  content: 'Prove success: the image builds reproducibly and the container starts
+    as intended. Mark the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-docker-072-build-dockerfile-8.conf`
+    and run Check Solution.'

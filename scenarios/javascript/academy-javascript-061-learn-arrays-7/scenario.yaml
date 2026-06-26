@@ -1,0 +1,38 @@
+title: 'JavaScript Development: Javascript Arrays — Fundamentals Lab'
+slug: academy-javascript-061-learn-arrays-7
+technology: JavaScript Development
+category: Core Skills
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: This beginner-friendly JavaScript Development lab introduces JavaScript
+  arrays. You will explore mutation vs copy, map/filter/reduce, and sparse arrays
+  on the JavaScript practice project. Read the environment first, then complete the
+  guided steps — no prior production experience required.
+objectives:
+- Understand how JavaScript arrays work in this lab environment
+- Identify the main status and configuration signals for JavaScript arrays
+- Confirm you can read the current state confidently before changing anything
+initial_state: The JavaScript practice project is online with a starter JavaScript
+  arrays setup. Some pieces are intentionally incomplete so you can learn how the
+  pieces fit together. Nothing is on fire yet — focus on observation and understanding.
+hints:
+- order: 1
+  cost: 10
+  content: 'Orient yourself: console experiments, unit tests, and typeof checks. Write
+    down what looks normal vs missing.'
+- order: 2
+  cost: 15
+  content: Core idea — mutation vs copy, map/filter/reduce, and sparse arrays. Make
+    one small, reversible change at a time and re-check status.
+- order: 3
+  cost: 20
+  content: When the lab objective is done, record completion by adding `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-javascript-061-learn-arrays-7.conf`, then click
+    Check Solution.

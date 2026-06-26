@@ -1,0 +1,37 @@
+title: 'Kubernetes: Ingress — Troubleshooting Drill'
+slug: academy-kubernetes-024-troubleshoot-ingress-3
+technology: Kubernetes
+category: Troubleshooting
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Production alert: HTTP routes return 404/502 or TLS handshake fails.
+  You are on call for Kubernetes and must troubleshoot Ingress methodically — triage
+  symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+objectives:
+- 'The incident symptom is clear: HTTP routes return 404/502 or TLS handshake fails'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The Kubernetes cluster is degraded. Http routes return 404/502 or tls
+  handshake fails. Recent changes may exist around Ingress, but do not restart blindly
+  — gather evidence first.
+hints:
+- order: 1
+  cost: 10
+  content: 'Triage: `kubectl describe ingress`, controller logs, and backend Service
+    health. Capture timestamps, error messages, and what still works.'
+- order: 2
+  cost: 15
+  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
+    the noisy log line.
+- order: 3
+  cost: 20
+  content: 'Verify recovery: requests reach the intended backend with a valid certificate
+    chain. Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-024-troubleshoot-ingress-3.conf`,
+    and rerun Check Solution.'

@@ -1,0 +1,36 @@
+title: 'JavaScript Development: The Dom — Production Readiness'
+slug: academy-javascript-085-production-dom-9
+technology: JavaScript Development
+category: Production
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for the DOM. Harden, document, and validate nodes,
+  events, delegation, and reflow costs so the change is safe to run during a maintenance
+  window.
+objectives:
+- Day-2 the DOM work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but the DOM is not production ready — missing
+  guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    the DOM.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: DOM updates reflect user actions without
+    memory leaks. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-javascript-085-production-dom-9.conf`
+    when complete.'

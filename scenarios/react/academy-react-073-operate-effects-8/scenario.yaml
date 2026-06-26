@@ -1,0 +1,35 @@
+title: 'React Development: React Effects — Daily Operations'
+slug: academy-react-073-operate-effects-8
+technology: React Development
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine React effects task safely in React
+  Development. Follow change control — inspect, change, verify — while working with
+  dependency arrays, cleanup, and stale closures.'
+objectives:
+- Day-2 React effects work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The React application is healthy enough for scheduled work on React
+  effects. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: eslint exhaustive-deps and React DevTools. Confirm backups
+    or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: effects run once per meaningful dependency change. Add `#
+    FIXED-OK` to `/opt/fixitlab/academy/academy-react-073-operate-effects-8.conf`
+    and run Check Solution.'

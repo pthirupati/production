@@ -1,0 +1,38 @@
+title: 'DevOps: Git Branching — Fundamentals Lab'
+slug: academy-devops-011-learn-git-flow-2
+technology: DevOps
+category: Core Skills
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: This beginner-friendly DevOps lab introduces Git branching. You will
+  explore trunk vs GitFlow, PR checks, and release tags on the CI/CD lab. Read the
+  environment first, then complete the guided steps — no prior production experience
+  required.
+objectives:
+- Understand how Git branching work in this lab environment
+- Identify the main status and configuration signals for Git branching
+- Confirm you can read the current state confidently before changing anything
+initial_state: The CI/CD lab is online with a starter Git branching setup. Some pieces
+  are intentionally incomplete so you can learn how the pieces fit together. Nothing
+  is on fire yet — focus on observation and understanding.
+hints:
+- order: 1
+  cost: 10
+  content: 'Orient yourself: `git log`, branch protections, and CI status. Write down
+    what looks normal vs missing.'
+- order: 2
+  cost: 15
+  content: Core idea — trunk vs GitFlow, PR checks, and release tags. Make one small,
+    reversible change at a time and re-check status.
+- order: 3
+  cost: 20
+  content: When the lab objective is done, record completion by adding `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-devops-011-learn-git-flow-2.conf`, then click
+    Check Solution.

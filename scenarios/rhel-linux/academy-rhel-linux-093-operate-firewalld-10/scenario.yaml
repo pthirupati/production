@@ -1,0 +1,35 @@
+title: 'RHEL Linux: Firewalld On Rhel — Daily Operations'
+slug: academy-rhel-linux-093-operate-firewalld-10
+technology: RHEL Linux
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: rhel
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine firewalld on RHEL task safely in
+  RHEL Linux. Follow change control — inspect, change, verify — while working with
+  zones, rich rules, and permanent vs runtime.'
+objectives:
+- Day-2 firewalld on RHEL work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The RHEL practice host is healthy enough for scheduled work on firewalld
+  on RHEL. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: `firewall-cmd --list-all`, `--reload`, and logs. Confirm backups
+    or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: permanent rules allow required services only. Add `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-rhel-linux-093-operate-firewalld-10.conf` and
+    run Check Solution.'

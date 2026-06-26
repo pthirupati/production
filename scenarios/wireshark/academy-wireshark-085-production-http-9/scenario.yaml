@@ -1,0 +1,36 @@
+title: 'Wireshark Packet Analysis: Http Protocol Analysis — Production Readiness'
+slug: academy-wireshark-085-production-http-9
+technology: Wireshark Packet Analysis
+category: Production
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: wireshark
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for HTTP protocol analysis. Harden, document, and
+  validate methods, status codes, headers, and keep-alive so the change is safe to
+  run during a maintenance window.
+objectives:
+- Day-2 HTTP protocol analysis work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but HTTP protocol analysis is not production
+  ready — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    HTTP protocol analysis.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: HTTP conversation shows where latency or
+    errors originate. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-wireshark-085-production-http-9.conf`
+    when complete.'

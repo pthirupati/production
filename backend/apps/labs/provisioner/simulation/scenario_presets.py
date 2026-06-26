@@ -4441,3 +4441,9 @@ try:
     _PRESETS.update(_MONITORING_PRESETS)
 except Exception:  # pragma: no cover - defensive: never break preset loading
     pass
+
+try:
+    from .complete_tech_presets import COMPLETE_TECH_PRESETS as _COMPLETE_TECH_PRESETS
+    _PRESETS.update(_COMPLETE_TECH_PRESETS)
+except Exception:  # pragma: no cover
+    pass

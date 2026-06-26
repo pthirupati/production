@@ -1,0 +1,39 @@
+title: 'Terraform & IaC: Terraform Modules — Troubleshooting Drill'
+slug: academy-terraform-004-troubleshoot-modules
+technology: Terraform & IaC
+category: Troubleshooting
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Production alert: module upgrades break dependents or outputs changed
+  unexpectedly. You are on call for Terraform & IaC and must troubleshoot Terraform
+  modules methodically — triage symptoms, find root cause, apply the smallest safe
+  fix, and confirm recovery.'
+objectives:
+- 'The incident symptom is clear: module upgrades break dependents or outputs changed
+  unexpectedly'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The Terraform workspace is degraded. Module upgrades break dependents
+  or outputs changed unexpectedly. Recent changes may exist around Terraform modules,
+  but do not restart blindly — gather evidence first.
+hints:
+- order: 1
+  cost: 10
+  content: 'Triage: module blocks, `terraform get`, and child module outputs. Capture
+    timestamps, error messages, and what still works.'
+- order: 2
+  cost: 15
+  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
+    the noisy log line.
+- order: 3
+  cost: 20
+  content: 'Verify recovery: module inputs/outputs match the wrapper and plans are
+    clean. Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-terraform-004-troubleshoot-modules.conf`,
+    and rerun Check Solution.'

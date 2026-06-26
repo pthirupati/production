@@ -1,0 +1,38 @@
+title: 'HTML & Web Servers: Semantic Html — Fundamentals Lab'
+slug: academy-html-021-learn-semantic-html-3
+technology: HTML & Web Servers
+category: Core Skills
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: This beginner-friendly HTML & Web Servers lab introduces semantic HTML.
+  You will explore landmarks, headings hierarchy, and native elements on the web server
+  lab. Read the environment first, then complete the guided steps — no prior production
+  experience required.
+objectives:
+- Understand how semantic HTML work in this lab environment
+- Identify the main status and configuration signals for semantic HTML
+- Confirm you can read the current state confidently before changing anything
+initial_state: The web server lab is online with a starter semantic HTML setup. Some
+  pieces are intentionally incomplete so you can learn how the pieces fit together.
+  Nothing is on fire yet — focus on observation and understanding.
+hints:
+- order: 1
+  cost: 10
+  content: 'Orient yourself: validator, outline view, and screen reader spot check.
+    Write down what looks normal vs missing.'
+- order: 2
+  cost: 15
+  content: Core idea — landmarks, headings hierarchy, and native elements. Make one
+    small, reversible change at a time and re-check status.
+- order: 3
+  cost: 20
+  content: When the lab objective is done, record completion by adding `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-html-021-learn-semantic-html-3.conf`, then click
+    Check Solution.

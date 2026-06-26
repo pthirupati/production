@@ -1,0 +1,35 @@
+title: 'Database Administration: Database Indexes — Daily Operations'
+slug: academy-database-093-operate-indexes-10
+technology: Database Administration
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: database
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine database indexes task safely in
+  Database Administration. Follow change control — inspect, change, verify — while
+  working with B-tree indexes, selectivity, covering indexes, and plan impact.'
+objectives:
+- Day-2 database indexes work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The database server is healthy enough for scheduled work on database
+  indexes. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: EXPLAIN/EXPLAIN ANALYZE and index usage views. Confirm backups
+    or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: plans use the intended index and latency drops. Add `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-database-093-operate-indexes-10.conf` and run
+    Check Solution.'

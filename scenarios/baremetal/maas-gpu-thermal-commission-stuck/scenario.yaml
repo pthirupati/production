@@ -21,10 +21,10 @@ initial_state: Thermal alert active; MAAS commission stuck on gpu-node-02.
 hints:
   - order: 1
     cost: 10
-    content: **IPMI** tab → **Clear thermal alert**.
+    content: "**IPMI** tab → **Clear thermal alert**."
   - order: 2
     cost: 15
-    content: **Reset stuck commission** then **Commission** on the MAAS tab.
+    content: "**Reset stuck commission** then **Commission** on the MAAS tab."
   - order: 3
     cost: 20
-    content: **Deploy** and run **Check**.
+    content: "**Deploy** and run **Check**."

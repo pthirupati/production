@@ -1,0 +1,38 @@
+title: 'Windows Server: Users And Groups — Build From Scratch'
+slug: academy-windows-062-build-users-groups-7
+technology: Windows Server
+category: Build Lab
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: windows
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: Build users and groups from scratch in this Windows Server lab. You start
+  from a minimal environment and must produce a working configuration that demonstrates
+  how accounts, UIDs/GIDs, primary groups, and supplementary membership are defined.
+  Treat this like a greenfield task — plan, implement, then prove it works.
+objectives:
+- A working users and groups setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+initial_state: The Windows Server host is ready but users and groups is not configured
+  yet. Required packages/tools may already be installed; your job is to create the
+  config and bring the capability online.
+hints:
+- order: 1
+  cost: 10
+  content: 'List prerequisites first: which packages, files, or API objects must exist
+    for users and groups?'
+- order: 2
+  cost: 15
+  content: Implement incrementally — create the smallest working slice of users and
+    groups, validate, then add the remaining pieces.
+- order: 3
+  cost: 20
+  content: 'Prove success: account and group entries match the expected owner and
+    membership. Mark the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-windows-062-build-users-groups-7.conf`
+    and run Check Solution.'

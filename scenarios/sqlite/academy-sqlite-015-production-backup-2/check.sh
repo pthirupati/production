@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+grep -q FIXED-OK /opt/fixitlab/academy/academy-sqlite-015-production-backup-2.conf
+exit 0

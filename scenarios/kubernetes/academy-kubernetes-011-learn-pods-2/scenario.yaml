@@ -1,0 +1,38 @@
+title: 'Kubernetes: Kubernetes Pods — Fundamentals Lab'
+slug: academy-kubernetes-011-learn-pods-2
+technology: Kubernetes
+category: Core Skills
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: This beginner-friendly Kubernetes lab introduces Kubernetes pods. You
+  will explore pod spec, containers, probes, resources, and scheduling on the Kubernetes
+  cluster. Read the environment first, then complete the guided steps — no prior production
+  experience required.
+objectives:
+- Understand how Kubernetes pods work in this lab environment
+- Identify the main status and configuration signals for Kubernetes pods
+- Confirm you can read the current state confidently before changing anything
+initial_state: The Kubernetes cluster is online with a starter Kubernetes pods setup.
+  Some pieces are intentionally incomplete so you can learn how the pieces fit together.
+  Nothing is on fire yet — focus on observation and understanding.
+hints:
+- order: 1
+  cost: 10
+  content: 'Orient yourself: `kubectl describe pod`, `kubectl logs`, and the rendered
+    manifest. Write down what looks normal vs missing.'
+- order: 2
+  cost: 15
+  content: Core idea — pod spec, containers, probes, resources, and scheduling. Make
+    one small, reversible change at a time and re-check status.
+- order: 3
+  cost: 20
+  content: When the lab objective is done, record completion by adding `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-kubernetes-011-learn-pods-2.conf`, then click
+    Check Solution.

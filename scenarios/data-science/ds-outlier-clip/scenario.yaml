@@ -2,7 +2,9 @@ title: Clip outliers in revenue column
 slug: ds-outlier-clip
 technology: data-science
 category: Data Science
-description: Single outlier skews mean dashboard.
+description: 'Single outlier skews mean dashboard. This data science scenario focuses
+  on data science: Clip outliers in revenue column. Read the environment, form a hypothesis,
+  apply a minimal fix, and verify behavior before closing the ticket.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -14,7 +16,9 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Single outlier skews mean dashboard.
+- Understand the current failure mode affecting Clip outliers in revenue column
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: Single outlier skews mean dashboard.
 hints:
 - order: 1
@@ -23,6 +27,9 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.
 coding_spec:
   language: python
   entrypoint: solution.py

@@ -1,0 +1,38 @@
+title: 'PostgreSQL: Ansible Roles — Fundamentals Lab'
+slug: academy-postgresql-061-learn-roles-7
+technology: PostgreSQL
+category: Core Skills
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: database
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: This beginner-friendly PostgreSQL lab introduces Ansible roles. You will
+  explore role layout, defaults/vars, tasks, handlers, and dependencies on the PostgreSQL
+  cluster. Read the environment first, then complete the guided steps — no prior production
+  experience required.
+objectives:
+- Understand how Ansible roles work in this lab environment
+- Identify the main status and configuration signals for Ansible roles
+- Confirm you can read the current state confidently before changing anything
+initial_state: The PostgreSQL cluster is online with a starter Ansible roles setup.
+  Some pieces are intentionally incomplete so you can learn how the pieces fit together.
+  Nothing is on fire yet — focus on observation and understanding.
+hints:
+- order: 1
+  cost: 10
+  content: 'Orient yourself: roles/ tree, `ansible-galaxy list`, and role variable
+    precedence. Write down what looks normal vs missing.'
+- order: 2
+  cost: 15
+  content: Core idea — role layout, defaults/vars, tasks, handlers, and dependencies.
+    Make one small, reversible change at a time and re-check status.
+- order: 3
+  cost: 20
+  content: When the lab objective is done, record completion by adding `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-postgresql-061-learn-roles-7.conf`, then click
+    Check Solution.

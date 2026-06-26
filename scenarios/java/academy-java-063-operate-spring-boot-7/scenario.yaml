@@ -1,0 +1,35 @@
+title: 'Java Development: Spring Boot — Daily Operations'
+slug: academy-java-063-operate-spring-boot-7
+technology: Java Development
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: java
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine Spring Boot task safely in Java
+  Development. Follow change control — inspect, change, verify — while working with
+  auto-config, profiles, actuator, and fat jars.'
+objectives:
+- Day-2 Spring Boot work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The Java project is healthy enough for scheduled work on Spring Boot.
+  Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: actuator `/health`, application.yml, and startup logs. Confirm
+    backups or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: app starts with healthy actuator and correct profile. Add
+    `# FIXED-OK` to `/opt/fixitlab/academy/academy-java-063-operate-spring-boot-7.conf`
+    and run Check Solution.'

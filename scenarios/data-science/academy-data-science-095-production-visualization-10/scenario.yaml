@@ -1,0 +1,36 @@
+title: 'Data Science & Analytics: Data Visualization — Production Readiness'
+slug: academy-data-science-095-production-visualization-10
+technology: Data Science & Analytics
+category: Production
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for data visualization. Harden, document, and validate
+  chart choice, scales, and honest axes so the change is safe to run during a maintenance
+  window.
+objectives:
+- Day-2 data visualization work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but data visualization is not production
+  ready — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    data visualization.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: visualizations match data table and label
+    uncertainty. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-data-science-095-production-visualization-10.conf`
+    when complete.'

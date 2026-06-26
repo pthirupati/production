@@ -1,0 +1,36 @@
+title: 'Security: Security Auditing — Production Readiness'
+slug: academy-security-075-production-audit-8
+technology: Security
+category: Production
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for security auditing. Harden, document, and validate
+  audit trails, tamper evidence, and retention so the change is safe to run during
+  a maintenance window.
+objectives:
+- Day-2 security auditing work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but security auditing is not production
+  ready — missing guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 10
+  content: Review SLO impact, rollback plan, and blast radius before changing production
+    settings.
+- order: 2
+  cost: 15
+  content: 'Apply production standards: limits, monitoring, and access controls for
+    security auditing.'
+- order: 3
+  cost: 20
+  content: 'Run post-change verification: every privileged action is attributable
+    with correct timestamps. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-security-075-production-audit-8.conf`
+    when complete.'

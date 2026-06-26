@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { scenarioApi } from '../api/scenarios'
+import { tutorialApi } from '../api/tutorials'
 import {
   ChevronLeft, Target, CheckCircle2, Lock, ChevronRight,
   Wrench, Play, Skull, FolderKanban, Clock, Layers, ChevronDown, ChevronUp,
@@ -36,6 +37,42 @@ const archLabel = {
 }
 
 const typeIcons = { fix: Wrench, do: Play, hack: Skull }
+
+const TECH_TUTORIAL_TOPICS = {
+  linux: ['Linux'],
+  'rhel-linux': ['RHEL', 'RHEL Linux'],
+  'shell-script': ['Bash', 'Shell Scripting'],
+  docker: ['Docker'],
+  kubernetes: ['Kubernetes'],
+  terraform: ['Terraform'],
+  ansible: ['Ansible'],
+  networking: ['Networking'],
+  vmware: ['VMware'],
+  windows: ['Windows'],
+  python: ['Python'],
+  java: ['Java'],
+  javascript: ['JavaScript'],
+  react: ['React'],
+  nodejs: ['Node.js'],
+  html: ['HTML'],
+  devops: ['DevOps'],
+  security: ['Security', 'Cybersecurity'],
+  grafana: ['Grafana'],
+  prometheus: ['Prometheus', 'Monitoring'],
+  postgresql: ['PostgreSQL'],
+  mysql: ['MySQL'],
+  sqlite: ['SQLite'],
+  database: ['Database'],
+  gpu: ['GPU'],
+  baremetal: ['Bare Metal'],
+  'ai-ml': ['AI', 'AI / ML'],
+  'data-science': ['Data Science'],
+  'prompt-engineering': ['Prompt Engineering'],
+  nmap: ['Nmap'],
+  wireshark: ['Wireshark'],
+  peoplesoft: ['PeopleSoft'],
+  simulation: ['Simulation'],
+}
 
 const DIFF_RANK = { easy: 0, medium: 1, hard: 2 }
 
@@ -198,6 +235,7 @@ export default function TechnologyDetail() {
   const [techDetail, setTechDetail] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('scenarios')
+  const [techTutorials, setTechTutorials] = useState([])
 
   useEffect(() => {
     if (!slug) return
@@ -213,6 +251,31 @@ export default function TechnologyDetail() {
       })
       .finally(() => setLoading(false))
   }, [slug, navigate])
+
+  useEffect(() => {
+    if (!slug) return
+    const topics = TECH_TUTORIAL_TOPICS[slug] || []
+    if (!topics.length) {
+      setTechTutorials([])
+      return
+    }
+    Promise.all(topics.map(topic => tutorialApi.list(topic).catch(() => ({ tutorials: [] }))))
+      .then(results => {
+        const seen = new Set()
+        const merged = []
+        for (const { tutorials } of results) {
+          for (const t of tutorials || []) {
+            if (!seen.has(t.slug)) {
+              seen.add(t.slug)
+              merged.push(t)
+            }
+          }
+        }
+        merged.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.title || '').localeCompare(b.title || ''))
+        setTechTutorials(merged)
+      })
+      .catch(() => setTechTutorials([]))
+  }, [slug])
 
   const handleStartProject = async (project) => {
     try {
@@ -289,6 +352,35 @@ export default function TechnologyDetail() {
     return paid.some(s => s.is_accessible !== false)
   }, [techDetail])
 
+  const curatedSteps = useMemo(() => {
+    const path = techDetail?.technology?.learning_path || []
+    const scenarioList = techDetail?.scenarios || []
+    if (!path.length || !scenarioList.length) return []
+    const bySlug = Object.fromEntries(scenarioList.map(s => [s.slug, s]))
+    return path
+      .map((step, i) => {
+        const stepSlug = typeof step === 'string' ? step : step?.scenario_slug
+        const scenario = bySlug[stepSlug]
+        if (!scenario) return null
+        return {
+          order: i + 1,
+          title: (typeof step === 'object' && step.title) || scenario.title,
+          description: typeof step === 'object' ? step.description : '',
+          scenario,
+        }
+      })
+      .filter(Boolean)
+  }, [techDetail])
+
+  const nextScenario = useMemo(() => {
+    const scenarioList = sortFreeFirst(techDetail?.scenarios || [])
+    if (curatedSteps.length) {
+      const step = curatedSteps.find(s => !s.scenario.user_progress?.completed)
+      if (step) return step.scenario
+    }
+    return scenarioList.find(s => !s.user_progress?.completed) || scenarioList[0] || null
+  }, [curatedSteps, techDetail])
+
   if (loading) {
     return (
       <div className="flex flex-col gap-5 animate-pulse">
@@ -326,7 +418,6 @@ export default function TechnologyDetail() {
   const hasProjects = projects.length > 0
   const hasScenarios = scenarios.length > 0
   const popularScenarios = scenarios.slice(0, 8)
-  const nextScenario = scenarios.find(s => !s.user_progress?.completed) || scenarios[0]
 
   return (
     <motion.div
@@ -401,6 +492,101 @@ export default function TechnologyDetail() {
           <FxStatCard value={stats?.avg || '—'} label="Avg score" color="#49b5ff" delay={0.1} />
           <FxStatCard value={tech.scenario_count || stats?.total || 0} label="In catalog" color="#b266e0" delay={0.15} />
         </div>
+      )}
+
+      {/* Curated learning path (ordered labs) */}
+      {curatedSteps.length > 0 && (
+        <ScrollReveal>
+          <FxPanel padding="p-6">
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <h3 className="font-display font-bold text-base text-white m-0">Start here — guided path</h3>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/25">
+                {curatedSteps.length} steps
+              </span>
+            </div>
+            <p className="text-[13px] text-white/50 m-0 mb-4">
+              Follow these labs in order — from fundamentals through production-ready skills.
+            </p>
+            <div className="flex flex-col gap-2">
+              {curatedSteps.slice(0, 12).map(step => {
+                const done = step.scenario.user_progress?.completed
+                const inProgress = step.scenario.user_progress?.attempts > 0 && !done
+                return (
+                  <Link
+                    key={step.scenario.slug}
+                    to={`/scenarios/${step.scenario.slug}`}
+                    className={`flex items-center gap-3 p-3 rounded-[11px] border transition-colors ${
+                      done
+                        ? 'bg-accent-green/[0.06] border-accent-green/25 hover:bg-accent-green/[0.1]'
+                        : inProgress
+                          ? 'bg-accent-amber/[0.06] border-accent-amber/25 hover:bg-accent-amber/[0.1]'
+                          : 'bg-white/[0.02] border-white/[0.07] hover:border-accent-cyan/30'
+                    }`}
+                  >
+                    <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold bg-white/[0.06] text-white/70">
+                      {done ? <CheckCircle2 size={14} className="text-accent-green" /> : step.order}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-white m-0 truncate">{step.title}</p>
+                      <p className="text-[11px] text-white/40 mt-0.5 capitalize">{step.scenario.category || 'Lab'}</p>
+                    </div>
+                    {step.scenario.is_free && <FreeLabBadge />}
+                    <span className="text-[11px] font-semibold text-accent-cyan shrink-0">
+                      {done ? 'Review' : inProgress ? 'Continue' : 'Start'}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+            {curatedSteps.length > 12 && (
+              <p className="text-[11px] text-white/45 mt-3 mb-0">
+                +{curatedSteps.length - 12} more steps in the full path below
+              </p>
+            )}
+          </FxPanel>
+        </ScrollReveal>
+      )}
+
+      {/* Tutorials for this technology */}
+      {techTutorials.length > 0 && (
+        <ScrollReveal>
+          <FxPanel padding="p-6">
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <h3 className="font-display font-bold text-base text-white m-0">Tutorials & courses</h3>
+              <Link to="/tutorials" className="text-xs font-semibold text-accent-cyan hover:underline">
+                All tutorials
+              </Link>
+            </div>
+            <p className="text-[13px] text-white/50 m-0 mb-4">
+              Read theory first, then launch the linked hands-on lab for each module.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-2">
+              {techTutorials.slice(0, 8).map(tutorial => (
+                <Link
+                  key={tutorial.slug}
+                  to={`/tutorials/${tutorial.slug}`}
+                  className="flex items-start gap-3 p-3 rounded-[11px] border border-white/[0.07] bg-white/[0.02] hover:border-accent-purple/30 hover:bg-white/[0.04] transition-colors"
+                >
+                  <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-accent-purple/15 text-accent-purple">
+                    <BookOpen size={15} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-white m-0 line-clamp-2">{tutorial.title}</p>
+                    <p className="text-[11px] text-white/40 mt-1">
+                      {tutorial.estimated_minutes ? `~${tutorial.estimated_minutes} min` : tutorial.difficulty || 'Course module'}
+                      {tutorial.scenario_slug ? ' · includes lab' : ''}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {techTutorials.length > 8 && (
+              <p className="text-[11px] text-white/45 mt-3 mb-0">
+                +{techTutorials.length - 8} more tutorial modules for {tech.name}
+              </p>
+            )}
+          </FxPanel>
+        </ScrollReveal>
       )}
 
       {/* Learning path modules */}

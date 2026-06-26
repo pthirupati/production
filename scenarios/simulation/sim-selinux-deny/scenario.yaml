@@ -2,7 +2,9 @@ title: Fix SELinux denial for app
 slug: sim-selinux-deny
 technology: simulation
 category: Simulation
-description: App cannot bind port due to SELinux.
+description: 'App cannot bind port due to SELinux. This FixitLab simulation scenario
+  focuses on simulation: Fix SELinux denial for app. Read the environment, form a
+  hypothesis, apply a minimal fix, and verify behavior before closing the ticket.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -14,7 +16,9 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- App cannot bind port due to SELinux.
+- Understand the current failure mode affecting Fix SELinux denial for app
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: App cannot bind port due to SELinux.
 hints:
 - order: 1
@@ -23,3 +27,6 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.

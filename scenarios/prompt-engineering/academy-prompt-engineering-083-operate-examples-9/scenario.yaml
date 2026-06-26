@@ -1,0 +1,35 @@
+title: 'Prompt Engineering & AI Mastery: Few-Shot Examples — Daily Operations'
+slug: academy-prompt-engineering-083-operate-examples-9
+technology: Prompt Engineering & AI Mastery
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: python
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine few-shot examples task safely in
+  Prompt Engineering & AI Mastery. Follow change control — inspect, change, verify
+  — while working with example ordering, diversity, and label leakage.'
+objectives:
+- Day-2 few-shot examples work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The LLM practice workspace is healthy enough for scheduled work on
+  few-shot examples. Complete the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 10
+  content: 'Pre-check: prompt transcripts and held-out eval cases. Confirm backups
+    or snapshots if the change is risky.'
+- order: 2
+  cost: 15
+  content: Execute the maintenance in small steps. Prefer reversible changes.
+- order: 3
+  cost: 20
+  content: 'Post-check: examples improve accuracy without overfitting phrasing. Add
+    `# FIXED-OK` to `/opt/fixitlab/academy/academy-prompt-engineering-083-operate-examples-9.conf`
+    and run Check Solution.'

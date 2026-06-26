@@ -2,7 +2,10 @@ title: Reclaim table bloat after bulk delete
 slug: pg-vacuum-bloat
 technology: postgresql
 category: Postgresql
-description: Autovacuum cannot keep up; queries slow on a bloated table.
+description: 'Autovacuum cannot keep up; queries slow on a bloated table. This PostgreSQL
+  scenario focuses on postgresql: Reclaim table bloat after bulk delete. Read the
+  environment, form a hypothesis, apply a minimal fix, and verify behavior before
+  closing the ticket.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -14,7 +17,9 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Autovacuum cannot keep up; queries slow on a bloated table.
+- Understand the current failure mode affecting Reclaim table bloat after bulk delete
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
 initial_state: Autovacuum cannot keep up; queries slow on a bloated table.
 hints:
 - order: 1
@@ -23,6 +28,9 @@ hints:
 - order: 2
   cost: 20
   content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+- order: 3
+  cost: 20
+  content: Re-run the failing check or user workflow to confirm the incident is resolved.
 coding_spec:
   language: python
   entrypoint: solution.py

@@ -1,0 +1,34 @@
+title: 'Terraform & IaC: Terraform Workspaces — Automation Practice'
+slug: academy-terraform-017-automation-workspaces-2
+technology: Terraform & IaC
+category: Automation
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Automation lab: remove toil around Terraform workspaces. Codify repeatable
+  steps for env isolation, workspace select, and naming and prove the automation is
+  idempotent.'
+objectives:
+- Day-2 Terraform workspaces work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: Operators still perform manual steps for Terraform workspaces. Automate
+  the boring parts without hiding important safety checks.
+hints:
+- order: 1
+  cost: 10
+  content: Write down the manual checklist. Circle steps that are safe to automate
+    first.
+- order: 2
+  cost: 15
+  content: Implement automation with dry-run/check mode when available. Run it twice
+    — second run should be clean.
+- order: 3
+  cost: 20
+  content: Attach logging and failure notifications. Finish with `# FIXED-OK` in `/opt/fixitlab/academy/academy-terraform-017-automation-workspaces-2.conf`.

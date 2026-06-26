@@ -1,0 +1,38 @@
+title: 'SQLite: Sqlite Schema — Fundamentals Lab'
+slug: academy-sqlite-001-learn-schema
+technology: SQLite
+category: Core Skills
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: database
+time_limit: 900
+max_score: 100
+is_free: true
+infrastructure_type: docker
+jira_priority: Low
+description: This beginner-friendly SQLite lab introduces SQLite schema. You will
+  explore DDL, migrations, and normalization on the SQLite database file. Read the
+  environment first, then complete the guided steps — no prior production experience
+  required.
+objectives:
+- Understand how SQLite schema work in this lab environment
+- Identify the main status and configuration signals for SQLite schema
+- Confirm you can read the current state confidently before changing anything
+initial_state: The SQLite database file is online with a starter SQLite schema setup.
+  Some pieces are intentionally incomplete so you can learn how the pieces fit together.
+  Nothing is on fire yet — focus on observation and understanding.
+hints:
+- order: 1
+  cost: 10
+  content: 'Orient yourself: `.schema`, migration files, and pragma table_info. Write
+    down what looks normal vs missing.'
+- order: 2
+  cost: 15
+  content: Core idea — DDL, migrations, and normalization. Make one small, reversible
+    change at a time and re-check status.
+- order: 3
+  cost: 20
+  content: When the lab objective is done, record completion by adding `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-sqlite-001-learn-schema.conf`, then click Check
+    Solution.

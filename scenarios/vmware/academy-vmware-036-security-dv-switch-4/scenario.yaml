@@ -1,0 +1,38 @@
+title: 'VMware vSphere: Distributed Virtual Switch — Security Practice'
+slug: academy-vmware-036-security-dv-switch-4
+technology: VMware vSphere
+category: Security
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: vmware
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security review: harden distributed virtual switch on this VMware vSphere
+  system. Close unsafe defaults, enforce least privilege, and ensure port groups,
+  uplinks, and private VLANs cannot be abused — without breaking legitimate use.'
+objectives:
+- Unsafe defaults related to distributed virtual switch are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around distributed
+  virtual switch. Assume an auditor or pen test is next week — tighten controls with
+  evidence.
+hints:
+- order: 1
+  cost: 10
+  content: 'Baseline current exposure: vSphere networking view and vmkernel adapters.
+    Note world-readable files, open ports, or excessive roles.'
+- order: 2
+  cost: 15
+  content: Apply least privilege incrementally. Prefer explicit allows over broad
+    wildcards.
+- order: 3
+  cost: 20
+  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
+    in `/opt/fixitlab/academy/academy-vmware-036-security-dv-switch-4.conf` and Check
+    Solution.
+vmware_link: true

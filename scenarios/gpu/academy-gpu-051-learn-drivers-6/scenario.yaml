@@ -1,0 +1,38 @@
+title: 'GPU & NVIDIA: Gpu Drivers — Fundamentals Lab'
+slug: academy-gpu-051-learn-drivers-6
+technology: GPU & NVIDIA
+category: Core Skills
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: This beginner-friendly GPU & NVIDIA lab introduces GPU drivers. You will
+  explore driver/kernel module versions, persistence mode, and device nodes on the
+  GPU node. Read the environment first, then complete the guided steps — no prior
+  production experience required.
+objectives:
+- Understand how GPU drivers work in this lab environment
+- Identify the main status and configuration signals for GPU drivers
+- Confirm you can read the current state confidently before changing anything
+initial_state: The GPU node is online with a starter GPU drivers setup. Some pieces
+  are intentionally incomplete so you can learn how the pieces fit together. Nothing
+  is on fire yet — focus on observation and understanding.
+hints:
+- order: 1
+  cost: 10
+  content: 'Orient yourself: `nvidia-smi`, `dmesg`, and driver package versions. Write
+    down what looks normal vs missing.'
+- order: 2
+  cost: 15
+  content: Core idea — driver/kernel module versions, persistence mode, and device
+    nodes. Make one small, reversible change at a time and re-check status.
+- order: 3
+  cost: 20
+  content: When the lab objective is done, record completion by adding `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-gpu-051-learn-drivers-6.conf`, then click Check
+    Solution.
